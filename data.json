@@ -1,0 +1,78 @@
+{
+    "users": [
+        {
+            "username": "Mike1825",
+            "password_hash": "scrypt:32768:8:1$huGclNHXABMHEcy8$d0f4d42f6d9d3b15b1f5bb9e8542329c7702498ad6d4b770db138286a3d85ff1725e67d01aaa2a783aa71734fa0944bec5da0c485334a27b416b6d5c9de7e688",
+            "role": "Admin"
+        },
+        {
+            "username": "jmenard19",
+            "password_hash": "scrypt:32768:8:1$NXmmyfrZ8mNPHTNu$f6ebea2ddcc2429b29136a329e66bcc66b65d507395417ea898b86d50c74064274305bfcc3c00a51d898930f390f27fba5c0638362bbc4dd8cb87b26fa75fd7f",
+            "role": "Coach"
+        },
+        {
+            "username": "Test",
+            "password_hash": "scrypt:32768:8:1$CGBLbtS8ECHhfTnB$9f68e10f32b23774684b45f33e177ef2696ab318768076da045a45c13a2d329e007b99f619668bc9e5e9bd8921ac770745e3c7d973b3f9e0f0fa01777b854cac",
+            "role": "Coach"
+        }
+    ],
+    "roster": [
+        {
+            "name": "Graham Menard",
+            "number": 3,
+            "position1": "1B",
+            "position2": "P",
+            "throws": "Left",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Reliever"
+        },
+        {
+            "name": "Jack Fordice",
+            "number": "",
+            "position1": "C",
+            "position2": "RF",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher"
+        },
+        {
+            "name": "Rylan Wright",
+            "number": "",
+            "position1": "3B",
+            "position2": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Starter"
+        },
+        {
+            "name": "Reed Evans",
+            "number": "",
+            "position1": "3B",
+            "position2": "P",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Starter"
+        }
+    ],
+    "lineups": [],
+    "pitching": [],
+    "rotations": [],
+    "games": [],
+    "feedback": [],
+    "settings": {
+        "registration_code": "Westfield"
+    },
+    "scouting_list": {
+        "committed": [],
+        "targets": []
+    },
+    "collaboration_notes": {
+        "player_notes": [],
+        "team_notes": []
+    },
+    "practice_plans": []
+}

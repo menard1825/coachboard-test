@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Marucci Prospects 11u - Coach Planner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f9f9f9; }
+    .navbar-brand img { height: 40px; margin-right: 10px; }
+    .nav-tabs .nav-link.active { background-color: #c8102e; color: white; }
+    .nav-tabs .nav-link { color: #c8102e; font-weight: bold; }
+    .btn-primary { background-color: #c8102e; border-color: #c8102e; }
+    .btn-outline-danger { border-color: #c8102e; color: #c8102e; }
+    .btn-outline-danger:hover { background-color: #c8102e; color: white; }
+
+    /* Header Responsiveness */
+    .navbar-brand .brand-text {
+        font-size: 1.25rem;
+        white-space: nowrap;
+    }
+
+    @media (max-width: 768px) {
+        .navbar-brand .brand-text {
+            font-size: 1rem;
+            white-space: normal;
+            line-height: 1.2;
+        }
+        .navbar-brand {
+            padding-right: 0;
+        }
+    }
+    @media (max-width: 480px) {
+        .navbar-brand .brand-text {
+            font-size: 0.9rem;
+        }
+    }
+
+    /* Accordion Style */
+    .accordion-button:not(.collapsed) {
+        background-color: #fcebeb;
+        color: #c8102e;
+    }
+
+    /* Drag and Drop Styles */
+    .lineup-player-item, .player-chip {
+      padding: 8px 12px;
+      margin-bottom: 5px;
+      border: 1px solid #ddd;
+      background-color: #f8f8f8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: .25rem;
+      transition: background-color 0.2s ease;
+      cursor: grab;
+    }
+    .player-chip {
+        background-color: #c8102e;
+        color: white;
+    }
+    .lineup-player-item:hover, .player-chip:hover {
+      background-color: #f0f0f0;
+    }
+    .sortable-ghost {
+      opacity: 0.5;
+      background-color: #e9e9e9;
+      border: 1px dashed #c8102e;
+    }
+    
+    /* Practice Plan and Field Styles */
+    .practice-plan { border-left: 3px solid #c8102e; }
+    .task-item.complete { text-decoration: line-through; opacity: 0.6; }
+    
+    .baseball-field-container {
+        position: relative;
+        width: 100%;
+        max-width: 600px;
+        margin: 20px auto;
+        aspect-ratio: 1 / 1;
+        background-color: #4A7729; /* Outfield grass */
+        overflow: hidden;
+        border-radius: 0 0 50% 50% / 0 0 20% 20%;
+    }
+    .infield {
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%) rotate(45deg);
+        width: 70%;
+        height: 70%;
+        background-color: #C19A6B; /* Infield dirt */
+        border: 2px solid #fff;
+    }
+    .pitchers-mound {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 18%;
+        height: 18%;
+        background-color: #C19A6B;
+        border-radius: 50%;
+        border: 2px solid #fff;
+    }
+    .home-plate {
+        position: absolute;
+        bottom: 5%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 8%;
+        height: 8%;
+        background-color: white;
+        clip-path: polygon(0 0, 100% 0, 100% 50%, 50% 100%, 0 50%);
+    }
+
+    .position-marker {
+        position: absolute;
+        width: 80px;
+        min-height: 55px;
+        border: 1px dashed #666;
+        border-radius: 5px;
+        padding: 2px;
+        background-color: rgba(255, 255, 255, 0.8);
+        text-align: center;
+        z-index: 10;
+    }
+    .position-label { font-weight: bold; font-size: 0.8em; }
+
+    .player-chip {
+        padding: 4px 8px;
+        margin: 2px !important;
+    }
+    
+    /* Positioning based on the new field */
+    #pos-p { top: 62%; left: 50%; transform: translate(-50%, -50%); }
+    #pos-c { top: 85%; left: 50%; transform: translate(-50%, -50%); }
+    #pos-1b { top: 62%; left: 75%; transform: translate(-50%, -50%); }
+    #pos-2b { top: 48%; left: 63%; transform: translate(-50%, -50%); }
+    #pos-3b { top: 62%; left: 25%; transform: translate(-50%, -50%); }
+    #pos-ss { top: 48%; left: 37%; transform: translate(-50%, -50%); }
+    #pos-lf { top: 25%; left: 18%; transform: translate(-50%, -50%); }
+    #pos-cf { top: 15%; left: 50%; transform: translate(-50%, -50%); }
+    #pos-rf { top: 25%; left: 82%; transform: translate(-50%, -50%); }
+    
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom mb-3 px-3">
+  <a class="navbar-brand d-flex align-items-center" href="#">
+    <img src="/static/logo.png" alt="Team Logo">
+    <span class="fw-bold brand-text">Marucci Prospects 11u - Coach Planner</span>
+  </a>
+  <div class="ms-auto d-flex align-items-center">
+    {% if session.role == 'Admin' %}
+      <a href="{{ url_for('user_management') }}" class="btn btn-info me-2">User Management</a>
+      <a href="{{ url_for('admin_settings') }}" class="btn btn-secondary me-3">Admin Settings</a>
+    {% endif %}
+      <span class="navbar-text me-3">Welcome, {{ session.username }}!</span>
+      <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Logout</a>
+  </div>
+</nav>
+
+<div class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
+    <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#roster">Roster</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#lineups">Lineups</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#pitching">Pitching</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#scouting_list">Scouting List</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#rotations">Rotations</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#games">Games</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#collaboration">Collaboration</a></li>
+    <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#practice_plan">Practice Plan</a></li>
+  </ul>
+
+  <div class="tab-content">
+    <div class="tab-pane fade show active" id="roster">
+        <h4 class="mb-3">Current Roster</h4>
+        <div class="accordion" id="rosterAccordion">
+            {% for p in data.roster %}
+            <div class="accordion-item" data-player-index="{{ loop.index0 }}">
+                <h2 class="accordion-header" id="heading-{{ loop.index0 }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ loop.index0 }}" aria-expanded="false" aria-controls="collapse-{{ loop.index0 }}">
+                        <strong>{{ p.name }}</strong>&nbsp;(#{{ p.number }})
+                    </button>
+                </h2>
+                <div id="collapse-{{ loop.index0 }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ loop.index0 }}" data-bs-parent="#rosterAccordion">
+                    <div class="accordion-body">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-12 col-md-5">
+                                <label for="name_{{ loop.index0 }}" class="form-label visually-hidden">Name</label>
+                                <input type="text" class="form-control" name="name" id="name_{{ loop.index0 }}" value="{{ p.name }}" placeholder="Name">
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label for="number_{{ loop.index0 }}" class="form-label visually-hidden">J#</label>
+                                <input type="number" class="form-control" name="number" id="number_{{ loop.index0 }}" value="{{ p.number }}" placeholder="J#">
+                            </div>
+                            <div class="col-6 col-md-5 text-end">
+                                <label for="position1_{{ loop.index0 }}" class="form-label small text-muted mb-0">Pos1:</label>
+                                <select name="position1" id="position1_{{ loop.index0 }}" class="form-select form-select-sm d-inline-block w-auto" style="min-width: 80px;" title="Primary Position">
+                                    <option value="" {% if p.position1 == "" %}selected{% endif %}>Select</option>
+                                    <option value="P" {% if p.position1 == "P" %}selected{% endif %}>P</option>
+                                    <option value="C" {% if p.position1 == "C" %}selected{% endif %}>C</option>
+                                    <option value="1B" {% if p.position1 == "1B" %}selected{% endif %}>1B</option>
+                                    <option value="2B" {% if p.position1 == "2B" %}selected{% endif %}>2B</option>
+                                    <option value="3B" {% if p.position1 == "3B" %}selected{% endif %}>3B</option>
+                                    <option value="SS" {% if p.position1 == "SS" %}selected{% endif %}>SS</option>
+                                    <option value="LF" {% if p.position1 == "LF" %}selected{% endif %}>LF</option>
+                                    <option value="CF" {% if p.position1 == "CF" %}selected{% endif %}>CF</option>
+                                    <option value="RF" {% if p.position1 == "RF" %}selected{% endif %}>RF</option>
+                                    <option value="DH" {% if p.position1 == "DH" %}selected{% endif %}>DH</option>
+                                </select>
+                                <label for="position2_{{ loop.index0 }}" class="form-label small text-muted mb-0">Pos2:</label>
+                                <select name="position2" id="position2_{{ loop.index0 }}" class="form-select form-select-sm d-inline-block w-auto" style="min-width: 80px;" title="Secondary Position">
+                                    <option value="" {% if p.position2 == "" %}selected{% endif %}>Select</option>
+                                    <option value="P" {% if p.position2 == "P" %}selected{% endif %}>P</option>
+                                    <option value="C" {% if p.position2 == "C" %}selected{% endif %}>C</option>
+                                    <option value="1B" {% if p.position2 == "1B" %}selected{% endif %}>1B</option>
+                                    <option value="2B" {% if p.position2 == "2B" %}selected{% endif %}>2B</option>
+                                    <option value="3B" {% if p.position2 == "3B" %}selected{% endif %}>3B</option>
+                                    <option value="SS" {% if p.position2 == "SS" %}selected{% endif %}>SS</option>
+                                    <option value="LF" {% if p.position2 == "LF" %}selected{% endif %}>LF</option>
+                                    <option value="CF" {% if p.position2 == "CF" %}selected{% endif %}>CF</option>
+                                    <option value="RF" {% if p.position2 == "RF" %}selected{% endif %}>RF</option>
+                                    <option value="DH" {% if p.position2 == "DH" %}selected{% endif %}>DH</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label for="throws_{{ loop.index0 }}" class="form-label small text-muted mb-0">Throws:</label>
+                                <select name="throws" id="throws_{{ loop.index0 }}" class="form-select form-select-sm d-inline-block w-auto" style="min-width: 80px;" title="Throws">
+                                    <option value="" {% if p.throws == "" %}selected{% endif %}>Select</option>
+                                    <option value="Right" {% if p.throws == "Right" %}selected{% endif %}>Right</option>
+                                    <option value="Left" {% if p.throws == "Left" %}selected{% endif %}>Left</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label for="bats_{{ loop.index0 }}" class="form-label small text-muted mb-0">Bats:</label>
+                                <select name="bats" id="bats_{{ loop.index0 }}" class="form-select form-select-sm d-inline-block w-auto" style="min-width: 80px;" title="Bats">
+                                    <option value="" {% if p.bats == "" %}selected{% endif %}>Select</option>
+                                    <option value="Right" {% if p.bats == "Right" %}selected{% endif %}>Right</option>
+                                    <option value="Left" {% if p.bats == "Left" %}selected{% endif %}>Left</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="pitcher_role_{{ loop.index0 }}" class="form-label small text-muted mb-0">Pitcher Role:</label>
+                                <select name="pitcher_role" id="pitcher_role_{{ loop.index0 }}" class="form-select form-select-sm d-inline-block w-auto" title="Pitcher Role">
+                                    <option value="Not a Pitcher" {% if p.pitcher_role == "Not a Pitcher" %}selected{% endif %}>Not a Pitcher</option>
+                                    <option value="Starter" {% if p.pitcher_role == "Starter" %}selected{% endif %}>Starter</option>
+                                    <option value="Reliever" {% if p.pitcher_role == "Reliever" %}selected{% endif %}>Reliever</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-8">
+                                <label for="notes_{{ loop.index0 }}" class="form-label visually-hidden">Notes</label>
+                                <textarea class="form-control" name="notes" id="notes_{{ loop.index0 }}" rows="2" placeholder="Notes">{{ p.notes }}</textarea>
+                            </div>
+                            <div class="col-12 col-md-4 d-flex justify-content-end">
+                                <button type="button" class="btn btn-sm btn-success me-2 save-player-btn">Save</button>
+                                <a href="/delete_player/{{ loop.index0 }}?active_tab=#roster" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this player?');">Remove</a>
+                            </div>
+                          </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <hr class="my-4">
+        <div class="accordion" id="addPlayerAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingAddPlayer">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAddPlayer" aria-expanded="false" aria-controls="collapseAddPlayer">
+                        Add New Player
+                    </button>
+                </h2>
+                <div id="collapseAddPlayer" class="accordion-collapse collapse" aria-labelledby="headingAddPlayer" data-bs-parent="#addPlayerAccordion">
+                    <div class="accordion-body">
+                        <form id="addPlayerForm" action="/add_player_inline" method="POST" class="row g-2">
+                            <input type="hidden" name="active_tab" value="" class="active-tab-input">
+                            <div class="col-md-6"><input type="text" name="name" class="form-control" placeholder="Name" required></div>
+                            <div class="col-md-6"><input type="number" name="number" class="form-control" placeholder="Number" required></div>
+                            <div class="col-md-6">
+                                <label for="position1_add" class="form-label visually-hidden">Primary Position</label>
+                                <select name="position1" id="position1_add" class="form-select" title="Primary Position">
+                                    <option value="">Primary Position</option>
+                                    <option value="P">P</option>
+                                    <option value="C">C</option>
+                                    <option value="1B">1B</option>
+                                    <option value="2B">2B</option>
+                                    <option value="3B">3B</option>
+                                    <option value="SS">SS</option>
+                                    <option value="LF">LF</option>
+                                    <option value="CF">CF</option>
+                                    <option value="RF">RF</option>
+                                    <option value="DH">DH</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="position2_add" class="form-label visually-hidden">Secondary Position</label>
+                                <select name="position2" id="position2_add" class="form-select" title="Secondary Position">
+                                    <option value="">Secondary Position</option>
+                                    <option value="P">P</option>
+                                    <option value="C">C</option>
+                                    <option value="1B">1B</option>
+                                    <option value="2B">2B</option>
+                                    <option value="3B">3B</option>
+                                    <option value="SS">SS</option>
+                                    <option value="LF">LF</option>
+                                    <option value="CF">CF</option>
+                                    <option value="RF">RF</option>
+                                    <option value="DH">DH</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="throws_add" class="form-label small text-muted mb-0">Throws:</label>
+                                <select name="throws" id="throws_add" class="form-select" title="Throws">
+                                    <option value="">Select</option>
+                                    <option value="Right">Right</option>
+                                    <option value="Left">Left</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="bats_add" class="form-label small text-muted mb-0">Bats:</label>
+                                <select name="bats" id="bats_add" class="form-select" title="Bats">
+                                    <option value="">Select</option>
+                                    <option value="Right">Right</option>
+                                    <option value="Left">Left</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="pitcher_role_add" class="form-label small text-muted mb-0">Pitcher Role:</label>
+                                <select name="pitcher_role" id="pitcher_role_add" class="form-select" title="Pitcher Role">
+                                    <option value="Not a Pitcher">Not a Pitcher</option>
+                                    <option value="Starter">Starter</option>
+                                    <option value="Reliever">Reliever</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label for="notes_add" class="form-label visually-hidden">Notes</label>
+                                <textarea name="notes" id="notes_add" class="form-control" rows="3" placeholder="Coaching notes on player"></textarea>
+                            </div>
+                            <div class="col-12"><button type="submit" class="btn btn-primary w-100">Add Player</button></div>
+                          </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tab-pane fade" id="lineups">
+      <h4>Create New Lineup</h4>
+      <form action="/add_lineup" method="POST" class="mb-3">
+        <input type="hidden" name="active_tab" value="#lineups" class="active-tab-input">
+        <input type="text" name="lineup_title" class="form-control mb-2" placeholder="Lineup Title" required>
+        <div class="mb-2">
+          <strong>Select Players for Lineup:</strong>
+          {% for player in data.roster %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="lineup_player" value="{{ player.name }}">
+            <label class="form-check-label">{{ player.name }} (#{{ player.number }})</label>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary mt-2">Save New Lineup</button>
+      </form>
+      <hr>
+      <h4 class="mt-4">Saved Lineups</h4>
+      <ul class="list-group">
+        {% for l in data.lineups %}
+        <li class="list-group-item" data-lineup-index="{{ loop.index0 }}" data-lineup-title="{{ l.title }}">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>{{ l.title }}</strong>
+            <div>
+              <button class="btn btn-sm btn-info me-2" data-bs-toggle="modal" data-bs-target="#editLineupModal"
+                      data-lineup-index="{{ loop.index0 }}" data-lineup-title="{{ l.title }}" data-lineup-players="{{ l.players | tojson | urlencode }}">
+                Edit
+              </button>
+              <a href="/delete_lineup/{{ loop.index0 }}?active_tab=#lineups" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this lineup?');">Delete</a>
+            </div>
+          </div>
+          <ol class="list-group list-group-numbered">
+            {% for player in l.players %}
+            <li class="list-group-item">{{ player.name }}</li>
+            {% endfor %}
+          </ol>
+        </li>
+        {% else %}
+        <li class="list-group-item">No lineups saved yet.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="tab-pane fade" id="pitching">
+      <h4>Pitching Tracker</h4>
+      <form action="/add_pitching" method="POST" class="row g-2 mb-3">
+        <input type="hidden" name="active_tab" value="#pitching" class="active-tab-input">
+        <div class="col-md-6"><input type="date" name="pitch_date" class="form-control" required title="Pitch Date"></div>
+        <div class="col-md-6">
+          <select name="pitcher" class="form-select" required title="Select Pitcher">
+            <option value="">Select Pitcher</option>
+            {% for player in data.roster %}
+            <option value="{{ player.name }}">{{ player.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6"><input type="text" name="opponent" class="form-control" placeholder="Opponent" required></div>
+        <div class="col-md-6">
+            <select name="pitcher_type" class="form-select" title="Pitcher Type">
+                <option value="Starter">Starting Pitcher</option>
+                <option value="Reliever">Relief Pitcher</option>
+            </select>
+        </div>
+        <div class="col-md-6"><input type="number" name="pitches" class="form-control" placeholder="Pitch Count" required></div>
+        <div class="col-md-6"><input type="text" name="innings" class="form-control" placeholder="Innings Pitched (e.g., 3.0 or 2.1)" required></div>
+        <div class="col-12"><button type="submit" class="btn btn-primary w-100">Add Outing</button></div>
+      </form>
+      <hr>
+      <h5>Recorded Outings</h5>
+      <ul class="list-group">
+        {% for outing in data.pitching %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ outing.date }}: <strong>{{ outing.pitcher }}</strong> ({{ outing.pitcher_type }}) vs {{ outing.opponent }} - {{ outing.pitches }} pitches ({{ outing.innings }} IP)</span>
+          <a href="/delete_pitching/{{ loop.index0 }}?active_tab=#pitching" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this pitching outing?');">Delete</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="tab-pane fade" id="scouting_list">
+      <h4>Add Player to Scouting List</h4>
+      <form action="/add_scouted_player" method="POST" class="row g-3 mb-4">
+        <input type="hidden" name="active_tab" value="#scouting_list" class="active-tab-input">
+        <div class="col-md-6">
+            <input type="text" name="scouted_player_name" class="form-control" placeholder="Player Name" required>
+        </div>
+        <div class="col-md-6">
+          <select name="scouted_player_type" class="form-select" required title="Scouting List Type">
+            <option value="targets">Target Player</option>
+            <option value="committed">Committed Player</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+            <select name="scouted_player_pos1" class="form-select" title="Primary Position">
+                <option value="">Primary Position (Optional)</option>
+                <option value="P">P</option>
+                <option value="C">C</option>
+                <option value="1B">1B</option>
+                <option value="2B">2B</option>
+                <option value="3B">3B</option>
+                <option value="SS">SS</option>
+                <option value="LF">LF</option>
+                <option value="CF">CF</option>
+                <option value="RF">RF</option>
+                <option value="DH">DH</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <select name="scouted_player_pos2" class="form-select" title="Secondary Position">
+                <option value="">Secondary Position (Optional)</option>
+                <option value="P">P</option>
+                <option value="C">C</option>
+                <option value="1B">1B</option>
+                <option value="2B">2B</option>
+                <option value="3B">3B</option>
+                <option value="SS">SS</option>
+                <option value="LF">LF</option>
+                <option value="CF">CF</option>
+                <option value="RF">RF</option>
+                <option value="DH">DH</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <select name="scouted_player_throws" class="form-select" title="Throws">
+                <option value="">Throws (Optional)</option>
+                <option value="Right">Right</option>
+                <option value="Left">Left</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <select name="scouted_player_bats" class="form-select" title="Bats">
+                <option value="">Bats (Optional)</option>
+                <option value="Right">Right</option>
+                <option value="Left">Left</option>
+            </select>
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary w-100">Add to Scouting List</button>
+        </div>
+      </form>
+
+      <h5 class="mt-4">Committed Players</h5>
+      <ul class="list-group mb-4">
+        {% for player in data.scouting_list.committed %}
+        <li class="list-group-item">
+          <div class="d-flex justify-content-between align-items-center">
+            <span>
+                <strong>{{ player.name }}</strong>
+                <small class="text-muted d-block">
+                    {% if player.position1 or player.position2 %}Pos: {{ player.position1 }}{% if player.position2 %}/{{player.position2}}{% endif %} | {% endif %}
+                    {% if player.throws %}T: {{ player.throws[0] }}{% endif %}{% if player.bats %} B: {{ player.bats[0] }}{% endif %}
+                </small>
+            </span>
+            <div>
+              <form action="{{ url_for('move_scouted_player_to_roster', index=loop.index0) }}" method="POST" class="d-inline">
+                <input type="hidden" name="active_tab" value="#scouting_list" class="active-tab-input">
+                <button type="submit" class="btn btn-sm btn-success me-2">Move to Roster</button>
+              </form>
+              <form action="{{ url_for('move_scouted_player', from_type='committed', to_type='targets', index=loop.index0) }}" method="POST" class="d-inline">
+                <input type="hidden" name="active_tab" value="#scouting_list" class="active-tab-input">
+                <button type="submit" class="btn btn-sm btn-secondary me-2">Move to Targets</button>
+              </form>
+              <a href="{{ url_for('remove_scouted_player', scouted_player_type='committed', index=loop.index0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to remove this player?');">Remove</a>
+            </div>
+          </div>
+        </li>
+        {% else %}
+        <li class="list-group-item">No committed players.</li>
+        {% endfor %}
+      </ul>
+
+    <h5 class="mt-4">Target Players</h5>
+      <ul class="list-group">
+        {% for player in data.scouting_list.targets %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>
+                <strong>{{ player.name }}</strong>
+                <small class="text-muted d-block">
+                    {% if player.position1 or player.position2 %}Pos: {{ player.position1 }}{% if player.position2 %}/{{player.position2}}{% endif %} | {% endif %}
+                    {% if player.throws %}T: {{ player.throws[0] }}{% endif %}{% if player.bats %} B: {{ player.bats[0] }}{% endif %}
+                </small>
+            </span>
+            <div>
+              <form action="{{ url_for('move_scouted_player', from_type='targets', to_type='committed', index=loop.index0) }}" method="POST" class="d-inline">
+                <input type="hidden" name="active_tab" value="#scouting_list" class="active-tab-input">
+                <button type="submit" class="btn btn-sm btn-primary me-2">Move to Committed</button>
+              </form>
+              <a href="{{ url_for('remove_scouted_player', scouted_player_type='targets', index=loop.index0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to remove this player?');">Remove</a>
+            </div>
+        </li>
+        {% else %}
+        <li class="list-group-item">No target players.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="tab-pane fade" id="rotations">
+      <div class="row">
+        <div class="col-lg-8">
+          <h4>Defensive Rotation</h4>
+          <div class="baseball-field-container">
+            <div class="infield"></div>
+            <div class="pitchers-mound"></div>
+            <div class="home-plate"></div>
+            {% set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
+            {% for pos in positions %}
+            <div id="pos-{{ pos.lower() }}" class="position-marker" data-position="{{ pos }}">
+              <div class="position-label">{{ pos }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="accordion" id="rotationsAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingAvailablePlayers">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAvailablePlayers" aria-expanded="true" aria-controls="collapseAvailablePlayers">
+                        Available Players
+                    </button>
+                </h2>
+                <div id="collapseAvailablePlayers" class="accordion-collapse collapse show" aria-labelledby="headingAvailablePlayers" data-bs-parent="#rotationsAccordion">
+                    <div class="accordion-body">
+                        <div id="available-players" class="list-group" style="min-height: 150px;">
+                            {% for p in data.roster %}
+                            <div class="player-chip" data-player-name="{{ p.name }}">{{ p.name }} (#{{ p.number }})</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingSaveRotation">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSaveRotation" aria-expanded="false" aria-controls="collapseSaveRotation">
+                        Save/Load Rotation
+                    </button>
+                </h2>
+                <div id="collapseSaveRotation" class="accordion-collapse collapse" aria-labelledby="headingSaveRotation" data-bs-parent="#rotationsAccordion">
+                    <div class="accordion-body">
+                        <input type="text" id="rotation-title" class="form-control mb-2" placeholder="Rotation Title (e.g., vs. Tigers)">
+                        <button id="save-rotation-btn" class="btn btn-primary w-100 mb-3">Save Current Rotation</button>
+                        <hr>
+                        <h6>Saved Rotations</h6>
+                        <ul class="list-group">
+                            {% for r in data.rotations %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ r.title }}
+                                <div>
+                                    <button class="btn btn-sm btn-success me-2 load-rotation-btn" data-rotation-id="{{ r.id }}">Load</button>
+                                    <a href="/delete_rotation/{{ r.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">&times;</a>
+                                </div>
+                            </li>
+                            {% else %}
+                            <li class="list-group-item">No saved rotations.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="tab-pane fade" id="games">
+      </div>
+    
+    <div class="tab-pane fade" id="collaboration">
+      </div>
+    
+    <div class="tab-pane fade" id="practice_plan">
+      </div>
+
+  </div>
+</div>
+
+<div class="modal fade" id="editLineupModal" tabindex="-1" aria-labelledby="editLineupModalLabel" aria-hidden="true">
+  </div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  // --- Sticky Tabs Logic ---
+  const mainTabs = document.getElementById('mainTabs');
+  const activeTabInputs = document.querySelectorAll('.active-tab-input');
+  function setActiveTabInput() {
+    const activeTabLink = mainTabs.querySelector('.nav-link.active');
+    if (activeTabLink) {
+      const activeTabId = activeTabLink.getAttribute('href');
+      activeTabInputs.forEach(input => { input.value = activeTabId; });
+    }
+  }
+  const urlHash = window.location.hash;
+  if (urlHash) {
+    const tabLink = mainTabs.querySelector(`.nav-link[href="${urlHash}"]`);
+    if (tabLink) { new bootstrap.Tab(tabLink).show(); }
+  }
+  mainTabs.addEventListener('shown.bs.tab', setActiveTabInput);
+  document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', setActiveTabInput);
+  });
+  setActiveTabInput();
+  
+  // --- Inline Player Editing Logic ---
+  const rosterAccordion = document.getElementById('rosterAccordion');
+  if (rosterAccordion) {
+      rosterAccordion.addEventListener('click', function(event) {
+        if (event.target.classList.contains('save-player-btn')) {
+          const accordionItem = event.target.closest('.accordion-item');
+          const playerIndex = accordionItem.dataset.playerIndex;
+          const updatedPlayer = {
+            name: accordionItem.querySelector('input[name="name"]').value,
+            number: accordionItem.querySelector('input[name="number"]').value,
+            position1: accordionItem.querySelector('select[name="position1"]').value,
+            position2: accordionItem.querySelector('select[name="position2"]').value,
+            throws: accordionItem.querySelector('select[name="throws"]').value,
+            bats: accordionItem.querySelector('select[name="bats"]').value,
+            pitcher_role: accordionItem.querySelector('select[name="pitcher_role"]').value,
+            notes: accordionItem.querySelector('textarea[name="notes"]').value
+          };
+          const actionUrl = `/update_player_inline/${playerIndex}`;
+          const formData = new URLSearchParams(updatedPlayer);
+          
+          fetch(actionUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData
+          })
+          .then(response => {
+              if (!response.ok) { return response.json().then(errData => { throw new Error(errData.message); }); }
+              return response.json();
+          })
+          .then(data => {
+              if (data.status === 'success') {
+                  alert(data.message);
+                  window.location.reload();
+              }
+          })
+          .catch(error => {
+            console.error('Fetch error:', error.message);
+            alert(`Error: ${error.message}`);
+          });
+        }
+      });
+  }
+
+  const addPlayerForm = document.getElementById('addPlayerForm');
+  if(addPlayerForm) {
+      addPlayerForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new URLSearchParams(new FormData(form));
+
+        fetch('/add_player_inline', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) { return response.json().then(errData => { throw new Error(errData.message); });}
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                alert('Player added successfully!');
+                window.location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error for add player:', error.message);
+            alert(`Error: ${error.message}`);
+        });
+      });
+  }
+  
+    // --- Rotations Drag-and-Drop Logic ---
+    const availablePlayersList = document.getElementById('available-players');
+    const positionMarkers = document.querySelectorAll('.position-marker');
+
+    if(availablePlayersList){
+        new Sortable(availablePlayersList, {
+            group: 'rotation-group',
+            animation: 150,
+            sort: false
+        });
+
+        positionMarkers.forEach(marker => {
+            new Sortable(marker, {
+                group: 'rotation-group',
+                animation: 150,
+                onAdd: function (evt) {
+                    if (evt.to.children.length > 2) { 
+                        evt.from.appendChild(evt.to.children[1]);
+                    }
+                }
+            });
+        });
+        
+        document.getElementById('save-rotation-btn').addEventListener('click', function() {
+            const title = document.getElementById('rotation-title').value;
+            if (!title) {
+                alert('Please enter a title for the rotation.');
+                return;
+            }
+
+            const positions = {};
+            document.querySelectorAll('.position-marker').forEach(marker => {
+                const position = marker.dataset.position;
+                const playerChip = marker.querySelector('.player-chip');
+                positions[position] = playerChip ? playerChip.dataset.playerName : null;
+            });
+
+            fetch('/save_rotation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title, positions: positions })
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.status === 'success') {
+                      alert(data.message);
+                      window.location.reload();
+                  } else {
+                      alert('Error saving rotation.');
+                  }
+              });
+        });
+
+        document.querySelectorAll('.load-rotation-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const rotationId = this.dataset.rotationId;
+                const savedRotation = {{ data.rotations | tojson }}.find(r => r.id == rotationId);
+                
+                if (savedRotation) {
+                    sessionStorage.setItem('loadedRotationId', rotationId); // Store loaded rotation
+                    loadRotation(savedRotation);
+                    alert(`Rotation "${savedRotation.title}" loaded.`);
+                }
+            });
+        });
+        
+        function loadRotation(rotationData) {
+            document.querySelectorAll('.position-marker .player-chip').forEach(chip => chip.remove());
+            const availablePlayersContainer = document.getElementById('available-players');
+            availablePlayersContainer.innerHTML = '';
+            
+            let rosterPlayers = {{ data.roster | tojson }};
+            let assignedPlayers = Object.values(rotationData.positions);
+            
+            rosterPlayers.forEach(player => {
+                if (!assignedPlayers.includes(player.name)) {
+                    const playerChip = document.createElement('div');
+                    playerChip.className = 'player-chip';
+                    playerChip.dataset.playerName = player.name;
+                    playerChip.textContent = `${player.name} (#${player.number})`;
+                    availablePlayersContainer.appendChild(playerChip);
+                }
+            });
+
+            for (const pos in rotationData.positions) {
+                const playerName = rotationData.positions[pos];
+                if (playerName) {
+                    const playerInfo = rosterPlayers.find(p => p.name === playerName);
+                    const playerChip = document.createElement('div');
+                    playerChip.className = 'player-chip';
+                    playerChip.dataset.playerName = playerName;
+                    playerChip.textContent = `${playerName} (#${playerInfo.number})`;
+                    document.getElementById(`pos-${pos.toLowerCase()}`).appendChild(playerChip);
+                }
+            }
+            document.getElementById('rotation-title').value = rotationData.title;
+        }
+
+        const loadedRotationId = sessionStorage.getItem('loadedRotationId');
+        if (loadedRotationId) {
+            const savedRotation = {{ data.rotations | tojson }}.find(r => r.id == loadedRotationId);
+            if (savedRotation) {
+                loadRotation(savedRotation);
+            }
+        }
+    }
+});
+</script>
+</body>
+</html>

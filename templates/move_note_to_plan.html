@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Move Note to Practice Plan</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f9f9f9; }
+    .btn-primary { background-color: #c8102e; border-color: #c8102e; }
+  </style>
+</head>
+<body>
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <h2>Move Note to Practice Plan</h2>
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Note to Move:</h5>
+          <p class="card-text">"{{ note.text }}"</p>
+          <small class="text-muted">By {{ note.author }}</small>
+        </div>
+      </div>
+      <form method="POST" action="{{ url_for('move_note_to_practice_plan', note_type=note_type, note_index=note_index) }}">
+        <div class="mb-3">
+          <label for="plan_id" class="form-label">Select a Practice Plan to Add This Note To:</label>
+          <select name="plan_id" id="plan_id" class="form-select" required>
+            <option value="">Select a Plan...</option>
+            {% for plan in practice_plans %}
+              <option value="{{ plan.id }}">{{ plan.date }} - {{ plan.general_notes|truncate(30) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Add to Plan</button>
+        <a href="{{ url_for('home') }}#collaboration" class="btn btn-secondary">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+</body>
+</html>
