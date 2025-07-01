@@ -129,19 +129,20 @@
         }
     ],
     "scouting_list": {
-        "committed": [],
+        "committed": [
+            {
+                "name": "Jack Fordice",
+                "position1": "OF",
+                "position2": "1B",
+                "throws": "Right",
+                "bats": "Right"
+            }
+        ],
         "targets": [
             {
                 "name": "Luke Charles",
                 "position1": "C",
                 "position2": "",
-                "throws": "Right",
-                "bats": "Right"
-            },
-            {
-                "name": "Jack Fordice",
-                "position1": "OF",
-                "position2": "1B",
                 "throws": "Right",
                 "bats": "Right"
             }

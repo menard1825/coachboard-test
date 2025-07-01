@@ -197,7 +197,7 @@ def home():
         'scouting_list': 'Scouting List', 
         'rotations': 'Rotations',
         'games': 'Games', 
-        'collaboration': 'Collaboration', 
+        'collaboration': 'Coaches Log', 
         'practice_plan': 'Practice Plan',
         'signs': 'Signs'
     }

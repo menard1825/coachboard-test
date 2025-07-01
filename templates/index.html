@@ -492,7 +492,7 @@
     </div>
       
     <div class="tab-pane fade" id="collaboration">
-        <h4>Collaboration Notes</h4>
+        <h4>Coaches Log</h4>
         <div class="row">
             <div class="col-md-6">
                 <h5>Team Notes</h5>
@@ -537,7 +537,17 @@
                         <p class="card-text">{{ note.text }}</p>
                         <small class="text-muted">By {{ note.author }} on {{ note.timestamp }}</small>
                         {% if session.username == note.author or session.role == 'Admin' %}
-                        <a href="{{ url_for('delete_note', note_type='player_notes', index=loop.index0) }}" class="btn btn-sm btn-outline-danger float-end" onclick="return confirm('Are you sure?');">Delete</a>
+                        <div class="float-end">
+                            <button class="btn btn-sm btn-success me-2" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#editFocusModal"
+                                    data-action="add"
+                                    data-player-name="{{ note.player_name }}"
+                                    data-focus-text="{{ note.text }}">
+                                Create Goal
+                            </button>
+                            <a href="{{ url_for('delete_note', note_type='player_notes', index=loop.index0) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
+                        </div>
                         {% endif %}
                     </div>
                 </div>
@@ -816,25 +826,45 @@ document.addEventListener('DOMContentLoaded', () => {
             const notesInput = form.querySelector('#editFocusNotes');
             const completeBtn = editFocusModalEl.querySelector('#completeFocusBtn');
 
-            skillInput.value = skill;
-            const skillTitle = skill.charAt(0).toUpperCase() + skill.slice(1);
+            const skillTitle = skill ? skill.charAt(0).toUpperCase() + skill.slice(1) : '';
 
             if (action === 'add') {
-                modalTitle.textContent = `Add New ${skillTitle} Focus for ${playerName}`;
+                modalTitle.textContent = `Add New Focus for ${playerName}`;
                 form.action = `/add_focus/${playerName}`;
-                focusTextInput.value = '';
+                focusTextInput.value = button.dataset.focusText || '';
                 notesInput.value = '';
                 completeBtn.style.display = 'none';
+
+                const skillSelectHTML = `
+                    <div class="mb-3" id="skillSelectWrapper">
+                        <label for="editFocusSkillSelect" class="form-label">Skill Category</label>
+                        <select name="skill" id="editFocusSkillSelect" class="form-select" required>
+                            <option value="hitting">Hitting</option>
+                            <option value="pitching">Pitching</option>
+                            <option value="fielding">Fielding</option>
+                            <option value="baserunning">Baserunning</option>
+                        </select>
+                    </div>
+                `;
+                if (!form.querySelector('#skillSelectWrapper')) {
+                    form.querySelector('.modal-body').insertAdjacentHTML('afterbegin', skillSelectHTML);
+                }
             } else { // 'edit'
                 modalTitle.textContent = `Edit Active ${skillTitle} Focus for ${playerName}`;
                 form.action = `/update_focus/${focusId}`;
                 completeForm.action = `/complete_focus/${focusId}`;
                 completeBtn.style.display = 'block';
+                skillInput.value = skill;
 
                 const focusItem = ALL_DEV_DATA[playerName]?.[skill]?.find(f => f.id == focusId);
                 if(focusItem) {
                     focusTextInput.value = focusItem.focus;
                     notesInput.value = focusItem.notes;
+                }
+
+                const skillSelectWrapper = form.querySelector('#skillSelectWrapper');
+                if (skillSelectWrapper) {
+                    skillSelectWrapper.remove();
                 }
             }
         });
