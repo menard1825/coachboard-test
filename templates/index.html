@@ -36,29 +36,10 @@
     .accordion-button:not(.collapsed) { background-color: #fcebeb; color: #c8102e; }
     .practice-plan { border-left: 3px solid #c8102e; }
     .task-item.complete { text-decoration: line-through; opacity: 0.6; }
-    .baseball-field-container { position: relative; width: 100%; max-width: 600px; margin: 10px auto; aspect-ratio: 1 / 1; background-color: #4A7729; overflow: hidden; border-radius: 0 0 50% 50% / 0 0 20% 20%; }
-    .infield { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%) rotate(45deg); width: 70%; height: 70%; background-color: #C19A6B; border: 2px solid #fff; }
-    .pitchers-mound { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 18%; height: 18%; background-color: #C19A6B; border-radius: 50%; border: 2px solid #fff; }
-    .home-plate { position: absolute; bottom: 5%; left: 50%; transform: translateX(-50%); width: 8%; height: 8%; background-color: white; clip-path: polygon(0 0, 100% 0, 100% 50%, 50% 100%, 0 50%); }
-    .position-marker { position: absolute; width: 80px; min-height: 60px; border: 2px dashed #666; border-radius: 8px; padding: 4px; background-color: rgba(255, 255, 255, 0.85); text-align: center; z-index: 10; cursor: pointer; transition: background-color 0.2s ease; }
-    .position-marker:hover { background-color: rgba(230, 230, 230, 0.95); }
-    .position-label { font-weight: bold; font-size: 0.9em; margin-bottom: 2px; }
-    .player-assignment { font-size: 0.85em; font-weight: bold; color: #333; }
-    .inning-tabs .nav-link { padding: 0.5rem 0.8rem; color: #c8102e; background-color: #fff; border: 1px solid #dee2e6; }
-    .inning-tabs .nav-link.active { color: #fff; background-color: #c8102e; border-color: #c8102e; }
-    #pos-p { top: 62%; left: 50%; transform: translate(-50%, -50%); }
-    #pos-c { top: 85%; left: 50%; transform: translate(-50%, -50%); }
-    #pos-1b { top: 62%; left: 75%; transform: translate(-50%, -50%); }
-    #pos-2b { top: 48%; left: 63%; transform: translate(-50%, -50%); }
-    #pos-3b { top: 62%; left: 25%; transform: translate(-50%, -50%); }
-    #pos-ss { top: 48%; left: 37%; transform: translate(-50%, -50%); }
-    #pos-lf { top: 25%; left: 18%; transform: translate(-50%, -50%); }
-    #pos-cf { top: 15%; left: 50%; transform: translate(-50%, -50%); }
-    #pos-rf { top: 25%; left: 82%; transform: translate(-50%, -50%); }
-    .progress-bar { transition: width .6s ease; }
+    .focus-item-notes { font-size: 0.9em; color: #6c757d; white-space: pre-wrap; min-height: 60px; }
   </style>
 </head>
-<body data-roster='{{ data.roster | tojson }}'>
+<body data-roster='{{ data.roster | tojson }}' data-player-dev='{{ data.player_development | tojson }}'>
 <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom mb-3 px-3">
   <a class="navbar-brand d-flex align-items-center" href="#">
     <img src="/static/logo.png" alt="Team Logo">
@@ -146,12 +127,11 @@
             </div>
             {% endfor %}
         </div>
-        <hr class="my-4">
-        </div>
-
+    </div>
+    
     <div class="tab-pane fade" id="player_development">
-        <h4>Player Development Focus</h4>
-        <p>A comprehensive overview of each player's development plan, including team focus and external lesson details.</p>
+        <h4>Player Development Log</h4>
+        <p>Track current and past development goals for each player.</p>
         <div class="accordion" id="playerDevelopmentAccordion">
             {% for p in data.roster %}
             {% set player_dev = data.player_development.get(p.name, {}) %}
@@ -163,169 +143,74 @@
                 </h2>
                 <div id="collapse-dev-{{ loop.index0 }}" class="accordion-collapse collapse" data-bs-parent="#playerDevelopmentAccordion">
                     <div class="accordion-body">
-                        <form class="player-development-form" data-player-name="{{ p.name }}">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Hitting Focus</label>
-                                    <input type="text" name="hitting_focus" class="form-control" value="{{ player_dev.get('hitting', '') }}" placeholder="Primary hitting focus...">
+                        <ul class="nav nav-pills mb-3" role="tablist">
+                            {% for skill in ['hitting', 'pitching', 'fielding', 'baserunning', 'lessons'] %}
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="pill" data-bs-target="#dev-{{p.name|replace(' ', '-')}}-{{skill}}" type="button" role="tab">{{ skill.title() }}</button>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        <div class="tab-content">
+                            {% for skill in ['hitting', 'pitching', 'fielding', 'baserunning'] %}
+                            {% set active_focuses = player_dev.get(skill, [])|selectattr('status', 'equalto', 'active')|list %}
+                            <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="dev-{{p.name|replace(' ', '-')}}-{{skill}}" role="tabpanel">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h5>Active {{ skill.title() }} Focus</h5>
+                                    <div>
+                                        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="{{p.name}}" data-skill="{{skill}}" data-action="add">Add New Focus</button>
+                                        <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#historyModal" data-player-name="{{p.name}}" data-skill="{{skill}}">View History</button>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Pitching Focus</label>
-                                    <input type="text" name="pitching_focus" class="form-control" value="{{ player_dev.get('pitching', '') }}" placeholder="Primary pitching focus...">
+                                {% if active_focuses %}
+                                    {% for active_focus in active_focuses %}
+                                    <div class="card bg-light mb-2">
+                                        <div class="card-body">
+                                            <p class="mb-1"><strong>Focus:</strong> {{ active_focus.focus }}</p>
+                                            <p class="mb-1"><strong>Notes:</strong></p>
+                                            <div class="p-2 bg-white rounded border focus-item-notes mb-2">{{ active_focus.notes or 'No notes yet.' }}</div>
+                                            <small class="text-muted">Created on: {{ active_focus.created_date }}</small>
+                                            <div class="d-flex justify-content-end gap-2 mt-2">
+                                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="{{p.name}}" data-skill="{{skill}}" data-focus-id="{{active_focus.id}}" data-action="edit">Edit Details</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                <div class="text-center p-3 border rounded">
+                                    <p>No active focus for {{ skill.title() }}.</p>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Fielding Focus</label>
-                                    <input type="text" name="fielding_focus" class="form-control" value="{{ player_dev.get('fielding', '') }}" placeholder="Primary fielding focus...">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Baserunning Focus</label>
-                                    <input type="text" name="baserunning_focus" class="form-control" value="{{ player_dev.get('baserunning', '') }}" placeholder="Primary baserunning focus...">
-                                </div>
-                                
-                                <hr class="my-3">
-
-                                <div class="col-md-4">
-                                    <label class="form-label">Getting Lessons?</label>
-                                    <select name="has_lessons" class="form-select">
-                                        <option value="No" {% if p.has_lessons == 'No' %}selected{% endif %}>No</option>
-                                        <option value="Yes" {% if p.has_lessons == 'Yes' %}selected{% endif %}>Yes</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label">Instructor's Focus</label>
-                                    <input type="text" name="lesson_focus" class="form-control" value="{{ p.lesson_focus }}" placeholder="What is their instructor working on?">
-                                </div>
-
-                                <div class="col-12 d-flex justify-content-end mt-3">
-                                    <button type="button" class="btn btn-sm btn-primary save-development-btn">Save Development Plan</button>
-                                </div>
+                                {% endif %}
                             </div>
-                        </form>
+                            {% endfor %}
+                            <div class="tab-pane fade" id="dev-{{p.name|replace(' ', '-')}}-lessons" role="tabpanel">
+                                <h5>External Lessons</h5>
+                                <form action="{{ url_for('update_lesson_info', player_name=p.name) }}" method="POST">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Getting Lessons?</label>
+                                            <select name="has_lessons" class="form-select">
+                                                <option value="No" {% if p.has_lessons == 'No' %}selected{% endif %}>No</option>
+                                                <option value="Yes" {% if p.has_lessons == 'Yes' %}selected{% endif %}>Yes</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <label class="form-label">Instructor's Focus</label>
+                                            <input type="text" name="lesson_focus" class="form-control" value="{{ p.lesson_focus }}">
+                                        </div>
+                                        <div class="col-12 d-flex justify-content-end">
+                                            <button type="submit" class="btn btn-sm btn-primary">Save Lesson Info</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
-    
-    <div class="tab-pane fade" id="pitching">
-      <h4>Pitching Log & Count Tracker</h4>
-      <div class="card mb-4">
-        <div class="card-header"><strong>Pitch Count Summary</strong></div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Pitcher</th>
-                            <th>Daily (Limit: 85)</th>
-                            <th>Weekly (Limit: 100)</th>
-                            <th>Season (Limit: 1000)</th>
-                            <th>Annual (Limit: 3000)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for name, counts in pitch_count_summary.items() %}
-                        <tr>
-                            <td><strong>{{ name }}</strong></td>
-                            <td>
-                                {% set daily_pct = (counts.daily / 85 * 100) | int %}
-                                <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar {% if daily_pct > 80 %}bg-danger{% elif daily_pct > 60 %}bg-warning{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ daily_pct }}%;" aria-valuenow="{{ counts.daily }}" aria-valuemin="0" aria-valuemax="85">{{ counts.daily }}</div>
-                                </div>
-                            </td>
-                            <td>
-                                {% set weekly_pct = (counts.weekly / 100 * 100) | int %}
-                                <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar {% if weekly_pct > 80 %}bg-danger{% elif weekly_pct > 60 %}bg-warning{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ weekly_pct }}%;" aria-valuenow="{{ counts.weekly }}" aria-valuemin="0" aria-valuemax="100">{{ counts.weekly }}</div>
-                                </div>
-                            </td>
-                            <td>
-                                {% set season_pct = (counts.season / 1000 * 100) | int %}
-                                <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar" role="progressbar" style="width: {{ season_pct }}%;" aria-valuenow="{{ counts.season }}" aria-valuemin="0" aria-valuemax="1000">{{ counts.season }}</div>
-                                </div>
-                            </td>
-                            <td>
-                                {% set annual_pct = (counts.annual / 3000 * 100) | int %}
-                                <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar" role="progressbar" style="width: {{ annual_pct }}%;" aria-valuenow="{{ counts.annual }}" aria-valuemin="0" aria-valuemax="3000">{{ counts.annual }}</div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="5" class="text-center">No pitching outings recorded yet.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-      </div>
 
-      <form action="/add_pitching" method="POST" class="row g-2 mb-3">
-        <input type="hidden" name="active_tab" value="#pitching" class="active-tab-input">
-        <div class="col-md-3"><input type="date" name="pitch_date" class="form-control" required title="Pitch Date"></div>
-        <div class="col-md-3"><select name="pitcher" class="form-select" required title="Select Pitcher"><option value="">Select Pitcher</option>{% for p in data.roster %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}</select></div>
-        <div class="col-md-3"><input type="text" name="opponent" class="form-control" placeholder="Opponent / Context"></div>
-        <div class="col-md-3"><select name="outing_type" class="form-select" title="Outing Type"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div>
-        <div class="col-md-4"><input type="number" name="pitches" class="form-control" placeholder="Pitch Count" required></div>
-        <div class="col-md-4"><input type="text" name="innings" class="form-control" placeholder="Innings Pitched (e.g., 2.1)" required></div>
-        <div class="col-md-4"><select name="pitcher_type" class="form-select" title="Pitcher Type"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
-        <div class="col-12"><button type="submit" class="btn btn-primary w-100">Add Outing</button></div>
-      </form>
-      <hr>
-      <h5>Recorded Outings</h5>
-      <ul class="list-group">
-        {% for outing in data.pitching | sort(attribute='date', reverse=True) %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <span>{{ outing.date }}: <strong>{{ outing.pitcher }}</strong> ({{ outing.pitcher_type }}) vs {{ outing.opponent }} - {{ outing.pitches }} pitches ({{ outing.innings }} IP) <span class="badge bg-info">{{ outing.outing_type }}</span></span>
-          <a href="/delete_pitching/{{ loop.index0 }}?active_tab=#pitching" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-
-    <div class="tab-pane fade" id="signs">
-        <h4>Team Signs</h4>
-        <div class="row">
-            <div class="col-md-8">
-                <ul class="list-group">
-                    {% for sign in data.signs %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>{{ sign.name }}:</strong> {{ sign.indicator }}
-                        </div>
-                        <div>
-                            <button class="btn btn-sm btn-info me-2" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-index="{{ loop.index0 }}" data-sign-name="{{ sign.name }}" data-sign-indicator="{{ sign.indicator }}">Edit</button>
-                            <a href="{{ url_for('delete_sign', index=loop.index0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this sign?');">Delete</a>
-                        </div>
-                    </li>
-                    {% else %}
-                    <li class="list-group-item">No signs have been added yet.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Add New Sign</h5>
-                        <form action="{{ url_for('add_sign') }}" method="POST">
-                            <div class="mb-2">
-                                <label for="sign_name" class="form-label">Sign Name</label>
-                                <input type="text" name="sign_name" id="sign_name" class="form-control" placeholder="e.g., Steal" required>
-                            </div>
-                            <div class="mb-2">
-                                <label for="sign_indicator" class="form-label">Indicator</label>
-                                <input type="text" name="sign_indicator" id="sign_indicator" class="form-control" placeholder="e.g., Touch nose" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">Add Sign</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
     <div class="tab-pane fade" id="lineups">
       <h4>Create New Lineup</h4>
       <form action="/add_lineup" method="POST" class="mb-3">
@@ -368,453 +253,348 @@
         {% endfor %}
       </ul>
     </div>
-
-    <div class="tab-pane fade" id="scouting_list">
-      <div class="alert alert-info">
-        <h4>
-            Full Team Count (Roster + New Commits): 
-            <span class="badge bg-primary">{{ data.roster|length + data.scouting_list.committed|length }}</span>
-        </h4>
+    
+    <div class="tab-pane fade" id="pitching">
+      <h4>Pitching Log & Count Tracker</h4>
+      <div class="card mb-4">
+        <div class="card-header"><strong>Pitch Count Summary</strong></div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Pitcher</th>
+                            <th>Daily (Limit: 85)</th>
+                            <th>Weekly (Limit: 100)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for name, counts in pitch_count_summary.items() %}
+                        <tr>
+                            <td><strong>{{ name }}</strong></td>
+                            <td>
+                                {% set daily_pct = (counts.daily / 85 * 100) | int %}
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar {% if daily_pct > 80 %}bg-danger{% elif daily_pct > 60 %}bg-warning{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ daily_pct }}%;" aria-valuenow="{{ counts.daily }}" aria-valuemin="0" aria-valuemax="85">{{ counts.daily }}</div>
+                                </div>
+                            </td>
+                            <td>
+                                {% set weekly_pct = (counts.weekly / 100 * 100) | int %}
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar {% if weekly_pct > 80 %}bg-danger{% elif weekly_pct > 60 %}bg-warning{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ weekly_pct }}%;" aria-valuenow="{{ counts.weekly }}" aria-valuemin="0" aria-valuemax="100">{{ counts.weekly }}</div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-center">No pitching outings recorded yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
       </div>
+
+      <form action="/add_pitching" method="POST" class="row g-2 mb-3">
+        <input type="hidden" name="active_tab" value="#pitching" class="active-tab-input">
+        <div class="col-md-3"><input type="date" name="pitch_date" class="form-control" required title="Pitch Date"></div>
+        <div class="col-md-3"><select name="pitcher" class="form-select" required title="Select Pitcher"><option value="">Select Pitcher</option>{% for p in data.roster %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}</select></div>
+        <div class="col-md-3"><input type="text" name="opponent" class="form-control" placeholder="Opponent / Context"></div>
+        <div class="col-md-3"><select name="outing_type" class="form-select" title="Outing Type"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div>
+        <div class="col-md-4"><input type="number" name="pitches" class="form-control" placeholder="Pitch Count" required></div>
+        <div class="col-md-4"><input type="text" name="innings" class="form-control" placeholder="Innings Pitched (e.g., 2.1)" required></div>
+        <div class="col-md-4"><select name="pitcher_type" class="form-select" title="Pitcher Type"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
+        <div class="col-12"><button type="submit" class="btn btn-primary w-100">Add Outing</button></div>
+      </form>
       <hr>
+      <h5>Recorded Outings</h5>
+      <ul class="list-group">
+        {% for outing in data.pitching | sort(attribute='date', reverse=True) %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ outing.date }}: <strong>{{ outing.pitcher }}</strong> ({{ outing.pitcher_type }}) vs {{ outing.opponent }} - {{ outing.pitches }} pitches ({{ outing.innings }} IP) <span class="badge bg-info">{{ outing.outing_type }}</span></span>
+          <a href="/delete_pitching/{{ loop.index0 }}?active_tab=#pitching" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
       
-      <div class="accordion" id="rosterAndScoutingAccordion">
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="headingRoster">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRoster" aria-expanded="false" aria-controls="collapseRoster">
-              Current Roster ({{ data.roster|length }})
-            </button>
-          </h2>
-          <div id="collapseRoster" class="accordion-collapse collapse" aria-labelledby="headingRoster" data-bs-parent="#rosterAndScoutingAccordion">
-            <div class="accordion-body p-0">
-                <ul class="list-group list-group-flush">
-                  {% for player in data.roster %}
-                  <li class="list-group-item">
-                      <strong>{{ player.name }}</strong> (#{{ player.number }})
-                      <small class="text-muted d-block">
-                          {% if player.position1 %}<span class="badge bg-primary me-1">{{ player.position1 }}</span>{% endif %}
-                          {% if player.position2 %}<span class="badge bg-secondary me-1">{{ player.position2 }}</span>{% endif %}
-                          {% if player.throws %}<span>Throws: {{ player.throws[0] }}</span>{% endif %}
-                          {% if player.bats %} | <span>Bats: {{ player.bats[0] }}</span>{% endif %}
-                      </small>
-                  </li>
-                  {% else %}
-                  <li class="list-group-item">The main roster is empty.</li>
-                  {% endfor %}
+    <div class="tab-pane fade" id="scouting_list">
+        <h4>Scouting & Recruiting Lists</h4>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Add New Scouted Player</h5>
+                <form action="{{ url_for('add_scouted_player') }}" method="POST" class="row g-3">
+                    <div class="col-md-3"><input type="text" class="form-control" name="scouted_player_name" placeholder="Player Name" required></div>
+                    <div class="col-md-2">{{ position_select('scouted_player_pos1', 'scouted_player_pos1', '', title='Pos 1') }}</div>
+                    <div class="col-md-2">{{ position_select('scouted_player_pos2', 'scouted_player_pos2', '', title='Pos 2') }}</div>
+                    <div class="col-md-2"><select name="scouted_player_throws" class="form-select"><option value="">Throws</option><option value="Right">Right</option><option value="Left">Left</option></select></div>
+                    <div class="col-md-2"><select name="scouted_player_bats" class="form-select"><option value="">Bats</option><option value="Right">Right</option><option value="Left">Left</option></select></div>
+                    <div class="col-md-4"><label class="form-label">Add to List:</label><select name="scouted_player_type" class="form-select"><option value="targets">Targets</option><option value="committed">Committed</option><option value="not_interested">Not Interested</option></select></div>
+                    <div class="col-md-2 d-flex align-items-end"><button type="submit" class="btn btn-primary w-100">Add Player</button></div>
+                </form>
+            </div>
+        </div>
+        <div class="row">
+            {% for list_type, players in data.scouting_list.items() %}
+            <div class="col-md-4">
+                <h5>{{ list_type.replace('_', ' ').title() }}</h5>
+                <ul class="list-group">
+                    {% for player in players %}
+                    <li class="list-group-item">
+                        <strong>{{ player.name }}</strong> ({{ player.position1 }}{% if player.position2 %}/{{ player.position2 }}{% endif %})
+                        <div class="mt-2">
+                            <form action="{{ url_for('move_scouted_player', from_type=list_type, to_type='targets', index=loop.index0) }}" method="POST" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-primary" {% if list_type == 'targets' %}disabled{% endif %}>Target</button></form>
+                            <form action="{{ url_for('move_scouted_player', from_type=list_type, to_type='committed', index=loop.index0) }}" method="POST" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-success" {% if list_type == 'committed' %}disabled{% endif %}>Commit</button></form>
+                            <form action="{{ url_for('move_scouted_player', from_type=list_type, to_type='not_interested', index=loop.index0) }}" method="POST" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-secondary" {% if list_type == 'not_interested' %}disabled{% endif %}>Pass</button></form>
+                            <a href="{{ url_for('remove_scouted_player', scouted_player_type=list_type, index=loop.index0) }}" class="btn btn-sm btn-outline-danger float-end" onclick="return confirm('Are you sure?');">X</a>
+                        </div>
+                        {% if list_type == 'committed' %}
+                        <form action="{{ url_for('move_scouted_player_to_roster', index=loop.index0) }}" method="POST" class="d-grid mt-2"><button type="submit" class="btn btn-sm btn-success">Move to Roster</button></form>
+                        {% endif %}
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-muted">No players in this list.</li>
+                    {% endfor %}
                 </ul>
             </div>
-          </div>
+            {% endfor %}
         </div>
-
-        <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
-            <h4 class="mb-0">Recruiting Lists</h4>
-            <div>
-                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addScoutedPlayerModal">
-                    <i class="bi bi-person-plus-fill me-1"></i> Add Player
-                </button>
-            </div>
-        </div>
-        <div class="mb-3">
-            <input type="text" id="scouting-search" class="form-control" placeholder="Search recruiting lists...">
-        </div>
-
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="headingCommitted">
-            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCommitted" aria-expanded="true" aria-controls="collapseCommitted">
-              Newly Committed Players ({{ data.scouting_list.committed|length }})
-            </button>
-          </h2>
-          <div id="collapseCommitted" class="accordion-collapse collapse show" aria-labelledby="headingCommitted" data-bs-parent="#rosterAndScoutingAccordion">
-            <div class="accordion-body">
-                <ul class="list-group">
-                {% for player in data.scouting_list.committed %}
-                <li class="list-group-item scouted-player-item">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>{{ player.name }}</strong>
-                        <small class="text-muted d-block mt-1">
-                            {% if player.position1 %}<span class="badge bg-primary me-1">{{ player.position1 }}</span>{% endif %}
-                            {% if player.position2 %}<span class="badge bg-secondary me-1">{{ player.position2 }}</span>{% endif %}
-                            {% if player.throws %}<span>T: {{ player.throws[0] }}</span>{% endif %}
-                            {% if player.bats %} | <span>B: {{ player.bats[0] }}</span>{% endif %}
-                        </small>
-                    </div>
-                    <div>
-                      <form action="{{ url_for('move_scouted_player_to_roster', index=loop.index0) }}" method="POST" class="d-inline">
-                        <input type="hidden" name="active_tab" value="#scouting_list" class="active-tab-input">
-                        <button type="submit" class="btn btn-sm btn-success me-2" title="Move to Roster">Move to Roster</button>
-                      </form>
-                      <form action="{{ url_for('move_scouted_player', from_type='committed', to_type='targets', index=loop.index0) }}" method="POST" class="d-inline">
-                        <input type="hidden" name="active_tab" value="#scouting_list" class="active-tab-input">
-                        <button type="submit" class="btn btn-sm btn-secondary me-2" title="Move to Targets">Move to Targets</button>
-                      </form>
-                      <a href="{{ url_for('remove_scouted_player', scouted_player_type='committed', index=loop.index0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to remove this player?');" title="Remove Player">&times;</a>
-                    </div>
-                  </div>
-                </li>
-                {% else %}
-                <li class="list-group-item">No newly committed players.</li>
-                {% endfor %}
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="headingTargets">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTargets" aria-expanded="false" aria-controls="collapseTargets">
-              Target Players ({{ data.scouting_list.targets|length }})
-            </button>
-          </h2>
-          <div id="collapseTargets" class="accordion-collapse collapse" aria-labelledby="headingTargets" data-bs-parent="#rosterAndScoutingAccordion">
-            <div class="accordion-body">
-                <ul class="list-group">
-                {% for player in data.scouting_list.targets %}
-                <li class="list-group-item scouted-player-item">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>{{ player.name }}</strong>
-                        <small class="text-muted d-block mt-1">
-                            {% if player.position1 %}<span class="badge bg-primary me-1">{{ player.position1 }}</span>{% endif %}
-                            {% if player.position2 %}<span class="badge bg-secondary me-1">{{ player.position2 }}</span>{% endif %}
-                            {% if player.throws %}<span>T: {{ player.throws[0] }}</span>{% endif %}
-                            {% if player.bats %} | <span>B: {{ player.bats[0] }}</span>{% endif %}
-                        </small>
-                    </div>
-                    <div>
-                      <form action="{{ url_for('move_scouted_player', from_type='targets', to_type='committed', index=loop.index0) }}" method="POST" class="d-inline">
-                        <input type="hidden" name="active_tab" value="#scouting_list" class="active-tab-input">
-                        <button type="submit" class="btn btn-sm btn-primary me-2" title="Move to Committed">Move to Committed</button>
-                      </form>
-                      <a href="{{ url_for('remove_scouted_player', scouted_player_type='targets', index=loop.index0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to remove this player?');" title="Remove Player">&times;</a>
-                    </div>
-                  </div>
-                </li>
-                {% else %}
-                <li class="list-group-item">No target players.</li>
-                {% endfor %}
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="headingNotInterested">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNotInterested" aria-expanded="false" aria-controls="collapseNotInterested">
-              Not Interested ({{ data.scouting_list.not_interested|length }})
-            </button>
-          </h2>
-          <div id="collapseNotInterested" class="accordion-collapse collapse" aria-labelledby="headingNotInterested" data-bs-parent="#rosterAndScoutingAccordion">
-            <div class="accordion-body">
-                <ul class="list-group">
-                {% for player in data.scouting_list.not_interested %}
-                <li class="list-group-item scouted-player-item">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>{{ player.name }}</strong>
-                        <small class="text-muted d-block mt-1">
-                            {% if player.position1 %}<span class="badge bg-primary me-1">{{ player.position1 }}</span>{% endif %}
-                            {% if player.position2 %}<span class="badge bg-secondary me-1">{{ player.position2 }}</span>{% endif %}
-                            {% if player.throws %}<span>T: {{ player.throws[0] }}</span>{% endif %}
-                            {% if player.bats %} | <span>B: {{ player.bats[0] }}</span>{% endif %}
-                        </small>
-                    </div>
-                    <div>
-                      <a href="{{ url_for('remove_scouted_player', scouted_player_type='not_interested', index=loop.index0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to permanently delete this player?');" title="Delete Permanently">Delete Permanently</a>
-                    </div>
-                  </div>
-                </li>
-                {% else %}
-                <li class="list-group-item">No players in this list.</li>
-                {% endfor %}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {% if position_counts %}
-      <hr class="my-4">
-      <h4 class="mb-3">Full Positional Summary (Roster + Scouting)</h4>
-      <div>
-          {% for position, count in position_counts.items()|sort %}
-              <span class="badge rounded-pill 
-                  {% if count > 4 %}
-                      bg-danger
-                  {% elif count > 3 %}
-                      bg-warning text-dark
-                  {% else %}
-                      bg-secondary
-                  {% endif %}
-                  me-2 mb-2 fs-6">
-                  {{ position }}: {{ count }}
-              </span>
-          {% endfor %}
-      </div>
-      {% endif %}
     </div>
 
     <div class="tab-pane fade" id="rotations">
-      <div class="row">
-        <div class="col-lg-8">
-          <h4 class="text-center">Defensive Rotation</h4>
-          
-          <ul class="nav nav-tabs inning-tabs justify-content-center mb-2" id="inning-tab-container" role="tablist">
-            <li class="nav-item" role="presentation">
-              <button class="nav-link active" id="inning-1-tab" data-bs-toggle="tab" data-bs-target="#inning-pane" type="button" role="tab" aria-controls="inning-pane" aria-selected="true" data-inning="1">Inn 1</button>
-            </li>
-            {% for i in range(2, 8) %}
-            <li class="nav-item" role="presentation">
-              <button class="nav-link" id="inning-{{i}}-tab" data-bs-toggle="tab" data-bs-target="#inning-pane" type="button" role="tab" aria-controls="inning-pane" aria-selected="false" data-inning="{{i}}">Inn {{i}}</button>
-            </li>
-            {% endfor %}
-          </ul>
-
-          <div class="baseball-field-container">
-            <div class="infield"></div>
-            <div class="pitchers-mound"></div>
-            <div class="home-plate"></div>
-            {% set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
-            {% for pos in positions %}
-            <div id="pos-{{ pos.lower() }}" class="position-marker" data-position="{{ pos }}" data-bs-toggle="modal" data-bs-target="#assignPlayerModal">
-              <div class="position-label">{{ pos }}</div>
-              <div class="player-assignment"></div>
-            </div>
-            {% endfor %}
-          </div>
+        <h4>Pitching Rotations</h4>
+        <p>This feature is under development.</p>
         </div>
-        <div class="col-lg-4">
-          <div class="accordion" id="rotationsManagementAccordion">
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="headingSaveLoad">
-                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSaveLoad" aria-expanded="true" aria-controls="collapseSaveLoad">
-                        Save & Load Rotation
-                    </button>
-                </h2>
-                <div id="collapseSaveLoad" class="accordion-collapse collapse show" aria-labelledby="headingSaveLoad" data-bs-parent="#rotationsManagementAccordion">
-                    <div class="accordion-body">
-                        <input type="text" id="rotation-title" class="form-control mb-2" placeholder="Rotation Title (e.g., vs. Tigers)">
-                        <button id="save-rotation-btn" class="btn btn-primary w-100 mb-3">Save Current Rotation</button>
-                        <hr>
-                        <h6>Saved Rotations</h6>
-                        <ul class="list-group">
-                            {% for r in data.rotations %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                {{ r.title }}
-                                <div>
-                                    <button class="btn btn-sm btn-success me-2 load-rotation-btn" data-rotation-id="{{ r.id }}">Load</button>
-                                    <a href="/delete_rotation/{{ r.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">&times;</a>
-                                </div>
-                            </li>
-                            {% else %}
-                            <li class="list-group-item">No saved rotations.</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
+      
     <div class="tab-pane fade" id="games">
-      <h4>Add Game</h4>
-        <form action="/add_game" method="POST" class="row g-2 mb-3">
-            <input type="hidden" name="active_tab" value="#games" class="active-tab-input">
-            <div class="col-md-6"><input type="date" name="game_date" class="form-control" required title="Game Date"></div>
-            <div class="col-md-6"><input type="text" name="game_opponent" class="form-control" placeholder="Opponent Name" required></div>
-            <div class="col-12"><input type="text" name="game_location" class="form-control" placeholder="Game Location"></div>
-            <div class="col-12">
-                <textarea name="game_notes" class="form-control" rows="3" placeholder="Notes for this game"></textarea>
+        <h4>Game Schedule</h4>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Add New Game</h5>
+                <form action="{{ url_for('add_game') }}" method="POST" class="row g-3">
+                    <div class="col-md-3"><input type="date" name="game_date" class="form-control" required></div>
+                    <div class="col-md-3"><input type="text" name="game_opponent" class="form-control" placeholder="Opponent" required></div>
+                    <div class="col-md-3"><input type="text" name="game_location" class="form-control" placeholder="Location"></div>
+                    <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add Game</button></div>
+                    <div class="col-12"><textarea name="game_notes" class="form-control" rows="2" placeholder="Game Notes (e.g., arrival time, uniform)"></textarea></div>
+                </form>
             </div>
-            <div class="col-md-6">
-                <label for="associated_lineup_title" class="form-label visually-hidden">Select Lineup</label>
-                <select name="associated_lineup_title" id="associated_lineup_title" class="form-select" title="Select Lineup">
-                    <option value="">Select Lineup (Optional)</option>
-                    {% for lineup in data.lineups %}
-                    <option value="{{ lineup.title }}">{{ lineup.title }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label for="associated_rotation_date" class="form-label visually-hidden">Select Rotation</label>
-                <select name="associated_rotation_date" id="associated_rotation_date" class="form-select" title="Select Rotation">
-                    <option value="">Select Rotation (Optional)</option>
-                    {% for rotation in data.rotations %}
-                    <option value="{{ rotation.date }} - {{ rotation.opponent }}">{{ rotation.date }} vs {{ rotation.opponent }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-12"><button type="submit" class="btn btn-primary w-100">Add Game</button></div>
-        </form>
-
-        <h5 class="mt-4">Scheduled Games</h5>
+        </div>
         <ul class="list-group">
-            {% for game in data.games %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span>
-                    <strong>{{ game.date }} vs {{ game.opponent }}</strong>
-                    {% if game.location %}<br><small class="text-muted">{{ game.location }}</small>{% endif %}
-                    {% if game.game_notes %}<br><small class="text-muted">Notes: {{ game.game_notes }}</small>{% endif %}
-                    {% if game.associated_lineup_title %}<br>Lineup: <a href="#lineups" data-lineup-title="{{ game.associated_lineup_title }}" class="game-link">{{ game.associated_lineup_title }}</a>{% endif %}
-                    {% if game.associated_rotation_date %}<br>Rotation: <a href="#rotations" data-rotation-date="{{ game.associated_rotation_date }}" class="game-link">{{ game.associated_rotation_date }}</a>{% endif %}
-                </span>
-                <a href="/delete_game/{{ loop.index0 }}?active_tab=#games" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this game?');">Delete</a>
+            {% for game in data.games | sort(attribute='date') %}
+            <li class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">vs. {{ game.opponent }}</h5>
+                    <a href="{{ url_for('delete_game', index=loop.index0) }}" class="btn-close" aria-label="Delete" onclick="return confirm('Are you sure?');"></a>
+                </div>
+                <p class="mb-1"><strong>Date:</strong> {{ game.date }} | <strong>Location:</strong> {{ game.location }}</p>
+                <small>{{ game.game_notes }}</small>
             </li>
             {% else %}
-            <li class="list-group-item">No games scheduled yet.</li>
+            <li class="list-group-item">No games scheduled.</li>
             {% endfor %}
         </ul>
     </div>
-    
+      
     <div class="tab-pane fade" id="collaboration">
-      <div class="row">
+        <h4>Collaboration Notes</h4>
+        <div class="row">
             <div class="col-md-6">
-                <h4>Player-Specific Notes</h4>
-                <form action="{{ url_for('add_note', note_type='player_notes') }}" method="POST" class="mb-3">
-                    <input type="hidden" name="active_tab" value="#collaboration" class="active-tab-input">
-                    <div class="mb-2">
-                        <select name="player_name" class="form-select" required title="Select Player for Note">
-                            <option value="">Select a Player</option>
-                            {% for player in data.roster %}
-                            <option value="{{ player.name }}">{{ player.name }}</option>
-                            {% endfor %}
-                        </select>
+                <h5>Team Notes</h5>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <form action="{{ url_for('add_note', note_type='team_notes') }}" method="POST">
+                            <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note for the whole team..."></textarea>
+                            <button type="submit" class="btn btn-primary btn-sm">Add Team Note</button>
+                        </form>
                     </div>
-                    <div class="mb-2">
-                        <textarea name="note_text" class="form-control" rows="3" placeholder="Add player-specific note..." required></textarea>
+                </div>
+                {% for note in data.collaboration_notes.team_notes | reverse %}
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <p class="card-text">{{ note.text }}</p>
+                        <small class="text-muted">By {{ note.author }} on {{ note.timestamp }}</small>
+                        {% if session.username == note.author or session.role == 'Admin' %}
+                        <a href="{{ url_for('delete_note', note_type='team_notes', index=loop.index0) }}" class="btn btn-sm btn-outline-danger float-end" onclick="return confirm('Are you sure?');">Delete</a>
+                        {% endif %}
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Add Player Note</button>
-                </form>
-                <ul class="list-group">
-                    {% for note in data.collaboration_notes.player_notes %}
-                    <li class="list-group-item">
-                        <strong>{{ note.player_name }}:</strong> {{ note.text }}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">By {{ note.author }} on {{ note.timestamp }}</small>
-                            <div>
-                                <a href="{{ url_for('move_note_to_practice_plan', note_type='player_notes', note_index=loop.index0) }}" class="btn btn-sm btn-success">Move to Plan</a>
-                                {% if session.username == note.author or session.role == 'Admin' %}
-                                <a href="{{ url_for('delete_note', note_type='player_notes', index=loop.index0) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this note?');">&times;</a>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </li>
-                    {% else %}
-                    <li class="list-group-item">No player notes yet.</li>
-                    {% endfor %}
-                </ul>
+                </div>
+                {% endfor %}
             </div>
             <div class="col-md-6">
-                <h4>General Team Notes</h4>
-                <form action="{{ url_for('add_note', note_type='team_notes') }}" method="POST" class="mb-3">
-                    <input type="hidden" name="active_tab" value="#collaboration" class="active-tab-input">
-                    <div class="mb-2">
-                        <textarea name="note_text" class="form-control" rows="3" placeholder="Add general team note..." required></textarea>
+                <h5>Player Notes</h5>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <form action="{{ url_for('add_note', note_type='player_notes') }}" method="POST">
+                            <select name="player_name" class="form-select mb-2" required>
+                                <option value="">Select a player...</option>
+                                {% for p in data.roster %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}
+                            </select>
+                            <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note for the selected player..."></textarea>
+                            <button type="submit" class="btn btn-primary btn-sm">Add Player Note</button>
+                        </form>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Add Team Note</button>
-                </form>
-                 <ul class="list-group">
-                    {% for note in data.collaboration_notes.team_notes %}
-                    <li class="list-group-item">
-                        {{ note.text }}
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">By {{ note.author }} on {{ note.timestamp }}</small>
-                            <div>
-                                <a href="{{ url_for('move_note_to_practice_plan', note_type='team_notes', note_index=loop.index0) }}" class="btn btn-sm btn-success">Move to Plan</a>
-                                {% if session.username == note.author or session.role == 'Admin' %}
-                                <a href="{{ url_for('delete_note', note_type='team_notes', index=loop.index0) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this note?');">&times;</a>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </li>
-                    {% else %}
-                    <li class="list-group-item">No team notes yet.</li>
-                    {% endfor %}
-                </ul>
+                </div>
+                {% for note in data.collaboration_notes.player_notes | reverse %}
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <h6>For: {{ note.player_name }}</h6>
+                        <p class="card-text">{{ note.text }}</p>
+                        <small class="text-muted">By {{ note.author }} on {{ note.timestamp }}</small>
+                        {% if session.username == note.author or session.role == 'Admin' %}
+                        <a href="{{ url_for('delete_note', note_type='player_notes', index=loop.index0) }}" class="btn btn-sm btn-outline-danger float-end" onclick="return confirm('Are you sure?');">Delete</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
-    
+      
     <div class="tab-pane fade" id="practice_plan">
-      <h4>Create New Practice Plan</h4>
-        <form action="{{ url_for('add_practice_plan') }}" method="POST" class="row g-2 mb-4">
-            <div class="col-md-4">
-                <input type="date" name="plan_date" class="form-control" required>
-            </div>
-            <div class="col-md-8">
-                <input type="text" name="general_notes" class="form-control" placeholder="General focus for the practice...">
-            </div>
-            <div class="col-12">
-                <button type="submit" class="btn btn-primary w-100">Create New Plan</button>
-            </div>
-        </form>
-
-        <hr>
-
-        <h4>Existing Practice Plans</h4>
-        {% for plan in data.practice_plans %}
-        <div class="card mb-3 practice-plan">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div>
-                    <strong>{{ plan.date }}</strong> - <span>{{ plan.general_notes }}</span>
-                </div>
-                <div>
-                    <button class="btn btn-sm btn-info me-2" data-bs-toggle="modal" data-bs-target="#editPracticePlanModal" 
-                            data-plan-id="{{ plan.id }}" 
-                            data-plan-date="{{ plan.date }}" 
-                            data-plan-notes="{{ plan.general_notes }}">Edit</button>
-                    <a href="{{ url_for('delete_practice_plan', plan_id=plan.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this entire practice plan and all its tasks?');">Delete</a>
-                </div>
-            </div>
+        <h4>Practice Plans</h4>
+        <div class="card mb-4">
             <div class="card-body">
-                <h5 class="card-title">Tasks & Drills</h5>
-                <ul class="list-group mb-3">
-                    {% for task in plan.tasks %}
-                    <li class="list-group-item task-item d-flex justify-content-between align-items-center {% if task.status == 'complete' %}complete{% endif %}" data-task-id="{{ task.id }}" data-plan-id="{{ plan.id }}">
-                        <div>
-                            <input class="form-check-input me-2 task-status-checkbox" type="checkbox" {% if task.status == 'complete' %}checked{% endif %}>
-                            {{ task.text }}
-                            <small class="text-muted d-block">Added by {{ task.author }} on {{ task.timestamp }}</small>
-                        </div>
-                        <a href="{{ url_for('delete_task', plan_id=plan.id, task_id=task.id) }}" class="btn-close" onclick="return confirm('Are you sure you want to delete this task?');"></a>
-                    </li>
-                    {% else %}
-                    <li class="list-group-item">No tasks for this plan yet.</li>
-                    {% endfor %}
-                </ul>
-                <form action="{{ url_for('add_task_to_plan', plan_id=plan.id) }}" method="POST" class="d-flex">
-                    <input type="text" name="task_text" class="form-control me-2" placeholder="Add a new task..." required>
-                    <button type="submit" class="btn btn-secondary">Add</button>
+                <h5 class="card-title">Create New Practice Plan</h5>
+                <form action="{{ url_for('add_practice_plan') }}" method="POST">
+                    <div class="row">
+                        <div class="col-md-3"><input type="date" name="plan_date" class="form-control" required></div>
+                        <div class="col-md-7"><input type="text" name="general_notes" class="form-control" placeholder="General theme or focus for the practice"></div>
+                        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Create Plan</button></div>
+                    </div>
                 </form>
             </div>
         </div>
-        {% else %}
-        <p>No practice plans yet. Create one above to get started.</p>
-        {% endfor %}
+        <div class="accordion" id="practicePlanAccordion">
+            {% for plan in data.practice_plans %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="plan-heading-{{ plan.id }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-collapse-{{ plan.id }}">
+                        <strong>{{ plan.date }}</strong> - {{ plan.general_notes }}
+                    </button>
+                </h2>
+                <div id="plan-collapse-{{ plan.id }}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion">
+                    <div class="accordion-body">
+                        <ul class="list-group mb-3">
+                            {% for task in plan.tasks %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center task-item {% if task.status == 'complete' %}complete{% endif %}">
+                                <span><input type="checkbox" class="form-check-input me-2" onchange="updateTaskStatus({{ plan.id }}, {{ task.id }}, this.checked)" {% if task.status == 'complete' %}checked{% endif %}>{{ task.text }}</span>
+                                <a href="{{ url_for('delete_task', plan_id=plan.id, task_id=task.id) }}" class="btn-close" onclick="return confirm('Are you sure?');"></a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        <form action="{{ url_for('add_task_to_plan', plan_id=plan.id) }}" method="POST" class="d-flex">
+                            <input type="text" name="task_text" class="form-control me-2" placeholder="Add new task...">
+                            <button type="submit" class="btn btn-secondary">Add</button>
+                        </form>
+                        <div class="mt-3 d-flex justify-content-end">
+                            <a href="{{ url_for('delete_practice_plan', plan_id=plan.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this entire practice plan?');">Delete Plan</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p>No practice plans created yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+      
+    <div class="tab-pane fade" id="signs">
+      <h4>Signs & Signals</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Add New Sign</h5>
+                        <form action="{{ url_for('add_sign') }}" method="POST">
+                            <div class="mb-2"><input type="text" name="sign_name" class="form-control" placeholder="Sign Name (e.g., Steal, Bunt)" required></div>
+                            <div class="mb-2"><input type="text" name="sign_indicator" class="form-control" placeholder="Indicator (e.g., Touch Belt)" required></div>
+                            <button type="submit" class="btn btn-primary">Add Sign</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <ul class="list-group">
+                    {% for sign in data.signs %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div><strong>{{ sign.name }}:</strong> {{ sign.indicator }}</div>
+                        <div>
+                            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-index="{{ loop.index0 }}" data-sign-name="{{ sign.name }}" data-sign-indicator="{{ sign.indicator }}">Edit</button>
+                            <a href="{{ url_for('delete_sign', index=loop.index0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</a>
+                        </div>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item">No signs have been added.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
     </div>
 
+  </div> </div> <div class="modal fade" id="editSignModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST"> <div class="modal-header">
+          <h5 class="modal-title">Edit Sign</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label">Sign Name</label><input type="text" id="edit_sign_name" name="sign_name" class="form-control" required></div>
+          <div class="mb-3"><label class="form-label">Indicator</label><input type="text" id="edit_sign_indicator" name="sign_indicator" class="form-control" required></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
-<div class="modal fade" id="assignPlayerModal" tabindex="-1" aria-labelledby="assignPlayerModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+<div class="modal fade" id="editFocusModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="assignPlayerModalLabel">Assign Player to Position</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div id="player-list-for-assignment" class="list-group">
+      <form id="editFocusForm" method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editFocusModalTitle">Edit Focus</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="skill" id="editFocusSkill">
+          <div class="mb-3">
+            <label for="editFocusText" class="form-label">Focus Area</label>
+            <input type="text" name="focus_text" id="editFocusText" class="form-control" required>
           </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-warning" id="unassign-player-btn">Unassign Player from Position</button>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
+          <div class="mb-3">
+            <label for="editFocusNotes" class="form-label">Notes</label>
+            <textarea name="notes" id="editFocusNotes" class="form-control" rows="4"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer justify-content-between">
+            <button type="submit" form="completeFocusForm" id="completeFocusBtn" class="btn btn-success" onclick="return confirm('Are you sure you want to mark this focus as complete?');">Mark as Complete</button>
+            <div>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" id="saveFocusBtn" class="btn btn-primary">Save Changes</button>
+            </div>
+        </div>
+      </form>
+      <form id="completeFocusForm" method="POST" style="display:none;"></form>
     </div>
   </div>
+</div>
+
+<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="historyModalTitle">Development History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="historyModalBody">
+                <p>Loading history...</p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="editLineupModal" tabindex="-1" aria-labelledby="editLineupModalLabel" aria-hidden="true">
@@ -835,197 +615,170 @@
   </div>
 </div>
 
-
-<div class="modal fade" id="editPracticePlanModal" tabindex="-1" aria-labelledby="editPracticePlanModalLabel" aria-hidden="true">
-  </div>
-
-<div class="modal fade" id="addScoutedPlayerModal" tabindex="-1" aria-labelledby="addScoutedPlayerModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="addScoutedPlayerModalLabel">Add Player to Scouting List</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <form action="/add_scouted_player" method="POST" class="row g-3">
-          <input type="hidden" name="active_tab" value="#scouting_list" class="active-tab-input">
-          <div class="col-md-12">
-              <input type="text" name="scouted_player_name" class="form-control" placeholder="Player Name" required>
-          </div>
-          <div class="col-md-12">
-            <select name="scouted_player_type" class="form-select" required title="Scouting List Type">
-              <option value="targets">Target Player</option>
-              <option value="committed">Newly Committed Player</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-              {{ position_select('scouted_player_pos1', 'scouted_player_pos1_add', '', title='Primary Position (Optional)') }}
-          </div>
-          <div class="col-md-6">
-              {{ position_select('scouted_player_pos2', 'scouted_player_pos2_add', '', title='Secondary Position (Optional)') }}
-          </div>
-          <div class="col-md-6">
-              <select name="scouted_player_throws" class="form-select" title="Throws">
-                  <option value="">Throws (Optional)</option>
-                  <option value="Right">Right</option>
-                  <option value="Left">Left</option>
-              </select>
-          </div>
-          <div class="col-md-6">
-              <select name="scouted_player_bats" class="form-select" title="Bats">
-                  <option value="">Bats (Optional)</option>
-                  <option value="Right">Right</option>
-                  <option value="Left">Left</option>
-              </select>
-          </div>
-          <div class="col-12">
-            <button type="submit" class="btn btn-primary w-100">Add to Scouting List</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="editSignModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form id="editSignForm" method="POST">
-        <div class="modal-header">
-          <h5 class="modal-title">Edit Sign</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label for="edit_sign_name" class="form-label">Sign Name</label>
-            <input type="text" name="sign_name" id="edit_sign_name" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label for="edit_sign_indicator" class="form-label">Indicator</label>
-            <input type="text" name="sign_indicator" id="edit_sign_indicator" class="form-control" required>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const ALL_DEV_DATA = JSON.parse(document.body.dataset.playerDev || '{}');
 
-  // --- Sticky Tabs Logic ---
-  const mainTabs = document.getElementById('mainTabs');
-  const activeTabInputs = document.querySelectorAll('.active-tab-input');
-  const allTabPanes = document.querySelectorAll('.tab-content .tab-pane');
+    // --- Sticky Tabs Logic ---
+    const mainTabs = document.getElementById('mainTabs');
+    const activeTabInputs = document.querySelectorAll('.active-tab-input');
+    const allTabPanes = document.querySelectorAll('.tab-content .tab-pane');
 
-  function setActiveTab() {
-      mainTabs.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-      allTabPanes.forEach(pane => pane.classList.remove('active', 'show'));
-      
-      const urlHash = window.location.hash;
-      let tabToActivate = urlHash ? mainTabs.querySelector(`.nav-link[href="${urlHash}"]`) : null;
+    function setActiveTab() {
+        mainTabs.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        allTabPanes.forEach(pane => pane.classList.remove('active', 'show'));
+        
+        const urlHash = window.location.hash;
+        let tabToActivate = urlHash ? mainTabs.querySelector(`.nav-link[href="${urlHash}"]`) : null;
 
-      if (!tabToActivate) {
-          tabToActivate = mainTabs.querySelector('.nav-link');
-      }
+        if (!tabToActivate || tabToActivate.offsetParent === null) {
+            tabToActivate = mainTabs.querySelector('.nav-link');
+        }
 
-      if (tabToActivate) {
-          tabToActivate.classList.add('active');
-          const paneToActivate = document.querySelector(tabToActivate.getAttribute('href'));
-          if(paneToActivate) {
-              paneToActivate.classList.add('show', 'active');
-          }
-      }
-      
-      activeTabInputs.forEach(input => { 
-          input.value = tabToActivate ? tabToActivate.getAttribute('href') : '#roster';
-      });
-  }
-
-  mainTabs.addEventListener('shown.bs.tab', (event) => {
-    if (history.pushState) {
-        history.pushState(null, null, event.target.getAttribute('href'));
-    } else {
-        window.location.hash = event.target.getAttribute('href');
-    }
-    setActiveTab();
-  });
-
-  window.addEventListener('popstate', setActiveTab);
-  setActiveTab();
-
-  // --- Reorderable Tabs Logic ---
-  new Sortable(mainTabs, {
-      animation: 150,
-      handle: '.drag-handle',
-      onEnd: () => {
-          const order = [...mainTabs.querySelectorAll('li.nav-item')].map(item => item.dataset.tabId);
-          fetch('/save_tab_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order }) });
-      }
-  });
-  
-  // --- Inline Player Roster Editing ---
-  document.getElementById('rosterAccordion')?.addEventListener('click', event => {
-    if (event.target.classList.contains('save-player-btn')) {
-      const item = event.target.closest('.accordion-item');
-      const index = item.dataset.playerIndex;
-      const formData = new URLSearchParams();
-      item.querySelectorAll('input, select, textarea').forEach(input => {
-        formData.append(input.name, input.value);
-      });
-      
-      fetch(`/update_player_inline/${index}`, { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert(data.message);
-                window.location.reload();
-            } else {
-                alert(`Error: ${data.message}`);
+        if (tabToActivate) {
+            tabToActivate.classList.add('active');
+            const paneToActivate = document.querySelector(tabToActivate.getAttribute('href'));
+            if(paneToActivate) {
+                paneToActivate.classList.add('show', 'active');
             }
-        }).catch(err => alert(`Fetch Error: ${err}`));
+        }
+        
+        activeTabInputs.forEach(input => { 
+            input.value = tabToActivate ? tabToActivate.getAttribute('href') : '#roster';
+        });
     }
-  });
 
-  // --- Player Development Saving Logic ---
-  document.querySelectorAll('.save-development-btn').forEach(button => {
-    button.addEventListener('click', (event) => {
-        const form = event.target.closest('.player-development-form');
-        const playerName = form.dataset.playerName;
-        const formData = new URLSearchParams(new FormData(form));
-
-        fetch(`/save_player_development/${playerName}`, {
-            method: 'POST',
-            body: formData
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                button.textContent = 'Saved!';
-                button.classList.remove('btn-primary');
-                button.classList.add('btn-success');
-                setTimeout(() => {
-                    button.textContent = 'Save Development Plan';
-                    button.classList.remove('btn-success');
-                    button.classList.add('btn-primary');
-                }, 2000);
-            } else {
-                alert('Error: ' + data.message);
-            }
-        }).catch(err => alert('An error occurred: ' + err));
+    mainTabs.addEventListener('shown.bs.tab', (event) => {
+        if (history.pushState) {
+            history.pushState(null, null, event.target.getAttribute('href'));
+        } else {
+            window.location.hash = event.target.getAttribute('href');
+        }
+        activeTabInputs.forEach(input => { 
+          input.value = event.target.getAttribute('href');
+        });
     });
-  });
 
-  // --- Edit Sign Modal Logic ---
-  const editSignModalEl = document.getElementById('editSignModal');
-  if (editSignModalEl) {
+    window.addEventListener('popstate', setActiveTab);
+    setActiveTab();
+
+    // --- Reorderable Tabs Logic ---
+    new Sortable(mainTabs, {
+        animation: 150,
+        handle: '.drag-handle',
+        onEnd: () => {
+            const order = [...mainTabs.querySelectorAll('li.nav-item')].map(item => item.dataset.tabId);
+            fetch('/save_tab_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order }) });
+        }
+    });
+  
+    // --- Inline Player Roster Editing ---
+    document.getElementById('rosterAccordion')?.addEventListener('click', event => {
+        if (event.target.classList.contains('save-player-btn')) {
+            const item = event.target.closest('.accordion-item');
+            const index = item.dataset.playerIndex;
+            const formData = new URLSearchParams();
+            item.querySelectorAll('input, select, textarea').forEach(input => {
+                formData.append(input.name, input.value);
+            });
+            
+            fetch(`/update_player_inline/${index}`, { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.reload();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            }).catch(err => alert(`Fetch Error: ${err}`));
+        }
+    });
+
+    // --- Player Development Modals Logic ---
+    const editFocusModalEl = document.getElementById('editFocusModal');
+    if(editFocusModalEl) {
+        editFocusModalEl.addEventListener('show.bs.modal', event => {
+            const button = event.relatedTarget;
+            const action = button.dataset.action;
+            const playerName = button.dataset.playerName;
+            const skill = button.dataset.skill;
+            const focusId = button.dataset.focusId;
+
+            const modalTitle = editFocusModalEl.querySelector('.modal-title');
+            const form = editFocusModalEl.querySelector('#editFocusForm');
+            const completeForm = editFocusModalEl.querySelector('#completeFocusForm');
+            const skillInput = form.querySelector('#editFocusSkill');
+            const focusTextInput = form.querySelector('#editFocusText');
+            const notesInput = form.querySelector('#editFocusNotes');
+            const completeBtn = editFocusModalEl.querySelector('#completeFocusBtn');
+
+            skillInput.value = skill;
+            const skillTitle = skill.charAt(0).toUpperCase() + skill.slice(1);
+
+            if (action === 'add') {
+                modalTitle.textContent = `Add New ${skillTitle} Focus for ${playerName}`;
+                form.action = `/add_focus/${playerName}`;
+                focusTextInput.value = '';
+                notesInput.value = '';
+                completeBtn.style.display = 'none';
+            } else { // 'edit'
+                modalTitle.textContent = `Edit Active ${skillTitle} Focus for ${playerName}`;
+                form.action = `/update_focus/${focusId}`;
+                completeForm.action = `/complete_focus/${focusId}`;
+                completeBtn.style.display = 'block';
+
+                const focusItem = ALL_DEV_DATA[playerName]?.[skill]?.find(f => f.id == focusId);
+                if(focusItem) {
+                    focusTextInput.value = focusItem.focus;
+                    notesInput.value = focusItem.notes;
+                }
+            }
+        });
+    }
+
+    const historyModalEl = document.getElementById('historyModal');
+    if(historyModalEl) {
+        historyModalEl.addEventListener('show.bs.modal', event => {
+            const button = event.relatedTarget;
+            const playerName = button.dataset.playerName;
+            const skill = button.dataset.skill;
+            
+            const modalTitle = historyModalEl.querySelector('.modal-title');
+            const modalBody = historyModalEl.querySelector('.modal-body');
+            const skillTitle = skill.charAt(0).toUpperCase() + skill.slice(1);
+
+            modalTitle.textContent = `${skillTitle} History for ${playerName}`;
+            
+            const historyItems = ALL_DEV_DATA[playerName]?.[skill]?.filter(f => f.status === 'completed') || [];
+            
+            if (historyItems.length === 0) {
+                modalBody.innerHTML = '<p>No completed items in history.</p>';
+                return;
+            }
+
+            let historyHtml = '<ul class="list-group list-group-flush">';
+            historyItems.sort((a, b) => (b.completed_date || '').localeCompare(a.completed_date || '')).forEach(item => {
+                historyHtml += `
+                    <li class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${item.focus}</h6>
+                            <small>Completed: ${item.completed_date || 'N/A'}</small>
+                        </div>
+                        <p class="mb-1 small">${item.notes || 'No notes.'}</p>
+                        <small class="text-muted">Created: ${item.created_date}</small>
+                    </li>
+                `;
+            });
+            historyHtml += '</ul>';
+            modalBody.innerHTML = historyHtml;
+        });
+    }
+
+    // --- Edit Sign Modal Logic ---
+    const editSignModalEl = document.getElementById('editSignModal');
+    if (editSignModalEl) {
       editSignModalEl.addEventListener('show.bs.modal', event => {
           const button = event.relatedTarget;
           const form = editSignModalEl.querySelector('form');
@@ -1033,69 +786,33 @@ document.addEventListener('DOMContentLoaded', () => {
           form.querySelector('#edit_sign_name').value = button.dataset.signName;
           form.querySelector('#edit_sign_indicator').value = button.dataset.signIndicator;
       });
-  }
+    }
 
-  // --- Edit Lineup Modal Logic ---
-  const editLineupModal = document.getElementById('editLineupModal');
-  if (editLineupModal) {
-      let sortable = null; // To hold the Sortable.js instance
-
+    // --- Edit Lineup Modal Logic ---
+    const editLineupModal = document.getElementById('editLineupModal');
+    if (editLineupModal) {
+      let sortable = null;
       editLineupModal.addEventListener('show.bs.modal', event => {
           const button = event.relatedTarget;
           const form = document.getElementById('editLineupForm');
           const modalBody = editLineupModal.querySelector('.modal-body');
-          
           const lineupIndex = button.dataset.lineupIndex;
           const lineupTitle = button.dataset.lineupTitle;
           const lineupPlayers = JSON.parse(decodeURIComponent(button.dataset.lineupPlayers));
           const lineupPlayerNames = new Set(lineupPlayers.map(p => p.name));
-          
           const fullRoster = JSON.parse(document.body.dataset.roster);
-          
           form.action = `/edit_lineup/${lineupIndex}`;
-          
           let playerHtml = '';
-          
           lineupPlayers.forEach(player => {
-              playerHtml += `
-                  <li class="list-group-item d-flex align-items-center">
-                      <i class="bi bi-grip-vertical me-3" style="cursor: move;"></i>
-                      <input class="form-check-input me-3" type="checkbox" name="lineup_player" value="${player.name}" id="edit-lineup-${player.name.replace(/\s+/g, '-')}" checked>
-                      <label class="form-check-label d-flex align-items-center" for="edit-lineup-${player.name.replace(/\s+/g, '-')}">
-                          <span class="lineup-order-number fw-bold me-2" style="width: 2em;"></span>
-                          ${player.name}
-                      </label>
-                  </li>`;
+              playerHtml += `<li class="list-group-item d-flex align-items-center"><i class="bi bi-grip-vertical me-3" style="cursor: move;"></i><input class="form-check-input me-3" type="checkbox" name="lineup_player" value="${player.name}" id="edit-lineup-${player.name.replace(/\s+/g, '-')}" checked><label class="form-check-label d-flex align-items-center" for="edit-lineup-${player.name.replace(/\s+/g, '-')}"><span class="lineup-order-number fw-bold me-2" style="width: 2em;"></span>${player.name}</label></li>`;
           });
-
           fullRoster.forEach(player => {
               if (!lineupPlayerNames.has(player.name)) {
-                  playerHtml += `
-                      <li class="list-group-item d-flex align-items-center">
-                          <i class="bi bi-grip-vertical me-3" style="cursor: move;"></i>
-                          <input class="form-check-input me-3" type="checkbox" name="lineup_player" value="${player.name}" id="edit-lineup-${player.name.replace(/\s+/g, '-')}">
-                          <label class="form-check-label d-flex align-items-center" for="edit-lineup-${player.name.replace(/\s+/g, '-')}">
-                              <span class="lineup-order-number fw-bold me-2" style="width: 2em;"></span>
-                              ${player.name}
-                          </label>
-                      </li>`;
+                  playerHtml += `<li class="list-group-item d-flex align-items-center"><i class="bi bi-grip-vertical me-3" style="cursor: move;"></i><input class="form-check-input me-3" type="checkbox" name="lineup_player" value="${player.name}" id="edit-lineup-${player.name.replace(/\s+/g, '-')}"><label class="form-check-label d-flex align-items-center" for="edit-lineup-${player.name.replace(/\s+/g, '-')}"><span class="lineup-order-number fw-bold me-2" style="width: 2em;"></span>${player.name}</label></li>`;
               }
           });
-
-          modalBody.innerHTML = `
-              <input type="hidden" name="active_tab" value="#lineups">
-              <div class="mb-3">
-                  <label for="lineup_title_edit" class="form-label">Lineup Title</label>
-                  <input type="text" name="lineup_title" id="lineup_title_edit" class="form-control" value="${lineupTitle}" required>
-              </div>
-              <h5>Players (Check/Uncheck and Drag to Reorder)</h5>
-              <ul id="sortable-player-list" class="list-group">
-                  ${playerHtml}
-              </ul>
-          `;
-          
+          modalBody.innerHTML = `<input type="hidden" name="active_tab" value="#lineups"><div class="mb-3"><label for="lineup_title_edit" class="form-label">Lineup Title</label><input type="text" name="lineup_title" id="lineup_title_edit" class="form-control" value="${lineupTitle}" required></div><h5>Players (Check/Uncheck and Drag to Reorder)</h5><ul id="sortable-player-list" class="list-group">${playerHtml}</ul>`;
           const sortableList = document.getElementById('sortable-player-list');
-
           const updateLineupNumbers = () => {
               const listItems = sortableList.querySelectorAll('li');
               let checkedCounter = 1;
@@ -1112,11 +829,9 @@ document.addEventListener('DOMContentLoaded', () => {
                   }
               });
           };
-
           sortableList.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
               checkbox.addEventListener('change', updateLineupNumbers);
           });
-
           if (sortableList) {
               sortable = new Sortable(sortableList, {
                   animation: 150,
@@ -1124,10 +839,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   onEnd: updateLineupNumbers
               });
           }
-          
           updateLineupNumbers();
       });
-      
       editLineupModal.addEventListener('hidden.bs.modal', () => {
           if (sortable) {
               sortable.destroy();
@@ -1135,7 +848,26 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           editLineupModal.querySelector('.modal-body').innerHTML = ''; 
       });
-  }
+    }
+
+    // --- Practice Plan Task Status Update ---
+    window.updateTaskStatus = function(planId, taskId, isChecked) {
+        const status = isChecked ? 'complete' : 'pending';
+        fetch(`/update_task_status/${planId}/${taskId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: status })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                alert('Failed to update task status.');
+            }
+            // Optionally, refresh or dynamically update the UI element
+             window.location.reload(); 
+        })
+        .catch(error => console.error('Error:', error));
+    }
 });
 </script>
 </body>

@@ -5,18 +5,15 @@
             "password_hash": "scrypt:32768:8:1$oUgMXAo0RQRn7YXq$d12a6062d5647d9fec96dba68357dc477be8671ca10ad3e4a08b44c0a0f37cb8e82c50239bcc3c81fd373656b59057783296eee79e5da8ab83e45d57d0b35186",
             "role": "Admin",
             "tab_order": [
-                "scouting_list",
                 "roster",
+                "player_development",
                 "lineups",
-                "collaboration",
                 "pitching",
-                "rotations",
                 "practice_plan",
                 "games",
-                "hitting_focus",
-                "pitching_focus",
-                "fielding_focus",
-                "baserunning_focus",
+                "scouting_list",
+                "rotations",
+                "collaboration",
                 "signs"
             ]
         },
@@ -59,11 +56,11 @@
             "position2": "P",
             "throws": "Left",
             "bats": "Right",
-            "notes": "",
+            "notes": "Good situational hitter.",
             "pitcher_role": "Reliever",
-            "position3": "",
+            "position3": "OF",
             "has_lessons": "Yes",
-            "lesson_focus": "Pitching"
+            "lesson_focus": "Pitching mechanics - staying tall."
         },
         {
             "name": "Rylan Wright",
@@ -72,68 +69,41 @@
             "position2": "P",
             "throws": "Right",
             "bats": "Right",
-            "notes": "",
+            "notes": "Team leader. Great attitude.",
             "pitcher_role": "Starter",
-            "position3": "",
+            "position3": "SS",
             "has_lessons": "No",
             "lesson_focus": ""
         },
         {
             "name": "Reed Evans",
             "number": 5,
-            "position1": "3B",
+            "position1": "C",
             "position2": "P",
             "throws": "Right",
             "bats": "Right",
-            "notes": "",
+            "notes": "Solid defensive catcher.",
             "pitcher_role": "Starter",
-            "position3": "",
+            "position3": "3B",
             "has_lessons": "No",
             "lesson_focus": ""
         }
     ],
     "lineups": [
         {
-            "title": "Test 2",
+            "title": "Weekend Opener vs. Canes",
             "players": [
                 {
                     "name": "Rylan Wright",
-                    "number": 1,
-                    "position1": "3B",
-                    "position2": "P",
-                    "throws": "Right",
-                    "bats": "Right",
-                    "notes": "",
-                    "pitcher_role": "Starter",
-                    "position3": "",
-                    "has_lessons": "No",
-                    "lesson_focus": ""
+                    "number": 1
                 },
                 {
                     "name": "Reed Evans",
-                    "number": 5,
-                    "position1": "3B",
-                    "position2": "P",
-                    "throws": "Right",
-                    "bats": "Right",
-                    "notes": "",
-                    "pitcher_role": "Starter",
-                    "position3": "",
-                    "has_lessons": "No",
-                    "lesson_focus": ""
+                    "number": 5
                 },
                 {
                     "name": "Graham Menard",
-                    "number": 3,
-                    "position1": "1B",
-                    "position2": "P",
-                    "throws": "Left",
-                    "bats": "Right",
-                    "notes": "",
-                    "pitcher_role": "Reliever",
-                    "position3": "",
-                    "has_lessons": "No",
-                    "lesson_focus": ""
+                    "number": 3
                 }
             ]
         }
@@ -151,44 +121,114 @@
             },
             {
                 "name": "Jack Fordice",
-                "position1": "C",
-                "position2": "LF",
+                "position1": "OF",
+                "position2": "1B",
                 "throws": "Right",
                 "bats": "Right"
             }
         ],
         "not_interested": []
     },
-    "rotations": [],
-    "games": [],
+    "rotations": [
+        {
+            "id": 1720454400,
+            "title": "Grand Park Weekend Rotation",
+            "innings": {
+                "1": "Rylan Wright",
+                "2": "Rylan Wright",
+                "3": "Rylan Wright",
+                "4": "Reed Evans",
+                "5": "Reed Evans",
+                "6": "Graham Menard"
+            }
+        }
+    ],
+    "games": [
+        {
+            "date": "2025-07-12",
+            "opponent": "Cincy Flames",
+            "location": "Grand Park, Field 4",
+            "game_notes": "Double header, be there at 8 AM.",
+            "associated_lineup_title": "Weekend Opener vs. Canes",
+            "associated_rotation_date": ""
+        }
+    ],
     "feedback": [],
     "settings": {
         "registration_code": "Westfield"
     },
     "collaboration_notes": {
-        "player_notes": [],
+        "player_notes": [
+            {
+                "text": "Needs to work on keeping his front shoulder closed when hitting.",
+                "author": "jwright",
+                "timestamp": "2025-06-29 10:00",
+                "player_name": "Graham Menard"
+            }
+        ],
         "team_notes": []
     },
-    "practice_plans": [],
+    "practice_plans": [
+        {
+            "id": 1720372800,
+            "date": "2025-07-07",
+            "general_notes": "Focus on baserunning and defensive fundamentals.",
+            "tasks": [
+                {
+                    "id": 1720372801,
+                    "text": "Dynamic Warmup & Throws",
+                    "status": "pending"
+                },
+                {
+                    "id": 1720372802,
+                    "text": "Infield / Outfield work - 2 rounds",
+                    "status": "pending"
+                },
+                {
+                    "id": 1720372803,
+                    "text": "Live BP - Situational Hitting",
+                    "status": "complete"
+                }
+            ]
+        }
+    ],
     "player_development": {
         "Reed Evans": {
-            "hitting": "",
-            "pitching": "",
-            "fielding": "",
-            "baserunning": ""
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
         },
         "Rylan Wright": {
-            "hitting": "",
-            "pitching": "",
-            "fielding": "",
-            "baserunning": ""
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
         },
         "Graham Menard": {
-            "hitting": "Not stepping out",
-            "pitching": "",
-            "fielding": "",
-            "baserunning": ""
+            "hitting": [
+                {
+                    "id": 1751385603401,
+                    "focus": "Not stepping out",
+                    "status": "active",
+                    "notes": "Using a bat in front of the plate to prevent stepping out.",
+                    "created_date": "2025-07-01",
+                    "completed_date": null
+                }
+            ],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
         }
     },
-    "signs": []
+    "signs": [
+        {
+            "name": "Steal",
+            "indicator": "Touch Belt"
+        },
+        {
+            "name": "Bunt",
+            "indicator": "Touch Chin"
+        }
+    ]
 }

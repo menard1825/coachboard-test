@@ -24,8 +24,8 @@ def load_data():
         "settings": {"registration_code": "DEFAULT_CODE"},
         "collaboration_notes": {"player_notes": [], "team_notes": []},
         "practice_plans": [],
-        "player_development": {}, # For Hitting, Fielding, etc. focus
-        "signs": [] # For team signs
+        "player_development": {},
+        "signs": []
     }
     if not os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'w') as f:
@@ -43,34 +43,47 @@ def load_data():
         data.setdefault(key, value)
 
     # --- Data Migrations ---
-    for user in data['users']:
-        if 'role' not in user:
-            user['role'] = 'Admin' if user['username'] == 'Mike1825' else 'Coach'
-        if 'tab_order' not in user:
-            default_tab_keys = list(default_data.keys())
-            tabs_to_exclude = ['users', 'feedback', 'settings', 'player_development', 'hitting_focus', 'pitching_focus', 'fielding_focus', 'baserunning_focus']
-            user['tab_order'] = [key for key in default_tab_keys if key not in tabs_to_exclude]
-
-
-    if 'rotations' in data:
-        for rotation in data['rotations']:
-            if 'positions' in rotation and 'innings' not in rotation:
-                rotation['innings'] = {'1': rotation.pop('positions')}
-            elif 'innings' not in rotation:
-                rotation['innings'] = {}
+    save_needed = False
+    today_str = date.today().strftime('%Y-%m-%d')
     
-    for player in data.get('roster', []):
-        player.setdefault('position3', '')
-        player.setdefault('has_lessons', 'No')
-        player.setdefault('lesson_focus', '')
+    # Migration for Player Development from string to log structure
+    if 'player_development' in data:
+        for player_name, skills in data['player_development'].items():
+            for skill_name, focus in skills.items():
+                if isinstance(focus, str):
+                    save_needed = True
+                    if focus: # Only migrate non-empty strings
+                        skills[skill_name] = [{
+                            "id": int(time.time() * 1000) + random.randint(1, 999),
+                            "focus": focus,
+                            "status": "active",
+                            "notes": "",
+                            "created_date": today_str,
+                            "completed_date": None
+                        }]
+                    else: # If focus was an empty string, make it an empty list
+                        skills[skill_name] = []
 
-    if 'roster' in data and 'player_development' in data:
-        roster_names = {p['name'] for p in data['roster']}
-        for name in roster_names:
-            if name not in data['player_development']:
-                data['player_development'][name] = {
-                    "hitting": "", "pitching": "", "fielding": "", "baserunning": ""
-                }
+    for player in data.get('roster', []):
+        if 'has_lessons' not in player:
+            player['has_lessons'] = 'No'
+            save_needed = True
+        if 'lesson_focus' not in player:
+            player['lesson_focus'] = ''
+            save_needed = True
+
+    # Ensure all players in roster have a player_development entry
+    roster_names = {p['name'] for p in data.get('roster', [])}
+    for name in roster_names:
+        if name not in data.get('player_development', {}):
+            data.setdefault('player_development', {})[name] = {
+                "hitting": [], "pitching": [], "fielding": [], "baserunning": []
+            }
+            save_needed = True
+
+    if save_needed:
+        save_data(data)
+
     return data
 
 def save_data(data):
@@ -177,17 +190,24 @@ def home():
     data = load_data()
     user = next((u for u in data.get('users', []) if u['username'] == session['username']), None)
     all_tabs = {
-        'roster': 'Roster', 'lineups': 'Lineups', 'pitching': 'Pitching Log',
-        'scouting_list': 'Scouting List', 'rotations': 'Rotations',
-        'games': 'Games', 'collaboration': 'Collaboration', 'practice_plan': 'Practice Plan',
+        'roster': 'Roster', 
         'player_development': 'Player Development',
+        'lineups': 'Lineups', 
+        'pitching': 'Pitching Log',
+        'scouting_list': 'Scouting List', 
+        'rotations': 'Rotations',
+        'games': 'Games', 
+        'collaboration': 'Collaboration', 
+        'practice_plan': 'Practice Plan',
         'signs': 'Signs'
     }
     default_tab_keys = list(all_tabs.keys())
     user_tab_order = user.get('tab_order', default_tab_keys) if user else default_tab_keys
     for key in default_tab_keys:
-        if key not in user_tab_order:
+        if key not in user_tab_order and key in all_tabs:
             user_tab_order.append(key)
+    user_tab_order = [key for key in user_tab_order if key in all_tabs]
+
     all_players_for_count = data['roster'] + data['scouting_list']['committed'] + data['scouting_list']['targets']
     position_counts = {}
     if all_players_for_count:
@@ -301,6 +321,85 @@ def reset_password(username):
     flash(f"Password for {username} has been reset. The temporary password is: {temp_password}", 'success')
     return redirect(url_for('user_management'))
 
+# --- Player Development Routes ---
+def find_focus_by_id(data, focus_id):
+    for player, skills in data['player_development'].items():
+        for skill, focuses in skills.items():
+            if isinstance(focuses, list):
+                for focus_item in focuses:
+                    if focus_item.get('id') == focus_id:
+                        return focus_item
+    return None
+
+@app.route('/add_focus/<player_name>', methods=['POST'])
+@login_required
+def add_focus(player_name):
+    data = load_data()
+    skill = request.form.get('skill')
+    focus_text = request.form.get('focus_text')
+    
+    if not all([skill, focus_text, player_name in data['player_development']]):
+        flash('Skill, focus text, and valid player are required.', 'danger')
+        return redirect(url_for('home', _anchor='player_development'))
+
+    new_focus = {
+        "id": int(time.time() * 1000) + random.randint(1, 999),
+        "focus": focus_text,
+        "status": "active",
+        "notes": request.form.get('notes', ''),
+        "created_date": date.today().strftime('%Y-%m-%d'),
+        "completed_date": None
+    }
+    data['player_development'][player_name][skill].append(new_focus)
+    save_data(data)
+    flash(f'New {skill} focus added for {player_name}.', 'success')
+    return redirect(url_for('home', _anchor='player_development'))
+
+@app.route('/update_focus/<int:focus_id>', methods=['POST'])
+@login_required
+def update_focus(focus_id):
+    data = load_data()
+    focus_item = find_focus_by_id(data, focus_id)
+    if not focus_item:
+        flash('Focus item not found.', 'danger')
+        return redirect(url_for('home', _anchor='player_development'))
+    
+    focus_item['focus'] = request.form.get('focus_text', focus_item['focus'])
+    focus_item['notes'] = request.form.get('notes', focus_item['notes'])
+    save_data(data)
+    flash('Focus item updated successfully.', 'success')
+    return redirect(url_for('home', _anchor='player_development'))
+
+@app.route('/complete_focus/<int:focus_id>', methods=['POST'])
+@login_required
+def complete_focus(focus_id):
+    data = load_data()
+    focus_item = find_focus_by_id(data, focus_id)
+    if not focus_item:
+        flash('Focus item not found.', 'danger')
+        return redirect(url_for('home', _anchor='player_development'))
+    
+    focus_item['status'] = 'completed'
+    focus_item['completed_date'] = date.today().strftime('%Y-%m-%d')
+    save_data(data)
+    flash('Focus marked as complete!', 'success')
+    return redirect(url_for('home', _anchor='player_development'))
+
+@app.route('/update_lesson_info/<player_name>', methods=['POST'])
+@login_required
+def update_lesson_info(player_name):
+    data = load_data()
+    player = next((p for p in data['roster'] if p['name'] == player_name), None)
+    if not player:
+        flash('Player not found.', 'danger')
+        return redirect(url_for('home', _anchor='player_development'))
+
+    player['has_lessons'] = request.form.get('has_lessons')
+    player['lesson_focus'] = request.form.get('lesson_focus')
+    save_data(data)
+    flash(f'Lesson info for {player_name} updated.', 'success')
+    return redirect(url_for('home', _anchor='player_development'))
+
 # --- Roster and Player Routes ---
 @app.route('/update_player_inline/<int:index>', methods=['POST'])
 @login_required
@@ -308,7 +407,7 @@ def update_player_inline(index):
     data = load_data()
     if not (0 <= index < len(data['roster'])):
         return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
-        
+    
     player_to_edit = data['roster'][index]
     original_name = player_to_edit['name']
 
@@ -336,37 +435,6 @@ def update_player_inline(index):
 
     save_data(data)
     return jsonify({'status': 'success', 'message': f'Player "{player_to_edit["name"]}" updated successfully!'})
-
-
-@app.route('/add_player_inline', methods=['POST'])
-@login_required
-def add_player_inline():
-    data = load_data()
-    new_name = request.form.get('name')
-    new_number_str = request.form.get('number', '')
-    if any(p['name'].lower() == new_name.lower() for p in data['roster']):
-        return jsonify({'status': 'error', 'message': f'A player named "{new_name}" already exists.'}), 400
-    if new_number_str and any(str(p.get('number', '')) == new_number_str for p in data['roster']):
-        return jsonify({'status': 'error', 'message': f'A player with number "{new_number_str}" already exists.'}), 400
-    try:
-        player_number = int(new_number_str) if new_number_str else ''
-    except ValueError:
-        return jsonify({'status': 'error', 'message': 'Player number must be a valid integer.'}), 400
-    player = { 
-        "name": new_name, "number": player_number, 
-        "position1": request.form.get('position1'), "position2": request.form.get('position2'),
-        "position3": request.form.get('position3'),
-        "throws": request.form.get('throws'), "bats": request.form.get('bats'), 
-        "notes": request.form.get('notes', ''), 
-        "pitcher_role": request.form.get('pitcher_role', 'Not a Pitcher'),
-        "has_lessons": "No",
-        "lesson_focus": ""
-    }
-    data['roster'].append(player)
-    data['player_development'][new_name] = {"hitting": "", "pitching": "", "fielding": "", "baserunning": ""}
-    save_data(data)
-    flash('Player added successfully!', 'success')
-    return jsonify({'status': 'success', 'message': 'Player added successfully!'})
 
 @app.route('/delete_player/<int:index>')
 @login_required
@@ -411,33 +479,6 @@ def edit_player(index):
         return redirect(url_for('home', _anchor='roster'))
     else:
         return render_template('edit_player.html', player=player_to_edit, index=index, session=session)
-
-# --- Player Development Route ---
-@app.route('/save_player_development/<player_name>', methods=['POST'])
-@login_required
-def save_player_development(player_name):
-    data = load_data()
-    
-    # Find player in roster to update lesson info
-    player_in_roster = next((p for p in data['roster'] if p['name'] == player_name), None)
-    if player_in_roster:
-        player_in_roster['has_lessons'] = request.form.get('has_lessons')
-        player_in_roster['lesson_focus'] = request.form.get('lesson_focus')
-    else:
-        return jsonify({'status': 'error', 'message': 'Player not found in roster.'}), 404
-
-    # Find player in development dict to update focus info
-    if player_name in data['player_development']:
-        data['player_development'][player_name]['hitting'] = request.form.get('hitting_focus')
-        data['player_development'][player_name]['pitching'] = request.form.get('pitching_focus')
-        data['player_development'][player_name]['fielding'] = request.form.get('fielding_focus')
-        data['player_development'][player_name]['baserunning'] = request.form.get('baserunning_focus')
-    else:
-        return jsonify({'status': 'error', 'message': 'Player not found in development records.'}), 404
-        
-    save_data(data)
-    return jsonify({'status': 'success', 'message': f'Development plan for {player_name} saved.'})
-
 
 # --- Pitching Routes ---
 @app.route('/add_pitching', methods=['POST'])
@@ -519,7 +560,6 @@ def delete_sign(index):
     return redirect(url_for('home', _anchor='signs'))
 
 # --- ALL OTHER ORIGINAL ROUTES ---
-
 @app.route('/save_rotation', methods=['POST'])
 @login_required
 def save_rotation():
