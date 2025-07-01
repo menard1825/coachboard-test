@@ -2,18 +2,48 @@
     "users": [
         {
             "username": "Mike1825",
-            "password_hash": "scrypt:32768:8:1$huGclNHXABMHEcy8$d0f4d42f6d9d3b15b1f5bb9e8542329c7702498ad6d4b770db138286a3d85ff1725e67d01aaa2a783aa71734fa0944bec5da0c485334a27b416b6d5c9de7e688",
-            "role": "Admin"
+            "password_hash": "scrypt:32768:8:1$oUgMXAo0RQRn7YXq$d12a6062d5647d9fec96dba68357dc477be8671ca10ad3e4a08b44c0a0f37cb8e82c50239bcc3c81fd373656b59057783296eee79e5da8ab83e45d57d0b35186",
+            "role": "Admin",
+            "tab_order": [
+                "scouting_list",
+                "roster",
+                "collaboration",
+                "lineups",
+                "pitching",
+                "rotations",
+                "practice_plan",
+                "games"
+            ]
         },
         {
-            "username": "jmenard19",
-            "password_hash": "scrypt:32768:8:1$NXmmyfrZ8mNPHTNu$f6ebea2ddcc2429b29136a329e66bcc66b65d507395417ea898b86d50c74064274305bfcc3c00a51d898930f390f27fba5c0638362bbc4dd8cb87b26fa75fd7f",
-            "role": "Coach"
+            "username": "jwright",
+            "password_hash": "scrypt:32768:8:1$qGTaVLpax8uBvwj4$4acd427d54659ab67d12815429f662346898c3931dd4955a0c77ba50d9da0778468a02ae7f39e6d8da13e2e21b0640079fcb77701ad42cdc7dc5366e6632b7ea",
+            "role": "Admin",
+            "tab_order": [
+                "lineups",
+                "roster",
+                "pitching",
+                "scouting_list",
+                "rotations",
+                "games",
+                "collaboration",
+                "practice_plan"
+            ]
         },
         {
-            "username": "Test",
-            "password_hash": "scrypt:32768:8:1$CGBLbtS8ECHhfTnB$9f68e10f32b23774684b45f33e177ef2696ab318768076da045a45c13a2d329e007b99f619668bc9e5e9bd8921ac770745e3c7d973b3f9e0f0fa01777b854cac",
-            "role": "Coach"
+            "username": "jvans",
+            "password_hash": "scrypt:32768:8:1$tYvZq00a2cOYQlYU$c786840f76b64f0728dda98092b524a78038d7aeb65b0e713a8dd7d4464aafff7e3f332008a1ff3a093ae66f8388d22d10b7fde153b24f919ccbd003a983915a",
+            "role": "Coach",
+            "tab_order": [
+                "roster",
+                "lineups",
+                "pitching",
+                "scouting_list",
+                "rotations",
+                "games",
+                "collaboration",
+                "practice_plan"
+            ]
         }
     ],
     "roster": [
@@ -28,20 +58,10 @@
             "pitcher_role": "Reliever"
         },
         {
-            "name": "Jack Fordice",
-            "number": "",
-            "position1": "C",
-            "position2": "RF",
-            "throws": "Right",
-            "bats": "Right",
-            "notes": "",
-            "pitcher_role": "Not a Pitcher"
-        },
-        {
             "name": "Rylan Wright",
-            "number": "",
+            "number": 1,
             "position1": "3B",
-            "position2": "",
+            "position2": "P",
             "throws": "Right",
             "bats": "Right",
             "notes": "",
@@ -49,7 +69,7 @@
         },
         {
             "name": "Reed Evans",
-            "number": "",
+            "number": 5,
             "position1": "3B",
             "position2": "P",
             "throws": "Right",
@@ -60,15 +80,31 @@
     ],
     "lineups": [],
     "pitching": [],
+    "scouting_list": {
+        "committed": [],
+        "targets": [
+            {
+                "name": "Luke Charles",
+                "position1": "C",
+                "position2": "",
+                "throws": "Right",
+                "bats": "Right"
+            },
+            {
+                "name": "Jack Fordice",
+                "position1": "C",
+                "position2": "LF",
+                "throws": "Right",
+                "bats": "Right"
+            }
+        ],
+        "not_interested": []
+    },
     "rotations": [],
     "games": [],
     "feedback": [],
     "settings": {
         "registration_code": "Westfield"
-    },
-    "scouting_list": {
-        "committed": [],
-        "targets": []
     },
     "collaboration_notes": {
         "player_notes": [],
