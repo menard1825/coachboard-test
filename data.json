@@ -92,52 +92,7 @@
             "lesson_focus": ""
         }
     ],
-    "lineups": [
-        {
-            "title": "Test 2",
-            "players": [
-                {
-                    "name": "Graham Menard",
-                    "number": 3,
-                    "position1": "1B",
-                    "position2": "P",
-                    "throws": "Left",
-                    "bats": "Right",
-                    "notes": "",
-                    "pitcher_role": "Reliever",
-                    "position3": "",
-                    "has_lessons": "No",
-                    "lesson_focus": ""
-                },
-                {
-                    "name": "Rylan Wright",
-                    "number": 1,
-                    "position1": "3B",
-                    "position2": "P",
-                    "throws": "Right",
-                    "bats": "Right",
-                    "notes": "",
-                    "pitcher_role": "Starter",
-                    "position3": "",
-                    "has_lessons": "No",
-                    "lesson_focus": ""
-                },
-                {
-                    "name": "Reed Evans",
-                    "number": 5,
-                    "position1": "3B",
-                    "position2": "P",
-                    "throws": "Right",
-                    "bats": "Right",
-                    "notes": "",
-                    "pitcher_role": "Starter",
-                    "position3": "",
-                    "has_lessons": "No",
-                    "lesson_focus": ""
-                }
-            ]
-        }
-    ],
+    "lineups": [],
     "pitching": [],
     "scouting_list": {
         "committed": [],

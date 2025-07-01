@@ -1020,8 +1020,122 @@ document.addEventListener('DOMContentLoaded', () => {
           form.querySelector('#edit_sign_name').value = button.dataset.signName;
           form.querySelector('#edit_sign_indicator').value = button.dataset.signIndicator;
       });
-  }
 
+ } // --- Edit Lineup Modal Logic ---
+  const editLineupModal = document.getElementById('editLineupModal');
+  if (editLineupModal) {
+      let sortable = null; // To hold the Sortable.js instance
+
+      editLineupModal.addEventListener('show.bs.modal', event => {
+          const button = event.relatedTarget;
+          const form = document.getElementById('editLineupForm');
+          const modalBody = editLineupModal.querySelector('.modal-body');
+          
+          // Get data from the button that opened the modal
+          const lineupIndex = button.dataset.lineupIndex;
+          const lineupTitle = button.dataset.lineupTitle;
+          const lineupPlayers = JSON.parse(decodeURIComponent(button.dataset.lineupPlayers));
+          const lineupPlayerNames = new Set(lineupPlayers.map(p => p.name));
+          
+          // Get the full team roster from the <body> data attribute
+          const fullRoster = JSON.parse(document.body.dataset.roster);
+          
+          // Set the form's action URL to point to the correct lineup
+          form.action = `/edit_lineup/${lineupIndex}`;
+          
+          // --- Build the player list HTML (without numbers initially) ---
+          let playerHtml = '';
+          
+          // 1. Add players already in the lineup, in their correct batting order
+          lineupPlayers.forEach(player => {
+              playerHtml += `
+                  <li class="list-group-item d-flex align-items-center">
+                      <i class="bi bi-grip-vertical me-3" style="cursor: move;"></i>
+                      <input class="form-check-input me-3" type="checkbox" name="lineup_player" value="${player.name}" id="edit-lineup-${player.name.replace(/\s+/g, '-')}" checked>
+                      <label class="form-check-label d-flex align-items-center" for="edit-lineup-${player.name.replace(/\s+/g, '-')}">
+                          <span class="lineup-order-number fw-bold me-2" style="width: 2em;"></span>
+                          ${player.name}
+                      </label>
+                  </li>`;
+          });
+
+          // 2. Add the rest of the players from the roster who are not in the lineup
+          fullRoster.forEach(player => {
+              if (!lineupPlayerNames.has(player.name)) {
+                  playerHtml += `
+                      <li class="list-group-item d-flex align-items-center">
+                          <i class="bi bi-grip-vertical me-3" style="cursor: move;"></i>
+                          <input class="form-check-input me-3" type="checkbox" name="lineup_player" value="${player.name}" id="edit-lineup-${player.name.replace(/\s+/g, '-')}">
+                          <label class="form-check-label d-flex align-items-center" for="edit-lineup-${player.name.replace(/\s+/g, '-')}">
+                              <span class="lineup-order-number fw-bold me-2" style="width: 2em;"></span>
+                              ${player.name}
+                          </label>
+                      </li>`;
+              }
+          });
+
+          // 3. Populate the modal body with the complete form
+          modalBody.innerHTML = `
+              <input type="hidden" name="active_tab" value="#lineups">
+              <div class="mb-3">
+                  <label for="lineup_title_edit" class="form-label">Lineup Title</label>
+                  <input type="text" name="lineup_title" id="lineup_title_edit" class="form-control" value="${lineupTitle}" required>
+              </div>
+              <h5>Players (Check/Uncheck and Drag to Reorder)</h5>
+              <ul id="sortable-player-list" class="list-group">
+                  ${playerHtml}
+              </ul>
+          `;
+          
+          const sortableList = document.getElementById('sortable-player-list');
+
+          // This function updates the visible lineup numbers for checked players
+          const updateLineupNumbers = () => {
+              const listItems = sortableList.querySelectorAll('li');
+              let checkedCounter = 1;
+              listItems.forEach(item => {
+                  const numberSpan = item.querySelector('.lineup-order-number');
+                  const checkbox = item.querySelector('input[type="checkbox"]');
+                  if (numberSpan && checkbox) {
+                      if (checkbox.checked) {
+                          numberSpan.textContent = `${checkedCounter}.`;
+                          checkedCounter++;
+                      } else {
+                          // Clear the number if the player is not checked
+                          numberSpan.textContent = '';
+                      }
+                  }
+              });
+          };
+
+          // Add event listeners to checkboxes to update numbering when checked/unchecked
+          sortableList.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+              checkbox.addEventListener('change', updateLineupNumbers);
+          });
+
+          // Initialize SortableJS and add the onEnd event to update numbers
+          if (sortableList) {
+              sortable = new Sortable(sortableList, {
+                  animation: 150,
+                  handle: '.bi-grip-vertical',
+                  onEnd: updateLineupNumbers // Update numbers after dragging
+              });
+          }
+          
+          // Call it once to set the initial numbers correctly
+          updateLineupNumbers();
+      });
+      
+      // This is good practice: clean up when the modal is closed
+      editLineupModal.addEventListener('hidden.bs.modal', () => {
+          if (sortable) {
+              sortable.destroy();
+              sortable = null;
+          }
+          // Clear the modal so it's fresh the next time it opens
+          editLineupModal.querySelector('.modal-body').innerHTML = ''; 
+      });
+  }
 });
 </script>
 </body>
