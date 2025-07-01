@@ -37,7 +37,45 @@
     .practice-plan { border-left: 3px solid #c8102e; }
     .task-item.complete { text-decoration: line-through; opacity: 0.6; }
     .focus-item-notes { font-size: 0.9em; color: #6c757d; white-space: pre-wrap; min-height: 60px; }
-    .rotation-grid .input-group-text { width: 45px; justify-content: center; }
+    
+    /* --- Diamond Rotation Styles --- */
+    .diamond-container {
+        position: relative;
+        max-width: 500px;
+        margin: 20px auto;
+        background-image: url('https://i.imgur.com/t2qbeH1.png'); /* <-- CORRECTED IMAGE LINK */
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        aspect-ratio: 1 / 1;
+    }
+    .position-label {
+        position: absolute;
+        background-color: rgba(255, 255, 255, 0.85);
+        border: 1px solid #c8102e;
+        color: #000;
+        padding: 4px 8px;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        text-align: center;
+        width: 100px;
+        transform: translate(-50%, -50%); /* Center the label on its coordinates */
+    }
+    .position-label .pos-abbr {
+        font-size: 0.7rem;
+        color: #c8102e;
+        display: block;
+    }
+    .pos-P  { top: 50%; left: 50%; }
+    .pos-C  { top: 83%; left: 50%; }
+    .pos-1B { top: 50%; left: 75%; }
+    .pos-2B { top: 35%; left: 65%; }
+    .pos-3B { top: 50%; left: 25%; }
+    .pos-SS { top: 35%; left: 35%; }
+    .pos-LF { top: 15%; left: 15%; }
+    .pos-CF { top: 10%; left: 50%; }
+    .pos-RF { top: 15%; left: 85%; }
   </style>
 </head>
 <body data-roster='{{ data.roster | tojson }}' data-player-dev='{{ data.player_development | tojson }}'>
@@ -363,110 +401,63 @@
 
     <div class="tab-pane fade" id="rotations">
         <h4>Pitching &amp; Defensive Rotations</h4>
-        {% set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
-        <div class="accordion" id="mainRotationsAccordion">
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="headingCreateRotation">
-                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreateRotation">
-                        Create New Rotation
-                    </button>
-                </h2>
-                <div id="collapseCreateRotation" class="accordion-collapse collapse show" data-bs-parent="#mainRotationsAccordion">
-                    <div class="accordion-body">
-                        <form id="rotationForm">
-                            <div class="row">
-                                <div class="col-md-8">
-                                    <input type="text" id="rotationTitle" class="form-control" placeholder="Enter Rotation Title (e.g., Weekend Tournament Plan)" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <button type="submit" class="btn btn-primary w-100">Save New Rotation</button>
-                                </div>
-                            </div>
-                            <div class="accordion mt-3" id="inningsAccordion">
-                                {% for i in range(1, 8) %}
-                                <div class="accordion-item">
-                                    <h2 class="accordion-header" id="heading-inning-{{i}}">
-                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-inning-{{i}}">
-                                            Inning {{ i }}
-                                        </button>
-                                    </h2>
-                                    <div id="collapse-inning-{{i}}" class="accordion-collapse collapse" data-bs-parent="#inningsAccordion">
-                                        <div class="accordion-body rotation-grid">
-                                            <div class="row g-2">
-                                            {% for pos in positions %}
-                                                <div class="col-md-4">
-                                                    <div class="input-group input-group-sm">
-                                                        <span class="input-group-text">{{ pos }}</span>
-                                                        <select class="form-select" data-inning="{{i}}" data-position="{{pos}}">
-                                                            <option value="">Select Player...</option>
-                                                            {% for p in data.roster %}
-                                                            <option value="{{ p.name }}">{{ p.name }}</option>
-                                                            {% endfor %}
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            {% endfor %}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </form>
+        <p>Use the grid to build a rotation. Select a player for each position in each inning. Use the controls to save, load, or clear the rotation.</p>
+        
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label for="rotationTitle" class="form-label fw-bold">Rotation Title</label>
+                        <input type="text" id="rotationTitle" class="form-control" placeholder="e.g., Weekend Tournament Rotation" required>
                     </div>
-                </div>
-            </div>
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="headingSavedRotations">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSavedRotations">
-                        View Saved Rotations
-                    </button>
-                </h2>
-                <div id="collapseSavedRotations" class="accordion-collapse collapse" data-bs-parent="#mainRotationsAccordion">
-                    <div class="accordion-body">
-                        <div class="accordion" id="savedRotationsList">
+                    <div class="col-md-4">
+                        <label for="savedRotationSelect" class="form-label fw-bold">Load Saved Rotation</label>
+                        <select id="savedRotationSelect" class="form-select">
+                            <option value="">-- Select a rotation to load --</option>
                             {% for rotation in data.rotations %}
-                            <div class="accordion-item">
-                                <h2 class="accordion-header">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#saved-rotation-{{rotation.id}}">
-                                        {{ rotation.title }}
-                                    </button>
-                                </h2>
-                                <div id="saved-rotation-{{rotation.id}}" class="accordion-collapse collapse" data-bs-parent="#savedRotationsList">
-                                    <div class="accordion-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-bordered table-sm text-center">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th>Position</th>
-                                                        {% for inning_num in rotation.innings.keys()|sort %}
-                                                        <th>Inning {{ inning_num }}</th>
-                                                        {% endfor %}
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for pos in positions %}
-                                                    <tr>
-                                                        <td class="fw-bold table-light">{{ pos }}</td>
-                                                        {% for inning_num in rotation.innings.keys()|sort %}
-                                                        <td>{{ rotation.innings[inning_num].get(pos, '') }}</td>
-                                                        {% endfor %}
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <a href="{{ url_for('delete_rotation', rotation_id=rotation.id) }}" class="btn btn-sm btn-danger mt-2 float-end" onclick="return confirm('Are you sure you want to delete this rotation?');">Delete Rotation</a>
-                                    </div>
-                                </div>
-                            </div>
-                            {% else %}
-                            <p class="p-3">No rotations saved yet.</p>
+                            <option value="{{ rotation.id }}">{{ rotation.title }}</option>
                             {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex gap-2">
+                             <button id="saveRotationBtn" class="btn btn-primary w-100">Save</button>
+                             <button id="newRotationBtn" class="btn btn-secondary w-100">New / Clear</button>
+                             <button id="deleteRotationBtn" class="btn btn-danger w-100" disabled>Delete</button>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped" style="min-width: 900px;">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-center">Inning</th>
+                        {% for pos in ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
+                        <th class="text-center">{{ pos }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody id="rotation-grid-body">
+                    {% for i in range(1, 8) %}
+                    <tr data-inning-number="{{ i }}">
+                        <td class="text-center fw-bold align-middle">{{ i }}</td>
+                        {% for pos in ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
+                        <td>
+                            <select class="form-select form-select-sm" data-position="{{ pos }}">
+                                <option value="">--</option>
+                                {% for p in data.roster %}
+                                <option value="{{ p.name }}">{{ p.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
       
@@ -726,6 +717,11 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const ALL_DEV_DATA = JSON.parse(document.body.dataset.playerDev || '{}');
+    const ALL_ROTATIONS = {{ data.rotations | tojson }};
+    const POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
+    let currentInning = 1;
+    let rotationMode = 'new'; // 'new' or 'view'
+    let currentRotationData = {};
 
     // --- Sticky Tabs Logic ---
     const mainTabs = document.getElementById('mainTabs');
@@ -974,59 +970,123 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(error => console.error('Error:', error));
     }
     
-    // --- Rotation Form Submission ---
-    const rotationForm = document.getElementById('rotationForm');
-    if(rotationForm) {
-        rotationForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            const title = document.getElementById('rotationTitle').value;
-            if (!title) {
-                alert('Rotation Title is required.');
+    // --- Rotations Grid Logic ---
+    const rotationTab = document.getElementById('rotations');
+    if (rotationTab) {
+        const titleInput = document.getElementById('rotationTitle');
+        const savedRotationSelect = document.getElementById('savedRotationSelect');
+        const saveBtn = document.getElementById('saveRotationBtn');
+        const newBtn = document.getElementById('newRotationBtn');
+        const deleteBtn = document.getElementById('deleteRotationBtn');
+        const gridBody = document.getElementById('rotation-grid-body');
+        let currentRotationId = null;
+
+        const ALL_SAVED_ROTATIONS = {{ data.rotations | tojson }};
+
+        function clearGrid() {
+            gridBody.querySelectorAll('select').forEach(sel => sel.value = '');
+            titleInput.value = '';
+            savedRotationSelect.value = '';
+            deleteBtn.disabled = true;
+            currentRotationId = null;
+        }
+
+        function populateGrid(rotationId) {
+            const rotationData = ALL_SAVED_ROTATIONS.find(r => r.id == rotationId);
+            if (!rotationData) {
+                clearGrid();
                 return;
             }
-            
-            const innings = {};
-            const inningsAccordion = document.getElementById('inningsAccordion');
-            inningsAccordion.querySelectorAll('.accordion-item').forEach((inningItem, index) => {
-                const inningNum = index + 1;
-                const positionSelects = inningItem.querySelectorAll('select');
-                const inningData = {};
-                let hasData = false;
-                positionSelects.forEach(select => {
-                    if(select.value) {
-                        inningData[select.dataset.position] = select.value;
-                        hasData = true;
-                    } else {
-                        inningData[select.dataset.position] = "";
+            clearGrid(); // Start with a clean slate
+            currentRotationId = rotationData.id;
+            titleInput.value = rotationData.title;
+            deleteBtn.disabled = false;
+
+            for (const [inning, positions] of Object.entries(rotationData.innings)) {
+                const row = gridBody.querySelector(`tr[data-inning-number="${inning}"]`);
+                if (row) {
+                    for (const [pos, playerName] of Object.entries(positions)) {
+                        const sel = row.querySelector(`select[data-position="${pos}"]`);
+                        if (sel) {
+                            sel.value = playerName;
+                        }
+                    }
+                }
+            }
+        }
+
+        function handleSave() {
+            const title = titleInput.value.trim();
+            if (!title) {
+                alert('Please enter a title for the rotation.');
+                return;
+            }
+
+            const inningsData = {};
+            gridBody.querySelectorAll('tr[data-inning-number]').forEach(row => {
+                const inningNum = row.dataset.inningNumber;
+                inningsData[inningNum] = {};
+                row.querySelectorAll('select').forEach(sel => {
+                    const position = sel.dataset.position;
+                    if (sel.value) {
+                        inningsData[inningNum][position] = sel.value;
                     }
                 });
-
-                if(hasData) {
-                    innings[inningNum] = inningData;
-                }
             });
-
-            if (Object.keys(innings).length === 0) {
-                alert('Please assign at least one player to a position in an inning.');
-                return;
-            }
+            
+            const payload = {
+                id: currentRotationId,
+                title: title,
+                innings: inningsData
+            };
+            
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
 
             fetch('/save_rotation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: title, innings: innings })
+                body: JSON.stringify(payload)
             })
             .then(res => res.json())
             .then(data => {
                 if(data.status === 'success') {
-                    window.location.hash = '#rotations';
-                    window.location.reload();
+                    // Refresh page to see changes reflected everywhere
+                    window.location.reload(); 
                 } else {
-                    alert('Error saving rotation: ' + data.message);
+                   alert(`Error: ${data.message || 'Could not save rotation.'}`);
                 }
-            })
-            .catch(error => console.error('Error:', error));
+            }).catch(err => {
+                console.error("Save Error:", err);
+                alert("An error occurred while saving.");
+            }).finally(() => {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save';
+            });
+        }
+        
+        function handleDelete() {
+            if (!currentRotationId) {
+                alert("No rotation selected to delete.");
+                return;
+            }
+            if (confirm(`Are you sure you want to delete the rotation "${titleInput.value}"?`)) {
+                window.location.href = `/delete_rotation/${currentRotationId}`;
+            }
+        }
+
+        // Event Listeners
+        savedRotationSelect.addEventListener('change', () => {
+            if (savedRotationSelect.value) {
+                populateGrid(savedRotationSelect.value);
+            } else {
+                clearGrid();
+            }
         });
+
+        newBtn.addEventListener('click', clearGrid);
+        saveBtn.addEventListener('click', handleSave);
+        deleteBtn.addEventListener('click', handleDelete);
     }
 });
 </script>

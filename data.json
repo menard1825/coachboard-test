@@ -148,53 +148,7 @@
         ],
         "not_interested": []
     },
-    "rotations": [
-        {
-            "id": 1720454400,
-            "title": "Full Defensive Plan vs. Canes",
-            "innings": {
-                "1": {
-                    "P": "Rylan Wright",
-                    "C": "Reed Evans",
-                    "1B": "Graham Menard",
-                    "2B": "Player A",
-                    "3B": "Player B",
-                    "SS": "Player C",
-                    "LF": "Player D",
-                    "CF": "Player E",
-                    "RF": "Player F"
-                },
-                "2": {
-                    "P": "Rylan Wright",
-                    "C": "Reed Evans",
-                    "1B": "Graham Menard",
-                    "2B": "Player C",
-                    "3B": "Player A",
-                    "SS": "Player B",
-                    "LF": "Player E",
-                    "CF": "Player F",
-                    "RF": "Player D"
-                }
-            }
-        },
-        {
-            "id": 1751387876,
-            "title": "Test",
-            "innings": {
-                "1": {
-                    "P": "Rylan Wright",
-                    "C": "",
-                    "1B": "Graham Menard",
-                    "2B": "",
-                    "3B": "Reed Evans",
-                    "SS": "",
-                    "LF": "",
-                    "CF": "",
-                    "RF": ""
-                }
-            }
-        }
-    ],
+    "rotations": [],
     "games": [
         {
             "date": "2025-07-12",

@@ -568,21 +568,32 @@ def save_rotation():
     rotation_id = rotation_data.get('id')
     title = rotation_data.get('title')
     innings_data = rotation_data.get('innings')
+
     if not title or not isinstance(innings_data, dict):
-        return jsonify({'status': 'error', 'message': 'Invalid data provided.'}), 400
+        return jsonify({'status': 'error', 'message': 'Invalid data provided. A title and inning data are required.'}), 400
+
+    # Try to find an existing rotation to update
     if rotation_id:
         rotation_to_update = next((r for r in data['rotations'] if r.get('id') == rotation_id), None)
         if rotation_to_update:
             rotation_to_update['title'] = title
             rotation_to_update['innings'] = innings_data
             message = 'Rotation updated successfully!'
-        else: rotation_id = None
+            new_rotation_id = rotation_id
+        else:
+            # ID was passed but not found, so treat as a new rotation
+            rotation_id = None 
+    
+    # If it's a new rotation (no valid ID was found)
     if not rotation_id:
-        new_rotation = {'id': int(time.time()), 'title': title, 'innings': innings_data}
+        new_rotation_id = int(time.time() * 1000)
+        new_rotation = {'id': new_rotation_id, 'title': title, 'innings': innings_data}
         data['rotations'].append(new_rotation)
         message = 'Rotation saved successfully!'
+
     save_data(data)
-    return jsonify({'status': 'success', 'message': message})
+    # Return the ID so the frontend knows it for subsequent saves
+    return jsonify({'status': 'success', 'message': message, 'new_id': new_rotation_id})
 
 @app.route('/delete_rotation/<int:rotation_id>')
 @login_required
