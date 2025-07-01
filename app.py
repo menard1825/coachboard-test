@@ -24,8 +24,8 @@ def load_data():
         "settings": {"registration_code": "DEFAULT_CODE"},
         "collaboration_notes": {"player_notes": [], "team_notes": []},
         "practice_plans": [],
-        "player_development": {}, # NEW: For Hitting, Fielding, etc. focus
-        "signs": [] # NEW: For team signs
+        "player_development": {}, # For Hitting, Fielding, etc. focus
+        "signs": [] # For team signs
     }
     if not os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'w') as f:
@@ -48,8 +48,9 @@ def load_data():
             user['role'] = 'Admin' if user['username'] == 'Mike1825' else 'Coach'
         if 'tab_order' not in user:
             default_tab_keys = list(default_data.keys())
-            tabs_to_exclude = ['users', 'feedback', 'settings', 'player_development']
+            tabs_to_exclude = ['users', 'feedback', 'settings', 'player_development', 'hitting_focus', 'pitching_focus', 'fielding_focus', 'baserunning_focus']
             user['tab_order'] = [key for key in default_tab_keys if key not in tabs_to_exclude]
+
 
     if 'rotations' in data:
         for rotation in data['rotations']:
@@ -179,8 +180,7 @@ def home():
         'roster': 'Roster', 'lineups': 'Lineups', 'pitching': 'Pitching Log',
         'scouting_list': 'Scouting List', 'rotations': 'Rotations',
         'games': 'Games', 'collaboration': 'Collaboration', 'practice_plan': 'Practice Plan',
-        'hitting_focus': 'Hitting Focus', 'pitching_focus': 'Pitching Focus',
-        'fielding_focus': 'Fielding Focus', 'baserunning_focus': 'Baserunning Focus',
+        'player_development': 'Player Development',
         'signs': 'Signs'
     }
     default_tab_keys = list(all_tabs.keys())
@@ -308,23 +308,35 @@ def update_player_inline(index):
     data = load_data()
     if not (0 <= index < len(data['roster'])):
         return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
-    player_number_str = request.form.get('number', '')
+        
+    player_to_edit = data['roster'][index]
+    original_name = player_to_edit['name']
+
+    player_number_str = request.form.get('number', str(player_to_edit.get('number', '')))
     try:
         player_number = int(player_number_str) if player_number_str else ''
     except ValueError:
         return jsonify({'status': 'error', 'message': 'Player number must be a valid integer.'}), 400
-    player_to_edit = data['roster'][index]
+
     player_to_edit.update({
-        "name": request.form.get('name'), "number": player_number,
-        "position1": request.form.get('position1'), "position2": request.form.get('position2'),
-        "position3": request.form.get('position3'),
-        "throws": request.form.get('throws'), "bats": request.form.get('bats'),
-        "notes": request.form.get('notes', ''), "pitcher_role": request.form.get('pitcher_role', 'Not a Pitcher'),
-        "has_lessons": request.form.get('has_lessons'),
-        "lesson_focus": request.form.get('lesson_focus')
+        "name": request.form.get('name', player_to_edit.get('name')), 
+        "number": player_number,
+        "position1": request.form.get('position1', player_to_edit.get('position1')),
+        "position2": request.form.get('position2', player_to_edit.get('position2')),
+        "position3": request.form.get('position3', player_to_edit.get('position3')),
+        "throws": request.form.get('throws', player_to_edit.get('throws')),
+        "bats": request.form.get('bats', player_to_edit.get('bats')),
+        "notes": request.form.get('notes', player_to_edit.get('notes')),
+        "pitcher_role": request.form.get('pitcher_role', player_to_edit.get('pitcher_role'))
     })
+
+    new_name = player_to_edit['name']
+    if original_name != new_name and original_name in data['player_development']:
+        data['player_development'][new_name] = data['player_development'].pop(original_name)
+
     save_data(data)
     return jsonify({'status': 'success', 'message': f'Player "{player_to_edit["name"]}" updated successfully!'})
+
 
 @app.route('/add_player_inline', methods=['POST'])
 @login_required
@@ -347,8 +359,8 @@ def add_player_inline():
         "throws": request.form.get('throws'), "bats": request.form.get('bats'), 
         "notes": request.form.get('notes', ''), 
         "pitcher_role": request.form.get('pitcher_role', 'Not a Pitcher'),
-        "has_lessons": request.form.get('has_lessons'),
-        "lesson_focus": request.form.get('lesson_focus')
+        "has_lessons": "No",
+        "lesson_focus": ""
     }
     data['roster'].append(player)
     data['player_development'][new_name] = {"hitting": "", "pitching": "", "fielding": "", "baserunning": ""}
@@ -401,19 +413,31 @@ def edit_player(index):
         return render_template('edit_player.html', player=player_to_edit, index=index, session=session)
 
 # --- Player Development Route ---
-@app.route('/save_development_focus', methods=['POST'])
+@app.route('/save_player_development/<player_name>', methods=['POST'])
 @login_required
-def save_development_focus():
+def save_player_development(player_name):
     data = load_data()
-    req_data = request.json
-    player_name = req_data.get('playerName')
-    skill = req_data.get('skill')
-    focus_text = req_data.get('focusText')
-    if player_name in data['player_development'] and skill in data['player_development'][player_name]:
-        data['player_development'][player_name][skill] = focus_text
-        save_data(data)
-        return jsonify({'status': 'success', 'message': f'Focus for {player_name} saved.'})
-    return jsonify({'status': 'error', 'message': 'Invalid player or skill.'}), 400
+    
+    # Find player in roster to update lesson info
+    player_in_roster = next((p for p in data['roster'] if p['name'] == player_name), None)
+    if player_in_roster:
+        player_in_roster['has_lessons'] = request.form.get('has_lessons')
+        player_in_roster['lesson_focus'] = request.form.get('lesson_focus')
+    else:
+        return jsonify({'status': 'error', 'message': 'Player not found in roster.'}), 404
+
+    # Find player in development dict to update focus info
+    if player_name in data['player_development']:
+        data['player_development'][player_name]['hitting'] = request.form.get('hitting_focus')
+        data['player_development'][player_name]['pitching'] = request.form.get('pitching_focus')
+        data['player_development'][player_name]['fielding'] = request.form.get('fielding_focus')
+        data['player_development'][player_name]['baserunning'] = request.form.get('baserunning_focus')
+    else:
+        return jsonify({'status': 'error', 'message': 'Player not found in development records.'}), 404
+        
+    save_data(data)
+    return jsonify({'status': 'success', 'message': f'Development plan for {player_name} saved.'})
+
 
 # --- Pitching Routes ---
 @app.route('/add_pitching', methods=['POST'])

@@ -136,11 +136,7 @@
                                 <select name="pitcher_role" class="form-select" title="Pitcher Role"><option value="Not a Pitcher" {% if p.pitcher_role == "Not a Pitcher" %}selected{% endif %}>Not a Pitcher</option><option value="Starter" {% if p.pitcher_role == "Starter" %}selected{% endif %}>Starter</option><option value="Reliever" {% if p.pitcher_role == "Reliever" %}selected{% endif %}>Reliever</option></select>
                             </div>
                             <div class="col-12"><textarea class="form-control" name="notes" rows="2" placeholder="General Player Notes">{{ p.notes }}</textarea></div>
-                            <hr class="my-3">
-                            <div class="col-md-3"><label class="form-label">Getting Lessons?</label><select name="has_lessons" class="form-select"><option value="No" {% if p.has_lessons == 'No' %}selected{% endif %}>No</option><option value="Yes" {% if p.has_lessons == 'Yes' %}selected{% endif %}>Yes</option></select></div>
-                            <div class="col-md-9"><label class="form-label">Instructor's Focus</label><input type="text" class="form-control" name="lesson_focus" value="{{ p.lesson_focus }}" placeholder="What is their instructor working on?"></div>
                             <div class="col-12 d-flex justify-content-end mt-3">
-                                <a href="{{ url_for('edit_player', index=loop.index0) }}" class="btn btn-sm btn-secondary me-2">Edit on Full Page</a>
                                 <button type="button" class="btn btn-sm btn-success me-2 save-player-btn">Save Changes</button>
                                 <a href="/delete_player/{{ loop.index0 }}?active_tab=#roster" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">Remove</a>
                             </div>
@@ -151,39 +147,69 @@
             {% endfor %}
         </div>
         <hr class="my-4">
-        <!-- Add Player Form -->
-    </div>
-    
-    <!-- Player Development Tabs -->
-    {% for skill in ['hitting', 'pitching', 'fielding', 'baserunning'] %}
-    <div class="tab-pane fade" id="{{ skill }}_focus">
-        <h4>{{ skill.replace('_', ' ').title() }} Focus</h4>
-        <p>For each player, enter the single most important technique to work on for this skill.</p>
-        <div class="list-group">
-            {% for player in data.roster %}
-            <div class="list-group-item">
-                <div class="row g-2 align-items-center">
-                    <div class="col-md-3"><strong>{{ player.name }}</strong></div>
-                    <div class="col-md-7">
-                        <input type="text" class="form-control development-focus-input" 
-                               data-player-name="{{ player.name }}" 
-                               data-skill="{{ skill }}" 
-                               value="{{ data.player_development.get(player.name, {}).get(skill, '') }}"
-                               placeholder="Enter focus area for {{ skill }}...">
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-sm btn-primary w-100 save-focus-btn" disabled>Save</button>
+        </div>
+
+    <div class="tab-pane fade" id="player_development">
+        <h4>Player Development Focus</h4>
+        <p>A comprehensive overview of each player's development plan, including team focus and external lesson details.</p>
+        <div class="accordion" id="playerDevelopmentAccordion">
+            {% for p in data.roster %}
+            {% set player_dev = data.player_development.get(p.name, {}) %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading-dev-{{ loop.index0 }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-dev-{{ loop.index0 }}">
+                        <strong>{{ p.name }}</strong>
+                    </button>
+                </h2>
+                <div id="collapse-dev-{{ loop.index0 }}" class="accordion-collapse collapse" data-bs-parent="#playerDevelopmentAccordion">
+                    <div class="accordion-body">
+                        <form class="player-development-form" data-player-name="{{ p.name }}">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Hitting Focus</label>
+                                    <input type="text" name="hitting_focus" class="form-control" value="{{ player_dev.get('hitting', '') }}" placeholder="Primary hitting focus...">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Pitching Focus</label>
+                                    <input type="text" name="pitching_focus" class="form-control" value="{{ player_dev.get('pitching', '') }}" placeholder="Primary pitching focus...">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Fielding Focus</label>
+                                    <input type="text" name="fielding_focus" class="form-control" value="{{ player_dev.get('fielding', '') }}" placeholder="Primary fielding focus...">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Baserunning Focus</label>
+                                    <input type="text" name="baserunning_focus" class="form-control" value="{{ player_dev.get('baserunning', '') }}" placeholder="Primary baserunning focus...">
+                                </div>
+                                
+                                <hr class="my-3">
+
+                                <div class="col-md-4">
+                                    <label class="form-label">Getting Lessons?</label>
+                                    <select name="has_lessons" class="form-select">
+                                        <option value="No" {% if p.has_lessons == 'No' %}selected{% endif %}>No</option>
+                                        <option value="Yes" {% if p.has_lessons == 'Yes' %}selected{% endif %}>Yes</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label">Instructor's Focus</label>
+                                    <input type="text" name="lesson_focus" class="form-control" value="{{ p.lesson_focus }}" placeholder="What is their instructor working on?">
+                                </div>
+
+                                <div class="col-12 d-flex justify-content-end mt-3">
+                                    <button type="button" class="btn btn-sm btn-primary save-development-btn">Save Development Plan</button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
-    {% endfor %}
-
+    
     <div class="tab-pane fade" id="pitching">
       <h4>Pitching Log & Count Tracker</h4>
-      <!-- Pitch Count Summary -->
       <div class="card mb-4">
         <div class="card-header"><strong>Pitch Count Summary</strong></div>
         <div class="card-body">
@@ -236,7 +262,6 @@
         </div>
       </div>
 
-      <!-- Add Pitching Outing Form -->
       <form action="/add_pitching" method="POST" class="row g-2 mb-3">
         <input type="hidden" name="active_tab" value="#pitching" class="active-tab-input">
         <div class="col-md-3"><input type="date" name="pitch_date" class="form-control" required title="Pitch Date"></div>
@@ -260,7 +285,6 @@
       </ul>
     </div>
 
-    <!-- Signs Tab -->
     <div class="tab-pane fade" id="signs">
         <h4>Team Signs</h4>
         <div class="row">
@@ -302,7 +326,6 @@
         </div>
     </div>
     
-    <!-- RESTORED TABS -->
     <div class="tab-pane fade" id="lineups">
       <h4>Create New Lineup</h4>
       <form action="/add_lineup" method="POST" class="mb-3">
@@ -775,7 +798,6 @@
   </div>
 </div>
 
-<!-- Modals -->
 <div class="modal fade" id="assignPlayerModal" tabindex="-1" aria-labelledby="assignPlayerModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
@@ -784,7 +806,6 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p>Select a player from the list below. Players already on the field for this inning are greyed out.</p>
         <div id="player-list-for-assignment" class="list-group">
           </div>
       </div>
@@ -950,7 +971,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
   });
   
-  // --- Inline Player Editing Logic ---
+  // --- Inline Player Roster Editing ---
   document.getElementById('rosterAccordion')?.addEventListener('click', event => {
     if (event.target.classList.contains('save-player-btn')) {
       const item = event.target.closest('.accordion-item');
@@ -973,41 +994,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // --- Development Focus Saving Logic ---
-  document.querySelectorAll('.development-focus-input').forEach(input => {
-      const saveBtn = input.closest('.row').querySelector('.save-focus-btn');
-      input.addEventListener('input', () => {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save';
-          saveBtn.classList.remove('btn-success');
-          saveBtn.classList.add('btn-primary');
-      });
-  });
+  // --- Player Development Saving Logic ---
+  document.querySelectorAll('.save-development-btn').forEach(button => {
+    button.addEventListener('click', (event) => {
+        const form = event.target.closest('.player-development-form');
+        const playerName = form.dataset.playerName;
+        const formData = new URLSearchParams(new FormData(form));
 
-  document.querySelectorAll('.save-focus-btn').forEach(button => {
-      button.addEventListener('click', () => {
-          const input = button.closest('.row').querySelector('.development-focus-input');
-          const playerName = input.dataset.playerName;
-          const skill = input.dataset.skill;
-          const focusText = input.value;
-
-          fetch('/save_development_focus', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ playerName, skill, focusText })
-          })
-          .then(res => res.json())
-          .then(data => {
-              if (data.status === 'success') {
-                  button.disabled = true;
-                  button.textContent = 'Saved!';
-                  button.classList.remove('btn-primary');
-                  button.classList.add('btn-success');
-              } else {
-                  alert('Error: ' + data.message);
-              }
-          }).catch(err => alert('An error occurred.'));
-      });
+        fetch(`/save_player_development/${playerName}`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                button.textContent = 'Saved!';
+                button.classList.remove('btn-primary');
+                button.classList.add('btn-success');
+                setTimeout(() => {
+                    button.textContent = 'Save Development Plan';
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-primary');
+                }, 2000);
+            } else {
+                alert('Error: ' + data.message);
+            }
+        }).catch(err => alert('An error occurred: ' + err));
+    });
   });
 
   // --- Edit Sign Modal Logic ---
@@ -1020,8 +1033,9 @@ document.addEventListener('DOMContentLoaded', () => {
           form.querySelector('#edit_sign_name').value = button.dataset.signName;
           form.querySelector('#edit_sign_indicator').value = button.dataset.signIndicator;
       });
+  }
 
- } // --- Edit Lineup Modal Logic ---
+  // --- Edit Lineup Modal Logic ---
   const editLineupModal = document.getElementById('editLineupModal');
   if (editLineupModal) {
       let sortable = null; // To hold the Sortable.js instance
@@ -1031,22 +1045,17 @@ document.addEventListener('DOMContentLoaded', () => {
           const form = document.getElementById('editLineupForm');
           const modalBody = editLineupModal.querySelector('.modal-body');
           
-          // Get data from the button that opened the modal
           const lineupIndex = button.dataset.lineupIndex;
           const lineupTitle = button.dataset.lineupTitle;
           const lineupPlayers = JSON.parse(decodeURIComponent(button.dataset.lineupPlayers));
           const lineupPlayerNames = new Set(lineupPlayers.map(p => p.name));
           
-          // Get the full team roster from the <body> data attribute
           const fullRoster = JSON.parse(document.body.dataset.roster);
           
-          // Set the form's action URL to point to the correct lineup
           form.action = `/edit_lineup/${lineupIndex}`;
           
-          // --- Build the player list HTML (without numbers initially) ---
           let playerHtml = '';
           
-          // 1. Add players already in the lineup, in their correct batting order
           lineupPlayers.forEach(player => {
               playerHtml += `
                   <li class="list-group-item d-flex align-items-center">
@@ -1059,7 +1068,6 @@ document.addEventListener('DOMContentLoaded', () => {
                   </li>`;
           });
 
-          // 2. Add the rest of the players from the roster who are not in the lineup
           fullRoster.forEach(player => {
               if (!lineupPlayerNames.has(player.name)) {
                   playerHtml += `
@@ -1074,7 +1082,6 @@ document.addEventListener('DOMContentLoaded', () => {
               }
           });
 
-          // 3. Populate the modal body with the complete form
           modalBody.innerHTML = `
               <input type="hidden" name="active_tab" value="#lineups">
               <div class="mb-3">
@@ -1089,7 +1096,6 @@ document.addEventListener('DOMContentLoaded', () => {
           
           const sortableList = document.getElementById('sortable-player-list');
 
-          // This function updates the visible lineup numbers for checked players
           const updateLineupNumbers = () => {
               const listItems = sortableList.querySelectorAll('li');
               let checkedCounter = 1;
@@ -1101,38 +1107,32 @@ document.addEventListener('DOMContentLoaded', () => {
                           numberSpan.textContent = `${checkedCounter}.`;
                           checkedCounter++;
                       } else {
-                          // Clear the number if the player is not checked
                           numberSpan.textContent = '';
                       }
                   }
               });
           };
 
-          // Add event listeners to checkboxes to update numbering when checked/unchecked
           sortableList.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
               checkbox.addEventListener('change', updateLineupNumbers);
           });
 
-          // Initialize SortableJS and add the onEnd event to update numbers
           if (sortableList) {
               sortable = new Sortable(sortableList, {
                   animation: 150,
                   handle: '.bi-grip-vertical',
-                  onEnd: updateLineupNumbers // Update numbers after dragging
+                  onEnd: updateLineupNumbers
               });
           }
           
-          // Call it once to set the initial numbers correctly
           updateLineupNumbers();
       });
       
-      // This is good practice: clean up when the modal is closed
       editLineupModal.addEventListener('hidden.bs.modal', () => {
           if (sortable) {
               sortable.destroy();
               sortable = null;
           }
-          // Clear the modal so it's fresh the next time it opens
           editLineupModal.querySelector('.modal-body').innerHTML = ''; 
       });
   }
