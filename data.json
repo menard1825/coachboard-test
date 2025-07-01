@@ -7,12 +7,17 @@
             "tab_order": [
                 "scouting_list",
                 "roster",
-                "collaboration",
                 "lineups",
+                "collaboration",
                 "pitching",
                 "rotations",
                 "practice_plan",
-                "games"
+                "games",
+                "hitting_focus",
+                "pitching_focus",
+                "fielding_focus",
+                "baserunning_focus",
+                "signs"
             ]
         },
         {
@@ -55,7 +60,10 @@
             "throws": "Left",
             "bats": "Right",
             "notes": "",
-            "pitcher_role": "Reliever"
+            "pitcher_role": "Reliever",
+            "position3": "",
+            "has_lessons": "No",
+            "lesson_focus": ""
         },
         {
             "name": "Rylan Wright",
@@ -65,7 +73,10 @@
             "throws": "Right",
             "bats": "Right",
             "notes": "",
-            "pitcher_role": "Starter"
+            "pitcher_role": "Starter",
+            "position3": "",
+            "has_lessons": "No",
+            "lesson_focus": ""
         },
         {
             "name": "Reed Evans",
@@ -75,10 +86,58 @@
             "throws": "Right",
             "bats": "Right",
             "notes": "",
-            "pitcher_role": "Starter"
+            "pitcher_role": "Starter",
+            "position3": "",
+            "has_lessons": "No",
+            "lesson_focus": ""
         }
     ],
-    "lineups": [],
+    "lineups": [
+        {
+            "title": "Test 2",
+            "players": [
+                {
+                    "name": "Graham Menard",
+                    "number": 3,
+                    "position1": "1B",
+                    "position2": "P",
+                    "throws": "Left",
+                    "bats": "Right",
+                    "notes": "",
+                    "pitcher_role": "Reliever",
+                    "position3": "",
+                    "has_lessons": "No",
+                    "lesson_focus": ""
+                },
+                {
+                    "name": "Rylan Wright",
+                    "number": 1,
+                    "position1": "3B",
+                    "position2": "P",
+                    "throws": "Right",
+                    "bats": "Right",
+                    "notes": "",
+                    "pitcher_role": "Starter",
+                    "position3": "",
+                    "has_lessons": "No",
+                    "lesson_focus": ""
+                },
+                {
+                    "name": "Reed Evans",
+                    "number": 5,
+                    "position1": "3B",
+                    "position2": "P",
+                    "throws": "Right",
+                    "bats": "Right",
+                    "notes": "",
+                    "pitcher_role": "Starter",
+                    "position3": "",
+                    "has_lessons": "No",
+                    "lesson_focus": ""
+                }
+            ]
+        }
+    ],
     "pitching": [],
     "scouting_list": {
         "committed": [],
@@ -110,5 +169,26 @@
         "player_notes": [],
         "team_notes": []
     },
-    "practice_plans": []
+    "practice_plans": [],
+    "player_development": {
+        "Reed Evans": {
+            "hitting": "",
+            "pitching": "",
+            "fielding": "",
+            "baserunning": ""
+        },
+        "Rylan Wright": {
+            "hitting": "",
+            "pitching": "",
+            "fielding": "",
+            "baserunning": ""
+        },
+        "Graham Menard": {
+            "hitting": "",
+            "pitching": "",
+            "fielding": "",
+            "baserunning": ""
+        }
+    },
+    "signs": []
 }

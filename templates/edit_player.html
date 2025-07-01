@@ -33,24 +33,65 @@
       <label for="number" class="form-label">Number</label>
       <input type="number" name="number" id="number" class="form-control" value="{{ player.number }}" required>
     </div>
-    <div class="col-md-6">
+    
+    <!-- Position Fields -->
+    {% set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'] %}
+    <div class="col-md-4">
       <label for="position1" class="form-label">Primary Position</label>
-      <input type="text" name="position1" id="position1" class="form-control" value="{{ player.position1 }}">
+      <select name="position1" id="position1" class="form-select">
+          <option value="">Select...</option>
+          {% for pos in positions %}<option value="{{ pos }}" {% if player.position1 == pos %}selected{% endif %}>{{ pos }}</option>{% endfor %}
+      </select>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-4">
       <label for="position2" class="form-label">Secondary Position</label>
-      <input type="text" name="position2" id="position2" class="form-control" value="{{ player.position2 }}">
+      <select name="position2" id="position2" class="form-select">
+          <option value="">Select...</option>
+          {% for pos in positions %}<option value="{{ pos }}" {% if player.position2 == pos %}selected{% endif %}>{{ pos }}</option>{% endfor %}
+      </select>
     </div>
+    <div class="col-md-4">
+      <label for="position3" class="form-label">Tertiary Position</label>
+      <select name="position3" id="position3" class="form-select">
+          <option value="">Select...</option>
+          {% for pos in positions %}<option value="{{ pos }}" {% if player.position3 == pos %}selected{% endif %}>{{ pos }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <!-- Throws/Bats -->
     <div class="col-md-6">
       <label for="throws" class="form-label">Throws (R/L)</label>
-      <input type="text" name="throws" id="throws" class="form-control" value="{{ player.throws }}">
+      <select name="throws" id="throws" class="form-select">
+          <option value="">Select...</option>
+          <option value="Right" {% if player.throws == 'Right' %}selected{% endif %}>Right</option>
+          <option value="Left" {% if player.throws == 'Left' %}selected{% endif %}>Left</option>
+      </select>
     </div>
     <div class="col-md-6">
       <label for="bats" class="form-label">Bats (R/L)</label>
-      <input type="text" name="bats" id="bats" class="form-control" value="{{ player.bats }}">
+      <select name="bats" id="bats" class="form-select">
+          <option value="">Select...</option>
+          <option value="Right" {% if player.bats == 'Right' %}selected{% endif %}>Right</option>
+          <option value="Left" {% if player.bats == 'Left' %}selected{% endif %}>Left</option>
+      </select>
     </div>
+
+    <!-- Lesson Information -->
+    <div class="col-md-4">
+        <label for="has_lessons" class="form-label">Getting Lessons?</label>
+        <select name="has_lessons" id="has_lessons" class="form-select">
+            <option value="No" {% if player.has_lessons == 'No' %}selected{% endif %}>No</option>
+            <option value="Yes" {% if player.has_lessons == 'Yes' %}selected{% endif %}>Yes</option>
+        </select>
+    </div>
+    <div class="col-md-8">
+        <label for="lesson_focus" class="form-label">Instructor's Focus</label>
+        <input type="text" name="lesson_focus" id="lesson_focus" class="form-control" value="{{ player.lesson_focus }}">
+    </div>
+
+    <!-- Notes -->
     <div class="col-12">
-      <label for="notes" class="form-label">Notes</label>
+      <label for="notes" class="form-label">General Player Notes</label>
       <textarea name="notes" id="notes" class="form-control" rows="5">{{ player.notes }}</textarea>
     </div>
     <div class="col-12 mt-3">
