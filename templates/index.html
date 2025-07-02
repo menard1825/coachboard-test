@@ -28,22 +28,19 @@
     @media (max-width: 768px) {
         .navbar-brand .brand-text { font-size: 1rem; white-space: normal; line-height: 1.2; }
         .navbar-brand { padding-right: 0; }
-        #mainTabs { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; -ms-overflow-style: none; scrollbar-width: none; }
-        #mainTabs::-webkit-scrollbar { display: none; }
-        #mainTabs .nav-item { flex-shrink: 0; }
     }
     @media (max-width: 480px) { .navbar-brand .brand-text { font-size: 0.9rem; } }
     .accordion-button:not(.collapsed) { background-color: #fcebeb; color: #c8102e; }
     .practice-plan { border-left: 3px solid #c8102e; }
     .task-item.complete { text-decoration: line-through; opacity: 0.6; }
     .focus-item-notes { font-size: 0.9em; color: #6c757d; white-space: pre-wrap; min-height: 60px; }
-    
+
     /* --- Diamond Rotation Styles --- */
     .diamond-container {
         position: relative;
         max-width: 500px;
         margin: 20px auto;
-        background-image: url('https://i.imgur.com/t2qbeH1.png'); /* <-- CORRECTED IMAGE LINK */
+        background-image: url('https://i.imgur.com/t2qbeH1.png');
         background-size: contain;
         background-repeat: no-repeat;
         background-position: center;
@@ -76,27 +73,64 @@
     .pos-LF { top: 15%; left: 15%; }
     .pos-CF { top: 10%; left: 50%; }
     .pos-RF { top: 15%; left: 85%; }
+
+    /* --- NEW/IMPROVED TAB STYLES --- */
+    /* On large screens, the tabs will wrap if needed */
+    @media (min-width: 992px) {
+        #mainTabs {
+            flex-wrap: wrap;
+        }
+    }
+
+    /* On smaller screens (mobile), hide the drag handle and clean up borders */
+    @media (max-width: 991.98px) {
+        #mainTabs .drag-handle {
+            display: none; /* Hide drag handle on mobile where it's not needed */
+        }
+        #tabsCollapse .nav-tabs {
+            border-bottom: none; /* Remove the main border in the collapsed menu */
+        }
+    }
   </style>
 </head>
 <body data-roster='{{ data.roster | tojson }}' data-player-dev='{{ data.player_development | tojson }}'>
 <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom mb-3 px-3">
-  <a class="navbar-brand d-flex align-items-center" href="#">
-    <img src="/static/logo.png" alt="Team Logo">
-    <span class="fw-bold brand-text">Marucci Prospects 11u - Coach Planner</span>
-  </a>
-  <div class="ms-auto d-flex align-items-center">
-    <div class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            Welcome, {{ session.username }}!
-        </a>
-        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-            {% if session.role == 'Admin' %}
-            <li><a class="dropdown-item" href="{{ url_for('user_management') }}">User Management</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('admin_settings') }}">Admin Settings</a></li>
-            <li><hr class="dropdown-divider"></li>
-            {% endif %}
-            <li><a class="dropdown-item" href="{{ url_for('change_password') }}">Change Password</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex align-items-center" href="#">
+      <img src="/static/logo.png" alt="Team Logo">
+      <span class="fw-bold brand-text">Marucci Prospects 11u - Coach Planner</span>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarResponsive">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="mainTabs" role="tablist">
+            {% for tab_key in tab_order %}
+                {% if tab_key in all_tabs %}
+                <li class="nav-item" role="presentation" data-tab-id="{{ tab_key }}">
+                    <a class="nav-link d-flex align-items-center" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
+                        <i class="bi bi-grip-vertical me-2 drag-handle" draggable="true" title="Drag to reorder"></i>
+                        <span>{{ all_tabs[tab_key] }}</span>
+                    </a>
+                </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+        <ul class="navbar-nav ms-auto">
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Welcome, {{ session.username }}!
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                    {% if session.role == 'Admin' %}
+                    <li><a class="dropdown-item" href="{{ url_for('user_management') }}">User Management</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('admin_settings') }}">Admin Settings</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    {% endif %}
+                    <li><a class="dropdown-item" href="{{ url_for('change_password') }}">Change Password</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
+                </ul>
+            </li>
         </ul>
     </div>
   </div>
@@ -114,18 +148,9 @@
     {% endif %}
   {% endwith %}
 
-  <ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
-    {% for tab_key in tab_order %}
-        {% if tab_key in all_tabs %}
-            <li class="nav-item" role="presentation" data-tab-id="{{ tab_key }}">
-                <a class="nav-link d-flex align-items-center" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab" draggable="false">
-                    <i class="bi bi-grip-vertical me-2 drag-handle" draggable="true"></i>
-                    <span draggable="false">{{ all_tabs[tab_key] }}</span>
-                </a>
-            </li>
-        {% endif %}
-    {% endfor %}
-  </ul>
+  <ul class="nav nav-tabs d-none" id="placeholder-for-js">
+      </ul>
+
 
   <div class="tab-content">
     <div class="tab-pane fade" id="roster">
@@ -320,7 +345,7 @@
                             <td>
                                 {% set weekly_pct = (counts.weekly / 100 * 100) | int %}
                                 <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar {% if weekly_pct > 80 %}bg-danger{% elif weekly_pct > 60 %}bg-warning{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ weekly_pct }}%;" aria-valuenow="{{ counts.weekly }}" aria-valuemin="0" aria-valuemax="100">{{ counts.weekly }}</div>
+                                    <div class="progress-bar {% if weekly_pct > 80 %}bg-danger{% elif daily_pct > 60 %}bg-warning{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ weekly_pct }}%;" aria-valuenow="{{ counts.weekly }}" aria-valuemin="0" aria-valuemax="100">{{ counts.weekly }}</div>
                                 </div>
                             </td>
                         </tr>
@@ -358,25 +383,11 @@
       
     <div class="tab-pane fade" id="scouting_list">
         <h4>Scouting & Recruiting Lists</h4>
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Add New Scouted Player</h5>
-                <form action="{{ url_for('add_scouted_player') }}" method="POST" class="row g-3">
-                    <div class="col-md-3"><input type="text" class="form-control" name="scouted_player_name" placeholder="Player Name" required></div>
-                    <div class="col-md-2">{{ position_select('scouted_player_pos1', 'scouted_player_pos1', '', title='Pos 1') }}</div>
-                    <div class="col-md-2">{{ position_select('scouted_player_pos2', 'scouted_player_pos2', '', title='Pos 2') }}</div>
-                    <div class="col-md-2"><select name="scouted_player_throws" class="form-select"><option value="">Throws</option><option value="Right">Right</option><option value="Left">Left</option></select></div>
-                    <div class="col-md-2"><select name="scouted_player_bats" class="form-select"><option value="">Bats</option><option value="Right">Right</option><option value="Left">Left</option></select></div>
-                    <div class="col-md-4"><label class="form-label">Add to List:</label><select name="scouted_player_type" class="form-select"><option value="targets">Targets</option><option value="committed">Committed</option><option value="not_interested">Not Interested</option></select></div>
-                    <div class="col-md-2 d-flex align-items-end"><button type="submit" class="btn btn-primary w-100">Add Player</button></div>
-                </form>
-            </div>
-        </div>
         <div class="row">
             {% for list_type, players in data.scouting_list.items() %}
             <div class="col-md-4">
                 <h5>{{ list_type.replace('_', ' ').title() }}</h5>
-                <ul class="list-group">
+                <ul class="list-group mb-4">
                     {% for player in players %}
                     <li class="list-group-item">
                         <strong>{{ player.name }}</strong> ({{ player.position1 }}{% if player.position2 %}/{{ player.position2 }}{% endif %})
@@ -396,6 +407,21 @@
                 </ul>
             </div>
             {% endfor %}
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Add New Scouted Player</h5>
+                <form action="{{ url_for('add_scouted_player') }}" method="POST" class="row g-3">
+                    <div class="col-md-3"><input type="text" class="form-control" name="scouted_player_name" placeholder="Player Name" required></div>
+                    <div class="col-md-2">{{ position_select('scouted_player_pos1', 'scouted_player_pos1', '', title='Pos 1') }}</div>
+                    <div class="col-md-2">{{ position_select('scouted_player_pos2', 'scouted_player_pos2', '', title='Pos 2') }}</div>
+                    <div class="col-md-2"><select name="scouted_player_throws" class="form-select"><option value="">Throws</option><option value="Right">Right</option><option value="Left">Left</option></select></div>
+                    <div class="col-md-2"><select name="scouted_player_bats" class="form-select"><option value="">Bats</option><option value="Right">Right</option><option value="Left">Left</option></select></div>
+                    <div class="col-md-4"><label class="form-label">Add to List:</label><select name="scouted_player_type" class="form-select"><option value="targets">Targets</option><option value="committed">Committed</option><option value="not_interested">Not Interested</option></select></div>
+                    <div class="col-md-2 d-flex align-items-end"><button type="submit" class="btn btn-primary w-100">Add Player</button></div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -441,7 +467,7 @@
                     </tr>
                 </thead>
                 <tbody id="rotation-grid-body">
-                    {% for i in range(1, 8) %}
+                    {% for i in range(1, 7) %}
                     <tr data-inning-number="{{ i }}">
                         <td class="text-center fw-bold align-middle">{{ i }}</td>
                         {% for pos in ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
@@ -458,6 +484,10 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+        <div class="mt-2 d-flex gap-2">
+            <button id="addInningBtn" class="btn btn-sm btn-success">Add Inning</button>
+            <button id="removeInningBtn" class="btn btn-sm btn-danger">Remove Last Inning</button>
         </div>
     </div>
       
@@ -637,7 +667,10 @@
         </div>
     </div>
 
-  </div> </div> <div class="modal fade" id="editSignModal" tabindex="-1" aria-hidden="true">
+  </div>
+</div>
+
+<div class="modal fade" id="editSignModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="POST">
@@ -707,7 +740,8 @@
 <div class="modal fade" id="editLineupModal" tabindex="-1" aria-labelledby="editLineupModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
-      <form id="editLineupForm" method="POST"> <div class="modal-header">
+      <form id="editLineupForm" method="POST">
+        <div class="modal-header">
           <h5 class="modal-title" id="editLineupModalLabel">Edit Lineup</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
@@ -726,66 +760,122 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const ALL_DEV_DATA = JSON.parse(document.body.dataset.playerDev || '{}');
-    const ALL_ROTATIONS = {{ data.rotations | tojson }};
-    const POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
-    let currentInning = 1;
-    let rotationMode = 'new'; // 'new' or 'view'
-    let currentRotationData = {};
+    // --- NEW, SIMPLIFIED TAB MANAGEMENT SCRIPT ---
 
-    // --- Sticky Tabs Logic ---
-    const mainTabs = document.getElementById('mainTabs');
+    // --- DOM ELEMENT REFERENCES ---
+    const mainTabsContainer = document.getElementById('mainTabs');
     const activeTabInputs = document.querySelectorAll('.active-tab-input');
-    const allTabPanes = document.querySelectorAll('.tab-content .tab-pane');
+    const navbarCollapseEl = document.getElementById('navbarResponsive'); // MODIFIED: Get collapsible element
 
-    function setActiveTab() {
-        mainTabs.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-        allTabPanes.forEach(pane => pane.classList.remove('active', 'show'));
-        
-        const urlHash = window.location.hash;
-        let tabToActivate = urlHash ? mainTabs.querySelector(`.nav-link[href="${urlHash}"]`) : null;
+    // --- STATE MANAGEMENT & INITIALIZATION ---
+    let sortableInstance = null;
+    // NEW: Create a Bootstrap Collapse instance to control the navbar programmatically
+    const bsCollapse = new bootstrap.Collapse(navbarCollapseEl, { toggle: false });
 
-        if (!tabToActivate || tabToActivate.offsetParent === null) {
-            tabToActivate = mainTabs.querySelector('.nav-link');
-        }
-
-        if (tabToActivate) {
-            tabToActivate.classList.add('active');
-            const paneToActivate = document.querySelector(tabToActivate.getAttribute('href'));
-            if(paneToActivate) {
-                paneToActivate.classList.add('show', 'active');
+    /**
+     * Activates the correct tab based on the URL hash, or the first tab if no hash.
+     * This function is for the initial page load.
+     */
+    function setActiveTabFromHash() {
+        // Use the URL's hash if it exists, otherwise find the first tab in the list.
+        let urlHash = window.location.hash;
+        if (!urlHash) {
+            const firstTabLink = mainTabsContainer.querySelector('.nav-link');
+            if (firstTabLink) {
+                urlHash = firstTabLink.getAttribute('href');
             }
         }
         
-        activeTabInputs.forEach(input => { 
-            input.value = tabToActivate ? tabToActivate.getAttribute('href') : '#roster';
-        });
+        // Update hidden form inputs with the active tab.
+        activeTabInputs.forEach(input => { input.value = urlHash; });
+
+        // Find the tab link element corresponding to the hash.
+        const tabToActivate = mainTabsContainer.querySelector(`[href="${urlHash}"]`);
+        
+        // The content pane to show
+        const tabContentPane = document.querySelector(urlHash);
+
+        if (tabToActivate && tabContentPane) {
+            // Use Bootstrap's own JS method to programmatically show the tab.
+            const tab = new bootstrap.Tab(tabToActivate);
+            tab.show();
+        } else {
+            // Fallback: If no hash or invalid hash, show the first tab
+            const firstTabLink = mainTabsContainer.querySelector('.nav-link');
+            if (firstTabLink) {
+                const tab = new bootstrap.Tab(firstTabLink);
+                tab.show();
+            }
+        }
+    }
+    
+    /**
+     * Initializes Sortable.js to allow drag-and-drop reordering of tabs.
+     * It now checks screen width and only enables dragging on larger screens.
+     */
+    function initializeSortable() {
+        if (sortableInstance) {
+            sortableInstance.destroy(); // Clean up previous instance if any
+        }
+
+        // Only enable Sortable on screens wider than 992px
+        if (window.innerWidth >= 992) {
+             sortableInstance = new Sortable(mainTabsContainer, {
+                animation: 150,
+                handle: '.drag-handle', // Specify that dragging is initiated by the handle element
+                onEnd: () => { // This function runs after the user finishes dragging a tab
+                    // Create an array of the tab IDs in their new order.
+                    const finalOrder = [...mainTabsContainer.querySelectorAll('li.nav-item')].map(item => item.dataset.tabId);
+                    
+                    // Send the new order to the server to be saved.
+                    fetch('/save_tab_order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order: finalOrder })
+                    }).catch(err => console.error('Failed to save tab order:', err));
+                }
+            });
+        }
     }
 
-    mainTabs.addEventListener('shown.bs.tab', (event) => {
-        if (history.pushState) {
-            history.pushState(null, null, event.target.getAttribute('href'));
-        } else {
-            window.location.hash = event.target.getAttribute('href');
+    // --- EVENT LISTENERS ---
+
+    // When the URL hash changes (e.g., user clicks browser back/forward), update the active tab.
+    window.addEventListener('popstate', setActiveTabFromHash);
+
+    // Re-check if Sortable should be active on window resize
+    window.addEventListener('resize', initializeSortable);
+
+    // MODIFIED: Listen for when a tab is shown to update the URL and hide the mobile menu
+    mainTabsContainer.addEventListener('shown.bs.tab', event => {
+        const newHash = event.target.getAttribute('href'); 
+        
+        // Update the URL in the address bar to match the new tab.
+        if (window.location.hash !== newHash) {
+            if (history.pushState) {
+                history.pushState(null, null, newHash);
+            } else {
+                window.location.hash = newHash;
+            }
         }
-        activeTabInputs.forEach(input => { 
-          input.value = event.target.getAttribute('href');
-        });
+        // Also update any hidden input fields that track the active tab for form submissions.
+        activeTabInputs.forEach(input => { input.value = newHash; });
+
+        // NEW: Hide the navbar menu if it's currently showing (on mobile)
+        bsCollapse.hide();
     });
 
-    window.addEventListener('popstate', setActiveTab);
-    setActiveTab();
+    // --- INITIALIZATION CALLS ---
+    initializeSortable();      // Set up the drag-and-drop functionality.
+    setActiveTabFromHash();    // Set the initial active tab when the page first loads.
+    
+    
+    // --- ALL OTHER ORIGINAL SCRIPTS ---
+    
+    // --- DATA & CONFIGURATION ---
+    const ALL_DEV_DATA = JSON.parse(document.body.dataset.playerDev || '{}');
+    const POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
 
-    // --- Reorderable Tabs Logic ---
-    new Sortable(mainTabs, {
-        animation: 150,
-        handle: '.drag-handle',
-        onEnd: () => {
-            const order = [...mainTabs.querySelectorAll('li.nav-item')].map(item => item.dataset.tabId);
-            fetch('/save_tab_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order }) });
-        }
-    });
-  
     // --- Inline Player Roster Editing ---
     document.getElementById('rosterAccordion')?.addEventListener('click', event => {
         if (event.target.classList.contains('save-player-btn')) {
@@ -1011,6 +1101,42 @@ document.addEventListener('DOMContentLoaded', () => {
         const gridBody = document.getElementById('rotation-grid-body');
         let currentRotationId = null;
 
+        const addInningBtn = document.getElementById('addInningBtn');
+        const removeInningBtn = document.getElementById('removeInningBtn');
+        const fullRoster = JSON.parse(document.body.dataset.roster);
+
+        addInningBtn.addEventListener('click', () => {
+            const currentRowCount = gridBody.rows.length;
+            const newInningNumber = currentRowCount + 1;
+
+            let playerOptions = '<option value="">--</option>';
+            fullRoster.forEach(p => {
+                playerOptions += `<option value="${p.name}">${p.name}</option>`;
+            });
+
+            const newRow = `
+                <tr data-inning-number="${newInningNumber}">
+                    <td class="text-center fw-bold align-middle">${newInningNumber}</td>
+                    ${POSITIONS.map(pos => `
+                        <td>
+                            <select class="form-select form-select-sm" data-position="${pos}">
+                                ${playerOptions}
+                            </select>
+                        </td>
+                    `).join('')}
+                </tr>
+            `;
+            
+            gridBody.insertAdjacentHTML('beforeend', newRow);
+        });
+
+        removeInningBtn.addEventListener('click', () => {
+            const currentRowCount = gridBody.rows.length;
+            if (currentRowCount > 1) {
+                gridBody.lastElementChild.remove();
+            }
+        });
+
         const ALL_SAVED_ROTATIONS = {{ data.rotations | tojson }};
 
         function clearGrid() {
@@ -1027,7 +1153,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearGrid();
                 return;
             }
-            clearGrid(); // Start with a clean slate
+            clearGrid(); 
             currentRotationId = rotationData.id;
             titleInput.value = rotationData.title;
             deleteBtn.disabled = false;
@@ -1081,7 +1207,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(res => res.json())
             .then(data => {
                 if(data.status === 'success') {
-                    // Refresh page to see changes reflected everywhere
                     window.location.reload(); 
                 } else {
                    alert(`Error: ${data.message || 'Could not save rotation.'}`);
@@ -1105,7 +1230,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Event Listeners
         savedRotationSelect.addEventListener('change', () => {
             if (savedRotationSelect.value) {
                 populateGrid(savedRotationSelect.value);

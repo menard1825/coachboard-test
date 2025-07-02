@@ -5,17 +5,18 @@
             "password_hash": "scrypt:32768:8:1$oUgMXAo0RQRn7YXq$d12a6062d5647d9fec96dba68357dc477be8671ca10ad3e4a08b44c0a0f37cb8e82c50239bcc3c81fd373656b59057783296eee79e5da8ab83e45d57d0b35186",
             "role": "Admin",
             "tab_order": [
-                "roster",
                 "player_development",
+                "signs",
+                "scouting_list",
+                "roster",
                 "lineups",
                 "pitching",
-                "practice_plan",
                 "games",
-                "scouting_list",
+                "practice_plan",
                 "rotations",
-                "collaboration",
-                "signs"
-            ]
+                "collaboration"
+            ],
+            "last_login": "2025-07-01 18:54"
         },
         {
             "username": "jwright",
@@ -30,7 +31,8 @@
                 "games",
                 "collaboration",
                 "practice_plan"
-            ]
+            ],
+            "last_login": "Never"
         },
         {
             "username": "jvans",
@@ -45,7 +47,24 @@
                 "games",
                 "collaboration",
                 "practice_plan"
-            ]
+            ],
+            "last_login": "Never"
+        },
+        {
+            "username": "joe",
+            "password_hash": "scrypt:32768:8:1$V9EZUsc1wrTchhWS$b51ca0fc924414bfa6ac131e88e33c64050d71da6ab7b29a6734360471f1849e3c6c616cda9d392c2bbf629848606341bbac87e83c9e26305a4ea1e76853dd61",
+            "role": "Coach",
+            "tab_order": [
+                "roster",
+                "lineups",
+                "pitching",
+                "scouting_list",
+                "rotations",
+                "games",
+                "collaboration",
+                "practice_plan"
+            ],
+            "last_login": "Never"
         }
     ],
     "roster": [
@@ -91,33 +110,51 @@
     ],
     "lineups": [
         {
-            "title": "Weekend Opener vs. Canes",
+            "title": "Test 2",
             "players": [
                 {
+                    "name": "Graham Menard",
+                    "number": 3,
+                    "position1": "1B",
+                    "position2": "P",
+                    "throws": "Left",
+                    "bats": "Right",
+                    "notes": "Good situational hitter.",
+                    "pitcher_role": "Reliever",
+                    "position3": "OF",
+                    "has_lessons": "Yes",
+                    "lesson_focus": "Pitching mechanics - staying tall."
+                },
+                {
                     "name": "Rylan Wright",
-                    "number": 1
+                    "number": 1,
+                    "position1": "3B",
+                    "position2": "P",
+                    "throws": "Right",
+                    "bats": "Right",
+                    "notes": "Team leader. Great attitude.",
+                    "pitcher_role": "Starter",
+                    "position3": "SS",
+                    "has_lessons": "No",
+                    "lesson_focus": ""
                 },
                 {
                     "name": "Reed Evans",
-                    "number": 5
-                },
-                {
-                    "name": "Graham Menard",
-                    "number": 3
+                    "number": 5,
+                    "position1": "C",
+                    "position2": "P",
+                    "throws": "Right",
+                    "bats": "Right",
+                    "notes": "Solid defensive catcher.",
+                    "pitcher_role": "Starter",
+                    "position3": "3B",
+                    "has_lessons": "No",
+                    "lesson_focus": ""
                 }
             ]
         }
     ],
     "pitching": [
-        {
-            "date": "2025-06-28",
-            "pitcher": "Rylan Wright",
-            "opponent": "Indy Bulls",
-            "pitches": 55,
-            "innings": 3,
-            "pitcher_type": "Starter",
-            "outing_type": "Game"
-        },
         {
             "date": "2025-06-28",
             "pitcher": "Graham Menard",
@@ -129,20 +166,19 @@
         }
     ],
     "scouting_list": {
-        "committed": [
-            {
-                "name": "Jack Fordice",
-                "position1": "OF",
-                "position2": "1B",
-                "throws": "Right",
-                "bats": "Right"
-            }
-        ],
+        "committed": [],
         "targets": [
             {
                 "name": "Luke Charles",
                 "position1": "C",
                 "position2": "",
+                "throws": "Right",
+                "bats": "Right"
+            },
+            {
+                "name": "Jack Fordice",
+                "position1": "OF",
+                "position2": "1B",
                 "throws": "Right",
                 "bats": "Right"
             }
@@ -190,12 +226,12 @@
                 {
                     "id": 1720372801,
                     "text": "Dynamic Warmup & Throws",
-                    "status": "pending"
+                    "status": "complete"
                 },
                 {
                     "id": 1720372802,
                     "text": "Infield / Outfield work - 2 rounds",
-                    "status": "pending"
+                    "status": "complete"
                 },
                 {
                     "id": 1720372803,

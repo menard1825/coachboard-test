@@ -71,6 +71,12 @@ def load_data():
         if 'lesson_focus' not in player:
             player['lesson_focus'] = ''
             save_needed = True
+            
+    # NEW MIGRATION: Add last_login to existing users
+    for user in data.get('users', []):
+        if 'last_login' not in user:
+            user['last_login'] = 'Never'
+            save_needed = True
 
     # Ensure all players in roster have a player_development entry
     roster_names = {p['name'] for p in data.get('roster', [])}
@@ -121,6 +127,10 @@ def login():
         user = next((u for u in data.get('users', []) if u['username'] == username), None)
         
         if user and 'password_hash' in user and check_password_hash(user['password_hash'], password):
+            # NEW: Record the login time
+            user['last_login'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+            save_data(data) # Save the updated data
+
             session['logged_in'] = True
             session['username'] = username
             session['role'] = user.get('role', 'Coach')
