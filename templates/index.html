@@ -436,58 +436,91 @@
                         <label for="rotationTitle" class="form-label fw-bold">Rotation Title</label>
                         <input type="text" id="rotationTitle" class="form-control" placeholder="e.g., Weekend Tournament Rotation" required>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label for="savedRotationSelect" class="form-label fw-bold">Load Saved Rotation</label>
                         <select id="savedRotationSelect" class="form-select">
-                            <option value="">-- Select a rotation to load --</option>
+                            <option value="">-- Select a rotation --</option>
                             {% for rotation in data.rotations %}
                             <option value="{{ rotation.id }}">{{ rotation.title }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <div class="d-flex gap-2">
-                             <button id="saveRotationBtn" class="btn btn-primary w-100">Save</button>
-                             <button id="newRotationBtn" class="btn btn-secondary w-100">New / Clear</button>
-                             <button id="deleteRotationBtn" class="btn btn-danger w-100" disabled>Delete</button>
+                    <div class="col-auto">
+                        <button id="loadRotationBtn" class="btn btn-success">Load</button>
+                    </div>
+                    <div class="col">
+                        <div class="d-flex gap-2 justify-content-end">
+                             <button id="saveRotationBtn" class="btn btn-primary">Save</button>
+                             <button id="newRotationBtn" class="btn btn-secondary">New / Clear</button>
+                             <button id="deleteRotationBtn" class="btn btn-danger" disabled>Delete</button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-bordered table-striped" style="min-width: 900px;">
-                <thead class="table-dark">
-                    <tr>
-                        <th class="text-center">Inning</th>
-                        {% for pos in ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
-                        <th class="text-center">{{ pos }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody id="rotation-grid-body">
-                    {% for i in range(1, 7) %}
-                    <tr data-inning-number="{{ i }}">
-                        <td class="text-center fw-bold align-middle">{{ i }}</td>
-                        {% for pos in ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
-                        <td>
-                            <select class="form-select form-select-sm" data-position="{{ pos }}">
-                                <option value="">--</option>
-                                {% for p in data.roster %}
-                                <option value="{{ p.name }}">{{ p.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="d-lg-none">
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <h5 class="mb-0">Inning by Inning View</h5>
+                <div>
+                    <button id="addInningBtnMobile" class="btn btn-sm btn-success">Add Inning</button>
+                    <button id="removeInningBtnMobile" class="btn btn-sm btn-danger">Remove</button>
+                </div>
+            </div>
+            <div class="accordion mt-2" id="rotationMobileAccordion">
+                </div>
         </div>
-        <div class="mt-2 d-flex gap-2">
-            <button id="addInningBtn" class="btn btn-sm btn-success">Add Inning</button>
-            <button id="removeInningBtn" class="btn btn-sm btn-danger">Remove Last Inning</button>
+
+        <div class="d-none d-lg-block">
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped" style="min-width: 800px;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="text-center">Inning</th>
+                                    {% for pos in ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
+                                    <th class="text-center">{{ pos }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody id="rotation-grid-body">
+                                </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-2 d-flex gap-2">
+                        <button id="addInningBtn" class="btn btn-sm btn-success">Add Inning</button>
+                        <button id="removeInningBtn" class="btn btn-sm btn-danger">Remove Last Inning</button>
+                    </div>
+                </div>
+                <div class="col-lg-4 mt-4 mt-lg-0">
+                    <div class="card">
+                        <div class="card-header">
+                            <strong>Playing Time Summary</strong>
+                        </div>
+                        <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Player</th>
+                                        <th class="text-center">Innings</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="playingTimeBody">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4" id="fullGameBenchCard" style="display: none;">
+            <div class="card-header bg-danger text-white">
+                <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Full Game Bench</strong>
+            </div>
+            <ul class="list-group list-group-flush" id="fullGameBenchList">
+            </ul>
         </div>
     </div>
       
@@ -613,7 +646,7 @@
                         <ul class="list-group mb-3">
                             {% for task in plan.tasks %}
                             <li class="list-group-item d-flex justify-content-between align-items-center task-item {% if task.status == 'complete' %}complete{% endif %}">
-                                <span><input type="checkbox" class="form-check-input me-2" onchange="updateTaskStatus({{ plan.id }}, {{ task.id }}, this.checked)" {% if task.status == 'complete' %}checked{% endif %}>{{ task.text }}</span>
+                                <span><input type="checkbox" class="form-check-input me-2" onchange="updateTaskStatus({{ plan.id }}, {{ task.id }}, this)" {% if task.status == 'complete' %}checked{% endif %}>{{ task.text }}</span>
                                 <a href="{{ url_for('delete_task', plan_id=plan.id, task_id=task.id) }}" class="btn-close" onclick="return confirm('Are you sure?');"></a>
                             </li>
                             {% endfor %}
@@ -760,445 +793,275 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // --- NEW, SIMPLIFIED TAB MANAGEMENT SCRIPT ---
 
-    // --- DOM ELEMENT REFERENCES ---
-    const mainTabsContainer = document.getElementById('mainTabs');
-    const activeTabInputs = document.querySelectorAll('.active-tab-input');
-    const navbarCollapseEl = document.getElementById('navbarResponsive'); // MODIFIED: Get collapsible element
-
-    // --- STATE MANAGEMENT & INITIALIZATION ---
-    let sortableInstance = null;
-    // NEW: Create a Bootstrap Collapse instance to control the navbar programmatically
-    const bsCollapse = new bootstrap.Collapse(navbarCollapseEl, { toggle: false });
-
-    /**
-     * Activates the correct tab based on the URL hash, or the first tab if no hash.
-     * This function is for the initial page load.
-     */
-    function setActiveTabFromHash() {
-        // Use the URL's hash if it exists, otherwise find the first tab in the list.
-        let urlHash = window.location.hash;
-        if (!urlHash) {
-            const firstTabLink = mainTabsContainer.querySelector('.nav-link');
-            if (firstTabLink) {
-                urlHash = firstTabLink.getAttribute('href');
-            }
-        }
-        
-        // Update hidden form inputs with the active tab.
-        activeTabInputs.forEach(input => { input.value = urlHash; });
-
-        // Find the tab link element corresponding to the hash.
-        const tabToActivate = mainTabsContainer.querySelector(`[href="${urlHash}"]`);
-        
-        // The content pane to show
-        const tabContentPane = document.querySelector(urlHash);
-
-        if (tabToActivate && tabContentPane) {
-            // Use Bootstrap's own JS method to programmatically show the tab.
-            const tab = new bootstrap.Tab(tabToActivate);
+    const hash = window.location.hash;
+    if (hash) {
+        const tabTriggerEl = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
+        if (tabTriggerEl) {
+            const tab = new bootstrap.Tab(tabTriggerEl);
             tab.show();
-        } else {
-            // Fallback: If no hash or invalid hash, show the first tab
-            const firstTabLink = mainTabsContainer.querySelector('.nav-link');
-            if (firstTabLink) {
-                const tab = new bootstrap.Tab(firstTabLink);
-                tab.show();
-            }
         }
-    }
-    
-    /**
-     * Initializes Sortable.js to allow drag-and-drop reordering of tabs.
-     * It now checks screen width and only enables dragging on larger screens.
-     */
-    function initializeSortable() {
-        if (sortableInstance) {
-            sortableInstance.destroy(); // Clean up previous instance if any
-        }
-
-        // Only enable Sortable on screens wider than 992px
-        if (window.innerWidth >= 992) {
-             sortableInstance = new Sortable(mainTabsContainer, {
-                animation: 150,
-                handle: '.drag-handle', // Specify that dragging is initiated by the handle element
-                onEnd: () => { // This function runs after the user finishes dragging a tab
-                    // Create an array of the tab IDs in their new order.
-                    const finalOrder = [...mainTabsContainer.querySelectorAll('li.nav-item')].map(item => item.dataset.tabId);
-                    
-                    // Send the new order to the server to be saved.
-                    fetch('/save_tab_order', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ order: finalOrder })
-                    }).catch(err => console.error('Failed to save tab order:', err));
-                }
-            });
+    } else {
+        const firstTab = document.querySelector('a[data-bs-toggle="tab"]');
+        if (firstTab) {
+            new bootstrap.Tab(firstTab).show();
         }
     }
 
-    // --- EVENT LISTENERS ---
-
-    // When the URL hash changes (e.g., user clicks browser back/forward), update the active tab.
-    window.addEventListener('popstate', setActiveTabFromHash);
-
-    // Re-check if Sortable should be active on window resize
-    window.addEventListener('resize', initializeSortable);
-
-    // MODIFIED: Listen for when a tab is shown to update the URL and hide the mobile menu
-    mainTabsContainer.addEventListener('shown.bs.tab', event => {
-        const newHash = event.target.getAttribute('href'); 
-        
-        // Update the URL in the address bar to match the new tab.
-        if (window.location.hash !== newHash) {
-            if (history.pushState) {
-                history.pushState(null, null, newHash);
-            } else {
-                window.location.hash = newHash;
-            }
-        }
-        // Also update any hidden input fields that track the active tab for form submissions.
-        activeTabInputs.forEach(input => { input.value = newHash; });
-
-        // NEW: Hide the navbar menu if it's currently showing (on mobile)
-        bsCollapse.hide();
-    });
-
-    // --- INITIALIZATION CALLS ---
-    initializeSortable();      // Set up the drag-and-drop functionality.
-    setActiveTabFromHash();    // Set the initial active tab when the page first loads.
-    
-    
-    // --- ALL OTHER ORIGINAL SCRIPTS ---
-    
-    // --- DATA & CONFIGURATION ---
-    const ALL_DEV_DATA = JSON.parse(document.body.dataset.playerDev || '{}');
-    const POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
-
-    // --- Inline Player Roster Editing ---
-    document.getElementById('rosterAccordion')?.addEventListener('click', event => {
-        if (event.target.classList.contains('save-player-btn')) {
-            const item = event.target.closest('.accordion-item');
-            const index = item.dataset.playerIndex;
-            const formData = new URLSearchParams();
-            item.querySelectorAll('input, select, textarea').forEach(input => {
+    document.querySelectorAll('.save-player-btn').forEach(button => {
+        button.addEventListener('click', function(event) {
+            const accordionItem = this.closest('.accordion-item');
+            const playerIndex = accordionItem.dataset.playerIndex;
+            const formContainer = accordionItem.querySelector('.accordion-body');
+            
+            const formData = new FormData();
+            formContainer.querySelectorAll('input, select, textarea').forEach(input => {
                 formData.append(input.name, input.value);
             });
-            
-            fetch(`/update_player_inline/${index}`, { method: 'POST', body: formData })
-            .then(res => res.json())
+
+            this.disabled = true;
+            this.textContent = 'Saving...';
+
+            fetch(`/update_player_inline/${playerIndex}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    window.location.reload();
+                    alert(data.message); 
                 } else {
                     alert(`Error: ${data.message}`);
                 }
-            }).catch(err => alert(`Fetch Error: ${err}`));
-        }
+            })
+            .catch(error => {
+                console.error('Error saving player:', error);
+                alert('An error occurred while saving. Please try again.');
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.textContent = 'Save Changes';
+            });
+        });
     });
 
-    // --- Player Development Modals Logic ---
-    const editFocusModalEl = document.getElementById('editFocusModal');
-    if(editFocusModalEl) {
-        editFocusModalEl.addEventListener('show.bs.modal', event => {
-            const button = event.relatedTarget;
-            const action = button.dataset.action;
-            const playerName = button.dataset.playerName;
-            const skill = button.dataset.skill;
-            const focusId = button.dataset.focusId;
-
-            const modalTitle = editFocusModalEl.querySelector('.modal-title');
-            const form = editFocusModalEl.querySelector('#editFocusForm');
-            const completeForm = editFocusModalEl.querySelector('#completeFocusForm');
-            const skillInput = form.querySelector('#editFocusSkill');
-            const focusTextInput = form.querySelector('#editFocusText');
-            const notesInput = form.querySelector('#editFocusNotes');
-            const completeBtn = editFocusModalEl.querySelector('#completeFocusBtn');
-
-            const skillTitle = skill ? skill.charAt(0).toUpperCase() + skill.slice(1) : '';
-
-            if (action === 'add') {
-                modalTitle.textContent = `Add New Focus for ${playerName}`;
-                form.action = `/add_focus/${playerName}`;
-                focusTextInput.value = button.dataset.focusText || '';
-                notesInput.value = '';
-                completeBtn.style.display = 'none';
-
-                const skillSelectHTML = `
-                    <div class="mb-3" id="skillSelectWrapper">
-                        <label for="editFocusSkillSelect" class="form-label">Skill Category</label>
-                        <select name="skill" id="editFocusSkillSelect" class="form-select" required>
-                            <option value="hitting">Hitting</option>
-                            <option value="pitching">Pitching</option>
-                            <option value="fielding">Fielding</option>
-                            <option value="baserunning">Baserunning</option>
-                        </select>
-                    </div>
-                `;
-                if (!form.querySelector('#skillSelectWrapper')) {
-                    form.querySelector('.modal-body').insertAdjacentHTML('afterbegin', skillSelectHTML);
-                }
-            } else { // 'edit'
-                modalTitle.textContent = `Edit Active ${skillTitle} Focus for ${playerName}`;
-                form.action = `/update_focus/${focusId}`;
-                completeForm.action = `/complete_focus/${focusId}`;
-                completeBtn.style.display = 'block';
-                skillInput.value = skill;
-
-                const focusItem = ALL_DEV_DATA[playerName]?.[skill]?.find(f => f.id == focusId);
-                if(focusItem) {
-                    focusTextInput.value = focusItem.focus;
-                    notesInput.value = focusItem.notes;
-                }
-
-                const skillSelectWrapper = form.querySelector('#skillSelectWrapper');
-                if (skillSelectWrapper) {
-                    skillSelectWrapper.remove();
-                }
-            }
-        });
-    }
-
-    const historyModalEl = document.getElementById('historyModal');
-    if(historyModalEl) {
-        historyModalEl.addEventListener('show.bs.modal', event => {
-            const button = event.relatedTarget;
-            const playerName = button.dataset.playerName;
-            const skill = button.dataset.skill;
-            
-            const modalTitle = historyModalEl.querySelector('.modal-title');
-            const modalBody = historyModalEl.querySelector('.modal-body');
-            const skillTitle = skill.charAt(0).toUpperCase() + skill.slice(1);
-
-            modalTitle.textContent = `${skillTitle} History for ${playerName}`;
-            
-            const historyItems = ALL_DEV_DATA[playerName]?.[skill]?.filter(f => f.status === 'completed') || [];
-            
-            if (historyItems.length === 0) {
-                modalBody.innerHTML = '<p>No completed items in history.</p>';
-                return;
-            }
-
-            let historyHtml = '<ul class="list-group list-group-flush">';
-            historyItems.sort((a, b) => (b.completed_date || '').localeCompare(a.completed_date || '')).forEach(item => {
-                historyHtml += `
-                    <li class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">${item.focus}</h6>
-                            <small>Completed: ${item.completed_date || 'N/A'}</small>
-                        </div>
-                        <p class="mb-1 small">${item.notes || 'No notes.'}</p>
-                        <small class="text-muted">Created: ${item.created_date}</small>
-                    </li>
-                `;
-            });
-            historyHtml += '</ul>';
-            modalBody.innerHTML = historyHtml;
-        });
-    }
-
-    // --- Edit Sign Modal Logic ---
-    const editSignModalEl = document.getElementById('editSignModal');
-    if (editSignModalEl) {
-      editSignModalEl.addEventListener('show.bs.modal', event => {
-          const button = event.relatedTarget;
-          const form = editSignModalEl.querySelector('form');
-          form.action = `/update_sign/${button.dataset.signIndex}`;
-          form.querySelector('#edit_sign_name').value = button.dataset.signName;
-          form.querySelector('#edit_sign_indicator').value = button.dataset.signIndicator;
-      });
-    }
-
-    // --- Edit Lineup Modal Logic ---
-    const editLineupModal = document.getElementById('editLineupModal');
-    if (editLineupModal) {
-      let sortable = null;
-      editLineupModal.addEventListener('show.bs.modal', event => {
-          const button = event.relatedTarget;
-          const form = document.getElementById('editLineupForm');
-          const modalBody = editLineupModal.querySelector('.modal-body');
-          const lineupIndex = button.dataset.lineupIndex;
-          const lineupTitle = button.dataset.lineupTitle;
-          const lineupPlayers = JSON.parse(decodeURIComponent(button.dataset.lineupPlayers));
-          const lineupPlayerNames = new Set(lineupPlayers.map(p => p.name));
-          const fullRoster = JSON.parse(document.body.dataset.roster);
-          form.action = `/edit_lineup/${lineupIndex}`;
-          let playerHtml = '';
-          lineupPlayers.forEach(player => {
-              playerHtml += `<li class="list-group-item d-flex align-items-center"><i class="bi bi-grip-vertical me-3" style="cursor: move;"></i><input class="form-check-input me-3" type="checkbox" name="lineup_player" value="${player.name}" id="edit-lineup-${player.name.replace(/\s+/g, '-')}" checked><label class="form-check-label d-flex align-items-center" for="edit-lineup-${player.name.replace(/\s+/g, '-')}"><span class="lineup-order-number fw-bold me-2" style="width: 2em;"></span>${player.name}</label></li>`;
-          });
-          fullRoster.forEach(player => {
-              if (!lineupPlayerNames.has(player.name)) {
-                  playerHtml += `<li class="list-group-item d-flex align-items-center"><i class="bi bi-grip-vertical me-3" style="cursor: move;"></i><input class="form-check-input me-3" type="checkbox" name="lineup_player" value="${player.name}" id="edit-lineup-${player.name.replace(/\s+/g, '-')}"><label class="form-check-label d-flex align-items-center" for="edit-lineup-${player.name.replace(/\s+/g, '-')}"><span class="lineup-order-number fw-bold me-2" style="width: 2em;"></span>${player.name}</label></li>`;
-              }
-          });
-          modalBody.innerHTML = `<input type="hidden" name="active_tab" value="#lineups"><div class="mb-3"><label for="lineup_title_edit" class="form-label">Lineup Title</label><input type="text" name="lineup_title" id="lineup_title_edit" class="form-control" value="${lineupTitle}" required></div><h5>Players (Check/Uncheck and Drag to Reorder)</h5><ul id="sortable-player-list" class="list-group">${playerHtml}</ul>`;
-          const sortableList = document.getElementById('sortable-player-list');
-          const updateLineupNumbers = () => {
-              const listItems = sortableList.querySelectorAll('li');
-              let checkedCounter = 1;
-              listItems.forEach(item => {
-                  const numberSpan = item.querySelector('.lineup-order-number');
-                  const checkbox = item.querySelector('input[type="checkbox"]');
-                  if (numberSpan && checkbox) {
-                      if (checkbox.checked) {
-                          numberSpan.textContent = `${checkedCounter}.`;
-                          checkedCounter++;
-                      } else {
-                          numberSpan.textContent = '';
-                      }
-                  }
-              });
-          };
-          sortableList.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-              checkbox.addEventListener('change', updateLineupNumbers);
-          });
-          if (sortableList) {
-              sortable = new Sortable(sortableList, {
-                  animation: 150,
-                  handle: '.bi-grip-vertical',
-                  onEnd: updateLineupNumbers
-              });
-          }
-          updateLineupNumbers();
-      });
-      editLineupModal.addEventListener('hidden.bs.modal', () => {
-          if (sortable) {
-              sortable.destroy();
-              sortable = null;
-          }
-          editLineupModal.querySelector('.modal-body').innerHTML = ''; 
-      });
-    }
-
-    // --- Practice Plan Task Status Update ---
-    window.updateTaskStatus = function(planId, taskId, isChecked) {
-        const status = isChecked ? 'complete' : 'pending';
-        fetch(`/update_task_status/${planId}/${taskId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: status })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status !== 'success') {
-                alert('Failed to update task status.');
-            }
-            window.location.reload(); 
-        })
-        .catch(error => console.error('Error:', error));
-    }
-    
     // --- Rotations Grid Logic ---
     const rotationTab = document.getElementById('rotations');
     if (rotationTab) {
-        const titleInput = document.getElementById('rotationTitle');
-        const savedRotationSelect = document.getElementById('savedRotationSelect');
-        const saveBtn = document.getElementById('saveRotationBtn');
-        const newBtn = document.getElementById('newRotationBtn');
-        const deleteBtn = document.getElementById('deleteRotationBtn');
-        const gridBody = document.getElementById('rotation-grid-body');
+        const titleInput = document.getElementById('rotationTitle'),
+            savedRotationSelect = document.getElementById('savedRotationSelect'),
+            loadRotationBtn = document.getElementById('loadRotationBtn'),
+            saveBtn = document.getElementById('saveRotationBtn'),
+            newBtn = document.getElementById('newRotationBtn'),
+            deleteBtn = document.getElementById('deleteRotationBtn'),
+            gridBody = document.getElementById('rotation-grid-body'),
+            playingTimeBody = document.getElementById('playingTimeBody'),
+            fullGameBenchCard = document.getElementById('fullGameBenchCard'),
+            fullGameBenchList = document.getElementById('fullGameBenchList'),
+            mobileAccordion = document.getElementById('rotationMobileAccordion'),
+            addInningBtn = document.getElementById('addInningBtn'),
+            removeInningBtn = document.getElementById('removeInningBtn'),
+            addInningBtnMobile = document.getElementById('addInningBtnMobile'),
+            removeInningBtnMobile = document.getElementById('removeInningBtnMobile');
+        
         let currentRotationId = null;
-
-        const addInningBtn = document.getElementById('addInningBtn');
-        const removeInningBtn = document.getElementById('removeInningBtn');
-        const fullRoster = JSON.parse(document.body.dataset.roster);
-
-        addInningBtn.addEventListener('click', () => {
-            const currentRowCount = gridBody.rows.length;
-            const newInningNumber = currentRowCount + 1;
-
-            let playerOptions = '<option value="">--</option>';
-            fullRoster.forEach(p => {
-                playerOptions += `<option value="${p.name}">${p.name}</option>`;
-            });
-
-            const newRow = `
-                <tr data-inning-number="${newInningNumber}">
-                    <td class="text-center fw-bold align-middle">${newInningNumber}</td>
-                    ${POSITIONS.map(pos => `
-                        <td>
-                            <select class="form-select form-select-sm" data-position="${pos}">
-                                ${playerOptions}
-                            </select>
-                        </td>
-                    `).join('')}
-                </tr>
-            `;
-            
-            gridBody.insertAdjacentHTML('beforeend', newRow);
-        });
-
-        removeInningBtn.addEventListener('click', () => {
-            const currentRowCount = gridBody.rows.length;
-            if (currentRowCount > 1) {
-                gridBody.lastElementChild.remove();
-            }
-        });
-
+        let copiedInningPlayers = null; 
+        const fullRoster = JSON.parse(document.body.dataset.roster || "[]");
+        const POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
         const ALL_SAVED_ROTATIONS = {{ data.rotations | tojson }};
 
+        function updateUI() {
+            const inningRows = gridBody.querySelectorAll('tr[data-inning-number]');
+            inningRows.forEach(row => {
+                const inningNum = row.dataset.inningNumber;
+                updateInningDropdowns(inningNum);
+            });
+            updateSummaries();
+        }
+
+        function updateInningDropdowns(inningNum) {
+            const allSelectsForInning = document.querySelectorAll(`select[data-inning-number="${inningNum}"]`);
+            const usedPlayers = new Set();
+            allSelectsForInning.forEach(sel => { if(sel.value) usedPlayers.add(sel.value); });
+            
+            allSelectsForInning.forEach(sel => {
+                const currentPlayer = sel.value;
+                let optionsHTML = '<option value="">--</option>';
+                fullRoster.forEach(player => {
+                    if (!usedPlayers.has(player.name) || player.name === currentPlayer) {
+                        optionsHTML += `<option value="${player.name}">${player.name}</option>`;
+                    }
+                });
+                sel.innerHTML = optionsHTML;
+                sel.value = currentPlayer;
+            });
+        }
+
+        function updateSummaries() {
+            const inningRows = gridBody.querySelectorAll('tr[data-inning-number]');
+            const totalInnings = inningRows.length;
+            const inningCounts = {};
+            fullRoster.forEach(p => { inningCounts[p.name] = 0; });
+
+            inningRows.forEach(row => {
+                row.querySelectorAll('select').forEach(sel => {
+                    if (sel.value) inningCounts[sel.value]++;
+                });
+            });
+
+            playingTimeBody.innerHTML = '';
+            const sortedPlayers = Object.entries(inningCounts).sort((a, b) => b[1] - a[1]);
+            const playersOnBench = [];
+            sortedPlayers.forEach(([name, count]) => {
+                let rowClass = '';
+                if (count === 0) {
+                    rowClass = 'table-danger';
+                    playersOnBench.push(name);
+                } else if (totalInnings > 2 && totalInnings - count > 2) {
+                    rowClass = 'table-warning';
+                }
+                playingTimeBody.insertAdjacentHTML('beforeend', `<tr class="${rowClass}"><td>${name}</td><td class="text-center">${count}</td></tr>`);
+            });
+
+            fullGameBenchList.innerHTML = '';
+            if (playersOnBench.length > 0) {
+                playersOnBench.forEach(name => fullGameBenchList.insertAdjacentHTML('beforeend', `<li class="list-group-item">${name}</li>`));
+                fullGameBenchCard.style.display = 'block';
+            } else {
+                fullGameBenchCard.style.display = 'none';
+            }
+        }
+
+        function syncViews(sourceElement) {
+            const inning = sourceElement.dataset.inningNumber;
+            const position = sourceElement.dataset.position;
+            const value = sourceElement.value;
+            const isDesktop = sourceElement.closest('tbody#rotation-grid-body');
+            const targetSelect = isDesktop 
+                ? mobileAccordion.querySelector(`select[data-inning-number="${inning}"][data-position="${position}"]`)
+                : gridBody.querySelector(`tr[data-inning-number="${inning}"] select[data-position="${position}"]`);
+            
+            if (targetSelect) targetSelect.value = value;
+            updateInningDropdowns(inning);
+            updateSummaries();
+        }
+
+        function buildInning(inningNum) {
+            // --- Desktop View: Table Row ---
+            const newDesktopRow = document.createElement('tr');
+            newDesktopRow.dataset.inningNumber = inningNum;
+            const desktopInningCell = `
+                <td class="text-center fw-bold align-middle">
+                    ${inningNum}
+                    <div class="d-flex justify-content-center gap-1 mt-1">
+                        <button class="btn btn-sm btn-outline-secondary copy-inning-btn" title="Copy Inning ${inningNum} Lineup"><i class="bi bi-clipboard"></i></button>
+                        <button class="btn btn-sm btn-outline-primary paste-inning-btn" title="Paste to Inning ${inningNum}"><i class="bi bi-clipboard-plus"></i></button>
+                    </div>
+                </td>`;
+            newDesktopRow.innerHTML = desktopInningCell + POSITIONS.map(pos => `<td><select class="form-select form-select-sm" data-inning-number="${inningNum}" data-position="${pos}"></select></td>`).join('');
+            gridBody.appendChild(newDesktopRow);
+            
+            // --- Mobile View: Accordion Item ---
+            let mobilePositionList = '<ul class="list-group list-group-flush">';
+            POSITIONS.forEach(pos => {
+                mobilePositionList += `<li class="list-group-item d-flex justify-content-between align-items-center"><strong>${pos}</strong> <select class="form-select form-select-sm w-75" data-inning-number="${inningNum}" data-position="${pos}"></select></li>`;
+            });
+            mobilePositionList += '</ul>';
+            
+            // Add copy/paste buttons to the mobile header as well
+            const mobileAccordionHeader = `
+                <h2 class="accordion-header d-flex align-items-center">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-mobile-${inningNum}">Inning ${inningNum}</button>
+                    <div class="p-2 d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-secondary copy-inning-btn" title="Copy Inning ${inningNum} Lineup"><i class="bi bi-clipboard"></i></button>
+                        <button class="btn btn-sm btn-outline-primary paste-inning-btn" title="Paste to Inning ${inningNum}"><i class="bi bi-clipboard-plus"></i></button>
+                    </div>
+                </h2>`;
+
+            const mobileAccordionItem = `
+                <div class="accordion-item" data-inning-number-mobile="${inningNum}">
+                    ${mobileAccordionHeader}
+                    <div id="collapse-mobile-${inningNum}" class="accordion-collapse collapse" data-bs-parent="#rotationMobileAccordion">
+                        <div class="accordion-body p-0">${mobilePositionList}</div>
+                    </div>
+                </div>`;
+            mobileAccordion.insertAdjacentHTML('beforeend', mobileAccordionItem);
+        }
+
+        function addInning() {
+            const newInningNum = gridBody.rows.length + 1;
+            buildInning(newInningNum);
+            updateInningDropdowns(newInningNum); // Populate new dropdowns
+            updateSummaries();
+        }
+
+        function removeInning() {
+            if (gridBody.rows.length > 1) {
+                const inningToRemove = gridBody.lastElementChild.dataset.inningNumber;
+                gridBody.lastElementChild.remove();
+                mobileAccordion.querySelector(`div[data-inning-number-mobile="${inningToRemove}"]`).remove();
+                updateSummaries();
+            }
+        }
+
         function clearGrid() {
-            gridBody.querySelectorAll('select').forEach(sel => sel.value = '');
+            gridBody.innerHTML = '';
+            mobileAccordion.innerHTML = '';
+            for (let i = 1; i <= 6; i++) {
+                buildInning(i);
+                updateInningDropdowns(i);
+            }
             titleInput.value = '';
             savedRotationSelect.value = '';
             deleteBtn.disabled = true;
             currentRotationId = null;
+            updateSummaries(); 
         }
-
-        function populateGrid(rotationId) {
-            const rotationData = ALL_SAVED_ROTATIONS.find(r => r.id == rotationId);
-            if (!rotationData) {
-                clearGrid();
-                return;
-            }
-            clearGrid(); 
+        
+        function populateGrid(rotationData) {
+            gridBody.innerHTML = '';
+            mobileAccordion.innerHTML = '';
             currentRotationId = rotationData.id;
             titleInput.value = rotationData.title;
             deleteBtn.disabled = false;
-
-            for (const [inning, positions] of Object.entries(rotationData.innings)) {
-                const row = gridBody.querySelector(`tr[data-inning-number="${inning}"]`);
-                if (row) {
-                    for (const [pos, playerName] of Object.entries(positions)) {
-                        const sel = row.querySelector(`select[data-position="${pos}"]`);
-                        if (sel) {
-                            sel.value = playerName;
-                        }
-                    }
-                }
+            
+            const savedInnings = Object.keys(rotationData.innings).map(Number).sort((a,b) => a - b);
+            if (savedInnings.length === 0) { 
+                clearGrid();
+                titleInput.value = rotationData.title;
+                return; 
             }
+
+            savedInnings.forEach(inningNum => {
+                buildInning(inningNum);
+                updateInningDropdowns(inningNum); // First, create all the <option> tags
+                
+                const inningAssignments = rotationData.innings[inningNum];
+                for (const [pos, playerName] of Object.entries(inningAssignments)) {
+                    document.querySelectorAll(`select[data-inning-number="${inningNum}"][data-position="${pos}"]`).forEach(sel => {
+                        sel.value = playerName; // Now, set the value
+                    });
+                }
+            });
+
+            updateUI(); // Finally, re-filter dropdowns and update summary
         }
 
         function handleSave() {
             const title = titleInput.value.trim();
-            if (!title) {
-                alert('Please enter a title for the rotation.');
-                return;
-            }
-
+            if (!title) { alert('Please enter a title for the rotation.'); return; }
             const inningsData = {};
             gridBody.querySelectorAll('tr[data-inning-number]').forEach(row => {
                 const inningNum = row.dataset.inningNumber;
                 inningsData[inningNum] = {};
                 row.querySelectorAll('select').forEach(sel => {
-                    const position = sel.dataset.position;
-                    if (sel.value) {
-                        inningsData[inningNum][position] = sel.value;
-                    }
+                    if (sel.value) inningsData[inningNum][sel.dataset.position] = sel.value;
                 });
             });
-            
-            const payload = {
-                id: currentRotationId,
-                title: title,
-                innings: inningsData
-            };
+            const payload = { id: currentRotationId, title: title, innings: inningsData };
             
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
-
             fetch('/save_rotation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1207,7 +1070,12 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(res => res.json())
             .then(data => {
                 if(data.status === 'success') {
-                    window.location.reload(); 
+                    if (!currentRotationId) {
+                        const newOption = new Option(title, data.new_id, false, true);
+                        savedRotationSelect.add(newOption);
+                        currentRotationId = data.new_id;
+                    }
+                    alert(data.message);
                 } else {
                    alert(`Error: ${data.message || 'Could not save rotation.'}`);
                 }
@@ -1221,27 +1089,90 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         function handleDelete() {
-            if (!currentRotationId) {
-                alert("No rotation selected to delete.");
-                return;
-            }
+            if (!currentRotationId) return;
             if (confirm(`Are you sure you want to delete the rotation "${titleInput.value}"?`)) {
                 window.location.href = `/delete_rotation/${currentRotationId}`;
             }
         }
 
-        savedRotationSelect.addEventListener('change', () => {
-            if (savedRotationSelect.value) {
-                populateGrid(savedRotationSelect.value);
+        // --- Event Listeners ---
+        addInningBtn.addEventListener('click', addInning);
+        removeInningBtn.addEventListener('click', removeInning);
+        addInningBtnMobile.addEventListener('click', addInning);
+        removeInningBtnMobile.addEventListener('click', removeInning);
+
+        newBtn.addEventListener('click', clearGrid);
+        deleteBtn.addEventListener('click', handleDelete);
+        saveBtn.addEventListener('click', handleSave);
+        
+        loadRotationBtn.addEventListener('click', () => {
+            const selectedId = savedRotationSelect.value;
+            if (!selectedId) {
+                alert("Please select a rotation from the dropdown to load.");
+                return;
+            }
+            const rotationData = ALL_SAVED_ROTATIONS.find(r => r.id == selectedId);
+            if (rotationData) {
+                populateGrid(rotationData);
             } else {
-                clearGrid();
+                alert("Could not find the selected rotation data.");
             }
         });
 
-        newBtn.addEventListener('click', clearGrid);
-        saveBtn.addEventListener('click', handleSave);
-        deleteBtn.addEventListener('click', handleDelete);
+        // Add a single listener to the parent tab content to handle changes
+        rotationTab.addEventListener('change', e => {
+            if (e.target.tagName === 'SELECT' && e.target.dataset.position) {
+                syncViews(e.target);
+            }
+        });
+
+        // Add a single listener for copy/paste clicks
+        rotationTab.addEventListener('click', e => {
+            const copyBtn = e.target.closest('.copy-inning-btn');
+            const pasteBtn = e.target.closest('.paste-inning-btn');
+
+            if (copyBtn) {
+                const inningRow = copyBtn.closest('[data-inning-number], [data-inning-number-mobile]');
+                const inningNum = inningRow.dataset.inningNumber || inningRow.dataset.inningNumberMobile;
+                
+                copiedInningPlayers = {};
+                document.querySelectorAll(`select[data-inning-number="${inningNum}"]`).forEach(sel => {
+                    if (sel.value) copiedInningPlayers[sel.dataset.position] = sel.value;
+                });
+                alert(`Inning ${inningNum} lineup copied!`);
+            }
+
+            if (pasteBtn) {
+                if (!copiedInningPlayers) {
+                    alert('Please copy an inning lineup first!');
+                    return;
+                }
+                const inningRow = pasteBtn.closest('[data-inning-number], [data-inning-number-mobile]');
+                const inningNum = inningRow.dataset.inningNumber || inningRow.dataset.inningNumberMobile;
+
+                // Clear the inning first
+                document.querySelectorAll(`select[data-inning-number="${inningNum}"]`).forEach(sel => sel.value = '');
+
+                // Paste the new players
+                for (const [pos, playerName] of Object.entries(copiedInningPlayers)) {
+                    document.querySelectorAll(`select[data-inning-number="${inningNum}"][data-position="${pos}"]`).forEach(sel => sel.value = playerName);
+                }
+
+                // Update the UI
+                updateInningDropdowns(inningNum);
+                updateSummaries();
+                alert(`Pasted lineup to inning ${inningNum}.`);
+            }
+        });
+
+        // Initial setup
+        clearGrid();
     }
+    
+    const mainTabsContainer = document.getElementById('mainTabs');
+    const navbarCollapseEl = document.getElementById('navbarResponsive');
+    const bsCollapse = new bootstrap.Collapse(navbarCollapseEl, { toggle: false });
+    mainTabsContainer.addEventListener('shown.bs.tab', () => bsCollapse.hide());
 });
 </script>
 </body>

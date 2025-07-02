@@ -16,7 +16,7 @@
                 "rotations",
                 "collaboration"
             ],
-            "last_login": "2025-07-01 18:54"
+            "last_login": "2025-07-02 16:10"
         },
         {
             "username": "jwright",
@@ -69,26 +69,13 @@
     ],
     "roster": [
         {
-            "name": "Graham Menard",
-            "number": 3,
-            "position1": "1B",
-            "position2": "P",
-            "throws": "Left",
-            "bats": "Right",
-            "notes": "Good situational hitter.",
-            "pitcher_role": "Reliever",
-            "position3": "OF",
-            "has_lessons": "Yes",
-            "lesson_focus": "Pitching mechanics - staying tall."
-        },
-        {
             "name": "Rylan Wright",
             "number": 1,
             "position1": "3B",
             "position2": "P",
             "throws": "Right",
             "bats": "Right",
-            "notes": "Team leader. Great attitude.",
+            "notes": "",
             "pitcher_role": "Starter",
             "position3": "SS",
             "has_lessons": "No",
@@ -106,6 +93,127 @@
             "position3": "3B",
             "has_lessons": "No",
             "lesson_focus": ""
+        },
+        {
+            "name": "Luke Charles",
+            "number": "",
+            "position1": "C",
+            "position2": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": ""
+        },
+        {
+            "name": "Jack Fordice",
+            "number": "",
+            "position1": "OF",
+            "position2": "1B",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": ""
+        },
+        {
+            "name": "Test1",
+            "number": "",
+            "position1": "",
+            "position2": "",
+            "throws": "",
+            "bats": "",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": ""
+        },
+        {
+            "name": "Test 2",
+            "number": "",
+            "position1": "",
+            "position2": "",
+            "throws": "",
+            "bats": "",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": ""
+        },
+        {
+            "name": "Test 3",
+            "number": "",
+            "position1": "",
+            "position2": "",
+            "throws": "",
+            "bats": "",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": ""
+        },
+        {
+            "name": "Test 4",
+            "number": "",
+            "position1": "",
+            "position2": "",
+            "throws": "",
+            "bats": "",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": ""
+        },
+        {
+            "name": "Test 5",
+            "number": "",
+            "position1": "",
+            "position2": "",
+            "throws": "",
+            "bats": "",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": ""
+        },
+        {
+            "name": "Test 7",
+            "number": "",
+            "position1": "",
+            "position2": "",
+            "throws": "",
+            "bats": "",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": ""
+        },
+        {
+            "name": "Test 6",
+            "number": "",
+            "position1": "",
+            "position2": "",
+            "throws": "",
+            "bats": "",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": ""
+        },
+        {
+            "name": "Graham Menard",
+            "number": 3,
+            "position1": "1B",
+            "position2": "RF",
+            "throws": "Left",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Reliever",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "position3": "LF"
         }
     ],
     "lineups": [
@@ -154,35 +262,10 @@
             ]
         }
     ],
-    "pitching": [
-        {
-            "date": "2025-06-28",
-            "pitcher": "Graham Menard",
-            "opponent": "Indy Bulls",
-            "pitches": 45,
-            "innings": 1.1,
-            "pitcher_type": "Reliever",
-            "outing_type": "Game"
-        }
-    ],
+    "pitching": [],
     "scouting_list": {
         "committed": [],
-        "targets": [
-            {
-                "name": "Luke Charles",
-                "position1": "C",
-                "position2": "",
-                "throws": "Right",
-                "bats": "Right"
-            },
-            {
-                "name": "Jack Fordice",
-                "position1": "OF",
-                "position2": "1B",
-                "throws": "Right",
-                "bats": "Right"
-            }
-        ],
+        "targets": [],
         "not_interested": []
     },
     "rotations": [],
@@ -226,17 +309,17 @@
                 {
                     "id": 1720372801,
                     "text": "Dynamic Warmup & Throws",
-                    "status": "complete"
+                    "status": "pending"
                 },
                 {
                     "id": 1720372802,
                     "text": "Infield / Outfield work - 2 rounds",
-                    "status": "complete"
+                    "status": "pending"
                 },
                 {
                     "id": 1720372803,
                     "text": "Live BP - Situational Hitting",
-                    "status": "complete"
+                    "status": "pending"
                 }
             ]
         }
@@ -254,17 +337,62 @@
             "fielding": [],
             "baserunning": []
         },
+        "Luke Charles": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Jack Fordice": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Test1": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Test 2": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Test 3": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Test 4": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Test 5": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Test 7": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Test 6": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
         "Graham Menard": {
-            "hitting": [
-                {
-                    "id": 1751385603401,
-                    "focus": "Not stepping out",
-                    "status": "active",
-                    "notes": "Using a bat in front of the plate to prevent stepping out.",
-                    "created_date": "2025-07-01",
-                    "completed_date": null
-                }
-            ],
+            "hitting": [],
             "pitching": [],
             "fielding": [],
             "baserunning": []
