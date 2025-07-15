@@ -1,4 +1,14 @@
-venv/
+# Ignore Python cache and virtual environments
 __pycache__/
+*.pyc
 venv/
-__pycache__/
+venv-staging/
+
+# Ignore database and log files
+*.db
+*.log
+
+# Ignore backup and local environment files
+*.json
+.env
+.env.*
