@@ -1,331 +1,185 @@
 {
     "users": [
         {
-            "username": "Mike1825",
-            "password_hash": "scrypt:32768:8:1$oUgMXAo0RQRn7YXq$d12a6062d5647d9fec96dba68357dc477be8671ca10ad3e4a08b44c0a0f37cb8e82c50239bcc3c81fd373656b59057783296eee79e5da8ab83e45d57d0b35186",
+            "username": "admin",
+            "password_hash": "pbkdf2:sha256:600000$LEyODOOJG8Zi45cB$09783c828dfe2815d625697ebce2a3aafab56eebf9c1fca14d2d572dcd0d96a0",
             "role": "Admin",
             "tab_order": [
-                "player_development",
-                "signs",
                 "scouting_list",
                 "roster",
-                "lineups",
+                "player_development",
                 "pitching",
                 "games",
                 "practice_plan",
-                "rotations",
-                "collaboration"
+                "collaboration",
+                "gameday_dropdown"
             ],
-            "last_login": "2025-07-02 16:10"
+            "last_login": "Never",
+            "player_order": [
+                "Graham Menard",
+                "Rylan Wright",
+                "Jack Fordice",
+                "Reed Evans",
+                "Luke Charles"
+            ]
         },
         {
-            "username": "jwright",
-            "password_hash": "scrypt:32768:8:1$qGTaVLpax8uBvwj4$4acd427d54659ab67d12815429f662346898c3931dd4955a0c77ba50d9da0778468a02ae7f39e6d8da13e2e21b0640079fcb77701ad42cdc7dc5366e6632b7ea",
+            "username": "mike1825",
+            "password_hash": "pbkdf2:sha256:600000$khHjCJgK6JeRZpcL$e926f9be6591f20af9eaabcd974091396b156120c5a51c76c6f3ea41ea086db7",
             "role": "Admin",
             "tab_order": [
-                "lineups",
                 "roster",
-                "pitching",
-                "scouting_list",
-                "rotations",
+                "player_development",
                 "games",
-                "collaboration",
-                "practice_plan"
-            ],
-            "last_login": "Never"
-        },
-        {
-            "username": "jvans",
-            "password_hash": "scrypt:32768:8:1$tYvZq00a2cOYQlYU$c786840f76b64f0728dda98092b524a78038d7aeb65b0e713a8dd7d4464aafff7e3f332008a1ff3a093ae66f8388d22d10b7fde153b24f919ccbd003a983915a",
-            "role": "Coach",
-            "tab_order": [
-                "roster",
-                "lineups",
+                "gameday_dropdown",
                 "pitching",
-                "scouting_list",
-                "rotations",
-                "games",
+                "practice_plan",
                 "collaboration",
-                "practice_plan"
+                "scouting_list"
             ],
-            "last_login": "Never"
-        },
-        {
-            "username": "joe",
-            "password_hash": "scrypt:32768:8:1$V9EZUsc1wrTchhWS$b51ca0fc924414bfa6ac131e88e33c64050d71da6ab7b29a6734360471f1849e3c6c616cda9d392c2bbf629848606341bbac87e83c9e26305a4ea1e76853dd61",
-            "role": "Coach",
-            "tab_order": [
-                "roster",
-                "lineups",
-                "pitching",
-                "scouting_list",
-                "rotations",
-                "games",
-                "collaboration",
-                "practice_plan"
-            ],
-            "last_login": "Never"
+            "last_login": "Never",
+            "player_order": [
+                "Graham Menard",
+                "Rylan Wright",
+                "Jack Fordice",
+                "Reed Evans",
+                "Luke Charles"
+            ]
         }
     ],
     "roster": [
         {
+            "name": "Graham Menard",
+            "number": "",
+            "position1": "1B",
+            "position2": "LF",
+            "position3": "",
+            "throws": "Left",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        },
+        {
             "name": "Rylan Wright",
-            "number": 1,
+            "number": "",
             "position1": "3B",
-            "position2": "P",
+            "position2": "DH",
+            "position3": "",
             "throws": "Right",
             "bats": "Right",
             "notes": "",
-            "pitcher_role": "Starter",
-            "position3": "SS",
+            "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": ""
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        },
+        {
+            "name": "Jack Fordice",
+            "number": "",
+            "position1": "C",
+            "position2": "LF",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
         },
         {
             "name": "Reed Evans",
-            "number": 5,
-            "position1": "C",
-            "position2": "P",
+            "number": "",
+            "position1": "3B",
+            "position2": "SS",
+            "position3": "",
             "throws": "Right",
             "bats": "Right",
-            "notes": "Solid defensive catcher.",
-            "pitcher_role": "Starter",
-            "position3": "3B",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": ""
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
         },
         {
             "name": "Luke Charles",
             "number": "",
             "position1": "C",
-            "position2": "",
+            "position2": "3B",
+            "position3": "",
             "throws": "Right",
             "bats": "Right",
             "notes": "",
             "pitcher_role": "Not a Pitcher",
-            "has_lessons": "No",
-            "lesson_focus": ""
-        },
-        {
-            "name": "Jack Fordice",
-            "number": "",
-            "position1": "OF",
-            "position2": "1B",
-            "throws": "Right",
-            "bats": "Right",
-            "notes": "",
-            "pitcher_role": "Not a Pitcher",
-            "has_lessons": "No",
-            "lesson_focus": ""
-        },
-        {
-            "name": "Test1",
-            "number": "",
-            "position1": "",
-            "position2": "",
-            "throws": "",
-            "bats": "",
-            "notes": "",
-            "pitcher_role": "Not a Pitcher",
-            "has_lessons": "No",
-            "lesson_focus": ""
-        },
-        {
-            "name": "Test 2",
-            "number": "",
-            "position1": "",
-            "position2": "",
-            "throws": "",
-            "bats": "",
-            "notes": "",
-            "pitcher_role": "Not a Pitcher",
-            "has_lessons": "No",
-            "lesson_focus": ""
-        },
-        {
-            "name": "Test 3",
-            "number": "",
-            "position1": "",
-            "position2": "",
-            "throws": "",
-            "bats": "",
-            "notes": "",
-            "pitcher_role": "Not a Pitcher",
-            "has_lessons": "No",
-            "lesson_focus": ""
-        },
-        {
-            "name": "Test 4",
-            "number": "",
-            "position1": "",
-            "position2": "",
-            "throws": "",
-            "bats": "",
-            "notes": "",
-            "pitcher_role": "Not a Pitcher",
-            "has_lessons": "No",
-            "lesson_focus": ""
-        },
-        {
-            "name": "Test 5",
-            "number": "",
-            "position1": "",
-            "position2": "",
-            "throws": "",
-            "bats": "",
-            "notes": "",
-            "pitcher_role": "Not a Pitcher",
-            "has_lessons": "No",
-            "lesson_focus": ""
-        },
-        {
-            "name": "Test 7",
-            "number": "",
-            "position1": "",
-            "position2": "",
-            "throws": "",
-            "bats": "",
-            "notes": "",
-            "pitcher_role": "Not a Pitcher",
-            "has_lessons": "No",
-            "lesson_focus": ""
-        },
-        {
-            "name": "Test 6",
-            "number": "",
-            "position1": "",
-            "position2": "",
-            "throws": "",
-            "bats": "",
-            "notes": "",
-            "pitcher_role": "Not a Pitcher",
-            "has_lessons": "No",
-            "lesson_focus": ""
-        },
-        {
-            "name": "Graham Menard",
-            "number": 3,
-            "position1": "1B",
-            "position2": "RF",
-            "throws": "Left",
-            "bats": "Right",
-            "notes": "",
-            "pitcher_role": "Reliever",
             "has_lessons": "No",
             "lesson_focus": "",
-            "position3": "LF"
+            "notes_author": "N/A",
+            "notes_timestamp": ""
         }
     ],
-    "lineups": [
-        {
-            "title": "Test 2",
-            "players": [
-                {
-                    "name": "Graham Menard",
-                    "number": 3,
-                    "position1": "1B",
-                    "position2": "P",
-                    "throws": "Left",
-                    "bats": "Right",
-                    "notes": "Good situational hitter.",
-                    "pitcher_role": "Reliever",
-                    "position3": "OF",
-                    "has_lessons": "Yes",
-                    "lesson_focus": "Pitching mechanics - staying tall."
-                },
-                {
-                    "name": "Rylan Wright",
-                    "number": 1,
-                    "position1": "3B",
-                    "position2": "P",
-                    "throws": "Right",
-                    "bats": "Right",
-                    "notes": "Team leader. Great attitude.",
-                    "pitcher_role": "Starter",
-                    "position3": "SS",
-                    "has_lessons": "No",
-                    "lesson_focus": ""
-                },
-                {
-                    "name": "Reed Evans",
-                    "number": 5,
-                    "position1": "C",
-                    "position2": "P",
-                    "throws": "Right",
-                    "bats": "Right",
-                    "notes": "Solid defensive catcher.",
-                    "pitcher_role": "Starter",
-                    "position3": "3B",
-                    "has_lessons": "No",
-                    "lesson_focus": ""
-                }
-            ]
-        }
-    ],
+    "lineups": [],
     "pitching": [],
     "scouting_list": {
         "committed": [],
         "targets": [],
         "not_interested": []
     },
-    "rotations": [],
-    "games": [
+    "rotations": [
         {
-            "date": "2025-07-12",
-            "opponent": "Cincy Flames",
-            "location": "Grand Park, Field 4",
-            "game_notes": "Double header, be there at 8 AM.",
-            "associated_lineup_title": "Weekend Opener vs. Canes",
-            "associated_rotation_date": ""
+            "id": 1751987488109,
+            "title": "New Rotation",
+            "innings": {
+                "1": {
+                    "1B": "Graham Menard",
+                    "C": "Luke Charles",
+                    "3B": "Rylan Wright",
+                    "P": "Reed Evans",
+                    "2B": "Jack Fordice"
+                },
+                "2": {
+                    "1B": "Graham Menard",
+                    "C": "Luke Charles",
+                    "3B": "Rylan Wright",
+                    "P": "Reed Evans",
+                    "2B": "Jack Fordice"
+                },
+                "3": {
+                    "1B": "Graham Menard",
+                    "C": "Luke Charles",
+                    "3B": "Rylan Wright",
+                    "P": "Reed Evans",
+                    "2B": "Jack Fordice"
+                },
+                "4": {
+                    "1B": "Graham Menard",
+                    "C": "Luke Charles",
+                    "3B": "Rylan Wright",
+                    "P": "Reed Evans",
+                    "2B": "Jack Fordice"
+                }
+            },
+            "associated_game_id": null
         }
     ],
+    "games": [],
     "feedback": [],
     "settings": {
         "registration_code": "Westfield"
     },
     "collaboration_notes": {
-        "player_notes": [
-            {
-                "text": "Needs to work on keeping his front shoulder closed when hitting.",
-                "author": "jwright",
-                "timestamp": "2025-06-29 10:00",
-                "player_name": "Graham Menard"
-            }
-        ],
-        "team_notes": [
-            {
-                "text": "Team needs to focus on hitting the cutoff man during infield drills.",
-                "author": "Mike1825",
-                "timestamp": "2025-06-30 14:20"
-            }
-        ]
+        "player_notes": [],
+        "team_notes": []
     },
-    "practice_plans": [
-        {
-            "id": 1720372800,
-            "date": "2025-07-07",
-            "general_notes": "Focus on baserunning and defensive fundamentals.",
-            "tasks": [
-                {
-                    "id": 1720372801,
-                    "text": "Dynamic Warmup & Throws",
-                    "status": "pending"
-                },
-                {
-                    "id": 1720372802,
-                    "text": "Infield / Outfield work - 2 rounds",
-                    "status": "pending"
-                },
-                {
-                    "id": 1720372803,
-                    "text": "Live BP - Situational Hitting",
-                    "status": "pending"
-                }
-            ]
-        }
-    ],
+    "practice_plans": [],
     "player_development": {
-        "Reed Evans": {
+        "Graham Menard": {
             "hitting": [],
             "pitching": [],
             "fielding": [],
@@ -337,75 +191,24 @@
             "fielding": [],
             "baserunning": []
         },
-        "Luke Charles": {
-            "hitting": [],
-            "pitching": [],
-            "fielding": [],
-            "baserunning": []
-        },
         "Jack Fordice": {
             "hitting": [],
             "pitching": [],
             "fielding": [],
             "baserunning": []
         },
-        "Test1": {
+        "Reed Evans": {
             "hitting": [],
             "pitching": [],
             "fielding": [],
             "baserunning": []
         },
-        "Test 2": {
-            "hitting": [],
-            "pitching": [],
-            "fielding": [],
-            "baserunning": []
-        },
-        "Test 3": {
-            "hitting": [],
-            "pitching": [],
-            "fielding": [],
-            "baserunning": []
-        },
-        "Test 4": {
-            "hitting": [],
-            "pitching": [],
-            "fielding": [],
-            "baserunning": []
-        },
-        "Test 5": {
-            "hitting": [],
-            "pitching": [],
-            "fielding": [],
-            "baserunning": []
-        },
-        "Test 7": {
-            "hitting": [],
-            "pitching": [],
-            "fielding": [],
-            "baserunning": []
-        },
-        "Test 6": {
-            "hitting": [],
-            "pitching": [],
-            "fielding": [],
-            "baserunning": []
-        },
-        "Graham Menard": {
+        "Luke Charles": {
             "hitting": [],
             "pitching": [],
             "fielding": [],
             "baserunning": []
         }
     },
-    "signs": [
-        {
-            "name": "Steal",
-            "indicator": "Touch Belt"
-        },
-        {
-            "name": "Bunt",
-            "indicator": "Touch Chin"
-        }
-    ]
+    "signs": []
 }

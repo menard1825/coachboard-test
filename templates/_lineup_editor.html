@@ -1,0 +1,53 @@
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Batting Lineup</h5>
+        <button id="saveLineupBtn" class="btn btn-primary btn-sm">Save Lineup</button>
+    </div>
+    <div class="card-body">
+        <form id="lineupEditorForm" onsubmit="return false;">
+            <input type="hidden" id="lineupId" name="lineup_id" value="{{ lineup.id or '' }}">
+             <div class="mb-3">
+                <label for="lineupTitle" class="form-label">Lineup Title</label>
+                <input type="text" class="form-control" id="lineupTitle" value="{{ lineup.title or '' }}" required>
+            </div>
+            
+            <div class="row" id="lineup-editor-lists">
+                <div class="col-md-5 d-none d-md-block">
+                    <h6>Available Players</h6>
+                    <div id="lineup-bench" class="list-group border rounded p-2" style="min-height: 400px; max-height: 60vh; overflow-y: auto;"></div>
+                </div>
+
+                <div class="col-md-7">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6>Batting Order</h6>
+                        <button id="addPlayerToLineupBtn" class="btn btn-sm btn-success d-md-none">
+                            <i class="bi bi-plus-circle"></i> Add Player
+                        </button>
+                    </div>
+                    <div id="lineup-order" class="list-group border rounded p-2" style="min-height: 400px; max-height: 60vh; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+        <button id="syncRotationBtn" class="btn btn-success btn-sm" title="Updates Inning 1 of the rotation with the positions set here.">Sync Positions to Rotation (Inn. 1)</button>
+        {% if lineup.id %}
+        <a href="{{ url_for('delete_lineup', lineup_id=lineup.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this lineup?');">Delete Lineup</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="addPlayerToLineupModal" tabindex="-1" aria-labelledby="addPlayerToLineupModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addPlayerToLineupModalLabel">Add Player to Lineup</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="lineup-modal-bench-list" class="list-group">
+          </div>
+      </div>
+    </div>
+  </div>
+</div>

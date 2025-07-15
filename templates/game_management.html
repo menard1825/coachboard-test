@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Game Management - {{ game.opponent }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('home', _anchor='games') }}">
+            <i class="bi bi-arrow-left"></i> Back to All Games
+        </a>
+        <span class="navbar-text fw-bold">
+            vs {{ game.opponent }} on {{ game.date }}
+        </span>
+    </div>
+</nav>
+
+<div class="container-fluid mt-3">
+    <ul class="nav nav-tabs nav-fill mb-3" id="gameTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="lineup-tab" data-bs-toggle="tab" data-bs-target="#lineup" type="button" role="tab">Lineup</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="rotation-tab" data-bs-toggle="tab" data-bs-target="#rotation" type="button" role="tab">Rotation</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="pitching-tab" data-bs-toggle="tab" data-bs-target="#pitching" type="button" role="tab">Pitching Log</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="gameTabsContent">
+        <div class="tab-pane fade show active" id="lineup" role="tabpanel" aria-labelledby="lineup-tab">
+            {% include '_lineup_editor.html' %}
+        </div>
+        <div class="tab-pane fade" id="rotation" role="tabpanel" aria-labelledby="rotation-tab">
+            {% include '_rotation_editor.html' %}
+        </div>
+        <div class="tab-pane fade" id="pitching" role="tabpanel" aria-labelledby="pitching-tab">
+            {% include '_pitching_log.html' %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="assignPlayerModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assignPlayerModalTitle">Assign Player</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group" id="assignPlayerModalBenchList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
+
+<script>
+    // This script block passes data from your Flask template to the JavaScript file
+    document.addEventListener('DOMContentLoaded', () => {
+        const gameData = {
+            game: {{ game|tojson }},
+            roster: {{ roster|tojson }},
+            lineup: {{ lineup|tojson }},
+            rotation: {{ rotation|tojson }}
+        };
+        initializeGameManagement(gameData);
+    });
+</script>
+
+</body>
+</html>

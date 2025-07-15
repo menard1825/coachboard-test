@@ -1,0 +1,77 @@
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0" id="rotation-editor-title">Defensive Rotation</h5>
+         <div>
+            <button id="saveRotationBtn" class="btn btn-primary btn-sm">Save Rotation</button>
+            <button id="deleteRotationBtn" class="btn btn-outline-danger btn-sm" {% if not rotation.id %}disabled{% endif %}>Delete Rotation</button>
+        </div>
+    </div>
+    <div class="card-body" id="rotation-board">
+        <div class="mb-3">
+            <h5>Inning</h5>
+            <div id="inning-selector" class="btn-toolbar mb-2" role="toolbar">
+                <div id="inning-btn-group" class="btn-group flex-wrap me-3 mb-2" role="group"></div>
+                <div id="copy-btn-group" class="btn-group flex-wrap mb-2">
+                    <button id="copyInningBtn" class="btn btn-sm btn-info">Copy This Inning</button>
+                </div>
+            </div>
+            <div id="inning-paste-controls" class="alert alert-info p-2 d-none">
+                <p class="mb-1 fw-bold">Select one or more innings to paste to:</p>
+                <div id="inning-paste-checkboxes" class="mb-2"></div>
+                <button id="pasteToSelectedBtn" class="btn btn-sm btn-success">Paste to Selected</button>
+                <button id="cancelPasteBtn" class="btn btn-sm btn-secondary">Cancel</button>
+            </div>
+            <div class="d-flex gap-2">
+                <button id="addInningBtn" class="btn btn-sm btn-success">Add Inning</button>
+                <button id="removeInningBtn" class="btn btn-sm btn-danger">Remove Last</button>
+            </div>
+        </div>
+        <div class="row d-none d-lg-flex">
+            <div class="col-lg-3">
+                <h5>Bench</h5>
+                <div id="bench-list-desktop" class="list-group bench-list" style="min-height: 200px; max-height: 500px; overflow-y: auto;" data-position="bench"></div>
+            </div>
+            <div class="col-lg-6">
+                <div id="diamond-parent-desktop">
+                    <div class="diamond-container-interactive">
+                        <div id="pos-desktop-P" class="position-dropzone pos-P" data-position="P"><span class="pos-abbr">P</span></div>
+                        <div id="pos-desktop-C" class="position-dropzone pos-C" data-position="C"><span class="pos-abbr">C</span></div>
+                        <div id="pos-desktop-1B" class="position-dropzone pos-1B" data-position="1B"><span class="pos-abbr">1B</span></div>
+                        <div id="pos-desktop-2B" class="position-dropzone pos-2B" data-position="2B"><span class="pos-abbr">2B</span></div>
+                        <div id="pos-desktop-3B" class="position-dropzone pos-3B" data-position="3B"><span class="pos-abbr">3B</span></div>
+                        <div id="pos-desktop-SS" class="position-dropzone pos-SS" data-position="SS"><span class="pos-abbr">SS</span></div>
+                        <div id="pos-desktop-LF" class="position-dropzone pos-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
+                        <div id="pos-desktop-CF" class="position-dropzone pos-CF" data-position="CF"><span class="pos-abbr">CF</span></div>
+                        <div id="pos-desktop-RF" class="position-dropzone pos-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3">
+                <h5>Playing Time Summary</h5>
+                <div id="summary-desktop"></div>
+            </div>
+        </div>
+        <div class="d-lg-none">
+            <div class="alert alert-info d-flex align-items-center" role="alert">
+                <i class="bi bi-info-circle-fill me-2"></i>
+                <div>Tap a position to assign a player. Tap a player on the field to send them to the bench.</div>
+            </div>
+            <div id="diamond-parent-mobile">
+                 <div class="diamond-container-interactive">
+                    <div id="pos-mobile-P" class="position-dropzone pos-P" data-position="P"><span class="pos-abbr">P</span></div>
+                    <div id="pos-mobile-C" class="position-dropzone pos-C" data-position="C"><span class="pos-abbr">C</span></div>
+                    <div id="pos-mobile-1B" class="position-dropzone pos-1B" data-position="1B"><span class="pos-abbr">1B</span></div>
+                    <div id="pos-mobile-2B" class="position-dropzone pos-2B" data-position="2B"><span class="pos-abbr">2B</span></div>
+                    <div id="pos-mobile-3B" class="position-dropzone pos-3B" data-position="3B"><span class="pos-abbr">3B</span></div>
+                    <div id="pos-mobile-SS" class="position-dropzone pos-SS" data-position="SS"><span class="pos-abbr">SS</span></div>
+                    <div id="pos-mobile-LF" class="position-dropzone pos-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
+                    <div id="pos-mobile-CF" class="position-dropzone pos-CF" data-position="CF"><span class="pos-abbr">CF</span></div>
+                    <div id="pos-mobile-RF" class="position-dropzone pos-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+                </div>
+            </div>
+            <hr>
+            <h5>Playing Time Summary</h5>
+            <div id="summary-mobile"></div>
+        </div>
+    </div>
+</div>

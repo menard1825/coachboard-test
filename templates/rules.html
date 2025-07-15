@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pitching Rules - Coach Planner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom sticky-top">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center" href="{{ url_for('home') }}">
+        <img src="/static/logo.png" alt="Team Logo" style="height: 40px; margin-right: 10px;">
+        <span class="fw-bold brand-text">Rules</span>
+      </a>
+      <a href="{{ url_for('home') }}" class="btn btn-outline-secondary">Back to Main App</a>
+    </div>
+</nav>
+
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">USSSA Pitching Rules (11U/12U)</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info d-flex align-items-center" role="alert">
+                        <i class="bi bi-bullhorn-fill me-3" style="font-size: 1.5rem;"></i>
+                        <div>
+                            <strong>Max Pitches Per Day: 85</strong>
+                        </div>
+                    </div>
+                    
+                    <h5 class="mt-4">Required Rest</h5>
+                    <p>Rest days are required based on the number of pitches thrown in a single day.</p>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Pitches Thrown in a Day</th>
+                                    <th class="text-center">Required Days of Rest</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>1 - 20</td><td class="text-center">0</td></tr>
+                                <tr><td>21 - 35</td><td class="text-center">1</td></tr>
+                                <tr><td>36 - 50</td><td class="text-center">2</td></tr>
+                                <tr><td>51 - 65</td><td class="text-center">3</td></tr>
+                                <tr><td>66+</td><td class="text-center">4</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <hr>
+
+                    <p class="card-text fst-italic">
+                        <i class="bi bi-info-circle-fill me-2"></i><strong>Finish the Batter Rule:</strong> A pitcher may finish the current batter if the pitch limit is reached during that at-bat. The pitcher must be removed after the at-bat is completed.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

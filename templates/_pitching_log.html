@@ -1,0 +1,95 @@
+<div class="row">
+    <div class="col-lg-5 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><strong>Add New Outing for this Game</strong></div>
+            <div class="card-body">
+                <form action="{{ url_for('add_pitching') }}" method="POST">
+                    <input type="hidden" name="game_id" value="{{ game.id }}">
+                    <input type="hidden" name="pitch_date" value="{{ game.date }}">
+                    <input type="hidden" name="opponent" value="{{ game.opponent }}">
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                           <label for="pitching-log-pitcher-select" class="form-label">Pitcher</label>
+                           <select name="pitcher" class="form-select" required id="pitching-log-pitcher-select">
+                               <option value="">Select Pitcher...</option>
+                               {% for p in roster %}
+                                   {% if p.pitcher_role != 'Not a Pitcher' %}
+                                   <option value="{{ p.name }}">{{ p.name }}</option>
+                                   {% endif %}
+                               {% endfor %}
+                           </select>
+                        </div>
+                        <div class="col-6">
+                          <label for="pitches" class="form-label">Pitch Count</label>
+                          <input type="number" id="pitches" name="pitches" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                          <label for="innings" class="form-label">Innings Pitched</label>
+                          <input type="text" id="innings" name="innings" class="form-control" placeholder="e.g., 2.1" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="outing_type" class="form-label">Outing Type</label>
+                            <select name="outing_type" id="outing_type" class="form-select">
+                                <option value="Game" selected>Game</option>
+                                <option value="Practice">Practice</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label for="pitcher_type" class="form-label">Pitcher Type</label>
+                            <select name="pitcher_type" id="pitcher_type" class="form-select">
+                                <option value="Starter">Starter</option>
+                                <option value="Reliever">Reliever</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 mt-3">Log Outing</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7 mb-4">
+        <div class="card h-100">
+            <div class="card-header"><strong>Outings Logged for this Game</strong></div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" id="recorded-outings-list">
+                    {% if game_pitching_log %}
+                        {% for o in game_pitching_log %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><strong>{{ o.pitcher }}</strong> ({{ o.pitcher_type }}) - {{ o.pitches }} pitches ({{ o.innings }} IP)</span>
+                            <a href="{{ url_for('delete_pitching', outing_id=o.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
+                        </li>
+                        {% endfor %}
+                    {% else %}
+                        <li class="list-group-item text-muted">No outings logged for this game yet.</li>
+                    {% endif %}
+                </ul>
+            </div>
+             <div class="card-footer">
+                <h6 class="card-title mb-2">Pitcher Availability Status</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                        {% for p in roster %}
+                            {% if p.pitcher_role != 'Not a Pitcher' %}
+                            <tr>
+                                <td><strong>{{ p.name }}</strong></td>
+                                <td>
+                                    {% set summary = pitch_count_summary.get(p.name) %}
+                                    {% if summary.status == 'Available' %}
+                                        <span class="badge bg-success">Available</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Resting</span>
+                                    {% endif %}
+                                </td>
+                                <td>Next Available: {{ summary.next_available }}</td>
+                            </tr>
+                            {% endif %}
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -3,7 +3,7 @@
 {% macro position_select(name, id, selected_val, title="Select Position", classes="form-select") %}
     <select name="{{ name }}" id="{{ id }}" class="{{ classes }}" title="{{ title }}">
         <option value="" {% if not selected_val %}selected{% endif %}>{{ title }}</option>
-        {% set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'] %}
+        {% set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'] %}
         {% for pos in positions %}
             <option value="{{ pos }}" {% if selected_val == pos %}selected{% endif %}>{{ pos }}</option>
         {% endfor %}
@@ -12,117 +12,125 @@
 <head>
   <meta charset="UTF-8">
   <title>Marucci Prospects 11u - Coach Planner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="manifest" href="/static/manifest.json">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <style>
-    body { background-color: #f9f9f9; }
-    .navbar-brand img { height: 40px; margin-right: 10px; }
-    .nav-tabs .nav-link.active { background-color: #c8102e; color: white; }
-    .nav-tabs .nav-link { color: #c8102e; font-weight: bold; }
-    .btn-primary { background-color: #c8102e; border-color: #c8102e; }
-    .btn-outline-danger { border-color: #c8102e; color: #c8102e; }
-    .btn-outline-danger:hover { background-color: #c8102e; color: white; }
-    #mainTabs .drag-handle { cursor: move; }
+    body {
+        padding-bottom: 120px;
+    }
     .navbar-brand .brand-text { font-size: 1.25rem; white-space: nowrap; }
     @media (max-width: 768px) {
         .navbar-brand .brand-text { font-size: 1rem; white-space: normal; line-height: 1.2; }
         .navbar-brand { padding-right: 0; }
     }
     @media (max-width: 480px) { .navbar-brand .brand-text { font-size: 0.9rem; } }
-    .accordion-button:not(.collapsed) { background-color: #fcebeb; color: #c8102e; }
     .practice-plan { border-left: 3px solid #c8102e; }
     .task-item.complete { text-decoration: line-through; opacity: 0.6; }
-    .focus-item-notes { font-size: 0.9em; color: #6c757d; white-space: pre-wrap; min-height: 60px; }
 
-    /* --- Diamond Rotation Styles --- */
-    .diamond-container {
-        position: relative;
-        max-width: 500px;
-        margin: 20px auto;
-        background-image: url('https://i.imgur.com/t2qbeH1.png');
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-        aspect-ratio: 1 / 1;
+    
+    /* --- MODIFIED: Adjusted padding for bottom nav --- */
+    .bottom-nav {
+        /* The height is now determined by the content and padding below */
+        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+        box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
     }
-    .position-label {
+    .bottom-nav .nav-link {
+        font-size: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-top: 3px solid transparent;
+        flex: 1; 
+    }
+    .bottom-nav .nav-link i { font-size: 1.7rem; margin-bottom: 2px; }
+    .bottom-nav .nav-link.active { 
+        color: #c8102e; 
+        border-top: 3px solid #c8102e;
+    }
+
+    
+    .more-menu-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(248, 249, 250, 0.98); 
+        z-index: 1040; 
+        padding: 20px;
+        overflow-y: auto;
+        transition: opacity 0.3s ease-in-out;
+    }
+    .more-menu-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+    .more-menu-close-btn {
         position: absolute;
-        background-color: rgba(255, 255, 255, 0.85);
-        border: 1px solid #c8102e;
-        color: #000;
-        padding: 4px 8px;
-        border-radius: 5px;
-        font-size: 0.8rem;
-        font-weight: bold;
-        text-align: center;
-        width: 100px;
-        transform: translate(-50%, -50%); /* Center the label on its coordinates */
+        top: 15px;
+        right: 20px;
+        font-size: 2rem;
+        color: #6c757d;
+        cursor: pointer;
+        line-height: 1;
     }
-    .position-label .pos-abbr {
-        font-size: 0.7rem;
-        color: #c8102e;
-        display: block;
-    }
-    .pos-P  { top: 50%; left: 50%; }
-    .pos-C  { top: 83%; left: 50%; }
-    .pos-1B { top: 50%; left: 75%; }
-    .pos-2B { top: 35%; left: 65%; }
-    .pos-3B { top: 50%; left: 25%; }
-    .pos-SS { top: 35%; left: 35%; }
-    .pos-LF { top: 15%; left: 15%; }
-    .pos-CF { top: 10%; left: 50%; }
-    .pos-RF { top: 15%; left: 85%; }
 
-    /* --- NEW/IMPROVED TAB STYLES --- */
-    /* On large screens, the tabs will wrap if needed */
+
+    /* Desktop Nav Bar */
+    .navbar-nav .nav-link.active {
+      background-color: #c8102e;
+      color: white;
+      border-radius: 0.25rem;
+    }
+    .navbar-nav .nav-link { color: #212529; font-weight: 500; }
+    .navbar-nav .nav-link:hover { color: #c8102e; }
+    .navbar-nav .nav-link.active:hover { color: white; }
+
     @media (min-width: 992px) {
-        #mainTabs {
-            flex-wrap: wrap;
-        }
+        #navbarResponsive { display: flex; align-items: center; width: 100%; }
+        .tab-content > .tab-pane { display: none; }
+        .tab-content > .tab-pane.active { display: block; }
+        body { padding-bottom: 0; } 
     }
 
-    /* On smaller screens (mobile), hide the drag handle and clean up borders */
     @media (max-width: 991.98px) {
-        #mainTabs .drag-handle {
-            display: none; /* Hide drag handle on mobile where it's not needed */
-        }
-        #tabsCollapse .nav-tabs {
-            border-bottom: none; /* Remove the main border in the collapsed menu */
-        }
+        #mainTabsDesktop .drag-handle { display: none; }
+        .tab-content > .tab-pane { display: none; }
+        .tab-content > .tab-pane.active { display: block; }
     }
   </style>
 </head>
-<body data-roster='{{ data.roster | tojson }}' data-player-dev='{{ data.player_development | tojson }}'>
-<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom mb-3 px-3">
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
   <div class="container-fluid">
     <a class="navbar-brand d-flex align-items-center" href="#">
       <img src="/static/logo.png" alt="Team Logo">
       <span class="fw-bold brand-text">Marucci Prospects 11u - Coach Planner</span>
     </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarResponsive">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="mainTabs" role="tablist">
+    <div class="collapse navbar-collapse d-none d-lg-flex" id="navbarResponsive">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0 desktop-nav" id="mainTabsDesktop" role="tablist">
             {% for tab_key in tab_order %}
-                {% if tab_key in all_tabs %}
-                <li class="nav-item" role="presentation" data-tab-id="{{ tab_key }}">
-                    <a class="nav-link d-flex align-items-center" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
-                        <i class="bi bi-grip-vertical me-2 drag-handle" draggable="true" title="Drag to reorder"></i>
-                        <span>{{ all_tabs[tab_key] }}</span>
-                    </a>
-                </li>
-                {% endif %}
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
+                    <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
+                    {{ all_tabs[tab_key] }}
+                </a>
+            </li>
             {% endfor %}
         </ul>
-        <ul class="navbar-nav ms-auto">
+        <ul class="navbar-nav desktop-nav">
             <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <a class="nav-link dropdown-toggle" href="#" id="userMenuDesktop" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     Welcome, {{ session.username }}!
                 </a>
-                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-                    {% if session.role == 'Admin' %}
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDesktop">
+                    {% if session.role in ['Head Coach', 'Super Admin'] %}
                     <li><a class="dropdown-item" href="{{ url_for('user_management') }}">User Management</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('admin_settings') }}">Admin Settings</a></li>
                     <li><hr class="dropdown-divider"></li>
@@ -148,271 +156,71 @@
     {% endif %}
   {% endwith %}
 
-  <ul class="nav nav-tabs d-none" id="placeholder-for-js">
-      </ul>
-
-
   <div class="tab-content">
     <div class="tab-pane fade" id="roster">
         <h4 class="mb-3">Current Roster</h4>
-        <div class="accordion" id="rosterAccordion">
-            {% for p in data.roster %}
-            <div class="accordion-item" data-player-index="{{ loop.index0 }}">
-                <h2 class="accordion-header" id="heading-{{ loop.index0 }}">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ loop.index0 }}">
-                        <strong>{{ p.name }}</strong>&nbsp;(#{{ p.number }})
-                    </button>
-                </h2>
-                <div id="collapse-{{ loop.index0 }}" class="accordion-collapse collapse" data-bs-parent="#rosterAccordion">
-                    <div class="accordion-body">
-                        <div class="row g-3 align-items-center">
-                            <div class="col-12 col-md-4"><input type="text" class="form-control" name="name" value="{{ p.name }}" placeholder="Name"></div>
-                            <div class="col-6 col-md-2"><input type="number" class="form-control" name="number" value="{{ p.number }}" placeholder="J#"></div>
-                            <div class="col-6 col-md-3">{{ position_select('position1', 'position1_' ~ loop.index0, p.position1, title='Pos1')}}</div>
-                            <div class="col-6 col-md-3">{{ position_select('position2', 'position2_' ~ loop.index0, p.position2, title='Pos2')}}</div>
-                            <div class="col-6 col-md-3">{{ position_select('position3', 'position3_' ~ loop.index0, p.position3, title='Pos3')}}</div>
-                            <div class="col-6 col-md-3">
-                                <select name="throws" class="form-select" title="Throws"><option value="Right" {% if p.throws == "Right" %}selected{% endif %}>Throws: Right</option><option value="Left" {% if p.throws == "Left" %}selected{% endif %}>Throws: Left</option></select>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <select name="bats" class="form-select" title="Bats"><option value="Right" {% if p.bats == "Right" %}selected{% endif %}>Bats: Right</option><option value="Left" {% if p.bats == "Left" %}selected{% endif %}>Bats: Left</option></select>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <select name="pitcher_role" class="form-select" title="Pitcher Role"><option value="Not a Pitcher" {% if p.pitcher_role == "Not a Pitcher" %}selected{% endif %}>Not a Pitcher</option><option value="Starter" {% if p.pitcher_role == "Starter" %}selected{% endif %}>Starter</option><option value="Reliever" {% if p.pitcher_role == "Reliever" %}selected{% endif %}>Reliever</option></select>
-                            </div>
-                            <div class="col-12"><textarea class="form-control" name="notes" rows="2" placeholder="General Player Notes">{{ p.notes }}</textarea></div>
-                            <div class="col-12 d-flex justify-content-end mt-3">
-                                <button type="button" class="btn btn-sm btn-success me-2 save-player-btn">Save Changes</button>
-                                <a href="/delete_player/{{ loop.index0 }}?active_tab=#roster" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">Remove</a>
-                            </div>
-                          </div>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
+        <div class="mb-3">
+          <input type="search" id="rosterSearch" class="form-control" placeholder="Search for a player...">
         </div>
+        <div class="accordion" id="rosterAccordion"></div>
     </div>
-    
+
     <div class="tab-pane fade" id="player_development">
-        <h4>Player Development Log</h4>
-        <p>Track current and past development goals for each player.</p>
-        <div class="accordion" id="playerDevelopmentAccordion">
-            {% for p in data.roster %}
-            {% set player_dev = data.player_development.get(p.name, {}) %}
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="heading-dev-{{ loop.index0 }}">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-dev-{{ loop.index0 }}">
-                        <strong>{{ p.name }}</strong>
-                    </button>
-                </h2>
-                <div id="collapse-dev-{{ loop.index0 }}" class="accordion-collapse collapse" data-bs-parent="#playerDevelopmentAccordion">
-                    <div class="accordion-body">
-                        <ul class="nav nav-pills mb-3" role="tablist">
-                            {% for skill in ['hitting', 'pitching', 'fielding', 'baserunning', 'lessons'] %}
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="pill" data-bs-target="#dev-{{p.name|replace(' ', '-')}}-{{skill}}" type="button" role="tab">{{ skill.title() }}</button>
-                            </li>
-                            {% endfor %}
-                        </ul>
-                        <div class="tab-content">
-                            {% for skill in ['hitting', 'pitching', 'fielding', 'baserunning'] %}
-                            {% set active_focuses = player_dev.get(skill, [])|selectattr('status', 'equalto', 'active')|list %}
-                            <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="dev-{{p.name|replace(' ', '-')}}-{{skill}}" role="tabpanel">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h5>Active {{ skill.title() }} Focus</h5>
-                                    <div>
-                                        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="{{p.name}}" data-skill="{{skill}}" data-action="add">Add New Focus</button>
-                                        <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#historyModal" data-player-name="{{p.name}}" data-skill="{{skill}}">View History</button>
-                                    </div>
-                                </div>
-                                {% if active_focuses %}
-                                    {% for active_focus in active_focuses %}
-                                    <div class="card bg-light mb-2">
-                                        <div class="card-body">
-                                            <p class="mb-1"><strong>Focus:</strong> {{ active_focus.focus }}</p>
-                                            <p class="mb-1"><strong>Notes:</strong></p>
-                                            <div class="p-2 bg-white rounded border focus-item-notes mb-2">{{ active_focus.notes or 'No notes yet.' }}</div>
-                                            <small class="text-muted">Created on: {{ active_focus.created_date }}</small>
-                                            <div class="d-flex justify-content-end gap-2 mt-2">
-                                                <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="{{p.name}}" data-skill="{{skill}}" data-focus-id="{{active_focus.id}}" data-action="edit">Edit Details</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                {% else %}
-                                <div class="text-center p-3 border rounded">
-                                    <p>No active focus for {{ skill.title() }}.</p>
-                                </div>
-                                {% endif %}
-                            </div>
-                            {% endfor %}
-                            <div class="tab-pane fade" id="dev-{{p.name|replace(' ', '-')}}-lessons" role="tabpanel">
-                                <h5>External Lessons</h5>
-                                <form action="{{ url_for('update_lesson_info', player_name=p.name) }}" method="POST">
-                                    <div class="row g-3">
-                                        <div class="col-md-4">
-                                            <label class="form-label">Getting Lessons?</label>
-                                            <select name="has_lessons" class="form-select">
-                                                <option value="No" {% if p.has_lessons == 'No' %}selected{% endif %}>No</option>
-                                                <option value="Yes" {% if p.has_lessons == 'Yes' %}selected{% endif %}>Yes</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-8">
-                                            <label class="form-label">Instructor's Focus</label>
-                                            <input type="text" name="lesson_focus" class="form-control" value="{{ p.lesson_focus }}">
-                                        </div>
-                                        <div class="col-12 d-flex justify-content-end">
-                                            <button type="submit" class="btn btn-sm btn-primary">Save Lesson Info</button>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+        <h4>Player Development</h4>
+        <p>Track development goals and view a complete activity log for each player. Drag players to reorder the list.</p>
+        <div class="accordion" id="player-dev-accordion"></div>
     </div>
 
     <div class="tab-pane fade" id="lineups">
-      <h4>Create New Lineup</h4>
-      <form action="/add_lineup" method="POST" class="mb-3">
-        <input type="hidden" name="active_tab" value="#lineups" class="active-tab-input">
-        <input type="text" name="lineup_title" class="form-control mb-2" placeholder="Lineup Title" required>
-        <div class="mb-2">
-          <strong>Select Players for Lineup:</strong>
-          {% for player in data.roster %}
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="lineup_player" value="{{ player.name }}">
-            <label class="form-check-label">{{ player.name }} (#{{ player.number }})</label>
-          </div>
-          {% endfor %}
-        </div>
-        <button type="submit" class="btn btn-primary mt-2">Save New Lineup</button>
-      </form>
-      <hr>
-      <h4 class="mt-4">Saved Lineups</h4>
-      <ul class="list-group">
-        {% for l in data.lineups %}
-        <li class="list-group-item" data-lineup-index="{{ loop.index0 }}" data-lineup-title="{{ l.title }}">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <strong>{{ l.title }}</strong>
-            <div>
-              <button class="btn btn-sm btn-info me-2" data-bs-toggle="modal" data-bs-target="#editLineupModal"
-                      data-lineup-index="{{ loop.index0 }}" data-lineup-title="{{ l.title }}" data-lineup-players="{{ l.players | tojson | urlencode }}">
-                Edit
-              </button>
-              <a href="/delete_lineup/{{ loop.index0 }}?active_tab=#lineups" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this lineup?');">Delete</a>
-            </div>
-          </div>
-          <ol class="list-group list-group-numbered">
-            {% for player in l.players %}
-            <li class="list-group-item">{{ player.name }}</li>
-            {% endfor %}
-          </ol>
-        </li>
-        {% else %}
-        <li class="list-group-item">No lineups saved yet.</li>
-        {% endfor %}
-      </ul>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Unassigned Lineups</h4>
+        <button class="btn btn-primary" id="createLineupBtn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">Create New Unassigned Lineup</button>
+      </div>
+      <div class="accordion" id="lineupsAccordion"></div>
     </div>
-    
+
     <div class="tab-pane fade" id="pitching">
-      <h4>Pitching Log & Count Tracker</h4>
-      <div class="card mb-4">
-        <div class="card-header"><strong>Pitch Count Summary</strong></div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Pitcher</th>
-                            <th>Daily (Limit: 85)</th>
-                            <th>Weekly (Limit: 100)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for name, counts in pitch_count_summary.items() %}
-                        <tr>
-                            <td><strong>{{ name }}</strong></td>
-                            <td>
-                                {% set daily_pct = (counts.daily / 85 * 100) | int %}
-                                <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar {% if daily_pct > 80 %}bg-danger{% elif daily_pct > 60 %}bg-warning{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ daily_pct }}%;" aria-valuenow="{{ counts.daily }}" aria-valuemin="0" aria-valuemax="85">{{ counts.daily }}</div>
-                                </div>
-                            </td>
-                            <td>
-                                {% set weekly_pct = (counts.weekly / 100 * 100) | int %}
-                                <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar {% if weekly_pct > 80 %}bg-danger{% elif daily_pct > 60 %}bg-warning{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ weekly_pct }}%;" aria-valuenow="{{ counts.weekly }}" aria-valuemin="0" aria-valuemax="100">{{ counts.weekly }}</div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="3" class="text-center">No pitching outings recorded yet.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <h4>Pitching Log & Count Tracker</h4>
+        <div class="card mb-4">
+          <div class="card-header"><strong>Pitch Count Summary</strong></div>
+          <div class="card-body p-2"><div class="table-responsive" id="pitch-count-summary-container"></div></div>
+        </div>
+        <div class="row">
+          <div class="col-lg-5 mb-4">
+            <div class="card h-100">
+              <div class="card-header"><strong>Add New Outing</strong></div>
+              <div class="card-body">
+                <form action="{{ url_for('add_pitching') }}" method="POST">
+                  <div class="row g-3">
+                    <div class="col-6"><label for="pitch_date" class="form-label">Date</label><input type="date" id="pitch_date" name="pitch_date" class="form-control" required></div>
+                    <div class="col-6"><label for="pitching-log-pitcher-select" class="form-label">Pitcher</label><select name="pitcher" class="form-select" required id="pitching-log-pitcher-select"></select></div>
+                    <div class="col-12"><label for="opponent" class="form-label">Opponent / Context</label><input type="text" id="opponent" name="opponent" class="form-control" placeholder="e.g., Scrimmage vs. Tigers"></div>
+                    <div class="col-6"><label for="pitches" class="form-label">Pitch Count</label><input type="number" id="pitches" name="pitches" class="form-control" required></div>
+                    <div class="col-6"><label for="innings" class="form-label">Innings Pitched</label><input type="text" id="innings" name="innings" class="form-control" placeholder="e.g., 2.1" required></div>
+                    <div class="col-6"><label for="outing_type" class="form-label">Outing Type</label><select name="outing_type" id="outing_type" class="form-select"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div>
+                    <div class="col-6"><label for="pitcher_type" class="form-label">Pitcher Type</label><select name="pitcher_type" id="pitcher_type" class="form-select"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
+                  </div>
+                  <button type="submit" class="btn btn-primary w-100 mt-3">Log Outing</button>
+                </form>
+              </div>
             </div>
+          </div>
+          <div class="col-lg-7 mb-4">
+             <div class="card h-100">
+                <div class="card-header"><strong>Recent Outing History</strong></div>
+                <div class="card-body p-0"><ul class="list-group list-group-flush" id="recorded-outings-list"></ul></div>
+             </div>
+          </div>
         </div>
       </div>
 
-      <form action="/add_pitching" method="POST" class="row g-2 mb-3">
-        <input type="hidden" name="active_tab" value="#pitching" class="active-tab-input">
-        <div class="col-md-3"><input type="date" name="pitch_date" class="form-control" required title="Pitch Date"></div>
-        <div class="col-md-3"><select name="pitcher" class="form-select" required title="Select Pitcher"><option value="">Select Pitcher</option>{% for p in data.roster %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}</select></div>
-        <div class="col-md-3"><input type="text" name="opponent" class="form-control" placeholder="Opponent / Context"></div>
-        <div class="col-md-3"><select name="outing_type" class="form-select" title="Outing Type"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div>
-        <div class="col-md-4"><input type="number" name="pitches" class="form-control" placeholder="Pitch Count" required></div>
-        <div class="col-md-4"><input type="text" name="innings" class="form-control" placeholder="Innings Pitched (e.g., 2.1)" required></div>
-        <div class="col-md-4"><select name="pitcher_type" class="form-select" title="Pitcher Type"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
-        <div class="col-12"><button type="submit" class="btn btn-primary w-100">Add Outing</button></div>
-      </form>
-      <hr>
-      <h5>Recorded Outings</h5>
-      <ul class="list-group">
-        {% for outing in data.pitching | sort(attribute='date', reverse=True) %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <span>{{ outing.date }}: <strong>{{ outing.pitcher }}</strong> ({{ outing.pitcher_type }}) vs {{ outing.opponent }} - {{ outing.pitches }} pitches ({{ outing.innings }} IP) <span class="badge bg-info">{{ outing.outing_type }}</span></span>
-          <a href="/delete_pitching/{{ loop.index0 }}?active_tab=#pitching" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-      
     <div class="tab-pane fade" id="scouting_list">
-        <h4>Scouting & Recruiting Lists</h4>
-        <div class="row">
-            {% for list_type, players in data.scouting_list.items() %}
-            <div class="col-md-4">
-                <h5>{{ list_type.replace('_', ' ').title() }}</h5>
-                <ul class="list-group mb-4">
-                    {% for player in players %}
-                    <li class="list-group-item">
-                        <strong>{{ player.name }}</strong> ({{ player.position1 }}{% if player.position2 %}/{{ player.position2 }}{% endif %})
-                        <div class="mt-2">
-                            <form action="{{ url_for('move_scouted_player', from_type=list_type, to_type='targets', index=loop.index0) }}" method="POST" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-primary" {% if list_type == 'targets' %}disabled{% endif %}>Target</button></form>
-                            <form action="{{ url_for('move_scouted_player', from_type=list_type, to_type='committed', index=loop.index0) }}" method="POST" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-success" {% if list_type == 'committed' %}disabled{% endif %}>Commit</button></form>
-                            <form action="{{ url_for('move_scouted_player', from_type=list_type, to_type='not_interested', index=loop.index0) }}" method="POST" class="d-inline"><button type="submit" class="btn btn-sm btn-outline-secondary" {% if list_type == 'not_interested' %}disabled{% endif %}>Pass</button></form>
-                            <a href="{{ url_for('remove_scouted_player', scouted_player_type=list_type, index=loop.index0) }}" class="btn btn-sm btn-outline-danger float-end" onclick="return confirm('Are you sure?');">X</a>
-                        </div>
-                        {% if list_type == 'committed' %}
-                        <form action="{{ url_for('move_scouted_player_to_roster', index=loop.index0) }}" method="POST" class="d-grid mt-2"><button type="submit" class="btn btn-sm btn-success">Move to Roster</button></form>
-                        {% endif %}
-                    </li>
-                    {% else %}
-                    <li class="list-group-item text-muted">No players in this list.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endfor %}
-        </div>
-
+        <h4 class="mb-3">Scouting & Recruiting Lists</h4>
+        <div class="row" id="scouting-list-container"><div class="text-center p-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div></div>
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">Add New Scouted Player</h5>
-                <form action="{{ url_for('add_scouted_player') }}" method="POST" class="row g-3">
+                <form id="addScoutedPlayerForm" class="row g-3">
                     <div class="col-md-3"><input type="text" class="form-control" name="scouted_player_name" placeholder="Player Name" required></div>
                     <div class="col-md-2">{{ position_select('scouted_player_pos1', 'scouted_player_pos1', '', title='Pos 1') }}</div>
                     <div class="col-md-2">{{ position_select('scouted_player_pos2', 'scouted_player_pos2', '', title='Pos 2') }}</div>
@@ -421,759 +229,928 @@
                     <div class="col-md-4"><label class="form-label">Add to List:</label><select name="scouted_player_type" class="form-select"><option value="targets">Targets</option><option value="committed">Committed</option><option value="not_interested">Not Interested</option></select></div>
                     <div class="col-md-2 d-flex align-items-end"><button type="submit" class="btn btn-primary w-100">Add Player</button></div>
                 </form>
+                <div id="addScoutedPlayerFeedback" class="mt-2"></div>
             </div>
         </div>
     </div>
 
     <div class="tab-pane fade" id="rotations">
-        <h4>Pitching &amp; Defensive Rotations</h4>
-        <p>Use the grid to build a rotation. Select a player for each position in each inning. Use the controls to save, load, or clear the rotation.</p>
-        
-        <div class="card mb-3">
-            <div class="card-body">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-4">
-                        <label for="rotationTitle" class="form-label fw-bold">Rotation Title</label>
-                        <input type="text" id="rotationTitle" class="form-control" placeholder="e.g., Weekend Tournament Rotation" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="savedRotationSelect" class="form-label fw-bold">Load Saved Rotation</label>
-                        <select id="savedRotationSelect" class="form-select">
-                            <option value="">-- Select a rotation --</option>
-                            {% for rotation in data.rotations %}
-                            <option value="{{ rotation.id }}">{{ rotation.title }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-auto">
-                        <button id="loadRotationBtn" class="btn btn-success">Load</button>
-                    </div>
-                    <div class="col">
-                        <div class="d-flex gap-2 justify-content-end">
-                             <button id="saveRotationBtn" class="btn btn-primary">Save</button>
-                             <button id="newRotationBtn" class="btn btn-secondary">New / Clear</button>
-                             <button id="deleteRotationBtn" class="btn btn-danger" disabled>Delete</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="d-lg-none">
-            <div class="d-flex justify-content-between align-items-center mt-4">
-                <h5 class="mb-0">Inning by Inning View</h5>
-                <div>
-                    <button id="addInningBtnMobile" class="btn btn-sm btn-success">Add Inning</button>
-                    <button id="removeInningBtnMobile" class="btn btn-sm btn-danger">Remove</button>
-                </div>
-            </div>
-            <div class="accordion mt-2" id="rotationMobileAccordion">
-                </div>
-        </div>
-
-        <div class="d-none d-lg-block">
-            <div class="row">
-                <div class="col-lg-8">
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-striped" style="min-width: 800px;">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th class="text-center">Inning</th>
-                                    {% for pos in ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] %}
-                                    <th class="text-center">{{ pos }}</th>
-                                    {% endfor %}
-                                </tr>
-                            </thead>
-                            <tbody id="rotation-grid-body">
-                                </tbody>
-                        </table>
-                    </div>
-                    <div class="mt-2 d-flex gap-2">
-                        <button id="addInningBtn" class="btn btn-sm btn-success">Add Inning</button>
-                        <button id="removeInningBtn" class="btn btn-sm btn-danger">Remove Last Inning</button>
-                    </div>
-                </div>
-                <div class="col-lg-4 mt-4 mt-lg-0">
-                    <div class="card">
-                        <div class="card-header">
-                            <strong>Playing Time Summary</strong>
-                        </div>
-                        <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                            <table class="table table-sm table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Player</th>
-                                        <th class="text-center">Innings</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="playingTimeBody">
-                                    </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card mt-4" id="fullGameBenchCard" style="display: none;">
-            <div class="card-header bg-danger text-white">
-                <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Full Game Bench</strong>
-            </div>
-            <ul class="list-group list-group-flush" id="fullGameBenchList">
-            </ul>
-        </div>
+        <h4>Unassigned Rotations</h4>
+        <p>Manage rotations that are not linked to a specific game. Game-specific rotations should be managed from the <a href="#games" data-bs-toggle="tab">Games</a> tab.</p>
+        <div class="accordion" id="rotationsAccordion"></div>
     </div>
-      
+
     <div class="tab-pane fade" id="games">
-        <h4>Game Schedule</h4>
+        <h4>Game Schedule & Management</h4>
         <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title">Add New Game</h5>
                 <form action="{{ url_for('add_game') }}" method="POST" class="row g-3">
-                    <div class="col-md-3"><input type="date" name="game_date" class="form-control" required></div>
+                    <div class="col-md-3"><input type="date" name="game_date" id="add_game_date" class="form-control" required></div>
                     <div class="col-md-3"><input type="text" name="game_opponent" class="form-control" placeholder="Opponent" required></div>
                     <div class="col-md-3"><input type="text" name="game_location" class="form-control" placeholder="Location"></div>
-                    <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add Game</button></div>
+                    <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add Game & Manage</button></div>
                     <div class="col-12"><textarea name="game_notes" class="form-control" rows="2" placeholder="Game Notes (e.g., arrival time, uniform)"></textarea></div>
                 </form>
             </div>
         </div>
-        <ul class="list-group">
-            {% for game in data.games | sort(attribute='date') %}
-            <li class="list-group-item">
-                <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">vs. {{ game.opponent }}</h5>
-                    <a href="{{ url_for('delete_game', index=loop.index0) }}" class="btn-close" aria-label="Delete" onclick="return confirm('Are you sure?');"></a>
-                </div>
-                <p class="mb-1"><strong>Date:</strong> {{ game.date }} | <strong>Location:</strong> {{ game.location }}</p>
-                <small>{{ game.game_notes }}</small>
-            </li>
-            {% else %}
-            <li class="list-group-item">No games scheduled.</li>
-            {% endfor %}
-        </ul>
+        <ul class="list-group" id="games-list-container"></ul>
     </div>
-      
+
     <div class="tab-pane fade" id="collaboration">
         <h4>Coaches Log</h4>
         <div class="row">
             <div class="col-md-6">
                 <h5>Team Notes</h5>
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <form action="{{ url_for('add_note', note_type='team_notes') }}" method="POST">
-                            <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note for the whole team..."></textarea>
-                            <button type="submit" class="btn btn-primary btn-sm">Add Team Note</button>
-                        </form>
-                    </div>
-                </div>
-                {% for note in data.collaboration_notes.team_notes | reverse %}
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <p class="card-text">{{ note.text }}</p>
-                        <small class="text-muted">By {{ note.author }} on {{ note.timestamp }}</small>
-                        {% if session.username == note.author or session.role == 'Admin' %}
-                        <a href="{{ url_for('delete_note', note_type='team_notes', index=loop.index0) }}" class="btn btn-sm btn-outline-danger float-end" onclick="return confirm('Are you sure?');">Delete</a>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
+                <div class="card mb-3"><div class="card-body">
+                    <form action="{{ url_for('add_note', note_type='team_notes') }}" method="POST">
+                        <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note for the whole team..."></textarea>
+                        <button type="submit" class="btn btn-primary btn-sm">Add Team Note</button>
+                    </form>
+                </div></div>
+                <div id="team-notes-container"></div>
             </div>
             <div class="col-md-6">
                 <h5>Player Notes</h5>
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <form action="{{ url_for('add_note', note_type='player_notes') }}" method="POST">
-                            <select name="player_name" class="form-select mb-2" required>
-                                <option value="">Select a player...</option>
-                                {% for p in data.roster %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}
-                            </select>
-                            <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note for the selected player..."></textarea>
-                            <button type="submit" class="btn btn-primary btn-sm">Add Player Note</button>
-                        </form>
-                    </div>
-                </div>
-                {% for note in data.collaboration_notes.player_notes | reverse %}
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <h6>For: {{ note.player_name }}</h6>
-                        <p class="card-text">{{ note.text }}</p>
-                        <small class="text-muted">By {{ note.author }} on {{ note.timestamp }}</small>
-                        {% if session.username == note.author or session.role == 'Admin' %}
-                        <div class="float-end">
-                            <button class="btn btn-sm btn-success me-2" 
-                                    data-bs-toggle="modal" 
-                                    data-bs-target="#editFocusModal"
-                                    data-action="add"
-                                    data-player-name="{{ note.player_name }}"
-                                    data-focus-text="{{ note.text }}">
-                                Create Goal
-                            </button>
-                            <a href="{{ url_for('delete_note', note_type='player_notes', index=loop.index0) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
+                <div class="card mb-3"><div class="card-body">
+                    <form action="{{ url_for('add_note', note_type='player_notes') }}" method="POST">
+                        <select name="player_name" class="form-select mb-2" required id="collab-player-select"></select>
+                        <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note for the selected player..."></textarea>
+                        <button type="submit" class="btn btn-primary btn-sm">Add Player Note</button>
+                    </form>
+                </div></div>
+                <div id="player-notes-container"></div>
             </div>
         </div>
     </div>
-      
+
     <div class="tab-pane fade" id="practice_plan">
         <h4>Practice Plans</h4>
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Create New Practice Plan</h5>
-                <form action="{{ url_for('add_practice_plan') }}" method="POST">
-                    <div class="row">
-                        <div class="col-md-3"><input type="date" name="plan_date" class="form-control" required></div>
-                        <div class="col-md-7"><input type="text" name="general_notes" class="form-control" placeholder="General theme or focus for the practice"></div>
-                        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Create Plan</button></div>
-                    </div>
-                </form>
-            </div>
-        </div>
-        <div class="accordion" id="practicePlanAccordion">
-            {% for plan in data.practice_plans %}
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="plan-heading-{{ plan.id }}">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-collapse-{{ plan.id }}">
-                        <strong>{{ plan.date }}</strong> - {{ plan.general_notes }}
-                    </button>
-                </h2>
-                <div id="plan-collapse-{{ plan.id }}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion">
-                    <div class="accordion-body">
-                        <ul class="list-group mb-3">
-                            {% for task in plan.tasks %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center task-item {% if task.status == 'complete' %}complete{% endif %}">
-                                <span><input type="checkbox" class="form-check-input me-2" onchange="updateTaskStatus({{ plan.id }}, {{ task.id }}, this)" {% if task.status == 'complete' %}checked{% endif %}>{{ task.text }}</span>
-                                <a href="{{ url_for('delete_task', plan_id=plan.id, task_id=task.id) }}" class="btn-close" onclick="return confirm('Are you sure?');"></a>
-                            </li>
-                            {% endfor %}
-                        </ul>
-                        <form action="{{ url_for('add_task_to_plan', plan_id=plan.id) }}" method="POST" class="d-flex">
-                            <input type="text" name="task_text" class="form-control me-2" placeholder="Add new task...">
-                            <button type="submit" class="btn btn-secondary">Add</button>
-                        </form>
-                        <div class="mt-3 d-flex justify-content-end">
-                            <a href="{{ url_for('delete_practice_plan', plan_id=plan.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this entire practice plan?');">Delete Plan</a>
-                        </div>
-                    </div>
+        <div class="card mb-4"><div class="card-body">
+            <h5 class="card-title">Create New Practice Plan</h5>
+            <form action="{{ url_for('add_practice_plan') }}" method="POST">
+                <div class="row">
+                    <div class="col-md-3"><input type="date" name="plan_date" class="form-control" required></div>
+                    <div class="col-md-7"><input type="text" name="general_notes" class="form-control" value="" placeholder="General theme or focus for the practice"></div>
+                    <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Create Plan</button></div>
                 </div>
-            </div>
-            {% else %}
-            <p>No practice plans created yet.</p>
-            {% endfor %}
-        </div>
+            </form>
+        </div></div>
+        <div class="accordion" id="practicePlanAccordion"></div>
     </div>
-      
+
     <div class="tab-pane fade" id="signs">
       <h4>Signs & Signals</h4>
         <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Add New Sign</h5>
-                        <form action="{{ url_for('add_sign') }}" method="POST">
-                            <div class="mb-2"><input type="text" name="sign_name" class="form-control" placeholder="Sign Name (e.g., Steal, Bunt)" required></div>
-                            <div class="mb-2"><input type="text" name="sign_indicator" class="form-control" placeholder="Indicator (e.g., Touch Belt)" required></div>
-                            <button type="submit" class="btn btn-primary">Add Sign</button>
-                        </form>
-                    </div>
+            <div class="col-md-6"><div class="card"><div class="card-body">
+                <h5 class="card-title">Add New Sign</h5>
+                <form action="{{ url_for('add_sign') }}" method="POST">
+                    <div class="mb-2"><input type="text" name="sign_name" class="form-control" placeholder="Sign Name (e.g., Steal, Bunt)" required></div>
+                    <div class="mb-2"><input type="text" name="sign_indicator" class="form-control" placeholder="Indicator (e.g., Touch Belt)" required></div>
+                    <button type="submit" class="btn btn-primary">Add Sign</button>
+                </form>
+            </div></div></div>
+            <div class="col-md-6"><ul class="list-group" id="signs-list-container"></ul></div>
+        </div>
+    </div>
+  </div>
+</div>
+
+<div class="more-menu-overlay hidden" id="more">
+    <span class="more-menu-close-btn" id="more-menu-close-btn">&times;</span>
+    <h4 class="mb-3">More Options</h4>
+    <div class="list-group mb-4">
+        <a class="list-group-item list-group-item-action" href="{{ url_for('pitching_rules') }}"><i class="bi bi-gavel me-2"></i>Pitching Rules</a>
+        <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#scouting_list" role="tab"><i class="bi bi-binoculars-fill me-2"></i>Scouting List</a>
+        <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#pitching" role="tab"><i class="bi bi-bullseye me-2"></i>Pitching Log</a>
+        <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#collaboration" role="tab"><i class="bi bi-people-fill me-2"></i>Coaches Log</a>
+        <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#signs" role="tab"><i class="bi bi-signpost-split-fill me-2"></i>Signs & Signals</a>
+    </div>
+    <div class="list-group">
+        {% if session.role in ['Head Coach', 'Super Admin'] %}
+        <a class="list-group-item list-group-item-action" href="{{ url_for('user_management') }}"><i class="bi bi-person-badge-fill me-2"></i>User Management</a>
+        <a class="list-group-item list-group-item-action" href="{{ url_for('admin_settings') }}"><i class="bi bi-gear-fill me-2"></i>Team Settings</a>
+        {% endif %}
+        <a class="list-group-item list-group-item-action" href="{{ url_for('change_password') }}"><i class="bi bi-key-fill me-2"></i>Change Password</a>
+        <a class="list-group-item list-group-item-action" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a>
+    </div>
+</div>
+
+
+<nav class="navbar fixed-bottom bg-light border-top d-lg-none bottom-nav">
+  <div class="container-fluid d-flex justify-content-around nav nav-tabs" id="mobile-nav-tabs" role="tablist">
+    <a class="nav-link text-center" data-bs-toggle="tab" href="#roster" role="tab"><i class="bi bi-people-fill"></i>Roster</a>
+    <a class="nav-link text-center" data-bs-toggle="tab" href="#player_development" role="tab"><i class="bi bi-graph-up-arrow"></i>Development</a>
+    <a class="nav-link text-center" data-bs-toggle="tab" href="#games" role="tab"><i class="bi bi-calendar-event"></i>Games</a>
+    <a class="nav-link text-center" data-bs-toggle="tab" href="#practice_plan" role="tab"><i class="bi bi-clipboard-check"></i>Practice</a>
+    <a class="nav-link text-center" id="mobile-more-button" href="#"><i class="bi bi-three-dots"></i>More</a>
+  </div>
+</nav>
+
+<div class="modal fade" id="lineupEditorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="lineupEditorTitle">Unassigned Lineup Editor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <form id="lineupEditorForm" onsubmit="return false;">
+                <input type="hidden" id="lineupId" name="lineup_id">
+                <div class="row mb-3">
+                    <div class="col-12"><label for="lineupTitle" class="form-label">Lineup Title</label><input type="text" class="form-control" id="lineupTitle" required></div>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <ul class="list-group">
-                    {% for sign in data.signs %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div><strong>{{ sign.name }}:</strong> {{ sign.indicator }}</div>
-                        <div>
-                            <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-index="{{ loop.index0 }}" data-sign-name="{{ sign.name }}" data-sign-indicator="{{ sign.indicator }}">Edit</button>
-                            <a href="{{ url_for('delete_sign', index=loop.index0) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</a>
-                        </div>
-                    </li>
-                    {% else %}
-                    <li class="list-group-item">No signs have been added.</li>
-                    {% endfor %}
-                </ul>
-            </div>
+                <div class="row" id="lineup-editor-lists">
+                    <div class="col-md-6"><h6>Available Players</h6><div id="lineup-bench" class="list-group border rounded p-2" style="min-height: 400px; max-height: 50vh; overflow-y: auto;"></div></div>
+                    <div class="col-md-6"><h6>Batting Order</h6><div id="lineup-order" class="list-group border rounded p-2" style="min-height: 400px; max-height: 50vh; overflow-y: auto;"></div></div>
+                </div>
+            </form>
         </div>
-    </div>
-
-  </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" id="saveLineupBtn" class="btn btn-primary">Save Lineup</button></div>
+    </div></div>
+</div>
+<div class="modal fade" id="editNoteModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Edit Note</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <form id="editNoteForm" action="{{ url_for('edit_note') }}" method="POST">
+      <div class="modal-body"><input type="hidden" id="editNoteId" name="note_id"><input type="hidden" id="editNoteType" name="note_type"><div class="mb-3"><label for="editNoteText" class="form-label">Note Text</label><textarea class="form-control" id="editNoteText" name="note_text" rows="5" required></textarea></div></div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+    </form>
+  </div></div>
+</div>
+<div class="modal fade" id="editFocusModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form id="focusForm" method="POST">
+      <div class="modal-header"><h5 class="modal-title" id="focusModalTitle">Development Focus</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="focusId" name="focus_id">
+        <div class="mb-3"><label for="focusSkill" class="form-label">Skill Area</label><select id="focusSkill" name="skill" class="form-select" required><option value="hitting">Hitting</option><option value="pitching">Pitching</option><option value="fielding">Fielding</option><option value="baserunning">Baserunning</option></select></div>
+        <div class="mb-3"><label for="focusText" class="form-label">Focus / Goal</label><input type="text" class="form-control" id="focusText" name="focus_text" required></div>
+        <div class="mb-3"><label for="focusNotes" class="form-label">Additional Notes</label><textarea class="form-control" id="focusNotes" name="notes" rows="3"></textarea></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Focus</button></div>
+    </form>
+  </div></div>
+</div>
+<div class="modal fade" id="editSignModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Edit Sign</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form id="editSignForm" method="POST">
+            <div class="modal-body">
+                <input type="hidden" name="index" id="editSignIndex">
+                <div class="mb-2"><label class="form-label">Sign Name</label><input type="text" id="editSignName" name="sign_name" class="form-control" required></div>
+                <div class="mb-2"><label class="form-label">Indicator</label><input type="text" id="editSignIndicator" name="sign_indicator" class="form-control" required></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div>
+        </form>
+    </div></div>
 </div>
 
-<div class="modal fade" id="editSignModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="POST">
-        <div class="modal-header">
-          <h5 class="modal-title">Edit Sign</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3"><label class="form-label">Sign Name</label><input type="text" id="edit_sign_name" name="sign_name" class="form-control" required></div>
-          <div class="mb-3"><label class="form-label">Indicator</label><input type="text" id="edit_sign_indicator" name="sign_indicator" class="form-control" required></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
 
-<div class="modal fade" id="editFocusModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form id="editFocusForm" method="POST">
-        <div class="modal-header">
-          <h5 class="modal-title" id="editFocusModalTitle">Edit Focus</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <input type="hidden" name="skill" id="editFocusSkill">
-          <div class="mb-3">
-            <label for="editFocusText" class="form-label">Focus Area</label>
-            <input type="text" name="focus_text" id="editFocusText" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label for="editFocusNotes" class="form-label">Notes</label>
-            <textarea name="notes" id="editFocusNotes" class="form-control" rows="4"></textarea>
-          </div>
-        </div>
-        <div class="modal-footer justify-content-between">
-            <button type="submit" form="completeFocusForm" id="completeFocusBtn" class="btn btn-success" onclick="return confirm('Are you sure you want to mark this focus as complete?');">Mark as Complete</button>
-            <div>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" id="saveFocusBtn" class="btn btn-primary">Save Changes</button>
-            </div>
-        </div>
-      </form>
-      <form id="completeFocusForm" method="POST" style="display:none;"></form>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="historyModalTitle">Development History</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="historyModalBody">
-                <p>Loading history...</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="editLineupModal" tabindex="-1" aria-labelledby="editLineupModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-xl">
-    <div class="modal-content">
-      <form id="editLineupForm" method="POST">
-        <div class="modal-header">
-          <h5 class="modal-title" id="editLineupModalLabel">Edit Lineup</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/service-worker.js')
+            .then(reg => console.log('Service worker registered.', reg))
+            .catch(err => console.log('Service worker not registered.', err));
+    }
+</script>
+
+<script>
+
 document.addEventListener('DOMContentLoaded', () => {
 
-    const hash = window.location.hash;
-    if (hash) {
-        const tabTriggerEl = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
-        if (tabTriggerEl) {
-            const tab = new bootstrap.Tab(tabTriggerEl);
-            tab.show();
-        }
-    } else {
-        const firstTab = document.querySelector('a[data-bs-toggle="tab"]');
-        if (firstTab) {
-            new bootstrap.Tab(firstTab).show();
-        }
+    let AppState = {
+        full_data: {},
+        player_order: [],
+        session: {},
+        pitch_count_summary: {},
+    };
+    let sortableInstances = {};
+    let lineupEditorModal;
+
+    const renderPositionSelect = (name, id, selectedVal = '', title = 'Pos', classes = 'form-select form-select-sm') => {
+        const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'];
+        let optionsHtml = `<option value="" ${!selectedVal ? 'selected' : ''}>${title}</option>`;
+        positions.forEach(pos => {
+            optionsHtml += `<option value="${pos}" ${selectedVal === pos ? 'selected' : ''}>${pos}</option>`;
+        });
+        return `<select name="${name}" id="${id}" class="${classes}" title="${title}">${optionsHtml}</select>`;
+    };
+    const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
+    const canEdit = (author) => AppState.session.username === author || AppState.session.role === 'Head Coach' || AppState.session.role === 'Super Admin';
+
+
+    function attachRosterSaveListeners() {
+        document.querySelectorAll('.save-player-btn').forEach(button => {
+            button.removeEventListener('click', handleRosterSave);
+            button.addEventListener('click', handleRosterSave);
+        });
     }
 
-    document.querySelectorAll('.save-player-btn').forEach(button => {
-        button.addEventListener('click', function(event) {
-            const accordionItem = this.closest('.accordion-item');
-            const playerIndex = accordionItem.dataset.playerIndex;
-            const formContainer = accordionItem.querySelector('.accordion-body');
-            
-            const formData = new FormData();
-            formContainer.querySelectorAll('input, select, textarea').forEach(input => {
-                formData.append(input.name, input.value);
-            });
+    async function handleRosterSave(event) {
+        const savePlayerBtn = event.target;
+        const playerId = savePlayerBtn.dataset.playerId;
+        const accordionBody = savePlayerBtn.closest('.accordion-body');
+        const formData = new FormData();
+        accordionBody.querySelectorAll('input, select, textarea').forEach(input => formData.append(input.name, input.value));
 
-            this.disabled = true;
-            this.textContent = 'Saving...';
+        const originalText = savePlayerBtn.textContent;
+        savePlayerBtn.disabled = true;
+        savePlayerBtn.textContent = 'Saving...';
 
-            fetch(`/update_player_inline/${playerIndex}`, {
+        try {
+            const response = await fetch(`/update_player_inline/${playerId}`, {
                 method: 'POST',
                 body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    alert(data.message); 
-                } else {
-                    alert(`Error: ${data.message}`);
-                }
-            })
-            .catch(error => {
-                console.error('Error saving player:', error);
-                alert('An error occurred while saving. Please try again.');
-            })
-            .finally(() => {
-                this.disabled = false;
-                this.textContent = 'Save Changes';
             });
-        });
-    });
-
-    // --- Rotations Grid Logic ---
-    const rotationTab = document.getElementById('rotations');
-    if (rotationTab) {
-        const titleInput = document.getElementById('rotationTitle'),
-            savedRotationSelect = document.getElementById('savedRotationSelect'),
-            loadRotationBtn = document.getElementById('loadRotationBtn'),
-            saveBtn = document.getElementById('saveRotationBtn'),
-            newBtn = document.getElementById('newRotationBtn'),
-            deleteBtn = document.getElementById('deleteRotationBtn'),
-            gridBody = document.getElementById('rotation-grid-body'),
-            playingTimeBody = document.getElementById('playingTimeBody'),
-            fullGameBenchCard = document.getElementById('fullGameBenchCard'),
-            fullGameBenchList = document.getElementById('fullGameBenchList'),
-            mobileAccordion = document.getElementById('rotationMobileAccordion'),
-            addInningBtn = document.getElementById('addInningBtn'),
-            removeInningBtn = document.getElementById('removeInningBtn'),
-            addInningBtnMobile = document.getElementById('addInningBtnMobile'),
-            removeInningBtnMobile = document.getElementById('removeInningBtnMobile');
-        
-        let currentRotationId = null;
-        let copiedInningPlayers = null; 
-        const fullRoster = JSON.parse(document.body.dataset.roster || "[]");
-        const POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
-        const ALL_SAVED_ROTATIONS = {{ data.rotations | tojson }};
-
-        function updateUI() {
-            const inningRows = gridBody.querySelectorAll('tr[data-inning-number]');
-            inningRows.forEach(row => {
-                const inningNum = row.dataset.inningNumber;
-                updateInningDropdowns(inningNum);
-            });
-            updateSummaries();
-        }
-
-        function updateInningDropdowns(inningNum) {
-            const allSelectsForInning = document.querySelectorAll(`select[data-inning-number="${inningNum}"]`);
-            const usedPlayers = new Set();
-            allSelectsForInning.forEach(sel => { if(sel.value) usedPlayers.add(sel.value); });
-            
-            allSelectsForInning.forEach(sel => {
-                const currentPlayer = sel.value;
-                let optionsHTML = '<option value="">--</option>';
-                fullRoster.forEach(player => {
-                    if (!usedPlayers.has(player.name) || player.name === currentPlayer) {
-                        optionsHTML += `<option value="${player.name}">${player.name}</option>`;
-                    }
-                });
-                sel.innerHTML = optionsHTML;
-                sel.value = currentPlayer;
-            });
-        }
-
-        function updateSummaries() {
-            const inningRows = gridBody.querySelectorAll('tr[data-inning-number]');
-            const totalInnings = inningRows.length;
-            const inningCounts = {};
-            fullRoster.forEach(p => { inningCounts[p.name] = 0; });
-
-            inningRows.forEach(row => {
-                row.querySelectorAll('select').forEach(sel => {
-                    if (sel.value) inningCounts[sel.value]++;
-                });
-            });
-
-            playingTimeBody.innerHTML = '';
-            const sortedPlayers = Object.entries(inningCounts).sort((a, b) => b[1] - a[1]);
-            const playersOnBench = [];
-            sortedPlayers.forEach(([name, count]) => {
-                let rowClass = '';
-                if (count === 0) {
-                    rowClass = 'table-danger';
-                    playersOnBench.push(name);
-                } else if (totalInnings > 2 && totalInnings - count > 2) {
-                    rowClass = 'table-warning';
-                }
-                playingTimeBody.insertAdjacentHTML('beforeend', `<tr class="${rowClass}"><td>${name}</td><td class="text-center">${count}</td></tr>`);
-            });
-
-            fullGameBenchList.innerHTML = '';
-            if (playersOnBench.length > 0) {
-                playersOnBench.forEach(name => fullGameBenchList.insertAdjacentHTML('beforeend', `<li class="list-group-item">${name}</li>`));
-                fullGameBenchCard.style.display = 'block';
+            const data = await response.json();
+            if (data.status === 'success') {
+                savePlayerBtn.textContent = 'Saved!';
+                savePlayerBtn.classList.replace('btn-success', 'btn-secondary');
             } else {
-                fullGameBenchCard.style.display = 'none';
+                alert(`Error: ${data.message}`);
+                savePlayerBtn.textContent = 'Save Failed';
             }
+        } catch (err) {
+            alert('An error occurred while saving player changes.');
+            savePlayerBtn.textContent = 'Save Failed';
+        } finally {
+            setTimeout(() => {
+                savePlayerBtn.textContent = originalText;
+                savePlayerBtn.classList.replace('btn-secondary', 'btn-success');
+                savePlayerBtn.disabled = false;
+            }, 2000);
         }
+    }
 
-        function syncViews(sourceElement) {
-            const inning = sourceElement.dataset.inningNumber;
-            const position = sourceElement.dataset.position;
-            const value = sourceElement.value;
-            const isDesktop = sourceElement.closest('tbody#rotation-grid-body');
-            const targetSelect = isDesktop 
-                ? mobileAccordion.querySelector(`select[data-inning-number="${inning}"][data-position="${position}"]`)
-                : gridBody.querySelector(`tr[data-inning-number="${inning}"] select[data-position="${position}"]`);
-            
-            if (targetSelect) targetSelect.value = value;
-            updateInningDropdowns(inning);
-            updateSummaries();
-        }
+    function attachTaskListeners() {
+        document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+            checkbox.removeEventListener('change', handleTaskCheckboxChange);
+            checkbox.addEventListener('change', handleTaskCheckboxChange);
+        });
+    }
 
-        function buildInning(inningNum) {
-            // --- Desktop View: Table Row ---
-            const newDesktopRow = document.createElement('tr');
-            newDesktopRow.dataset.inningNumber = inningNum;
-            const desktopInningCell = `
-                <td class="text-center fw-bold align-middle">
-                    ${inningNum}
-                    <div class="d-flex justify-content-center gap-1 mt-1">
-                        <button class="btn btn-sm btn-outline-secondary copy-inning-btn" title="Copy Inning ${inningNum} Lineup"><i class="bi bi-clipboard"></i></button>
-                        <button class="btn btn-sm btn-outline-primary paste-inning-btn" title="Paste to Inning ${inningNum}"><i class="bi bi-clipboard-plus"></i></button>
-                    </div>
-                </td>`;
-            newDesktopRow.innerHTML = desktopInningCell + POSITIONS.map(pos => `<td><select class="form-select form-select-sm" data-inning-number="${inningNum}" data-position="${pos}"></select></td>`).join('');
-            gridBody.appendChild(newDesktopRow);
-            
-            // --- Mobile View: Accordion Item ---
-            let mobilePositionList = '<ul class="list-group list-group-flush">';
-            POSITIONS.forEach(pos => {
-                mobilePositionList += `<li class="list-group-item d-flex justify-content-between align-items-center"><strong>${pos}</strong> <select class="form-select form-select-sm w-75" data-inning-number="${inningNum}" data-position="${pos}"></select></li>`;
-            });
-            mobilePositionList += '</ul>';
-            
-            // Add copy/paste buttons to the mobile header as well
-            const mobileAccordionHeader = `
-                <h2 class="accordion-header d-flex align-items-center">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-mobile-${inningNum}">Inning ${inningNum}</button>
-                    <div class="p-2 d-flex gap-1">
-                        <button class="btn btn-sm btn-outline-secondary copy-inning-btn" title="Copy Inning ${inningNum} Lineup"><i class="bi bi-clipboard"></i></button>
-                        <button class="btn btn-sm btn-outline-primary paste-inning-btn" title="Paste to Inning ${inningNum}"><i class="bi bi-clipboard-plus"></i></button>
-                    </div>
-                </h2>`;
+    async function handleTaskCheckboxChange(event) {
+        const listItem = event.target.closest('.task-item');
+        const taskId = listItem.dataset.taskId;
+        const planId = listItem.dataset.planId;
+        const newStatus = event.target.checked ? 'complete' : 'pending';
 
-            const mobileAccordionItem = `
-                <div class="accordion-item" data-inning-number-mobile="${inningNum}">
-                    ${mobileAccordionHeader}
-                    <div id="collapse-mobile-${inningNum}" class="accordion-collapse collapse" data-bs-parent="#rotationMobileAccordion">
-                        <div class="accordion-body p-0">${mobilePositionList}</div>
-                    </div>
-                </div>`;
-            mobileAccordion.insertAdjacentHTML('beforeend', mobileAccordionItem);
-        }
-
-        function addInning() {
-            const newInningNum = gridBody.rows.length + 1;
-            buildInning(newInningNum);
-            updateInningDropdowns(newInningNum); // Populate new dropdowns
-            updateSummaries();
-        }
-
-        function removeInning() {
-            if (gridBody.rows.length > 1) {
-                const inningToRemove = gridBody.lastElementChild.dataset.inningNumber;
-                gridBody.lastElementChild.remove();
-                mobileAccordion.querySelector(`div[data-inning-number-mobile="${inningToRemove}"]`).remove();
-                updateSummaries();
-            }
-        }
-
-        function clearGrid() {
-            gridBody.innerHTML = '';
-            mobileAccordion.innerHTML = '';
-            for (let i = 1; i <= 6; i++) {
-                buildInning(i);
-                updateInningDropdowns(i);
-            }
-            titleInput.value = '';
-            savedRotationSelect.value = '';
-            deleteBtn.disabled = true;
-            currentRotationId = null;
-            updateSummaries(); 
-        }
-        
-        function populateGrid(rotationData) {
-            gridBody.innerHTML = '';
-            mobileAccordion.innerHTML = '';
-            currentRotationId = rotationData.id;
-            titleInput.value = rotationData.title;
-            deleteBtn.disabled = false;
-            
-            const savedInnings = Object.keys(rotationData.innings).map(Number).sort((a,b) => a - b);
-            if (savedInnings.length === 0) { 
-                clearGrid();
-                titleInput.value = rotationData.title;
-                return; 
-            }
-
-            savedInnings.forEach(inningNum => {
-                buildInning(inningNum);
-                updateInningDropdowns(inningNum); // First, create all the <option> tags
-                
-                const inningAssignments = rotationData.innings[inningNum];
-                for (const [pos, playerName] of Object.entries(inningAssignments)) {
-                    document.querySelectorAll(`select[data-inning-number="${inningNum}"][data-position="${pos}"]`).forEach(sel => {
-                        sel.value = playerName; // Now, set the value
-                    });
-                }
-            });
-
-            updateUI(); // Finally, re-filter dropdowns and update summary
-        }
-
-        function handleSave() {
-            const title = titleInput.value.trim();
-            if (!title) { alert('Please enter a title for the rotation.'); return; }
-            const inningsData = {};
-            gridBody.querySelectorAll('tr[data-inning-number]').forEach(row => {
-                const inningNum = row.dataset.inningNumber;
-                inningsData[inningNum] = {};
-                row.querySelectorAll('select').forEach(sel => {
-                    if (sel.value) inningsData[inningNum][sel.dataset.position] = sel.value;
-                });
-            });
-            const payload = { id: currentRotationId, title: title, innings: inningsData };
-            
-            saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
-            fetch('/save_rotation', {
+        try {
+            const response = await fetch(`/update_task_status/${planId}/${taskId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === 'success') {
-                    if (!currentRotationId) {
-                        const newOption = new Option(title, data.new_id, false, true);
-                        savedRotationSelect.add(newOption);
-                        currentRotationId = data.new_id;
-                    }
-                    alert(data.message);
-                } else {
-                   alert(`Error: ${data.message || 'Could not save rotation.'}`);
+                body: JSON.stringify({ status: newStatus })
+            });
+            const result = await response.json();
+            if (result.status === 'success') {
+                listItem.classList.toggle('complete', event.target.checked);
+            } else {
+                alert('Error updating task status: ' + result.message);
+                event.target.checked = !event.target.checked;
+            }
+        } catch (error) {
+            alert('An error occurred while updating task status.');
+            event.target.checked = !event.target.checked;
+        }
+    }
+
+
+    function renderRoster() {
+        const container = document.getElementById('rosterAccordion');
+        const searchTerm = document.getElementById('rosterSearch').value.toLowerCase();
+        if (!container) return;
+
+        let html = '';
+        let visiblePlayerCount = 0;
+        AppState.player_order.forEach((playerName) => {
+            const p = AppState.full_data.roster.find(player => player.name === playerName);
+            if (!p) return;
+            if (searchTerm && !p.name.toLowerCase().includes(searchTerm) && !(p.number||'').toString().includes(searchTerm)) return;
+
+            visiblePlayerCount++;
+            const pNameSafe = escapeHTML(p.name);
+            const pNotesSafe = escapeHTML(p.notes || '');
+            const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
+
+            html += `
+            <div class="accordion-item" data-player-name="${pNameSafe}">
+                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-roster-${p.id}"><i class="bi bi-grip-vertical me-2 drag-handle" title="Drag to reorder"></i><strong>${pNameSafe}</strong>&nbsp;(#${p.number || 'N/A'})</button></h2>
+                <div id="collapse-roster-${p.id}" class="accordion-collapse collapse" data-bs-parent="#rosterAccordion"><div class="accordion-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-12"><h5 class="mb-0">Player Profile Notes</h5></div>
+                        <div class="col-12"><textarea class="form-control" name="notes" rows="2" placeholder="General Player Notes">${pNotesSafe}</textarea></div>
+                        ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${p.notes_timestamp || ''}</small></div>` : ''}
+                        <hr class="my-3">
+                        <div class="col-12 col-md-4"><input type="text" class="form-control" name="name" value="${pNameSafe}" placeholder="Name"></div>
+                        <div class="col-6 col-md-2"><input type="number" class="form-control" name="number" value="${p.number || ''}" placeholder="J#"></div>
+                        <div class="col-6 col-md-3">${renderPositionSelect('position1', `position1_${p.id}`, p.position1, 'Pos1', 'form-select')}</div>
+                        <div class="col-6 col-md-3">${renderPositionSelect('position2', `position2_${p.id}`, p.position2, 'Pos2', 'form-select')}</div>
+                        <div class="col-6 col-md-3">${renderPositionSelect('position3', `position3_${p.id}`, p.position3, 'Pos3', 'form-select')}</div>
+                        <div class="col-6 col-md-3"><select name="throws" class="form-select" title="Throws"><option value="Right" ${p.throws === 'Right' ? 'selected' : ''}>Throws: Right</option><option value="Left" ${p.throws === 'Left' ? 'selected' : ''}>Throws: Left</option></select></div>
+                        <div class="col-6 col-md-3"><select name="bats" class="form-select" title="Bats"><option value="Right" ${p.bats === 'Right' ? 'selected' : ''}>Bats: Right</option><option value="Left" ${p.bats === 'Left' ? 'selected' : ''}>Bats: Left</option></select></div>
+                        <div class="col-6 col-md-3"><select name="pitcher_role" class="form-select" title="Pitcher Role"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Not a Pitcher</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starter</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Reliever</option></select></div>
+                        <div class="col-12 d-flex justify-content-end mt-3"><button type="button" class="btn btn-sm btn-success me-2 save-player-btn" data-player-id="${p.id}">Save Changes</button><a href="/delete_player/${p.id}?active_tab=#roster" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">Remove</a></div>
+                    </div>
+                </div></div>
+            </div>`;
+        });
+        if (visiblePlayerCount === 0) html = `<div class="p-3 text-center text-muted">No players found.</div>`;
+        container.innerHTML = html;
+        attachRosterSaveListeners();
+    }
+
+    function renderPlayerDevelopment() {
+        const container = document.getElementById('player-dev-accordion');
+        if (!container) return;
+        let html = '';
+        const playerDevData = AppState.full_data.player_development || {};
+        const roster = AppState.full_data.roster || [];
+
+        const getIconForType = (type) => {
+            switch(type) {
+                case 'Development': return '<i class="bi bi-graph-up-arrow text-primary"></i>';
+                case 'Coach Note': return '<i class="bi bi-chat-left-text-fill text-info"></i>';
+                case 'Lessons': return '<i class="bi bi-person-video3 text-success"></i>';
+                default: return '<i class="bi bi-record-circle"></i>';
+            }
+        };
+
+        const createActionButtons = (log) => {
+            if (!canEdit(log.author)) return '';
+
+            let editButton = '', deleteLink = '';
+
+            if (log.type === 'Development') {
+                editButton = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-focus-id="${log.id}" data-player-name="${log.player_name}">Edit</button>`;
+                deleteLink = `<a href="/delete_focus/${log.id}" class="btn btn-sm btn-link text-danger py-0" onclick="return confirm('Are you sure?');">Delete</a>`;
+            } else if (log.type === 'Coach Note') {
+                const noteText = escapeHTML(log.text);
+                editButton = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${log.id}" data-note-type="player_notes" data-note-text="${noteText}">Edit</button>`;
+                deleteLink = `<a href="/delete_note/player_notes/${log.id}" class="btn btn-sm btn-link text-danger py-0" onclick="return confirm('Are you sure?');">Delete</a>`;
+            }
+            return `<div class="mt-2">${editButton}${deleteLink}</div>`;
+        };
+
+        AppState.player_order.forEach((playerName) => {
+            const p = roster.find(player => player.name === playerName);
+            if (!p) return;
+            const activityLog = playerDevData[p.name] || [];
+            const pNameSafe = escapeHTML(p.name);
+            
+            html += `
+            <div class="accordion-item" data-player-name="${pNameSafe}">
+                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-dev-${p.id}"><i class="bi bi-grip-vertical me-2 drag-handle"></i><strong>${pNameSafe}</strong></button></h2>
+                <div id="collapse-dev-${p.id}" class="accordion-collapse collapse" data-bs-parent="#player-dev-accordion"><div class="accordion-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Activity Log</h5>
+                        <div class="btn-group"><button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Add New Entry</button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">New Hitting Focus</a></li>
+                                <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">New Pitching Focus</a></li>
+                                <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">New Fielding Focus</a></li>
+                                <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">New Baserunning Focus</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; new bootstrap.Tab(document.querySelector('a[href=\\'#collaboration\\']')).show();">New Coach Note</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    ${activityLog.length > 0 ? `
+                    <ul class="list-group">
+                        ${activityLog.map(log => {
+                            log.player_name = pNameSafe;
+                            return `
+                            <li class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.type)}: <span class="text-muted fw-normal">${escapeHTML(log.subtype)}</span></h6>
+                                    <small>${log.date}</small>
+                                </div>
+                                <p class="mb-1">${escapeHTML(log.text)}</p>
+                                ${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}
+                                <small class="text-muted">By: ${escapeHTML(log.author)}</small>
+                                ${createActionButtons(log)}
+                            </li>`;
+                        }).join('')}
+                    </ul>` : `<div class="text-center p-3 border rounded"><p>No activity logged for this player yet.</p></div>`}
+                </div></div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function renderLineups() {
+        const container = document.getElementById('lineupsAccordion');
+        if (!container) return;
+        const lineups = AppState.full_data.lineups.filter(l => !l.associated_game_id) || [];
+        
+        if (lineups.length === 0) {
+            container.innerHTML = `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned lineups saved yet.</p></div>`;
+        } else {
+            container.innerHTML = lineups.map((l) => `
+            <div class="accordion-item" data-lineup-id="${l.id}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#lineup-collapse-${l.id}"><strong>${escapeHTML(l.title)}</strong></button></h2>
+                <div id="lineup-collapse-${l.id}" class="accordion-collapse collapse" data-bs-parent="#lineupsAccordion"><div class="accordion-body">
+                    <div class="d-flex justify-content-end mb-3"><button class="btn btn-sm btn-info me-2 edit-lineup-btn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal" data-lineup-id="${l.id}">Edit</button><a href="/delete_lineup/${l.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a></div>
+                    <table class="table table-striped table-sm"><thead><tr><th style="width: 5%;">#</th><th>Player</th><th style="width: 15%;">Position</th></tr></thead>
+                        <tbody>${(l.lineup_positions || []).map((spot, i) => `<tr><td><strong>${i + 1}</strong></td><td>${escapeHTML(spot.name)}</td><td>${spot.position}</td></tr>`).join('') || `<tr><td colspan="3" class="text-center text-muted">This lineup is empty.</td></tr>`}</tbody>
+                    </table>
+                </div></div>
+            </div>`).join('');
+        }
+    }
+
+    function renderPitchingLog() {
+        const summaryContainer = document.getElementById('pitch-count-summary-container');
+        if (summaryContainer) {
+            let summaryHtml = `<table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Pitcher</th><th>Daily (Limit: 85)</th><th>Weekly (Limit: 100)</th><th>Cumulative (Yearly)</th></tr></thead><tbody>`;
+            const summaryData = AppState.pitch_count_summary || {};
+            if (Object.keys(summaryData).length > 0) {
+                for (const [name, counts] of Object.entries(summaryData)) {
+                    const dailyPct = Math.min((counts.daily / 85 * 100), 100);
+                    const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
+                    const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
+                    const weeklyBg = weeklyPct > 80 ? 'bg-danger' : weeklyPct > 60 ? 'bg-warning' : 'bg-success';
+                    summaryHtml += `
+                    <tr><td><strong>${escapeHTML(name)}</strong></td>
+                        <td><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div></td>
+                        <td><div class="progress" style="height: 20px;"><div class="progress-bar ${weeklyBg}" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div></div></td>
+                        <td class="text-center align-middle"><strong>${counts.cumulative_year || 0}</strong></td>
+                    </tr>`;
                 }
-            }).catch(err => {
-                console.error("Save Error:", err);
-                alert("An error occurred while saving.");
-            }).finally(() => {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'Save';
+            } else {
+                summaryHtml += `<tr><td colspan="4" class="text-center">No pitching outings recorded yet.</td></tr>`;
+            }
+            summaryHtml += `</tbody></table>`;
+            summaryContainer.innerHTML = summaryHtml;
+        }
+
+        const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
+        if (pitcherSelect) {
+            pitcherSelect.innerHTML = `<option value="">Select Pitcher</option>` + AppState.full_data.roster.filter(p=>p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${escapeHTML(p.name)}">${escapeHTML(p.name)}</option>`).join('');
+        }
+
+        const outingsList = document.getElementById('recorded-outings-list');
+        if (outingsList) {
+            const outings = (AppState.full_data.pitching || []).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
+            outingsList.innerHTML = outings.map((o) => `
+                <li class="list-group-item d-flex justify-content-between align-items-center"><span>${o.date}: <strong>${escapeHTML(o.pitcher)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
+                <a href="/delete_pitching/${o.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');"><i class="bi bi-trash"></i></a></li>`).join('') || `<li class="list-group-item text-muted">No outings recorded.</li>`;
+        }
+    }
+
+    function renderSigns() {
+        const container = document.getElementById('signs-list-container');
+        if (!container) return;
+        const signs = AppState.full_data.signs || [];
+        container.innerHTML = signs.length > 0 ? signs.map((sign) => `
+            <li class="list-group-item d-flex justify-content-between align-items-center"><div><strong>${escapeHTML(sign.name)}:</strong> ${escapeHTML(sign.indicator)}</div>
+            <div><button class="btn btn-sm btn-info edit-sign-btn" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-id="${sign.id}">Edit</button><a href="/delete_sign/${sign.id}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</a></div></li>`).join('') : `<li class="list-group-item">No signs have been added.</li>`;
+    }
+
+    function renderCollaborationNotes() {
+        const teamContainer = document.getElementById('team-notes-container');
+        const playerContainer = document.getElementById('player-notes-container');
+        if (!teamContainer || !playerContainer) return;
+        const collabData = AppState.full_data.collaboration_notes || {};
+
+        const createNoteHTML = (note, note_type) => {
+            const noteText = escapeHTML(note.text);
+            const author = escapeHTML(note.author);
+            return `<div class="card mb-2"><div class="card-body pb-2"><p class="card-text" style="white-space: pre-wrap;">${noteText}</p><small class="text-muted">By ${author} on ${note.timestamp}${note.player_name ? ` for <strong>${escapeHTML(note.player_name)}</strong>` : ''}</small></div>
+                <div class="card-footer bg-white border-top-0 text-end py-2">
+                    ${canEdit(note.author) ? `<button class="btn btn-sm btn-link text-secondary" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${note.id}" data-note-type="${note_type}" data-note-text="${noteText}">Edit</button>` : ''}
+                    <a href="/move_note_to_practice_plan/${note_type}/${note.id}" class="btn btn-sm btn-link text-secondary">Move to Plan</a>
+                    ${canEdit(note.author) ? `<a href="/delete_note/${note_type}/${note.id}" class="btn btn-sm btn-link text-danger" onclick="return confirm('Are you sure?')">Delete</a>` : ''}
+                </div></div>`;
+        };
+
+        const teamNotes = (collabData.team_notes || []).sort((a,b) => b.timestamp.localeCompare(a.timestamp));
+        teamContainer.innerHTML = teamNotes.map(note => createNoteHTML(note, 'team_notes')).join('') || '<div class="text-center p-3 border rounded text-muted">No team notes yet.</div>';
+        const playerNotes = (collabData.player_notes || []).sort((a,b) => b.timestamp.localeCompare(a.timestamp));
+        playerContainer.innerHTML = playerNotes.map(note => createNoteHTML(note, 'player_notes')).join('') || '<div class="text-center p-3 border rounded text-muted">No player notes yet.</div>';
+        document.getElementById('collab-player-select').innerHTML = '<option value="">Select a player...</option>' + AppState.player_order.map(name => `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`).join('');
+    }
+
+    function renderScoutingList() {
+        const container = document.getElementById('scouting-list-container');
+        if (!container) return;
+        const scoutingData = AppState.full_data.scouting_list || {};
+        const listTypes = {'targets': 'Targets', 'committed': 'Committed', 'not_interested': 'Not Interested'};
+        let html = '';
+        for (const [key, title] of Object.entries(listTypes)) {
+            html += `<div class="col-md-4 mb-3"><div class="card h-100"><div class="card-header fw-bold">${title}</div><div class="card-body p-0"><ul class="list-group list-group-flush">`;
+            const players = scoutingData[key] || [];
+            if (players.length > 0) {
+                players.forEach((p) => {
+                    let moveOptions = '';
+                    if (key === 'targets') moveOptions = `<li><form action="/move_scouted_player/targets/committed/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">Move to Committed</button></form></li><li><form action="/move_scouted_player/targets/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">Move to Not Interested</button></form></li>`;
+                    else if (key === 'committed') moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item fw-bold">Move to Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">Move to Not Interested</button></form></li>`;
+
+                    html += `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${p.position1 || 'N/A'}${p.position2 ? ` / ${p.position2}` : ''} | Throws: ${p.throws || 'N/A'} | Bats: ${p.bats || 'N/A'}</small></div>
+                        <div class="btn-group"><a href="/delete_scouted_player/${key}/${p.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');" title="Remove Player"><i class="bi bi-trash"></i></a>
+                        ${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Toggle Dropdown</span></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
+                });
+            } else html += `<li class="list-group-item text-center text-muted">No players on this list.</li>`;
+            html += `</ul></div></div></div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function renderGames() {
+        const container = document.getElementById('games-list-container');
+        if (!container) return;
+        const games = (AppState.full_data.games || []).sort((a,b) => b.date.localeCompare(a.date));
+        if (games.length === 0) {
+            container.innerHTML = `<li class="list-group-item text-center text-muted">No games scheduled. Add one above!</li>`;
+            return;
+        }
+        container.innerHTML = games.map(game => {
+            const lineup = AppState.full_data.lineups.find(l => l.associated_game_id === game.id);
+            const rotation = AppState.full_data.rotations.find(r => r.associated_game_id === game.id);
+            const lineupHTML = lineup ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
+            const rotationHTML = rotation ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
+            return `<li class="list-group-item" data-game-id="${game.id}">
+                <div class="d-flex justify-content-between align-items-center flex-wrap">
+                    <div class="me-auto">
+                        <h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5>
+                        <p class="mb-1"><i class="bi bi-calendar-event"></i> ${game.date} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p>
+                    </div>
+                    <div class="d-flex align-items-center mt-2 mt-md-0">
+                        <div class="text-end me-3"><div class="mb-1"><strong>Lineup:</strong> ${lineupHTML}</div><div><strong>Rotation:</strong> ${rotationHTML}</div></div>
+                        <div class="btn-group-vertical btn-group-sm">
+                            <a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a>
+                            <a href="/delete_game/${game.id}" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to delete this game?');"><i class="bi bi-trash"></i> Delete</a>
+                        </div>
+                    </div>
+                </div></li>`;
+        }).join('');
+    }
+
+    function renderPracticePlans() {
+        const container = document.getElementById('practicePlanAccordion');
+        if (!container) return;
+        const plans = (AppState.full_data.practice_plans || []).sort((a,b) => b.date.localeCompare(a.date));
+        if (plans.length === 0) {
+            container.innerHTML = `<div class="text-center p-4 border rounded"><p class="mb-0">No practice plans saved yet. Create one above!</p></div>`;
+            return;
+        }
+        container.innerHTML = plans.map(plan => `
+            <div class="accordion-item" data-plan-id="${plan.id}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#practice-plan-collapse-${plan.id}"><strong>${plan.date}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}</button></h2>
+                <div id="practice-plan-collapse-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body practice-plan">
+                    <form action="/edit_practice_plan/${plan.id}" method="POST" class="row g-3 mb-3 align-items-end">
+                        <div class="col-md-3"><label class="form-label">Date:</label><input type="date" name="plan_date" class="form-control" value="${plan.date}" required></div>
+                        <div class="col-md-7"><label class="form-label">General Notes:</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}" placeholder="General theme or focus"></div>
+                        <div class="col-md-2 d-flex justify-content-end"><button type="submit" class="btn btn-sm btn-primary me-2">Save</button><a href="/delete_practice_plan/${plan.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this practice plan and all its tasks?');">Delete</a></div>
+                    </form><hr><h5>Tasks</h5>
+                    <form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add a new task..." required><button type="submit" class="btn btn-primary">Add Task</button></div></form>
+                    <ul class="list-group task-list">${(plan.tasks || []).map(task => `<li class="list-group-item d-flex justify-content-between align-items-center task-item ${task.status === 'complete' ? 'complete' : ''}" data-task-id="${task.id}" data-plan-id="${plan.id}">
+                        <div class="form-check"><input class="form-check-input task-checkbox" type="checkbox" value="" ${task.status === 'complete' ? 'checked' : ''} id="task-${task.id}"><label class="form-check-label" for="task-${task.id}">${escapeHTML(task.text)}<div class="text-muted small">By ${escapeHTML(task.author)} on ${task.timestamp}</div></label></div>
+                        <a href="/delete_task/${plan.id}/${task.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');"><i class="bi bi-trash"></i></a></li>`).join('') || '<li class="list-group-item text-muted text-center">No tasks for this plan yet.</li>'}</ul>
+                </div></div>
+            </div>`).join('');
+        attachTaskListeners();
+    }
+
+
+    function renderAll() {
+        renderRoster();
+        renderPlayerDevelopment();
+        renderLineups();
+        renderPitchingLog();
+        renderSigns();
+        renderCollaborationNotes();
+        renderScoutingList();
+        renderGames();
+        renderPracticePlans();
+    }
+
+    async function init() {
+        const addGameDateInput = document.getElementById('add_game_date');
+        if (addGameDateInput) {
+            addGameDateInput.valueAsDate = new Date();
+        }
+
+        try {
+            const response = await fetch('/get_app_data');
+            if (!response.ok) throw new Error(`Failed to fetch app data: ${response.statusText}`);
+            AppState = await response.json();
+        } catch (error) {
+            console.error("Initialization Error: Failed to fetch app data.", error);
+            document.body.innerHTML = `<div class="alert alert-danger m-3">Could not load application data. Please try refreshing.</div>`;
+            return;
+        }
+
+        renderAll();
+        lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
+        initializeSortables();
+        setupEventListeners();
+
+        setTimeout(() => {
+            const hash = window.location.hash || '#roster';
+            const tabId = hash.split('?')[0];
+            let targetTabLink = document.querySelector(`a[data-bs-toggle="tab"][href="${tabId}"]`);
+            if (targetTabLink && !targetTabLink.closest('.more-menu-overlay')) {
+                new bootstrap.Tab(targetTabLink).show();
+            } else {
+                 new bootstrap.Tab(document.querySelector('a[data-bs-toggle="tab"]')).show();
+            }
+        }, 100);
+
+        const socket = io();
+        socket.on('data_updated', async (msg) => {
+            console.log('Data update received:', msg.message);
+            
+            const openPlanItem = document.querySelector('#practicePlanAccordion .accordion-collapse.show');
+            const openPlanId = openPlanItem ? openPlanItem.closest('.accordion-item').dataset.planId : null;
+
+            try {
+                const response = await fetch('/get_app_data');
+                AppState = await response.json();
+                
+                renderAll(); 
+
+                if (openPlanId) {
+                    const newCollapseElement = document.getElementById(`practice-plan-collapse-${openPlanId}`);
+                    const newButtonElement = document.querySelector(`button[data-bs-target="#practice-plan-collapse-${openPlanId}"]`);
+                    
+                    if (newCollapseElement && newButtonElement) {
+                        newCollapseElement.classList.add('show');
+                        newButtonElement.classList.remove('collapsed');
+                        newButtonElement.setAttribute('aria-expanded', 'true');
+                    }
+                }
+            } catch (error) {
+                console.error("Error refreshing data:", error);
+            }
+        });
+    }
+
+    function initializeSortables() {
+        Object.values(sortableInstances).forEach(s => { if (s.destroy) s.destroy(); });
+        sortableInstances = {};
+        const createSortable = (id, handleClass) => {
+            const el = document.getElementById(id);
+            if(el) {
+                sortableInstances[id] = new Sortable(el, {
+                    handle: handleClass,
+                    animation: 150,
+                    scroll: true, 
+                    scrollSensitivity: 50,
+                    onEnd: () => {
+                        const newPlayerOrder = Array.from(el.children).map(item => item.dataset.playerName);
+                        AppState.player_order = newPlayerOrder;
+                        fetch('/save_player_order', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ player_order: newPlayerOrder })
+                        });
+                    }
+                });
+            }
+        };
+        createSortable('rosterAccordion', '.drag-handle');
+        createSortable('player-dev-accordion', '.drag-handle');
+    }
+
+
+    function setupEventListeners() {
+        document.getElementById('rosterSearch').addEventListener('input', renderRoster);
+        
+        document.body.addEventListener('submit', async (event) => {
+            if (event.target.classList.contains('add-task-form')) {
+                event.preventDefault(); 
+
+                const form = event.target;
+                const input = form.querySelector('input[name="task_text"]');
+                const button = form.querySelector('button[type="submit"]');
+                const taskText = input.value.trim();
+                const url = form.action;
+
+                if (!taskText) {
+                    alert('Please enter a task.');
+                    return;
+                }
+
+                input.disabled = true;
+                button.disabled = true;
+                button.textContent = 'Adding...';
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ task_text: taskText })
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok) {
+                        throw new Error(result.message || 'An unknown error occurred.');
+                    }
+                    
+                    input.value = '';
+                } catch (error) {
+                    console.error('Failed to add task:', error);
+                    alert(`Error: ${error.message}`);
+                } finally {
+                    input.disabled = false;
+                    button.disabled = false;
+                    button.textContent = 'Add Task';
+                }
+            }
+        });
+
+        document.getElementById('addScoutedPlayerForm')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.target, feedbackEl = document.getElementById('addScoutedPlayerFeedback');
+            const data = Object.fromEntries(new FormData(form).entries());
+            try {
+                const response = await fetch('/add_scouted_player', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message);
+                feedbackEl.innerHTML = `<div class="alert alert-success p-2">${escapeHTML(result.message)}</div>`;
+                form.reset();
+            } catch (error) {
+                feedbackEl.innerHTML = `<div class="alert alert-danger p-2">${escapeHTML(error.message)}</div>`;
+            }
+        });
+        
+        document.body.addEventListener('show.bs.tab', function (event) {
+            const tabPanes = document.querySelectorAll('.tab-content .tab-pane');
+            const targetPaneId = event.target.getAttribute('href');
+            tabPanes.forEach(pane => {
+                if (`#${pane.id}` !== targetPaneId) {
+                    pane.classList.remove('show', 'active');
+                }
+            });
+        });
+
+        const moreMenuButton = document.getElementById('mobile-more-button');
+        const moreMenuOverlay = document.getElementById('more');
+        const moreMenuCloseButton = document.getElementById('more-menu-close-btn');
+
+        if (moreMenuButton && moreMenuOverlay) {
+            const hideMoreMenu = () => moreMenuOverlay.classList.add('hidden');
+            const showMoreMenu = () => {
+                moreMenuOverlay.classList.remove('hidden');
+                document.querySelectorAll('#mobile-nav-tabs .nav-link').forEach(link => link.classList.remove('active'));
+                moreMenuButton.classList.add('active');
+            };
+
+            moreMenuButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                showMoreMenu();
+            });
+            
+            moreMenuCloseButton.addEventListener('click', hideMoreMenu);
+
+            moreMenuOverlay.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', (event) => {
+                    if (!link.hasAttribute('data-bs-toggle')) {
+                         hideMoreMenu();
+                    } else {
+                        setTimeout(hideMoreMenu, 150);
+                    }
+                });
             });
         }
         
-        function handleDelete() {
-            if (!currentRotationId) return;
-            if (confirm(`Are you sure you want to delete the rotation "${titleInput.value}"?`)) {
-                window.location.href = `/delete_rotation/${currentRotationId}`;
-            }
-        }
+        document.body.addEventListener('shown.bs.tab', (event) => {
+            const newTabId = event.target.getAttribute('href');
+            if (history.pushState) history.pushState(null, null, newTabId); else location.hash = newTabId;
 
-        // --- Event Listeners ---
-        addInningBtn.addEventListener('click', addInning);
-        removeInningBtn.addEventListener('click', removeInning);
-        addInningBtnMobile.addEventListener('click', addInning);
-        removeInningBtnMobile.addEventListener('click', removeInning);
-
-        newBtn.addEventListener('click', clearGrid);
-        deleteBtn.addEventListener('click', handleDelete);
-        saveBtn.addEventListener('click', handleSave);
-        
-        loadRotationBtn.addEventListener('click', () => {
-            const selectedId = savedRotationSelect.value;
-            if (!selectedId) {
-                alert("Please select a rotation from the dropdown to load.");
-                return;
+            if (!moreMenuOverlay.classList.contains('hidden') && !event.target.closest('.more-menu-overlay')) {
+                moreMenuOverlay.classList.add('hidden');
             }
-            const rotationData = ALL_SAVED_ROTATIONS.find(r => r.id == selectedId);
-            if (rotationData) {
-                populateGrid(rotationData);
+
+            document.querySelectorAll('#mobile-nav-tabs .nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+
+            const mobileNavLink = document.querySelector(`#mobile-nav-tabs a[href="${newTabId}"]`);
+            if (mobileNavLink) {
+                mobileNavLink.classList.add('active');
             } else {
-                alert("Could not find the selected rotation data.");
-            }
-        });
-
-        // Add a single listener to the parent tab content to handle changes
-        rotationTab.addEventListener('change', e => {
-            if (e.target.tagName === 'SELECT' && e.target.dataset.position) {
-                syncViews(e.target);
-            }
-        });
-
-        // Add a single listener for copy/paste clicks
-        rotationTab.addEventListener('click', e => {
-            const copyBtn = e.target.closest('.copy-inning-btn');
-            const pasteBtn = e.target.closest('.paste-inning-btn');
-
-            if (copyBtn) {
-                const inningRow = copyBtn.closest('[data-inning-number], [data-inning-number-mobile]');
-                const inningNum = inningRow.dataset.inningNumber || inningRow.dataset.inningNumberMobile;
-                
-                copiedInningPlayers = {};
-                document.querySelectorAll(`select[data-inning-number="${inningNum}"]`).forEach(sel => {
-                    if (sel.value) copiedInningPlayers[sel.dataset.position] = sel.value;
-                });
-                alert(`Inning ${inningNum} lineup copied!`);
-            }
-
-            if (pasteBtn) {
-                if (!copiedInningPlayers) {
-                    alert('Please copy an inning lineup first!');
-                    return;
+                if (moreMenuOverlay.querySelector(`a[href="${newTabId}"]`)) {
+                    document.getElementById('mobile-more-button')?.classList.add('active');
                 }
-                const inningRow = pasteBtn.closest('[data-inning-number], [data-inning-number-mobile]');
-                const inningNum = inningRow.dataset.inningNumber || inningRow.dataset.inningNumberMobile;
-
-                // Clear the inning first
-                document.querySelectorAll(`select[data-inning-number="${inningNum}"]`).forEach(sel => sel.value = '');
-
-                // Paste the new players
-                for (const [pos, playerName] of Object.entries(copiedInningPlayers)) {
-                    document.querySelectorAll(`select[data-inning-number="${inningNum}"][data-position="${pos}"]`).forEach(sel => sel.value = playerName);
-                }
-
-                // Update the UI
-                updateInningDropdowns(inningNum);
-                updateSummaries();
-                alert(`Pasted lineup to inning ${inningNum}.`);
             }
         });
 
-        // Initial setup
-        clearGrid();
+        document.body.addEventListener('click', function(event){
+            if(event.target.closest('.edit-sign-btn')) {
+                const signId = parseInt(event.target.closest('.edit-sign-btn').dataset.signId, 10);
+                const sign = AppState.full_data.signs.find(s => s.id === signId);
+                const form = document.getElementById('editSignForm');
+                form.action = `/update_sign/${sign.id}`;
+                form.querySelector('#editSignName').value = sign.name;
+                form.querySelector('#editSignIndicator').value = sign.indicator;
+            }
+        });
+        
+        document.getElementById('lineupEditorModal')?.addEventListener('show.bs.modal', (event) => {
+            const button = event.relatedTarget;
+            const lineupId = button ? button.dataset.lineupId : null;
+            const lineup = lineupId ? AppState.full_data.lineups.find(l => l.id == lineupId) : null;
+            openLineupEditor(lineup);
+        });
+        
+        document.getElementById('editNoteModal')?.addEventListener('show.bs.modal', (e) => {
+            e.target.querySelector('#editNoteId').value = e.relatedTarget.dataset.noteId;
+            e.target.querySelector('#editNoteType').value = e.relatedTarget.dataset.noteType;
+            e.target.querySelector('#editNoteText').value = e.relatedTarget.dataset.noteText;
+        });
+
+        document.getElementById('editFocusModal')?.addEventListener('show.bs.modal', (e) => {
+            const btn = e.relatedTarget;
+            const form = e.target.querySelector('form');
+            form.reset();
+
+            const focusId = btn.dataset.focusId;
+            if (focusId) {
+                e.target.querySelector('.modal-title').textContent = 'Edit Development Focus';
+                form.action = `/update_focus/${focusId}`;
+
+                let focusItem = null;
+                const playerName = btn.dataset.playerName;
+                if (AppState.full_data.player_development[playerName]) {
+                    focusItem = AppState.full_data.player_development[playerName].find(item => item.id == focusId && item.type === 'Development');
+                }
+
+                if (focusItem) {
+                    form.querySelector('#focusSkill').value = focusItem.subtype;
+                    form.querySelector('#focusText').value = focusItem.text.replace(/^(New Focus|Completed): /i, '');
+                    form.querySelector('#focusNotes').value = focusItem.notes || '';
+                }
+            } else {
+                e.target.querySelector('.modal-title').textContent = 'Add Development Focus';
+                form.action = `/add_focus/${encodeURIComponent(btn.dataset.playerName)}`;
+                form.querySelector('#focusSkill').value = btn.dataset.skill;
+            }
+        });
+        
+        document.getElementById('saveLineupBtn')?.addEventListener('click', async () => {
+            const modal = document.getElementById('lineupEditorModal');
+            const id = modal.querySelector('#lineupId').value;
+            const title = modal.querySelector('#lineupTitle').value;
+            if (!title) return alert('Lineup Title is required.');
+            const lineup_data = Array.from(modal.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
+                name: item.dataset.playerName, position: item.querySelector('select')?.value || '' }));
+            const payload = { title, lineup_data, associated_game_id: null };
+            const url = id ? `/edit_lineup/${id}` : '/add_lineup';
+            try {
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if(!response.ok) throw new Error((await response.json()).message);
+                lineupEditorModal.hide();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        });
     }
-    
-    const mainTabsContainer = document.getElementById('mainTabs');
-    const navbarCollapseEl = document.getElementById('navbarResponsive');
-    const bsCollapse = new bootstrap.Collapse(navbarCollapseEl, { toggle: false });
-    mainTabsContainer.addEventListener('shown.bs.tab', () => bsCollapse.hide());
+
+    function openLineupEditor(lineup = null) {
+        const modal = document.getElementById('lineupEditorModal');
+        modal.querySelector('#lineupId').value = lineup ? lineup.id : '';
+        modal.querySelector('#lineupTitle').value = lineup ? lineup.title : 'New Unassigned Lineup';
+        const bench = modal.querySelector('#lineup-bench'), order = modal.querySelector('#lineup-order');
+        bench.innerHTML = '', order.innerHTML = '';
+
+        const lineupPlayerNames = new Set((lineup ? lineup.lineup_positions : []).map(p => p.name));
+        AppState.full_data.roster.forEach(player => {
+            if (!lineupPlayerNames.has(player.name)) {
+                const playerEl = document.createElement('div');
+                playerEl.className = 'list-group-item';
+                playerEl.textContent = player.name;
+                playerEl.dataset.playerName = player.name;
+                bench.appendChild(playerEl);
+            }
+        });
+        const createBattingOrderItem = (player, selectedPosition = null) => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item d-flex justify-content-between align-items-center';
+            item.dataset.playerName = player.name;
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = `${player.name} (#${player.number || 'N/A'})`;
+            item.appendChild(nameSpan);
+            item.insertAdjacentHTML('beforeend', renderPositionSelect('pos', '', selectedPosition || player.position1));
+            return item;
+        };
+        (lineup ? lineup.lineup_positions : []).forEach(spot => {
+            const player = AppState.full_data.roster.find(p => p.name === spot.name);
+            if (player) order.appendChild(createBattingOrderItem(player, spot.position));
+        });
+        if(sortableInstances.unassignedLineupBench) sortableInstances.unassignedLineupBench.destroy();
+        if(sortableInstances.unassignedLineupOrder) sortableInstances.unassignedLineupOrder.destroy();
+        sortableInstances.unassignedLineupBench = new Sortable(bench, { group: 'lineup', animation: 150 });
+        sortableInstances.unassignedLineupOrder = new Sortable(order, { group: 'lineup', animation: 150,
+            onAdd: (evt) => {
+                const player = AppState.full_data.roster.find(p => p.name === evt.item.dataset.playerName);
+                if (player) evt.item.replaceWith(createBattingOrderItem(player));
+            }
+        });
+    };
+
+    init();
 });
 </script>
+
 </body>
 </html>

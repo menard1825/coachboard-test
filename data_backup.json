@@ -1,0 +1,353 @@
+{
+    "users": [
+        {
+            "username": "Mike1825",
+            "password_hash": "scrypt:32768:8:1$oUgMXAo0RQRn7YXq$d12a6062d5647d9fec96dba68357dc477be8671ca10ad3e4a08b44c0a0f37cb8e82c50239bcc3c81fd373656b59057783296eee79e5da8ab83e45d57d0b35186",
+            "role": "Admin",
+            "tab_order": [
+                "scouting_list",
+                "roster",
+                "player_development",
+                "pitching",
+                "games",
+                "practice_plan",
+                "collaboration",
+                "gameday_dropdown"
+            ],
+            "last_login": "2025-07-08 14:08",
+            "player_order": [
+                "Graham Menard",
+                "Reed Evans",
+                "Jack Fordice",
+                "Rylan Wright",
+                "Luke Charles",
+                "Riggins Robinson"
+            ]
+        },
+        {
+            "username": "jvans",
+            "password_hash": "scrypt:32768:8:1$tYvZq00a2cOYQlYU$c786840f76b64f0728dda98092b524a78038d7aeb65b0e713a8dd7d4464aafff7e3f332008a1ff3a093ae66f8388d22d10b7fde153b24f919ccbd003a983915a",
+            "role": "Coach",
+            "tab_order": [
+                "roster",
+                "lineups",
+                "pitching",
+                "scouting_list",
+                "rotations",
+                "games",
+                "collaboration",
+                "practice_plan"
+            ],
+            "last_login": "Never",
+            "player_order": [
+                "Reed Evans",
+                "Jack Fordice",
+                "Rylan Wright",
+                "Luke Charles",
+                "Riggins Robinson",
+                "Graham Menard"
+            ]
+        },
+        {
+            "username": "joe",
+            "password_hash": "pbkdf2:sha256:600000$LEyODOOJG8Zi45cB$09783c828dfe2815d625697ebce2a3aafab56eebf9c1fca14d2d572dcd0d96a0",
+            "role": "Coach",
+            "tab_order": [
+                "roster",
+                "player_development",
+                "games",
+                "gameday_dropdown",
+                "pitching",
+                "practice_plan",
+                "collaboration",
+                "scouting_list"
+            ],
+            "last_login": "2025-07-07 13:43",
+            "player_order": [
+                "Reed Evans",
+                "Jack Fordice",
+                "Rylan Wright",
+                "Luke Charles",
+                "Riggins Robinson",
+                "Graham Menard"
+            ]
+        },
+        {
+            "username": "jwright",
+            "password_hash": "pbkdf2:sha256:600000$OldJxeiVxvjXCeyw$12fab5200d43d212500a34763cfdac5a45895ef5227e38c4c16c462276c70a8f",
+            "role": "Admin",
+            "tab_order": [
+                "roster",
+                "player_development",
+                "games",
+                "gameday_dropdown",
+                "pitching",
+                "practice_plan",
+                "collaboration",
+                "scouting_list"
+            ],
+            "last_login": "Never",
+            "player_order": [
+                "Reed Evans",
+                "Jack Fordice",
+                "Rylan Wright",
+                "Luke Charles",
+                "Riggins Robinson",
+                "Graham Menard"
+            ]
+        }
+    ],
+    "roster": [
+        {
+            "name": "Reed Evans",
+            "number": 5,
+            "position1": "C",
+            "position2": "P",
+            "position3": "3B",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "Solid defensive catcher.",
+            "pitcher_role": "Starter",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        },
+        {
+            "name": "Jack Fordice",
+            "number": 7,
+            "position1": "C",
+            "position2": "RF",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "Mike1825",
+            "notes_timestamp": "2025-07-07 16:17",
+            "position3": ""
+        },
+        {
+            "name": "Rylan Wright",
+            "number": 1,
+            "position1": "3B",
+            "position2": "EH",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "Mike1825",
+            "notes_timestamp": "2025-07-04 17:24"
+        },
+        {
+            "name": "Luke Charles",
+            "number": "",
+            "position1": "C",
+            "position2": "P",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        },
+        {
+            "name": "Riggins Robinson",
+            "number": "",
+            "position1": "2B",
+            "position2": "SS",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        },
+        {
+            "name": "Graham Menard",
+            "number": 3,
+            "position1": "1B",
+            "position2": "RF",
+            "position3": "",
+            "throws": "Left",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Reliever",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "Mike1825",
+            "notes_timestamp": "2025-07-07 19:48"
+        }
+    ],
+    "lineups": [],
+    "pitching": [],
+    "scouting_list": {
+        "committed": [],
+        "targets": [
+            {
+                "name": "Nathan Bishop",
+                "position1": "2B",
+                "position2": "SS",
+                "throws": "Right",
+                "bats": "Right"
+            },
+            {
+                "name": "Leo Christofaro",
+                "position1": "CF",
+                "position2": "LF",
+                "throws": "Right",
+                "bats": "Right"
+            },
+            {
+                "name": "Jack Schumaker",
+                "position1": "2B",
+                "position2": "C",
+                "throws": "Right",
+                "bats": "Right"
+            },
+            {
+                "name": "Will Koch",
+                "position1": "C",
+                "position2": "3B",
+                "throws": "Right",
+                "bats": "Right"
+            }
+        ],
+        "not_interested": []
+    },
+    "rotations": [
+        {
+            "id": 1751945601488,
+            "title": "vs Nitro Gold (2025-07-10)",
+            "innings": {
+                "1": {
+                    "C": "Luke Charles",
+                    "1B": "Graham Menard",
+                    "P": "Reed Evans",
+                    "3B": "Rylan Wright",
+                    "2B": "Riggins Robinson",
+                    "SS": "Jack Fordice"
+                },
+                "2": {
+                    "C": "Luke Charles",
+                    "1B": "Graham Menard",
+                    "P": "Reed Evans",
+                    "3B": "Rylan Wright",
+                    "2B": "Riggins Robinson",
+                    "SS": "Jack Fordice"
+                },
+                "3": {
+                    "C": "Luke Charles",
+                    "1B": "Graham Menard",
+                    "P": "Reed Evans",
+                    "3B": "Rylan Wright",
+                    "2B": "Riggins Robinson",
+                    "SS": "Jack Fordice"
+                },
+                "4": {
+                    "C": "Luke Charles",
+                    "1B": "Graham Menard",
+                    "P": "Reed Evans",
+                    "3B": "Rylan Wright",
+                    "2B": "Riggins Robinson",
+                    "SS": "Jack Fordice"
+                },
+                "5": {
+                    "C": "Luke Charles",
+                    "1B": "Graham Menard",
+                    "P": "Reed Evans",
+                    "3B": "Rylan Wright",
+                    "2B": "Riggins Robinson",
+                    "SS": "Jack Fordice"
+                },
+                "6": {
+                    "C": "Luke Charles",
+                    "1B": "Graham Menard",
+                    "P": "Reed Evans",
+                    "3B": "Rylan Wright",
+                    "2B": "Riggins Robinson",
+                    "SS": "Jack Fordice"
+                }
+            },
+            "associated_game_id": 1751945436327
+        }
+    ],
+    "games": [
+        {
+            "id": 1751945408383,
+            "date": "2025-07-08",
+            "opponent": "Westfield gold",
+            "location": "Grand park",
+            "game_notes": "Blue uniform",
+            "associated_lineup_title": "",
+            "associated_rotation_date": ""
+        },
+        {
+            "id": 1751945436327,
+            "date": "2025-07-10",
+            "opponent": "Nitro Gold",
+            "location": "Grand park",
+            "game_notes": "White uniform",
+            "associated_lineup_title": "",
+            "associated_rotation_date": ""
+        }
+    ],
+    "feedback": [],
+    "settings": {
+        "registration_code": "Westfield"
+    },
+    "collaboration_notes": {
+        "player_notes": [],
+        "team_notes": []
+    },
+    "practice_plans": [],
+    "player_development": {
+        "Reed Evans": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Jack Fordice": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Rylan Wright": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Luke Charles": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Riggins Robinson": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Graham Menard": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        }
+    },
+    "signs": []
+}

@@ -1,0 +1,122 @@
+/* Shared application styles */
+body {
+    background-color: #f9f9f9;
+    /* Add space at the bottom for mobile nav bars */
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+}
+
+.navbar-brand img { height: 40px; margin-right: 10px; }
+.btn-primary { background-color: #c8102e; border-color: #c8102e; }
+.btn-outline-danger { border-color: #c8102e; color: #c8102e; }
+.btn-outline-danger:hover { background-color: #c8102e; color: white; }
+.drag-handle { cursor: move; }
+.accordion-button:not(.collapsed) { background-color: #fcebeb; color: #c8102e; }
+
+/* Interactive Diamond Styles */
+.diamond-container-interactive {
+    position: relative;
+    max-width: 500px;
+    margin: 20px auto;
+    background-image: url('/static/diamond.jpg');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    aspect-ratio: 1 / 1;
+}
+
+.position-dropzone {
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.7);
+    border: 2px dashed #c8102e;
+    color: #c8102e;
+    padding: 5px;
+    border-radius: 8px;
+    font-weight: bold;
+    text-align: center;
+    width: 110px;
+    min-height: 55px;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.d-lg-none .position-dropzone { cursor: pointer; }
+.position-dropzone.sortable-ghost { background-color: #fcebeb; }
+.position-dropzone .pos-abbr { font-size: 0.75rem; display: block; margin-bottom: 3px; }
+
+.player-tag {
+    background-color: #c8102e;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: grab;
+    width: 100%;
+    text-align: center;
+    border: 1px solid #a30e25;
+    margin-top: 2px;
+}
+
+.d-lg-none .player-tag { cursor: pointer; }
+.bench-list .player-tag { background-color: #6c757d; border-color: #5c636a; }
+
+/* Position coordinates for the diamond */
+.pos-P  { top: 52%; left: 50%; }
+.pos-C  { top: 83%; left: 50%; }
+.pos-1B { top: 52%; left: 78%; }
+.pos-2B { top: 33%; left: 65%; }
+.pos-3B { top: 52%; left: 22%; }
+.pos-SS { top: 33%; left: 35%; }
+.pos-LF { top: 15%; left: 15%; }
+.pos-CF { top: 8%;  left: 50%; }
+.pos-RF { top: 15%; left: 85%; }
+
+/* Inning selector styles */
+#inning-btn-group .btn-check:checked+.btn-outline-primary {
+    background-color: #c8102e;
+    border-color: #c8102e;
+    color: white;
+}
+.copy-mode #inning-btn-group,
+.copy-mode #copyInningBtn,
+.copy-mode .d-flex.gap-2 {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Lineup Editor styles */
+#lineup-editor-lists { min-height: 400px; }
+#lineup-bench .list-group-item, #lineup-order .list-group-item { cursor: grab; }
+#lineup-order { counter-reset: batting-order; }
+#lineup-order .list-group-item { position: relative; padding-left: 35px !important; }
+#lineup-order .list-group-item::before {
+    counter-increment: batting-order;
+    content: counter(batting-order) ".";
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-weight: bold;
+    color: #6c757d;
+}
+
+/* --- NEW: Styles for the Mobile "More" Menu Overlay --- */
+.more-menu-overlay {
+  position: fixed; /* Keeps it in place during scroll */
+  bottom: calc(65px + env(safe-area-inset-bottom)); /* Positions it right above the nav bar */
+  left: 0;
+  right: 0;
+  z-index: 1030; /* Sits on top of page content */
+  background-color: #f9f9f9; /* Matches your body background color */
+  border-top: 1px solid #dee2e6;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+  padding: 1rem;
+}
+
+/* This class will be toggled by JavaScript to show/hide the menu */
+.more-menu-overlay.hidden {
+  display: none;
+}

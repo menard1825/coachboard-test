@@ -28,37 +28,46 @@
     <div class="card-body">
       <h5 class="card-title">Create New User</h5>
       <p>Manually create a new user account and assign them a role.</p>
-      <form method="POST" action="{{ url_for('add_user') }}" class="row g-3">
-        <div class="col-12 col-md-4">
+      <form method="POST" action="{{ url_for('add_user') }}" class="row g-3 align-items-end">
+        <div class="col-12 col-md-3">
           <label for="username" class="form-label">Username</label>
           <input type="text" class="form-control" id="username" name="username" required>
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
+          <label for="full_name" class="form-label">Full Name</label>
+          <input type="text" class="form-control" id="full_name" name="full_name" placeholder="e.g., John Doe">
+        </div>
+        <div class="col-12 col-md-3">
           <label for="password" class="form-label">Initial Password</label>
           <input type="password" class="form-control" id="password" name="password" required>
         </div>
-        <div class="col-12 col-md-2">
+        <div class="col-12 col-md-2 col-lg-2">
           <label for="role" class="form-label">Role</label>
           <select name="role" id="role" class="form-select">
-            <option value="Coach" selected>Coach</option>
-            <option value="Admin">Head Coach</option>
+            <option value="Assistant Coach" selected>Assistant Coach</option>
+            <option value="Game Changer">Game Changer</option>
+            <option value="Head Coach">Head Coach</option>
+            {% if session.role == 'Super Admin' %}
+            <option value="Super Admin">Super Admin</option>
+            {% endif %}
           </select>
         </div>
-        <div class="col-12 col-md-2 d-flex align-items-end">
-          <button type="submit" class="btn btn-primary w-100">Create User</button>
+        <div class="col-12 col-md-1 col-lg-1">
+          <button type="submit" class="btn btn-primary w-100">Create</button>
         </div>
       </form>
     </div>
   </div>
 
   <div class="table-responsive">
-    <table class="table table-striped">
+    <table class="table table-striped align-middle">
         <thead>
             <tr>
                 <th>Username</th>
+                <th>Full Name</th>
                 <th>Role</th>
                 <th>Last Login</th>
-                <th>Actions</th>
+                <th style="width: 35%;">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -66,25 +75,40 @@
             <tr>
                 <td>{{ user.username }}</td>
                 <td>
-                    {% if user.username == 'Mike1825' %}
-                        <span class="badge bg-success">Super Admin</span>
+                    <form action="{{ url_for('update_user_details', username=user.username) }}" method="POST" class="d-inline-flex align-items-center gap-2">
+                        <input type="text" name="full_name" class="form-control form-control-sm" value="{{ user.full_name or '' }}" placeholder="Full Name">
+                        <button type="submit" class="btn btn-sm btn-outline-success" title="Save Name"><i class="bi bi-check-lg"></i></button>
+                    </form>
+                </td>
+                <td>
+                    {% if user.role == 'Super Admin' %}
+                        <span class="badge bg-danger">Super Admin</span>
+                    {% elif user.role == 'Head Coach' %}
+                        <span class="badge bg-success">Head Coach</span>
+                    {% elif user.role == 'Assistant Coach' %}
+                        <span class="badge bg-info text-dark">Assistant Coach</span>
+                    {% elif user.role == 'Game Changer' %}
+                        <span class="badge bg-secondary">Game Changer</span>
                     {% else %}
-                        <form action="{{ url_for('change_user_role', username=user.username) }}" method="POST" class="d-inline">
-                            <select name="role" class="form-select form-select-sm" onchange="this.form.submit()" style="max-width: 150px;">
-                                <option value="Coach" {% if user.role == 'Coach' %}selected{% endif %}>Coach</option>
-                                <option value="Admin" {% if user.role == 'Admin' %}selected{% endif %}>Head Coach</option>
-                            </select>
-                        </form>
+                        <span class="badge bg-light text-dark">{{ user.role }}</span>
                     {% endif %}
                 </td>
-                <td>{{ user.get('last_login', 'Never') }}</td>
+                <td>{{ user.last_login or 'Never' }}</td>
                 <td>
-                    {% if user.username != 'Mike1825' %}
-                    <form action="{{ url_for('reset_password', username=user.username) }}" method="POST" class="d-inline me-2">
-                        <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Are you sure you want to reset the password for this user?');">Reset Password</button>
+                    <form action="{{ url_for('change_user_role', username=user.username) }}" method="POST" class="d-inline me-2">
+                        <select name="role" class="form-select form-select-sm" onchange="this.form.submit()" style="max-width: 180px;" {% if user.username.lower() == 'mike1825' %}disabled{% endif %}>
+                            <option value="Assistant Coach" {% if user.role == 'Assistant Coach' %}selected{% endif %}>Assistant Coach</option>
+                            <option value="Game Changer" {% if user.role == 'Game Changer' %}selected{% endif %}>Game Changer</option>
+                            <option value="Head Coach" {% if user.role == 'Head Coach' %}selected{% endif %}>Head Coach</option>
+                            {% if session.role == 'Super Admin' %}
+                            <option value="Super Admin" {% if user.role == 'Super Admin' %}selected{% endif %}>Super Admin</option>
+                            {% endif %}
+                        </select>
                     </form>
-                    <a href="{{ url_for('delete_user', username=user.username) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this user?');">Delete</a>
-                    {% endif %}
+                    <form action="{{ url_for('reset_password', username=user.username) }}" method="POST" class="d-inline me-2">
+                        <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Are you sure you want to reset the password for this user?');" {% if user.username.lower() == 'mike1825' %}disabled{% endif %}>Reset Password</button>
+                    </form>
+                    <a href="{{ url_for('delete_user', username=user.username) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this user?');" {% if user.username.lower() == 'mike1825' %}disabled{% endif %}>Delete</a>
                 </td>
             </tr>
             {% endfor %}
