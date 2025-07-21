@@ -17,6 +17,7 @@ from models import ( # Import all necessary models
 from sqlalchemy import create_engine
 from sqlalchemy.inspection import inspect as sqlalchemy_inspect
 from flask_socketio import SocketIO, emit # ADDED: Flask-SocketIO imports
+import uuid # ADDED: For unique registration codes
 
 app = Flask(__name__)
 app.secret_key = 'xXxG#fjs72d_!z921!kJjkjsd123kfj3FJ!*kfdjf8s!jf9jKJJJd' # IMPORTANT: Change this to a strong, random key in production
@@ -121,6 +122,101 @@ def logout():
     session.clear()
     flash('You were successfully logged out.', 'success')
     return redirect(url_for('login'))
+
+# --- NEW REGISTRATION ROUTE ---
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        db = SessionLocal()
+        try:
+            username = request.form.get('username')
+            full_name = request.form.get('full_name')
+            password = request.form.get('password')
+            team_option = request.form.get('team_option')
+
+            # Basic validation
+            if not all([username, full_name, password, team_option]):
+                flash('All fields are required.', 'danger')
+                return redirect(url_for('register'))
+            if len(password) < 4:
+                flash('Password must be at least 4 characters long.', 'danger')
+                return redirect(url_for('register'))
+            if db.query(User).filter(func.lower(User.username) == func.lower(username)).first():
+                flash('That username is already taken. Please choose another.', 'danger')
+                return redirect(url_for('register'))
+
+            team_id = None
+            user_role = None
+
+            if team_option == 'create':
+                team_name = request.form.get('team_name')
+                if not team_name:
+                    flash('Team Name is required when creating a new team.', 'danger')
+                    return redirect(url_for('register'))
+                
+                # Create new Team
+                new_team = Team(
+                    team_name=team_name,
+                    registration_code=str(uuid.uuid4()).split('-')[-1] # Short, unique code
+                )
+                db.add(new_team)
+                db.flush() # Flush to get the new team's ID
+                team_id = new_team.id
+                user_role = 'Head Coach' # The creator of a team is the Head Coach
+                print(f"New team created: {team_name} with code {new_team.registration_code}")
+
+            elif team_option == 'join':
+                reg_code = request.form.get('registration_code')
+                if not reg_code:
+                    flash('Registration Code is required to join a team.', 'danger')
+                    return redirect(url_for('register'))
+                
+                team = db.query(Team).filter_by(registration_code=reg_code).first()
+                if not team:
+                    flash('Invalid Registration Code.', 'danger')
+                    return redirect(url_for('register'))
+                
+                team_id = team.id
+                user_role = 'Assistant Coach' # Default role for joining users
+
+            # If we have a team_id, create the user
+            if team_id:
+                hashed_password = generate_password_hash(password)
+                default_tab_keys = ['roster', 'player_development', 'games', 'pitching', 'practice_plan', 'collaboration']
+                
+                new_user = User(
+                    username=username,
+                    full_name=full_name,
+                    password_hash=hashed_password,
+                    role=user_role,
+                    team_id=team_id,
+                    tab_order=json.dumps(default_tab_keys),
+                    player_order=json.dumps([])
+                )
+                db.add(new_user)
+                db.commit()
+
+                # Log the new user in automatically
+                session['logged_in'] = True
+                session['username'] = new_user.username
+                session['full_name'] = new_user.full_name
+                session['role'] = new_user.role
+                session['team_id'] = new_user.team_id
+                session['player_order'] = []
+                session.permanent = True
+                
+                flash('Registration successful! Welcome.', 'success')
+                return redirect(url_for('home'))
+
+        except Exception as e:
+            db.rollback()
+            print(f"Registration Error: {e}")
+            flash('An error occurred during registration. Please try again.', 'danger')
+        finally:
+            db.close()
+            
+    return render_template('register.html')
+
 
 @app.route('/change_password', methods=['GET', 'POST'])
 @login_required
