@@ -19,7 +19,7 @@ from sqlalchemy.inspection import inspect as sqlalchemy_inspect
 from flask_socketio import SocketIO, emit # ADDED: Flask-SocketIO imports
 
 app = Flask(__name__)
-app.secret_key = 'your_super_secret_key_here' # IMPORTANT: Change this to a strong, random key in production
+app.secret_key = 'xXxG#fjs72d_!z921!kJjkjsd123kfj3FJ!*kfdjf8s!jf9jKJJJd' # IMPORTANT: Change this to a strong, random key in production
 
 # Set the permanent session lifetime to 30 days
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
@@ -1978,4 +1978,4 @@ def edit_practice_plan(plan_id):
 if __name__ == '__main__':
     # Run a check to ensure the database is set up before starting the app.
     check_database_initialized()
-    socketio.run(app, host='0.0.0.0', port=5001, debug=True) # CHANGED: Use socketio.run()
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False) # CHANGED: Use socketio.run()

@@ -1,0 +1,214 @@
+{
+    "users": [
+        {
+            "username": "admin",
+            "password_hash": "pbkdf2:sha256:600000$LEyODOOJG8Zi45cB$09783c828dfe2815d625697ebce2a3aafab56eebf9c1fca14d2d572dcd0d96a0",
+            "role": "Admin",
+            "tab_order": [
+                "scouting_list",
+                "roster",
+                "player_development",
+                "pitching",
+                "games",
+                "practice_plan",
+                "collaboration",
+                "gameday_dropdown"
+            ],
+            "last_login": "Never",
+            "player_order": [
+                "Graham Menard",
+                "Rylan Wright",
+                "Jack Fordice",
+                "Reed Evans",
+                "Luke Charles"
+            ]
+        },
+        {
+            "username": "mike1825",
+            "password_hash": "pbkdf2:sha256:600000$khHjCJgK6JeRZpcL$e926f9be6591f20af9eaabcd974091396b156120c5a51c76c6f3ea41ea086db7",
+            "role": "Admin",
+            "tab_order": [
+                "roster",
+                "player_development",
+                "games",
+                "gameday_dropdown",
+                "pitching",
+                "practice_plan",
+                "collaboration",
+                "scouting_list"
+            ],
+            "last_login": "Never",
+            "player_order": [
+                "Graham Menard",
+                "Rylan Wright",
+                "Jack Fordice",
+                "Reed Evans",
+                "Luke Charles"
+            ]
+        }
+    ],
+    "roster": [
+        {
+            "name": "Graham Menard",
+            "number": "",
+            "position1": "1B",
+            "position2": "LF",
+            "position3": "",
+            "throws": "Left",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        },
+        {
+            "name": "Rylan Wright",
+            "number": "",
+            "position1": "3B",
+            "position2": "DH",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        },
+        {
+            "name": "Jack Fordice",
+            "number": "",
+            "position1": "C",
+            "position2": "LF",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        },
+        {
+            "name": "Reed Evans",
+            "number": "",
+            "position1": "3B",
+            "position2": "SS",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        },
+        {
+            "name": "Luke Charles",
+            "number": "",
+            "position1": "C",
+            "position2": "3B",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": "",
+            "notes_author": "N/A",
+            "notes_timestamp": ""
+        }
+    ],
+    "lineups": [],
+    "pitching": [],
+    "scouting_list": {
+        "committed": [],
+        "targets": [],
+        "not_interested": []
+    },
+    "rotations": [
+        {
+            "id": 1751987488109,
+            "title": "New Rotation",
+            "innings": {
+                "1": {
+                    "1B": "Graham Menard",
+                    "C": "Luke Charles",
+                    "3B": "Rylan Wright",
+                    "P": "Reed Evans",
+                    "2B": "Jack Fordice"
+                },
+                "2": {
+                    "1B": "Graham Menard",
+                    "C": "Luke Charles",
+                    "3B": "Rylan Wright",
+                    "P": "Reed Evans",
+                    "2B": "Jack Fordice"
+                },
+                "3": {
+                    "1B": "Graham Menard",
+                    "C": "Luke Charles",
+                    "3B": "Rylan Wright",
+                    "P": "Reed Evans",
+                    "2B": "Jack Fordice"
+                },
+                "4": {
+                    "1B": "Graham Menard",
+                    "C": "Luke Charles",
+                    "3B": "Rylan Wright",
+                    "P": "Reed Evans",
+                    "2B": "Jack Fordice"
+                }
+            },
+            "associated_game_id": null
+        }
+    ],
+    "games": [],
+    "feedback": [],
+    "settings": {
+        "registration_code": "Westfield"
+    },
+    "collaboration_notes": {
+        "player_notes": [],
+        "team_notes": []
+    },
+    "practice_plans": [],
+    "player_development": {
+        "Graham Menard": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Rylan Wright": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Jack Fordice": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Reed Evans": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        },
+        "Luke Charles": {
+            "hitting": [],
+            "pitching": [],
+            "fielding": [],
+            "baserunning": []
+        }
+    },
+    "signs": []
+}

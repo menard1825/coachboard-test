@@ -1,14 +1,19 @@
-# Ignore Python cache and virtual environments
-__pycache__/
-*.pyc
+# Python virtual environments
 venv/
 venv-staging/
 
-# Ignore database and log files
-*.db
-*.log
+# Python cache
+__pycache__/
+*.pyc
 
-# Ignore backup and local environment files
-*.json
+# Environment variables / secrets
 .env
-.env.*
+
+# OS junk
+.DS_Store
+
+# IDE/project files
+.vscode/
+.idea/
+*.swp
+team-coach-app-test/
