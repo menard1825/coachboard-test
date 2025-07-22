@@ -9,15 +9,15 @@ from sqlalchemy import func
 import random
 import string
 import math # FIXED: Import math library for data cleaning
-from db import SessionLocal 
-from models import ( 
+from db import SessionLocal
+from models import (
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
     Rotation, Game, CollaborationNote, PracticePlan, PracticeTask,
     PlayerDevelopmentFocus, Sign
 )
 from sqlalchemy import create_engine
 from sqlalchemy.inspection import inspect as sqlalchemy_inspect
-from sqlalchemy.orm import joinedload 
+from sqlalchemy.orm import joinedload
 from flask_socketio import SocketIO, emit
 import uuid
 # ADDED: New import for file handling
@@ -103,6 +103,12 @@ def inject_team_info():
             db.close()
     return {}
 
+# --- Favicon Route ---
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'logo.png', mimetype='image/png')
+
 # --- AUTHENTICATION ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -113,7 +119,7 @@ def login():
             password = request.form['password']
 
             user = db.query(User).filter(func.lower(User.username) == func.lower(username)).first()
-            
+
             if user and check_password_hash(user.password_hash, password):
                 if user.username.lower() == 'mike1825':
                     user.role = 'Super Admin'
@@ -121,7 +127,7 @@ def login():
                     user.role = 'Head Coach'
                 elif user.role == 'Coach':
                     user.role = 'Assistant Coach'
-                
+
                 user.last_login = datetime.now().strftime("%Y-%m-%d %H:%M")
                 db.commit()
 
@@ -167,7 +173,7 @@ def register():
             if db.query(User).filter(func.lower(User.username) == func.lower(username)).first():
                 flash('That username is already taken. Please choose another.', 'danger')
                 return redirect(url_for('register'))
-            
+
             team = db.query(Team).filter_by(registration_code=reg_code).first()
             if not team:
                 flash('Invalid Registration Code.', 'danger')
@@ -178,7 +184,7 @@ def register():
 
             hashed_password = generate_password_hash(password)
             default_tab_keys = ['roster', 'player_development', 'games', 'pitching', 'practice_plan', 'collaboration']
-            
+
             new_user = User(
                 username=username,
                 full_name=full_name,
@@ -198,7 +204,7 @@ def register():
             session['team_id'] = new_user.team_id
             session['player_order'] = []
             session.permanent = True
-            
+
             flash(f'Registration successful! You have joined team "{team.team_name}". Welcome.', 'success')
             return redirect(url_for('home'))
 
@@ -208,7 +214,7 @@ def register():
             flash('An error occurred during registration. Please try again.', 'danger')
         finally:
             db.close()
-            
+
     registration_code = request.args.get('code', '')
     return render_template('register.html', registration_code=registration_code)
 
@@ -222,9 +228,9 @@ def change_password():
             current_password = request.form.get('current_password')
             new_password = request.form.get('new_password')
             confirm_new_password = request.form.get('confirm_new_password')
-            
+
             user = db.query(User).filter_by(username=session['username']).first()
-            
+
             if not user or not check_password_hash(user.password_hash, current_password):
                 flash('Your current password was incorrect.', 'danger')
                 return redirect(url_for('change_password'))
@@ -234,10 +240,10 @@ def change_password():
             if len(new_password) < 4:
                 flash('New password must be at least 4 characters long.', 'danger')
                 return redirect(url_for('change_password'))
-            
+
             user.password_hash = generate_password_hash(new_password)
             db.commit()
-            
+
             flash('Your password has been updated successfully!', 'success')
             return redirect(url_for('home'))
         return render_template('change_password.html')
@@ -306,14 +312,14 @@ def home():
             return redirect(url_for('login'))
 
         team_id = user.team_id
-        
+
         all_users = db.query(User).filter_by(team_id=team_id).all()
         user_name_map = {u.username: (u.full_name or u.username) for u in all_users}
         display_full_names = user.team.display_coach_names
         def get_display_name(username):
             if not username or username == 'N/A': return 'N/A'
             return user_name_map.get(username, username) if display_full_names else username
-        
+
         roster_players = db.query(Player).filter_by(team_id=team_id).all()
         lineups = db.query(Lineup).filter_by(team_id=team_id).all()
         pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
@@ -340,9 +346,9 @@ def home():
                     log_entries.append({'type': 'Coach Note', 'subtype': 'Player Log', 'date': ts_str, 'timestamp': note.timestamp or '1970-01-01 00:00', 'text': note.text, 'notes': None, 'author': get_display_name(note.author), 'status': 'active', 'id': note.id})
             if player.has_lessons == 'Yes' and player.lesson_focus:
                  log_entries.append({'type': 'Lessons', 'subtype': 'Private Instruction', 'date': player.notes_timestamp.split(' ')[0] if player.notes_timestamp else 'N/A', 'timestamp': player.notes_timestamp or '1970-01-01 00:00', 'text': f"Lesson Focus: {player.lesson_focus}", 'notes': None, 'author': 'N/A', 'status': 'active', 'id': player.id})
-            
+
             player_activity_log[player.name] = sorted(log_entries, key=lambda x: x['timestamp'], reverse=True)
-        
+
         # FIXED: Sanitize pitching data to prevent JSON errors with non-finite numbers
         clean_pitching_outings = []
         for po in pitching_outings:
@@ -350,8 +356,8 @@ def home():
             if not math.isfinite(innings):
                 innings = 0.0
             clean_pitching_outings.append({
-                "id": po.id, "date": po.date, "pitcher": po.pitcher, 
-                "opponent": po.opponent, "pitches": po.pitches, "innings": innings, 
+                "id": po.id, "date": po.date, "pitcher": po.pitcher,
+                "opponent": po.opponent, "pitches": po.pitches, "innings": innings,
                 "pitcher_type": po.pitcher_type, "outing_type": po.outing_type
             })
 
@@ -375,7 +381,7 @@ def home():
             "player_development": player_activity_log,
             "signs": [{"id": s.id, "name": s.name, "indicator": s.indicator} for s in signs]
         }
-        
+
         all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs'}
         default_tab_keys = list(all_tabs.keys())
         user_tab_order = json.loads(user.tab_order or "[]") if user.tab_order else default_tab_keys
@@ -395,7 +401,7 @@ def home():
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
             pitch_count_summary[name] = {**counts, **availability}
-        
+
         current_team = db.query(Team).filter_by(id=session['team_id']).first()
         return render_template('index.html', data=app_data, session=session, tab_order=user_tab_order, all_tabs=all_tabs, position_counts=position_counts, pitch_count_summary=pitch_count_summary, current_team=current_team)
     finally:
@@ -424,7 +430,7 @@ def get_app_data():
         def get_display_name(username):
             if not username or username == 'N/A': return 'N/A'
             return user_name_map.get(username, username) if display_full_names else username
-        
+
         roster_players = db.query(Player).filter_by(team_id=team_id).all()
         lineups = db.query(Lineup).filter_by(team_id=team_id).all()
         pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
@@ -437,7 +443,7 @@ def get_app_data():
         collaboration_team_notes = db.query(CollaborationNote).filter_by(team_id=team_id, note_type='team_notes').all()
         practice_plans = db.query(PracticePlan).filter_by(team_id=team_id).order_by(PracticePlan.date.desc()).all()
         signs = db.query(Sign).filter_by(team_id=team_id).all()
-        
+
         player_activity_log = {}
         for player in roster_players:
             log_entries = []
@@ -451,7 +457,7 @@ def get_app_data():
                     log_entries.append({'type': 'Coach Note', 'subtype': 'Player Log', 'date': ts_str, 'timestamp': note.timestamp or '1970-01-01 00:00', 'text': note.text, 'notes': None, 'author': get_display_name(note.author), 'status': 'active', 'id': note.id})
             if player.has_lessons == 'Yes' and player.lesson_focus:
                  log_entries.append({'type': 'Lessons', 'subtype': 'Private Instruction', 'date': player.notes_timestamp.split(' ')[0] if player.notes_timestamp else 'N/A', 'timestamp': player.notes_timestamp or '1970-01-01 00:00', 'text': f"Lesson Focus: {player.lesson_focus}", 'notes': None, 'author': 'N/A', 'status': 'active', 'id': player.id})
-            
+
             player_activity_log[player.name] = sorted(log_entries, key=lambda x: x['timestamp'], reverse=True)
 
         # FIXED: Sanitize pitching data to prevent JSON errors with non-finite numbers
@@ -461,8 +467,8 @@ def get_app_data():
             if not math.isfinite(innings):
                 innings = 0.0
             clean_pitching_outings.append({
-                "id": po.id, "date": po.date, "pitcher": po.pitcher, 
-                "opponent": po.opponent, "pitches": po.pitches, "innings": innings, 
+                "id": po.id, "date": po.date, "pitcher": po.pitcher,
+                "opponent": po.opponent, "pitches": po.pitches, "innings": innings,
                 "pitcher_type": po.pitcher_type, "outing_type": po.outing_type
             })
 
@@ -486,16 +492,16 @@ def get_app_data():
             'player_development': player_activity_log,
             'signs': [{"id": s.id, "name": s.name, "indicator": s.indicator} for s in signs]
         }
-        
+
         player_order = session.get('player_order', [p['name'] for p in app_data.get('roster', [])])
-        
+
         pitcher_names = sorted(list(set(po['pitcher'] for po in clean_pitching_outings if po['pitcher'])))
         pitch_count_summary = {}
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
             pitch_count_summary[name] = {**counts, **availability}
-        
+
         app_data_response = {'full_data': app_data, 'player_order': player_order, 'session': {'username': session.get('username'), 'role': session.get('role'), 'full_name': session.get('full_name')}, 'pitch_count_summary': pitch_count_summary}
         return jsonify(app_data_response)
     finally:
@@ -522,13 +528,13 @@ def save_tab_order():
 def user_management():
     db = SessionLocal()
     try:
-        teams = [] 
+        teams = []
         if session.get('role') == 'Super Admin':
             users = db.query(User).options(joinedload(User.team)).all()
-            teams = db.query(Team).options(joinedload(Team.users)).order_by(Team.team_name).all() 
+            teams = db.query(Team).options(joinedload(Team.users)).order_by(Team.team_name).all()
         else:
             users = db.query(User).filter_by(team_id=session['team_id']).options(joinedload(User.team)).all()
-        
+
         return render_template('user_management.html', users=users, teams=teams, session=session)
     finally:
         db.close()
@@ -560,47 +566,47 @@ def add_user():
         if db.query(User).filter(func.lower(User.username) == func.lower(username)).first():
             flash('Username already exists.', 'danger')
             return redirect(url_for('user_management'))
-        
+
         if role == 'Super Admin' and session.get('role') != 'Super Admin':
             flash('Only a Super Admin can create another Super Admin.', 'danger')
             return redirect(url_for('user_management'))
-        
+
         hashed_password = generate_password_hash(password)
         default_tab_keys = ['roster', 'lineups', 'pitching', 'scouting_list', 'rotations', 'games', 'collaboration', 'practice_plan']
-        
+
         new_user = User(
-            username=username, 
-            full_name=full_name, 
-            password_hash=hashed_password, 
-            role=role, 
-            tab_order=json.dumps(default_tab_keys), 
-            last_login='Never', 
+            username=username,
+            full_name=full_name,
+            password_hash=hashed_password,
+            role=role,
+            tab_order=json.dumps(default_tab_keys),
+            last_login='Never',
             team_id=team_id_for_new_user  # Use the determined team ID
         )
         db.add(new_user)
         db.commit()
-        
+
         team_name = db.query(Team).filter_by(id=team_id_for_new_user).first().team_name
         flash(f"User '{username}' created successfully for team '{team_name}'.", 'success')
         socketio.emit('data_updated', {'message': 'A new user was added.'})
         return redirect(url_for('user_management'))
     finally:
         db.close()
-    
+
 @app.route('/admin/create_team', methods=['POST'])
 @login_required
 def create_team():
     if session.get('role') != 'Super Admin':
         flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('user_management'))
-    
+
     db = SessionLocal()
     try:
         team_name = request.form.get('team_name')
         if not team_name:
             flash('Team Name is required.', 'danger')
             return redirect(url_for('user_management'))
-        
+
         if db.query(Team).filter(func.lower(Team.team_name) == func.lower(team_name)).first():
             flash(f'A team with the name "{team_name}" already exists.', 'danger')
             return redirect(url_for('user_management'))
@@ -634,7 +640,7 @@ def delete_team(team_id):
         if not team_to_delete:
             flash('Team not found.', 'danger')
             return redirect(url_for('user_management'))
-        
+
         if team_to_delete.id == session.get('team_id'):
             flash('You cannot delete your own active team.', 'danger')
             return redirect(url_for('user_management'))
@@ -672,11 +678,11 @@ def update_admin_settings():
         if not team_settings:
             flash('Team settings not found.', 'danger')
             return redirect(url_for('admin_settings'))
-        
+
         team_settings.team_name = request.form.get('team_name', team_settings.team_name)
         team_settings.display_coach_names = 'display_coach_names' in request.form
         db.commit()
-        
+
         flash('General settings updated successfully!', 'success')
         socketio.emit('data_updated', {'message': 'Team settings updated.'})
         return redirect(url_for('admin_settings'))
@@ -696,7 +702,7 @@ def upload_logo():
         if 'logo' not in request.files:
             flash('No file part in the request.', 'danger')
             return redirect(url_for('admin_settings'))
-        
+
         file = request.files['logo']
         if file.filename == '':
             flash('No selected file.', 'danger')
@@ -707,24 +713,24 @@ def upload_logo():
             unique_id = uuid.uuid4().hex
             file_ext = filename.rsplit('.', 1)[1].lower()
             new_filename = f"{team.id}_{unique_id}.{file_ext}"
-            
+
             if team.logo_path:
                 old_logo_path = os.path.join(app.config['UPLOAD_FOLDER'], team.logo_path)
                 if os.path.exists(old_logo_path):
                     os.remove(old_logo_path)
-            
+
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            
+
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
             file.save(file_path)
             team.logo_path = new_filename
             db.commit()
-            
+
             flash('Team logo uploaded successfully!', 'success')
             socketio.emit('data_updated', {'message': 'Team logo updated.'})
         else:
             flash('Invalid file type. Allowed types are: png, jpg, jpeg, gif, svg.', 'danger')
-            
+
         return redirect(url_for('admin_settings'))
     finally:
         db.close()
@@ -863,7 +869,7 @@ def add_focus(player_name):
         player = db.query(Player).filter_by(name=player_name, team_id=session['team_id']).first()
         skill = request.form.get('skill')
         focus_text = request.form.get('focus_text')
-        
+
         if not all([player, skill, focus_text]):
             flash('Skill, focus text, and valid player are required.', 'danger')
             return redirect(url_for('home', _anchor='player_development'))
@@ -891,7 +897,7 @@ def update_focus(focus_id):
         if not focus_item or focus_item.team_id != session['team_id']:
             flash('Focus item not found or you do not have permission to edit.', 'danger')
             return redirect(url_for('home', _anchor='player_development'))
-        
+
         focus_item.focus = request.form.get('focus_text', focus_item.focus)
         focus_item.notes = request.form.get('notes', focus_item.notes)
         focus_item.last_edited_by = session['username']
@@ -912,7 +918,7 @@ def complete_focus(focus_id):
         if not focus_item or focus_item.team_id != session['team_id']:
             flash('Focus item not found or you do not have permission.', 'danger')
             return redirect(url_for('home', _anchor='player_development'))
-        
+
         focus_item.status = 'completed'
         focus_item.completed_date = date.today().strftime('%Y-%m-%d')
         db.commit()
@@ -986,7 +992,7 @@ def add_player():
         if not name:
             flash('Player name is required.', 'danger')
             return redirect(url_for('home', _anchor='roster'))
-        
+
         existing_player = db.query(Player).filter_by(name=name, team_id=session['team_id']).first()
         if existing_player:
             flash(f'A player with the name "{name}" already exists on this roster.', 'danger')
@@ -1008,14 +1014,14 @@ def add_player():
             team_id=session['team_id']
         )
         db.add(new_player)
-        
+
         # Add the new player to the end of the ordering for all users on the team
         for user_obj in db.query(User).filter_by(team_id=session['team_id']).all():
             current_order = json.loads(user_obj.player_order or "[]")
             if new_player.name not in current_order:
                 current_order.append(new_player.name)
                 user_obj.player_order = json.dumps(current_order)
-        
+
         db.commit()
         flash(f'Player "{name}" added successfully!', 'success')
         socketio.emit('data_updated', {'message': f'Player {name} added.'})
@@ -1039,7 +1045,7 @@ def update_player_inline(player_id):
         new_name = request.form.get('name', original_name)
         if new_name != original_name and db.query(Player).filter_by(name=new_name, team_id=session['team_id']).first():
             return jsonify({'status': 'error', 'message': f'Player name "{new_name}" already exists.'}), 400
-        
+
         player_to_edit.name = new_name
         player_to_edit.number = request.form.get('number', player_to_edit.number)
         player_to_edit.position1 = request.form.get('position1', player_to_edit.position1)
@@ -1079,7 +1085,7 @@ def delete_player(player_id):
                 user_obj.player_order = json.dumps(updated_order)
             if 'player_order' in session:
                 session['player_order'] = [name for name in session['player_order'] if name != player_name]
-                session.modified = True 
+                session.modified = True
             db.commit()
             flash(f'Player "{player_name}" removed successfully!', 'success')
             socketio.emit('data_updated', {'message': f'Player {player_name} deleted.'})
@@ -1101,7 +1107,7 @@ def add_pitching():
         except ValueError:
             flash('Pitch count and innings must be valid numbers.', 'danger')
             return redirect(url_for('home', _anchor='pitching'))
-        
+
         new_outing = PitchingOuting(
             date=request.form['pitch_date'], pitcher=request.form['pitcher'], opponent=request.form['opponent'],
             pitches=pitch_count, innings=innings_pitched, pitcher_type=request.form.get('pitcher_type', 'Starter'),
@@ -1552,14 +1558,14 @@ def move_scouted_player_to_roster(player_id):
                 user_obj.player_order = json.dumps(current_order)
         if 'player_order' in session and new_roster_player.name not in session['player_order']:
             session['player_order'].append(new_roster_player.name)
-            session.modified = True 
+            session.modified = True
         db.commit()
         flash(f'Player "{new_roster_player.name}" moved to Roster. Please assign a number.', 'success')
         socketio.emit('data_updated', {'message': f'Scouted player {new_roster_player.name} moved to roster.'})
         return redirect(url_for('home', _anchor='scouting_list'))
     finally:
         db.close()
-    
+
 # --- Game and Lineup Routes ---
 @app.route('/add_game', methods=['POST'])
 @login_required
@@ -1777,4 +1783,4 @@ def edit_practice_plan(plan_id):
 
 if __name__ == '__main__':
     check_database_initialized()
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5002, debug=False)

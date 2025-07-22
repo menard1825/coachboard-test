@@ -18,9 +18,9 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <style>
-    {# MODIFIED: Added overscroll-behavior to prevent "bouncing" on scroll #}
     body {
-        padding-bottom: 120px;
+        /* MODIFIED: Set a single, consistent padding value for mobile view. */
+        padding-bottom: 100px;
         overscroll-behavior-y: contain;
     }
     .navbar-brand .brand-text { font-size: 1.25rem; white-space: nowrap; }
@@ -32,52 +32,6 @@
     .practice-plan { border-left: 3px solid #c8102e; }
     .task-item.complete { text-decoration: line-through; opacity: 0.6; }
 
-    .bottom-nav {
-        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
-        box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-    }
-    .bottom-nav .nav-link {
-        font-size: 0.75rem;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 0.5rem 0;
-        border-top: 3px solid transparent;
-        flex: 1; 
-    }
-    .bottom-nav .nav-link i { font-size: 1.7rem; margin-bottom: 2px; }
-    .bottom-nav .nav-link.active { 
-        color: #c8102e; 
-        border-top: 3px solid #c8102e;
-    }
-    
-    .more-menu-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(248, 249, 250, 0.98); 
-        z-index: 1040; 
-        padding: 20px;
-        overflow-y: auto;
-        transition: opacity 0.3s ease-in-out;
-    }
-    .more-menu-overlay.hidden {
-        opacity: 0;
-        pointer-events: none;
-    }
-    .more-menu-close-btn {
-        position: absolute;
-        top: 15px;
-        right: 20px;
-        font-size: 2rem;
-        color: #6c757d;
-        cursor: pointer;
-        line-height: 1;
-    }
-
     /* Desktop Nav Bar */
     .navbar-nav .nav-link.active {
       background-color: #c8102e;
@@ -88,7 +42,6 @@
     .navbar-nav .nav-link:hover { color: #c8102e; }
     .navbar-nav .nav-link.active:hover { color: white; }
 
-    {# MODIFIED: Added styles for sortable table headers #}
     .sortable-header {
         cursor: pointer;
     }
@@ -106,7 +59,7 @@
         #navbarResponsive { display: flex; align-items: center; width: 100%; }
         .tab-content > .tab-pane { display: none; }
         .tab-content > .tab-pane.active { display: block; }
-        body { padding-bottom: 0; } 
+        body { padding-bottom: 0; }
     }
 
     @media (max-width: 991.98px) {
@@ -362,14 +315,29 @@
 </div>
 
 
-<nav class="navbar fixed-bottom bg-light border-top d-lg-none bottom-nav">
-  <div class="container-fluid d-flex justify-content-around nav nav-tabs" id="mobile-nav-tabs" role="tablist">
-    <a class="nav-link text-center" data-bs-toggle="tab" href="#roster" role="tab"><i class="bi bi-people-fill"></i>Roster</a>
-    <a class="nav-link text-center" data-bs-toggle="tab" href="#player_development" role="tab"><i class="bi bi-graph-up-arrow"></i>Development</a>
-    <a class="nav-link text-center" data-bs-toggle="tab" href="#games" role="tab"><i class="bi bi-calendar-event"></i>Games</a>
-    <a class="nav-link text-center" data-bs-toggle="tab" href="#practice_plan" role="tab"><i class="bi bi-clipboard-check"></i>Practice</a>
-    <a class="nav-link text-center" id="mobile-more-button" href="#"><i class="bi bi-three-dots"></i>More</a>
-  </div>
+<nav class="navbar fixed-bottom bg-light d-lg-none">
+    <div class="bottom-nav" role="tablist">
+        <a class="nav-item active" data-bs-toggle="tab" href="#roster" role="tab">
+            <i class="bi bi-people-fill"></i>
+            <span class="nav-label">Roster</span>
+        </a>
+        <a class="nav-item" data-bs-toggle="tab" href="#player_development" role="tab">
+            <i class="bi bi-graph-up-arrow"></i>
+            <span class="nav-label">Development</span>
+        </a>
+        <a class="nav-item" data-bs-toggle="tab" href="#games" role="tab">
+            <i class="bi bi-calendar-event"></i>
+            <span class="nav-label">Games</span>
+        </a>
+        <a class="nav-item" data-bs-toggle="tab" href="#practice_plan" role="tab">
+            <i class="bi bi-clipboard-check"></i>
+            <span class="nav-label">Practice</span>
+        </a>
+        <a class="nav-item" id="mobile-more-button" href="#">
+            <i class="bi bi-three-dots"></i>
+            <span class="nav-label">More</span>
+        </a>
+    </div>
 </nav>
 
 {# MODIFIED: Added a comprehensive set of modals for player management #}
@@ -529,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
         player_order: [],
         session: {},
         pitch_count_summary: {},
-        roster_sort: { key: 'name', order: 'asc' } // MODIFIED: Added state for sorting
+        roster_sort: { key: 'name', order: 'asc' }
     };
     let sortableInstances = {};
     let lineupEditorModal, editPlayerModal, confirmDeleteModal;
@@ -577,24 +545,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // MODIFIED: This function is completely overhauled for the new table layout with sorting.
     function renderRoster() {
         const container = document.getElementById('rosterContainer');
         const searchTerm = document.getElementById('rosterSearch').value.toLowerCase();
         if (!container) return;
 
-        // Sort the roster data before rendering
         const sortedRoster = [...AppState.full_data.roster].sort((a, b) => {
             const key = AppState.roster_sort.key;
             const order = AppState.roster_sort.order;
-            
+
             let valA = a[key];
             let valB = b[key];
 
             if (key === 'number') {
                 valA = parseInt(a.number || '9999', 10);
                 valB = parseInt(b.number || '9999', 10);
-            } else { // name sorting
+            } else {
                 valA = (a.name || '').toLowerCase();
                 valB = (b.name || '').toLowerCase();
             }
@@ -632,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
             visiblePlayerCount++;
             const pNameSafe = escapeHTML(p.name);
             const positions = [p.position1, p.position2, p.position3].filter(Boolean).join(', ');
-            
+
             tableHTML += `
                 <tr data-player-id="${p.id}">
                     <td><strong>${pNameSafe}</strong></td>
@@ -647,7 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         tableHTML += `</tbody></table>`;
-        
+
         if (visiblePlayerCount === 0) {
             container.innerHTML = `<div class="p-3 text-center text-muted">No players found.</div>`;
         } else {
@@ -693,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!p) return;
             const activityLog = playerDevData[p.name] || [];
             const pNameSafe = escapeHTML(p.name);
-            
+
             html += `
             <div class="accordion-item" data-player-name="${pNameSafe}">
                 <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-dev-${p.id}"><i class="bi bi-grip-vertical me-2 drag-handle"></i><strong>${pNameSafe}</strong></button></h2>
@@ -738,7 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('lineupsAccordion');
         if (!container) return;
         const lineups = AppState.full_data.lineups.filter(l => !l.associated_game_id) || [];
-        
+
         if (lineups.length === 0) {
             container.innerHTML = `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned lineups saved yet.</p></div>`;
         } else {
@@ -928,7 +894,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/get_app_data');
             if (!response.ok) throw new Error(`Failed to fetch app data: ${response.statusText}`);
-            // MODIFIED: Merge server data into AppState instead of overwriting it
             const serverData = await response.json();
             Object.assign(AppState, serverData);
         } catch (error) {
@@ -938,7 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderAll();
-        // MODIFIED: Initialize all new modals
+
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
         editPlayerModal = new bootstrap.Modal(document.getElementById('editPlayerModal'));
         confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
@@ -949,33 +914,33 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             const hash = window.location.hash || '#roster';
             const tabId = hash.split('?')[0];
-            let targetTabLink = document.querySelector(`a[data-bs-toggle="tab"][href="${tabId}"]`);
-            if (targetTabLink && !targetTabLink.closest('.more-menu-overlay')) {
+            let targetTabLink = document.querySelector(`.nav-item[href="${tabId}"], .nav-link[href="${tabId}"]`);
+            if (!targetTabLink) {
+                 targetTabLink = document.querySelector('a[data-bs-toggle="tab"]');
+            }
+             if (targetTabLink) {
                 new bootstrap.Tab(targetTabLink).show();
-            } else {
-                 new bootstrap.Tab(document.querySelector('a[data-bs-toggle="tab"]')).show();
             }
         }, 100);
 
         const socket = io();
         socket.on('data_updated', async (msg) => {
             console.log('Data update received:', msg.message);
-            
+
             const openPlanItem = document.querySelector('#practicePlanAccordion .accordion-collapse.show');
             const openPlanId = openPlanItem ? openPlanItem.closest('.accordion-item').dataset.planId : null;
 
             try {
                 const response = await fetch('/get_app_data');
-                // MODIFIED: Merge server data into AppState instead of overwriting it
                 const serverData = await response.json();
                 Object.assign(AppState, serverData);
-                
-                renderAll(); 
+
+                renderAll();
 
                 if (openPlanId) {
                     const newCollapseElement = document.getElementById(`practice-plan-collapse-${openPlanId}`);
                     const newButtonElement = document.querySelector(`button[data-bs-target="#practice-plan-collapse-${openPlanId}"]`);
-                    
+
                     if (newCollapseElement && newButtonElement) {
                         newCollapseElement.classList.add('show');
                         newButtonElement.classList.remove('collapsed');
@@ -997,7 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sortableInstances[id] = new Sortable(el, {
                     handle: handleClass,
                     animation: 150,
-                    scroll: true, 
+                    scroll: true,
                     scrollSensitivity: 50,
                     onEnd: () => {
                         const newPlayerOrder = Array.from(el.children).map(item => item.dataset.playerName);
@@ -1014,10 +979,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // MODIFIED: Added all new event listeners for modals, sorting, and forms
     function setupEventListeners() {
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
-        
+
         document.body.addEventListener('click', (event) => {
             const sortHeader = event.target.closest('.sortable-header');
             if (sortHeader) {
@@ -1063,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modalPlayerName.textContent = playerName;
             confirmButton.href = `/delete_player/${playerId}?active_tab=#roster`;
         });
-        
+
         document.getElementById('editPlayerForm').addEventListener('submit', async (event) => {
             event.preventDefault();
             const form = event.target;
@@ -1078,7 +1042,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.message);
-                editPlayerModal.hide();
+                var editModal = bootstrap.Modal.getInstance(document.getElementById('editPlayerModal'));
+                editModal.hide();
             } catch(error) {
                 alert(`Error saving player: ${error.message}`);
             } finally {
@@ -1087,29 +1052,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Add an event listener for the Add Player form submission to use AJAX
         document.getElementById('addPlayerForm').addEventListener('submit', async (event) => {
             event.preventDefault();
             const form = event.target;
             const addButton = form.querySelector('button[type="submit"]');
             addButton.disabled = true;
             addButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';
-            
+
             try {
                 const response = await fetch(form.action, {
                     method: 'POST',
                     body: new FormData(form)
                 });
                 if (!response.ok) {
-                    // We expect a redirect on success, so only errors will be handled here
                     const errorData = await response.json();
                     throw new Error(errorData.message);
                 }
-                // Since the backend does a redirect, we can just reload the page to see the changes.
-                // The socket.io event will handle this automatically for other clients.
-                // For this client, we can manually hide the modal.
-                const addPlayerModal = bootstrap.Modal.getInstance(document.getElementById('addPlayerModal'));
-                addPlayerModal.hide();
+                var addModal = bootstrap.Modal.getInstance(document.getElementById('addPlayerModal'));
+                addModal.hide();
                 form.reset();
             } catch(error) {
                 alert(`Error adding player: ${error.message}`);
@@ -1122,7 +1082,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.body.addEventListener('submit', async (event) => {
             if (event.target.classList.contains('add-task-form')) {
-                event.preventDefault(); 
+                event.preventDefault();
                 const form = event.target;
                 const input = form.querySelector('input[name="task_text"]');
                 const button = form.querySelector('button[type="submit"]');
@@ -1149,7 +1109,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!response.ok) {
                         throw new Error(result.message || 'An unknown error occurred.');
                     }
-                    
+
                     input.value = '';
                 } catch (error) {
                     console.error('Failed to add task:', error);
@@ -1178,66 +1138,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 feedbackEl.innerHTML = `<div class="alert alert-danger p-2">${escapeHTML(error.message)}</div>`;
             }
         });
-        
-        document.body.addEventListener('show.bs.tab', function (event) {
-            const tabPanes = document.querySelectorAll('.tab-content .tab-pane');
-            const targetPaneId = event.target.getAttribute('href');
-            tabPanes.forEach(pane => {
-                if (`#${pane.id}` !== targetPaneId) {
-                    pane.classList.remove('show', 'active');
-                }
-            });
-        });
 
         const moreMenuButton = document.getElementById('mobile-more-button');
         const moreMenuOverlay = document.getElementById('more');
         const moreMenuCloseButton = document.getElementById('more-menu-close-btn');
+        const bottomNavItems = document.querySelectorAll('.bottom-nav .nav-item');
 
         if (moreMenuButton && moreMenuOverlay) {
             const hideMoreMenu = () => moreMenuOverlay.classList.add('hidden');
-            const showMoreMenu = () => {
+            const showMoreMenu = (event) => {
+                event.preventDefault();
                 moreMenuOverlay.classList.remove('hidden');
-                document.querySelectorAll('#mobile-nav-tabs .nav-link').forEach(link => link.classList.remove('active'));
-                moreMenuButton.classList.add('active');
             };
 
-            moreMenuButton.addEventListener('click', (event) => {
-                event.preventDefault();
-                showMoreMenu();
-            });
-            
+            moreMenuButton.addEventListener('click', showMoreMenu);
             moreMenuCloseButton.addEventListener('click', hideMoreMenu);
 
             moreMenuOverlay.querySelectorAll('a').forEach(link => {
-                link.addEventListener('click', (event) => {
-                    if (!link.hasAttribute('data-bs-toggle')) {
-                         hideMoreMenu();
-                    } else {
-                        setTimeout(hideMoreMenu, 150);
-                    }
-                });
+                link.addEventListener('click', () => setTimeout(hideMoreMenu, 150));
             });
         }
-        
+
         document.body.addEventListener('shown.bs.tab', (event) => {
             const newTabId = event.target.getAttribute('href');
-            if (history.pushState) history.pushState(null, null, newTabId); else location.hash = newTabId;
+            if (history.pushState) {
+                history.pushState(null, null, newTabId);
+            } else {
+                location.hash = newTabId;
+            }
 
             if (!moreMenuOverlay.classList.contains('hidden') && !event.target.closest('.more-menu-overlay')) {
                 moreMenuOverlay.classList.add('hidden');
             }
 
-            document.querySelectorAll('#mobile-nav-tabs .nav-link').forEach(link => {
-                link.classList.remove('active');
+            bottomNavItems.forEach(link => {
+                const isActive = link.getAttribute('href') === newTabId;
+                link.classList.toggle('active', isActive);
             });
 
-            const mobileNavLink = document.querySelector(`#mobile-nav-tabs a[href="${newTabId}"]`);
-            if (mobileNavLink) {
-                mobileNavLink.classList.add('active');
-            } else {
-                if (moreMenuOverlay.querySelector(`a[href="${newTabId}"]`)) {
-                    document.getElementById('mobile-more-button')?.classList.add('active');
-                }
+            const moreMenuLink = moreMenuOverlay.querySelector(`a[data-bs-toggle="tab"][href="${newTabId}"]`);
+            if (moreMenuLink) {
+                moreMenuButton.classList.add('active');
+            } else if (moreMenuButton.getAttribute('href') !== newTabId) {
+                moreMenuButton.classList.remove('active');
             }
         });
 
@@ -1251,14 +1194,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 form.querySelector('#editSignIndicator').value = sign.indicator;
             }
         });
-        
+
         document.getElementById('lineupEditorModal')?.addEventListener('show.bs.modal', (event) => {
             const button = event.relatedTarget;
             const lineupId = button ? button.dataset.lineupId : null;
             const lineup = lineupId ? AppState.full_data.lineups.find(l => l.id == lineupId) : null;
             openLineupEditor(lineup);
         });
-        
+
         document.getElementById('editNoteModal')?.addEventListener('show.bs.modal', (e) => {
             e.target.querySelector('#editNoteId').value = e.relatedTarget.dataset.noteId;
             e.target.querySelector('#editNoteType').value = e.relatedTarget.dataset.noteType;
@@ -1292,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 form.querySelector('#focusSkill').value = btn.dataset.skill;
             }
         });
-        
+
         document.getElementById('saveLineupBtn')?.addEventListener('click', async () => {
             const modal = document.getElementById('lineupEditorModal');
             const id = modal.querySelector('#lineupId').value;
@@ -1305,7 +1248,8 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if(!response.ok) throw new Error((await response.json()).message);
-                lineupEditorModal.hide();
+                var lineupModal = bootstrap.Modal.getInstance(document.getElementById('lineupEditorModal'));
+                lineupModal.hide();
             } catch (error) {
                 alert(`Error: ${error.message}`);
             }
