@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Cumulative Stats{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <h2 class="mb-4">Cumulative Player Statistics</h2>
+
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Cumulative Pitching Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Pitcher</th>
+                                    <th>Total Innings Pitched</th>
+                                    <th>Total Pitches Thrown</th>
+                                    <th>Appearances</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for player in roster_players %}
+                                    {% if player.pitcher_role != 'Not a Pitcher' %}
+                                        {% set stats = cumulative_pitching_data.get(player.name, {'total_innings_pitched': 0, 'total_pitches_thrown': 0, 'appearances': 0}) %}
+                                        <tr>
+                                            <td><strong>{{ player.name }}</strong></td>
+                                            <td>{{ stats.total_innings_pitched }}</td>
+                                            <td>{{ stats.total_pitches_thrown }}</td>
+                                            <td>{{ stats.appearances }}</td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Cumulative Games Played by Position</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Player</th>
+                                    {# Dynamically generate position headers based on all positions found #}
+                                    {% set all_positions = [] %}
+                                    {% for player_name, positions in cumulative_position_data.items() %}
+                                        {% for pos in positions.keys() %}
+                                            {% if pos not in all_positions %}{% set _ = all_positions.append(pos) %}{% endif %}
+                                        {% endfor %}
+                                    {% endfor %}
+                                    {% set all_positions = all_positions|sort %}
+                                    {% for pos in all_positions %}
+                                        <th>{{ pos }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for player in roster_players %}
+                                    <tr>
+                                        <td><strong>{{ player.name }}</strong></td>
+                                        {% set player_positions = cumulative_position_data.get(player.name, {}) %}
+                                        {% for pos in all_positions %}
+                                            <td>{{ player_positions.get(pos, 0) }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-muted mt-3">
+                        * "Games Played by Position" counts the number of games a player appeared in a lineup at that specific position.
+                        It does not reflect actual innings played at that position within a game.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

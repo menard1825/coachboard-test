@@ -300,6 +300,67 @@ def calculate_pitch_counts(pitcher_name, all_outings):
             except (ValueError, TypeError): continue
     return counts
 
+def calculate_cumulative_pitching_stats(pitcher_name, all_outings):
+    """
+    Calculates cumulative pitching statistics for a given pitcher.
+    Args:
+        pitcher_name (str): The name of the pitcher.
+        all_outings (list): A list of all PitchingOuting objects.
+    Returns:
+        dict: A dictionary containing total innings pitched, total pitches thrown, and appearances.
+    """
+    total_innings = 0.0
+    total_pitches = 0
+    appearances = 0
+
+    for outing in all_outings:
+        if outing.pitcher == pitcher_name:
+            try:
+                # Ensure innings are treated as float and pitches as int
+                innings = float(outing.innings) if outing.innings is not None else 0.0
+                pitches = int(outing.pitches) if outing.pitches is not None else 0
+
+                total_innings += innings
+                total_pitches += pitches
+                appearances += 1
+            except (ValueError, TypeError):
+                # Handle cases where data might be malformed, skip the outing
+                continue
+    return {
+        'total_innings_pitched': round(total_innings, 1), # Round to 1 decimal place for display
+        'total_pitches_thrown': total_pitches,
+        'appearances': appearances
+    }
+
+def calculate_cumulative_position_stats(roster_players, lineups):
+    """
+    Calculates cumulative games played at each position for all players.
+    Args:
+        roster_players (list): List of Player objects.
+        lineups (list): List of Lineup objects.
+    Returns:
+        dict: A dictionary where keys are player names and values are
+              dictionaries of positions and counts (games played at that position).
+    """
+    player_position_stats = {}
+    for player in roster_players:
+        player_position_stats[player.name] = {}
+
+    for lineup in lineups:
+        try:
+            lineup_positions = json.loads(lineup.lineup_positions or "[]")
+            for item in lineup_positions:
+                player_name = item.get('name')
+                position = item.get('position')
+                if player_name and position:
+                    if player_name in player_position_stats:
+                        player_position_stats[player_name][position] = player_position_stats[player_name].get(position, 0) + 1
+        except json.JSONDecodeError:
+            # Handle cases where lineup_positions might be malformed JSON
+            continue
+    return player_position_stats
+
+
 # --- MAIN AND ADMIN ROUTES ---
 @app.route('/')
 @login_required
@@ -400,8 +461,9 @@ def home():
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
-            pitch_count_summary[name] = {**counts, **availability}
-
+            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings) # NEW
+            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats} # MERGED NEW
+            
         current_team = db.query(Team).filter_by(id=session['team_id']).first()
         return render_template('index.html', data=app_data, session=session, tab_order=user_tab_order, all_tabs=all_tabs, position_counts=position_counts, pitch_count_summary=pitch_count_summary, current_team=current_team)
     finally:
@@ -500,10 +562,39 @@ def get_app_data():
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
-            pitch_count_summary[name] = {**counts, **availability}
+            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings) # NEW
+            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats} # MERGED NEW
 
         app_data_response = {'full_data': app_data, 'player_order': player_order, 'session': {'username': session.get('username'), 'role': session.get('role'), 'full_name': session.get('full_name')}, 'pitch_count_summary': pitch_count_summary}
         return jsonify(app_data_response)
+    finally:
+        db.close()
+
+# NEW ROUTE: Cumulative Stats Page
+@app.route('/stats')
+@login_required
+def stats_page():
+    db = SessionLocal()
+    try:
+        team_id = session['team_id']
+        roster_players = db.query(Player).filter_by(team_id=team_id).all()
+        lineups = db.query(Lineup).filter_by(team_id=team_id).all()
+        pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
+
+        # Calculate cumulative pitching stats for all pitchers
+        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
+        cumulative_pitching_data = {}
+        for name in pitcher_names:
+            cumulative_pitching_data[name] = calculate_cumulative_pitching_stats(name, pitching_outings)
+
+        # Calculate cumulative position stats for all players
+        cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
+
+        return render_template('stats.html',
+                               roster_players=roster_players,
+                               cumulative_pitching_data=cumulative_pitching_data,
+                               cumulative_position_data=cumulative_position_data,
+                               session=session)
     finally:
         db.close()
 
@@ -1710,7 +1801,8 @@ def game_management(game_id):
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
-            pitch_count_summary[name] = {**counts, **availability}
+            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings) # NEW
+            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats} # MERGED NEW
         game_pitching_log = [p for p in pitching_outings if p.opponent == game.opponent and p.date == game.date]
         return render_template('game_management.html', game=game_dict, roster=roster_list, lineup=lineup_dict, rotation=rotation_dict, pitch_count_summary=pitch_count_summary, game_pitching_log=game_pitching_log, session=session)
     finally:

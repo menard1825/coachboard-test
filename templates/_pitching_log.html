@@ -66,9 +66,19 @@
                 </ul>
             </div>
              <div class="card-footer">
-                <h6 class="card-title mb-2">Pitcher Availability Status</h6>
+                <h6 class="card-title mb-2">Pitcher Availability & Cumulative Stats</h6> {# MODIFIED TITLE #}
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered">
+                        <thead> {# ADDED TABLE HEAD #}
+                            <tr>
+                                <th>Pitcher</th>
+                                <th>Status</th>
+                                <th>Next Available</th>
+                                <th>Total IP</th> {# ADDED COLUMN #}
+                                <th>Total Pitches</th> {# ADDED COLUMN #}
+                                <th>Appearances</th> {# ADDED COLUMN #}
+                            </tr>
+                        </thead>
                         <tbody>
                         {% for p in roster %}
                             {% if p.pitcher_role != 'Not a Pitcher' %}
@@ -82,7 +92,10 @@
                                         <span class="badge bg-danger">Resting</span>
                                     {% endif %}
                                 </td>
-                                <td>Next Available: {{ summary.next_available }}</td>
+                                <td>{{ summary.next_available }}</td>
+                                <td>{{ summary.total_innings_pitched }}</td> {# DISPLAY CUMULATIVE STAT #}
+                                <td>{{ summary.total_pitches_thrown }}</td> {# DISPLAY CUMULATIVE STAT #}
+                                <td>{{ summary.appearances }}</td> {# DISPLAY CUMULATIVE STAT #}
                             </tr>
                             {% endif %}
                         {% endfor %}
