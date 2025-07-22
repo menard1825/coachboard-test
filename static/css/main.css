@@ -102,45 +102,18 @@ body {
     color: #6c757d;
 }
 
-/* --- NEW: Styles for the Mobile "More" Menu Overlay --- */
-.more-menu-overlay {
-  position: fixed; /* Keeps it in place during scroll */
-  bottom: calc(85px + env(safe-area-inset-bottom));
-  left: 0;
-  right: 0;
-  z-index: 1030; /* Sits on top of page content */
-  background-color: #f9f9f9; /* Matches your body background color */
-  border-top: 1px solid #dee2e6;
-  box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
-  padding: 1rem;
-}
-
-/* This class will be toggled by JavaScript to show/hide the menu */
-.more-menu-overlay.hidden {
-  display: none;
-}
-
-/* ADDED: Styles for the close button within the new menu */
-.more-menu-close-btn {
-    position: absolute;
-    top: 10px;
-    right: 15px;
-    font-size: 1.5rem;
-    color: #6c757d;
-    cursor: pointer;
-    line-height: 1;
-}
+/* REMOVED: Styles for the pop-up more menu are no longer needed */
 
 
-/* --- NEW: Enhanced Mobile Bottom Bar Styles --- */
+/* --- Enhanced Mobile Bottom Bar Styles --- */
 .bottom-nav {
-    width: 100%; /* ADDED: Ensure the container fills the navbar */
-    height: calc(85px + env(safe-area-inset-bottom)); /* Increased height for easier tapping */
-    padding-bottom: env(safe-area-inset-bottom); /* Respects safe area on mobile */
+    width: 100%;
+    height: calc(85px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
     background-color: #ffffff;
     border-top: 1px solid #dee2e6;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.1); /* Floating effect */
-    border-radius: 15px 15px 0 0; /* Modern rounded top corners */
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    border-radius: 15px 15px 0 0;
     display: flex;
     justify-content: space-around;
     align-items: center;
@@ -154,41 +127,48 @@ body {
     align-items: center;
     text-align: center;
     text-decoration: none;
-    color: #495057; /* Darker default color for better readability */
+    color: #495057;
     font-weight: 500;
     position: relative;
     transition: color 0.2s ease-in-out, transform 0.1s ease;
 }
 
 .bottom-nav .nav-item i {
-    font-size: 1.8rem; /* Larger icons */
+    font-size: 1.8rem;
     margin-bottom: 4px;
 }
 
 .bottom-nav .nav-item .nav-label {
-    font-size: 0.8rem; /* Slightly larger text */
+    font-size: 0.8rem;
 }
 
 .bottom-nav .nav-item:active {
-    transform: scale(0.95); /* Pronounced tap feedback */
+    transform: scale(0.95);
 }
 
-/* The "pill" effect for the active link */
 .bottom-nav .nav-item.active {
-    color: #c8102e; /* Highlight color */
+    color: #c8102e;
     font-weight: 700;
 }
 
-.bottom-nav .nav-item.active::before {
+/* MODIFIED: Added transition and default state for the "egg" animation */
+.bottom-nav .nav-item::before {
     content: '';
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
-    width: 85%; /* More pronounced width */
-    height: 70%; /* More pronounced height */
-    background-color: #fcebeb; /* Light red for the pill background */
-    border-radius: 20px; /* Rounded pill shape */
+    transform: translate(-50%, -50%) scale(0.9);
+    width: 85%;
+    height: 70%;
+    background-color: #fcebeb;
+    border-radius: 20px;
     z-index: -1;
-    transition: all 0.3s ease;
+    opacity: 0;
+    transition: all 0.2s ease-in-out;
+}
+
+/* MODIFIED: Added active state for the "egg" animation */
+.bottom-nav .nav-item.active::before {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
 }

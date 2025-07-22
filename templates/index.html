@@ -19,7 +19,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <style>
     body {
-        /* MODIFIED: Set a single, consistent padding value for mobile view. */
         padding-bottom: 100px;
         overscroll-behavior-y: contain;
     }
@@ -31,6 +30,33 @@
     @media (max-width: 480px) { .navbar-brand .brand-text { font-size: 0.9rem; } }
     .practice-plan { border-left: 3px solid #c8102e; }
     .task-item.complete { text-decoration: line-through; opacity: 0.6; }
+
+    /* ADDED: Full-screen modal styles for the "More" menu */
+    .more-menu-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(248, 249, 250, 0.98);
+        z-index: 1040;
+        padding: 20px;
+        overflow-y: auto;
+        transition: opacity 0.3s ease-in-out;
+    }
+    .more-menu-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+    .more-menu-close-btn {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        font-size: 2rem;
+        color: #6c757d;
+        cursor: pointer;
+        line-height: 1;
+    }
 
     /* Desktop Nav Bar */
     .navbar-nav .nav-link.active {
@@ -57,15 +83,18 @@
 
     @media (min-width: 992px) {
         #navbarResponsive { display: flex; align-items: center; width: 100%; }
-        .tab-content > .tab-pane { display: none; }
-        .tab-content > .tab-pane.active { display: block; }
         body { padding-bottom: 0; }
     }
 
     @media (max-width: 991.98px) {
         #mainTabsDesktop .drag-handle { display: none; }
-        .tab-content > .tab-pane { display: none; }
-        .tab-content > .tab-pane.active { display: block; }
+    }
+    /* IMPORTANT: Ensure only one tab pane is visible at a time */
+    .tab-content > .tab-pane {
+        display: none;
+    }
+    .tab-content > .tab-pane.active {
+        display: block;
     }
   </style>
 </head>
@@ -317,30 +346,29 @@
 
 <nav class="navbar fixed-bottom bg-light d-lg-none">
     <div class="bottom-nav" role="tablist">
-        <a class="nav-item active" data-bs-toggle="tab" href="#roster" role="tab">
+        <a class="nav-item active" data-bs-toggle="tab" href="#roster" role="tab" data-icon-inactive="bi bi-people" data-icon-active="bi bi-people-fill">
             <i class="bi bi-people-fill"></i>
             <span class="nav-label">Roster</span>
         </a>
-        <a class="nav-item" data-bs-toggle="tab" href="#player_development" role="tab">
+        <a class="nav-item" data-bs-toggle="tab" href="#player_development" role="tab" data-icon-inactive="bi bi-graph-up-arrow" data-icon-active="bi bi-graph-up-arrow">
             <i class="bi bi-graph-up-arrow"></i>
             <span class="nav-label">Development</span>
         </a>
-        <a class="nav-item" data-bs-toggle="tab" href="#games" role="tab">
+        <a class="nav-item" data-bs-toggle="tab" href="#games" role="tab" data-icon-inactive="bi bi-calendar-event" data-icon-active="bi bi-calendar-event-fill">
             <i class="bi bi-calendar-event"></i>
             <span class="nav-label">Games</span>
         </a>
-        <a class="nav-item" data-bs-toggle="tab" href="#practice_plan" role="tab">
+        <a class="nav-item" data-bs-toggle="tab" href="#practice_plan" role="tab" data-icon-inactive="bi bi-clipboard-check" data-icon-active="bi bi-clipboard-check-fill">
             <i class="bi bi-clipboard-check"></i>
             <span class="nav-label">Practice</span>
         </a>
-        <a class="nav-item" id="mobile-more-button" href="#">
+        <a class="nav-item" id="mobile-more-button" href="#" data-icon-inactive="bi bi-three-dots" data-icon-active="bi bi-three-dots">
             <i class="bi bi-three-dots"></i>
             <span class="nav-label">More</span>
         </a>
     </div>
 </nav>
 
-{# MODIFIED: Added a comprehensive set of modals for player management #}
 <div class="modal fade" id="addPlayerModal" tabindex="-1" aria-labelledby="addPlayerModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -497,10 +525,10 @@ document.addEventListener('DOMContentLoaded', () => {
         player_order: [],
         session: {},
         pitch_count_summary: {},
-        roster_sort: { key: 'name', order: 'asc' }
+        roster_sort: { key: 'name', order: 'asc' } // Ensure this is initialized for sorting
     };
     let sortableInstances = {};
-    let lineupEditorModal, editPlayerModal, confirmDeleteModal;
+    let lineupEditorModal;
 
     const renderPositionSelect = (name, id, selectedVal = '', title = 'Pos', classes = 'form-select form-select-sm') => {
         const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'];
@@ -512,6 +540,50 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
     const canEdit = (author) => AppState.session.username === author || AppState.session.role === 'Head Coach' || AppState.session.role === 'Super Admin';
+
+
+    function attachRosterSaveListeners() {
+        document.querySelectorAll('.save-player-btn').forEach(button => {
+            button.removeEventListener('click', handleRosterSave);
+            button.addEventListener('click', handleRosterSave);
+        });
+    }
+
+    async function handleRosterSave(event) {
+        const savePlayerBtn = event.target;
+        const playerId = savePlayerBtn.dataset.playerId;
+        const accordionBody = savePlayerBtn.closest('.accordion-body');
+        const formData = new FormData();
+        accordionBody.querySelectorAll('input, select, textarea').forEach(input => formData.append(input.name, input.value));
+
+        const originalText = savePlayerBtn.textContent;
+        savePlayerBtn.disabled = true;
+        savePlayerBtn.textContent = 'Saving...';
+
+        try {
+            const response = await fetch(`/update_player_inline/${playerId}`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                savePlayerBtn.textContent = 'Saved!';
+                savePlayerBtn.classList.replace('btn-success', 'btn-secondary');
+            } else {
+                alert(`Error: ${data.message}`);
+                savePlayerBtn.textContent = 'Save Failed';
+            }
+        } catch (err) {
+            alert('An error occurred while saving player changes.');
+            savePlayerBtn.textContent = 'Save Failed';
+        } finally {
+            setTimeout(() => {
+                savePlayerBtn.textContent = originalText;
+                savePlayerBtn.classList.replace('btn-secondary', 'btn-success');
+                savePlayerBtn.disabled = false;
+            }, 2000);
+        }
+    }
 
     function attachTaskListeners() {
         document.querySelectorAll('.task-checkbox').forEach(checkbox => {
@@ -545,18 +617,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+
     function renderRoster() {
+        // FIXED: Corrected the ID to target 'rosterContainer'
         const container = document.getElementById('rosterContainer');
         const searchTerm = document.getElementById('rosterSearch').value.toLowerCase();
         if (!container) return;
 
-        const sortedRoster = [...AppState.full_data.roster].sort((a, b) => {
+        const sortedRoster = [...(AppState.full_data.roster || [])].sort((a, b) => {
             const key = AppState.roster_sort.key;
             const order = AppState.roster_sort.order;
-
-            let valA = a[key];
-            let valB = b[key];
-
+            let valA = a[key], valB = b[key];
             if (key === 'number') {
                 valA = parseInt(a.number || '9999', 10);
                 valB = parseInt(b.number || '9999', 10);
@@ -564,7 +635,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 valA = (a.name || '').toLowerCase();
                 valB = (b.name || '').toLowerCase();
             }
-
             if (valA < valB) return order === 'asc' ? -1 : 1;
             if (valA > valB) return order === 'asc' ? 1 : -1;
             return 0;
@@ -572,8 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const getSortIcon = (key) => {
             if (AppState.roster_sort.key !== key) return '<i class="bi bi-arrow-down-up"></i>';
-            if (AppState.roster_sort.order === 'asc') return '<i class="bi bi-sort-up"></i>';
-            return '<i class="bi bi-sort-down"></i>';
+            return AppState.roster_sort.order === 'asc' ? '<i class="bi bi-sort-up"></i>' : '<i class="bi bi-sort-down"></i>';
         };
 
         let tableHTML = `
@@ -582,28 +651,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     <tr>
                         <th scope="col" class="sortable-header" data-sort-key="name">Name <span class="sort-icon">${getSortIcon('name')}</span></th>
                         <th scope="col" class="sortable-header text-center" data-sort-key="number"># <span class="sort-icon">${getSortIcon('number')}</span></th>
-                        <th scope="col">Positions</th>
-                        <th scope="col">B/T</th>
-                        <th scope="col" class="text-end">Actions</th>
+                        <th scope="col">Positions</th><th scope="col">B/T</th><th scope="col" class="text-end">Actions</th>
                     </tr>
                 </thead>
-                <tbody id="rosterTableBody">`;
+                <tbody>`;
 
         let visiblePlayerCount = 0;
         sortedRoster.forEach((p) => {
-            if (searchTerm && !p.name.toLowerCase().includes(searchTerm) && !(p.number||'').toString().includes(searchTerm)) {
-                return;
-            }
-
+            if (searchTerm && !p.name.toLowerCase().includes(searchTerm) && !(p.number||'').toString().includes(searchTerm)) return;
             visiblePlayerCount++;
             const pNameSafe = escapeHTML(p.name);
-            const positions = [p.position1, p.position2, p.position3].filter(Boolean).join(', ');
-
             tableHTML += `
                 <tr data-player-id="${p.id}">
                     <td><strong>${pNameSafe}</strong></td>
                     <td class="text-center">${p.number || 'N/A'}</td>
-                    <td>${positions || 'N/A'}</td>
+                    <td>${[p.position1, p.position2, p.position3].filter(Boolean).join(', ') || 'N/A'}</td>
                     <td>${p.bats || 'N/A'} / ${p.throws || 'N/A'}</td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#editPlayerModal" data-player-id="${p.id}"><i class="bi bi-pencil"></i> Edit</button>
@@ -611,16 +673,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     </td>
                 </tr>`;
         });
-
         tableHTML += `</tbody></table>`;
-
-        if (visiblePlayerCount === 0) {
-            container.innerHTML = `<div class="p-3 text-center text-muted">No players found.</div>`;
-        } else {
-            container.innerHTML = tableHTML;
-        }
+        container.innerHTML = visiblePlayerCount > 0 ? tableHTML : `<div class="p-3 text-center text-muted">No players found.</div>`;
     }
-
 
     function renderPlayerDevelopment() {
         const container = document.getElementById('player-dev-accordion');
@@ -659,7 +714,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!p) return;
             const activityLog = playerDevData[p.name] || [];
             const pNameSafe = escapeHTML(p.name);
-
+            
             html += `
             <div class="accordion-item" data-player-name="${pNameSafe}">
                 <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-dev-${p.id}"><i class="bi bi-grip-vertical me-2 drag-handle"></i><strong>${pNameSafe}</strong></button></h2>
@@ -673,7 +728,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">New Fielding Focus</a></li>
                                 <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">New Baserunning Focus</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; new bootstrap.Tab(document.querySelector('a[href=\\'#collaboration\\']')).show();">New Coach Note</a></li>
+                                <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; switchTab('#collaboration');">New Coach Note</a></li>
                             </ul>
                         </div>
                     </div>
@@ -704,7 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('lineupsAccordion');
         if (!container) return;
         const lineups = AppState.full_data.lineups.filter(l => !l.associated_game_id) || [];
-
+        
         if (lineups.length === 0) {
             container.innerHTML = `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned lineups saved yet.</p></div>`;
         } else {
@@ -861,7 +916,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <form action="/edit_practice_plan/${plan.id}" method="POST" class="row g-3 mb-3 align-items-end">
                         <div class="col-md-3"><label class="form-label">Date:</label><input type="date" name="plan_date" class="form-control" value="${plan.date}" required></div>
                         <div class="col-md-7"><label class="form-label">General Notes:</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}" placeholder="General theme or focus"></div>
-                        <div class="col-md-2 d-flex justify-content-end"><button type="submit" class="btn btn-sm btn-primary me-2">Save</button><a href="/delete_practice_plan/${plan.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this practice plan and all its tasks?');">Delete</a></div>
+                        <div class="col-md-2 d-flex justify-content-end"><button type="submit" class="btn btn-sm btn-primary me-2">Save</button><a href="/delete_practice_plan/${plan.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a></div>
                     </form><hr><h5>Tasks</h5>
                     <form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add a new task..." required><button type="submit" class="btn btn-primary">Add Task</button></div></form>
                     <ul class="list-group task-list">${(plan.tasks || []).map(task => `<li class="list-group-item d-flex justify-content-between align-items-center task-item ${task.status === 'complete' ? 'complete' : ''}" data-task-id="${task.id}" data-plan-id="${plan.id}">
@@ -894,8 +949,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/get_app_data');
             if (!response.ok) throw new Error(`Failed to fetch app data: ${response.statusText}`);
-            const serverData = await response.json();
-            Object.assign(AppState, serverData);
+            const serverData = await response.json(); // Store fetched data
+            Object.assign(AppState, serverData); // Merge fetched data into AppState
         } catch (error) {
             console.error("Initialization Error: Failed to fetch app data.", error);
             document.body.innerHTML = `<div class="alert alert-danger m-3">Could not load application data. Please try refreshing.</div>`;
@@ -903,44 +958,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderAll();
-
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
-        editPlayerModal = new bootstrap.Modal(document.getElementById('editPlayerModal'));
-        confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-
         initializeSortables();
         setupEventListeners();
 
+        // MODIFIED: Use the new switchTab function for initial tab activation
         setTimeout(() => {
             const hash = window.location.hash || '#roster';
             const tabId = hash.split('?')[0];
-            let targetTabLink = document.querySelector(`.nav-item[href="${tabId}"], .nav-link[href="${tabId}"]`);
-            if (!targetTabLink) {
-                 targetTabLink = document.querySelector('a[data-bs-toggle="tab"]');
-            }
-             if (targetTabLink) {
-                new bootstrap.Tab(targetTabLink).show();
-            }
+            switchTab(tabId); // Use the centralized function
         }, 100);
 
         const socket = io();
         socket.on('data_updated', async (msg) => {
             console.log('Data update received:', msg.message);
-
+            
             const openPlanItem = document.querySelector('#practicePlanAccordion .accordion-collapse.show');
             const openPlanId = openPlanItem ? openPlanItem.closest('.accordion-item').dataset.planId : null;
 
             try {
                 const response = await fetch('/get_app_data');
-                const serverData = await response.json();
-                Object.assign(AppState, serverData);
-
-                renderAll();
+                const serverData = await response.json(); // Store fetched data
+                Object.assign(AppState, serverData); // Merge fetched data into AppState
+                
+                renderAll(); 
 
                 if (openPlanId) {
                     const newCollapseElement = document.getElementById(`practice-plan-collapse-${openPlanId}`);
                     const newButtonElement = document.querySelector(`button[data-bs-target="#practice-plan-collapse-${openPlanId}"]`);
-
+                    
                     if (newCollapseElement && newButtonElement) {
                         newCollapseElement.classList.add('show');
                         newButtonElement.classList.remove('collapsed');
@@ -962,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sortableInstances[id] = new Sortable(el, {
                     handle: handleClass,
                     animation: 150,
-                    scroll: true,
+                    scroll: true, 
                     scrollSensitivity: 50,
                     onEnd: () => {
                         const newPlayerOrder = Array.from(el.children).map(item => item.dataset.playerName);
@@ -975,14 +1021,83 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         };
+        // Removed createSortable('rosterAccordion', '.drag-handle'); as roster is now a table
         createSortable('player-dev-accordion', '.drag-handle');
+    }
+
+    // --- Centralized Tab Switching Function ---
+    let currentActiveTabId = '#roster'; // Initialize with a default active tab
+
+    function switchTab(targetTabSelector) {
+        if (!targetTabSelector || targetTabSelector === '#') return;
+
+        // Hide all tab panes
+        document.querySelectorAll('.tab-content > .tab-pane').forEach(pane => {
+            pane.classList.remove('show', 'active');
+        });
+
+        // Deactivate all nav links (both desktop and mobile)
+        document.querySelectorAll('.navbar-nav .nav-link, .bottom-nav .nav-item').forEach(link => {
+            link.classList.remove('active');
+            // Reset icons for bottom nav
+            if (link.dataset.iconInactive && link.querySelector('i')) {
+                link.querySelector('i').className = link.dataset.iconInactive;
+            }
+        });
+        
+        // Hide the more menu overlay if it's open
+        const moreMenuOverlay = document.getElementById('more');
+        if (moreMenuOverlay && !moreMenuOverlay.classList.contains('hidden')) {
+            moreMenuOverlay.classList.add('hidden');
+        }
+
+        // Activate the target tab pane
+        const targetTabPane = document.querySelector(targetTabSelector);
+        if (targetTabPane) {
+            targetTabPane.classList.add('show', 'active');
+        }
+
+        // Activate the corresponding nav link (desktop)
+        const desktopTabLink = document.querySelector(`.desktop-nav a[href="${targetTabSelector}"]`);
+        if (desktopTabLink) {
+            desktopTabLink.classList.add('active');
+        }
+
+        // Activate the corresponding nav link (mobile bottom nav)
+        const mobileTabLink = document.querySelector(`.bottom-nav a[href="${targetTabSelector}"]`);
+        if (mobileTabLink) {
+            mobileTabLink.classList.add('active');
+            if (mobileTabLink.dataset.iconActive && mobileTabLink.querySelector('i')) {
+                mobileTabLink.querySelector('i').className = mobileTabLink.dataset.iconActive;
+            }
+        } else {
+            // If the tab is not in the main bottom nav, activate the "More" button
+            const moreButton = document.getElementById('mobile-more-button');
+            if (moreButton) {
+                moreButton.classList.add('active');
+                if (moreButton.dataset.iconActive && moreButton.querySelector('i')) {
+                    moreButton.querySelector('i').className = moreButton.dataset.iconActive;
+                }
+            }
+        }
+
+        // Update URL hash and scroll
+        if (history.pushState) {
+            history.pushState(null, null, targetTabSelector);
+        } else {
+            window.location.hash = targetTabSelector;
+        }
+        currentActiveTabId = targetTabSelector; // Update the global tracker
+        window.scrollTo(0, 0);
     }
 
 
     function setupEventListeners() {
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
-
+        
+        // This handles all clicks on the body and delegates them
         document.body.addEventListener('click', (event) => {
+            // Roster Sorting
             const sortHeader = event.target.closest('.sortable-header');
             if (sortHeader) {
                 const sortKey = sortHeader.dataset.sortKey;
@@ -994,16 +1109,85 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 renderRoster();
             }
+
+            // Edit Sign Modal trigger
+            if(event.target.closest('[data-bs-target="#editSignModal"]')) {
+                 const signId = parseInt(event.target.closest('button').dataset.signId, 10);
+                const sign = (AppState.full_data.signs || []).find(s => s.id === signId);
+                const form = document.getElementById('editSignForm');
+                form.action = `/update_sign/${sign.id}`;
+                form.querySelector('#editSignName').value = sign.name;
+                form.querySelector('#editSignIndicator').value = sign.indicator;
+            }
+            
+            // Handle tab clicks (desktop and mobile bottom nav)
+            const tabLink = event.target.closest('a[data-bs-toggle="tab"]');
+            if (tabLink) {
+                event.preventDefault(); // Prevent default Bootstrap tab behavior
+                switchTab(tabLink.getAttribute('href'));
+            }
+        });
+        
+        // More Menu specific logic
+        const moreMenuButton = document.getElementById('mobile-more-button');
+        const moreMenuOverlay = document.getElementById('more');
+        const moreMenuCloseButton = document.getElementById('more-menu-close-btn');
+
+        if (moreMenuButton && moreMenuOverlay && moreMenuCloseButton) {
+            moreMenuButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                // When "More" button is clicked, just show the overlay
+                moreMenuOverlay.classList.remove('hidden');
+                // Ensure the "More" button itself is active in the bottom nav
+                document.querySelectorAll('.bottom-nav .nav-item').forEach(link => link.classList.remove('active'));
+                moreMenuButton.classList.add('active');
+                if (moreMenuButton.dataset.iconActive && moreMenuButton.querySelector('i')) {
+                    moreMenuButton.querySelector('i').className = moreMenuButton.dataset.iconActive;
+                }
+            });
+            
+            moreMenuCloseButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                moreMenuOverlay.classList.add('hidden');
+                // After closing "More" menu, activate the previously active tab
+                switchTab(currentActiveTabId);
+            });
+
+            // Handle clicks on links inside the more menu overlay
+            moreMenuOverlay.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', (event) => {
+                    // If it's a tab link, use switchTab
+                    if (link.hasAttribute('data-bs-toggle') && link.getAttribute('data-bs-toggle') === 'tab') {
+                        event.preventDefault(); // Prevent default Bootstrap tab behavior
+                        switchTab(link.getAttribute('href'));
+                        moreMenuOverlay.classList.add('hidden'); // Hide the overlay immediately
+                    } else {
+                        // For non-tab links (like logout, user management), just hide the overlay
+                        moreMenuOverlay.classList.add('hidden');
+                    }
+                });
+            });
+        }
+
+        // Modals
+        document.getElementById('addPlayerModal')?.addEventListener('show.bs.modal', (event) => {
+            // Reset form when modal is shown
+            const form = event.target.querySelector('form');
+            form.reset();
+            // Set default values for selects if needed, or rely on macro defaults
+            form.querySelector('#add_position1').value = '';
+            form.querySelector('#add_position2').value = '';
+            form.querySelector('#add_position3').value = '';
+            form.querySelector('select[name="throws"]').value = 'Right';
+            form.querySelector('select[name="bats"]').value = 'Right';
+            form.querySelector('select[name="pitcher_role"]').value = 'Not a Pitcher';
         });
 
-        document.getElementById('editPlayerModal').addEventListener('show.bs.modal', (event) => {
-            const button = event.relatedTarget;
-            const playerId = button.dataset.playerId;
-            const player = AppState.full_data.roster.find(p => p.id == playerId);
+        document.getElementById('editPlayerModal')?.addEventListener('show.bs.modal', (event) => {
+            const player = (AppState.full_data.roster || []).find(p => p.id == event.relatedTarget.dataset.playerId);
             if (!player) return;
-
             const form = document.getElementById('editPlayerForm');
-            form.action = `/update_player_inline/${playerId}`;
+            form.action = `/update_player_inline/${player.id}`;
             form.querySelector('#edit_player_id').value = player.id;
             form.querySelector('#edit_name').value = player.name;
             form.querySelector('#edit_number').value = player.number || '';
@@ -1016,192 +1200,18 @@ document.addEventListener('DOMContentLoaded', () => {
             form.querySelector('#edit_notes').value = player.notes || '';
         });
 
-        document.getElementById('confirmDeleteModal').addEventListener('show.bs.modal', (event) => {
-            const button = event.relatedTarget;
-            const playerId = button.dataset.playerId;
-            const playerName = button.dataset.playerName;
-
-            const modalPlayerName = document.getElementById('playerNameToDelete');
-            const confirmButton = document.getElementById('confirmDeleteButton');
-
-            modalPlayerName.textContent = playerName;
-            confirmButton.href = `/delete_player/${playerId}?active_tab=#roster`;
+        document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (event) => {
+            document.getElementById('playerNameToDelete').textContent = event.relatedTarget.dataset.playerName;
+            document.getElementById('confirmDeleteButton').href = `/delete_player/${event.relatedTarget.dataset.playerId}?active_tab=${currentActiveTabId}`;
         });
-
-        document.getElementById('editPlayerForm').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const form = event.target;
-            const saveButton = form.querySelector('button[type="submit"]');
-            saveButton.disabled = true;
-            saveButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
-
-            try {
-                const response = await fetch(form.action, {
-                    method: 'POST',
-                    body: new FormData(form)
-                });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.message);
-                var editModal = bootstrap.Modal.getInstance(document.getElementById('editPlayerModal'));
-                editModal.hide();
-            } catch(error) {
-                alert(`Error saving player: ${error.message}`);
-            } finally {
-                saveButton.disabled = false;
-                saveButton.textContent = 'Save Changes';
-            }
-        });
-
-        document.getElementById('addPlayerForm').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const form = event.target;
-            const addButton = form.querySelector('button[type="submit"]');
-            addButton.disabled = true;
-            addButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';
-
-            try {
-                const response = await fetch(form.action, {
-                    method: 'POST',
-                    body: new FormData(form)
-                });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message);
-                }
-                var addModal = bootstrap.Modal.getInstance(document.getElementById('addPlayerModal'));
-                addModal.hide();
-                form.reset();
-            } catch(error) {
-                alert(`Error adding player: ${error.message}`);
-            } finally {
-                addButton.disabled = false;
-                addButton.textContent = 'Add Player';
-            }
-        });
-
-
-        document.body.addEventListener('submit', async (event) => {
-            if (event.target.classList.contains('add-task-form')) {
-                event.preventDefault();
-                const form = event.target;
-                const input = form.querySelector('input[name="task_text"]');
-                const button = form.querySelector('button[type="submit"]');
-                const taskText = input.value.trim();
-                const url = form.action;
-
-                if (!taskText) {
-                    alert('Please enter a task.');
-                    return;
-                }
-
-                input.disabled = true;
-                button.disabled = true;
-                button.textContent = 'Adding...';
-
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ task_text: taskText })
-                    });
-
-                    const result = await response.json();
-                    if (!response.ok) {
-                        throw new Error(result.message || 'An unknown error occurred.');
-                    }
-
-                    input.value = '';
-                } catch (error) {
-                    console.error('Failed to add task:', error);
-                    alert(`Error: ${error.message}`);
-                } finally {
-                    input.disabled = false;
-                    button.disabled = false;
-                    button.textContent = 'Add Task';
-                }
-            }
-        });
-
-        document.getElementById('addScoutedPlayerForm')?.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const form = event.target, feedbackEl = document.getElementById('addScoutedPlayerFeedback');
-            const data = Object.fromEntries(new FormData(form).entries());
-            try {
-                const response = await fetch('/add_scouted_player', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
-                });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.message);
-                feedbackEl.innerHTML = `<div class="alert alert-success p-2">${escapeHTML(result.message)}</div>`;
-                form.reset();
-            } catch (error) {
-                feedbackEl.innerHTML = `<div class="alert alert-danger p-2">${escapeHTML(error.message)}</div>`;
-            }
-        });
-
-        const moreMenuButton = document.getElementById('mobile-more-button');
-        const moreMenuOverlay = document.getElementById('more');
-        const moreMenuCloseButton = document.getElementById('more-menu-close-btn');
-        const bottomNavItems = document.querySelectorAll('.bottom-nav .nav-item');
-
-        if (moreMenuButton && moreMenuOverlay) {
-            const hideMoreMenu = () => moreMenuOverlay.classList.add('hidden');
-            const showMoreMenu = (event) => {
-                event.preventDefault();
-                moreMenuOverlay.classList.remove('hidden');
-            };
-
-            moreMenuButton.addEventListener('click', showMoreMenu);
-            moreMenuCloseButton.addEventListener('click', hideMoreMenu);
-
-            moreMenuOverlay.querySelectorAll('a').forEach(link => {
-                link.addEventListener('click', () => setTimeout(hideMoreMenu, 150));
-            });
-        }
-
-        document.body.addEventListener('shown.bs.tab', (event) => {
-            const newTabId = event.target.getAttribute('href');
-            if (history.pushState) {
-                history.pushState(null, null, newTabId);
-            } else {
-                location.hash = newTabId;
-            }
-
-            if (!moreMenuOverlay.classList.contains('hidden') && !event.target.closest('.more-menu-overlay')) {
-                moreMenuOverlay.classList.add('hidden');
-            }
-
-            bottomNavItems.forEach(link => {
-                const isActive = link.getAttribute('href') === newTabId;
-                link.classList.toggle('active', isActive);
-            });
-
-            const moreMenuLink = moreMenuOverlay.querySelector(`a[data-bs-toggle="tab"][href="${newTabId}"]`);
-            if (moreMenuLink) {
-                moreMenuButton.classList.add('active');
-            } else if (moreMenuButton.getAttribute('href') !== newTabId) {
-                moreMenuButton.classList.remove('active');
-            }
-        });
-
-        document.body.addEventListener('click', function(event){
-            if(event.target.closest('.edit-sign-btn')) {
-                const signId = parseInt(event.target.closest('.edit-sign-btn').dataset.signId, 10);
-                const sign = AppState.full_data.signs.find(s => s.id === signId);
-                const form = document.getElementById('editSignForm');
-                form.action = `/update_sign/${sign.id}`;
-                form.querySelector('#editSignName').value = sign.name;
-                form.querySelector('#editSignIndicator').value = sign.indicator;
-            }
-        });
-
+        
         document.getElementById('lineupEditorModal')?.addEventListener('show.bs.modal', (event) => {
             const button = event.relatedTarget;
             const lineupId = button ? button.dataset.lineupId : null;
             const lineup = lineupId ? AppState.full_data.lineups.find(l => l.id == lineupId) : null;
             openLineupEditor(lineup);
         });
-
+        
         document.getElementById('editNoteModal')?.addEventListener('show.bs.modal', (e) => {
             e.target.querySelector('#editNoteId').value = e.relatedTarget.dataset.noteId;
             e.target.querySelector('#editNoteType').value = e.relatedTarget.dataset.noteType;
@@ -1226,6 +1236,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (focusItem) {
                     form.querySelector('#focusSkill').value = focusItem.subtype;
+                    form.querySelector('#focusSkill').disabled = true; // Disable skill selection if editing
                     form.querySelector('#focusText').value = focusItem.text.replace(/^(New Focus|Completed): /i, '');
                     form.querySelector('#focusNotes').value = focusItem.notes || '';
                 }
@@ -1233,9 +1244,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.target.querySelector('.modal-title').textContent = 'Add Development Focus';
                 form.action = `/add_focus/${encodeURIComponent(btn.dataset.playerName)}`;
                 form.querySelector('#focusSkill').value = btn.dataset.skill;
+                form.querySelector('#focusSkill').disabled = false;
             }
         });
-
+        
         document.getElementById('saveLineupBtn')?.addEventListener('click', async () => {
             const modal = document.getElementById('lineupEditorModal');
             const id = modal.querySelector('#lineupId').value;
@@ -1248,8 +1260,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if(!response.ok) throw new Error((await response.json()).message);
-                var lineupModal = bootstrap.Modal.getInstance(document.getElementById('lineupEditorModal'));
-                lineupModal.hide();
+                lineupEditorModal.hide();
             } catch (error) {
                 alert(`Error: ${error.message}`);
             }
