@@ -26,13 +26,17 @@
         <div class="mb-3">
           <label for="plan_id" class="form-label">Select a Practice Plan to Add This Note To:</label>
           <select name="plan_id" id="plan_id" class="form-select" required>
-            <option value="">Select a Plan...</option>
-            {% for plan in practice_plans %}
-              <option value="{{ plan.id }}">{{ plan.date }} - {{ plan.general_notes|truncate(30) }}</option>
-            {% endfor %}
+            {% if practice_plans %}
+              <option value="">Select a Plan...</option>
+              {% for plan in practice_plans %}
+                <option value="{{ plan.id }}">{{ plan.date }} - {{ plan.general_notes|truncate(30) }}</option>
+              {% endfor %}
+            {% else %}
+              <option value="" selected disabled>No practice plans found for your team. Create one first.</option>
+            {% endif %}
           </select>
         </div>
-        <button type="submit" class="btn btn-primary">Add to Plan</button>
+        <button type="submit" class="btn btn-primary" {% if not practice_plans %}disabled{% endif %}>Add to Plan</button>
         <a href="{{ url_for('home') }}#collaboration" class="btn btn-secondary">Cancel</a>
       </form>
     </div>

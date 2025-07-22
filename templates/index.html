@@ -471,7 +471,7 @@
             <div class="row g-3">
                 <div class="col-md-6"><label class="form-label">Player Name</label><input type="text" class="form-control" name="name" id="edit_name" required></div>
                 <div class="col-md-6"><label class="form-label">Jersey Number</label><input type="number" class="form-control" name="number" id="edit_number"></div>
-                <div class="col-md-4"><label class="form-label">Primary Position</label>{{ position_select('position1', 'edit_position1', '', title='') }}</div>
+                <div class="md-4"><label class="form-label">Primary Position</label>{{ position_select('position1', 'edit_position1', '', title='') }}</div>
                 <div class="col-md-4"><label class="form-label">Secondary Position</label>{{ position_select('position2', 'edit_position2', '', title='') }}</div>
                 <div class="col-md-4"><label class="form-label">Tertiary Position</label>{{ position_select('position3', 'edit_position3', '', title='') }}</div>
                 <div class="col-md-4"><label class="form-label">Throws</label><select name="throws" class="form-select" id="edit_throws"><option value="Right">Right</option><option value="Left">Left</option></select></div>
@@ -1417,12 +1417,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const nameSpan = document.createElement('span');
             nameSpan.textContent = `${player.name} (#${player.number || 'N/A'})`;
             item.appendChild(nameSpan);
-            item.insertAdjacentHTML('beforeend', renderPositionSelect('pos', '', selectedPosition || player.position1));
+            // Removed the position select dropdown:
+            // item.insertAdjacentHTML('beforeend', renderPositionSelect('pos', '', selectedPosition || player.position1));
             return item;
         };
         (lineup ? lineup.lineup_positions : []).forEach(spot => {
             const player = AppState.full_data.roster.find(p => p.name === spot.name);
-            if (player) order.appendChild(createBattingOrderItem(player, spot.position));
+            // Ensure we still pass 'null' for position if it's not needed for display here
+            if (player) order.appendChild(createBattingOrderItem(player, null));
         });
         if(sortableInstances.unassignedLineupBench) sortableInstances.unassignedLineupBench.destroy();
         if(sortableInstances.unassignedLineupOrder) sortableInstances.unassignedLineupOrder.destroy();
@@ -1430,7 +1432,8 @@ document.addEventListener('DOMContentLoaded', () => {
         sortableInstances.unassignedLineupOrder = new Sortable(order, { group: 'lineup', animation: 150,
             onAdd: (evt) => {
                 const player = AppState.full_data.roster.find(p => p.name === evt.item.dataset.playerName);
-                if (player) evt.item.replaceWith(createBattingOrderItem(player));
+                // MODIFIED: Pass null for selectedPosition as we no longer have a position select
+                if (player) evt.item.replaceWith(createBattingOrderItem(player, null));
             }
         });
     };

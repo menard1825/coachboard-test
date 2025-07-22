@@ -1,26 +1,35 @@
 // =================================================================================
 // Coach Planner - Game Management Client-Side Logic
 // =================================================================================
+
+// Ensure window.AppState and window.sortableInstances are initialized globally
+// before any other scripts might try to access them.
+window.AppState = window.AppState || {};
+window.sortableInstances = window.sortableInstances || {};
+
 function initializeGameManagement(gameData) {
     // --- Application State & Global Variables for this page ---
 
     // Safely initialize the game object first to prevent errors
     const game = gameData.game || {};
-    const AppState = {
+    
+    // Update AppState properties
+    Object.assign(window.AppState, {
         roster: gameData.roster || [],
         lineup: gameData.lineup || { id: null, title: `Lineup for vs ${game.opponent}`, lineup_positions: [], associated_game_id: game.id },
         rotation: gameData.rotation || { id: null, title: `Rotation for vs ${game.opponent}`, innings: { '1': {} }, associated_game_id: game.id },
         game: game, // Use the safely defined game object
         currentInning: '1',
         copiedInningData: null
-    };
+    });
 
-    let sortableInstances = {};
     let assignPlayerModal;
     let addPlayerToLineupModal;
 
     // --- Utility Functions ---
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
+    // The renderPositionSelect utility function is no longer needed for the lineup editor
+    // but is kept here as it might be used elsewhere or for future features.
     const renderPositionSelect = (name, id, selectedVal = '', title = 'Pos', classes = 'form-select form-select-sm') => {
         const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'];
         let optionsHtml = `<option value="" ${!selectedVal ? 'selected' : ''}>${title}</option>`;
@@ -38,15 +47,17 @@ function initializeGameManagement(gameData) {
         bench.innerHTML = '';
         order.innerHTML = '';
 
-        const lineupPlayerNames = new Set((AppState.lineup.lineup_positions || []).map(p => p.name));
+        const lineupPlayerNames = new Set((window.AppState.lineup.lineup_positions || []).map(p => p.name));
         
-        (AppState.lineup.lineup_positions || []).forEach(spot => {
-            const player = AppState.roster.find(p => p.name === spot.name);
+        (window.AppState.lineup.lineup_positions || []).forEach(spot => {
+            const player = window.AppState.roster.find(p => p.name === spot.name);
+            // When rendering existing lineup positions, we still pass the position,
+            // but createBattingOrderItem will no longer render the dropdown.
             if (player) order.appendChild(createBattingOrderItem(player, spot.position));
         });
 
         if (!isMobile()) {
-            AppState.roster.forEach(player => {
+            window.AppState.roster.forEach(player => {
                 if (!lineupPlayerNames.has(player.name)) {
                     const playerEl = createBenchPlayerItem(player);
                     bench.appendChild(playerEl);
@@ -58,44 +69,46 @@ function initializeGameManagement(gameData) {
     }
     
     function initializeLineupSortables() {
-        if(sortableInstances.lineupBench) sortableInstances.lineupBench.destroy();
-        if(sortableInstances.lineupOrder) sortableInstances.lineupOrder.destroy();
+        // Destroy existing instances if they exist to prevent re-initialization issues
+        if(window.sortableInstances.lineupBench) window.sortableInstances.lineupBench.destroy();
+        if(window.sortableInstances.lineupOrder) window.sortableInstances.lineupOrder.destroy();
         
         const order = document.getElementById('lineup-order');
         const bench = document.getElementById('lineup-bench');
 
         if (isMobile()) {
-            sortableInstances.lineupOrder = new Sortable(order, {
+            window.sortableInstances.lineupOrder = new Sortable(order, {
                 handle: '.lineup-drag-handle',
                 animation: 150,
             });
         } else {
-            sortableInstances.lineupBench = new Sortable(bench, {
+            window.sortableInstances.lineupBench = new Sortable(bench, {
                 group: 'lineup',
                 animation: 150,
             });
-            sortableInstances.lineupOrder = new Sortable(order, {
+            window.sortableInstances.lineupOrder = new Sortable(order, {
                 group: 'lineup',
                 handle: '.lineup-drag-handle',
                 animation: 150,
                 onAdd: (evt) => {
-                    const player = AppState.roster.find(p => p.name === evt.item.dataset.playerName);
+                    const player = window.AppState.roster.find(p => p.name === evt.item.dataset.playerName);
+                    // MODIFIED: No longer pass selectedPosition, as dropdown is removed
                     if (player) evt.item.replaceWith(createBattingOrderItem(player));
                 }
             });
         }
     }
 
-
     function createBenchPlayerItem(player) {
         const item = document.createElement('div');
         item.className = 'list-group-item';
-        item.textContent = player.name;
+        item.textContent = `${player.name} (#${player.number || 'N/A'})`; // Added number for clarity on bench
         item.dataset.playerName = player.name;
         return item;
     }
 
-    function createBattingOrderItem(player, selectedPosition = null) {
+    // MODIFIED: Removed position select rendering from createBattingOrderItem
+    function createBattingOrderItem(player, selectedPosition = null) { // selectedPosition is now unused
         const item = document.createElement('div');
         item.className = 'list-group-item';
         item.dataset.playerName = player.name;
@@ -110,9 +123,7 @@ function initializeGameManagement(gameData) {
                     <i class="bi bi-x-circle-fill" style="font-size: 1.1rem;"></i>
                 </button>
             </div>
-            <div class="mt-1 ps-4">
-                ${renderPositionSelect('pos', '', selectedPosition || player.position1, 'Position')}
-            </div>
+            <!-- Position selection removed as per user request -->
         `;
         return item;
     };
@@ -124,12 +135,12 @@ function initializeGameManagement(gameData) {
                  .map(item => item.dataset.playerName)
         );
 
-        const availablePlayers = AppState.roster.filter(p => !lineupPlayerNames.has(p.name));
+        const availablePlayers = window.AppState.roster.filter(p => !lineupPlayerNames.has(p.name));
         
         if (availablePlayers.length > 0) {
             modalList.innerHTML = availablePlayers.map(p => `
                 <a href="#" class="list-group-item list-group-item-action" data-player-name="${escapeHTML(p.name)}">
-                    ${escapeHTML(p.name)}
+                    ${escapeHTML(p.name)} (#${escapeHTML(p.number) || 'N/A'})
                 </a>
             `).join('');
         } else {
@@ -141,7 +152,7 @@ function initializeGameManagement(gameData) {
 
     // --- Rotation Editor Functions ---
     function renderRotationEditor() {
-        if (!AppState.rotation) return;
+        if (!window.AppState.rotation) return;
         renderInningSelector();
         renderRotationDiamondAndBench();
         updatePlayingTimeSummary();
@@ -150,29 +161,30 @@ function initializeGameManagement(gameData) {
 
     function renderInningSelector() {
         const container = document.getElementById('inning-btn-group');
-        const innings = Object.keys(AppState.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const innings = Object.keys(window.AppState.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
         if (innings.length === 0) { 
-            AppState.rotation.innings['1'] = {};
+            window.AppState.rotation.innings['1'] = {};
             innings.push('1');
         }
         container.innerHTML = innings.map(inn => `
-            <input type="radio" class="btn-check" name="inning-radio" id="inning-${inn}" value="${inn}" ${AppState.currentInning == inn ? 'checked' : ''}>
+            <input type="radio" class="btn-check" name="inning-radio" id="inning-${inn}" value="${inn}" ${window.AppState.currentInning == inn ? 'checked' : ''}>
             <label class="btn btn-outline-primary" for="inning-${inn}">${inn}</label>
         `).join('');
         container.querySelectorAll('input[name="inning-radio"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
-                AppState.currentInning = e.target.value;
+                window.AppState.currentInning = e.target.value;
                 renderRotationEditor();
             });
         });
     }
 
     function renderRotationDiamondAndBench() {
-        if (!AppState.rotation) return;
-        const currentInningData = AppState.rotation.innings[AppState.currentInning] || {};
+        if (!window.AppState.rotation) return;
+        const currentInningData = window.AppState.rotation.innings[window.AppState.currentInning] || {};
         const createPlayerTag = (playerName) => `<div class="player-tag" data-player-name="${escapeHTML(playerName)}">${escapeHTML(playerName)}</div>`;
 
         document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => tag.remove());
+        // FIXED: Added 'of' keyword to for...of loop
         for (const [pos, playerName] of Object.entries(currentInningData)) {
             const dropzoneDesktop = document.getElementById(`pos-desktop-${pos}`);
             const dropzoneMobile = document.getElementById(`pos-mobile-${pos}`);
@@ -181,7 +193,7 @@ function initializeGameManagement(gameData) {
         }
 
         const assignedPlayers = new Set(Object.values(currentInningData));
-        const benchPlayers = AppState.roster.filter(p => !assignedPlayers.has(p.name));
+        const benchPlayers = window.AppState.roster.filter(p => !assignedPlayers.has(p.name));
         const benchDesktop = document.getElementById('bench-list-desktop');
         if(benchDesktop) {
             benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p.name)).join('');
@@ -189,10 +201,10 @@ function initializeGameManagement(gameData) {
     }
 
     function updatePlayingTimeSummary() {
-         if (!AppState.rotation) return;
+         if (!window.AppState.rotation) return;
         const summary = {};
         
-        AppState.roster.forEach(player => {
+        window.AppState.roster.forEach(player => {
             summary[player.name] = {
                 name: player.name,
                 inningsOnField: 0,
@@ -201,13 +213,13 @@ function initializeGameManagement(gameData) {
             };
         });
 
-        const innings = Object.keys(AppState.rotation.innings || {});
+        const innings = Object.keys(window.AppState.rotation.innings || {});
 
         innings.forEach(inningNum => {
-            const inningPositions = AppState.rotation.innings[inningNum] || {};
+            const inningPositions = window.AppState.rotation.innings[inningNum] || {};
             const playersOnFieldThisInning = new Set(Object.values(inningPositions));
 
-            AppState.roster.forEach(player => {
+            window.AppState.roster.forEach(player => {
                 if (playersOnFieldThisInning.has(player.name)) {
                     if (summary[player.name]) summary[player.name].inningsOnField++;
                 } else {
@@ -223,7 +235,7 @@ function initializeGameManagement(gameData) {
         });
 
         let tableHtml = `<div class="table-responsive"><table class="table table-sm table-striped table-bordered"><thead class="table-light"><tr><th>Player</th><th>Field</th><th>Bench</th><th>Positions</th></tr></thead><tbody>`;
-        const sortedPlayerNames = AppState.roster.map(p => p.name).sort();
+        const sortedPlayerNames = window.AppState.roster.map(p => p.name).sort();
 
         for (const playerName of sortedPlayerNames) {
             const data = summary[playerName];
@@ -239,10 +251,10 @@ function initializeGameManagement(gameData) {
     }
 
     function initializeRotationSortables() {
-        Object.values(sortableInstances).forEach(s => { if (s.destroy && s.el.id.includes('desktop')) s.destroy(); });
+        Object.values(window.sortableInstances).forEach(s => { if (s.destroy && s.el.id.includes('desktop')) s.destroy(); });
 
         const onEndHandler = () => {
-            const inningData = AppState.rotation.innings[AppState.currentInning] = {};
+            const inningData = window.AppState.rotation.innings[window.AppState.currentInning] = {};
             document.querySelectorAll('#diamond-parent-desktop .position-dropzone').forEach(dz => {
                 const playerTag = dz.querySelector('.player-tag');
                 if (playerTag) {
@@ -256,7 +268,7 @@ function initializeGameManagement(gameData) {
 
         const allContainers = [...document.querySelectorAll('#bench-list-desktop, #diamond-parent-desktop .position-dropzone')];
         allContainers.forEach(container => {
-            sortableInstances[container.id] = new Sortable(container, {
+            window.sortableInstances[container.id] = new Sortable(container, {
                 group: 'rotation',
                 animation: 150,
                 onEnd: onEndHandler,
@@ -271,7 +283,7 @@ function initializeGameManagement(gameData) {
     }
 
     function exitCopyMode() {
-        AppState.copiedInningData = null;
+        window.AppState.copiedInningData = null;
         const pasteControls = document.getElementById('inning-paste-controls');
         if (pasteControls) {
             pasteControls.classList.add('d-none');
@@ -281,17 +293,17 @@ function initializeGameManagement(gameData) {
     }
 
     async function saveLineup() {
-        AppState.lineup.title = document.getElementById('lineupTitle').value;
-        AppState.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
+        window.AppState.lineup.title = document.getElementById('lineupTitle').value;
+        window.AppState.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
             name: item.dataset.playerName,
-            position: item.querySelector('select')?.value || ''
+            position: '' // Explicitly set position to empty string
         }));
         
-        const url = AppState.lineup.id ? `/edit_lineup/${AppState.lineup.id}` : '/add_lineup';
+        const url = window.AppState.lineup.id ? `/edit_lineup/${window.AppState.lineup.id}` : '/add_lineup';
         const payload = {
-            title: AppState.lineup.title,
-            lineup_data: AppState.lineup.lineup_positions,
-            associated_game_id: AppState.game.id
+            title: window.AppState.lineup.title,
+            lineup_data: window.AppState.lineup.lineup_positions,
+            associated_game_id: window.AppState.game.id
         };
 
         try {
@@ -317,10 +329,10 @@ function initializeGameManagement(gameData) {
         btn.textContent = 'Saving...';
         
         const payload = {
-            id: AppState.rotation.id,
-            title: AppState.rotation.title || `Rotation for vs ${AppState.game.opponent}`,
-            innings: AppState.rotation.innings,
-            associated_game_id: AppState.game.id
+            id: window.AppState.rotation.id,
+            title: window.AppState.rotation.title || `Rotation for vs ${window.AppState.game.opponent}`,
+            innings: window.AppState.rotation.innings,
+            associated_game_id: window.AppState.game.id
         };
 
         try {
@@ -332,9 +344,15 @@ function initializeGameManagement(gameData) {
             if (!response.ok) throw new Error('Failed to save rotation.');
             const result = await response.json();
             if (result.status === 'success') {
-                if (result.new_id) AppState.rotation.id = result.new_id;
+                if (result.new_id) window.AppState.rotation.id = result.new_id;
                 btn.textContent = 'Saved!';
-                setTimeout(() => window.location.reload(), 1000);
+                // MODIFIED: Activate the rotation tab instead of reloading the page
+                const rotationTabButton = document.getElementById('rotation-tab');
+                if (rotationTabButton) {
+                    const rotationTab = new bootstrap.Tab(rotationTabButton);
+                    rotationTab.show();
+                }
+                renderRotationEditor(); // Re-render the rotation editor to reflect saved state
             } else { throw new Error(result.message); }
         } catch (error) {
             alert('Error saving rotation: ' + error.message);
@@ -363,9 +381,10 @@ function initializeGameManagement(gameData) {
             if (!playerLink) return;
 
             const playerName = playerLink.dataset.playerName;
-            const player = AppState.roster.find(p => p.name === playerName);
+            const player = window.AppState.roster.find(p => p.name === playerName);
             if (player) {
                 const orderList = document.getElementById('lineup-order');
+                // MODIFIED: Ensure createBattingOrderItem is called without position
                 orderList.appendChild(createBattingOrderItem(player));
                 addPlayerToLineupModal.hide();
             }
@@ -382,15 +401,18 @@ function initializeGameManagement(gameData) {
         document.getElementById('syncRotationBtn')?.addEventListener('click', () => {
             const lineupPositions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
                 name: item.dataset.playerName,
-                position: item.querySelector('select')?.value || ''
+                // The position value will be an empty string here as the dropdown is removed
+                position: '' 
             }));
             const inning1Data = {};
             lineupPositions.forEach(item => {
+                // Only add to inning1Data if a position is explicitly set (which won't happen from lineup now)
+                // This ensures we don't accidentally sync empty positions.
                 if(item.position && item.name) inning1Data[item.position] = item.name;
             });
 
             if (Object.keys(inning1Data).length > 0) {
-                AppState.rotation.innings['1'] = inning1Data;
+                window.AppState.rotation.innings['1'] = inning1Data;
                 alert('Inning 1 of the rotation has been updated with positions from the lineup. Please go to the Rotation tab and click Save to persist this change.');
                 const rotationTab = new bootstrap.Tab(document.getElementById('rotation-tab'));
                 rotationTab.show();
@@ -401,9 +423,9 @@ function initializeGameManagement(gameData) {
         });
         
         document.getElementById('deleteRotationBtn')?.addEventListener('click', () => {
-            if (!AppState.rotation || !AppState.rotation.id) return;
+            if (!window.AppState.rotation || !window.AppState.rotation.id) return;
             if (confirm(`Are you sure you want to delete this rotation? This cannot be undone.`)) {
-                window.location.href = `/delete_rotation/${AppState.rotation.id}`;
+                window.location.href = `/delete_rotation/${window.AppState.rotation.id}`;
             }
         });
 
@@ -414,14 +436,14 @@ function initializeGameManagement(gameData) {
                 const playerTag = mobileDropzone.querySelector('.player-tag');
 
                 if (playerTag) { 
-                    delete AppState.rotation.innings[AppState.currentInning][position];
+                    delete window.AppState.rotation.innings[window.AppState.currentInning][position];
                     renderRotationEditor();
                 } else { 
                     const modalTitle = document.getElementById('assignPlayerModalTitle');
                     const modalList = document.getElementById('assignPlayerModalBenchList');
 
-                    const assignedPlayers = new Set(Object.values(AppState.rotation.innings[AppState.currentInning] || {}));
-                    const benchPlayers = AppState.roster.filter(p => !assignedPlayers.has(p.name));
+                    const assignedPlayers = new Set(Object.values(window.AppState.rotation.innings[window.AppState.currentInning] || {}));
+                    const benchPlayers = window.AppState.roster.filter(p => !assignedPlayers.has(p.name));
 
                     modalTitle.textContent = `Assign to ${position}`;
                     document.getElementById('assignPlayerModal').dataset.targetPosition = position;
@@ -439,7 +461,7 @@ function initializeGameManagement(gameData) {
                 const playerName = modalPlayerLink.dataset.playerName;
                 const position = document.getElementById('assignPlayerModal').dataset.targetPosition;
                 if (playerName && position) {
-                    AppState.rotation.innings[AppState.currentInning][position] = playerName;
+                    window.AppState.rotation.innings[window.AppState.currentInning][position] = playerName;
                     renderRotationEditor();
                     assignPlayerModal.hide();
                 }
@@ -447,32 +469,32 @@ function initializeGameManagement(gameData) {
         });
         
         document.getElementById('addInningBtn')?.addEventListener('click', () => {
-            if(!AppState.rotation) return;
-            const innings = Object.keys(AppState.rotation.innings);
+            if(!window.AppState.rotation) return;
+            const innings = Object.keys(window.AppState.rotation.innings);
             const nextInningNum = innings.length > 0 ? Math.max(...innings.map(Number)) + 1 : 1;
-            AppState.rotation.innings[nextInningNum] = {};
+            window.AppState.rotation.innings[nextInningNum] = {};
             renderInningSelector();
         });
         document.getElementById('removeInningBtn')?.addEventListener('click', () => {
-            if(!AppState.rotation) return;
-            const innings = Object.keys(AppState.rotation.innings);
+            if(!window.AppState.rotation) return;
+            const innings = Object.keys(window.AppState.rotation.innings);
             if(innings.length <= 1) return alert("Cannot remove the last inning.");
             const lastInningNum = Math.max(...innings.map(Number));
-            delete AppState.rotation.innings[lastInningNum];
-            if(AppState.currentInning == lastInningNum) {
-                AppState.currentInning = Math.max(...Object.keys(AppState.rotation.innings).map(Number));
+            delete window.AppState.rotation.innings[lastInningNum];
+            if(window.AppState.currentInning == lastInningNum) {
+                window.AppState.currentInning = Math.max(...Object.keys(window.AppState.rotation.innings).map(Number));
             }
             renderRotationEditor();
         });
         document.getElementById('copyInningBtn')?.addEventListener('click', () => {
-            if (!AppState.rotation || !AppState.currentInning) return;
-            AppState.copiedInningData = { ...AppState.rotation.innings[AppState.currentInning] };
+            if (!window.AppState.rotation || !window.AppState.currentInning) return;
+            window.AppState.copiedInningData = { ...window.AppState.rotation.innings[window.AppState.currentInning] };
             document.getElementById('inning-paste-controls').classList.remove('d-none');
             document.getElementById('rotation-board').classList.add('copy-mode');
             const pasteCheckboxes = document.getElementById('inning-paste-checkboxes');
-            const allInnings = Object.keys(AppState.rotation.innings);
+            const allInnings = Object.keys(window.AppState.rotation.innings);
             pasteCheckboxes.innerHTML = allInnings
-                .filter(inn => inn != AppState.currentInning)
+                .filter(inn => inn != window.AppState.currentInning)
                 .map(inn => `
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="checkbox" value="${inn}" id="paste-check-${inn}">
@@ -481,11 +503,11 @@ function initializeGameManagement(gameData) {
                 `).join('');
         });
         document.getElementById('pasteToSelectedBtn')?.addEventListener('click', () => {
-            if (!AppState.copiedInningData) return;
+            if (!window.AppState.copiedInningData) return;
             const selectedInnings = Array.from(document.querySelectorAll('#inning-paste-checkboxes input:checked')).map(cb => cb.value);
             if (selectedInnings.length === 0) return alert('Please select at least one inning to paste to.');
             selectedInnings.forEach(inn => {
-                AppState.rotation.innings[inn] = { ...AppState.copiedInningData };
+                window.AppState.rotation.innings[inn] = { ...window.AppState.copiedInningData };
             });
             exitCopyMode();
             updatePlayingTimeSummary();
