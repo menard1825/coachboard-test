@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
-{% macro position_select(name, id, selected_val, title="Select Position", classes="form-select") %}\
-    <select name="{{ name }}" id="{{ id }}" class="{{ classes }}" title="{{ title }}">\
-        <option value="" {% if not selected_val %}selected{% endif %}>{{ title }}</option>\
-        {% set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'] %}\
-        {% for pos in positions %}\
-            <option value="{{ pos }}" {% if selected_val == pos %}selected{% endif %}>{{ pos }}</option>\
-        {% endfor %}\
-    </select>\
-{% endmacro %}
+{% macro position_select(name, id, selected_val, title="Select Position", classes="form-select") -%}
+    <select name="{{ name }}" id="{{ id }}" class="{{ classes }}" title="{{ title }}">
+        <option value="" {% if not selected_val %}selected{% endif %}>{{ title }}</option>
+        {%- set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'] -%}
+        {%- for pos in positions -%}
+            <option value="{{ pos }}" {% if selected_val == pos %}selected{% endif %}>{{ pos }}</option>
+        {%- endfor -%}
+    </select>
+{%- endmacro %}
 <head>
   <meta charset="UTF-8">
   <title>{% if current_team %}{{ current_team.team_name }} - Coach Planner{% else %}Coach Planner{% endif %}</title>
@@ -440,9 +440,9 @@
             <div class="row g-3">
                 <div class="col-md-6"><label class="form-label">Player Name</label><input type="text" class="form-control" name="name" required></div>
                 <div class="col-md-6"><label class="form-label">Jersey Number</label><input type="number" class="form-control" name="number"></div>
-                <div class="col-md-4">{{ position_select('position1', 'add_position1', '', title='Primary Position') }}</div>
-                <div class="col-md-4">{{ position_select('position2', 'add_position2', '', title='Secondary Position') }}</div>
-                <div class="col-md-4">{{ position_select('position3', 'add_position3', '', title='Tertiary Position') }}</div>
+                <div class="col-md-4"><label class="form-label">Primary Position</label>{{ position_select('position1', 'add_position1', '', title='') }}</div>
+                <div class="col-md-4"><label class="form-label">Secondary Position</label>{{ position_select('position2', 'add_position2', '', title='') }}</div>
+                <div class="col-md-4"><label class="form-label">Tertiary Position</label>{{ position_select('position3', 'add_position3', '', title='') }}</div>
                 <div class="col-md-4"><label class="form-label">Throws</label><select name="throws" class="form-select"><option value="Right">Right</option><option value="Left">Left</option></select></div>
                 <div class="col-md-4"><label class="form-label">Bats</label><select name="bats" class="form-select"><option value="Right">Right</option><option value="Left">Left</option></select></div>
                 <div class="col-md-4"><label class="form-label">Pitcher Role</label><select name="pitcher_role" class="form-select"><option value="Not a Pitcher">Not a Pitcher</option><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
@@ -471,12 +471,12 @@
             <div class="row g-3">
                 <div class="col-md-6"><label class="form-label">Player Name</label><input type="text" class="form-control" name="name" id="edit_name" required></div>
                 <div class="col-md-6"><label class="form-label">Jersey Number</label><input type="number" class="form-control" name="number" id="edit_number"></div>
-                <div class="col-md-4">{{ position_select('position1', 'edit_position1', '', title='Primary Position') }}</div>
-                <div class="col-md-4">{{ position_select('position2', 'edit_position2', '', title='Secondary Position') }}</div>
-                <div class="col-md-4">{{ position_select('position3', 'edit_position3', '', title='Tertiary Position') }}</div>
+                <div class="col-md-4"><label class="form-label">Primary Position</label>{{ position_select('position1', 'edit_position1', '', title='') }}</div>
+                <div class="col-md-4"><label class="form-label">Secondary Position</label>{{ position_select('position2', 'edit_position2', '', title='') }}</div>
+                <div class="col-md-4"><label class="form-label">Tertiary Position</label>{{ position_select('position3', 'edit_position3', '', title='') }}</div>
                 <div class="col-md-4"><label class="form-label">Throws</label><select name="throws" class="form-select" id="edit_throws"><option value="Right">Right</option><option value="Left">Left</option></select></div>
                 <div class="col-md-4"><label class="form-label">Bats</label><select name="bats" class="form-select" id="edit_bats"><option value="Right">Right</option><option value="Left">Left</option></select></div>
-                <div class="col-md-4"><label class="form-label">Pitcher Role</label><select name="pitcher_role" class="form-select" id="edit_pitcher_role"><option value="Not a Pitcher">Not a Pitcher</option><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
+                <div class="col-md-4"><label class="form-label">Pitcher Role</label><select name="pitcher_role" class="form-select" id="edit_pitcher_role"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Not a Pitcher</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starter</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Reliever</option></select></div>
                 <div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes" id="edit_notes" rows="2"></textarea></div>
             </div>
         </div>
@@ -589,9 +589,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let sortableInstances = {};
     let lineupEditorModal;
 
-    const renderPositionSelect = (name, id, selectedVal = '', title = 'Pos', classes = 'form-select form-select-sm') => {
+    const renderPositionSelect = (name, id, selectedVal = '', title = 'Select Position', classes = 'form-select form-select-sm') => {
         const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'];
-        let optionsHtml = `<option value="" ${!selectedVal ? 'selected' : ''}>${title}</option>`;
+        let optionsHtml = `<option value="" {% if not selected_val %}selected{% endif %}>${title}</option>`;
         positions.forEach(pos => {
             optionsHtml += `<option value="${pos}" ${selectedVal === pos ? 'selected' : ''}>${pos}</option>`;
         });
@@ -984,7 +984,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (key === 'targets') moveOptions = `<li><form action="/move_scouted_player/targets/committed/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">Move to Committed</button></form></li><li><form action="/move_scouted_player/targets/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">Move to Not Interested</button></form></li>`;
                     else if (key === 'committed') moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item fw-bold">Move to Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">Move to Not Interested</button></form></li>`;
 
-                    html += `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${p.position1 || 'N/A'}${p.position2 ? ` / ${p.position2}` : ''} | Throws: ${p.throws || 'N/A'} | Bats: ${p.bats || 'N/A'}</small></div>
+                    // Construct positions string dynamically, avoiding leading slashes
+                    const positions = [p.position1, p.position2].filter(Boolean); // Filter out empty strings
+                    const positionsDisplay = positions.length > 0 ? `Pos: ${positions.join(' / ')}` : 'Pos: N/A';
+
+                    html += `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">${positionsDisplay} | Throws: ${p.throws || 'N/A'} | Bats: ${p.bats || 'N/A'}</small></div>
                         <div class="btn-group"><a href="/delete_scouted_player/${key}/${p.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');" title="Remove Player"><i class="bi bi-trash"></i></a>
                         ${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false"><span class="visually-hidden">Toggle Dropdown</span></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
                 });
@@ -1279,7 +1283,7 @@ document.addEventListener('DOMContentLoaded', () => {
             moreMenuOverlay.querySelectorAll('a').forEach(link => {
                 link.addEventListener('click', (event) => {
                     // If it's a tab link, use switchTab
-                    if (link.has(link.getAttribute('href'))) { // Check if it's a tab link
+                    if (link.hasAttribute('data-bs-toggle') && link.getAttribute('data-bs-toggle') === 'tab') { // Corrected condition
                         event.preventDefault(); // Prevent default Bootstrap tab behavior
                         switchTab(link.getAttribute('href'));
                         moreMenuOverlay.classList.add('hidden'); // Hide the overlay immediately
