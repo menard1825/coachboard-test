@@ -8,7 +8,7 @@ import time
 from sqlalchemy import func
 import random
 import string
-import math # FIXED: Import math library for data cleaning
+import math
 from db import SessionLocal
 from models import (
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
@@ -20,7 +20,6 @@ from sqlalchemy.inspection import inspect as sqlalchemy_inspect
 from sqlalchemy.orm import joinedload
 from flask_socketio import SocketIO, emit
 import uuid
-# ADDED: New import for file handling
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -29,11 +28,11 @@ app.secret_key = 'xXxG#fjs72d_!z921!kJjkjsd123kfj3FJ!*kfdjf8s!jf9jKJJJd'
 # Set the permanent session lifetime to 30 days
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-# ADDED: Configuration for file uploads
+# Configuration for file uploads
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
 
-# ADDED: Helper function to check for allowed file extensions
+# Helper function to check for allowed file extensions
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -91,7 +90,7 @@ def admin_required(f):
 def inject_current_year():
     return {'current_year': datetime.now().year}
 
-# ADDED: This makes the current team's info (like the logo) available on every page.
+# This makes the current team's info (like the logo) available on every page.
 @app.context_processor
 def inject_team_info():
     if 'team_id' in session:
@@ -410,7 +409,7 @@ def home():
 
             player_activity_log[player.name] = sorted(log_entries, key=lambda x: x['timestamp'], reverse=True)
 
-        # FIXED: Sanitize pitching data to prevent JSON errors with non-finite numbers
+        # Sanitize pitching data to prevent JSON errors with non-finite numbers
         clean_pitching_outings = []
         for po in pitching_outings:
             innings = float(po.innings) if po.innings is not None else 0.0
@@ -461,11 +460,32 @@ def home():
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
-            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings) # NEW
-            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats} # MERGED NEW
+            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
+            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
             
         current_team = db.query(Team).filter_by(id=session['team_id']).first()
-        return render_template('index.html', data=app_data, session=session, tab_order=user_tab_order, all_tabs=all_tabs, position_counts=position_counts, pitch_count_summary=pitch_count_summary, current_team=current_team)
+
+        # Calculate cumulative pitching stats for all pitchers (for stats.html)
+        pitcher_names_for_stats = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
+        cumulative_pitching_data = {}
+        for name in pitcher_names_for_stats:
+            cumulative_pitching_data[name] = calculate_cumulative_pitching_stats(name, pitching_outings)
+
+        # Calculate cumulative position stats for all players (for stats.html)
+        cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
+
+        return render_template('index.html',
+                               data=app_data,
+                               session=session,
+                               tab_order=user_tab_order,
+                               all_tabs=all_tabs,
+                               position_counts=position_counts,
+                               pitch_count_summary=pitch_count_summary,
+                               current_team=current_team,
+                               # Pass the new stats data to index.html
+                               roster_players=roster_players,
+                               cumulative_pitching_data=cumulative_pitching_data,
+                               cumulative_position_data=cumulative_position_data)
     finally:
         db.close()
 
@@ -522,7 +542,7 @@ def get_app_data():
 
             player_activity_log[player.name] = sorted(log_entries, key=lambda x: x['timestamp'], reverse=True)
 
-        # FIXED: Sanitize pitching data to prevent JSON errors with non-finite numbers
+        # Sanitize pitching data to prevent JSON errors with non-finite numbers
         clean_pitching_outings = []
         for po in pitching_outings:
             innings = float(po.innings) if po.innings is not None else 0.0
@@ -562,8 +582,8 @@ def get_app_data():
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
-            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings) # NEW
-            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats} # MERGED NEW
+            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
+            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
 
         app_data_response = {'full_data': app_data, 'player_order': player_order, 'session': {'username': session.get('username'), 'role': session.get('role'), 'full_name': session.get('full_name')}, 'pitch_count_summary': pitch_count_summary}
         return jsonify(app_data_response)
@@ -640,7 +660,7 @@ def add_user():
         full_name = request.form.get('full_name')
         role = request.form.get('role', 'Assistant Coach')
 
-        # MODIFIED: Determine the correct team ID
+        # Determine the correct team ID
         team_id_for_new_user = None
         if session.get('role') == 'Super Admin':
             form_team_id = request.form.get('team_id')
@@ -672,7 +692,7 @@ def add_user():
             role=role,
             tab_order=json.dumps(default_tab_keys),
             last_login='Never',
-            team_id=team_id_for_new_user  # Use the determined team ID
+            team_id=team_id_for_new_user
         )
         db.add(new_user)
         db.commit()
@@ -1801,8 +1821,8 @@ def game_management(game_id):
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
-            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings) # NEW
-            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats} # MERGED NEW
+            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
+            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
         game_pitching_log = [p for p in pitching_outings if p.opponent == game.opponent and p.date == game.date]
         return render_template('game_management.html', game=game_dict, roster=roster_list, lineup=lineup_dict, rotation=rotation_dict, pitch_count_summary=pitch_count_summary, game_pitching_log=game_pitching_log, session=session)
     finally:

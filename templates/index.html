@@ -133,7 +133,7 @@
     }
     #player-dev-accordion .accordion-button:not(.collapsed) {
         background-color: #e9ecef; /* Slightly darker when open */
-        color: #212529;
+        color: #212121;
         border-bottom-color: #ced4da;
     }
     #player-dev-accordion .accordion-body {
@@ -175,6 +175,13 @@
     </a>
     <div class="collapse navbar-collapse d-none d-lg-flex" id="navbarResponsive">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0 desktop-nav" id="mainTabsDesktop" role="tablist">
+            {# ADDED: New 'Stats' tab link #}
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#stats_tab" role="tab">
+                    <i class="bi bi-bar-chart-fill me-1 drag-handle" title="Drag to reorder"></i>
+                    Stats
+                </a>
+            </li>
             {% for tab_key in tab_order %}
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
@@ -217,6 +224,11 @@
   {% endwith %}
 
   <div class="tab-content">
+    {# ADDED: New tab pane for Stats #}
+    <div class="tab-pane fade" id="stats_tab">
+        {% include 'stats.html' %}
+    </div>
+
     <div class="tab-pane fade" id="roster">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h4 class="mb-0">Current Roster</h4>
@@ -387,6 +399,7 @@
     <h4 class="mb-3">More Options</h4>
     <div class="list-group mb-4">
         <a class="list-group-item list-group-item-action" href="{{ url_for('pitching_rules') }}"><i class="bi bi-gavel me-2"></i>Pitching Rules</a>
+        <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#stats_tab" role="tab"><i class="bi bi-bar-chart-fill me-2"></i>Stats</a> {# ADDED: Stats link to mobile "More" menu #}
         <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#scouting_list" role="tab"><i class="bi bi-binoculars-fill me-2"></i>Scouting List</a>
         <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#pitching" role="tab"><i class="bi bi-bullseye me-2"></i>Pitching Log</a>
         <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#collaboration" role="tab"><i class="bi bi-people-fill me-2"></i>Coaches Log</a>
@@ -860,11 +873,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 return `
                                 <li class="list-group-item ${itemClass}">
                                     <div class="d-flex w-100 justify-content-between">
-                                        <h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.type)}: <span class="text-muted fw-normal">${escapeHTML(log.subtype)}</span></h6>
+                                        <h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${escapeHTML(log.text)}</span></h6>
                                         <small>${log.date}</small>
                                     </div>
-                                    <p class="mb-1">${escapeHTML(log.text)}</p>
-                                    ${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}
+                                    <p class="mb-1">${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}
                                     <small class="text-muted">By: ${escapeHTML(log.author)}</small>
                                     ${createActionButtons(log)}
                                 </li>`;
