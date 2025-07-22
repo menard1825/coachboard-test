@@ -1,45 +1,65 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Admin Settings - Coach Planner</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f9f9f9; }
-        .btn-primary { background-color: #c8102e; border-color: #c8102e; }
-    </style>
-</head>
-<body>
-<div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Admin Settings</h2>
-        <a href="{{ url_for('home') }}" class="btn btn-secondary">Back to App</a>
-    </div>
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+{% extends "base.html" %}
 
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">General Settings</h5>
-            <form method="POST" action="{{ url_for('update_admin_settings') }}">
-                <div class="mb-3">
-                    <label for="team_name" class="form-label">Team Name</label>
-                    <input type="text" class="form-control" id="team_name" name="team_name" value="{{ settings.team_name or '' }}">
+{% block title %}Admin Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Admin Settings</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="{{ url_for('home') }}" class="btn btn-sm btn-outline-secondary">
+                <span data-feather="arrow-left"></span>
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">General Settings</h5>
                 </div>
-                <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" role="switch" id="display_coach_names" name="display_coach_names" {% if settings.display_coach_names %}checked{% endif %}>
-                    <label class="form-check-label" for="display_coach_names">Display Full Names for Coaches (instead of usernames)</label>
+                <div class="card-body">
+                    <form action="{{ url_for('update_admin_settings') }}" method="POST">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="team_name" name="team_name" value="{{ settings.team_name }}" required>
+                            <label for="team_name">Team Name</label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="display_coach_names" name="display_coach_names" {% if settings.display_coach_names %}checked{% endif %}>
+                            <label class="form-check-label" for="display_coach_names">Display Full Coach Names in Logs</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Save General Settings</button>
+                    </form>
                 </div>
-                <button type="submit" class="btn btn-primary">Save Settings</button>
-            </form>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">Team Logo</h5>
+                </div>
+                <div class="card-body text-center">
+                    <p>Current Logo:</p>
+                    {% if settings.logo_path %}
+                        <img src="{{ url_for('static', filename='uploads/logos/' + settings.logo_path) }}" alt="Team Logo" class="img-thumbnail mb-3" style="max-height: 150px;">
+                    {% else %}
+                        <p class="text-muted">No custom logo uploaded.</p>
+                    {% endif %}
+                    
+                    <form action="{{ url_for('upload_logo') }}" method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="logo" class="form-label">Upload New Logo</label>
+                            <input class="form-control" type="file" id="logo" name="logo" required>
+                            <div class="form-text">Allowed types: png, jpg, gif, svg.</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Upload Logo</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-</body>
-</html>
+{% endblock %}

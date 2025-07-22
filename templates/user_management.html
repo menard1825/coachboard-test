@@ -52,13 +52,41 @@
             <div class="card h-100">
                 <div class="card-header"><h5 class="mb-0">Existing Teams & Codes</h5></div>
                 <div class="card-body">
-                    <p class="card-text">A permanent list of all teams and their registration codes.</p>
+                    <p class="card-text">A permanent list of all teams and their registration codes. A team can only be deleted if it has no users.</p>
                      <ul class="list-group">
                         {% for team in teams %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ team.team_name }}
-                            <span class="badge bg-dark rounded-pill" style="font-family: monospace;">{{ team.registration_code }}</span>
+                            <div>
+                                {{ team.team_name }}
+                                <br>
+                                <small class="text-muted" style="font-family: monospace;">{{ team.registration_code }}</small>
+                            </div>
+                            
+                            <span class="d-inline-block" tabindex="0" {% if team.users|length > 0 %}data-bs-toggle="tooltip" title="Cannot delete a team with active users"{% endif %}>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTeamModal-{{ team.id }}" {% if team.users|length > 0 %}disabled style="pointer-events: none;"{% endif %}>
+                                    <span data-feather="trash-2" class="align-text-bottom"></span>
+                                </button>
+                            </span>
                         </li>
+
+                        <div class="modal fade" id="deleteTeamModal-{{ team.id }}" tabindex="-1" aria-labelledby="deleteTeamModalLabel-{{ team.id }}" aria-hidden="true">
+                          <div class="modal-dialog">
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <h5 class="modal-title" id="deleteTeamModalLabel-{{ team.id }}">Delete Team: {{ team.team_name }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body">
+                                <p class="text-danger"><strong>Warning:</strong> This action cannot be undone.</p>
+                                <p>Are you absolutely sure you want to delete the team <strong>{{ team.team_name }}</strong> and its registration code? This is only possible if no users are assigned to this team.</p>
+                              </div>
+                              <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <a href="{{ url_for('delete_team', team_id=team.id) }}" class="btn btn-danger">Delete Team</a>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                         {% else %}
                         <li class="list-group-item">No teams created yet.</li>
                         {% endfor %}
@@ -96,6 +124,22 @@
                                     <label for="role">Role</label>
                                 </div>
                             </div>
+                            
+                            {# MODIFIED: Add Team dropdown for Super Admins #}
+                            {% if session.role == 'Super Admin' %}
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    <select class="form-select" id="team_id" name="team_id" required>
+                                        <option value="" disabled selected>Select a Team</option>
+                                        {% for team in teams %}
+                                        <option value="{{ team.id }}">{{ team.team_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label for="team_id">Assign to Team</label>
+                                </div>
+                            </div>
+                            {% endif %}
+
                         </div>
                         <button type="submit" class="btn btn-primary w-100">
                              <span data-feather="user-plus" class="align-text-bottom"></span>

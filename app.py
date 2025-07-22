@@ -8,8 +8,8 @@ import time
 from sqlalchemy import func
 import random
 import string
-from db import SessionLocal # Import SessionLocal
-from models import ( # Import all necessary models
+from db import SessionLocal 
+from models import ( 
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
     Rotation, Game, CollaborationNote, PracticePlan, PracticeTask,
     PlayerDevelopmentFocus, Sign
@@ -19,12 +19,24 @@ from sqlalchemy.inspection import inspect as sqlalchemy_inspect
 from sqlalchemy.orm import joinedload 
 from flask_socketio import SocketIO, emit
 import uuid
+# ADDED: New import for file handling
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = 'xXxG#fjs72d_!z921!kJjkjsd123kfj3FJ!*kfdjf8s!jf9jKJJJd' # IMPORTANT: Change this to a strong, random key in production
+app.secret_key = 'xXxG#fjs72d_!z921!kJjkjsd123kfj3FJ!*kfdjf8s!jf9jKJJJd'
 
 # Set the permanent session lifetime to 30 days
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+
+# ADDED: Configuration for file uploads
+app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+
+# ADDED: Helper function to check for allowed file extensions
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
 
 def check_database_initialized():
     """
@@ -52,7 +64,6 @@ def check_database_initialized():
         print("="*70)
         exit()
 
-# ADDED: Initialize Flask-SocketIO
 socketio = SocketIO(app)
 
 def login_required(f):
@@ -78,6 +89,18 @@ def admin_required(f):
 @app.context_processor
 def inject_current_year():
     return {'current_year': datetime.now().year}
+
+# ADDED: This makes the current team's info (like the logo) available on every page.
+@app.context_processor
+def inject_team_info():
+    if 'team_id' in session:
+        db = SessionLocal()
+        try:
+            team = db.query(Team).filter_by(id=session['team_id']).first()
+            return {'current_team': team}
+        finally:
+            db.close()
+    return {}
 
 # --- AUTHENTICATION ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -467,21 +490,18 @@ def save_tab_order():
     finally:
         db.close()
 
-# MODIFIED: This function now queries for all teams to display their registration codes.
 @app.route('/admin/users')
 @admin_required
 def user_management():
     db = SessionLocal()
     try:
-        teams = [] # Initialize teams list
+        teams = [] 
         if session.get('role') == 'Super Admin':
             users = db.query(User).options(joinedload(User.team)).all()
-            # Query for all teams if the user is a Super Admin
-            teams = db.query(Team).order_by(Team.team_name).all() 
-        else: # Head Coach
+            teams = db.query(Team).options(joinedload(Team.users)).order_by(Team.team_name).all() 
+        else:
             users = db.query(User).filter_by(team_id=session['team_id']).options(joinedload(User.team)).all()
         
-        # Pass the 'teams' list to the template
         return render_template('user_management.html', users=users, teams=teams, session=session)
     finally:
         db.close()
@@ -495,6 +515,18 @@ def add_user():
         password = request.form.get('password')
         full_name = request.form.get('full_name')
         role = request.form.get('role', 'Assistant Coach')
+
+        # MODIFIED: Determine the correct team ID
+        team_id_for_new_user = None
+        if session.get('role') == 'Super Admin':
+            form_team_id = request.form.get('team_id')
+            if not form_team_id:
+                flash('Super Admins must select a team for the new user.', 'danger')
+                return redirect(url_for('user_management'))
+            team_id_for_new_user = int(form_team_id)
+        else:
+            team_id_for_new_user = session['team_id']
+
         if not username or not password:
             flash('Username and password are required.', 'danger')
             return redirect(url_for('user_management'))
@@ -509,10 +541,20 @@ def add_user():
         hashed_password = generate_password_hash(password)
         default_tab_keys = ['roster', 'lineups', 'pitching', 'scouting_list', 'rotations', 'games', 'collaboration', 'practice_plan']
         
-        new_user = User(username=username, full_name=full_name, password_hash=hashed_password, role=role, tab_order=json.dumps(default_tab_keys), last_login='Never', team_id=session['team_id'])
+        new_user = User(
+            username=username, 
+            full_name=full_name, 
+            password_hash=hashed_password, 
+            role=role, 
+            tab_order=json.dumps(default_tab_keys), 
+            last_login='Never', 
+            team_id=team_id_for_new_user  # Use the determined team ID
+        )
         db.add(new_user)
         db.commit()
-        flash(f"User '{username}' created successfully for your team.", 'success')
+        
+        team_name = db.query(Team).filter_by(id=team_id_for_new_user).first().team_name
+        flash(f"User '{username}' created successfully for team '{team_name}'.", 'success')
         socketio.emit('data_updated', {'message': 'A new user was added.'})
         return redirect(url_for('user_management'))
     finally:
@@ -541,7 +583,6 @@ def create_team():
         db.commit()
 
         flash(f'Team "{new_team.team_name}" created successfully!', 'success')
-        # We no longer need to flash the code, as it will be in a permanent list.
         return redirect(url_for('user_management'))
 
     except Exception as e:
@@ -552,6 +593,38 @@ def create_team():
     finally:
         db.close()
 
+@app.route('/admin/delete_team/<int:team_id>')
+@login_required
+def delete_team(team_id):
+    if session.get('role') != 'Super Admin':
+        flash('You do not have permission to perform this action.', 'danger')
+        return redirect(url_for('user_management'))
+
+    db = SessionLocal()
+    try:
+        team_to_delete = db.query(Team).filter_by(id=team_id).first()
+
+        if not team_to_delete:
+            flash('Team not found.', 'danger')
+            return redirect(url_for('user_management'))
+        
+        if team_to_delete.id == session.get('team_id'):
+            flash('You cannot delete your own active team.', 'danger')
+            return redirect(url_for('user_management'))
+
+        user_count = db.query(User).filter_by(team_id=team_id).count()
+        if user_count > 0:
+            flash(f'Cannot delete team "{team_to_delete.team_name}" because it still has {user_count} user(s) assigned to it.', 'danger')
+            return redirect(url_for('user_management'))
+
+        flash(f'Successfully deleted team "{team_to_delete.team_name}".', 'success')
+        db.delete(team_to_delete)
+        db.commit()
+        socketio.emit('data_updated', {'message': f'Team {team_to_delete.team_name} deleted.'})
+        return redirect(url_for('user_management'))
+
+    finally:
+        db.close()
 
 @app.route('/admin/settings', methods=['GET'])
 @admin_required
@@ -579,6 +652,52 @@ def update_admin_settings():
         
         flash('General settings updated successfully!', 'success')
         socketio.emit('data_updated', {'message': 'Team settings updated.'})
+        return redirect(url_for('admin_settings'))
+    finally:
+        db.close()
+
+@app.route('/admin/upload_logo', methods=['POST'])
+@admin_required
+def upload_logo():
+    db = SessionLocal()
+    try:
+        team = db.query(Team).filter_by(id=session['team_id']).first()
+        if not team:
+            flash('Your team could not be found.', 'danger')
+            return redirect(url_for('admin_settings'))
+
+        if 'logo' not in request.files:
+            flash('No file part in the request.', 'danger')
+            return redirect(url_for('admin_settings'))
+        
+        file = request.files['logo']
+        if file.filename == '':
+            flash('No selected file.', 'danger')
+            return redirect(url_for('admin_settings'))
+
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            unique_id = uuid.uuid4().hex
+            file_ext = filename.rsplit('.', 1)[1].lower()
+            new_filename = f"{team.id}_{unique_id}.{file_ext}"
+            
+            if team.logo_path:
+                old_logo_path = os.path.join(app.config['UPLOAD_FOLDER'], team.logo_path)
+                if os.path.exists(old_logo_path):
+                    os.remove(old_logo_path)
+            
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+            file.save(file_path)
+            team.logo_path = new_filename
+            db.commit()
+            
+            flash('Team logo uploaded successfully!', 'success')
+            socketio.emit('data_updated', {'message': 'Team logo updated.'})
+        else:
+            flash('Invalid file type. Allowed types are: png, jpg, jpeg, gif, svg.', 'danger')
+            
         return redirect(url_for('admin_settings'))
     finally:
         db.close()
