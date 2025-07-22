@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
-{% macro position_select(name, id, selected_val, title="Select Position", classes="form-select") %}
-    <select name="{{ name }}" id="{{ id }}" class="{{ classes }}" title="{{ title }}">
-        <option value="" {% if not selected_val %}selected{% endif %}>{{ title }}</option>
-        {% set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'] %}
-        {% for pos in positions %}
-            <option value="{{ pos }}" {% if selected_val == pos %}selected{% endif %}>{{ pos }}</option>
-        {% endfor %}
-    </select>
+{% macro position_select(name, id, selected_val, title="Select Position", classes="form-select") %}\
+    <select name="{{ name }}" id="{{ id }}" class="{{ classes }}" title="{{ title }}">\
+        <option value="" {% if not selected_val %}selected{% endif %}>{{ title }}</option>\
+        {% set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'] %}\
+        {% for pos in positions %}\
+            <option value="{{ pos }}" {% if selected_val == pos %}selected{% endif %}>{{ pos }}</option>\
+        {% endfor %}\
+    </select>\
 {% endmacro %}
 <head>
   <meta charset="UTF-8">
@@ -96,6 +96,65 @@
     .tab-content > .tab-pane.active {
         display: block;
     }
+
+    /* Roster Accordion Specific Styles */
+    #rosterAccordion .accordion-button {
+        display: flex;
+        align-items: center;
+    }
+    #rosterAccordion .accordion-button .drag-handle {
+        margin-right: 10px;
+    }
+    #rosterAccordion .accordion-button strong {
+        flex-grow: 1;
+        text-align: left;
+    }
+    #rosterAccordion .accordion-body .form-control,
+    #rosterAccordion .accordion-body .form-select {
+        margin-bottom: 10px; /* Add some spacing between inline form elements */
+    }
+    #rosterAccordion .accordion-body .row.g-3 {
+        align-items: flex-end; /* Align elements at the bottom */
+    }
+
+    /* Player Development Accordion Styles */
+    #player-dev-accordion .accordion-item {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    #player-dev-accordion .accordion-button {
+        background-color: #f8f9fa; /* Light background for distinction */
+        color: #343a40;
+        font-weight: 600;
+        border-bottom: 1px solid #dee2e6;
+        border-radius: 0.375rem; /* Rounded corners for the button */
+    }
+    #player-dev-accordion .accordion-button:not(.collapsed) {
+        background-color: #e9ecef; /* Slightly darker when open */
+        color: #212529;
+        border-bottom-color: #ced4da;
+    }
+    #player-dev-accordion .accordion-body {
+        background-color: #ffffff;
+        padding: 1rem;
+    }
+    #player-dev-accordion .list-group-item {
+        border-left: 3px solid #007bff; /* Default blue for active focus */
+        margin-bottom: 0.5rem;
+        padding-left: 1rem;
+    }
+    #player-dev-accordion .list-group-item.completed-focus {
+        border-left-color: #28a745; /* Green for completed */
+        opacity: 0.8;
+    }
+    #player-dev-accordion .list-group-item.lesson-entry {
+        border-left-color: #ffc107; /* Yellow for lessons */
+    }
+    #player-dev-accordion .list-group-item.coach-note-entry {
+        border-left-color: #17a2b8; /* Cyan for coach notes */
+    }
   </style>
 </head>
 <body>
@@ -168,7 +227,7 @@
                 </button>
             </div>
         </div>
-        <div class="table-responsive" id="rosterContainer">
+        <div class="accordion" id="rosterAccordion">
             </div>
     </div>
 
@@ -568,7 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.status === 'success') {
                 savePlayerBtn.textContent = 'Saved!';
-                savePlayerBtn.classList.replace('btn-success', 'btn-secondary');
+                savePlayerBtn.classList.replace('btn-primary', 'btn-success'); // Changed from secondary to primary
             } else {
                 alert(`Error: ${data.message}`);
                 savePlayerBtn.textContent = 'Save Failed';
@@ -579,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             setTimeout(() => {
                 savePlayerBtn.textContent = originalText;
-                savePlayerBtn.classList.replace('btn-secondary', 'btn-success');
+                savePlayerBtn.classList.replace('btn-success', 'btn-primary'); // Changed from secondary to primary
                 savePlayerBtn.disabled = false;
             }, 2000);
         }
@@ -619,8 +678,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function renderRoster() {
-        // FIXED: Corrected the ID to target 'rosterContainer'
-        const container = document.getElementById('rosterContainer');
+        // Changed to use accordion for roster
+        const container = document.getElementById('rosterAccordion');
         const searchTerm = document.getElementById('rosterSearch').value.toLowerCase();
         if (!container) return;
 
@@ -640,41 +699,82 @@ document.addEventListener('DOMContentLoaded', () => {
             return 0;
         });
 
-        const getSortIcon = (key) => {
-            if (AppState.roster_sort.key !== key) return '<i class="bi bi-arrow-down-up"></i>';
-            return AppState.roster_sort.order === 'asc' ? '<i class="bi bi-sort-up"></i>' : '<i class="bi bi-sort-down"></i>';
-        };
-
-        let tableHTML = `
-            <table class="table table-hover align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th scope="col" class="sortable-header" data-sort-key="name">Name <span class="sort-icon">${getSortIcon('name')}</span></th>
-                        <th scope="col" class="sortable-header text-center" data-sort-key="number"># <span class="sort-icon">${getSortIcon('number')}</span></th>
-                        <th scope="col">Positions</th><th scope="col">B/T</th><th scope="col" class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-
+        let html = '';
         let visiblePlayerCount = 0;
         sortedRoster.forEach((p) => {
             if (searchTerm && !p.name.toLowerCase().includes(searchTerm) && !(p.number||'').toString().includes(searchTerm)) return;
+
             visiblePlayerCount++;
             const pNameSafe = escapeHTML(p.name);
-            tableHTML += `
-                <tr data-player-id="${p.id}">
-                    <td><strong>${pNameSafe}</strong></td>
-                    <td class="text-center">${p.number || 'N/A'}</td>
-                    <td>${[p.position1, p.position2, p.position3].filter(Boolean).join(', ') || 'N/A'}</td>
-                    <td>${p.bats || 'N/A'} / ${p.throws || 'N/A'}</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#editPlayerModal" data-player-id="${p.id}"><i class="bi bi-pencil"></i> Edit</button>
-                        <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-player-id="${p.id}" data-player-name="${pNameSafe}"><i class="bi bi-trash"></i> Delete</button>
-                    </td>
-                </tr>`;
+            const pNotesSafe = escapeHTML(p.notes || '');
+            const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
+
+            html += `
+            <div class="accordion-item" data-player-name="${pNameSafe}">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-roster-${p.id}">
+                        <i class="bi bi-grip-vertical me-2 drag-handle" title="Drag to reorder"></i>
+                        <strong>${pNameSafe}</strong>&nbsp;(#${p.number || 'N/A'})
+                        <span class="ms-auto text-muted small d-none d-sm-inline">
+                            ${[p.position1, p.position2, p.position3].filter(Boolean).join(', ') || 'N/A'} | ${p.bats || 'N/A'} / ${p.throws || 'N/A'}
+                        </span>
+                    </button>
+                </h2>
+                <div id="collapse-roster-${p.id}" class="accordion-collapse collapse" data-bs-parent="#rosterAccordion">
+                    <div class="accordion-body">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-12">
+                                <h5 class="mb-0">Player Profile Notes</h5>
+                            </div>
+                            <div class="col-12">
+                                <textarea class="form-control" name="notes" rows="2" placeholder="General Player Notes">${pNotesSafe}</textarea>
+                            </div>
+                            ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${p.notes_timestamp || ''}</small></div>` : ''}
+                            <hr class="my-3">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Player Name</label>
+                                <input type="text" class="form-control" name="name" value="${pNameSafe}" placeholder="Name">
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label">Jersey #</label>
+                                <input type="number" class="form-control" name="number" value="${p.number || ''}" placeholder="J#">
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label">Primary Pos</label>
+                                ${renderPositionSelect('position1', `position1_${p.id}`, p.position1, 'Pos1', 'form-select')}
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label">Secondary Pos</label>
+                                ${renderPositionSelect('position2', `position2_${p.id}`, p.position2, 'Pos2', 'form-select')}
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label">Tertiary Pos</label>
+                                ${renderPositionSelect('position3', `position3_${p.id}`, p.position3, 'Pos3', 'form-select')}
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label">Throws</label>
+                                <select name="throws" class="form-select" title="Throws"><option value="Right" ${p.throws === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.throws === 'Left' ? 'selected' : ''}>Left</option></select>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label">Bats</label>
+                                <select name="bats" class="form-select" title="Bats"><option value="Right" ${p.bats === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.bats === 'Left' ? 'selected' : ''}>Left</option></select>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label">Pitcher Role</label>
+                                <select name="pitcher_role" class="form-select" title="Pitcher Role"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Not a Pitcher</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starter</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Reliever</option></select>
+                            </div>
+                            <div class="col-12 d-flex justify-content-end mt-3">
+                                <button type="button" class="btn btn-sm btn-primary me-2 save-player-btn" data-player-id="${p.id}">Save Changes</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-player-id="${p.id}" data-player-name="${pNameSafe}">Delete Player</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
         });
-        tableHTML += `</tbody></table>`;
-        container.innerHTML = visiblePlayerCount > 0 ? tableHTML : `<div class="p-3 text-center text-muted">No players found.</div>`;
+        if (visiblePlayerCount === 0) html = `<div class="p-3 text-center text-muted">No players found.</div>`;
+        container.innerHTML = html;
+        attachRosterSaveListeners();
     }
 
     function renderPlayerDevelopment() {
@@ -715,41 +815,63 @@ document.addEventListener('DOMContentLoaded', () => {
             const activityLog = playerDevData[p.name] || [];
             const pNameSafe = escapeHTML(p.name);
             
+            // Calculate active focuses for summary
+            const activeFocusCount = activityLog.filter(log => log.type === 'Development' && log.status === 'active').length;
+            const summaryText = activeFocusCount > 0 ? `${activeFocusCount} active focus${activeFocusCount > 1 ? 'es' : ''}` : 'No active focuses';
+
             html += `
             <div class="accordion-item" data-player-name="${pNameSafe}">
-                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-dev-${p.id}"><i class="bi bi-grip-vertical me-2 drag-handle"></i><strong>${pNameSafe}</strong></button></h2>
-                <div id="collapse-dev-${p.id}" class="accordion-collapse collapse" data-bs-parent="#player-dev-accordion"><div class="accordion-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">Activity Log</h5>
-                        <div class="btn-group"><button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Add New Entry</button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">New Hitting Focus</a></li>
-                                <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">New Pitching Focus</a></li>
-                                <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">New Fielding Focus</a></li>
-                                <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">New Baserunning Focus</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; switchTab('#collaboration');">New Coach Note</a></li>
-                            </ul>
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-dev-${p.id}">
+                        <i class="bi bi-grip-vertical me-2 drag-handle"></i>
+                        <strong>${pNameSafe}</strong>
+                        <span class="ms-auto text-muted small">${summaryText}</span>
+                    </button>
+                </h2>
+                <div id="collapse-dev-${p.id}" class="accordion-collapse collapse" data-bs-parent="#player-dev-accordion">
+                    <div class="accordion-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Activity Log</h5>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Add New Entry</button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">New Hitting Focus</a></li>
+                                    <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">New Pitching Focus</a></li>
+                                    <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">New Fielding Focus</a></li>
+                                    <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">New Baserunning Focus</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; switchTab('#collaboration');">New Coach Note</a></li>
+                                </ul>
+                            </div>
                         </div>
+                        ${activityLog.length > 0 ? `
+                        <ul class="list-group">
+                            ${activityLog.map(log => {
+                                log.player_name = pNameSafe;
+                                let itemClass = '';
+                                if (log.type === 'Development') {
+                                    itemClass = log.status === 'completed' ? 'completed-focus' : 'active-focus';
+                                } else if (log.type === 'Lessons') {
+                                    itemClass = 'lesson-entry';
+                                } else if (log.type === 'Coach Note') {
+                                    itemClass = 'coach-note-entry';
+                                }
+
+                                return `
+                                <li class="list-group-item ${itemClass}">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.type)}: <span class="text-muted fw-normal">${escapeHTML(log.subtype)}</span></h6>
+                                        <small>${log.date}</small>
+                                    </div>
+                                    <p class="mb-1">${escapeHTML(log.text)}</p>
+                                    ${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}
+                                    <small class="text-muted">By: ${escapeHTML(log.author)}</small>
+                                    ${createActionButtons(log)}
+                                </li>`;
+                            }).join('')}
+                        </ul>` : `<div class="text-center p-3 border rounded"><p>No activity logged for this player yet.</p></div>`}
                     </div>
-                    ${activityLog.length > 0 ? `
-                    <ul class="list-group">
-                        ${activityLog.map(log => {
-                            log.player_name = pNameSafe;
-                            return `
-                            <li class="list-group-item">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.type)}: <span class="text-muted fw-normal">${escapeHTML(log.subtype)}</span></h6>
-                                    <small>${log.date}</small>
-                                </div>
-                                <p class="mb-1">${escapeHTML(log.text)}</p>
-                                ${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}
-                                <small class="text-muted">By: ${escapeHTML(log.author)}</small>
-                                ${createActionButtons(log)}
-                            </li>`;
-                        }).join('')}
-                    </ul>` : `<div class="text-center p-3 border rounded"><p>No activity logged for this player yet.</p></div>`}
-                </div></div>
+                </div>
             </div>`;
         });
         container.innerHTML = html;
@@ -916,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <form action="/edit_practice_plan/${plan.id}" method="POST" class="row g-3 mb-3 align-items-end">
                         <div class="col-md-3"><label class="form-label">Date:</label><input type="date" name="plan_date" class="form-control" value="${plan.date}" required></div>
                         <div class="col-md-7"><label class="form-label">General Notes:</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}" placeholder="General theme or focus"></div>
-                        <div class="col-md-2 d-flex justify-content-end"><button type="submit" class="btn btn-sm btn-primary me-2">Save</button><a href="/delete_practice_plan/${plan.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a></div>
+                        <div class="col-md-2 d-flex justify-content-end"><button type="submit" class="btn btn-sm btn-primary me-2">Save</button><a href="/delete_practice_plan/${plan.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a></a></div>
                     </form><hr><h5>Tasks</h5>
                     <form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add a new task..." required><button type="submit" class="btn btn-primary">Add Task</button></div></form>
                     <ul class="list-group task-list">${(plan.tasks || []).map(task => `<li class="list-group-item d-flex justify-content-between align-items-center task-item ${task.status === 'complete' ? 'complete' : ''}" data-task-id="${task.id}" data-plan-id="${plan.id}">
@@ -1021,7 +1143,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         };
-        // Removed createSortable('rosterAccordion', '.drag-handle'); as roster is now a table
+        createSortable('rosterAccordion', '.drag-handle'); // Roster is now sortable via accordion
         createSortable('player-dev-accordion', '.drag-handle');
     }
 
@@ -1097,7 +1219,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // This handles all clicks on the body and delegates them
         document.body.addEventListener('click', (event) => {
-            // Roster Sorting
+            // Roster Sorting (now handled by accordion headers directly)
             const sortHeader = event.target.closest('.sortable-header');
             if (sortHeader) {
                 const sortKey = sortHeader.dataset.sortKey;
@@ -1157,7 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
             moreMenuOverlay.querySelectorAll('a').forEach(link => {
                 link.addEventListener('click', (event) => {
                     // If it's a tab link, use switchTab
-                    if (link.hasAttribute('data-bs-toggle') && link.getAttribute('data-bs-toggle') === 'tab') {
+                    if (link.has(link.getAttribute('href'))) { // Check if it's a tab link
                         event.preventDefault(); // Prevent default Bootstrap tab behavior
                         switchTab(link.getAttribute('href'));
                         moreMenuOverlay.classList.add('hidden'); // Hide the overlay immediately
