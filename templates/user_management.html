@@ -1,120 +1,171 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>User Management - Coach Planner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body { background-color: #f9f9f9; }
-    .btn-primary { background-color: #c8102e; border-color: #c8102e; }
-  </style>
-</head>
-<body>
-<div class="container mt-5">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>User Management</h2>
-    <a href="{{ url_for('home') }}" class="btn btn-secondary">Back to App</a>
-  </div>
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }}">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+{% extends "base.html" %}
 
-  <div class="card mb-4">
-    <div class="card-body">
-      <h5 class="card-title">Create New User</h5>
-      <p>Manually create a new user account and assign them a role.</p>
-      <form method="POST" action="{{ url_for('add_user') }}" class="row g-3 align-items-end">
-        <div class="col-12 col-md-3">
-          <label for="username" class="form-label">Username</label>
-          <input type="text" class="form-control" id="username" name="username" required>
+{% block title %}User Management - Coach Planner{% endblock %}
+
+{% block head %}
+<style>
+  @media (max-width: 767px) {
+    .responsive-stack-table thead { display: none; }
+    .responsive-stack-table tr { display: block; margin-bottom: 1rem; border: 1px solid #dee2e6; }
+    .responsive-stack-table td { display: block; text-align: right; padding-left: 50%; position: relative; }
+    .responsive-stack-table td::before { content: attr(data-label); position: absolute; left: 0.5rem; width: 45%; padding-right: 0.5rem; font-weight: bold; text-align: left; }
+    .responsive-stack-table td:last-child { text-align: center; }
+  }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">User Management</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="{{ url_for('home') }}" class="btn btn-sm btn-outline-secondary">
+                <span data-feather="arrow-left"></span>
+                Back to Dashboard
+            </a>
         </div>
-        <div class="col-12 col-md-3">
-          <label for="full_name" class="form-label">Full Name</label>
-          <input type="text" class="form-control" id="full_name" name="full_name" placeholder="e.g., John Doe">
-        </div>
-        <div class="col-12 col-md-3">
-          <label for="password" class="form-label">Initial Password</label>
-          <input type="password" class="form-control" id="password" name="password" required>
-        </div>
-        <div class="col-12 col-md-2 col-lg-2">
-          <label for="role" class="form-label">Role</label>
-          <select name="role" id="role" class="form-select">
-            <option value="Assistant Coach" selected>Assistant Coach</option>
-            <option value="Game Changer">Game Changer</option>
-            <option value="Head Coach">Head Coach</option>
-            {% if session.role == 'Super Admin' %}
-            <option value="Super Admin">Super Admin</option>
-            {% endif %}
-          </select>
-        </div>
-        <div class="col-12 col-md-1 col-lg-1">
-          <button type="submit" class="btn btn-primary w-100">Create</button>
-        </div>
-      </form>
     </div>
-  </div>
 
-  <div class="table-responsive">
-    <table class="table table-striped align-middle">
-        <thead>
-            <tr>
-                <th>Username</th>
-                <th>Full Name</th>
-                <th>Role</th>
-                <th>Last Login</th>
-                <th style="width: 35%;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in users|sort(attribute='username') %}
-            <tr>
-                <td>{{ user.username }}</td>
-                <td>
-                    <form action="{{ url_for('update_user_details', username=user.username) }}" method="POST" class="d-inline-flex align-items-center gap-2">
-                        <input type="text" name="full_name" class="form-control form-control-sm" value="{{ user.full_name or '' }}" placeholder="Full Name">
-                        <button type="submit" class="btn btn-sm btn-outline-success" title="Save Name"><i class="bi bi-check-lg"></i></button>
+    <div class="row">
+        {% if session.role == 'Super Admin' %}
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header"><h5 class="mb-0">Create a New Team</h5></div>
+                <div class="card-body">
+                    <p class="card-text">Create a team to generate a unique registration code for its Head Coach.</p>
+                    <form action="{{ url_for('create_team') }}" method="POST">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="team_name" name="team_name" placeholder="New Team Name" required>
+                            <label for="team_name">New Team Name</label>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">
+                            <span data-feather="plus-circle" class="align-text-bottom"></span>
+                            Create Team
+                        </button>
                     </form>
-                </td>
-                <td>
-                    {% if user.role == 'Super Admin' %}
-                        <span class="badge bg-danger">Super Admin</span>
-                    {% elif user.role == 'Head Coach' %}
-                        <span class="badge bg-success">Head Coach</span>
-                    {% elif user.role == 'Assistant Coach' %}
-                        <span class="badge bg-info text-dark">Assistant Coach</span>
-                    {% elif user.role == 'Game Changer' %}
-                        <span class="badge bg-secondary">Game Changer</span>
-                    {% else %}
-                        <span class="badge bg-light text-dark">{{ user.role }}</span>
-                    {% endif %}
-                </td>
-                <td>{{ user.last_login or 'Never' }}</td>
-                <td>
-                    <form action="{{ url_for('change_user_role', username=user.username) }}" method="POST" class="d-inline me-2">
-                        <select name="role" class="form-select form-select-sm" onchange="this.form.submit()" style="max-width: 180px;" {% if user.username.lower() == 'mike1825' %}disabled{% endif %}>
-                            <option value="Assistant Coach" {% if user.role == 'Assistant Coach' %}selected{% endif %}>Assistant Coach</option>
-                            <option value="Game Changer" {% if user.role == 'Game Changer' %}selected{% endif %}>Game Changer</option>
-                            <option value="Head Coach" {% if user.role == 'Head Coach' %}selected{% endif %}>Head Coach</option>
-                            {% if session.role == 'Super Admin' %}
-                            <option value="Super Admin" {% if user.role == 'Super Admin' %}selected{% endif %}>Super Admin</option>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header"><h5 class="mb-0">Existing Teams & Codes</h5></div>
+                <div class="card-body">
+                    <p class="card-text">A permanent list of all teams and their registration codes.</p>
+                     <ul class="list-group">
+                        {% for team in teams %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ team.team_name }}
+                            <span class="badge bg-dark rounded-pill" style="font-family: monospace;">{{ team.registration_code }}</span>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item">No teams created yet.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card h-100">
+                <div class="card-header"><h5 class="mb-0">Add a New User to Your Team</h5></div>
+                <div class="card-body">
+                    <form action="{{ url_for('add_user') }}" method="POST">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating"><input type="text" class="form-control" id="username" name="username" placeholder="Username" required><label for="username">Username</label></div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating"><input type="text" class="form-control" id="full_name" name="full_name" placeholder="Full Name"><label for="full_name">Full Name</label></div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating"><input type="password" class="form-control" id="password" name="password" placeholder="Password" required><label for="password">Password</label></div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-floating">
+                                    <select class="form-select" id="role" name="role">
+                                        {% if session.role == 'Super Admin' %}<option value="Super Admin">Super Admin</option>{% endif %}
+                                        <option value="Head Coach">Head Coach</option>
+                                        <option value="Assistant Coach" selected>Assistant Coach</option>
+                                        <option value="Game Changer">Game Changer</option>
+                                    </select>
+                                    <label for="role">Role</label>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                             <span data-feather="user-plus" class="align-text-bottom"></span>
+                             Add User
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0">Current Users</h5></div>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0 align-middle responsive-stack-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Username</th>
+                        <th scope="col">Full Name</th>
+                        <th scope="col">Role</th>
+                        {% if session.role == 'Super Admin' %}<th scope="col">Team</th>{% endif %}
+                        <th scope="col">Last Login</th>
+                        <th scope="col" class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td data-label="Username"><strong>{{ user.username }}</strong></td>
+                        <td data-label="Full Name">
+                            <form action="{{ url_for('update_user_details', username=user.username) }}" method="POST">
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" name="full_name" value="{{ user.full_name or '' }}" placeholder="N/A" aria-label="User's full name">
+                                    <button class="btn btn-outline-secondary" type="submit" title="Save Name"><span data-feather="save" class="align-text-bottom"></span></button>
+                                </div>
+                            </form>
+                        </td>
+                        <td data-label="Role">
+                            {% if user.username.lower() == 'mike1825' %}<span class="badge bg-danger">{{ user.role }}</span>
+                            {% elif user.username == session.username %}<span class="badge bg-success">{{ user.role }}</span>
+                            {% else %}
+                            <form action="{{ url_for('change_user_role', username=user.username) }}" method="POST">
+                                <select class="form-select form-select-sm" name="role" onchange="this.form.submit()">
+                                    {% if session.role == 'Super Admin' %}<option value="Super Admin" {% if user.role == 'Super Admin' %}selected{% endif %}>Super Admin</option>{% endif %}
+                                    <option value="Head Coach" {% if user.role == 'Head Coach' %}selected{% endif %}>Head Coach</option>
+                                    <option value="Assistant Coach" {% if user.role == 'Assistant Coach' %}selected{% endif %}>Assistant Coach</option>
+                                    <option value="Game Changer" {% if user.role == 'Game Changer' %}selected{% endif %}>Game Changer</option>
+                                </select>
+                            </form>
                             {% endif %}
-                        </select>
-                    </form>
-                    <form action="{{ url_for('reset_password', username=user.username) }}" method="POST" class="d-inline me-2">
-                        <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Are you sure you want to reset the password for this user?');" {% if user.username.lower() == 'mike1825' %}disabled{% endif %}>Reset Password</button>
-                    </form>
-                    <a href="{{ url_for('delete_user', username=user.username) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this user?');" {% if user.username.lower() == 'mike1825' %}disabled{% endif %}>Delete</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-  </div>
+                        </td>
+                        {% if session.role == 'Super Admin' %}
+                        <td data-label="Team">{{ user.team.team_name if user.team else 'N/A' }}</td>
+                        {% endif %}
+                        <td data-label="Last Login">{{ user.last_login }}</td>
+                        <td data-label="Actions">
+                            {% if user.username.lower() != 'mike1825' and user.username != session.username %}
+                            <div class="btn-group" role="group">
+                               <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resetPasswordModal-{{ user.username }}">Reset Pass</button>
+                               <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal-{{ user.username }}">Delete</button>
+                            </div>
+                            {% else %}<small class="text-muted">N/A</small>{% endif %}
+                        </td>
+                    </tr>
+                    <div class="modal fade" id="resetPasswordModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reset Password for {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>This will generate a new random password for <strong>{{ user.username }}</strong>. The new password will be displayed in a confirmation message after you click 'Reset'. Are you sure you want to continue?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form action="{{ url_for('reset_password', username=user.username) }}" method="POST" style="display:inline;"><button type="submit" class="btn btn-warning">Reset Password</button></form></div></div></div></div>
+                    <div class="modal fade" id="deleteUserModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Delete User {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-danger"><strong>Warning:</strong> This action cannot be undone. Are you absolutely sure you want to delete the user <strong>{{ user.username }}</strong>?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><a href="{{ url_for('delete_user', username=user.username) }}" class="btn btn-danger">Delete User</a></div></div></div></div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
-</body>
-</html>
+{% endblock %}

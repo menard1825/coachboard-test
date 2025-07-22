@@ -15,6 +15,7 @@
   <div class="row justify-content-center">
     <div class="col-md-6">
       <h2 class="text-center mb-4">Create Your Account</h2>
+      <p class="text-center text-muted">Enter your details and the registration code provided by your team administrator to join your team.</p>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for category, message in messages %}
@@ -36,33 +37,9 @@
           <label for="password">Password (min. 4 characters)</label>
         </div>
         <hr>
-        <div class="mb-3">
-          <div class="form-check">
-            <input class="form-check-input" type="radio" name="team_option" id="create_team_radio" value="create" checked>
-            <label class="form-check-label" for="create_team_radio">
-              Create a new team
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="radio" name="team_option" id="join_team_radio" value="join">
-            <label class="form-check-label" for="join_team_radio">
-              Join an existing team
-            </label>
-          </div>
-        </div>
-
-        <div id="create_team_fields">
-          <div class="form-floating mb-3">
-            <input type="text" class="form-control" id="team_name" name="team_name" placeholder="Team Name">
-            <label for="team_name">Team Name</label>
-          </div>
-        </div>
-
-        <div id="join_team_fields" style="display: none;">
-          <div class="form-floating mb-3">
-            <input type="text" class="form-control" id="registration_code" name="registration_code" placeholder="Registration Code">
+        <div class="form-floating mb-3">
+            <input type="text" class="form-control" id="registration_code" name="registration_code" placeholder="Registration Code" value="{{ registration_code }}" required>
             <label for="registration_code">Team Registration Code</label>
-          </div>
         </div>
 
         <button type="submit" class="btn btn-primary w-100">Register</button>
@@ -73,37 +50,5 @@
     </div>
   </div>
 </div>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const createTeamRadio = document.getElementById('create_team_radio');
-    const joinTeamRadio = document.getElementById('join_team_radio');
-    const createTeamFields = document.getElementById('create_team_fields');
-    const joinTeamFields = document.getElementById('join_team_fields');
-    const teamNameInput = document.getElementById('team_name');
-    const regCodeInput = document.getElementById('registration_code');
-
-    function toggleFields() {
-      if (createTeamRadio.checked) {
-        createTeamFields.style.display = 'block';
-        joinTeamFields.style.display = 'none';
-        teamNameInput.required = true;
-        regCodeInput.required = false;
-      } else {
-        createTeamFields.style.display = 'none';
-        joinTeamFields.style.display = 'block';
-        teamNameInput.required = false;
-        regCodeInput.required = true;
-      }
-    }
-
-    createTeamRadio.addEventListener('change', toggleFields);
-    joinTeamRadio.addEventListener('change', toggleFields);
-    
-    // Initial call to set the correct fields visibility
-    toggleFields();
-  });
-</script>
-
 </body>
 </html>
