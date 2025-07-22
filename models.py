@@ -44,6 +44,8 @@ class Team(Base):
     collaboration_notes = relationship("CollaborationNote", back_populates="team")
     practice_plans = relationship("PracticePlan", back_populates="team")
     signs = relationship("Sign", back_populates="team")
+    # ADDED THIS LINE
+    player_development_focuses = relationship("PlayerDevelopmentFocus", back_populates="team")
 
     def to_dict(self): return to_dict(self)
 
@@ -217,7 +219,8 @@ class PlayerDevelopmentFocus(Base):
     skill_type = Column(String, nullable=False) # 'hitting', 'pitching', 'fielding', 'baserunning'
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
-    team = relationship("Team") # Simple relationship without back_populates if not directly accessed from Team
+    # MODIFIED THIS LINE
+    team = relationship("Team", back_populates="player_development_focuses")
 
     def to_dict(self): return to_dict(self)
 

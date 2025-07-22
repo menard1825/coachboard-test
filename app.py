@@ -8,6 +8,7 @@ import time
 from sqlalchemy import func
 import random
 import string
+import math # FIXED: Import math library for data cleaning
 from db import SessionLocal 
 from models import ( 
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
@@ -325,27 +326,39 @@ def home():
         collaboration_team_notes = db.query(CollaborationNote).filter_by(team_id=team_id, note_type='team_notes').all()
         practice_plans = db.query(PracticePlan).filter_by(team_id=team_id).order_by(PracticePlan.date.desc()).all()
         signs = db.query(Sign).filter_by(team_id=team_id).all()
-        player_development_focuses = db.query(PlayerDevelopmentFocus).filter_by(team_id=team_id).all()
 
         player_activity_log = {}
         for player in roster_players:
-            player_activity_log[player.name] = []
+            log_entries = []
             for focus in player.development_focuses:
-                player_activity_log[player.name].append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.created_date, 'timestamp': datetime.strptime(focus.created_date, '%Y-%m-%d'), 'text': f"New Focus: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.author), 'status': focus.status, 'id': focus.id})
+                log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.created_date, 'timestamp': focus.created_date, 'text': f"New Focus: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.author), 'status': focus.status, 'id': focus.id})
                 if focus.status == 'completed' and focus.completed_date:
-                     player_activity_log[player.name].append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.completed_date, 'timestamp': datetime.strptime(focus.completed_date, '%Y-%m-%d'), 'text': f"Completed: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.last_edited_by or focus.author), 'status': focus.status, 'id': focus.id})
+                     log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.completed_date, 'timestamp': focus.completed_date, 'text': f"Completed: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.last_edited_by or focus.author), 'status': focus.status, 'id': focus.id})
             for note in collaboration_player_notes:
                 if note.player_name == player.name:
-                    ts_str = note.timestamp.split(' ')[0]
-                    player_activity_log[player.name].append({'type': 'Coach Note', 'subtype': 'Player Log', 'date': ts_str, 'timestamp': datetime.strptime(note.timestamp, '%Y-%m-%d %H:%M'), 'text': note.text, 'notes': None, 'author': get_display_name(note.author), 'status': 'active', 'id': note.id})
+                    ts_str = note.timestamp.split(' ')[0] if note.timestamp else 'N/A'
+                    log_entries.append({'type': 'Coach Note', 'subtype': 'Player Log', 'date': ts_str, 'timestamp': note.timestamp or '1970-01-01 00:00', 'text': note.text, 'notes': None, 'author': get_display_name(note.author), 'status': 'active', 'id': note.id})
             if player.has_lessons == 'Yes' and player.lesson_focus:
-                 player_activity_log[player.name].append({'type': 'Lessons', 'subtype': 'Private Instruction', 'date': player.notes_timestamp.split(' ')[0] if player.notes_timestamp else 'N/A', 'timestamp': datetime.strptime(player.notes_timestamp, '%Y-%m-%d %H:%M') if player.notes_timestamp else datetime.min, 'text': f"Lesson Focus: {player.lesson_focus}", 'notes': None, 'author': 'N/A', 'status': 'active', 'id': player.id})
-            player_activity_log[player.name].sort(key=lambda x: x['timestamp'], reverse=True)
+                 log_entries.append({'type': 'Lessons', 'subtype': 'Private Instruction', 'date': player.notes_timestamp.split(' ')[0] if player.notes_timestamp else 'N/A', 'timestamp': player.notes_timestamp or '1970-01-01 00:00', 'text': f"Lesson Focus: {player.lesson_focus}", 'notes': None, 'author': 'N/A', 'status': 'active', 'id': player.id})
+            
+            player_activity_log[player.name] = sorted(log_entries, key=lambda x: x['timestamp'], reverse=True)
+        
+        # FIXED: Sanitize pitching data to prevent JSON errors with non-finite numbers
+        clean_pitching_outings = []
+        for po in pitching_outings:
+            innings = float(po.innings) if po.innings is not None else 0.0
+            if not math.isfinite(innings):
+                innings = 0.0
+            clean_pitching_outings.append({
+                "id": po.id, "date": po.date, "pitcher": po.pitcher, 
+                "opponent": po.opponent, "pitches": po.pitches, "innings": innings, 
+                "pitcher_type": po.pitcher_type, "outing_type": po.outing_type
+            })
 
         app_data = {
             "roster": [{"name": p.name, "number": p.number, "position1": p.position1, "position2": p.position2, "position3": p.position3, "throws": p.throws, "bats": p.bats, "notes": p.notes, "pitcher_role": p.pitcher_role, "has_lessons": p.has_lessons, "lesson_focus": p.lesson_focus, "notes_author": get_display_name(p.notes_author), "notes_timestamp": p.notes_timestamp, "id": p.id} for p in roster_players],
             "lineups": [{"id": l.id, "title": l.title, "lineup_positions": json.loads(l.lineup_positions or "[]"), "associated_game_id": l.associated_game_id} for l in lineups],
-            "pitching": [{"id": po.id, "date": po.date, "pitcher": po.pitcher, "opponent": po.opponent, "pitches": po.pitches, "innings": po.innings, "pitcher_type": po.pitcher_type, "outing_type": po.outing_type} for po in pitching_outings],
+            "pitching": clean_pitching_outings,
             "scouting_list": {
                 "committed": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_committed],
                 "targets": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_targets],
@@ -376,14 +389,15 @@ def home():
             pos = player.position1
             if pos: position_counts[pos] = position_counts.get(pos, 0) + 1
 
-        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
+        pitcher_names = sorted(list(set(po['pitcher'] for po in clean_pitching_outings if po['pitcher'])))
         pitch_count_summary = {}
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
             pitch_count_summary[name] = {**counts, **availability}
         
-        return render_template('index.html', data=app_data, session=session, tab_order=user_tab_order, all_tabs=all_tabs, position_counts=position_counts, pitch_count_summary=pitch_count_summary)
+        current_team = db.query(Team).filter_by(id=session['team_id']).first()
+        return render_template('index.html', data=app_data, session=session, tab_order=user_tab_order, all_tabs=all_tabs, position_counts=position_counts, pitch_count_summary=pitch_count_summary, current_team=current_team)
     finally:
         db.close()
 
@@ -423,26 +437,39 @@ def get_app_data():
         collaboration_team_notes = db.query(CollaborationNote).filter_by(team_id=team_id, note_type='team_notes').all()
         practice_plans = db.query(PracticePlan).filter_by(team_id=team_id).order_by(PracticePlan.date.desc()).all()
         signs = db.query(Sign).filter_by(team_id=team_id).all()
-
+        
         player_activity_log = {}
         for player in roster_players:
-            player_activity_log[player.name] = []
+            log_entries = []
             for focus in player.development_focuses:
-                player_activity_log[player.name].append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.created_date, 'timestamp': datetime.strptime(focus.created_date, '%Y-%m-%d'), 'text': f"New Focus: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.author), 'status': focus.status, 'id': focus.id})
+                log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.created_date, 'timestamp': focus.created_date, 'text': f"New Focus: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.author), 'status': focus.status, 'id': focus.id})
                 if focus.status == 'completed' and focus.completed_date:
-                     player_activity_log[player.name].append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.completed_date, 'timestamp': datetime.strptime(focus.completed_date, '%Y-%m-%d'), 'text': f"Completed: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.last_edited_by or focus.author), 'status': focus.status, 'id': focus.id})
+                     log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.completed_date, 'timestamp': focus.completed_date, 'text': f"Completed: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.last_edited_by or focus.author), 'status': focus.status, 'id': focus.id})
             for note in collaboration_player_notes:
                 if note.player_name == player.name:
-                    ts_str = note.timestamp.split(' ')[0]
-                    player_activity_log[player.name].append({'type': 'Coach Note', 'subtype': 'Player Log', 'date': ts_str, 'timestamp': datetime.strptime(note.timestamp, '%Y-%m-%d %H:%M'), 'text': note.text, 'notes': None, 'author': get_display_name(note.author), 'status': 'active', 'id': note.id})
+                    ts_str = note.timestamp.split(' ')[0] if note.timestamp else 'N/A'
+                    log_entries.append({'type': 'Coach Note', 'subtype': 'Player Log', 'date': ts_str, 'timestamp': note.timestamp or '1970-01-01 00:00', 'text': note.text, 'notes': None, 'author': get_display_name(note.author), 'status': 'active', 'id': note.id})
             if player.has_lessons == 'Yes' and player.lesson_focus:
-                 player_activity_log[player.name].append({'type': 'Lessons', 'subtype': 'Private Instruction', 'date': player.notes_timestamp.split(' ')[0] if player.notes_timestamp else 'N/A', 'timestamp': datetime.strptime(player.notes_timestamp, '%Y-%m-%d %H:%M') if player.notes_timestamp else datetime.min, 'text': f"Lesson Focus: {player.lesson_focus}", 'notes': None, 'author': 'N/A', 'status': 'active', 'id': player.id})
-            player_activity_log[player.name].sort(key=lambda x: x['timestamp'], reverse=True)
+                 log_entries.append({'type': 'Lessons', 'subtype': 'Private Instruction', 'date': player.notes_timestamp.split(' ')[0] if player.notes_timestamp else 'N/A', 'timestamp': player.notes_timestamp or '1970-01-01 00:00', 'text': f"Lesson Focus: {player.lesson_focus}", 'notes': None, 'author': 'N/A', 'status': 'active', 'id': player.id})
+            
+            player_activity_log[player.name] = sorted(log_entries, key=lambda x: x['timestamp'], reverse=True)
+
+        # FIXED: Sanitize pitching data to prevent JSON errors with non-finite numbers
+        clean_pitching_outings = []
+        for po in pitching_outings:
+            innings = float(po.innings) if po.innings is not None else 0.0
+            if not math.isfinite(innings):
+                innings = 0.0
+            clean_pitching_outings.append({
+                "id": po.id, "date": po.date, "pitcher": po.pitcher, 
+                "opponent": po.opponent, "pitches": po.pitches, "innings": innings, 
+                "pitcher_type": po.pitcher_type, "outing_type": po.outing_type
+            })
 
         app_data = {
             'roster': [{"name": p.name, "number": p.number, "position1": p.position1, "position2": p.position2, "position3": p.position3, "throws": p.throws, "bats": p.bats, "notes": p.notes, "pitcher_role": p.pitcher_role, "has_lessons": p.has_lessons, "lesson_focus": p.lesson_focus, "notes_author": get_display_name(p.notes_author), "notes_timestamp": p.notes_timestamp, "id": p.id} for p in roster_players],
             'lineups': [{"id": l.id, "title": l.title, "lineup_positions": json.loads(l.lineup_positions or "[]"), "associated_game_id": l.associated_game_id} for l in lineups],
-            'pitching': [{"id": po.id, "date": po.date, "pitcher": po.pitcher, "opponent": po.opponent, "pitches": po.pitches, "innings": po.innings, "pitcher_type": po.pitcher_type, "outing_type": po.outing_type} for po in pitching_outings],
+            'pitching': clean_pitching_outings,
             'scouting_list': {
                 "committed": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_committed],
                 "targets": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_targets],
@@ -462,7 +489,7 @@ def get_app_data():
         
         player_order = session.get('player_order', [p['name'] for p in app_data.get('roster', [])])
         
-        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
+        pitcher_names = sorted(list(set(po['pitcher'] for po in clean_pitching_outings if po['pitcher'])))
         pitch_count_summary = {}
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
@@ -950,6 +977,56 @@ def delete_lesson_info(player_id):
         db.close()
 
 # --- Roster and Player Routes ---
+@app.route('/add_player', methods=['POST'])
+@login_required
+def add_player():
+    db = SessionLocal()
+    try:
+        name = request.form.get('name')
+        if not name:
+            flash('Player name is required.', 'danger')
+            return redirect(url_for('home', _anchor='roster'))
+        
+        existing_player = db.query(Player).filter_by(name=name, team_id=session['team_id']).first()
+        if existing_player:
+            flash(f'A player with the name "{name}" already exists on this roster.', 'danger')
+            return redirect(url_for('home', _anchor='roster'))
+
+        new_player = Player(
+            name=name,
+            number=request.form.get('number'),
+            position1=request.form.get('position1'),
+            position2=request.form.get('position2'),
+            position3=request.form.get('position3'),
+            throws=request.form.get('throws'),
+            bats=request.form.get('bats'),
+            notes=request.form.get('notes'),
+            pitcher_role=request.form.get('pitcher_role'),
+            has_lessons="No",
+            notes_author=session['username'],
+            notes_timestamp=datetime.now().strftime("%Y-%m-%d %H:%M"),
+            team_id=session['team_id']
+        )
+        db.add(new_player)
+        
+        # Add the new player to the end of the ordering for all users on the team
+        for user_obj in db.query(User).filter_by(team_id=session['team_id']).all():
+            current_order = json.loads(user_obj.player_order or "[]")
+            if new_player.name not in current_order:
+                current_order.append(new_player.name)
+                user_obj.player_order = json.dumps(current_order)
+        
+        db.commit()
+        flash(f'Player "{name}" added successfully!', 'success')
+        socketio.emit('data_updated', {'message': f'Player {name} added.'})
+        # Use jsonify for AJAX form, or redirect for standard form
+        if 'X-Requested-With' in request.headers and request.headers['X-Requested-With'] == 'XMLHttpRequest':
+             return jsonify({'status': 'success'})
+
+        return redirect(url_for('home', _anchor='roster'))
+    finally:
+        db.close()
+
 @app.route('/update_player_inline/<int:player_id>', methods=['POST'])
 @login_required
 def update_player_inline(player_id):
@@ -962,14 +1039,9 @@ def update_player_inline(player_id):
         new_name = request.form.get('name', original_name)
         if new_name != original_name and db.query(Player).filter_by(name=new_name, team_id=session['team_id']).first():
             return jsonify({'status': 'error', 'message': f'Player name "{new_name}" already exists.'}), 400
-        player_number_str = request.form.get('number', player_to_edit.number)
-        try:
-            player_number = player_number_str if player_number_str else ''
-        except ValueError:
-            return jsonify({'status': 'error', 'message': 'Player number must be a valid integer.'}), 400
-
+        
         player_to_edit.name = new_name
-        player_to_edit.number = player_number
+        player_to_edit.number = request.form.get('number', player_to_edit.number)
         player_to_edit.position1 = request.form.get('position1', player_to_edit.position1)
         player_to_edit.position2 = request.form.get('position2', player_to_edit.position2)
         player_to_edit.position3 = request.form.get('position3', player_to_edit.position3)
