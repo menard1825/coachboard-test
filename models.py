@@ -44,8 +44,9 @@ class Team(Base):
     collaboration_notes = relationship("CollaborationNote", back_populates="team")
     practice_plans = relationship("PracticePlan", back_populates="team")
     signs = relationship("Sign", back_populates="team")
-    # ADDED THIS LINE
     player_development_focuses = relationship("PlayerDevelopmentFocus", back_populates="team")
+    # ADDED: Relationship for the new PlayerGameAbsence model
+    player_absences = relationship("PlayerGameAbsence", back_populates="team")
 
     def to_dict(self): return to_dict(self)
 
@@ -53,12 +54,12 @@ class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False)
-    full_name = Column(String(100), nullable=True) # <<< This line is crucial
+    full_name = Column(String(100), nullable=True)
     password_hash = Column(String, nullable=False)
     role = Column(String, default='Coach')
-    last_login = Column(String) # Stored as string for now, consider DateTime
-    tab_order = Column(Text) # Storing JSON string
-    player_order = Column(Text) # Storing JSON string
+    last_login = Column(String)
+    tab_order = Column(Text)
+    player_order = Column(Text)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="users")
@@ -80,14 +81,14 @@ class Player(Base):
     has_lessons = Column(String)
     lesson_focus = Column(Text)
     notes_author = Column(String)
-    notes_timestamp = Column(String) # Stored as string for now, consider DateTime
+    notes_timestamp = Column(String)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="players")
 
-    # A single relationship to handle all development focuses for a player.
-    # The cascade option will automatically delete focuses when a player is deleted.
     development_focuses = relationship("PlayerDevelopmentFocus", back_populates="player", cascade="all, delete-orphan")
+    # ADDED: Relationship for the new PlayerGameAbsence model
+    absences = relationship("PlayerGameAbsence", back_populates="player", cascade="all, delete-orphan")
     
     def to_dict(self): return to_dict(self)
 
@@ -95,8 +96,8 @@ class Lineup(Base):
     __tablename__ = 'lineups'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
-    lineup_positions = Column(Text) # Storing JSON string of [{'name': 'Player Name', 'position': 'Pos'}]
-    associated_game_id = Column(Integer) # Can be ForeignKey to games.id later if desired, nullable=True
+    lineup_positions = Column(Text)
+    associated_game_id = Column(Integer)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="lineups")
@@ -106,8 +107,8 @@ class Lineup(Base):
 class PitchingOuting(Base):
     __tablename__ = 'pitching_outings'
     id = Column(Integer, primary_key=True)
-    date = Column(String, nullable=False) # Stored as string, consider Date or DateTime
-    pitcher = Column(String, nullable=False) # Consider ForeignKey to players.id later
+    date = Column(String, nullable=False)
+    pitcher = Column(String, nullable=False)
     opponent = Column(String)
     pitches = Column(Integer)
     innings = Column(Float)
@@ -127,7 +128,7 @@ class ScoutedPlayer(Base):
     position2 = Column(String)
     throws = Column(String)
     bats = Column(String)
-    list_type = Column(String, nullable=False) # 'committed', 'targets', 'not_interested'
+    list_type = Column(String, nullable=False)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="scouted_players")
@@ -138,8 +139,8 @@ class Rotation(Base):
     __tablename__ = 'rotations'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
-    innings = Column(Text) # Storing JSON string of {inning_num: {pos: player_name}}
-    associated_game_id = Column(Integer, nullable=True) # ForeignKey to games.id later if desired
+    innings = Column(Text)
+    associated_game_id = Column(Integer, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
@@ -149,26 +150,29 @@ class Rotation(Base):
 class Game(Base):
     __tablename__ = 'games'
     id = Column(Integer, primary_key=True)
-    date = Column(String, nullable=False) # Stored as string, consider Date or DateTime
+    date = Column(String, nullable=False)
     opponent = Column(String, nullable=False)
     location = Column(String)
     game_notes = Column(Text)
-    associated_lineup_title = Column(String) # Can be linked to Lineup model later
-    associated_rotation_date = Column(String) # Can be linked to Rotation model later
+    associated_lineup_title = Column(String)
+    associated_rotation_date = Column(String)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="games")
+    # ADDED: Relationship for the new PlayerGameAbsence model
+    absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
+
 
     def to_dict(self): return to_dict(self)
 
 class CollaborationNote(Base):
     __tablename__ = 'collaboration_notes'
     id = Column(Integer, primary_key=True)
-    note_type = Column(String, nullable=False) # 'player_notes' or 'team_notes'
+    note_type = Column(String, nullable=False)
     text = Column(Text, nullable=False)
-    author = Column(String) # Consider ForeignKey to users.id later
-    timestamp = Column(String) # Stored as string, consider DateTime
-    player_name = Column(String, nullable=True) # Only for player_notes, consider ForeignKey to players.id
+    author = Column(String)
+    timestamp = Column(String)
+    player_name = Column(String, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="collaboration_notes")
@@ -178,13 +182,12 @@ class CollaborationNote(Base):
 class PracticePlan(Base):
     __tablename__ = 'practice_plans'
     id = Column(Integer, primary_key=True)
-    date = Column(String, nullable=False) # Stored as string, consider Date
+    date = Column(String, nullable=False)
     general_notes = Column(Text)
-    # tasks will be a relationship to PracticeTask
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="practice_plans")
-    tasks = relationship("PracticeTask", back_populates="practice_plan", order_by="PracticeTask.id") # Order by ID for consistency
+    tasks = relationship("PracticeTask", back_populates="practice_plan", order_by="PracticeTask.id")
 
     def to_dict(self): return to_dict(self)
 
@@ -192,9 +195,9 @@ class PracticeTask(Base):
     __tablename__ = 'practice_tasks'
     id = Column(Integer, primary_key=True)
     text = Column(Text, nullable=False)
-    status = Column(String, default="pending") # 'pending' or 'complete'
-    author = Column(String) # Consider ForeignKey to users.id later
-    timestamp = Column(String) # Stored as string, consider DateTime
+    status = Column(String, default="pending")
+    author = Column(String)
+    timestamp = Column(String)
 
     practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
     practice_plan = relationship("PracticePlan", back_populates="tasks")
@@ -207,19 +210,17 @@ class PlayerDevelopmentFocus(Base):
     focus = Column(Text, nullable=False)
     status = Column(String, default="active")
     notes = Column(Text)
-    created_date = Column(String) # Stored as string, consider Date
-    completed_date = Column(String, nullable=True) # Stored as string, consider Date
-    author = Column(String) # Consider ForeignKey to users.id later
-    last_edited_by = Column(String) # Consider ForeignKey to users.id later
-    last_edited_date = Column(String) # Stored as string, consider DateTime
+    created_date = Column(String)
+    completed_date = Column(String, nullable=True)
+    author = Column(String)
+    last_edited_by = Column(String)
+    last_edited_date = Column(String)
 
-    # Link to player and skill type
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
     player = relationship("Player", back_populates="development_focuses")
-    skill_type = Column(String, nullable=False) # 'hitting', 'pitching', 'fielding', 'baserunning'
+    skill_type = Column(String, nullable=False)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
-    # MODIFIED THIS LINE
     team = relationship("Team", back_populates="player_development_focuses")
 
     def to_dict(self): return to_dict(self)
@@ -233,4 +234,19 @@ class Sign(Base):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="signs")
     
+    def to_dict(self): return to_dict(self)
+
+# ADDED: New model to track player absences for specific games
+class PlayerGameAbsence(Base):
+    __tablename__ = 'player_game_absences'
+    id = Column(Integer, primary_key=True)
+
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+
+    player = relationship("Player", back_populates="absences")
+    game = relationship("Game", back_populates="absences")
+    team = relationship("Team", back_populates="player_absences")
+
     def to_dict(self): return to_dict(self)

@@ -13,12 +13,15 @@ function initializeGameManagement(gameData) {
     // Safely initialize the game object first to prevent errors
     const game = gameData.game || {};
     
+    // MODIFIED: Filter the roster to only include available players
+    const availableRoster = (gameData.roster || []).filter(p => !(gameData.absent_player_ids || []).includes(p.id));
+
     // Update AppState properties
     Object.assign(window.AppState, {
-        roster: gameData.roster || [],
+        roster: availableRoster, // Use the filtered roster
         lineup: gameData.lineup || { id: null, title: `Lineup for vs ${game.opponent}`, lineup_positions: [], associated_game_id: game.id },
         rotation: gameData.rotation || { id: null, title: `Rotation for vs ${game.opponent}`, innings: { '1': {} }, associated_game_id: game.id },
-        game: game, // Use the safely defined game object
+        game: game,
         currentInning: '1',
         copiedInningData: null
     });
@@ -28,8 +31,7 @@ function initializeGameManagement(gameData) {
 
     // --- Utility Functions ---
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
-    // The renderPositionSelect utility function is no longer needed for the lineup editor
-    // but is kept here as it might be used elsewhere or for future features.
+    
     const renderPositionSelect = (name, id, selectedVal = '', title = 'Pos', classes = 'form-select form-select-sm') => {
         const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'];
         let optionsHtml = `<option value="" ${!selectedVal ? 'selected' : ''}>${title}</option>`;
@@ -51,8 +53,6 @@ function initializeGameManagement(gameData) {
         
         (window.AppState.lineup.lineup_positions || []).forEach(spot => {
             const player = window.AppState.roster.find(p => p.name === spot.name);
-            // When rendering existing lineup positions, we still pass the position,
-            // but createBattingOrderItem will no longer render the dropdown.
             if (player) order.appendChild(createBattingOrderItem(player, spot.position));
         });
 
@@ -69,7 +69,6 @@ function initializeGameManagement(gameData) {
     }
     
     function initializeLineupSortables() {
-        // Destroy existing instances if they exist to prevent re-initialization issues
         if(window.sortableInstances.lineupBench) window.sortableInstances.lineupBench.destroy();
         if(window.sortableInstances.lineupOrder) window.sortableInstances.lineupOrder.destroy();
         
@@ -92,8 +91,7 @@ function initializeGameManagement(gameData) {
                 animation: 150,
                 onAdd: (evt) => {
                     const player = window.AppState.roster.find(p => p.name === evt.item.dataset.playerName);
-                    // MODIFIED: No longer pass selectedPosition, as dropdown is removed
-                    if (player) evt.item.replaceWith(createBattingOrderItem(player));
+                    if (player) evt.item.replaceWith(createBattingOrderItem(player, player.position1));
                 }
             });
         }
@@ -102,13 +100,12 @@ function initializeGameManagement(gameData) {
     function createBenchPlayerItem(player) {
         const item = document.createElement('div');
         item.className = 'list-group-item';
-        item.textContent = `${player.name} (#${player.number || 'N/A'})`; // Added number for clarity on bench
+        item.textContent = `${player.name} (#${player.number || 'N/A'})`;
         item.dataset.playerName = player.name;
         return item;
     }
 
-    // MODIFIED: Removed position select rendering from createBattingOrderItem
-    function createBattingOrderItem(player, selectedPosition = null) { // selectedPosition is now unused
+    function createBattingOrderItem(player, selectedPosition) {
         const item = document.createElement('div');
         item.className = 'list-group-item';
         item.dataset.playerName = player.name;
@@ -123,7 +120,7 @@ function initializeGameManagement(gameData) {
                     <i class="bi bi-x-circle-fill" style="font-size: 1.1rem;"></i>
                 </button>
             </div>
-            <!-- Position selection removed as per user request -->
+            ${renderPositionSelect(`position_${player.id}`, `pos_select_${player.id}`, selectedPosition || player.position1, player.position1 || 'Pos')}
         `;
         return item;
     };
@@ -144,7 +141,7 @@ function initializeGameManagement(gameData) {
                 </a>
             `).join('');
         } else {
-            modalList.innerHTML = `<div class="list-group-item text-muted">All players are in the lineup.</div>`;
+            modalList.innerHTML = `<div class="list-group-item text-muted">All available players are in the lineup.</div>`;
         }
 
         addPlayerToLineupModal.show();
@@ -184,7 +181,7 @@ function initializeGameManagement(gameData) {
         const createPlayerTag = (playerName) => `<div class="player-tag" data-player-name="${escapeHTML(playerName)}">${escapeHTML(playerName)}</div>`;
 
         document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => tag.remove());
-        // FIXED: Added 'of' keyword to for...of loop
+        
         for (const [pos, playerName] of Object.entries(currentInningData)) {
             const dropzoneDesktop = document.getElementById(`pos-desktop-${pos}`);
             const dropzoneMobile = document.getElementById(`pos-mobile-${pos}`);
@@ -296,7 +293,7 @@ function initializeGameManagement(gameData) {
         window.AppState.lineup.title = document.getElementById('lineupTitle').value;
         window.AppState.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
             name: item.dataset.playerName,
-            position: '' // Explicitly set position to empty string
+            position: item.querySelector('select')?.value || ''
         }));
         
         const url = window.AppState.lineup.id ? `/edit_lineup/${window.AppState.lineup.id}` : '/add_lineup';
@@ -346,13 +343,12 @@ function initializeGameManagement(gameData) {
             if (result.status === 'success') {
                 if (result.new_id) window.AppState.rotation.id = result.new_id;
                 btn.textContent = 'Saved!';
-                // MODIFIED: Activate the rotation tab instead of reloading the page
                 const rotationTabButton = document.getElementById('rotation-tab');
                 if (rotationTabButton) {
                     const rotationTab = new bootstrap.Tab(rotationTabButton);
                     rotationTab.show();
                 }
-                renderRotationEditor(); // Re-render the rotation editor to reflect saved state
+                renderRotationEditor();
             } else { throw new Error(result.message); }
         } catch (error) {
             alert('Error saving rotation: ' + error.message);
@@ -384,8 +380,7 @@ function initializeGameManagement(gameData) {
             const player = window.AppState.roster.find(p => p.name === playerName);
             if (player) {
                 const orderList = document.getElementById('lineup-order');
-                // MODIFIED: Ensure createBattingOrderItem is called without position
-                orderList.appendChild(createBattingOrderItem(player));
+                orderList.appendChild(createBattingOrderItem(player, player.position1));
                 addPlayerToLineupModal.hide();
             }
         });
@@ -401,13 +396,10 @@ function initializeGameManagement(gameData) {
         document.getElementById('syncRotationBtn')?.addEventListener('click', () => {
             const lineupPositions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
                 name: item.dataset.playerName,
-                // The position value will be an empty string here as the dropdown is removed
-                position: '' 
+                position: item.querySelector('select')?.value || ''
             }));
             const inning1Data = {};
             lineupPositions.forEach(item => {
-                // Only add to inning1Data if a position is explicitly set (which won't happen from lineup now)
-                // This ensures we don't accidentally sync empty positions.
                 if(item.position && item.name) inning1Data[item.position] = item.name;
             });
 

@@ -23,8 +23,12 @@
 
 <div class="container-fluid mt-3">
     <ul class="nav nav-tabs nav-fill mb-3" id="gameTabs" role="tablist">
+        <!-- MODIFIED: Added 'Availability' tab and set it as active -->
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="lineup-tab" data-bs-toggle="tab" data-bs-target="#lineup" type="button" role="tab">Lineup</button>
+            <button class="nav-link active" id="availability-tab" data-bs-toggle="tab" data-bs-target="#availability" type="button" role="tab">Availability</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="lineup-tab" data-bs-toggle="tab" data-bs-target="#lineup" type="button" role="tab">Lineup</button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="rotation-tab" data-bs-toggle="tab" data-bs-target="#rotation" type="button" role="tab">Rotation</button>
@@ -35,7 +39,37 @@
     </ul>
 
     <div class="tab-content" id="gameTabsContent">
-        <div class="tab-pane fade show active" id="lineup" role="tabpanel" aria-labelledby="lineup-tab">
+        <!-- ADDED: New tab pane for player availability -->
+        <div class="tab-pane fade show active" id="availability" role="tabpanel" aria-labelledby="availability-tab">
+            <div class="row justify-content-center">
+                <div class="col-lg-6 col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Set Player Availability</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">Check the box next to any player who will be absent for this game. This will remove them from the lineup and rotation builders.</p>
+                            <form action="{{ url_for('update_absences', game_id=game.id) }}" method="POST">
+                                <ul class="list-group mb-3">
+                                    {% for player in roster %}
+                                    <li class="list-group-item">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player.id }}" id="player-{{ player.id }}" {% if player.id in absent_player_ids %}checked{% endif %}>
+                                            <label class="form-check-label" for="player-{{ player.id }}">
+                                                {{ player.name }}
+                                            </label>
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                <button type="submit" class="btn btn-primary w-100">Save Availability</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="lineup" role="tabpanel" aria-labelledby="lineup-tab">
             {% include '_lineup_editor.html' %}
         </div>
         <div class="tab-pane fade" id="rotation" role="tabpanel" aria-labelledby="rotation-tab">
@@ -74,9 +108,28 @@
             game: {{ game|tojson }},
             roster: {{ roster|tojson }},
             lineup: {{ lineup|tojson }},
-            rotation: {{ rotation|tojson }}
+            rotation: {{ rotation|tojson }},
+            // MODIFIED: Pass the list of absent player IDs to the script
+            absent_player_ids: {{ absent_player_ids|tojson }}
         };
         initializeGameManagement(gameData);
+
+        // Logic to remember and open the last active tab
+        const gameTabs = document.querySelectorAll('#gameTabs button[data-bs-toggle="tab"]');
+        gameTabs.forEach(tab => {
+            tab.addEventListener('shown.bs.tab', event => {
+                localStorage.setItem('lastGameTab', event.target.id);
+            });
+        });
+
+        const lastTabId = localStorage.getItem('lastGameTab');
+        if (lastTabId) {
+            const lastTab = document.querySelector(`#${lastTabId}`);
+            if (lastTab) {
+                const tab = new bootstrap.Tab(lastTab);
+                tab.show();
+            }
+        }
     });
 </script>
 

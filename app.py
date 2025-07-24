@@ -13,11 +13,11 @@ from db import SessionLocal
 from models import (
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
     Rotation, Game, CollaborationNote, PracticePlan, PracticeTask,
-    PlayerDevelopmentFocus, Sign
+    PlayerDevelopmentFocus, Sign, PlayerGameAbsence # ADDED: Import the new model
 )
 from sqlalchemy import create_engine
 from sqlalchemy.inspection import inspect as sqlalchemy_inspect
-from sqlalchemy.orm import joinedload, selectinload # MODIFIED: Imported selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from flask_socketio import SocketIO, emit
 import uuid
 from werkzeug.utils import secure_filename
@@ -56,19 +56,23 @@ def check_database_initialized():
         print(f"The database file '{db_path}' does not exist.")
         print("Please create and initialize it by running the setup script first:")
         print("\n    python init_db.py\n")
+        print("If you have an existing `data_backup.json` you want to use, run `migrate_data.py` after `init_db.py`.")
         print("="*70)
         exit()
 
     engine = create_engine(f'sqlite:///{db_path}')
     inspector = sqlalchemy_inspect(engine)
-    if not inspector.has_table("users"):
+    # Check for a new table as well as an old one
+    if not inspector.has_table("users") or not inspector.has_table("player_game_absences"):
         print("="*70)
-        print("!!! DATABASE NOT INITIALIZED !!!")
-        print("The database exists, but the 'users' table is missing.")
+        print("!!! DATABASE NOT INITIALIZED OR OUT OF DATE !!!")
+        print("The database exists, but it's missing required tables.")
         print("Please ensure you have run the setup script successfully:")
         print("\n    python init_db.py\n")
+        print("This will create all tables, including the new 'player_game_absences' table.")
         print("="*70)
         exit()
+
 
 socketio = SocketIO(app)
 
@@ -455,7 +459,6 @@ def home():
             flash('User not found or not associated with a team.', 'danger')
             return redirect(url_for('login'))
         
-        # MODIFIED: Call the centralized data fetching function
         app_data, roster_players, lineups, pitching_outings = _get_full_team_data(db, user.team_id, user)
         
         all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs'}
@@ -522,7 +525,6 @@ def get_app_data():
         if not user:
             return jsonify({'status': 'error', 'message': 'User not found or not associated with a team.'}), 404
         
-        # MODIFIED: Call the centralized data fetching function
         app_data, _, _, pitching_outings = _get_full_team_data(db, user.team_id, user)
 
         player_order = session.get('player_order', [p['name'] for p in app_data.get('roster', [])])
@@ -1774,9 +1776,57 @@ def game_management(game_id):
             cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
             pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
         game_pitching_log = [p for p in pitching_outings if p.opponent == game.opponent and p.date == game.date]
-        return render_template('game_management.html', game=game_dict, roster=roster_list, lineup=lineup_dict, rotation=rotation_dict, pitch_count_summary=pitch_count_summary, game_pitching_log=game_pitching_log, session=session)
+        
+        # MODIFIED: Fetch absences for the current game
+        absences = db.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
+        absent_player_ids = [absence.player_id for absence in absences]
+
+        return render_template('game_management.html', game=game_dict, roster=roster_list, lineup=lineup_dict, rotation=rotation_dict, pitch_count_summary=pitch_count_summary, game_pitching_log=game_pitching_log, session=session, absent_player_ids=absent_player_ids)
     finally:
         db.close()
+
+# ADDED: New route to handle updating player absences for a game
+@app.route('/game/<int:game_id>/update_absences', methods=['POST'])
+@login_required
+def update_absences(game_id):
+    db = SessionLocal()
+    try:
+        team_id = session['team_id']
+        game = db.query(Game).filter_by(id=game_id, team_id=team_id).first()
+        if not game:
+            flash('Game not found.', 'danger')
+            return redirect(url_for('home', _anchor='games'))
+
+        # Get the list of player IDs submitted from the form
+        absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
+
+        # Delete all existing absences for this game to sync with the new submission
+        db.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=team_id).delete()
+
+        # Add the new absences
+        for player_id in absent_player_ids:
+            # Verify the player belongs to the team
+            player = db.query(Player).filter_by(id=player_id, team_id=team_id).first()
+            if player:
+                new_absence = PlayerGameAbsence(
+                    player_id=player.id,
+                    game_id=game.id,
+                    team_id=team_id
+                )
+                db.add(new_absence)
+
+        db.commit()
+        flash('Player availability updated for this game.', 'success')
+        socketio.emit('data_updated', {'message': f'Availability updated for game {game_id}.'})
+
+    except Exception as e:
+        db.rollback()
+        flash('An error occurred while updating availability.', 'danger')
+        print(f"Error updating absences: {e}")
+    finally:
+        db.close()
+
+    return redirect(url_for('game_management', game_id=game_id, _anchor='availability'))
 
 
 @app.route('/edit_game/<int:game_id>', methods=['POST'])
