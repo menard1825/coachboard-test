@@ -8,7 +8,7 @@ import time
 from sqlalchemy import func
 import random
 import string
-import math # FIXED: Import math library for data cleaning
+import math
 from db import SessionLocal
 from models import (
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
@@ -17,10 +17,9 @@ from models import (
 )
 from sqlalchemy import create_engine
 from sqlalchemy.inspection import inspect as sqlalchemy_inspect
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload # MODIFIED: Imported selectinload
 from flask_socketio import SocketIO, emit
 import uuid
-# ADDED: New import for file handling
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -29,11 +28,17 @@ app.secret_key = 'xXxG#fjs72d_!z921!kJjkjsd123kfj3FJ!*kfdjf8s!jf9jKJJJd'
 # Set the permanent session lifetime to 30 days
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
-# ADDED: Configuration for file uploads
+# Configuration for file uploads
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
 
-# ADDED: Helper function to check for allowed file extensions
+# --- ROLE CONSTANTS ---
+SUPER_ADMIN = 'Super Admin'
+HEAD_COACH = 'Head Coach'
+ASSISTANT_COACH = 'Assistant Coach'
+GAME_CHANGER = 'Game Changer'
+
+# Helper function to check for allowed file extensions
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -80,7 +85,7 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         if not session.get('logged_in'):
             return redirect(url_for('login'))
-        if session.get('role') not in ['Head Coach', 'Super Admin']:
+        if session.get('role') not in [HEAD_COACH, SUPER_ADMIN]:
             flash('You must be a Head Coach or Super Admin to access this page.', 'danger')
             return redirect(url_for('home'))
         return f(*args, **kwargs)
@@ -91,7 +96,7 @@ def admin_required(f):
 def inject_current_year():
     return {'current_year': datetime.now().year}
 
-# ADDED: This makes the current team's info (like the logo) available on every page.
+# This makes the current team's info (like the logo) available on every page.
 @app.context_processor
 def inject_team_info():
     if 'team_id' in session:
@@ -122,11 +127,11 @@ def login():
 
             if user and check_password_hash(user.password_hash, password):
                 if user.username.lower() == 'mike1825':
-                    user.role = 'Super Admin'
+                    user.role = SUPER_ADMIN
                 elif user.role == 'Admin':
-                    user.role = 'Head Coach'
+                    user.role = HEAD_COACH
                 elif user.role == 'Coach':
-                    user.role = 'Assistant Coach'
+                    user.role = ASSISTANT_COACH
 
                 user.last_login = datetime.now().strftime("%Y-%m-%d %H:%M")
                 db.commit()
@@ -180,7 +185,7 @@ def register():
                 return redirect(url_for('register'))
 
             is_first_user = db.query(User).filter_by(team_id=team.id).count() == 0
-            user_role = 'Head Coach' if is_first_user else 'Assistant Coach'
+            user_role = HEAD_COACH if is_first_user else ASSISTANT_COACH
 
             hashed_password = generate_password_hash(password)
             default_tab_keys = ['roster', 'player_development', 'games', 'pitching', 'practice_plan', 'collaboration']
@@ -300,6 +305,145 @@ def calculate_pitch_counts(pitcher_name, all_outings):
             except (ValueError, TypeError): continue
     return counts
 
+def calculate_cumulative_pitching_stats(pitcher_name, all_outings):
+    """
+    Calculates cumulative pitching statistics for a given pitcher.
+    Args:
+        pitcher_name (str): The name of the pitcher.
+        all_outings (list): A list of all PitchingOuting objects.
+    Returns:
+        dict: A dictionary containing total innings pitched, total pitches thrown, and appearances.
+    """
+    total_innings = 0.0
+    total_pitches = 0
+    appearances = 0
+
+    for outing in all_outings:
+        if outing.pitcher == pitcher_name:
+            try:
+                # Ensure innings are treated as float and pitches as int
+                innings = float(outing.innings) if outing.innings is not None else 0.0
+                pitches = int(outing.pitches) if outing.pitches is not None else 0
+
+                total_innings += innings
+                total_pitches += pitches
+                appearances += 1
+            except (ValueError, TypeError):
+                # Handle cases where data might be malformed, skip the outing
+                continue
+    return {
+        'total_innings_pitched': round(total_innings, 1), # Round to 1 decimal place for display
+        'total_pitches_thrown': total_pitches,
+        'appearances': appearances
+    }
+
+def calculate_cumulative_position_stats(roster_players, lineups):
+    """
+    Calculates cumulative games played at each position for all players.
+    Args:
+        roster_players (list): List of Player objects.
+        lineups (list): List of Lineup objects.
+    Returns:
+        dict: A dictionary where keys are player names and values are
+              dictionaries of positions and counts (games played at that position).
+    """
+    player_position_stats = {}
+    for player in roster_players:
+        player_position_stats[player.name] = {}
+
+    for lineup in lineups:
+        try:
+            lineup_positions = json.loads(lineup.lineup_positions or "[]")
+            for item in lineup_positions:
+                player_name = item.get('name')
+                position = item.get('position')
+                if player_name and position:
+                    if player_name in player_position_stats:
+                        player_position_stats[player_name][position] = player_position_stats[player_name].get(position, 0) + 1
+        except json.JSONDecodeError:
+            # Handle cases where lineup_positions might be malformed JSON
+            continue
+    return player_position_stats
+
+# NEW: Centralized data fetching function
+def _get_full_team_data(db, team_id, current_user):
+    """
+    Fetches and structures all data for a given team.
+    This function centralizes data loading to be used by multiple routes.
+    """
+    all_users = db.query(User).filter_by(team_id=team_id).all()
+    user_name_map = {u.username: (u.full_name or u.username) for u in all_users}
+    display_full_names = current_user.team.display_coach_names
+    def get_display_name(username):
+        if not username or username == 'N/A': return 'N/A'
+        return user_name_map.get(username, username) if display_full_names else username
+
+    # Use eager loading (selectinload) to prevent N+1 query issues on player.development_focuses
+    roster_players = db.query(Player).options(selectinload(Player.development_focuses)).filter_by(team_id=team_id).all()
+    
+    lineups = db.query(Lineup).filter_by(team_id=team_id).all()
+    pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
+    scouted_committed = db.query(ScoutedPlayer).filter_by(team_id=team_id, list_type='committed').all()
+    scouted_targets = db.query(ScoutedPlayer).filter_by(team_id=team_id, list_type='targets').all()
+    scouted_not_interested = db.query(ScoutedPlayer).filter_by(team_id=team_id, list_type='not_interested').all()
+    rotations = db.query(Rotation).filter_by(team_id=team_id).all()
+    games = db.query(Game).filter_by(team_id=team_id).all()
+    collaboration_player_notes = db.query(CollaborationNote).filter_by(team_id=team_id, note_type='player_notes').all()
+    collaboration_team_notes = db.query(CollaborationNote).filter_by(team_id=team_id, note_type='team_notes').all()
+    practice_plans = db.query(PracticePlan).filter_by(team_id=team_id).order_by(PracticePlan.date.desc()).all()
+    signs = db.query(Sign).filter_by(team_id=team_id).all()
+
+    player_activity_log = {}
+    for player in roster_players:
+        log_entries = []
+        # This loop is now efficient because development_focuses are pre-loaded
+        for focus in player.development_focuses:
+            log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.created_date, 'timestamp': focus.created_date, 'text': f"New Focus: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.author), 'status': focus.status, 'id': focus.id})
+            if focus.status == 'completed' and focus.completed_date:
+                 log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.completed_date, 'timestamp': focus.completed_date, 'text': f"Completed: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.last_edited_by or focus.author), 'status': focus.status, 'id': focus.id})
+        for note in collaboration_player_notes:
+            if note.player_name == player.name:
+                ts_str = note.timestamp.split(' ')[0] if note.timestamp else 'N/A'
+                log_entries.append({'type': 'Coach Note', 'subtype': 'Player Log', 'date': ts_str, 'timestamp': note.timestamp or '1970-01-01 00:00', 'text': note.text, 'notes': None, 'author': get_display_name(note.author), 'status': 'active', 'id': note.id})
+        if player.has_lessons == 'Yes' and player.lesson_focus:
+             log_entries.append({'type': 'Lessons', 'subtype': 'Private Instruction', 'date': player.notes_timestamp.split(' ')[0] if player.notes_timestamp else 'N/A', 'timestamp': player.notes_timestamp or '1970-01-01 00:00', 'text': f"Lesson Focus: {player.lesson_focus}", 'notes': None, 'author': 'N/A', 'status': 'active', 'id': player.id})
+
+        player_activity_log[player.name] = sorted(log_entries, key=lambda x: x['timestamp'], reverse=True)
+
+    clean_pitching_outings = []
+    for po in pitching_outings:
+        innings = float(po.innings) if po.innings is not None else 0.0
+        if not math.isfinite(innings):
+            innings = 0.0
+        clean_pitching_outings.append({
+            "id": po.id, "date": po.date, "pitcher": po.pitcher,
+            "opponent": po.opponent, "pitches": po.pitches, "innings": innings,
+            "pitcher_type": po.pitcher_type, "outing_type": po.outing_type
+        })
+
+    app_data = {
+        "roster": [{"name": p.name, "number": p.number, "position1": p.position1, "position2": p.position2, "position3": p.position3, "throws": p.throws, "bats": p.bats, "notes": p.notes, "pitcher_role": p.pitcher_role, "has_lessons": p.has_lessons, "lesson_focus": p.lesson_focus, "notes_author": get_display_name(p.notes_author), "notes_timestamp": p.notes_timestamp, "id": p.id} for p in roster_players],
+        "lineups": [{"id": l.id, "title": l.title, "lineup_positions": json.loads(l.lineup_positions or "[]"), "associated_game_id": l.associated_game_id} for l in lineups],
+        "pitching": clean_pitching_outings,
+        "scouting_list": {
+            "committed": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_committed],
+            "targets": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_targets],
+            "not_interested": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_not_interested]
+        },
+        "rotations": [{"id": r.id, "title": r.title, "innings": json.loads(r.innings or "{}"), "associated_game_id": r.associated_game_id} for r in rotations],
+        "games": [{"id": g.id, "date": g.date, "opponent": g.opponent, "location": g.location, "game_notes": g.game_notes, "associated_lineup_title": g.associated_lineup_title, "associated_rotation_date": g.associated_rotation_date} for g in games],
+        "settings": {"registration_code": current_user.team.registration_code, "team_name": current_user.team.team_name},
+        "collaboration_notes": {
+            "player_notes": [{"id": cn.id, "text": cn.text, "author": get_display_name(cn.author), "timestamp": cn.timestamp, "player_name": cn.player_name} for cn in collaboration_player_notes],
+            "team_notes": [{"id": cn.id, "text": cn.text, "author": get_display_name(cn.author), "timestamp": cn.timestamp} for cn in collaboration_team_notes]
+        },
+        "practice_plans": [{"id": pp.id, "date": pp.date, "general_notes": pp.general_notes, "tasks": [{"id": pt.id, "text": pt.text, "status": pt.status, "author": get_display_name(pt.author), "timestamp": pt.timestamp } for pt in pp.tasks]} for pp in practice_plans],
+        "player_development": player_activity_log,
+        "signs": [{"id": s.id, "name": s.name, "indicator": s.indicator} for s in signs]
+    }
+    return app_data, roster_players, lineups, pitching_outings
+
+
 # --- MAIN AND ADMIN ROUTES ---
 @app.route('/')
 @login_required
@@ -310,78 +454,10 @@ def home():
         if not user:
             flash('User not found or not associated with a team.', 'danger')
             return redirect(url_for('login'))
-
-        team_id = user.team_id
-
-        all_users = db.query(User).filter_by(team_id=team_id).all()
-        user_name_map = {u.username: (u.full_name or u.username) for u in all_users}
-        display_full_names = user.team.display_coach_names
-        def get_display_name(username):
-            if not username or username == 'N/A': return 'N/A'
-            return user_name_map.get(username, username) if display_full_names else username
-
-        roster_players = db.query(Player).filter_by(team_id=team_id).all()
-        lineups = db.query(Lineup).filter_by(team_id=team_id).all()
-        pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
-        scouted_committed = db.query(ScoutedPlayer).filter_by(team_id=team_id, list_type='committed').all()
-        scouted_targets = db.query(ScoutedPlayer).filter_by(team_id=team_id, list_type='targets').all()
-        scouted_not_interested = db.query(ScoutedPlayer).filter_by(team_id=team_id, list_type='not_interested').all()
-        rotations = db.query(Rotation).filter_by(team_id=team_id).all()
-        games = db.query(Game).filter_by(team_id=team_id).all()
-        collaboration_player_notes = db.query(CollaborationNote).filter_by(team_id=team_id, note_type='player_notes').all()
-        collaboration_team_notes = db.query(CollaborationNote).filter_by(team_id=team_id, note_type='team_notes').all()
-        practice_plans = db.query(PracticePlan).filter_by(team_id=team_id).order_by(PracticePlan.date.desc()).all()
-        signs = db.query(Sign).filter_by(team_id=team_id).all()
-
-        player_activity_log = {}
-        for player in roster_players:
-            log_entries = []
-            for focus in player.development_focuses:
-                log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.created_date, 'timestamp': focus.created_date, 'text': f"New Focus: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.author), 'status': focus.status, 'id': focus.id})
-                if focus.status == 'completed' and focus.completed_date:
-                     log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.completed_date, 'timestamp': focus.completed_date, 'text': f"Completed: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.last_edited_by or focus.author), 'status': focus.status, 'id': focus.id})
-            for note in collaboration_player_notes:
-                if note.player_name == player.name:
-                    ts_str = note.timestamp.split(' ')[0] if note.timestamp else 'N/A'
-                    log_entries.append({'type': 'Coach Note', 'subtype': 'Player Log', 'date': ts_str, 'timestamp': note.timestamp or '1970-01-01 00:00', 'text': note.text, 'notes': None, 'author': get_display_name(note.author), 'status': 'active', 'id': note.id})
-            if player.has_lessons == 'Yes' and player.lesson_focus:
-                 log_entries.append({'type': 'Lessons', 'subtype': 'Private Instruction', 'date': player.notes_timestamp.split(' ')[0] if player.notes_timestamp else 'N/A', 'timestamp': player.notes_timestamp or '1970-01-01 00:00', 'text': f"Lesson Focus: {player.lesson_focus}", 'notes': None, 'author': 'N/A', 'status': 'active', 'id': player.id})
-
-            player_activity_log[player.name] = sorted(log_entries, key=lambda x: x['timestamp'], reverse=True)
-
-        # FIXED: Sanitize pitching data to prevent JSON errors with non-finite numbers
-        clean_pitching_outings = []
-        for po in pitching_outings:
-            innings = float(po.innings) if po.innings is not None else 0.0
-            if not math.isfinite(innings):
-                innings = 0.0
-            clean_pitching_outings.append({
-                "id": po.id, "date": po.date, "pitcher": po.pitcher,
-                "opponent": po.opponent, "pitches": po.pitches, "innings": innings,
-                "pitcher_type": po.pitcher_type, "outing_type": po.outing_type
-            })
-
-        app_data = {
-            "roster": [{"name": p.name, "number": p.number, "position1": p.position1, "position2": p.position2, "position3": p.position3, "throws": p.throws, "bats": p.bats, "notes": p.notes, "pitcher_role": p.pitcher_role, "has_lessons": p.has_lessons, "lesson_focus": p.lesson_focus, "notes_author": get_display_name(p.notes_author), "notes_timestamp": p.notes_timestamp, "id": p.id} for p in roster_players],
-            "lineups": [{"id": l.id, "title": l.title, "lineup_positions": json.loads(l.lineup_positions or "[]"), "associated_game_id": l.associated_game_id} for l in lineups],
-            "pitching": clean_pitching_outings,
-            "scouting_list": {
-                "committed": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_committed],
-                "targets": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_targets],
-                "not_interested": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_not_interested]
-            },
-            "rotations": [{"id": r.id, "title": r.title, "innings": json.loads(r.innings or "{}"), "associated_game_id": r.associated_game_id} for r in rotations],
-            "games": [{"id": g.id, "date": g.date, "opponent": g.opponent, "location": g.location, "game_notes": g.game_notes, "associated_lineup_title": g.associated_lineup_title, "associated_rotation_date": g.associated_rotation_date} for g in games],
-            "settings": {"registration_code": user.team.registration_code, "team_name": user.team.team_name},
-            "collaboration_notes": {
-                "player_notes": [{"id": cn.id, "text": cn.text, "author": get_display_name(cn.author), "timestamp": cn.timestamp, "player_name": cn.player_name} for cn in collaboration_player_notes],
-                "team_notes": [{"id": cn.id, "text": cn.text, "author": get_display_name(cn.author), "timestamp": cn.timestamp} for cn in collaboration_team_notes]
-            },
-            "practice_plans": [{"id": pp.id, "date": pp.date, "general_notes": pp.general_notes, "tasks": [{"id": pt.id, "text": pt.text, "status": pt.status, "author": get_display_name(pt.author), "timestamp": pt.timestamp } for pt in pp.tasks]} for pp in practice_plans],
-            "player_development": player_activity_log,
-            "signs": [{"id": s.id, "name": s.name, "indicator": s.indicator} for s in signs]
-        }
-
+        
+        # MODIFIED: Call the centralized data fetching function
+        app_data, roster_players, lineups, pitching_outings = _get_full_team_data(db, user.team_id, user)
+        
         all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs'}
         default_tab_keys = list(all_tabs.keys())
         user_tab_order = json.loads(user.tab_order or "[]") if user.tab_order else default_tab_keys
@@ -389,21 +465,43 @@ def home():
             if key not in user_tab_order and key in all_tabs: user_tab_order.append(key)
         user_tab_order = [key for key in user_tab_order if key in all_tabs]
 
-        all_players_for_count = roster_players + scouted_committed + scouted_targets
+        all_players_for_count = roster_players + app_data['scouting_list']['committed'] + app_data['scouting_list']['targets']
         position_counts = {}
-        for player in all_players_for_count:
-            pos = player.position1
+        for player_data in all_players_for_count:
+            # Handle both Player objects and dicts from scouting list
+            pos = player_data.position1 if isinstance(player_data, Player) else player_data.get('position1')
             if pos: position_counts[pos] = position_counts.get(pos, 0) + 1
 
-        pitcher_names = sorted(list(set(po['pitcher'] for po in clean_pitching_outings if po['pitcher'])))
+        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
         pitch_count_summary = {}
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
-            pitch_count_summary[name] = {**counts, **availability}
-
+            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
+            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
+            
         current_team = db.query(Team).filter_by(id=session['team_id']).first()
-        return render_template('index.html', data=app_data, session=session, tab_order=user_tab_order, all_tabs=all_tabs, position_counts=position_counts, pitch_count_summary=pitch_count_summary, current_team=current_team)
+
+        # Calculate cumulative pitching stats for all pitchers (for stats.html)
+        pitcher_names_for_stats = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
+        cumulative_pitching_data = {}
+        for name in pitcher_names_for_stats:
+            cumulative_pitching_data[name] = calculate_cumulative_pitching_stats(name, pitching_outings)
+
+        # Calculate cumulative position stats for all players (for stats.html)
+        cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
+
+        return render_template('index.html',
+                               data=app_data,
+                               session=session,
+                               tab_order=user_tab_order,
+                               all_tabs=all_tabs,
+                               position_counts=position_counts,
+                               pitch_count_summary=pitch_count_summary,
+                               current_team=current_team,
+                               roster_players=roster_players,
+                               cumulative_pitching_data=cumulative_pitching_data,
+                               cumulative_position_data=cumulative_position_data)
     finally:
         db.close()
 
@@ -423,87 +521,50 @@ def get_app_data():
         user = db.query(User).filter_by(username=session['username'], team_id=session['team_id']).first()
         if not user:
             return jsonify({'status': 'error', 'message': 'User not found or not associated with a team.'}), 404
-        team_id = user.team_id
-        all_users = db.query(User).filter_by(team_id=team_id).all()
-        user_name_map = {u.username: (u.full_name or u.username) for u in all_users}
-        display_full_names = user.team.display_coach_names
-        def get_display_name(username):
-            if not username or username == 'N/A': return 'N/A'
-            return user_name_map.get(username, username) if display_full_names else username
-
-        roster_players = db.query(Player).filter_by(team_id=team_id).all()
-        lineups = db.query(Lineup).filter_by(team_id=team_id).all()
-        pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
-        scouted_committed = db.query(ScoutedPlayer).filter_by(team_id=team_id, list_type='committed').all()
-        scouted_targets = db.query(ScoutedPlayer).filter_by(team_id=team_id, list_type='targets').all()
-        scouted_not_interested = db.query(ScoutedPlayer).filter_by(team_id=team_id, list_type='not_interested').all()
-        rotations = db.query(Rotation).filter_by(team_id=team_id).all()
-        games = db.query(Game).filter_by(team_id=team_id).all()
-        collaboration_player_notes = db.query(CollaborationNote).filter_by(team_id=team_id, note_type='player_notes').all()
-        collaboration_team_notes = db.query(CollaborationNote).filter_by(team_id=team_id, note_type='team_notes').all()
-        practice_plans = db.query(PracticePlan).filter_by(team_id=team_id).order_by(PracticePlan.date.desc()).all()
-        signs = db.query(Sign).filter_by(team_id=team_id).all()
-
-        player_activity_log = {}
-        for player in roster_players:
-            log_entries = []
-            for focus in player.development_focuses:
-                log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.created_date, 'timestamp': focus.created_date, 'text': f"New Focus: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.author), 'status': focus.status, 'id': focus.id})
-                if focus.status == 'completed' and focus.completed_date:
-                     log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.completed_date, 'timestamp': focus.completed_date, 'text': f"Completed: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.last_edited_by or focus.author), 'status': focus.status, 'id': focus.id})
-            for note in collaboration_player_notes:
-                if note.player_name == player.name:
-                    ts_str = note.timestamp.split(' ')[0] if note.timestamp else 'N/A'
-                    log_entries.append({'type': 'Coach Note', 'subtype': 'Player Log', 'date': ts_str, 'timestamp': note.timestamp or '1970-01-01 00:00', 'text': note.text, 'notes': None, 'author': get_display_name(note.author), 'status': 'active', 'id': note.id})
-            if player.has_lessons == 'Yes' and player.lesson_focus:
-                 log_entries.append({'type': 'Lessons', 'subtype': 'Private Instruction', 'date': player.notes_timestamp.split(' ')[0] if player.notes_timestamp else 'N/A', 'timestamp': player.notes_timestamp or '1970-01-01 00:00', 'text': f"Lesson Focus: {player.lesson_focus}", 'notes': None, 'author': 'N/A', 'status': 'active', 'id': player.id})
-
-            player_activity_log[player.name] = sorted(log_entries, key=lambda x: x['timestamp'], reverse=True)
-
-        # FIXED: Sanitize pitching data to prevent JSON errors with non-finite numbers
-        clean_pitching_outings = []
-        for po in pitching_outings:
-            innings = float(po.innings) if po.innings is not None else 0.0
-            if not math.isfinite(innings):
-                innings = 0.0
-            clean_pitching_outings.append({
-                "id": po.id, "date": po.date, "pitcher": po.pitcher,
-                "opponent": po.opponent, "pitches": po.pitches, "innings": innings,
-                "pitcher_type": po.pitcher_type, "outing_type": po.outing_type
-            })
-
-        app_data = {
-            'roster': [{"name": p.name, "number": p.number, "position1": p.position1, "position2": p.position2, "position3": p.position3, "throws": p.throws, "bats": p.bats, "notes": p.notes, "pitcher_role": p.pitcher_role, "has_lessons": p.has_lessons, "lesson_focus": p.lesson_focus, "notes_author": get_display_name(p.notes_author), "notes_timestamp": p.notes_timestamp, "id": p.id} for p in roster_players],
-            'lineups': [{"id": l.id, "title": l.title, "lineup_positions": json.loads(l.lineup_positions or "[]"), "associated_game_id": l.associated_game_id} for l in lineups],
-            'pitching': clean_pitching_outings,
-            'scouting_list': {
-                "committed": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_committed],
-                "targets": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_targets],
-                "not_interested": [{"id": sp.id, "name": sp.name, "position1": sp.position1, "position2": sp.position2, "throws": sp.throws, "bats": sp.bats} for sp in scouted_not_interested]
-            },
-            'rotations': [{"id": r.id, "title": r.title, "innings": json.loads(r.innings or "{}"), "associated_game_id": r.associated_game_id} for r in rotations],
-            'games': [{"id": g.id, "date": g.date, "opponent": g.opponent, "location": g.location, "game_notes": g.game_notes, "associated_lineup_title": g.associated_lineup_title, "associated_rotation_date": g.associated_rotation_date} for g in games],
-            'settings': {'registration_code': user.team.registration_code, 'team_name': user.team.team_name},
-            'collaboration_notes': {
-                'player_notes': [{"id": cn.id, "text": cn.text, "author": get_display_name(cn.author), "timestamp": cn.timestamp, "player_name": cn.player_name} for cn in collaboration_player_notes],
-                'team_notes': [{"id": cn.id, "text": cn.text, "author": get_display_name(cn.author), "timestamp": cn.timestamp} for cn in collaboration_team_notes]
-            },
-            'practice_plans': [{"id": pp.id, "date": pp.date, "general_notes": pp.general_notes, "tasks": [{"id": pt.id, "text": pt.text, "status": pt.status, "author": get_display_name(pt.author), "timestamp": pt.timestamp } for pt in pp.tasks]} for pp in practice_plans],
-            'player_development': player_activity_log,
-            'signs': [{"id": s.id, "name": s.name, "indicator": s.indicator} for s in signs]
-        }
+        
+        # MODIFIED: Call the centralized data fetching function
+        app_data, _, _, pitching_outings = _get_full_team_data(db, user.team_id, user)
 
         player_order = session.get('player_order', [p['name'] for p in app_data.get('roster', [])])
 
-        pitcher_names = sorted(list(set(po['pitcher'] for po in clean_pitching_outings if po['pitcher'])))
+        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
         pitch_count_summary = {}
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
-            pitch_count_summary[name] = {**counts, **availability}
+            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
+            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
 
         app_data_response = {'full_data': app_data, 'player_order': player_order, 'session': {'username': session.get('username'), 'role': session.get('role'), 'full_name': session.get('full_name')}, 'pitch_count_summary': pitch_count_summary}
         return jsonify(app_data_response)
+    finally:
+        db.close()
+
+# NEW ROUTE: Cumulative Stats Page
+@app.route('/stats')
+@login_required
+def stats_page():
+    db = SessionLocal()
+    try:
+        team_id = session['team_id']
+        roster_players = db.query(Player).filter_by(team_id=team_id).all()
+        lineups = db.query(Lineup).filter_by(team_id=team_id).all()
+        pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
+
+        # Calculate cumulative pitching stats for all pitchers
+        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
+        cumulative_pitching_data = {}
+        for name in pitcher_names:
+            cumulative_pitching_data[name] = calculate_cumulative_pitching_stats(name, pitching_outings)
+
+        # Calculate cumulative position stats for all players
+        cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
+
+        return render_template('stats.html',
+                               roster_players=roster_players,
+                               cumulative_pitching_data=cumulative_pitching_data,
+                               cumulative_position_data=cumulative_position_data,
+                               session=session)
     finally:
         db.close()
 
@@ -529,7 +590,7 @@ def user_management():
     db = SessionLocal()
     try:
         teams = []
-        if session.get('role') == 'Super Admin':
+        if session.get('role') == SUPER_ADMIN:
             users = db.query(User).options(joinedload(User.team)).all()
             teams = db.query(Team).options(joinedload(Team.users)).order_by(Team.team_name).all()
         else:
@@ -547,11 +608,11 @@ def add_user():
         username = request.form.get('username')
         password = request.form.get('password')
         full_name = request.form.get('full_name')
-        role = request.form.get('role', 'Assistant Coach')
+        role = request.form.get('role', ASSISTANT_COACH)
 
-        # MODIFIED: Determine the correct team ID
+        # Determine the correct team ID
         team_id_for_new_user = None
-        if session.get('role') == 'Super Admin':
+        if session.get('role') == SUPER_ADMIN:
             form_team_id = request.form.get('team_id')
             if not form_team_id:
                 flash('Super Admins must select a team for the new user.', 'danger')
@@ -567,7 +628,7 @@ def add_user():
             flash('Username already exists.', 'danger')
             return redirect(url_for('user_management'))
 
-        if role == 'Super Admin' and session.get('role') != 'Super Admin':
+        if role == SUPER_ADMIN and session.get('role') != SUPER_ADMIN:
             flash('Only a Super Admin can create another Super Admin.', 'danger')
             return redirect(url_for('user_management'))
 
@@ -581,7 +642,7 @@ def add_user():
             role=role,
             tab_order=json.dumps(default_tab_keys),
             last_login='Never',
-            team_id=team_id_for_new_user  # Use the determined team ID
+            team_id=team_id_for_new_user
         )
         db.add(new_user)
         db.commit()
@@ -596,7 +657,7 @@ def add_user():
 @app.route('/admin/create_team', methods=['POST'])
 @login_required
 def create_team():
-    if session.get('role') != 'Super Admin':
+    if session.get('role') != SUPER_ADMIN:
         flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('user_management'))
 
@@ -629,7 +690,7 @@ def create_team():
 @app.route('/admin/delete_team/<int:team_id>')
 @login_required
 def delete_team(team_id):
-    if session.get('role') != 'Super Admin':
+    if session.get('role') != SUPER_ADMIN:
         flash('You do not have permission to perform this action.', 'danger')
         return redirect(url_for('user_management'))
 
@@ -745,7 +806,7 @@ def update_user_details(username):
         if not user_to_update:
             flash('User not found.', 'danger')
             return redirect(url_for('user_management'))
-        if session.get('role') == 'Head Coach' and user_to_update.team_id != session.get('team_id'):
+        if session.get('role') == HEAD_COACH and user_to_update.team_id != session.get('team_id'):
             flash('You do not have permission to edit this user.', 'danger')
             return redirect(url_for('user_management'))
         user_to_update.full_name = request.form.get('full_name')
@@ -767,20 +828,20 @@ def change_user_role(username):
         if not user_to_change:
             flash('User not found.', 'danger')
             return redirect(url_for('user_management'))
-        if session.get('role') == 'Head Coach' and user_to_change.team_id != session.get('team_id'):
+        if session.get('role') == HEAD_COACH and user_to_change.team_id != session.get('team_id'):
             flash('You do not have permission to edit this user.', 'danger')
             return redirect(url_for('user_management'))
         if user_to_change.username.lower() == 'mike1825':
             flash('You cannot change the role of the Super Admin.', 'danger')
             return redirect(url_for('user_management'))
         new_role = request.form.get('role')
-        if new_role == 'Super Admin' and session.get('role') != 'Super Admin':
+        if new_role == SUPER_ADMIN and session.get('role') != SUPER_ADMIN:
             flash('Only a Super Admin can assign the Super Admin role.', 'danger')
             return redirect(url_for('user_management'))
-        if user_to_change.username == session['username'] and new_role != 'Super Admin' and db.query(User).filter_by(role='Super Admin').count() == 1:
+        if user_to_change.username == session['username'] and new_role != SUPER_ADMIN and db.query(User).filter_by(role=SUPER_ADMIN).count() == 1:
             flash('You cannot demote yourself as the sole Super Admin. Assign another Super Admin first.', 'danger')
             return redirect(url_for('user_management'))
-        if new_role in ['Head Coach', 'Assistant Coach', 'Game Changer', 'Super Admin']:
+        if new_role in [HEAD_COACH, ASSISTANT_COACH, GAME_CHANGER, SUPER_ADMIN]:
             user_to_change.role = new_role
             db.commit()
             flash(f"Successfully changed {username}'s role to {new_role}.", 'success')
@@ -801,7 +862,7 @@ def delete_user(username):
             return redirect(url_for('user_management'))
         user_to_delete = db.query(User).filter(func.lower(User.username) == func.lower(username)).first()
         if user_to_delete:
-            if session.get('role') == 'Head Coach' and user_to_delete.team_id != session.get('team_id'):
+            if session.get('role') == HEAD_COACH and user_to_delete.team_id != session.get('team_id'):
                 flash('You do not have permission to delete this user.', 'danger')
                 return redirect(url_for('user_management'))
             db.delete(user_to_delete)
@@ -826,7 +887,7 @@ def reset_password(username):
         if not user_to_reset:
             flash('User not found.', 'danger')
             return redirect(url_for('user_management'))
-        if session.get('role') == 'Head Coach' and user_to_reset.team_id != session.get('team_id'):
+        if session.get('role') == HEAD_COACH and user_to_reset.team_id != session.get('team_id'):
             flash('You do not have permission to reset this password.', 'danger')
             return redirect(url_for('user_management'))
         temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
@@ -1302,7 +1363,7 @@ def edit_note():
         if not note_to_edit or note_to_edit.note_type != note_type:
             flash('Note not found or invalid note type.', 'danger')
             return redirect(url_for('home', _anchor='collaboration'))
-        if session['username'] == note_to_edit.author or session.get('role') in ['Head Coach', 'Super Admin']:
+        if session['username'] == note_to_edit.author or session.get('role') in [HEAD_COACH, SUPER_ADMIN]:
             note_to_edit.text = new_text
             db.commit()
             flash('Note updated successfully.', 'success')
@@ -1320,7 +1381,7 @@ def delete_note(note_type, note_id):
     try:
         note_to_delete = db.query(CollaborationNote).filter_by(id=note_id, team_id=session['team_id']).first()
         if note_to_delete and note_to_delete.note_type == note_type:
-            if session['username'] == note_to_delete.author or session.get('role') in ['Head Coach', 'Super Admin']:
+            if session['username'] == note_to_delete.author or session.get('role') in [HEAD_COACH, SUPER_ADMIN]:
                 db.delete(note_to_delete)
                 db.commit()
                 flash('Note deleted successfully.', 'success')
@@ -1710,7 +1771,8 @@ def game_management(game_id):
         for name in pitcher_names:
             counts = calculate_pitch_counts(name, pitching_outings)
             availability = calculate_pitcher_availability(name, pitching_outings)
-            pitch_count_summary[name] = {**counts, **availability}
+            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
+            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
         game_pitching_log = [p for p in pitching_outings if p.opponent == game.opponent and p.date == game.date]
         return render_template('game_management.html', game=game_dict, roster=roster_list, lineup=lineup_dict, rotation=rotation_dict, pitch_count_summary=pitch_count_summary, game_pitching_log=game_pitching_log, session=session)
     finally:
