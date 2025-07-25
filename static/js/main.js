@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
         roster_sort: { key: 'name', order: 'asc' }
     };
 
-    // MODIFIED: Changed from const to let to allow reassignment
     let sortableInstances = {};
     let lineupEditorModal;
 
@@ -221,23 +220,51 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderPitchingLog() {
         const summaryContainer = document.getElementById('pitch-count-summary-container');
         if (summaryContainer) {
-            let summaryHtml = `<table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Pitcher</th><th>Daily (Limit: 85)</th><th>Weekly (Limit: 100)</th><th>Cumulative (Yearly)</th></tr></thead><tbody>`;
             const summaryData = AppState.pitch_count_summary || {};
+            const firstPitcher = Object.values(summaryData)[0];
+            const maxDaily = firstPitcher ? firstPitcher.max_daily : 85;
+
+            let summaryHtml = `<table class="table table-sm table-bordered table-striped"><thead class="table-light"><tr><th>Pitcher</th><th>Daily (${maxDaily} max)</th><th>Weekly</th><th>Status</th></tr></thead><tbody>`;
+
             if (Object.keys(summaryData).length > 0) {
-                for (const [name, counts] of Object.entries(summaryData)) {
-                    const dailyPct = Math.min((counts.daily / 85 * 100), 100);
-                    const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
+                // Use the sorted player_order to render pitchers
+                const sortedPitchers = AppState.player_order.filter(name => summaryData[name]);
+
+                for (const name of sortedPitchers) {
+                    const counts = summaryData[name];
+                    const dailyPct = Math.min((counts.daily / counts.max_daily * 100), 100);
+                    // Assuming a generic weekly limit for visual purposes, as it's not in the rules engine
+                    const weeklyPct = Math.min((counts.weekly / 100 * 100), 100); 
                     const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
                     const weeklyBg = weeklyPct > 80 ? 'bg-danger' : weeklyPct > 60 ? 'bg-warning' : 'bg-success';
+
+                    const statusBadge = counts.status === 'Available' 
+                        ? `<span class="badge bg-success">Available</span>` 
+                        : `<span class="badge bg-danger">Resting</span>`;
+                    const nextAvailableText = counts.status === 'Resting' ? `<br><small class="text-muted">Next up: ${counts.next_available}</small>` : '';
+
                     summaryHtml += `
-                    <tr><td><strong>${escapeHTML(name)}</strong></td>
-                        <td><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div></td>
-                        <td><div class="progress" style="height: 20px;"><div class="progress-bar ${weeklyBg}" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div></div></td>
-                        <td class="text-center align-middle"><strong>${counts.cumulative_year || 0}</strong></td>
+                    <tr>
+                        <td class="align-middle"><strong>${escapeHTML(name)}</strong></td>
+                        <td class="align-middle">
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div>
+                            </div>
+                            <small class="text-muted">${counts.pitches_remaining_today} remaining today</small>
+                        </td>
+                        <td class="align-middle">
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar ${weeklyBg}" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div>
+                            </div>
+                        </td>
+                        <td class="text-center align-middle">
+                            ${statusBadge}
+                            ${nextAvailableText}
+                        </td>
                     </tr>`;
                 }
             } else {
-                summaryHtml += `<tr><td colspan="4" class="text-center">No pitching outings recorded yet.</td></tr>`;
+                summaryHtml += `<tr><td colspan="4" class="text-center text-muted">No pitching data recorded.</td></tr>`;
             }
             summaryHtml += `</tbody></table>`;
             summaryContainer.innerHTML = summaryHtml;

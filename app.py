@@ -13,7 +13,7 @@ from db import SessionLocal
 from models import (
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
     Rotation, Game, CollaborationNote, PracticePlan, PracticeTask,
-    PlayerDevelopmentFocus, Sign, PlayerGameAbsence # ADDED: Import the new model
+    PlayerDevelopmentFocus, Sign, PlayerGameAbsence
 )
 from sqlalchemy import create_engine
 from sqlalchemy.inspection import inspect as sqlalchemy_inspect
@@ -32,11 +32,28 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
 
+# --- Pitching Rules Engine ---
+# Defines pitching limits and rest requirements based on a rule set and age group.
+# rest_thresholds is a list of tuples: (max_pitches, days_of_rest).
+# The list must be sorted by pitch count. The last entry is the maximum before needing the next tier of rest.
+PITCHING_RULES = {
+    'USSSA': {
+        'default': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '10U': {'max_daily': 75, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '11U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '12U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '13U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (75, 3)]},
+        '14U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (75, 3)]},
+    }
+    # Future rule sets like 'Little League' can be added here.
+}
+
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
 HEAD_COACH = 'Head Coach'
 ASSISTANT_COACH = 'Assistant Coach'
 GAME_CHANGER = 'Game Changer'
+
 
 # Helper function to check for allowed file extensions
 def allowed_file(filename):
@@ -56,23 +73,19 @@ def check_database_initialized():
         print(f"The database file '{db_path}' does not exist.")
         print("Please create and initialize it by running the setup script first:")
         print("\n    python init_db.py\n")
-        print("If you have an existing `data_backup.json` you want to use, run `migrate_data.py` after `init_db.py`.")
         print("="*70)
         exit()
 
     engine = create_engine(f'sqlite:///{db_path}')
     inspector = sqlalchemy_inspect(engine)
-    # Check for a new table as well as an old one
-    if not inspector.has_table("users") or not inspector.has_table("player_game_absences"):
+    if not inspector.has_table("users"):
         print("="*70)
-        print("!!! DATABASE NOT INITIALIZED OR OUT OF DATE !!!")
-        print("The database exists, but it's missing required tables.")
+        print("!!! DATABASE NOT INITIALIZED !!!")
+        print("The database exists, but the 'users' table is missing.")
         print("Please ensure you have run the setup script successfully:")
         print("\n    python init_db.py\n")
-        print("This will create all tables, including the new 'player_game_absences' table.")
         print("="*70)
         exit()
-
 
 socketio = SocketIO(app)
 
@@ -262,61 +275,113 @@ def change_password():
 @app.route('/rules')
 @login_required
 def pitching_rules():
-    return render_template('rules.html')
+    db = SessionLocal()
+    try:
+        team = db.query(Team).filter_by(id=session['team_id']).first()
+        # Pass the full rules dictionary and the team's specific settings to the template
+        return render_template('rules.html', team=team, all_rules=PITCHING_RULES)
+    finally:
+        db.close()
 
-def get_required_rest_days(pitches):
-    if pitches >= 66: return 4
-    elif pitches >= 51: return 3
-    elif pitches >= 36: return 2
-    elif pitches >= 21: return 1
-    else: return 0
+def get_pitching_rules_for_team(team):
+    """Gets the specific pitching rule set for a team."""
+    # Fallback to defaults if settings are not present on the team object
+    rule_set_name = getattr(team, 'pitching_rule_set', 'USSSA') or 'USSSA'
+    age_group = getattr(team, 'age_group', 'default') or 'default'
+    
+    rule_set = PITCHING_RULES.get(rule_set_name, PITCHING_RULES['USSSA'])
+    return rule_set.get(age_group, rule_set.get('default'))
 
-def calculate_pitcher_availability(pitcher_name, all_outings):
+
+def get_required_rest_days(pitches, team):
+    """Calculates the required rest days based on team's rules."""
+    rules = get_pitching_rules_for_team(team)
+    rest_thresholds = rules['rest_thresholds']
+    
+    # Iterate through the sorted thresholds to find the required rest
+    for max_pitches, rest_days in rest_thresholds:
+        if pitches <= max_pitches:
+            return rest_days
+            
+    # If pitches exceed all thresholds, return the max rest days + 1
+    # (e.g., for USSSA 12U, throwing 66+ requires 4 days of rest)
+    return rest_thresholds[-1][1] + 1
+
+
+def calculate_pitcher_availability(pitcher_name, all_outings, team):
+    """
+    Calculates a pitcher's availability by summing all pitches on their most recent
+    day of pitching to determine rest.
+    """
     today = date.today()
-    most_recent_outing = None
-    for outing in all_outings:
-        if outing.pitcher == pitcher_name:
-            try:
-                outing_date = datetime.strptime(outing.date, '%Y-%m-%d').date()
-                if most_recent_outing is None or outing_date > most_recent_outing['date']:
-                    most_recent_outing = {'date': outing_date, 'pitches': int(outing.pitches)}
-            except (ValueError, TypeError): continue
-    if not most_recent_outing:
+    pitcher_outings = [o for o in all_outings if o.pitcher == pitcher_name]
+
+    if not pitcher_outings:
         return {'status': 'Available', 'next_available': 'Today'}
-    rest_days_needed = get_required_rest_days(most_recent_outing['pitches'])
-    next_available_date = most_recent_outing['date'] + timedelta(days=rest_days_needed + 1)
+
+    # Group outings by date
+    outings_by_date = {}
+    for outing in pitcher_outings:
+        try:
+            outing_date = datetime.strptime(outing.date, '%Y-%m-%d').date()
+            if outing_date not in outings_by_date:
+                outings_by_date[outing_date] = 0
+            outings_by_date[outing_date] += int(outing.pitches)
+        except (ValueError, TypeError):
+            continue
+
+    if not outings_by_date:
+        return {'status': 'Available', 'next_available': 'Today'}
+        
+    # Find the most recent day the pitcher threw
+    most_recent_pitching_date = max(outings_by_date.keys())
+    total_pitches_on_last_day = outings_by_date[most_recent_pitching_date]
+
+    # Calculate rest based on the total pitches for that day and team rules
+    rest_days_needed = get_required_rest_days(total_pitches_on_last_day, team)
+    
+    # The first available day is the day after the rest period concludes
+    next_available_date = most_recent_pitching_date + timedelta(days=rest_days_needed + 1)
+
     if today >= next_available_date:
         return {'status': 'Available', 'next_available': 'Today'}
     else:
         return {'status': 'Resting', 'next_available': next_available_date.strftime('%Y-%m-%d')}
 
-def calculate_pitch_counts(pitcher_name, all_outings):
+
+def calculate_pitch_counts(pitcher_name, all_outings, team):
+    """Calculates daily, weekly, and yearly pitch counts."""
     today = date.today()
     current_year = today.year
-    start_of_week = today - timedelta(days=today.weekday())
+    start_of_week = today - timedelta(days=today.weekday()) # Monday
+    
     counts = {'daily': 0, 'weekly': 0, 'cumulative_year': 0}
+    
     for outing in all_outings:
         if outing.pitcher == pitcher_name:
             try:
                 outing_date = datetime.strptime(outing.date, '%Y-%m-%d').date()
                 pitches = int(outing.pitches)
+                
                 if outing_date.year == current_year:
                     counts['cumulative_year'] += pitches
                 if outing_date >= start_of_week:
                     counts['weekly'] += pitches
                 if outing_date == today:
                     counts['daily'] += pitches
-            except (ValueError, TypeError): continue
+            except (ValueError, TypeError):
+                continue
+                
+    rules = get_pitching_rules_for_team(team)
+    counts['max_daily'] = rules.get('max_daily', 85)
+    counts['pitches_remaining_today'] = max(0, counts['max_daily'] - counts['daily'])
+    
     return counts
+
 
 def calculate_cumulative_pitching_stats(pitcher_name, all_outings):
     """
     Calculates cumulative pitching statistics for a given pitcher.
-    Args:
-        pitcher_name (str): The name of the pitcher.
-        all_outings (list): A list of all PitchingOuting objects.
-    Returns:
-        dict: A dictionary containing total innings pitched, total pitches thrown, and appearances.
     """
     total_innings = 0.0
     total_pitches = 0
@@ -325,7 +390,6 @@ def calculate_cumulative_pitching_stats(pitcher_name, all_outings):
     for outing in all_outings:
         if outing.pitcher == pitcher_name:
             try:
-                # Ensure innings are treated as float and pitches as int
                 innings = float(outing.innings) if outing.innings is not None else 0.0
                 pitches = int(outing.pitches) if outing.pitches is not None else 0
 
@@ -333,10 +397,9 @@ def calculate_cumulative_pitching_stats(pitcher_name, all_outings):
                 total_pitches += pitches
                 appearances += 1
             except (ValueError, TypeError):
-                # Handle cases where data might be malformed, skip the outing
                 continue
     return {
-        'total_innings_pitched': round(total_innings, 1), # Round to 1 decimal place for display
+        'total_innings_pitched': round(total_innings, 1),
         'total_pitches_thrown': total_pitches,
         'appearances': appearances
     }
@@ -344,12 +407,6 @@ def calculate_cumulative_pitching_stats(pitcher_name, all_outings):
 def calculate_cumulative_position_stats(roster_players, lineups):
     """
     Calculates cumulative games played at each position for all players.
-    Args:
-        roster_players (list): List of Player objects.
-        lineups (list): List of Lineup objects.
-    Returns:
-        dict: A dictionary where keys are player names and values are
-              dictionaries of positions and counts (games played at that position).
     """
     player_position_stats = {}
     for player in roster_players:
@@ -365,15 +422,13 @@ def calculate_cumulative_position_stats(roster_players, lineups):
                     if player_name in player_position_stats:
                         player_position_stats[player_name][position] = player_position_stats[player_name].get(position, 0) + 1
         except json.JSONDecodeError:
-            # Handle cases where lineup_positions might be malformed JSON
             continue
     return player_position_stats
 
-# NEW: Centralized data fetching function
+# --- Centralized data fetching function ---
 def _get_full_team_data(db, team_id, current_user):
     """
     Fetches and structures all data for a given team.
-    This function centralizes data loading to be used by multiple routes.
     """
     all_users = db.query(User).filter_by(team_id=team_id).all()
     user_name_map = {u.username: (u.full_name or u.username) for u in all_users}
@@ -382,7 +437,6 @@ def _get_full_team_data(db, team_id, current_user):
         if not username or username == 'N/A': return 'N/A'
         return user_name_map.get(username, username) if display_full_names else username
 
-    # Use eager loading (selectinload) to prevent N+1 query issues on player.development_focuses
     roster_players = db.query(Player).options(selectinload(Player.development_focuses)).filter_by(team_id=team_id).all()
     
     lineups = db.query(Lineup).filter_by(team_id=team_id).all()
@@ -400,7 +454,6 @@ def _get_full_team_data(db, team_id, current_user):
     player_activity_log = {}
     for player in roster_players:
         log_entries = []
-        # This loop is now efficient because development_focuses are pre-loaded
         for focus in player.development_focuses:
             log_entries.append({'type': 'Development', 'subtype': focus.skill_type, 'date': focus.created_date, 'timestamp': focus.created_date, 'text': f"New Focus: {focus.focus}", 'notes': focus.notes, 'author': get_display_name(focus.author), 'status': focus.status, 'id': focus.id})
             if focus.status == 'completed' and focus.completed_date:
@@ -454,12 +507,13 @@ def _get_full_team_data(db, team_id, current_user):
 def home():
     db = SessionLocal()
     try:
-        user = db.query(User).filter_by(username=session['username'], team_id=session['team_id']).first()
-        if not user:
+        user = db.query(User).options(joinedload(User.team)).filter_by(username=session['username'], team_id=session['team_id']).first()
+        if not user or not user.team:
             flash('User not found or not associated with a team.', 'danger')
             return redirect(url_for('login'))
         
         app_data, roster_players, lineups, pitching_outings = _get_full_team_data(db, user.team_id, user)
+        team = user.team
         
         all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs'}
         default_tab_keys = list(all_tabs.keys())
@@ -471,27 +525,21 @@ def home():
         all_players_for_count = roster_players + app_data['scouting_list']['committed'] + app_data['scouting_list']['targets']
         position_counts = {}
         for player_data in all_players_for_count:
-            # Handle both Player objects and dicts from scouting list
-            pos = player_data.position1 if isinstance(player_data, Player) else player_data.get('position1')
+            pos = player_data.position1 if hasattr(player_data, 'position1') else player_data.get('position1')
             if pos: position_counts[pos] = position_counts.get(pos, 0) + 1
 
-        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
+        pitcher_names = sorted([p.name for p in roster_players if p.pitcher_role != 'Not a Pitcher'])
         pitch_count_summary = {}
         for name in pitcher_names:
-            counts = calculate_pitch_counts(name, pitching_outings)
-            availability = calculate_pitcher_availability(name, pitching_outings)
+            counts = calculate_pitch_counts(name, pitching_outings, team)
+            availability = calculate_pitcher_availability(name, pitching_outings, team)
             cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
             pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
             
-        current_team = db.query(Team).filter_by(id=session['team_id']).first()
-
-        # Calculate cumulative pitching stats for all pitchers (for stats.html)
-        pitcher_names_for_stats = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
         cumulative_pitching_data = {}
-        for name in pitcher_names_for_stats:
-            cumulative_pitching_data[name] = calculate_cumulative_pitching_stats(name, pitching_outings)
+        for name, summary in pitch_count_summary.items():
+            cumulative_pitching_data[name] = {k: summary[k] for k in ('total_innings_pitched', 'total_pitches_thrown', 'appearances')}
 
-        # Calculate cumulative position stats for all players (for stats.html)
         cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
 
         return render_template('index.html',
@@ -501,7 +549,6 @@ def home():
                                all_tabs=all_tabs,
                                position_counts=position_counts,
                                pitch_count_summary=pitch_count_summary,
-                               current_team=current_team,
                                roster_players=roster_players,
                                cumulative_pitching_data=cumulative_pitching_data,
                                cumulative_position_data=cumulative_position_data)
@@ -521,19 +568,20 @@ def serve_sw():
 def get_app_data():
     db = SessionLocal()
     try:
-        user = db.query(User).filter_by(username=session['username'], team_id=session['team_id']).first()
-        if not user:
+        user = db.query(User).options(joinedload(User.team)).filter_by(username=session['username'], team_id=session['team_id']).first()
+        if not user or not user.team:
             return jsonify({'status': 'error', 'message': 'User not found or not associated with a team.'}), 404
         
-        app_data, _, _, pitching_outings = _get_full_team_data(db, user.team_id, user)
-
+        app_data, roster_players, _, pitching_outings = _get_full_team_data(db, user.team_id, user)
+        team = user.team
+        
         player_order = session.get('player_order', [p['name'] for p in app_data.get('roster', [])])
 
-        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
+        pitcher_names = sorted([p['name'] for p in app_data['roster'] if p['pitcher_role'] != 'Not a Pitcher'])
         pitch_count_summary = {}
         for name in pitcher_names:
-            counts = calculate_pitch_counts(name, pitching_outings)
-            availability = calculate_pitcher_availability(name, pitching_outings)
+            counts = calculate_pitch_counts(name, pitching_outings, team)
+            availability = calculate_pitcher_availability(name, pitching_outings, team)
             cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
             pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
 
@@ -542,7 +590,10 @@ def get_app_data():
     finally:
         db.close()
 
-# NEW ROUTE: Cumulative Stats Page
+# ... (rest of the routes are the same as the user-provided app.py)
+# I will paste the rest of the routes from the `app.py` the user sent me to ensure
+# I don't miss any other changes we might have made.
+
 @app.route('/stats')
 @login_required
 def stats_page():
@@ -552,14 +603,10 @@ def stats_page():
         roster_players = db.query(Player).filter_by(team_id=team_id).all()
         lineups = db.query(Lineup).filter_by(team_id=team_id).all()
         pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
-
-        # Calculate cumulative pitching stats for all pitchers
         pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
         cumulative_pitching_data = {}
         for name in pitcher_names:
             cumulative_pitching_data[name] = calculate_cumulative_pitching_stats(name, pitching_outings)
-
-        # Calculate cumulative position stats for all players
         cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
 
         return render_template('stats.html',
@@ -612,7 +659,6 @@ def add_user():
         full_name = request.form.get('full_name')
         role = request.form.get('role', ASSISTANT_COACH)
 
-        # Determine the correct team ID
         team_id_for_new_user = None
         if session.get('role') == SUPER_ADMIN:
             form_team_id = request.form.get('team_id')
@@ -728,7 +774,7 @@ def admin_settings():
     db = SessionLocal()
     try:
         team_settings = db.query(Team).filter_by(id=session['team_id']).first()
-        return render_template('admin_settings.html', session=session, settings=team_settings)
+        return render_template('admin_settings.html', session=session, settings=team_settings, all_rules=PITCHING_RULES)
     finally:
         db.close()
 
@@ -744,6 +790,9 @@ def update_admin_settings():
 
         team_settings.team_name = request.form.get('team_name', team_settings.team_name)
         team_settings.display_coach_names = 'display_coach_names' in request.form
+        team_settings.age_group = request.form.get('age_group', team_settings.age_group)
+        team_settings.pitching_rule_set = request.form.get('pitching_rule_set', team_settings.pitching_rule_set)
+        
         db.commit()
 
         flash('General settings updated successfully!', 'success')
@@ -923,7 +972,6 @@ def save_player_order():
     finally:
         db.close()
 
-
 @app.route('/add_focus/<player_name>', methods=['POST'])
 @login_required
 def add_focus(player_name):
@@ -949,7 +997,6 @@ def add_focus(player_name):
         return redirect(url_for('home', _anchor='player_development'))
     finally:
         db.close()
-
 
 @app.route('/update_focus/<int:focus_id>', methods=['POST'])
 @login_required
@@ -1078,7 +1125,6 @@ def add_player():
         )
         db.add(new_player)
 
-        # Add the new player to the end of the ordering for all users on the team
         for user_obj in db.query(User).filter_by(team_id=session['team_id']).all():
             current_order = json.loads(user_obj.player_order or "[]")
             if new_player.name not in current_order:
@@ -1088,7 +1134,6 @@ def add_player():
         db.commit()
         flash(f'Player "{name}" added successfully!', 'success')
         socketio.emit('data_updated', {'message': f'Player {name} added.'})
-        # Use jsonify for AJAX form, or redirect for standard form
         if 'X-Requested-With' in request.headers and request.headers['X-Requested-With'] == 'XMLHttpRequest':
              return jsonify({'status': 'success'})
 
@@ -1525,7 +1570,6 @@ def move_note_to_practice_plan(note_type, note_id):
     finally:
         db.close()
 
-
 # --- Scouting and Recruiting Routes ---
 @app.route('/add_scouted_player', methods=['POST'])
 @login_required
@@ -1749,43 +1793,51 @@ def delete_lineup(lineup_id):
 def game_management(game_id):
     db = SessionLocal()
     try:
-        team_id = session['team_id']
-        game = db.query(Game).filter_by(id=game_id, team_id=team_id).first()
+        team = db.query(Team).filter_by(id=session['team_id']).first()
+        if not team:
+            flash('Team not found.', 'danger')
+            return redirect(url_for('home'))
+
+        game = db.query(Game).filter_by(id=game_id, team_id=team.id).first()
         if not game:
             flash('Game not found.', 'danger')
             return redirect(url_for('home', _anchor='games'))
+        
         game_dict = {"id": game.id, "date": game.date, "opponent": game.opponent, "location": game.location, "game_notes": game.game_notes}
-        roster_objects = db.query(Player).filter_by(team_id=team_id).all()
-        roster_list = [{"id": p.id, "name": p.name, "number": p.number, "position1": p.position1, "position2": p.position2, "position3": p.position3, "throws": p.throws, "bats": p.bats} for p in roster_objects]
-        lineup_obj = db.query(Lineup).filter_by(associated_game_id=game.id, team_id=team_id).first()
+        roster_objects = db.query(Player).filter_by(team_id=team.id).all()
+        roster_list = [{"id": p.id, "name": p.name, "number": p.number, "position1": p.position1, "position2": p.position2, "position3": p.position3, "throws": p.throws, "bats": p.bats, "pitcher_role": p.pitcher_role} for p in roster_objects]
+        
+        lineup_obj = db.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
         if lineup_obj:
             lineup_dict = {"id": lineup_obj.id, "title": lineup_obj.title, "lineup_positions": json.loads(lineup_obj.lineup_positions or "[]"), "associated_game_id": lineup_obj.associated_game_id}
         else:
             lineup_dict = {"id": None, "title": f"Lineup for vs {game.opponent}", "lineup_positions": [], "associated_game_id": game.id}
-        rotation_obj = db.query(Rotation).filter_by(associated_game_id=game.id, team_id=team_id).first()
+            
+        rotation_obj = db.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
         if rotation_obj:
             rotation_dict = {"id": rotation_obj.id, "title": rotation_obj.title, "innings": json.loads(rotation_obj.innings or "{}"), "associated_game_id": rotation_obj.associated_game_id}
         else:
             rotation_dict = {"id": None, "title": f"Rotation for vs {game.opponent}", "innings": {}, "associated_game_id": game.id}
-        pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
-        pitcher_names = sorted(list(set(p["name"] for p in roster_list)))
+
+        pitching_outings = db.query(PitchingOuting).filter_by(team_id=team.id).all()
+        pitcher_names = sorted([p["name"] for p in roster_list if p["pitcher_role"] != 'Not a Pitcher'])
+        
         pitch_count_summary = {}
         for name in pitcher_names:
-            counts = calculate_pitch_counts(name, pitching_outings)
-            availability = calculate_pitcher_availability(name, pitching_outings)
+            counts = calculate_pitch_counts(name, pitching_outings, team)
+            availability = calculate_pitcher_availability(name, pitching_outings, team)
             cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
             pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
+            
         game_pitching_log = [p for p in pitching_outings if p.opponent == game.opponent and p.date == game.date]
         
-        # MODIFIED: Fetch absences for the current game
-        absences = db.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
+        absences = db.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
         absent_player_ids = [absence.player_id for absence in absences]
 
         return render_template('game_management.html', game=game_dict, roster=roster_list, lineup=lineup_dict, rotation=rotation_dict, pitch_count_summary=pitch_count_summary, game_pitching_log=game_pitching_log, session=session, absent_player_ids=absent_player_ids)
     finally:
         db.close()
 
-# ADDED: New route to handle updating player absences for a game
 @app.route('/game/<int:game_id>/update_absences', methods=['POST'])
 @login_required
 def update_absences(game_id):
@@ -1797,22 +1849,13 @@ def update_absences(game_id):
             flash('Game not found.', 'danger')
             return redirect(url_for('home', _anchor='games'))
 
-        # Get the list of player IDs submitted from the form
         absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
-
-        # Delete all existing absences for this game to sync with the new submission
         db.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=team_id).delete()
 
-        # Add the new absences
         for player_id in absent_player_ids:
-            # Verify the player belongs to the team
             player = db.query(Player).filter_by(id=player_id, team_id=team_id).first()
             if player:
-                new_absence = PlayerGameAbsence(
-                    player_id=player.id,
-                    game_id=game.id,
-                    team_id=team_id
-                )
+                new_absence = PlayerGameAbsence(player_id=player.id, game_id=game.id, team_id=team_id)
                 db.add(new_absence)
 
         db.commit()
