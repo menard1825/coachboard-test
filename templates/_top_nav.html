@@ -13,37 +13,27 @@
         {% endif %}
       </span>
     </a>
-    
+
     <div class="d-lg-none ms-auto">
         <a class="nav-link" href="#" id="mobile-more-button"><i class="bi bi-three-dots" style="font-size: 1.8rem;"></i></a>
     </div>
 
     <div class="collapse navbar-collapse" id="navbarResponsive">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0 desktop-nav" id="mainTabsDesktop" role="tablist">
-            {% for tab_key in tab_order %}
-                {% if tab_key in ['roster', 'player_development', 'games', 'practice_plan', 'lineups'] %}
-                <li class="nav-item">
-                    <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
-                        <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
-                        {{ all_tabs[tab_key] }}
-                    </a>
-                </li>
-                {% endif %}
-            {% endfor %}
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="moreTabsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    More
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#stats_tab" role="tab">
+                    <i class="bi bi-bar-chart-fill me-1 drag-handle" title="Drag to reorder"></i>
+                    Stats
                 </a>
-                <ul class="dropdown-menu" aria-labelledby="moreTabsDropdown">
-                    {% for tab_key in tab_order %}
-                        {% if tab_key not in ['roster', 'player_development', 'games', 'practice_plan', 'lineups'] %}
-                        <li>
-                            <a class="dropdown-item" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">{{ all_tabs[tab_key] }}</a>
-                        </li>
-                        {% endif %}
-                    {% endfor %}
-                </ul>
             </li>
+            {% for tab_key in tab_order %}
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
+                    <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
+                    {{ all_tabs[tab_key] }}
+                </a>
+            </li>
+            {% endfor %}
         </ul>
         <ul class="navbar-nav desktop-nav">
             <li class="nav-item dropdown">

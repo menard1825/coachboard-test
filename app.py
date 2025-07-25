@@ -521,7 +521,7 @@ def home():
         app_data, roster_players, lineups, pitching_outings = _get_full_team_data(db, user.team_id, user)
         team = user.team
         
-        all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs'}
+        all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
         default_tab_keys = list(all_tabs.keys())
         user_tab_order = json.loads(user.tab_order or "[]") if user.tab_order else default_tab_keys
         for key in default_tab_keys:
