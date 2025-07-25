@@ -91,7 +91,10 @@ try:
 
     # Helper to get player ID and map existing players
     existing_players = {(p.name.lower(), p.team_id) for p in session.query(Player).all()}
-    player_name_to_id_map = {p.name: p.id for p in session.query(Player).all()}
+    player_name_to_id_map = {}
+    for p in session.query(Player).all():
+        player_name_to_id_map[p.name] = p.id
+
 
     # Add players (roster)
     for p_data in data.get("roster", []):

@@ -2,78 +2,64 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    {# MODIFIED: Title is now dynamic based on the logged-in user's team #}
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{% block title %}{% if current_team %}{{ current_team.team_name }} - Coach Planner{% else %}Team Coach App{% endif %}{% endblock %}</title>
     
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="manifest" href="{{ url_for('serve_manifest') }}">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
-
+    
     {% block head %}{% endblock %}
+    <style>
+        body {
+            /* Add padding to the bottom to prevent the fixed bottom navbar from overlapping content */
+            padding-bottom: 80px; 
+        }
+        @media (min-width: 992px) {
+            body {
+                padding-bottom: 0; /* No padding needed on desktop */
+            }
+        }
+    </style>
 </head>
 <body>
+    <!-- Unified Navbar for Desktop and Mobile -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom sticky-top">
+      <div class="container-fluid">
+        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('home') }}">
+          {% if current_team and current_team.logo_path %}
+              <img src="{{ url_for('static', filename='uploads/logos/' + current_team.logo_path) }}" alt="{{ current_team.team_name }} Logo" style="height: 40px; margin-right: 10px;">
+          {% endif %}
+          <span class="fw-bold brand-text">
+            {% if current_team %}{{ current_team.team_name }}{% else %}Coach Planner{% endif %}
+          </span>
+        </a>
 
-    <header class="main-header mb-4 border-bottom">
-        <nav class="navbar navbar-expand-lg navbar-light bg-light">
-            <div class="container-fluid">
-
-                <a class="navbar-brand" href="{{ url_for('home') }}">
-                    {% if current_team and current_team.logo_path %}
-                        <img src="{{ url_for('static', filename='uploads/logos/' + current_team.logo_path) }}" alt="{{ current_team.team_name }} Logo" style="height: 40px;">
-                    {% elif current_team %}
-                        {{ current_team.team_name }}
-                    {% else %}
-                        Team Coach
-                    {% endif %}
-                </a>
-
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    {% if session.logged_in %}
-                    <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('home') }}">Home</a>
-                        </li>
+        <!-- Desktop User Menu -->
+        <div class="collapse navbar-collapse" id="navbarResponsive">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="userMenuDesktop" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle me-1"></i> Welcome, {{ session.full_name or session.username }}!
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDesktop">
                         {% if session.role in ['Head Coach', 'Super Admin'] %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('user_management') }}">User Management</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('admin_settings') }}">Settings</a>
-                        </li>
+                        <li><a class="dropdown-item" href="{{ url_for('user_management') }}">User Management</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('admin_settings') }}">Team Settings</a></li>
+                        <li><hr class="dropdown-divider"></li>
                         {% endif %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Account ({{ session.full_name or session.username }})
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                                <li><a class="dropdown-item" href="{{ url_for('change_password') }}">Change Password</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
-                            </ul>
-                        </li>
+                        <li><a class="dropdown-item" href="{{ url_for('pitching_rules') }}">Pitching Rules</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('change_password') }}">Change Password</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
                     </ul>
-                    {% else %}
-                    <ul class="navbar-nav ms-auto">
-                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('login') }}">Login</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('register') }}">Register</a>
-                        </li>
-                    </ul>
-                    {% endif %}
-                </div>
-            </div>
-        </nav>
-    </header>
-
-    <main class="container">
+                </li>
+            </ul>
+        </div>
+      </div>
+    </nav>
+    
+    <main class="container-fluid mt-3">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -88,21 +74,56 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="container mt-4 pt-4 my-md-5 pt-md-5 border-top">
-        <p>&copy; {{ current_year }} {% if current_team %}{{ current_team.team_name }}{% else %}Your Team Name{% endif %}. All Rights Reserved.</p>
-    </footer>
+    <!-- Unified Mobile Bottom Nav Bar -->
+    <nav class="navbar fixed-bottom bg-light d-lg-none border-top">
+        <div class="bottom-nav" role="tablist">
+             <a class="nav-item active" data-bs-toggle="tab" href="#roster" role="tab" data-tab-id="roster">
+                <i class="bi bi-people-fill"></i><span class="nav-label">Roster</span>
+            </a>
+            <a class="nav-item" data-bs-toggle="tab" href="#player_development" role="tab" data-tab-id="player_development">
+                <i class="bi bi-graph-up-arrow"></i><span class="nav-label">Development</span>
+            </a>
+            <a class="nav-item" data-bs-toggle="tab" href="#games" role="tab" data-tab-id="games">
+                <i class="bi bi-calendar-event"></i><span class="nav-label">Games</span>
+            </a>
+            <a class="nav-item" data-bs-toggle="tab" href="#practice_plan" role="tab" data-tab-id="practice_plan">
+                <i class="bi bi-clipboard-check"></i><span class="nav-label">Practice</span>
+            </a>
+             <a class="nav-item" data-bs-toggle="offcanvas" href="#mobileMoreMenu" role="button">
+                <i class="bi bi-three-dots"></i><span class="nav-label">More</span>
+            </a>
+        </div>
+    </nav>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
-    <script>
-      feather.replace()
+    <!-- Mobile "More" Menu (Offcanvas) -->
+    <div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileMoreMenu" style="height: 75vh;">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title">More Options</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body">
+        <div class="list-group list-group-flush">
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#stats_tab" role="tab" data-tab-id="stats"><i class="bi bi-bar-chart-fill me-2"></i>Stats</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#scouting_list" role="tab" data-tab-id="scouting_list"><i class="bi bi-binoculars-fill me-2"></i>Scouting List</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#pitching" role="tab" data-tab-id="pitching"><i class="bi bi-bullseye me-2"></i>Pitching Log</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#collaboration" role="tab" data-tab-id="collaboration"><i class="bi bi-people-fill me-2"></i>Coaches Log</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#signs" role="tab" data-tab-id="signs"><i class="bi bi-signpost-split-fill me-2"></i>Signs & Signals</a>
+            <hr>
+            {% if session.role in ['Head Coach', 'Super Admin'] %}
+            <a class="list-group-item list-group-item-action" href="{{ url_for('user_management') }}"><i class="bi bi-person-badge-fill me-2"></i>User Management</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin_settings') }}"><i class="bi bi-gear-fill me-2"></i>Team Settings</a>
+            {% endif %}
+            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching_rules') }}"><i class="bi bi-gavel me-2"></i>Pitching Rules</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('change_password') }}"><i class="bi bi-key-fill me-2"></i>Change Password</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a>
+        </div>
+      </div>
+    </div>
 
-      // Automatically initialize tooltips
-      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-      var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
-      })
-    </script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
     {% block scripts %}{% endblock %}
 
 </body>
