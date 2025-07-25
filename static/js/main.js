@@ -99,8 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    // --- Other render functions (lineups, pitching, etc.) remain the same ---
-     function renderLineups() {
+    function renderLineups() {
         const container = document.getElementById('lineupsAccordion');
         if (!container) return;
         const lineups = AppState.full_data.lineups.filter(l => !l.associated_game_id) || [];
@@ -216,12 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderScoutingList();
         renderGames();
         renderPracticePlans();
-        // Also render stats content if the element exists
-        const statsContainer = document.querySelector('#stats_tab');
-        if (statsContainer) {
-            // This assumes _stats_content.html is already included and just needs dynamic parts filled
-            // For simplicity, we are not re-rendering the entire stats page here via JS
-        }
     }
 
     // --- EVENT HANDLERS & LISTENERS ---
@@ -320,16 +313,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         
-        document.body.addEventListener('click', (event) => {
-            const tabLink = event.target.closest('a[data-bs-toggle="tab"]');
-            if (tabLink) {
-                // Let Bootstrap handle the click, but update URL hash
-                const tabId = tabLink.getAttribute('href');
-                if (history.pushState) history.pushState(null, null, tabId);
-                else window.location.hash = tabId;
-            }
-        });
-
         // Modal population listeners
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
             document.getElementById('playerNameToDelete').textContent = e.relatedTarget.dataset.playerName;
@@ -387,29 +370,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTabLogic() {
+        const allTabs = document.querySelectorAll('a[data-bs-toggle="tab"]');
+        allTabs.forEach(tab => {
+            tab.addEventListener('shown.bs.tab', e => {
+                const newTabId = e.target.getAttribute('href').substring(1);
+
+                // Update URL hash
+                if (history.pushState) {
+                    history.pushState(null, null, '#' + newTabId);
+                } else {
+                    window.location.hash = '#' + newTabId;
+                }
+
+                // Handle active states on mobile bottom nav
+                const mainNavItems = document.querySelectorAll('.bottom-nav > .nav-item[data-tab-id]');
+                const moreMenuButton = document.querySelector('.bottom-nav > .nav-item[data-bs-toggle="offcanvas"]');
+                const moreMenuTabIds = Array.from(document.querySelectorAll('#mobileMoreMenu a[data-tab-id]')).map(a => a.dataset.tabId);
+
+                let isMoreTabActive = moreMenuTabIds.includes(newTabId);
+
+                mainNavItems.forEach(item => {
+                    item.classList.toggle('active', item.dataset.tabId === newTabId);
+                });
+
+                if (moreMenuButton) {
+                    moreMenuButton.classList.toggle('active', isMoreTabActive);
+                    if (isMoreTabActive) {
+                        mainNavItems.forEach(item => item.classList.remove('active'));
+                    }
+                }
+
+                // Close offcanvas if a tab inside it was clicked
+                const offcanvasEl = document.getElementById('mobileMoreMenu');
+                if (offcanvasEl) {
+                    const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
+                    if (offcanvas && offcanvas._isShown && e.target.closest('#mobileMoreMenu')) {
+                        offcanvas.hide();
+                    }
+                }
+            });
+        });
+
+        // Activate tab from URL hash on page load
         const hash = window.location.hash || '#roster';
         const tabEl = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
         if (tabEl) {
             new bootstrap.Tab(tabEl).show();
         } else {
-            new bootstrap.Tab(document.querySelector('a[href="#roster"]')).show();
+            const defaultTab = document.querySelector('a[href="#roster"]');
+            if (defaultTab) new bootstrap.Tab(defaultTab).show();
         }
-        // When a tab is shown, update active classes
-        document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tab => {
-            tab.addEventListener('shown.bs.tab', e => {
-                const currentTabId = e.target.getAttribute('href').substring(1);
-                // For mobile bottom nav
-                document.querySelectorAll('.bottom-nav .nav-item').forEach(link => {
-                    link.classList.toggle('active', link.dataset.tabId === currentTabId);
-                });
-                // Close offcanvas if a tab inside it was clicked
-                const offcanvasEl = document.getElementById('mobileMoreMenu');
-                const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
-                if (offcanvas && offcanvas._isShown) {
-                    offcanvas.hide();
-                }
-            });
-        });
     }
     
     init(); // Start the app
