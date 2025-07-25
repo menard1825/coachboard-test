@@ -15,13 +15,15 @@
     </div>
 
     <div class="row">
-        <div class="col-md-6 mb-4">
+        <!-- General and Rules Settings Card -->
+        <div class="col-lg-6 mb-4">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">General Settings</h5>
+                    <h5 class="mb-0">Team Settings</h5>
                 </div>
                 <div class="card-body">
                     <form action="{{ url_for('update_admin_settings') }}" method="POST">
+                        <h6 class="text-muted">General</h6>
                         <div class="form-floating mb-3">
                             <input type="text" class="form-control" id="team_name" name="team_name" value="{{ settings.team_name }}" required>
                             <label for="team_name">Team Name</label>
@@ -30,13 +32,44 @@
                             <input class="form-check-input" type="checkbox" id="display_coach_names" name="display_coach_names" {% if settings.display_coach_names %}checked{% endif %}>
                             <label class="form-check-label" for="display_coach_names">Display Full Coach Names in Logs</label>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">Save General Settings</button>
+                        
+                        <hr>
+
+                        <h6 class="text-muted">Pitching Rules</h6>
+                        <div class="form-floating mb-3">
+                            <select class="form-select" id="pitching_rule_set" name="pitching_rule_set">
+                                {% for rule_set_name in all_rules.keys() %}
+                                    <option value="{{ rule_set_name }}" {% if settings.pitching_rule_set == rule_set_name %}selected{% endif %}>
+                                        {{ rule_set_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <label for="pitching_rule_set">Pitching Rule Set</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <select class="form-select" id="age_group" name="age_group">
+                                {# This assumes all rule sets have the same age groups for simplicity. #}
+                                {% set sample_rule_set = all_rules['USSSA'] %}
+                                {% for age_group_key in sample_rule_set.keys() %}
+                                    {% if age_group_key != 'default' %}
+                                        <option value="{{ age_group_key }}" {% if settings.age_group == age_group_key %}selected{% endif %}>
+                                            {{ age_group_key }}
+                                        </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                            <label for="age_group">Team Age Group</label>
+                        </div>
+                        <p class="form-text">Changing this will update the <a href="{{ url_for('pitching_rules') }}" target="_blank">Pitching Rules</a> page and the pitch count tracker logic.</p>
+
+                        <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                     </form>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6 mb-4">
+        <!-- Team Logo Card -->
+        <div class="col-lg-6 mb-4">
             <div class="card h-100">
                 <div class="card-header">
                     <h5 class="mb-0">Team Logo</h5>

@@ -278,10 +278,16 @@ def pitching_rules():
     db = SessionLocal()
     try:
         team = db.query(Team).filter_by(id=session['team_id']).first()
-        # Pass the full rules dictionary and the team's specific settings to the template
-        return render_template('rules.html', team=team, all_rules=PITCHING_RULES)
+        # MODIFIED: Get the specific rule set for the team instead of hardcoding
+        rules_for_team = get_pitching_rules_for_team(team)
+        return render_template('rules.html', 
+                               team=team, 
+                               rules=rules_for_team,
+                               rule_set_name=team.pitching_rule_set,
+                               age_group=team.age_group)
     finally:
         db.close()
+
 
 def get_pitching_rules_for_team(team):
     """Gets the specific pitching rule set for a team."""
@@ -790,16 +796,19 @@ def update_admin_settings():
 
         team_settings.team_name = request.form.get('team_name', team_settings.team_name)
         team_settings.display_coach_names = 'display_coach_names' in request.form
+        
+        # MODIFIED: Get the new form fields and update the database
         team_settings.age_group = request.form.get('age_group', team_settings.age_group)
         team_settings.pitching_rule_set = request.form.get('pitching_rule_set', team_settings.pitching_rule_set)
         
         db.commit()
 
-        flash('General settings updated successfully!', 'success')
+        flash('Team settings updated successfully!', 'success')
         socketio.emit('data_updated', {'message': 'Team settings updated.'})
         return redirect(url_for('admin_settings'))
     finally:
         db.close()
+
 
 @app.route('/admin/upload_logo', methods=['POST'])
 @admin_required

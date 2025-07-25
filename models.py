@@ -33,6 +33,9 @@ class Team(Base):
     display_coach_names = Column(Boolean, default=False, nullable=False)
     primary_color = Column(String, default="#1F2937")
     secondary_color = Column(String, default="#E5E7EB")
+    # ADDED: New columns for pitching rules with default values
+    age_group = Column(String, default='12U', nullable=False)
+    pitching_rule_set = Column(String, default='USSSA', nullable=False)
 
     users = relationship("User", back_populates="team")
     players = relationship("Player", back_populates="team")
@@ -45,7 +48,6 @@ class Team(Base):
     practice_plans = relationship("PracticePlan", back_populates="team")
     signs = relationship("Sign", back_populates="team")
     player_development_focuses = relationship("PlayerDevelopmentFocus", back_populates="team")
-    # ADDED: Relationship for the new PlayerGameAbsence model
     player_absences = relationship("PlayerGameAbsence", back_populates="team")
 
     def to_dict(self): return to_dict(self)
@@ -87,7 +89,6 @@ class Player(Base):
     team = relationship("Team", back_populates="players")
 
     development_focuses = relationship("PlayerDevelopmentFocus", back_populates="player", cascade="all, delete-orphan")
-    # ADDED: Relationship for the new PlayerGameAbsence model
     absences = relationship("PlayerGameAbsence", back_populates="player", cascade="all, delete-orphan")
     
     def to_dict(self): return to_dict(self)
@@ -159,7 +160,6 @@ class Game(Base):
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="games")
-    # ADDED: Relationship for the new PlayerGameAbsence model
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
 
 
@@ -236,7 +236,6 @@ class Sign(Base):
     
     def to_dict(self): return to_dict(self)
 
-# ADDED: New model to track player absences for specific games
 class PlayerGameAbsence(Base):
     __tablename__ = 'player_game_absences'
     id = Column(Integer, primary_key=True)

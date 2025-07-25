@@ -13,7 +13,9 @@
 <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom sticky-top">
     <div class="container-fluid">
       <a class="navbar-brand d-flex align-items-center" href="{{ url_for('home') }}">
-        <img src="/static/logo.png" alt="Team Logo" style="height: 40px; margin-right: 10px;">
+        {% if current_team and current_team.logo_path %}
+            <img src="{{ url_for('static', filename='uploads/logos/' + current_team.logo_path) }}" alt="{{ current_team.team_name }} Logo" style="height: 40px; margin-right: 10px;">
+        {% endif %}
         <span class="fw-bold brand-text">Rules</span>
       </a>
       <a href="{{ url_for('home') }}" class="btn btn-outline-secondary">Back to Main App</a>
@@ -25,13 +27,15 @@
         <div class="col-lg-8 col-md-10">
             <div class="card">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">USSSA Pitching Rules (11U/12U)</h4>
+                    {# MODIFIED: Dynamic Title #}
+                    <h4 class="mb-0">{{ rule_set_name }} Pitching Rules ({{ age_group }})</h4>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-info d-flex align-items-center" role="alert">
                         <i class="bi bi-bullhorn-fill me-3" style="font-size: 1.5rem;"></i>
                         <div>
-                            <strong>Max Pitches Per Day: 85</strong>
+                             {# MODIFIED: Dynamic Max Pitches #}
+                            <strong>Max Pitches Per Day: {{ rules.max_daily }}</strong>
                         </div>
                     </div>
                     
@@ -47,11 +51,20 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td>1 - 20</td><td class="text-center">0</td></tr>
-                                <tr><td>21 - 35</td><td class="text-center">1</td></tr>
-                                <tr><td>36 - 50</td><td class="text-center">2</td></tr>
-                                <tr><td>51 - 65</td><td class="text-center">3</td></tr>
-                                <tr><td>66+</td><td class="text-center">4</td></tr>
+                                {# MODIFIED: Dynamic table generation #}
+                                {% set last_threshold = 0 %}
+                                {% for threshold, rest_days in rules.rest_thresholds %}
+                                    <tr>
+                                        <td>{{ last_threshold + 1 }} - {{ threshold }}</td>
+                                        <td class="text-center">{{ rest_days }}</td>
+                                    </tr>
+                                    {% set last_threshold = threshold %}
+                                {% endfor %}
+                                {# Add the final "catch-all" row #}
+                                <tr>
+                                    <td>{{ last_threshold + 1 }}+</td>
+                                    <td class="text-center">{{ rules.rest_thresholds[-1][1] + 1 }}</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
