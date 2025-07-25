@@ -290,6 +290,11 @@ function initializeGameManagement(gameData) {
     }
 
     async function saveLineup() {
+        const btn = document.getElementById('saveLineupBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
+
         window.AppState.lineup.title = document.getElementById('lineupTitle').value;
         window.AppState.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
             name: item.dataset.playerName,
@@ -312,10 +317,17 @@ function initializeGameManagement(gameData) {
             const result = await response.json();
             if(!response.ok) throw new Error(result.message);
             
-            window.location.reload();
+            // Update lineup ID if it was a new lineup
+            if (result.new_id) {
+                window.AppState.lineup.id = result.new_id;
+            }
+            alert('Lineup saved successfully!');
         } catch (error) {
-            alert('An error occurred while saving the lineup.');
+            alert('An error occurred while saving the lineup: ' + error.message);
             console.error(error);
+        } finally {
+             btn.disabled = false;
+             btn.innerHTML = originalText;
         }
     }
     
@@ -343,12 +355,7 @@ function initializeGameManagement(gameData) {
             if (result.status === 'success') {
                 if (result.new_id) window.AppState.rotation.id = result.new_id;
                 btn.textContent = 'Saved!';
-                const rotationTabButton = document.getElementById('rotation-tab');
-                if (rotationTabButton) {
-                    const rotationTab = new bootstrap.Tab(rotationTabButton);
-                    rotationTab.show();
-                }
-                renderRotationEditor();
+                renderRotationEditor(); // Re-render to show updated state
             } else { throw new Error(result.message); }
         } catch (error) {
             alert('Error saving rotation: ' + error.message);
@@ -393,7 +400,7 @@ function initializeGameManagement(gameData) {
             }
         });
         
-        document.getElementById('syncRotationBtn')?.addEventListener('click', () => {
+        document.getElementById('syncRotationBtn')?.addEventListener('click', async () => {
             const lineupPositions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
                 name: item.dataset.playerName,
                 position: item.querySelector('select')?.value || ''
@@ -405,7 +412,12 @@ function initializeGameManagement(gameData) {
 
             if (Object.keys(inning1Data).length > 0) {
                 window.AppState.rotation.innings['1'] = inning1Data;
-                alert('Inning 1 of the rotation has been updated with positions from the lineup. Please go to the Rotation tab and click Save to persist this change.');
+                
+                // Automatically save the rotation
+                await saveRotation(); 
+                
+                alert('Inning 1 of the rotation has been updated and saved based on the current lineup.');
+                
                 const rotationTab = new bootstrap.Tab(document.getElementById('rotation-tab'));
                 rotationTab.show();
                 renderRotationEditor();

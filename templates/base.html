@@ -21,6 +21,11 @@
                 padding-bottom: 0; /* No padding needed on desktop */
             }
         }
+        /* --- FIX for stacked tab content --- */
+        /* This rule ensures that only the active tab pane is visible, preventing content from other tabs from showing. */
+        .tab-content > .tab-pane:not(.active) {
+            display: none;
+        }
     </style>
 </head>
 <body>
