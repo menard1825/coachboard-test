@@ -24,13 +24,19 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom sticky-top">
+    {# MODIFIED: Updated navbar classes and added inline style for dynamic color #}
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm" style="background-color: {{ current_team.primary_color or '#343a40' }};">
       <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center" href="{{ url_for('home') }}">
           {% if current_team and current_team.logo_path %}
-              <img src="{{ url_for('static', filename='uploads/logos/' + current_team.logo_path) }}" alt="{{ current_team.team_name }} Logo" style="height: 40px; margin-right: 10px;">
+              {# MODIFIED: Added a class for styling the logo #}
+              <img src="{{ url_for('static', filename='uploads/logos/' + current_team.logo_path) }}" alt="{{ current_team.team_name }} Logo" class="navbar-logo">
+          {% else %}
+              {# ADDED: A default icon when no logo is present #}
+              <i class="bi bi-shield-shaded me-2" style="font-size: 1.5rem;"></i>
           {% endif %}
-          <span class="fw-bold brand-text">
+          {# MODIFIED: Wrapped the name in a span for better styling #}
+          <span class="navbar-brand-text">
             {% if current_team %}{{ current_team.team_name }}{% else %}Coach Planner{% endif %}
           </span>
         </a>
@@ -41,15 +47,16 @@
                     <a class="nav-link dropdown-toggle" href="#" id="userMenuDesktop" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="bi bi-person-circle me-1"></i> Welcome, {{ session.full_name or session.username }}!
                     </a>
+                    {# MODIFIED: Added icons to the user dropdown menu #}
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDesktop">
                         {% if session.role in ['Head Coach', 'Super Admin'] %}
-                        <li><a class="dropdown-item" href="{{ url_for('admin.user_management') }}">User Management</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('admin.admin_settings') }}">Team Settings</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill me-2"></i>User Management</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill me-2"></i>Team Settings</a></li>
                         <li><hr class="dropdown-divider"></li>
                         {% endif %}
-                        <li><a class="dropdown-item" href="{{ url_for('pitching.pitching_rules') }}">Pitching Rules</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}">Change Password</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">Logout</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('pitching.pitching_rules') }}"><i class="bi bi-gavel me-2"></i>Pitching Rules</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill me-2"></i>Change Password</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
                     </ul>
                 </li>
             </ul>
