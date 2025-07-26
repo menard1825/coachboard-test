@@ -21,13 +21,16 @@ def add_focus(player_name):
             flash('Skill, focus text, and valid player are required.', 'danger')
             return redirect(url_for('home', _anchor='player_development'))
 
+        # MODIFIED: Use the user's full name, falling back to username if it doesn't exist.
+        author_name = session.get('full_name') or session.get('username')
+
         new_focus = PlayerDevelopmentFocus(
             player_id=player.id, 
             skill_type=skill, 
             focus=focus_text, 
             status="active",
             notes=request.form.get('notes', ''), 
-            author=session['username'],
+            author=author_name, # MODIFIED
             created_date=date.today().strftime('%Y-%m-%d'), 
             team_id=session['team_id']
         )
@@ -48,9 +51,12 @@ def update_focus(focus_id):
             flash('Focus item not found or you do not have permission to edit.', 'danger')
             return redirect(url_for('home', _anchor='player_development'))
 
+        # MODIFIED: Use the user's full name for the 'last_edited_by' field.
+        editor_name = session.get('full_name') or session.get('username')
+
         focus_item.focus = request.form.get('focus_text', focus_item.focus)
         focus_item.notes = request.form.get('notes', focus_item.notes)
-        focus_item.last_edited_by = session['username']
+        focus_item.last_edited_by = editor_name # MODIFIED
         focus_item.last_edited_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         db.commit()
         flash('Focus item updated successfully.', 'success')

@@ -20,13 +20,17 @@ def add_note(note_type):
         if not note_text:
             flash('Note cannot be empty.', 'warning')
             return redirect(url_for('home', _anchor='collaboration'))
+        
+        author_name = session.get('full_name') or session.get('username')
+        
         new_note = CollaborationNote(
             note_type=note_type, 
             text=note_text, 
-            author=session['username'], 
+            author=author_name, 
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M"), 
             team_id=session['team_id']
         )
+
         if note_type == 'player_notes':
             player_name = request.form.get('player_name')
             if not player_name:
@@ -54,7 +58,8 @@ def edit_note():
             flash('Note not found or invalid note type.', 'danger')
             return redirect(url_for('home', _anchor='collaboration'))
             
-        if session['username'] == note_to_edit.author or session.get('role') in ['Head Coach', 'Super Admin']:
+        author_name = session.get('full_name') or session.get('username')
+        if author_name == note_to_edit.author or session.get('role') in ['Head Coach', 'Super Admin']:
             note_to_edit.text = new_text
             db.commit()
             flash('Note updated successfully.', 'success')
@@ -71,7 +76,8 @@ def delete_note(note_type, note_id):
     try:
         note_to_delete = db.query(CollaborationNote).filter_by(id=note_id, team_id=session['team_id']).first()
         if note_to_delete and note_to_delete.note_type == note_type:
-            if session['username'] == note_to_delete.author or session.get('role') in ['Head Coach', 'Super Admin']:
+            author_name = session.get('full_name') or session.get('username')
+            if author_name == note_to_delete.author or session.get('role') in ['Head Coach', 'Super Admin']:
                 db.delete(note_to_delete)
                 db.commit()
                 flash('Note deleted successfully.', 'success')
@@ -81,6 +87,52 @@ def delete_note(note_type, note_id):
         else:
             flash('Note not found or invalid note type.', 'danger')
         return redirect(url_for('home', _anchor='collaboration'))
+    finally:
+        db.close()
+
+# ADDED: New function to handle moving a note
+@team_management_bp.route('/move_note_to_practice_plan/<note_type>/<int:note_id>', methods=['GET', 'POST'])
+def move_note_to_practice_plan(note_type, note_id):
+    db = SessionLocal()
+    try:
+        note = db.query(CollaborationNote).filter_by(id=note_id, team_id=session['team_id']).first()
+        if not note:
+            flash('Note not found.', 'danger')
+            return redirect(url_for('home', _anchor='collaboration'))
+
+        if request.method == 'POST':
+            plan_id = request.form.get('plan_id')
+            plan = db.query(PracticePlan).filter_by(id=plan_id, team_id=session['team_id']).first()
+            if not plan:
+                flash('Practice plan not found.', 'danger')
+                return redirect(url_for('.move_note_to_practice_plan', note_type=note_type, note_id=note_id))
+
+            # Create a new task from the note
+            author_name = session.get('full_name') or session.get('username')
+            task_text = f"From {note.author}'s note"
+            if note.player_name:
+                task_text += f" for {note.player_name}"
+            task_text += f": \"{note.text}\""
+
+            new_task = PracticeTask(
+                text=task_text,
+                status="pending",
+                author=author_name,
+                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M"),
+                practice_plan_id=plan.id
+            )
+            db.add(new_task)
+            db.delete(note) # Delete the original note
+            db.commit()
+
+            flash('Note successfully moved to practice plan as a task!', 'success')
+            socketio.emit('data_updated', {'message': 'Note moved to plan.'})
+            return redirect(url_for('home', _anchor='collaboration'))
+
+        # For a GET request, show the selection form
+        practice_plans = db.query(PracticePlan).filter_by(team_id=session['team_id']).order_by(PracticePlan.date.desc()).all()
+        return render_template('move_note_to_plan.html', note=note, practice_plans=practice_plans, note_type=note_type, note_id=note_id)
+
     finally:
         db.close()
 
@@ -160,10 +212,12 @@ def add_task_to_plan(plan_id):
             flash('Practice plan not found.', 'danger')
             return redirect(url_for('home', _anchor='practice_plan'))
         
+        author_name = session.get('full_name') or session.get('username')
+        
         new_task = PracticeTask(
             text=task_text, 
             status="pending", 
-            author=session['username'], 
+            author=author_name, 
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M"), 
             practice_plan_id=plan.id
         )
