@@ -12,6 +12,11 @@ from models import (
     Rotation, Game, CollaborationNote, PracticePlan, PlayerDevelopmentFocus, Sign
 )
 from extensions import socketio
+# MODIFIED: Import from the new utils.py file
+from utils import (
+    get_pitching_rules_for_team, calculate_cumulative_pitching_stats,
+    calculate_cumulative_position_stats, calculate_pitch_count_summary, PITCHING_RULES
+)
 
 # --- Blueprint Imports ---
 from blueprints.auth import auth_bp
@@ -48,14 +53,6 @@ def create_app():
     app.register_blueprint(scouting_bp)
     app.register_blueprint(team_management_bp)
 
-    # --- PITCHING RULES (App-level config) ---
-    PITCHING_RULES = {
-        'USSSA': {
-            'default': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-            '11U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        }
-    }
-
     # --- Decorators & Context Processors ---
     def login_required(f):
         @wraps(f)
@@ -80,40 +77,6 @@ def create_app():
                 db.close()
         return {}
 
-    # --- DATA UTILITY FUNCTIONS ---
-    with app.app_context():
-        def get_pitching_rules_for_team(team):
-            rule_set_name = getattr(team, 'pitching_rule_set', 'USSSA') or 'USSSA'
-            age_group = getattr(team, 'age_group', 'default') or 'default'
-            rule_set = PITCHING_RULES.get(rule_set_name, PITCHING_RULES['USSSA'])
-            return rule_set.get(age_group, rule_set.get('default'))
-
-        def calculate_cumulative_pitching_stats(pitcher_name, all_outings):
-            stats = {'total_innings_pitched': 0.0, 'total_pitches_thrown': 0, 'appearances': 0}
-            for outing in all_outings:
-                if outing.pitcher == pitcher_name:
-                    try:
-                        stats['total_innings_pitched'] += float(outing.innings or 0.0)
-                        stats['total_pitches_thrown'] += int(outing.pitches or 0)
-                        stats['appearances'] += 1
-                    except (ValueError, TypeError):
-                        continue
-            stats['total_innings_pitched'] = round(stats['total_innings_pitched'], 1)
-            return stats
-
-        def calculate_cumulative_position_stats(roster_players, lineups):
-            stats = {player.name: {} for player in roster_players}
-            for lineup in lineups:
-                try:
-                    positions = json.loads(lineup.lineup_positions or "[]")
-                    for item in positions:
-                        if item.get('name') in stats and item.get('position'):
-                            pos = item['position']
-                            stats[item['name']][pos] = stats[item['name']].get(pos, 0) + 1
-                except (json.JSONDecodeError, TypeError):
-                    continue
-            return stats
-    
     # --- CORE APP ROUTES ---
     @app.route('/')
     @login_required
@@ -127,10 +90,8 @@ def create_app():
 
             roster_players = db.query(Player).filter_by(team_id=user.team_id).all()
             lineups = db.query(Lineup).filter_by(team_id=user.team_id).all()
-            # ADDED THIS LINE BACK
             pitching_outings = db.query(PitchingOuting).filter_by(team_id=user.team_id).all()
             
-            # ADDED THESE LINES BACK
             pitcher_names = sorted([p.name for p in roster_players if p.pitcher_role != 'Not a Pitcher'])
             cumulative_pitching_data = {name: calculate_cumulative_pitching_stats(name, pitching_outings) for name in pitcher_names}
 
@@ -142,20 +103,83 @@ def create_app():
                                    session=session,
                                    roster_players=roster_players,
                                    cumulative_position_data=cumulative_position_data,
-                                   cumulative_pitching_data=cumulative_pitching_data, # ADDED THIS LINE BACK
+                                   cumulative_pitching_data=cumulative_pitching_data,
                                    tab_order=json.loads(user.tab_order or "[]"),
                                    all_tabs=all_tabs
                                    )
         finally:
             db.close()
 
-    # The rest of the routes and functions are unchanged...
     @app.route('/get_app_data')
     @login_required
     def get_app_data():
-        # This will need a similar fix if it powers the stats tab dynamically,
-        # but for now, the error is in the initial page load.
-        pass
+        db = SessionLocal()
+        try:
+            team_id = session['team_id']
+            user = db.query(User).filter_by(username=session['username']).first()
+            team = db.query(Team).filter_by(id=team_id).first()
+
+            # --- Data Queries ---
+            roster_db = db.query(Player).filter_by(team_id=team_id).all()
+            roster = [p.to_dict() for p in roster_db]
+            lineups = [l.to_dict() for l in db.query(Lineup).filter_by(team_id=team_id).all()]
+            pitching_outings_db = db.query(PitchingOuting).filter_by(team_id=team_id).all()
+            pitching_outings = [po.to_dict() for po in pitching_outings_db]
+            scouted_players = db.query(ScoutedPlayer).filter_by(team_id=team_id).all()
+            rotations = [r.to_dict() for r in db.query(Rotation).filter_by(team_id=team_id).all()]
+            games = [g.to_dict() for g in db.query(Game).filter_by(team_id=team_id).all()]
+            collaboration_notes = db.query(CollaborationNote).filter_by(team_id=team_id).all()
+            practice_plans_q = db.query(PracticePlan).filter_by(team_id=team_id).options(joinedload(PracticePlan.tasks)).all()
+            player_dev_focuses = db.query(PlayerDevelopmentFocus).filter_by(team_id=team_id).all()
+            signs = [s.to_dict() for s in db.query(Sign).filter_by(team_id=team_id).all()]
+            
+            # --- Data Processing ---
+            player_dev_by_name = {}
+            for p in roster:
+                player_dev_by_name[p['name']] = []
+            
+            for focus in player_dev_focuses:
+                player = db.query(Player).filter_by(id=focus.player_id).first()
+                if player and player.name in player_dev_by_name:
+                    player_dev_by_name[player.name].append({
+                        'id': focus.id, 'type': 'Development', 'subtype': focus.skill_type.capitalize(),
+                        'text': focus.focus, 'status': focus.status, 'notes': focus.notes,
+                        'date': focus.created_date, 'completed_date': focus.completed_date, 'author': focus.author
+                    })
+            
+            rules = get_pitching_rules_for_team(team)
+            pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules)
+
+            full_data = {
+                'roster': roster,
+                'lineups': lineups,
+                'pitching': pitching_outings,
+                'scouting_list': {
+                    'targets': [sp.to_dict() for sp in scouted_players if sp.list_type == 'targets'],
+                    'committed': [sp.to_dict() for sp in scouted_players if sp.list_type == 'committed'],
+                    'not_interested': [sp.to_dict() for sp in scouted_players if sp.list_type == 'not_interested']
+                },
+                'rotations': rotations,
+                'games': games,
+                'collaboration_notes': {
+                    'team_notes': [cn.to_dict() for cn in collaboration_notes if cn.note_type == 'team_notes'],
+                    'player_notes': [cn.to_dict() for cn in collaboration_notes if cn.note_type == 'player_notes']
+                },
+                'practice_plans': [
+                    {**p.to_dict(), 'tasks': [t.to_dict() for t in p.tasks]} for p in practice_plans_q
+                ],
+                'player_development': player_dev_by_name,
+                'signs': signs
+            }
+
+            return jsonify({
+                'full_data': full_data,
+                'player_order': json.loads(user.player_order or "[]"),
+                'session': {'username': session.get('username'), 'role': session.get('role')},
+                'pitch_count_summary': pitch_count_summary
+            })
+        finally:
+            db.close()
         
     @app.route('/manifest.json')
     def serve_manifest():
@@ -164,7 +188,6 @@ def create_app():
     @app.route('/stats')
     @login_required
     def stats_page():
-        # This page also needs the data
         db = SessionLocal()
         try:
             team_id = session['team_id']

@@ -48,14 +48,16 @@
                             <thead>
                                 <tr>
                                     <th>Player</th>
-                                    {# Dynamically generate position headers based on all positions found #}
+                                    {# Dynamically generate position headers #}
                                     {% set all_positions = [] %}
-                                    {% for player_name, positions in cumulative_position_data.items() %}
-                                        {% for pos in positions.keys() %}
-                                            {% if pos not in all_positions %}{% set _ = all_positions.append(pos) %}{% endif %}
+                                    {% if cumulative_position_data %}
+                                        {% for player_name, positions in cumulative_position_data.items() %}
+                                            {% for pos in positions.keys() %}
+                                                {% if pos not in all_positions %}{% set _ = all_positions.append(pos) %}{% endif %}
+                                            {% endfor %}
                                         {% endfor %}
-                                    {% endfor %}
-                                    {% set all_positions = all_positions|sort %}
+                                        {% set all_positions = all_positions|sort %}
+                                    {% endif %}
                                     {% for pos in all_positions %}
                                         <th>{{ pos }}</th>
                                     {% endfor %}
@@ -65,10 +67,12 @@
                                 {% for player in roster_players %}
                                     <tr>
                                         <td><strong>{{ player.name }}</strong></td>
-                                        {% set player_positions = cumulative_position_data.get(player.name, {}) %}
-                                        {% for pos in all_positions %}
-                                            <td>{{ player_positions.get(pos, 0) }}</td>
-                                        {% endfor %}
+                                        {% if cumulative_position_data %}
+                                            {% set player_positions = cumulative_position_data.get(player.name, {}) %}
+                                            {% for pos in all_positions %}
+                                                <td>{{ player_positions.get(pos, 0) }}</td>
+                                            {% endfor %}
+                                        {% endif %}
                                     </tr>
                                 {% endfor %}
                             </tbody>

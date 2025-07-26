@@ -71,7 +71,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const roster = AppState.full_data.roster || [];
         const getIconForType = (type) => ({'Development': '<i class="bi bi-graph-up-arrow text-primary"></i>', 'Coach Note': '<i class="bi bi-chat-left-text-fill text-info"></i>', 'Lessons': '<i class="bi bi-person-video3 text-success"></i>'}[type] || '<i class="bi bi-record-circle"></i>');
 
-        // Failsafe: if player_order is empty, populate it from the roster
         if (!AppState.player_order || AppState.player_order.length === 0) {
             AppState.player_order = roster.map(p => p.name);
         }
@@ -104,6 +103,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!container) return;
         const lineups = AppState.full_data.lineups.filter(l => !l.associated_game_id) || [];
         container.innerHTML = lineups.length === 0 ? `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned lineups saved yet.</p></div>` : lineups.map((l) => `<div class="accordion-item" data-lineup-id="${l.id}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#lineup-collapse-${l.id}"><strong>${escapeHTML(l.title)}</strong></button></h2><div id="lineup-collapse-${l.id}" class="accordion-collapse collapse" data-bs-parent="#lineupsAccordion"><div class="accordion-body"><div class="d-flex justify-content-end mb-3"><button class="btn btn-sm btn-info me-2 edit-lineup-btn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal" data-lineup-id="${l.id}">Edit</button><a href="/delete_lineup/${l.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a></div><table class="table table-striped table-sm"><thead><tr><th style="width: 5%;">#</th><th>Player</th><th style="width: 15%;">Position</th></tr></thead><tbody>${(l.lineup_positions || []).map((spot, i) => `<tr><td><strong>${i + 1}</strong></td><td>${escapeHTML(spot.name)}</td><td>${spot.position}</td></tr>`).join('') || `<tr><td colspan="3" class="text-center text-muted">This lineup is empty.</td></tr>`}</tbody></table></div></div></div>`).join('');
+    }
+    
+    // ADDED: renderRotations function
+    function renderRotations() {
+        const container = document.getElementById('rotationsAccordion');
+        if (!container) return;
+        const rotations = AppState.full_data.rotations.filter(r => !r.associated_game_id) || [];
+        container.innerHTML = rotations.length === 0 ? `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned rotations saved.</p><p class="small text-muted">Create rotations from the 'Manage' screen of any game.</p></div>` : rotations.map((r) => {
+            const inningsCount = r.innings ? Object.keys(r.innings).length : 0;
+            return `<div class="accordion-item" data-rotation-id="${r.id}">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rotation-collapse-${r.id}">
+                        <strong>${escapeHTML(r.title)}</strong>
+                    </button>
+                </h2>
+                <div id="rotation-collapse-${r.id}" class="accordion-collapse collapse" data-bs-parent="#rotationsAccordion">
+                    <div class="accordion-body">
+                        <div class="d-flex justify-content-end mb-3">
+                            <a href="/delete_rotation/${r.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
+                        </div>
+                        <p>This rotation has <strong>${inningsCount}</strong> inning(s) defined. You can manage this rotation by assigning it to a game.</p>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
     }
 
     function renderPitchingLog() {
@@ -209,6 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderRoster();
         renderPlayerDevelopment();
         renderLineups();
+        renderRotations(); // ADDED
         renderPitchingLog();
         renderSigns();
         renderCollaborationNotes();

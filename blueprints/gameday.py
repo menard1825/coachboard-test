@@ -7,6 +7,9 @@ from extensions import socketio
 import json
 from datetime import datetime
 
+# MODIFIED: Import from utils.py instead of app.py
+from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
+
 gameday_bp = Blueprint('gameday', __name__, template_folder='templates')
 
 # --- Game Management ---
@@ -34,16 +37,28 @@ def game_management(game_id):
         rotation_obj = db.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
         rotation_dict = rotation_obj.to_dict() if rotation_obj else {"id": None, "title": f"Rotation for vs {game.opponent}", "innings": {}, "associated_game_id": game.id}
 
-        pitching_outings = db.query(PitchingOuting).filter_by(team_id=team.id).all()
-        game_pitching_log = [p.to_dict() for p in pitching_outings if p.opponent == game.opponent and p.date == game.date]
+        all_pitching_outings = db.query(PitchingOuting).filter_by(team_id=team.id).all()
+        game_pitching_log = [p.to_dict() for p in all_pitching_outings if p.opponent == game.opponent and p.date == game.date]
         
         absences = db.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
         absent_player_ids = [absence.player_id for absence in absences]
 
-        return render_template('game_management.html', game=game_dict, roster=roster_list, lineup=lineup_dict, rotation=rotation_dict, game_pitching_log=game_pitching_log, session=session, absent_player_ids=absent_player_ids)
+        rules = get_pitching_rules_for_team(team)
+        pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules)
+
+        return render_template('game_management.html', 
+                               game=game_dict, 
+                               roster=roster_list, 
+                               lineup=lineup_dict, 
+                               rotation=rotation_dict, 
+                               game_pitching_log=game_pitching_log, 
+                               session=session, 
+                               absent_player_ids=absent_player_ids,
+                               pitch_count_summary=pitch_count_summary)
     finally:
         db.close()
 
+# ... (the rest of the gameday.py file remains unchanged) ...
 @gameday_bp.route('/add_game', methods=['POST'])
 def add_game():
     db = SessionLocal()
