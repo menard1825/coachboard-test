@@ -105,7 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = lineups.length === 0 ? `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned lineups saved yet.</p></div>` : lineups.map((l) => `<div class="accordion-item" data-lineup-id="${l.id}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#lineup-collapse-${l.id}"><strong>${escapeHTML(l.title)}</strong></button></h2><div id="lineup-collapse-${l.id}" class="accordion-collapse collapse" data-bs-parent="#lineupsAccordion"><div class="accordion-body"><div class="d-flex justify-content-end mb-3"><button class="btn btn-sm btn-info me-2 edit-lineup-btn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal" data-lineup-id="${l.id}">Edit</button><a href="/delete_lineup/${l.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a></div><table class="table table-striped table-sm"><thead><tr><th style="width: 5%;">#</th><th>Player</th><th style="width: 15%;">Position</th></tr></thead><tbody>${(l.lineup_positions || []).map((spot, i) => `<tr><td><strong>${i + 1}</strong></td><td>${escapeHTML(spot.name)}</td><td>${spot.position}</td></tr>`).join('') || `<tr><td colspan="3" class="text-center text-muted">This lineup is empty.</td></tr>`}</tbody></table></div></div></div>`).join('');
     }
     
-    // ADDED: renderRotations function
     function renderRotations() {
         const container = document.getElementById('rotationsAccordion');
         if (!container) return;
@@ -233,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderRoster();
         renderPlayerDevelopment();
         renderLineups();
-        renderRotations(); // ADDED
+        renderRotations();
         renderPitchingLog();
         renderSigns();
         renderCollaborationNotes();
@@ -338,7 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         
-        // Modal population listeners
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
             document.getElementById('playerNameToDelete').textContent = e.relatedTarget.dataset.playerName;
             document.getElementById('confirmDeleteButton').href = `/delete_player/${e.relatedTarget.dataset.playerId}`;
@@ -397,53 +395,60 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleTabLogic() {
         const allTabs = document.querySelectorAll('a[data-bs-toggle="tab"]');
         allTabs.forEach(tab => {
-            tab.addEventListener('shown.bs.tab', e => {
-                const newTabId = e.target.getAttribute('href').substring(1);
-
-                // Update URL hash
-                if (history.pushState) {
-                    history.pushState(null, null, '#' + newTabId);
-                } else {
-                    window.location.hash = '#' + newTabId;
+            tab.addEventListener('click', e => {
+                e.preventDefault();
+    
+                const newTabTarget = e.currentTarget.getAttribute('href');
+                const newTabId = newTabTarget.substring(1);
+                
+                document.querySelectorAll('.tab-pane').forEach(pane => {
+                    pane.style.display = 'none';
+                    pane.classList.remove('show', 'active');
+                });
+    
+                const newPane = document.getElementById(newTabId);
+                if (newPane) {
+                    newPane.style.display = 'block';
+                    newPane.classList.add('show', 'active');
                 }
-
-                // Handle active states on mobile bottom nav
+    
+                if (history.pushState) {
+                    history.pushState(null, null, newTabTarget);
+                } else {
+                    window.location.hash = newTabTarget;
+                }
+    
                 const mainNavItems = document.querySelectorAll('.bottom-nav > .nav-item[data-tab-id]');
                 const moreMenuButton = document.querySelector('.bottom-nav > .nav-item[data-bs-toggle="offcanvas"]');
                 const moreMenuTabIds = Array.from(document.querySelectorAll('#mobileMoreMenu a[data-tab-id]')).map(a => a.dataset.tabId);
-
+    
                 let isMoreTabActive = moreMenuTabIds.includes(newTabId);
-
+    
                 mainNavItems.forEach(item => {
                     item.classList.toggle('active', item.dataset.tabId === newTabId);
                 });
-
+    
                 if (moreMenuButton) {
                     moreMenuButton.classList.toggle('active', isMoreTabActive);
-                    if (isMoreTabActive) {
-                        mainNavItems.forEach(item => item.classList.remove('active'));
-                    }
                 }
-
-                // Close offcanvas if a tab inside it was clicked
+    
                 const offcanvasEl = document.getElementById('mobileMoreMenu');
-                if (offcanvasEl) {
+                if (offcanvasEl && e.currentTarget.closest('#mobileMoreMenu')) {
                     const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
-                    if (offcanvas && offcanvas._isShown && e.target.closest('#mobileMoreMenu')) {
+                    if (offcanvas && offcanvas._isShown) {
                         offcanvas.hide();
                     }
                 }
             });
         });
-
-        // Activate tab from URL hash on page load
+    
         const hash = window.location.hash || '#roster';
         const tabEl = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
         if (tabEl) {
-            new bootstrap.Tab(tabEl).show();
+            tabEl.click();
         } else {
             const defaultTab = document.querySelector('a[href="#roster"]');
-            if (defaultTab) new bootstrap.Tab(defaultTab).show();
+            if (defaultTab) defaultTab.click();
         }
     }
     

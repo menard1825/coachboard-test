@@ -11,6 +11,11 @@ body {
 .drag-handle { cursor: move; }
 .accordion-button:not(.collapsed) { background-color: #fcebeb; color: #c8102e; }
 
+/* ADDED: Fix for stacked tab content on mobile */
+.tab-content > .tab-pane:not(.active) {
+    display: none;
+}
+
 /* Interactive Diamond Styles */
 .diamond-container-interactive {
     position: relative;
@@ -102,9 +107,6 @@ body {
     color: #6c757d;
 }
 
-/* REMOVED: Styles for the pop-up more menu are no longer needed */
-
-
 /* --- Enhanced Mobile Bottom Bar Styles --- */
 .bottom-nav {
     width: 100%;
@@ -151,7 +153,6 @@ body {
     font-weight: 700;
 }
 
-/* MODIFIED: Added transition and default state for the "egg" animation */
 .bottom-nav .nav-item::before {
     content: '';
     position: absolute;
@@ -167,7 +168,6 @@ body {
     transition: all 0.2s ease-in-out;
 }
 
-/* MODIFIED: Added active state for the "egg" animation */
 .bottom-nav .nav-item.active::before {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
