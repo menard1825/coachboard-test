@@ -23,7 +23,6 @@
 
 <div class="container-fluid mt-3">
     <ul class="nav nav-tabs nav-fill mb-3" id="gameTabs" role="tablist">
-        <!-- MODIFIED: Added 'Availability' tab and set it as active -->
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="availability-tab" data-bs-toggle="tab" data-bs-target="#availability" type="button" role="tab">Availability</button>
         </li>
@@ -39,7 +38,6 @@
     </ul>
 
     <div class="tab-content" id="gameTabsContent">
-        <!-- ADDED: New tab pane for player availability -->
         <div class="tab-pane fade show active" id="availability" role="tabpanel" aria-labelledby="availability-tab">
             <div class="row justify-content-center">
                 <div class="col-lg-6 col-md-8">
@@ -49,7 +47,7 @@
                         </div>
                         <div class="card-body">
                             <p class="text-muted">Check the box next to any player who will be absent for this game. This will remove them from the lineup and rotation builders.</p>
-                            <form action="{{ url_for('update_absences', game_id=game.id) }}" method="POST">
+                            <form action="{{ url_for('gameday.update_absences', game_id=game.id) }}" method="POST">
                                 <ul class="list-group mb-3">
                                     {% for player in roster %}
                                     <li class="list-group-item">

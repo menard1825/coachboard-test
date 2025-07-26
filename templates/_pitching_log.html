@@ -3,7 +3,7 @@
         <div class="card h-100">
             <div class="card-header"><strong>Add New Outing for this Game</strong></div>
             <div class="card-body">
-                <form action="{{ url_for('add_pitching') }}" method="POST">
+                <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
                     <input type="hidden" name="game_id" value="{{ game.id }}">
                     <input type="hidden" name="pitch_date" value="{{ game.date }}">
                     <input type="hidden" name="opponent" value="{{ game.opponent }}">
@@ -57,7 +57,7 @@
                         {% for o in game_pitching_log %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span><strong>{{ o.pitcher }}</strong> ({{ o.pitcher_type }}) - {{ o.pitches }} pitches ({{ o.innings }} IP)</span>
-                            <a href="{{ url_for('delete_pitching', outing_id=o.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
+                            <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
                         </li>
                         {% endfor %}
                     {% else %}

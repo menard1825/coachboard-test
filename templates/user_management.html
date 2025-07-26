@@ -35,7 +35,7 @@
                 <div class="card-header"><h5 class="mb-0">Create a New Team</h5></div>
                 <div class="card-body">
                     <p class="card-text">Create a team to generate a unique registration code for its Head Coach.</p>
-                    <form action="{{ url_for('create_team') }}" method="POST">
+                    <form action="{{ url_for('admin.create_team') }}" method="POST">
                         <div class="form-floating mb-3">
                             <input type="text" class="form-control" id="team_name" name="team_name" placeholder="New Team Name" required>
                             <label for="team_name">New Team Name</label>
@@ -83,7 +83,7 @@
                               </div>
                               <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <a href="{{ url_for('delete_team', team_id=team.id) }}" class="btn btn-danger">Delete Team</a>
+                                <a href="{{ url_for('admin.delete_team', team_id=team.id) }}" class="btn btn-danger">Delete Team</a>
                               </div>
                             </div>
                           </div>
@@ -103,7 +103,7 @@
             <div class="card h-100">
                 <div class="card-header"><h5 class="mb-0">Add a New User to Your Team</h5></div>
                 <div class="card-body">
-                    <form action="{{ url_for('add_user') }}" method="POST">
+                    <form action="{{ url_for('admin.add_user') }}" method="POST">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating"><input type="text" class="form-control" id="username" name="username" placeholder="Username" required><label for="username">Username</label></div>
@@ -126,7 +126,6 @@
                                 </div>
                             </div>
                             
-                            {# MODIFIED: Add Team dropdown for Super Admins #}
                             {% if session.role == 'Super Admin' %}
                             <div class="col-md-6 mb-3">
                                 <div class="form-floating">
@@ -171,7 +170,7 @@
                     <tr>
                         <td data-label="Username"><strong>{{ user.username }}</strong></td>
                         <td data-label="Full Name">
-                            <form action="{{ url_for('update_user_details', username=user.username) }}" method="POST">
+                            <form action="{{ url_for('admin.update_user_details', username=user.username) }}" method="POST">
                                 <div class="input-group input-group-sm">
                                     <input type="text" class="form-control" name="full_name" value="{{ user.full_name or '' }}" placeholder="N/A" aria-label="User's full name">
                                     <button class="btn btn-outline-secondary" type="submit" title="Save Name"><i class="bi bi-save"></i></button>
@@ -182,7 +181,7 @@
                             {% if user.username.lower() == 'mike1825' %}<span class="badge bg-danger">{{ user.role }}</span>
                             {% elif user.username == session.username %}<span class="badge bg-success">{{ user.role }}</span>
                             {% else %}
-                            <form action="{{ url_for('change_user_role', username=user.username) }}" method="POST">
+                            <form action="{{ url_for('admin.change_user_role', username=user.username) }}" method="POST">
                                 <select class="form-select form-select-sm" name="role" onchange="this.form.submit()">
                                     {% if session.role == 'Super Admin' %}<option value="Super Admin" {% if user.role == 'Super Admin' %}selected{% endif %}>Super Admin</option>{% endif %}
                                     <option value="Head Coach" {% if user.role == 'Head Coach' %}selected{% endif %}>Head Coach</option>
@@ -205,8 +204,8 @@
                             {% else %}<small class="text-muted">N/A</small>{% endif %}
                         </td>
                     </tr>
-                    <div class="modal fade" id="resetPasswordModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reset Password for {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>This will generate a new random password for <strong>{{ user.username }}</strong>. The new password will be displayed in a confirmation message after you click 'Reset'. Are you sure you want to continue?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form action="{{ url_for('reset_password', username=user.username) }}" method="POST" style="display:inline;"><button type="submit" class="btn btn-warning">Reset Password</button></form></div></div></div></div>
-                    <div class="modal fade" id="deleteUserModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Delete User {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-danger"><strong>Warning:</strong> This action cannot be undone. Are you absolutely sure you want to delete the user <strong>{{ user.username }}</strong>?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><a href="{{ url_for('delete_user', username=user.username) }}" class="btn btn-danger">Delete User</a></div></div></div></div>
+                    <div class="modal fade" id="resetPasswordModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reset Password for {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>This will generate a new random password for <strong>{{ user.username }}</strong>. The new password will be displayed in a confirmation message after you click 'Reset'. Are you sure you want to continue?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form action="{{ url_for('admin.reset_password', username=user.username) }}" method="POST" style="display:inline;"><button type="submit" class="btn btn-warning">Reset Password</button></form></div></div></div></div>
+                    <div class="modal fade" id="deleteUserModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Delete User {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-danger"><strong>Warning:</strong> This action cannot be undone. Are you absolutely sure you want to delete the user <strong>{{ user.username }}</strong>?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><a href="{{ url_for('admin.delete_user', username=user.username) }}" class="btn btn-danger">Delete User</a></div></div></div></div>
                     {% endfor %}
                 </tbody>
             </table>

@@ -57,7 +57,6 @@
 
 
 {% block content %}
-<!-- Desktop Tab Navigation -->
 <div class="d-none d-lg-block mb-3">
     <ul class="nav nav-tabs desktop-nav-tabs" id="mainTabsDesktop" role="tablist">
         {% for tab_key in tab_order %}
@@ -76,7 +75,6 @@
     </ul>
 </div>
 
-<!-- Main Tab Content Area -->
 <div class="tab-content" id="mainTabContent">
     <div class="tab-pane fade" id="roster" role="tabpanel">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -101,7 +99,6 @@
         {% include '_stats_content.html' %}
     </div>
 
-    <!-- Other tab panes here -->
     <div class="tab-pane fade" id="lineups" role="tabpanel">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h4>Unassigned Lineups</h4>
@@ -121,7 +118,7 @@
             <div class="card h-100">
               <div class="card-header"><strong>Add New Outing</strong></div>
               <div class="card-body">
-                <form action="{{ url_for('add_pitching') }}" method="POST">
+                <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
                   <div class="row g-3">
                     <div class="col-6"><label for="pitch_date" class="form-label">Date</label><input type="date" id="pitch_date" name="pitch_date" class="form-control" required></div>
                     <div class="col-6"><label for="pitching-log-pitcher-select" class="form-label">Pitcher</label><select name="pitcher" class="form-select" required id="pitching-log-pitcher-select"></select></div>
@@ -170,7 +167,7 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h5 class="card-title">Add New Game</h5>
-                <form action="{{ url_for('add_game') }}" method="POST" class="row g-3">
+                <form action="{{ url_for('gameday.add_game') }}" method="POST" class="row g-3">
                     <div class="col-md-3"><input type="date" name="game_date" id="add_game_date" class="form-control" required></div>
                     <div class="col-md-3"><input type="text" name="game_opponent" class="form-control" placeholder="Opponent" required></div>
                     <div class="col-md-3"><input type="text" name="game_location" class="form-control" placeholder="Location"></div>
@@ -188,7 +185,7 @@
             <div class="col-md-6">
                 <h5>Team Notes</h5>
                 <div class="card mb-3"><div class="card-body">
-                    <form action="{{ url_for('add_note', note_type='team_notes') }}" method="POST">
+                    <form action="{{ url_for('team_management.add_note', note_type='team_notes') }}" method="POST">
                         <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note..."></textarea>
                         <button type="submit" class="btn btn-primary btn-sm">Add Team Note</button>
                     </form>
@@ -198,7 +195,7 @@
             <div class="col-md-6">
                 <h5>Player Notes</h5>
                 <div class="card mb-3"><div class="card-body">
-                    <form action="{{ url_for('add_note', note_type='player_notes') }}" method="POST">
+                    <form action="{{ url_for('team_management.add_note', note_type='player_notes') }}" method="POST">
                         <select name="player_name" class="form-select mb-2" required id="collab-player-select"></select>
                         <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note..."></textarea>
                         <button type="submit" class="btn btn-primary btn-sm">Add Player Note</button>
@@ -213,7 +210,7 @@
         <h4>Practice Plans</h4>
         <div class="card mb-4"><div class="card-body">
             <h5 class="card-title">Create New Practice Plan</h5>
-            <form action="{{ url_for('add_practice_plan') }}" method="POST">
+            <form action="{{ url_for('team_management.add_practice_plan') }}" method="POST">
                 <div class="row">
                     <div class="col-md-3"><input type="date" name="plan_date" class="form-control" required></div>
                     <div class="col-md-7"><input type="text" name="general_notes" class="form-control" placeholder="General theme..."></div>
@@ -229,7 +226,7 @@
         <div class="row">
             <div class="col-md-6"><div class="card"><div class="card-body">
                 <h5 class="card-title">Add New Sign</h5>
-                <form action="{{ url_for('add_sign') }}" method="POST">
+                <form action="{{ url_for('team_management.add_sign') }}" method="POST">
                     <div class="mb-2"><input type="text" name="sign_name" class="form-control" placeholder="Sign Name" required></div>
                     <div class="mb-2"><input type="text" name="sign_indicator" class="form-control" placeholder="Indicator" required></div>
                     <button type="submit" class="btn btn-primary">Add Sign</button>
@@ -240,12 +237,11 @@
     </div>
 </div>
 
-<!-- All Modals -->
 <div class="modal fade" id="addPlayerModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header"><h5 class="modal-title">Add New Player</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-      <form id="addPlayerForm" action="{{ url_for('add_player') }}" method="POST">
+      <form id="addPlayerForm" action="{{ url_for('roster.add_player') }}" method="POST">
         <div class="modal-body">
             <div class="row g-3">
                 <div class="col-md-6"><label class="form-label">Player Name</label><input type="text" class="form-control" name="name" required></div>
@@ -289,7 +285,7 @@
 <div class="modal fade" id="editNoteModal" tabindex="-1">
   <div class="modal-dialog"><div class="modal-content">
     <div class="modal-header"><h5 class="modal-title">Edit Note</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-    <form action="{{ url_for('edit_note') }}" method="POST">
+    <form action="{{ url_for('team_management.edit_note') }}" method="POST">
       <div class="modal-body"><input type="hidden" name="note_id" id="editNoteId"><input type="hidden" name="note_type" id="editNoteType"><textarea class="form-control" name="note_text" id="editNoteText" rows="5" required></textarea></div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
     </form>

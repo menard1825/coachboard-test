@@ -48,13 +48,13 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDesktop">
                         {% if session.role in ['Head Coach', 'Super Admin'] %}
-                        <li><a class="dropdown-item" href="{{ url_for('user_management') }}">User Management</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('admin_settings') }}">Team Settings</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('admin.user_management') }}">User Management</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('admin.admin_settings') }}">Team Settings</a></li>
                         <li><hr class="dropdown-divider"></li>
                         {% endif %}
                         <li><a class="dropdown-item" href="{{ url_for('pitching_rules') }}">Pitching Rules</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('change_password') }}">Change Password</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}">Change Password</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">Logout</a></li>
                     </ul>
                 </li>
             </ul>
@@ -85,7 +85,7 @@
             <a class="nav-item" data-bs-toggle="tab" href="#player_development" role="tab" data-tab-id="player_development">
                 <i class="bi bi-graph-up-arrow"></i><span class="nav-label">Development</span>
             </a>
-            <a class="nav-item" data-bs-toggle="tab" href="#games" role="tab" data-tab-id="games">
+            <a class="nav-item" data-bs-to_gg_le="tab" href="#games" role="tab" data-tab-id="games">
                 <i class="bi bi-calendar-event"></i><span class="nav-label">Games</span>
             </a>
             <a class="nav-item" data-bs-toggle="tab" href="#practice_plan" role="tab" data-tab-id="practice_plan">
@@ -111,12 +111,12 @@
             <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#signs" role="tab" data-tab-id="signs"><i class="bi bi-signpost-split-fill me-2"></i>Signs & Signals</a>
             <hr>
             {% if session.role in ['Head Coach', 'Super Admin'] %}
-            <a class="list-group-item list-group-item-action" href="{{ url_for('user_management') }}"><i class="bi bi-person-badge-fill me-2"></i>User Management</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin_settings') }}"><i class="bi bi-gear-fill me-2"></i>Team Settings</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-person-badge-fill me-2"></i>User Management</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill me-2"></i>Team Settings</a>
             {% endif %}
             <a class="list-group-item list-group-item-action" href="{{ url_for('pitching_rules') }}"><i class="bi bi-gavel me-2"></i>Pitching Rules</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('change_password') }}"><i class="bi bi-key-fill me-2"></i>Change Password</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill me-2"></i>Change Password</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a>
         </div>
       </div>
     </div>
