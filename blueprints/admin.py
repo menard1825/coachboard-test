@@ -12,7 +12,7 @@ from functools import wraps
 
 from db import SessionLocal
 from models import User, Team
-from app import socketio # CORRECTED: Only import socketio, not app
+from extensions import socketio # CORRECTED: Only import socketio, not app
 
 # Define role constants
 SUPER_ADMIN = 'Super Admin'

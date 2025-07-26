@@ -1,8 +1,9 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
 from models import Player, User
 from db import SessionLocal
-from app import socketio
+from extensions import socketio
 import json
+from datetime import datetime
 
 roster_bp = Blueprint('roster', __name__, template_folder='templates')
 
@@ -37,7 +38,6 @@ def add_player():
         )
         db.add(new_player)
 
-        # Add the new player to the player_order list for all users on the team
         for user_obj in db.query(User).filter_by(team_id=session['team_id']).all():
             current_order = json.loads(user_obj.player_order or "[]")
             if new_player.name not in current_order:
@@ -48,7 +48,6 @@ def add_player():
         flash(f'Player "{name}" added successfully!', 'success')
         socketio.emit('data_updated', {'message': f'Player {name} added.'})
         
-        # This handles the AJAX request from the main.js file
         if 'X-Requested-With' in request.headers and request.headers['X-Requested-With'] == 'XMLHttpRequest':
              return jsonify({'status': 'success'})
 
@@ -81,13 +80,11 @@ def update_player_inline(player_id):
         player_to_edit.notes_author = session['username']
         player_to_edit.notes_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        # If name changed, update it in the order list for all users
         if original_name != new_name:
             for user_obj in db.query(User).filter_by(team_id=session['team_id']).all():
                 current_order = json.loads(user_obj.player_order or "[]")
                 updated_order = [new_name if name == original_name else name for name in current_order]
                 user_obj.player_order = json.dumps(updated_order)
-            # Update the current user's session
             session['player_order'] = [new_name if name == original_name else name for name in session.get('player_order', [])]
             session.modified = True
 
@@ -105,13 +102,11 @@ def delete_player(player_id):
         if player_to_delete:
             player_name = player_to_delete.name
             db.delete(player_to_delete)
-            # Remove from all users' player_order
             for user_obj in db.query(User).filter_by(team_id=session['team_id']).all():
                 current_order = json.loads(user_obj.player_order or "[]")
                 updated_order = [name for name in current_order if name != player_name]
                 user_obj.player_order = json.dumps(updated_order)
             
-            # Update session
             if 'player_order' in session:
                 session['player_order'] = [name for name in session['player_order'] if name != player_name]
                 session.modified = True

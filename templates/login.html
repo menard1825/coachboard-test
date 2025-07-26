@@ -22,7 +22,7 @@
           {% endfor %}
         {% endif %}
       {% endwith %}
-      <form method="POST" action="{{ url_for('login') }}">
+      <form method="POST" action="{{ url_for('auth.login') }}">
         <div class="form-floating mb-3">
           <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
           <label for="username">Username</label>
@@ -33,7 +33,7 @@
         </div>
         <button type="submit" class="btn btn-primary w-100">Login</button>
         <div class="text-center mt-3">
-            <a href="{{ url_for('register') }}">Need an account? Register here</a>
+            <a href="{{ url_for('auth.register') }}">Need an account? Register here</a>
         </div>
       </form>
     </div>

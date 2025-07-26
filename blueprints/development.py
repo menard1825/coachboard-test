@@ -1,7 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, flash, session
 from models import Player, PlayerDevelopmentFocus
 from db import SessionLocal
-from app import socketio
+from extensions import socketio
 from datetime import date, datetime
 
 development_bp = Blueprint('development', __name__, template_folder='templates')

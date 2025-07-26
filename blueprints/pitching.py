@@ -1,12 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, render_template
 from models import PitchingOuting, Team
 from db import SessionLocal
-from app import socketio
-
-# Import utility functions from the main app
-# This requires a bit of care to avoid circular imports.
-# We will ensure app.py does not import from blueprints directly at the top level.
-from app import get_pitching_rules_for_team 
+from extensions import socketio
 
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 
@@ -66,6 +61,7 @@ def pitching_rules():
     db = SessionLocal()
     try:
         team = db.query(Team).filter_by(id=session['team_id']).first()
+        from app import get_pitching_rules_for_team 
         rules_for_team = get_pitching_rules_for_team(team)
         return render_template('rules.html', 
                                team=team, 

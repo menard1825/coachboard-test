@@ -1,7 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
 from models import ScoutedPlayer, Player, User
 from db import SessionLocal
-from app import socketio
+from extensions import socketio
 from datetime import datetime
 import json
 

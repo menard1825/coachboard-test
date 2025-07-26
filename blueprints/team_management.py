@@ -3,7 +3,7 @@ from models import (
     CollaborationNote, PracticePlan, PracticeTask, Sign
 )
 from db import SessionLocal
-from app import socketio
+from extensions import socketio
 from datetime import datetime
 
 team_management_bp = Blueprint('team_management', __name__, template_folder='templates')

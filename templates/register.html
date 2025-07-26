@@ -23,7 +23,7 @@
           {% endfor %}
         {% endif %}
       {% endwith %}
-      <form method="POST" action="{{ url_for('register') }}">
+      <form method="POST" action="{{ url_for('auth.register') }}">
         <div class="form-floating mb-3">
           <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
           <label for="username">Username</label>
@@ -44,7 +44,7 @@
 
         <button type="submit" class="btn btn-primary w-100">Register</button>
         <div class="text-center mt-3">
-            <a href="{{ url_for('login') }}">Already have an account? Login</a>
+            <a href="{{ url_for('auth.login') }}">Already have an account? Login</a>
         </div>
       </form>
     </div>

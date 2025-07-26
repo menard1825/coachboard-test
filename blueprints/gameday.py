@@ -3,7 +3,7 @@ from models import (
     Game, Player, Lineup, Rotation, PitchingOuting, Team, PlayerGameAbsence
 )
 from db import SessionLocal
-from app import socketio, get_pitching_rules_for_team, calculate_pitch_counts, calculate_pitcher_availability, calculate_cumulative_pitching_stats
+from extensions import socketio
 import json
 from datetime import datetime
 
@@ -24,33 +24,23 @@ def game_management(game_id):
             flash('Game not found.', 'danger')
             return redirect(url_for('home', _anchor='games'))
         
-        game_dict = {"id": game.id, "date": game.date, "opponent": game.opponent, "location": game.location, "game_notes": game.game_notes}
-        
+        game_dict = game.to_dict()
         roster_objects = db.query(Player).filter_by(team_id=team.id).all()
-        roster_list = [{"id": p.id, "name": p.name, "number": p.number, "position1": p.position1, "position2": p.position2, "position3": p.position3, "throws": p.throws, "bats": p.bats, "pitcher_role": p.pitcher_role} for p in roster_objects]
+        roster_list = [p.to_dict() for p in roster_objects]
         
         lineup_obj = db.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
-        lineup_dict = json.loads(lineup_obj.lineup_positions or "[]") if lineup_obj else {"id": None, "title": f"Lineup for vs {game.opponent}", "lineup_positions": [], "associated_game_id": game.id}
+        lineup_dict = lineup_obj.to_dict() if lineup_obj else {"id": None, "title": f"Lineup for vs {game.opponent}", "lineup_positions": [], "associated_game_id": game.id}
 
         rotation_obj = db.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
-        rotation_dict = json.loads(rotation_obj.innings or "{}") if rotation_obj else {"id": None, "title": f"Rotation for vs {game.opponent}", "innings": {}, "associated_game_id": game.id}
+        rotation_dict = rotation_obj.to_dict() if rotation_obj else {"id": None, "title": f"Rotation for vs {game.opponent}", "innings": {}, "associated_game_id": game.id}
 
         pitching_outings = db.query(PitchingOuting).filter_by(team_id=team.id).all()
-        pitcher_names = sorted([p["name"] for p in roster_list if p["pitcher_role"] != 'Not a Pitcher'])
-        
-        pitch_count_summary = {}
-        for name in pitcher_names:
-            counts = calculate_pitch_counts(name, pitching_outings, team)
-            availability = calculate_pitcher_availability(name, pitching_outings, team)
-            cumulative_stats = calculate_cumulative_pitching_stats(name, pitching_outings)
-            pitch_count_summary[name] = {**counts, **availability, **cumulative_stats}
-            
-        game_pitching_log = [p for p in pitching_outings if p.opponent == game.opponent and p.date == game.date]
+        game_pitching_log = [p.to_dict() for p in pitching_outings if p.opponent == game.opponent and p.date == game.date]
         
         absences = db.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
         absent_player_ids = [absence.player_id for absence in absences]
 
-        return render_template('game_management.html', game=game_dict, roster=roster_list, lineup=lineup_dict, rotation=rotation_dict, pitch_count_summary=pitch_count_summary, game_pitching_log=game_pitching_log, session=session, absent_player_ids=absent_player_ids)
+        return render_template('game_management.html', game=game_dict, roster=roster_list, lineup=lineup_dict, rotation=rotation_dict, game_pitching_log=game_pitching_log, session=session, absent_player_ids=absent_player_ids)
     finally:
         db.close()
 
@@ -134,9 +124,7 @@ def update_absences(game_id):
         db.close()
     return redirect(url_for('.game_management', game_id=game_id, _anchor='availability'))
 
-
-# --- Lineup & Rotation ---
-
+# --- Lineup & Rotation Helper ---
 def _sync_lineup_to_rotation(db, lineup):
     if not lineup.associated_game_id: return
     game = db.query(Game).filter_by(id=lineup.associated_game_id, team_id=lineup.team_id).first()
@@ -155,6 +143,7 @@ def _sync_lineup_to_rotation(db, lineup):
         new_rotation = Rotation(title=f"vs {game.opponent} ({game.date})", associated_game_id=game.id, innings=json.dumps({'1': inning_1_data}), team_id=lineup.team_id)
         db.add(new_rotation)
 
+# --- Lineup & Rotation API-like routes ---
 @gameday_bp.route('/add_lineup', methods=['POST'])
 def add_lineup():
     db = SessionLocal()
@@ -238,7 +227,7 @@ def save_rotation():
                 message = 'Rotation updated successfully!'
                 new_rotation_id = rotation_id
             else: 
-                rotation_id = None # Force creation if ID not found
+                rotation_id = None
         
         if not rotation_id:
             new_rotation = Rotation(
@@ -248,7 +237,7 @@ def save_rotation():
                 team_id=session['team_id']
             )
             db.add(new_rotation)
-            db.commit() # Commit to get the new ID
+            db.commit()
             new_rotation_id = new_rotation.id
             message = 'Rotation saved successfully!'
         else:
