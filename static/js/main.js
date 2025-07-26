@@ -6,7 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
         player_order: [],
         session: {},
         pitch_count_summary: {},
-        roster_sort: { key: 'name', order: 'asc' }
+        roster_sort: { key: 'name', order: 'asc' },
+        active_player_dev_name: null
     };
 
     let sortableInstances = {};
@@ -64,12 +65,12 @@ document.addEventListener('DOMContentLoaded', () => {
         attachRosterSaveListeners();
     }
 
-    function renderPlayerDevelopment() {
-        const container = document.getElementById('player-dev-accordion');
+    function renderPlayerDevelopmentList() {
+        const container = document.getElementById('dev-player-list');
         if (!container) return;
+
         const playerDevData = AppState.full_data.player_development || {};
         const roster = AppState.full_data.roster || [];
-        const getIconForType = (type) => ({'Development': '<i class="bi bi-graph-up-arrow text-primary"></i>', 'Coach Note': '<i class="bi bi-chat-left-text-fill text-info"></i>', 'Lessons': '<i class="bi bi-person-video3 text-success"></i>'}[type] || '<i class="bi bi-record-circle"></i>');
 
         if (!AppState.player_order || AppState.player_order.length === 0) {
             AppState.player_order = roster.map(p => p.name);
@@ -78,25 +79,82 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = AppState.player_order.map((playerName) => {
             const p = roster.find(player => player.name === playerName);
             if (!p) return '';
-            const activityLog = playerDevData[p.name] || [];
+            
             const pNameSafe = escapeHTML(p.name);
-            const activeFocusCount = activityLog.filter(log => log.type === 'Development' && log.status === 'active').length;
+            const activeFocusCount = (playerDevData[p.name] || []).filter(log => log.type === 'Development' && log.status === 'active').length;
             const summaryText = activeFocusCount > 0 ? `${activeFocusCount} active focus${activeFocusCount > 1 ? 'es' : ''}` : 'No active focuses';
-            const activityHtml = activityLog.length > 0 ? `<ul class="list-group">${activityLog.map(log => {
-                log.player_name = pNameSafe;
-                let itemClass = '', statusText = '', mainText = escapeHTML(log.text);
-                if (log.type === 'Development') itemClass = log.status === 'completed' ? (statusText=`<span class="badge bg-success ms-2">Completed: ${log.completed_date}</span>`, 'completed-focus') : 'active-focus';
-                else if (log.type === 'Lessons') itemClass = 'lesson-entry'; else if (log.type === 'Coach Note') itemClass = 'coach-note-entry';
-                let actions = '';
-                if (canEdit(log.author) || log.type === 'Development') {
-                    if (log.type === 'Development') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-focus-id="${log.id}" data-player-name="${pNameSafe}">Edit</button><a href="/delete_focus/${log.id}" class="btn btn-sm btn-link text-danger py-0" onclick="return confirm('Are you sure?');">Delete</a>`;
-                    else if (log.type === 'Coach Note') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${log.id}" data-note-type="player_notes" data-note-text="${escapeHTML(log.text)}">Edit</button><a href="/delete_note/player_notes/${log.id}" class="btn btn-sm btn-link text-danger py-0" onclick="return confirm('Are you sure?');">Delete</a>`;
-                }
-                return `<li class="list-group-item ${itemClass}"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${mainText}</span>${statusText}</h6><small>${log.date}</small></div>${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}<small class="text-muted">By: ${escapeHTML(log.author)}</small>${actions ? `<div class="mt-2">${actions}</div>` : ''}</li>`;
-            }).join('')}</ul>` : `<div class="text-center p-3 border rounded"><p class="mb-0">No activity logged.</p></div>`;
-            return `<div class="accordion-item" data-player-name="${pNameSafe}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-dev-${p.id}"><i class="bi bi-grip-vertical me-2 drag-handle"></i><strong>${pNameSafe}</strong><span class="ms-auto text-muted small">${summaryText}</span></button></h2><div id="collapse-dev-${p.id}" class="accordion-collapse collapse" data-bs-parent="#player-dev-accordion"><div class="accordion-body"><div class="d-flex justify-content-between align-items-center mb-3"><h5 class="mb-0">Activity Log</h5><div class="btn-group"><button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown">Add New</button><ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">Hitting Focus</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">Pitching Focus</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">Fielding Focus</a></li><li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">Baserunning Focus</a></li><li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; switchTab(document.querySelector('a[href=\\'#collaboration\\']'));">Coach Note</a></li></ul></div></div>${activityHtml}</div></div></div>`;
+
+            return `<a href="#" class="list-group-item list-group-item-action" data-player-name="${pNameSafe}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">${pNameSafe}</h6>
+                            <small>${summaryText}</small>
+                        </div>
+                    </a>`;
         }).join('');
+
+        container.querySelectorAll('.list-group-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                AppState.active_player_dev_name = item.dataset.playerName;
+                renderPlayerDevelopmentDetails();
+                container.querySelector('.active')?.classList.remove('active');
+                item.classList.add('active');
+            });
+        });
     }
+
+    function renderPlayerDevelopmentDetails() {
+        const container = document.getElementById('player-dev-content');
+        if (!container) return;
+
+        const playerName = AppState.active_player_dev_name;
+        if (!playerName) {
+            container.innerHTML = `<div class="text-center p-5 text-muted">
+                                        <i class="bi bi-arrow-left-circle-fill" style="font-size: 3rem;"></i>
+                                        <h4 class="mt-3">Select a player</h4>
+                                        <p>Select a player from the list to view their development log.</p>
+                                    </div>`;
+            return;
+        }
+
+        const playerDevData = AppState.full_data.player_development || {};
+        const activityLog = playerDevData[playerName] || [];
+        const pNameSafe = escapeHTML(playerName);
+        
+        const getIconForType = (type) => ({'Development': '<i class="bi bi-graph-up-arrow text-primary"></i>', 'Coach Note': '<i class="bi bi-chat-left-text-fill text-info"></i>', 'Lessons': '<i class="bi bi-person-video3 text-success"></i>'}[type] || '<i class="bi bi-record-circle"></i>');
+
+        const activityHtml = activityLog.length > 0 ? `<ul class="list-group">${activityLog.map(log => {
+            let itemClass = '', statusText = '', mainText = escapeHTML(log.text);
+            if (log.type === 'Development') itemClass = log.status === 'completed' ? (statusText=`<span class="badge bg-success ms-2">Completed: ${log.completed_date}</span>`, 'completed-focus') : 'active-focus';
+            else if (log.type === 'Lessons') itemClass = 'lesson-entry'; else if (log.type === 'Coach Note') itemClass = 'coach-note-entry';
+            
+            let actions = '';
+            if (canEdit(log.author) || log.type === 'Development') {
+                if (log.type === 'Development') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-focus-id="${log.id}" data-player-name="${pNameSafe}">Edit</button><a href="/delete_focus/${log.id}" class="btn btn-sm btn-link text-danger py-0" onclick="return confirm('Are you sure?');">Delete</a>`;
+                else if (log.type === 'Coach Note') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${log.id}" data-note-type="player_notes" data-note-text="${escapeHTML(log.text)}">Edit</button><a href="/delete_note/player_notes/${log.id}" class="btn btn-sm btn-link text-danger py-0" onclick="return confirm('Are you sure?');">Delete</a>`;
+            }
+            return `<li class="list-group-item ${itemClass}"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${mainText}</span>${statusText}</h6><small>${log.date}</small></div>${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}<small class="text-muted">By: ${escapeHTML(log.author)}</small>${actions ? `<div class="mt-2">${actions}</div>` : ''}</li>`;
+        }).join('')}</ul>` : `<div class="text-center p-3 border rounded"><p class="mb-0">No activity logged.</p></div>`;
+
+        container.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">${pNameSafe} - Development Log</h4>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown">Add New</button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">Hitting Focus</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">Pitching Focus</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">Fielding Focus</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">Baserunning Focus</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; switchTab(document.querySelector('a[href=\\'#collaboration\\']'));">Coach Note</a></li>
+                    </ul>
+                </div>
+            </div>
+            ${activityHtml}
+        `;
+    }
+
 
     function renderLineups() {
         const container = document.getElementById('lineupsAccordion');
@@ -230,7 +288,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderAll() {
         renderRoster();
-        renderPlayerDevelopment();
+        renderPlayerDevelopmentList();
+        renderPlayerDevelopmentDetails();
         renderLineups();
         renderRotations();
         renderPitchingLog();
@@ -318,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
             AppState.player_order = newOrder;
             fetch('/save_player_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_order: newOrder }) });
         };
-        ['rosterAccordion', 'player-dev-accordion'].forEach(id => {
+        ['rosterAccordion', 'dev-player-list'].forEach(id => {
             const el = document.getElementById(id);
             if(el) sortableInstances[id] = new Sortable(el, { handle: '.drag-handle', animation: 150, onEnd: savePlayerOrder });
         });

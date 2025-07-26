@@ -172,3 +172,41 @@ body {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
 }
+
+/* --- Player Development Page --- */
+.player-dev-container {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.player-list-column {
+    flex: 0 0 300px;
+}
+
+.player-dev-details-column {
+    flex: 1 1 auto;
+}
+
+#dev-player-list .list-group-item {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#dev-player-list .list-group-item.active {
+    background-color: #c8102e;
+    border-color: #c8102e;
+}
+
+#player-dev-content .card {
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 991.98px) {
+    .player-dev-container {
+        flex-direction: column;
+    }
+
+    .player-list-column {
+        flex: 0 0 auto;
+    }
+}
