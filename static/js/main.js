@@ -18,6 +18,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
     const canEdit = (author) => AppState.session.username === author || ['Head Coach', 'Super Admin'].includes(AppState.session.role);
 
+    const formatDateTime = (s) => {
+        if (!s || s === 'Never') return s;
+        try {
+            const dt = new Date(s.replace(' ', 'T'));
+            if (isNaN(dt)) throw new Error('Invalid date');
+            
+            // Check if it's a date-only string
+            if (s.length <= 10) {
+                 return dt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' });
+            }
+            // It's a full datetime string
+            return dt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' }) + ', ' + 
+                   dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        } catch (e) {
+            return s; // Return original string if format is unexpected
+        }
+    };
+
     const renderPositionSelect = (name, id, selectedVal = '', title = 'Select Position', classes = 'form-select form-select-sm') => {
         const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'];
         let optionsHtml = `<option value="" ${!selectedVal ? 'selected' : ''}>${title}</option>`;
@@ -32,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pNameSafe = escapeHTML(p.name);
         const pNotesSafe = escapeHTML(p.notes || '');
         const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
+        const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
         return `
         <div class="accordion-item" data-player-name="${pNameSafe}">
             <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-roster-${p.id}"><i class="bi bi-grip-vertical me-2 drag-handle"></i><strong>${pNameSafe}</strong>&nbsp;(#${p.number || 'N/A'})<span class="ms-auto text-muted small d-none d-sm-inline">${[p.position1, p.position2, p.position3].filter(Boolean).join(', ') || 'N/A'} | ${p.bats || 'N/A'} / ${p.throws || 'N/A'}</span></button></h2>
@@ -39,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="row g-3 align-items-end">
                     <div class="col-12"><h5>Player Notes</h5></div>
                     <div class="col-12"><textarea class="form-control" name="notes" rows="2" placeholder="Notes">${pNotesSafe}</textarea></div>
-                    ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${p.notes_timestamp || ''}</small></div>` : ''}
+                    ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${formattedTimestamp}</small></div>` : ''}
                     <hr class="my-3">
                     <div class="col-12 col-md-4"><label class="form-label">Name</label><input type="text" class="form-control" name="name" value="${pNameSafe}"></div>
                     <div class="col-6 col-md-2"><label class="form-label">J#</label><input type="number" class="form-control" name="number" value="${p.number || ''}"></div>
@@ -147,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const activityHtml = activityLog.length > 0 ? `<ul class="list-group">${activityLog.map(log => {
             let itemClass = '', statusText = '', mainText = escapeHTML(log.text);
-            if (log.type === 'Development') itemClass = log.status === 'completed' ? (statusText=`<span class="badge bg-success ms-2">Completed: ${log.completed_date}</span>`, 'completed-focus') : 'active-focus';
+            if (log.type === 'Development') itemClass = log.status === 'completed' ? (statusText=`<span class="badge bg-success ms-2">Completed: ${formatDateTime(log.completed_date)}</span>`, 'completed-focus') : 'active-focus';
             else if (log.type === 'Lessons') itemClass = 'lesson-entry'; else if (log.type === 'Coach Note') itemClass = 'coach-note-entry';
             
             let actions = '';
@@ -155,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (log.type === 'Development') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-focus-id="${log.id}" data-player-name="${pNameSafe}">Edit</button><a href="/delete_focus/${log.id}" class="btn btn-sm btn-link text-danger py-0" onclick="return confirm('Are you sure?');">Delete</a>`;
                 else if (log.type === 'Coach Note') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${log.id}" data-note-type="player_notes" data-note-text="${escapeHTML(log.text)}">Edit</button><a href="/delete_note/player_notes/${log.id}" class="btn btn-sm btn-link text-danger py-0" onclick="return confirm('Are you sure?');">Delete</a>`;
             }
-            return `<li class="list-group-item ${itemClass}"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${mainText}</span>${statusText}</h6><small>${log.date}</small></div>${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}<small class="text-muted">By: ${escapeHTML(log.author)}</small>${actions ? `<div class="mt-2">${actions}</div>` : ''}</li>`;
+            return `<li class="list-group-item ${itemClass}"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${mainText}</span>${statusText}</h6><small>${formatDateTime(log.date)}</small></div>${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}<small class="text-muted">By: ${escapeHTML(log.author)}</small>${actions ? `<div class="mt-2">${actions}</div>` : ''}</li>`;
         }).join('')}</ul>` : `<div class="text-center p-3 border rounded"><p class="mb-0">No activity logged.</p></div>`;
 
         container.innerHTML = `
@@ -236,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const outingsList = document.getElementById('recorded-outings-list');
         if (outingsList) {
             const outings = (AppState.full_data.pitching || []).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
-            outingsList.innerHTML = outings.map((o) => `<li class="list-group-item d-flex justify-content-between align-items-center"><span>${o.date}: <strong>${escapeHTML(o.pitcher)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span><a href="/delete_pitching/${o.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');"><i class="bi bi-trash"></i></a></li>`).join('') || `<li class="list-group-item text-muted">No outings recorded.</li>`;
+            outingsList.innerHTML = outings.map((o) => `<li class="list-group-item d-flex justify-content-between align-items-center"><span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.pitcher)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span><a href="/delete_pitching/${o.id}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');"><i class="bi bi-trash"></i></a></li>`).join('') || `<li class="list-group-item text-muted">No outings recorded.</li>`;
         }
     }
 
@@ -260,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (canEdit(note.author)) {
                 actions = `<button class="btn btn-sm btn-link text-secondary" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${note.id}" data-note-type="${note_type}" data-note-text="${noteText}">Edit</button><a href="/delete_note/${note_type}/${note.id}" class="btn btn-sm btn-link text-danger" onclick="return confirm('Are you sure?')">Delete</a>`;
             }
-            return `<div class="card mb-2"><div class="card-body pb-2"><p class="card-text" style="white-space: pre-wrap;">${noteText}</p><small class="text-muted">By ${author} on ${note.timestamp}${note.player_name ? ` for <strong>${escapeHTML(note.player_name)}</strong>` : ''}</small></div>${actions ? `<div class="card-footer bg-white border-top-0 text-end py-2">${actions}</div>` : ''}</div>`;
+            return `<div class="card mb-2"><div class="card-body pb-2"><p class="card-text" style="white-space: pre-wrap;">${noteText}</p><small class="text-muted">By ${author} on ${formatDateTime(note.timestamp)}${note.player_name ? ` for <strong>${escapeHTML(note.player_name)}</strong>` : ''}</small></div>${actions ? `<div class="card-footer bg-white border-top-0 text-end py-2">${actions}</div>` : ''}</div>`;
         };
         const teamNotes = (collabData.team_notes || []).sort((a,b) => b.timestamp.localeCompare(a.timestamp));
         teamContainer.innerHTML = teamNotes.map(note => createNoteHTML(note, 'team_notes')).join('') || '<div class="text-center p-3 border rounded text-muted">No team notes.</div>';
@@ -296,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const rotation = AppState.full_data.rotations.find(r => r.associated_game_id === game.id);
             const lineupHTML = lineup ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
             const rotationHTML = rotation ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
-            return `<li class="list-group-item"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${game.date} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm"><a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a><a href="/delete_game/${game.id}" class="btn btn-outline-danger" onclick="return confirm('Are you sure?');"><i class="bi bi-trash"></i></a></div></div></div></li>`;
+            return `<li class="list-group-item"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${formatDateTime(game.date)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm"><a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a><a href="/delete_game/${game.id}" class="btn btn-outline-danger" onclick="return confirm('Are you sure?');"><i class="bi bi-trash"></i></a></div></div></div></li>`;
         }).join('');
     }
 
@@ -337,7 +356,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}">
-                        <strong>${plan.date}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}
+                        <strong>${formatDateTime(plan.date)}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}
                     </button>
                 </h2>
                 <div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion">

@@ -178,9 +178,7 @@
                             </form>
                         </td>
                         <td data-label="Role">
-                            {# MODIFIED: Role check is now based on role, not username #}
-                            {% if user.role == 'Super Admin' %}<span class="badge bg-danger">{{ user.role }}</span>
-                            {% elif user.username == session.username %}<span class="badge bg-success">{{ user.role }}</span>
+                            {% if user.username == session.username %}<span class="badge bg-success">{{ user.role }}</span>
                             {% else %}
                             <form action="{{ url_for('admin.change_user_role', username=user.username) }}" method="POST">
                                 <select class="form-select form-select-sm" name="role" onchange="this.form.submit()">
@@ -195,10 +193,9 @@
                         {% if session.role == 'Super Admin' %}
                         <td data-label="Team">{{ user.team.team_name if user.team else 'N/A' }}</td>
                         {% endif %}
-                        <td data-label="Last Login">{{ user.last_login }}</td>
+                        <td data-label="Last Login">{{ user.last_login | format_datetime }}</td>
                         <td data-label="Actions">
-                            {# MODIFIED: Action availability is now based on role, not username #}
-                            {% if user.role != 'Super Admin' and user.username != session.username %}
+                            {% if user.username != session.username %}
                             <div class="btn-group" role="group">
                                <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resetPasswordModal-{{ user.username }}">Reset Pass</button>
                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal-{{ user.username }}">Delete</button>

@@ -17,7 +17,7 @@
             <i class="bi bi-arrow-left"></i> Back to All Games
         </a>
         <span class="navbar-text fw-bold">
-            vs {{ game['opponent'] }} on {{ game['date'] }}
+            vs {{ game['opponent'] }} on {{ game['date'] | format_datetime }}
         </span>
     </div>
 </nav>

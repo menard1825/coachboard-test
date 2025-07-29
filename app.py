@@ -39,6 +39,7 @@ def create_app():
     app.secret_key = 'xXxG#fjs72d_!z921!kJjkjsd123kfj3FJ!*kfdjf8s!jf9jKJJJd'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
+    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -56,6 +57,23 @@ def create_app():
     app.register_blueprint(pitching_bp)
     app.register_blueprint(scouting_bp)
     app.register_blueprint(team_management_bp)
+
+    # --- Custom Jinja Filter for Date/Time Formatting ---
+    @app.template_filter('format_datetime')
+    def format_datetime_filter(s):
+        if not s or s == 'Never':
+            return s
+        try:
+            # Handle full datetime strings like '2025-07-24 23:55'
+            dt = datetime.strptime(s, '%Y-%m-%d %H:%M')
+            return dt.strftime('%A, %m/%d/%y, %I:%M %p')
+        except ValueError:
+            try:
+                # Handle date-only strings like '2025-07-24'
+                dt = datetime.strptime(s, '%Y-%m-%d')
+                return dt.strftime('%A, %m/%d/%y')
+            except ValueError:
+                return s # Return original string if format is unexpected
 
     # --- Decorators & Context Processors ---
     def login_required(f):
@@ -189,7 +207,11 @@ def create_app():
     def serve_manifest():
         return send_from_directory('static', 'manifest.json')
 
-    # REMOVED: The /stats route is now redundant.
-    # The stats content is included directly in the home page's 'stats_tab'.
-
     return app
+
+def allowed_file(filename):
+    """Check if the filename has an allowed extension."""
+    app = Flask(__name__)
+    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
