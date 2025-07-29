@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
         session: {},
         pitch_count_summary: {},
         roster_sort: { key: 'name', order: 'asc' },
-        active_player_dev_name: null
+        active_player_dev_name: null,
+        dev_player_sort: { key: 'custom', order: 'asc' } // New state for dev tab sorting
     };
 
     let sortableInstances = {};
@@ -70,23 +71,36 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!container) return;
 
         const playerDevData = AppState.full_data.player_development || {};
-        const roster = AppState.full_data.roster || [];
+        const roster = [...(AppState.full_data.roster || [])];
+        const searchTerm = document.getElementById('devPlayerSearch').value.toLowerCase();
 
-        if (!AppState.player_order || AppState.player_order.length === 0) {
-            AppState.player_order = roster.map(p => p.name);
+        // Apply search filter first
+        const filteredRoster = roster.filter(p => p.name.toLowerCase().includes(searchTerm));
+
+        // Apply sorting
+        if (AppState.dev_player_sort.key === 'name') {
+            filteredRoster.sort((a, b) => {
+                if (AppState.dev_player_sort.order === 'asc') return a.name.localeCompare(b.name);
+                return b.name.localeCompare(a.name);
+            });
+        } else {
+             // 'custom' sort - we need to filter the original player_order
+             const customOrderedNames = AppState.player_order.filter(name => filteredRoster.some(p => p.name === name));
+             filteredRoster.sort((a,b) => customOrderedNames.indexOf(a.name) - customOrderedNames.indexOf(b.name));
         }
 
-        container.innerHTML = AppState.player_order.map((playerName) => {
-            const p = roster.find(player => player.name === playerName);
-            if (!p) return '';
-            
+        container.innerHTML = filteredRoster.map(p => {
             const pNameSafe = escapeHTML(p.name);
             const activeFocusCount = (playerDevData[p.name] || []).filter(log => log.type === 'Development' && log.status === 'active').length;
             const summaryText = activeFocusCount > 0 ? `${activeFocusCount} active focus${activeFocusCount > 1 ? 'es' : ''}` : 'No active focuses';
 
+            // ADDED: The drag handle element
             return `<a href="#" class="list-group-item list-group-item-action" data-player-name="${pNameSafe}">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">${pNameSafe}</h6>
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                               <i class="bi bi-grip-vertical me-2 drag-handle"></i>
+                               <span class="fw-bold">${pNameSafe}</span>
+                            </div>
                             <small>${summaryText}</small>
                         </div>
                     </a>`;
@@ -94,6 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         container.querySelectorAll('.list-group-item').forEach(item => {
             item.addEventListener('click', (e) => {
+                // Prevent click action if dragging
+                if (e.target.classList.contains('drag-handle')) return;
                 e.preventDefault();
                 AppState.active_player_dev_name = item.dataset.playerName;
                 renderPlayerDevelopmentDetails();
@@ -101,6 +117,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.classList.add('active');
             });
         });
+
+        // Highlight active sort button
+        document.querySelectorAll('#dev-sort-az, #dev-sort-za, #dev-sort-custom').forEach(btn => btn.classList.remove('active'));
+        if(AppState.dev_player_sort.key === 'name' && AppState.dev_player_sort.order === 'asc') document.getElementById('dev-sort-az').classList.add('active');
+        if(AppState.dev_player_sort.key === 'name' && AppState.dev_player_sort.order === 'desc') document.getElementById('dev-sort-za').classList.add('active');
+        if(AppState.dev_player_sort.key === 'custom') document.getElementById('dev-sort-custom').classList.add('active');
     }
 
     function renderPlayerDevelopmentDetails() {
@@ -454,6 +476,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const newOrder = Array.from(evt.from.children).map(item => item.dataset.playerName);
             AppState.player_order = newOrder;
             fetch('/save_player_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_order: newOrder }) });
+            // When order is changed via drag-drop, revert sort to custom
+            AppState.dev_player_sort.key = 'custom';
+            renderPlayerDevelopmentList();
         };
         ['rosterAccordion', 'dev-player-list'].forEach(id => {
             const el = document.getElementById(id);
@@ -503,6 +528,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+
+        // NEW Event Listeners for Player Development Sorting and Searching
+        document.getElementById('devPlayerSearch').addEventListener('input', renderPlayerDevelopmentList);
+        document.getElementById('dev-sort-az').addEventListener('click', () => {
+            AppState.dev_player_sort = { key: 'name', order: 'asc' };
+            renderPlayerDevelopmentList();
+        });
+        document.getElementById('dev-sort-za').addEventListener('click', () => {
+            AppState.dev_player_sort = { key: 'name', order: 'desc' };
+            renderPlayerDevelopmentList();
+        });
+         document.getElementById('dev-sort-custom').addEventListener('click', () => {
+            AppState.dev_player_sort = { key: 'custom', order: 'asc' };
+            renderPlayerDevelopmentList();
+        });
 
 
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {

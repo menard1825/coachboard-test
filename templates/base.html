@@ -14,8 +14,8 @@
     {% block head %}{% endblock %}
     <style>
         body {
-            /* MODIFIED: Increased padding to ensure full scrolling on mobile */
-            padding-bottom: 100px; 
+            /* MODIFIED: Using calc() and env() to create a dynamic padding value that accounts for the "safe area" on newer mobile devices. This ensures the padding always matches the nav bar's true height, eliminating the scroll 'bounce'. */
+            padding-bottom: calc(85px + env(safe-area-inset-bottom)); 
         }
         @media (min-width: 992px) {
             body {

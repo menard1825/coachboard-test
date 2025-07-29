@@ -94,10 +94,17 @@
             <div class="player-list-column">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h5 class="mb-0">Players</h5>
-                    <small class="text-muted">Drag to reorder</small>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" id="dev-sort-az" title="Sort A-Z"><i class="bi bi-sort-alpha-down"></i></button>
+                        <button class="btn btn-outline-secondary" id="dev-sort-za" title="Sort Z-A"><i class="bi bi-sort-alpha-up"></i></button>
+                         <button class="btn btn-outline-secondary" id="dev-sort-custom" title="Custom Sort"><i class="bi bi-arrow-down-up"></i></button>
+                    </div>
+                </div>
+                 <div class="mb-3">
+                    <input type="search" id="devPlayerSearch" class="form-control" placeholder="Search players...">
                 </div>
                 <div class="list-group" id="dev-player-list">
-                    </div>
+                </div>
             </div>
             <div class="player-dev-details-column">
                 <div id="player-dev-content">

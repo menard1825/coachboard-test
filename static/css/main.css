@@ -244,3 +244,8 @@ body {
     font-size: 1.1rem;
     color: #6c757d;
 }
+
+/* Add this new rule to fix mobile scrolling */
+main {
+    min-height: calc(100vh - 56px); /* 56px is a standard height for the top navbar */
+}
