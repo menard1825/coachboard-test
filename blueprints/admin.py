@@ -218,6 +218,10 @@ def update_admin_settings():
     team_settings.age_group = request.form.get('age_group', team_settings.age_group)
     team_settings.pitching_rule_set = request.form.get('pitching_rule_set', team_settings.pitching_rule_set)
     
+    # ADDED: Handle the new color inputs
+    team_settings.primary_color = request.form.get('primary_color', team_settings.primary_color)
+    team_settings.secondary_color = request.form.get('secondary_color', team_settings.secondary_color)
+    
     db.session.commit()
     flash('Team settings updated successfully!', 'success')
     socketio.emit('data_updated', {'message': 'Team settings updated.'})

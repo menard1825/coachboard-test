@@ -36,6 +36,22 @@
                         
                         <hr>
 
+                        <!-- ADDED: Team Color Pickers -->
+                        <h6 class="text-muted">Team Colors</h6>
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label for="primary_color" class="form-label">Primary Color (Header)</label>
+                                <input type="color" class="form-control form-control-color" id="primary_color" name="primary_color" value="{{ settings.primary_color or '#1F2937' }}" title="Choose your primary color">
+                            </div>
+                            <div class="col">
+                                <label for="secondary_color" class="form-label">Secondary Color</label>
+                                <input type="color" class="form-control form-control-color" id="secondary_color" name="secondary_color" value="{{ settings.secondary_color or '#E5E7EB' }}" title="Choose your secondary color">
+                            </div>
+                        </div>
+
+
+                        <hr>
+
                         <h6 class="text-muted">Pitching Rules</h6>
                         <div class="form-floating mb-3">
                             <select class="form-select" id="pitching_rule_set" name="pitching_rule_set">
