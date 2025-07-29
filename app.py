@@ -39,7 +39,6 @@ def create_app():
     app.secret_key = 'xXxG#fjs72d_!z921!kJjkjsd123kfj3FJ!*kfdjf8s!jf9jKJJJd'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
-    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -190,38 +189,7 @@ def create_app():
     def serve_manifest():
         return send_from_directory('static', 'manifest.json')
 
-    @app.route('/stats')
-    @login_required
-    def stats_page():
-        team_id = session['team_id']
-        roster_players = db.session.query(Player).filter_by(team_id=team_id).all()
-        lineups = db.session.query(Lineup).filter_by(team_id=team_id).all()
-        pitching_outings = db.session.query(PitchingOuting).filter_by(team_id=team_id).all()
-        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
-        
-        cumulative_pitching_data = {name: calculate_cumulative_pitching_stats(name, pitching_outings) for name in pitcher_names}
-        cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
-
-        game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=team_id).group_by(PlayerGameAbsence.player_id).all()
-        practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=team_id).group_by(PlayerPracticeAbsence.player_id).all()
-        
-        attendance_stats = {p.id: {'name': p.name, 'games_missed': 0, 'practices_missed': 0} for p in roster_players}
-        for player_id, count in game_absences:
-            if player_id in attendance_stats:
-                attendance_stats[player_id]['games_missed'] = count
-        for player_id, count in practice_absences:
-            if player_id in attendance_stats:
-                attendance_stats[player_id]['practices_missed'] = count
-
-        return render_template('stats.html',
-                               roster_players=roster_players,
-                               cumulative_pitching_data=cumulative_pitching_data,
-                               cumulative_position_data=cumulative_position_data,
-                               attendance_stats=attendance_stats,
-                               session=session)
+    # REMOVED: The /stats route is now redundant.
+    # The stats content is included directly in the home page's 'stats_tab'.
 
     return app
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif', 'svg'}

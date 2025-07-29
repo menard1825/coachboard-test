@@ -178,7 +178,8 @@
                             </form>
                         </td>
                         <td data-label="Role">
-                            {% if user.username.lower() == 'mike1825' %}<span class="badge bg-danger">{{ user.role }}</span>
+                            {# MODIFIED: Role check is now based on role, not username #}
+                            {% if user.role == 'Super Admin' %}<span class="badge bg-danger">{{ user.role }}</span>
                             {% elif user.username == session.username %}<span class="badge bg-success">{{ user.role }}</span>
                             {% else %}
                             <form action="{{ url_for('admin.change_user_role', username=user.username) }}" method="POST">
@@ -196,7 +197,8 @@
                         {% endif %}
                         <td data-label="Last Login">{{ user.last_login }}</td>
                         <td data-label="Actions">
-                            {% if user.username.lower() != 'mike1825' and user.username != session.username %}
+                            {# MODIFIED: Action availability is now based on role, not username #}
+                            {% if user.role != 'Super Admin' and user.username != session.username %}
                             <div class="btn-group" role="group">
                                <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resetPasswordModal-{{ user.username }}">Reset Pass</button>
                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal-{{ user.username }}">Delete</button>

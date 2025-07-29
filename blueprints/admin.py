@@ -13,7 +13,7 @@ from functools import wraps
 from db import db
 from models import User, Team
 from extensions import socketio
-from utils import PITCHING_RULES
+from utils import PITCHING_RULES, allowed_file
 
 # Define role constants
 SUPER_ADMIN = 'Super Admin'
@@ -100,14 +100,17 @@ def add_user():
 @admin_bp.route('/delete_user/<username>')
 @admin_required
 def delete_user(username):
-    if username.lower() == 'mike1825':
-        flash("The Super Admin cannot be deleted.", "danger")
-        return redirect(url_for('.user_management'))
     user_to_delete = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
     if user_to_delete:
+        # MODIFIED: Check against the user's role instead of hardcoded username
+        if user_to_delete.role == SUPER_ADMIN:
+            flash("A Super Admin cannot be deleted.", "danger")
+            return redirect(url_for('.user_management'))
+            
         if session.get('role') == HEAD_COACH and user_to_delete.team_id != session.get('team_id'):
             flash('You do not have permission to delete this user.', 'danger')
             return redirect(url_for('.user_management'))
+            
         db.session.delete(user_to_delete)
         db.session.commit()
         flash(f"User '{username}' has been deleted.", "success")
@@ -120,16 +123,20 @@ def delete_user(username):
 @admin_bp.route('/reset_password/<username>', methods=['POST'])
 @admin_required
 def reset_password(username):
-    if username.lower() == 'mike1825':
-        flash("The Super Admin's password cannot be reset via this interface.", "danger")
-        return redirect(url_for('.user_management'))
     user_to_reset = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
     if not user_to_reset:
         flash('User not found.', 'danger')
         return redirect(url_for('.user_management'))
+    
+    # MODIFIED: Check against the user's role instead of hardcoded username
+    if user_to_reset.role == SUPER_ADMIN:
+        flash("A Super Admin's password cannot be reset via this interface.", "danger")
+        return redirect(url_for('.user_management'))
+
     if session.get('role') == HEAD_COACH and user_to_reset.team_id != session.get('team_id'):
         flash('You do not have permission to reset this password.', 'danger')
         return redirect(url_for('.user_management'))
+        
     temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
     user_to_reset.password_hash = generate_password_hash(temp_password)
     db.session.commit()
@@ -148,16 +155,19 @@ def change_user_role(username):
     if session.get('role') == HEAD_COACH and user_to_change.team_id != session.get('team_id'):
         flash('You do not have permission to edit this user.', 'danger')
         return redirect(url_for('.user_management'))
-    if user_to_change.username.lower() == 'mike1825':
-        flash('You cannot change the role of the Super Admin.', 'danger')
-        return redirect(url_for('.user_management'))
+    
+    # MODIFIED: Check against the user's role instead of hardcoded username
+    if user_to_change.role == SUPER_ADMIN and user_to_change.username == session['username']:
+        # This is a self-demotion attempt
+        if db.session.query(User).filter_by(role=SUPER_ADMIN).count() == 1:
+            flash('You cannot demote yourself as the sole Super Admin. Assign another Super Admin first.', 'danger')
+            return redirect(url_for('.user_management'))
+    
     new_role = request.form.get('role')
     if new_role == SUPER_ADMIN and session.get('role') != SUPER_ADMIN:
         flash('Only a Super Admin can assign the Super Admin role.', 'danger')
         return redirect(url_for('.user_management'))
-    if user_to_change.username == session['username'] and new_role != SUPER_ADMIN and db.session.query(User).filter_by(role=SUPER_ADMIN).count() == 1:
-        flash('You cannot demote yourself as the sole Super Admin. Assign another Super Admin first.', 'danger')
-        return redirect(url_for('.user_management'))
+        
     if new_role in [HEAD_COACH, 'Assistant Coach', 'Game Changer', SUPER_ADMIN]:
         user_to_change.role = new_role
         db.session.commit()
@@ -231,7 +241,6 @@ def upload_logo():
         flash('No selected file.', 'danger')
         return redirect(url_for('.admin_settings'))
 
-    from app import allowed_file
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         unique_id = uuid.uuid4().hex

@@ -10,6 +10,12 @@ PITCHING_RULES = {
     }
 }
 
+def allowed_file(filename):
+    """Checks if the filename has an allowed extension."""
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def get_pitching_rules_for_team(team):
     """Gets the appropriate pitching rule set for a given team."""
     rule_set_name = getattr(team, 'pitching_rule_set', 'USSSA') or 'USSSA'

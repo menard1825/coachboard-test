@@ -21,13 +21,8 @@ def login():
         user = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
 
         if user and check_password_hash(user.password_hash, password):
-            if user.username.lower() == 'mike1825':
-                user.role = SUPER_ADMIN
-            elif user.role == 'Admin':
-                user.role = HEAD_COACH
-            elif user.role == 'Coach':
-                user.role = ASSISTANT_COACH
-
+            # REMOVED: Automatic role-changing logic. Roles are now managed solely by admins.
+            # The role assigned in the database is the role the user gets.
             user.last_login = datetime.now().strftime("%Y-%m-%d %H:%M")
             db.session.commit()
 
