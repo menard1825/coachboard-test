@@ -12,18 +12,15 @@
     <link rel="manifest" href="{{ url_for('serve_manifest') }}">
     
     {% block head %}
-    <!-- This style block now uses a solid color with a bottom border -->
     <style>
         .navbar {
             background-color: {{ current_team.primary_color or '#1F2937' }};
-            /* A subtle border creates a clean separation from the content */
             border-bottom: 3px solid rgba(0, 0, 0, 0.15);
         }
     </style>
     {% endblock %}
 </head>
 <body>
-    <!-- The inline style attribute has been removed from the nav tag -->
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm">
       <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center" href="{{ url_for('home') }}">
@@ -119,6 +116,26 @@
         </div>
       </div>
     </div>
+
+    <!-- MODIFICATION START: Generic Confirmation Modal for All Deletions -->
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmDeleteModalLabel">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete this item? This action cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <a id="confirmDeleteButton" href="#" class="btn btn-danger">Delete</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- MODIFICATION END -->
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

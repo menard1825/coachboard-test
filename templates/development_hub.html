@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Development Hub - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">Development Hub</h1>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFocusModal">
+            <i class="fas fa-plus-circle mr-2"></i>Add New Focus
+        </button>
+    </div>
+
+    <!-- Display Existing Focus Areas -->
+    <div class="card">
+        <div class="card-header">
+            Current Focus Areas
+        </div>
+        <div class="card-body">
+            {% if focus_areas %}
+                <ul class="list-group list-group-flush">
+                    {% for focus in focus_areas %}
+                        <li class="list-group-item">
+                            <h5>{{ focus.name }}</h5>
+                            <p>{{ focus.description }}</p>
+                            <small class="text-muted">Assigned to: 
+                                {% if focus.players %}
+                                    {{ focus.players|map(attribute='name')|join(', ') }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </small>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-center text-muted">No development focus areas have been created yet. Click "Add New Focus" to get started.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Add New Focus Modal -->
+<div class="modal fade" id="addFocusModal" tabindex="-1" role="dialog" aria-labelledby="addFocusModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addFocusModalLabel">Add New Development Focus</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- The form posts to the add_focus route in your development blueprint -->
+                <form action="{{ url_for('development.add_focus') }}" method="post">
+                    <div class="form-group mb-3">
+                        <label for="focus_name">Focus Name</label>
+                        <input type="text" class="form-control" id="focus_name" name="focus_name" placeholder="e.g., Base Running, Pitch Recognition" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="description">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Describe the focus and its goals."></textarea>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="players">Assign to Players (Optional)</label>
+                        <small class="form-text text-muted">Select one or more players to assign this focus to. Use Ctrl-Click (or Cmd-Click) to select multiple.</small>
+                        <select multiple class="form-control" id="players" name="players" style="height: 150px;">
+                            {% for player in players %}
+                                <option value="{{ player.id }}">{{ player.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <hr>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Focus</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
