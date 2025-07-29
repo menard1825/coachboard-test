@@ -64,6 +64,7 @@
         {% block content %}{% endblock %}
     </main>
 
+    {% block bottom_nav %}
     <nav class="navbar fixed-bottom bg-light d-lg-none border-top">
         <div class="bottom-nav" role="tablist">
              <a class="nav-item active" data-bs-toggle="tab" href="#roster" role="tab" data-tab-id="roster">
@@ -83,6 +84,7 @@
             </a>
         </div>
     </nav>
+    {% endblock %}
 
     <div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileMoreMenu" style="height: 75vh;">
       <div class="offcanvas-header">
