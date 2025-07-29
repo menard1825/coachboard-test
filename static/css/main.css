@@ -189,7 +189,7 @@ body {
 
 #dev-player-list .list-group-item {
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color: 0.2s ease;
 }
 
 #dev-player-list .list-group-item.active {
@@ -245,7 +245,20 @@ body {
     color: #6c757d;
 }
 
-/* Add this new rule to fix mobile scrolling */
-main {
-    min-height: calc(100vh - 56px); /* 56px is a standard height for the top navbar */
+/* --- Mobile Scroll Bounce Fix --- */
+@media (max-width: 991.98px) {
+    html, body {
+        height: 100%;
+        overflow: hidden; /* Prevents the body from scrolling */
+        position: fixed; /* Added to further prevent scrolling issues */
+        width: 100%;
+    }
+
+    main.container-fluid {
+        /* 56px for top nav, 85px for bottom nav */
+        height: calc(100vh - 56px - 85px); 
+        overflow-y: auto; /* Makes the main content scrollable */
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        padding-bottom: 2rem; /* Add some space at the bottom */
+    }
 }
