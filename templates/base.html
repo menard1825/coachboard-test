@@ -7,14 +7,24 @@
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css', v='1.1') }}">
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}">
     <link rel="manifest" href="{{ url_for('serve_manifest') }}">
     
-    {% block head %}{% endblock %}
+    {% block head %}
+    <!-- This style block now uses a solid color with a bottom border -->
+    <style>
+        .navbar {
+            background-color: {{ current_team.primary_color or '#1F2937' }};
+            /* A subtle border creates a clean separation from the content */
+            border-bottom: 3px solid rgba(0, 0, 0, 0.15);
+        }
+    </style>
+    {% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm" style="background-color: {{ current_team.primary_color or '#343a40' }};">
+    <!-- The inline style attribute has been removed from the nav tag -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm">
       <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center" href="{{ url_for('home') }}">
           {% if current_team and current_team.logo_path %}
@@ -89,7 +99,7 @@
     <div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileMoreMenu" style="height: 75vh;">
       <div class="offcanvas-header">
         <h5 class="offcanvas-title">More Options</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="offcanvas-body">
         <div class="list-group list-group-flush" role="tablist">
