@@ -2,6 +2,40 @@
     <h2 class="mb-4">Cumulative Player Statistics</h2>
 
     <div class="row">
+        {# MODIFIED: Check if attendance_stats is defined before rendering #}
+        {% if attendance_stats %}
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Attendance Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Player</th>
+                                    <th>Games Missed</th>
+                                    <th>Practices Missed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for player in roster_players %}
+                                    {% set stats = attendance_stats.get(player.id, {'games_missed': 0, 'practices_missed': 0}) %}
+                                    <tr>
+                                        <td><strong>{{ player.name }}</strong></td>
+                                        <td>{{ stats.games_missed }}</td>
+                                        <td>{{ stats.practices_missed }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="col-12 mb-4">
             <div class="card">
                 <div class="card-header">

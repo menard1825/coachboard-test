@@ -1,30 +1,12 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Boolean, Float
-from sqlalchemy.orm import relationship, declarative_base
-from sqlalchemy.inspection import inspect as sqlalchemy_inspect
-from datetime import datetime
+# models.py
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float
+from sqlalchemy.orm import relationship
+# MODIFIED: Changed from relative to absolute import
+from db import db
 import json
 
-Base = declarative_base()
-
-# Helper function to convert model instances to dictionaries
-def to_dict(instance):
-    if instance is None:
-        return None
-    d = {}
-    for column in sqlalchemy_inspect(instance).mapper.column_attrs:
-        val = getattr(instance, column.key)
-        # Special handling for JSON strings so they are parsed in the final dict
-        if isinstance(val, str) and val.startswith(('[', '{')):
-            try:
-                d[column.key] = json.loads(val)
-            except json.JSONDecodeError:
-                d[column.key] = val # Keep as string if not valid JSON
-        else:
-            d[column.key] = val
-    return d
-
-
-class Team(Base):
+# All models now inherit from db.Model
+class Team(db.Model):
     __tablename__ = 'teams'
     id = Column(Integer, primary_key=True)
     team_name = Column(String, nullable=False)
@@ -33,7 +15,6 @@ class Team(Base):
     display_coach_names = Column(Boolean, default=False, nullable=False)
     primary_color = Column(String, default="#1F2937")
     secondary_color = Column(String, default="#E5E7EB")
-    # ADDED: New columns for pitching rules with default values
     age_group = Column(String, default='12U', nullable=False)
     pitching_rule_set = Column(String, default='USSSA', nullable=False)
 
@@ -48,11 +29,10 @@ class Team(Base):
     practice_plans = relationship("PracticePlan", back_populates="team")
     signs = relationship("Sign", back_populates="team")
     player_development_focuses = relationship("PlayerDevelopmentFocus", back_populates="team")
-    player_absences = relationship("PlayerGameAbsence", back_populates="team")
+    player_game_absences = relationship("PlayerGameAbsence", back_populates="team")
+    player_practice_absences = relationship("PlayerPracticeAbsence", back_populates="team")
 
-    def to_dict(self): return to_dict(self)
-
-class User(Base):
+class User(db.Model):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False)
@@ -65,10 +45,8 @@ class User(Base):
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="users")
-    
-    def to_dict(self): return to_dict(self)
 
-class Player(Base):
+class Player(db.Model):
     __tablename__ = 'players'
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
@@ -89,11 +67,10 @@ class Player(Base):
     team = relationship("Team", back_populates="players")
 
     development_focuses = relationship("PlayerDevelopmentFocus", back_populates="player", cascade="all, delete-orphan")
-    absences = relationship("PlayerGameAbsence", back_populates="player", cascade="all, delete-orphan")
-    
-    def to_dict(self): return to_dict(self)
+    game_absences = relationship("PlayerGameAbsence", back_populates="player", cascade="all, delete-orphan")
+    practice_absences = relationship("PlayerPracticeAbsence", back_populates="player", cascade="all, delete-orphan")
 
-class Lineup(Base):
+class Lineup(db.Model):
     __tablename__ = 'lineups'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
@@ -102,10 +79,8 @@ class Lineup(Base):
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="lineups")
-    
-    def to_dict(self): return to_dict(self)
 
-class PitchingOuting(Base):
+class PitchingOuting(db.Model):
     __tablename__ = 'pitching_outings'
     id = Column(Integer, primary_key=True)
     date = Column(String, nullable=False)
@@ -119,9 +94,7 @@ class PitchingOuting(Base):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="pitching_outings")
 
-    def to_dict(self): return to_dict(self)
-
-class ScoutedPlayer(Base):
+class ScoutedPlayer(db.Model):
     __tablename__ = 'scouted_players'
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
@@ -134,9 +107,7 @@ class ScoutedPlayer(Base):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="scouted_players")
 
-    def to_dict(self): return to_dict(self)
-
-class Rotation(Base):
+class Rotation(db.Model):
     __tablename__ = 'rotations'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
@@ -146,9 +117,7 @@ class Rotation(Base):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
 
-    def to_dict(self): return to_dict(self)
-
-class Game(Base):
+class Game(db.Model):
     __tablename__ = 'games'
     id = Column(Integer, primary_key=True)
     date = Column(String, nullable=False)
@@ -162,10 +131,7 @@ class Game(Base):
     team = relationship("Team", back_populates="games")
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
 
-
-    def to_dict(self): return to_dict(self)
-
-class CollaborationNote(Base):
+class CollaborationNote(db.Model):
     __tablename__ = 'collaboration_notes'
     id = Column(Integer, primary_key=True)
     note_type = Column(String, nullable=False)
@@ -177,21 +143,23 @@ class CollaborationNote(Base):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="collaboration_notes")
 
-    def to_dict(self): return to_dict(self)
-
-class PracticePlan(Base):
+class PracticePlan(db.Model):
     __tablename__ = 'practice_plans'
     id = Column(Integer, primary_key=True)
     date = Column(String, nullable=False)
     general_notes = Column(Text)
+    emphasis = Column(Text)
+    warm_up = Column(Text)
+    infield_outfield = Column(Text)
+    hitting = Column(Text)
+    pitching_catching = Column(Text)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="practice_plans")
     tasks = relationship("PracticeTask", back_populates="practice_plan", order_by="PracticeTask.id")
+    absences = relationship("PlayerPracticeAbsence", back_populates="practice_plan", cascade="all, delete-orphan")
 
-    def to_dict(self): return to_dict(self)
-
-class PracticeTask(Base):
+class PracticeTask(db.Model):
     __tablename__ = 'practice_tasks'
     id = Column(Integer, primary_key=True)
     text = Column(Text, nullable=False)
@@ -202,9 +170,7 @@ class PracticeTask(Base):
     practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
     practice_plan = relationship("PracticePlan", back_populates="tasks")
 
-    def to_dict(self): return to_dict(self)
-
-class PlayerDevelopmentFocus(Base):
+class PlayerDevelopmentFocus(db.Model):
     __tablename__ = 'player_development_focuses'
     id = Column(Integer, primary_key=True)
     focus = Column(Text, nullable=False)
@@ -223,9 +189,7 @@ class PlayerDevelopmentFocus(Base):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="player_development_focuses")
 
-    def to_dict(self): return to_dict(self)
-
-class Sign(Base):
+class Sign(db.Model):
     __tablename__ = 'signs'
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
@@ -233,10 +197,8 @@ class Sign(Base):
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="signs")
-    
-    def to_dict(self): return to_dict(self)
 
-class PlayerGameAbsence(Base):
+class PlayerGameAbsence(db.Model):
     __tablename__ = 'player_game_absences'
     id = Column(Integer, primary_key=True)
 
@@ -244,8 +206,18 @@ class PlayerGameAbsence(Base):
     game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
 
-    player = relationship("Player", back_populates="absences")
+    player = relationship("Player", back_populates="game_absences")
     game = relationship("Game", back_populates="absences")
-    team = relationship("Team", back_populates="player_absences")
+    team = relationship("Team", back_populates="player_game_absences")
 
-    def to_dict(self): return to_dict(self)
+class PlayerPracticeAbsence(db.Model):
+    __tablename__ = 'player_practice_absences'
+    id = Column(Integer, primary_key=True)
+
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+
+    player = relationship("Player", back_populates="practice_absences")
+    practice_plan = relationship("PracticePlan", back_populates="absences")
+    team = relationship("Team", back_populates="player_practice_absences")

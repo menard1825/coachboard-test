@@ -8,3 +8,5 @@ click==8.1.7
 blinker==1.6.2
 eventlet==0.35.2
 SQLAlchemy==2.0.30
+Flask-Migrate
+Flask-SQLAlchemy

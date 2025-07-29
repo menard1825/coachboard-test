@@ -3,19 +3,20 @@ import json
 from flask import Flask, render_template, session, jsonify, send_from_directory, redirect, url_for, flash
 from datetime import datetime, timedelta, date
 from functools import wraps
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload
+from sqlalchemy import func
 
 # Local Imports
-from db import SessionLocal
+from db import db
 from models import (
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
-    Rotation, Game, CollaborationNote, PracticePlan, PlayerDevelopmentFocus, Sign
+    Rotation, Game, CollaborationNote, PracticePlan, PlayerDevelopmentFocus, Sign,
+    PlayerGameAbsence, PlayerPracticeAbsence
 )
-from extensions import socketio
-# MODIFIED: Import from the new utils.py file
+from extensions import socketio, migrate
 from utils import (
     get_pitching_rules_for_team, calculate_cumulative_pitching_stats,
-    calculate_cumulative_position_stats, calculate_pitch_count_summary, PITCHING_RULES
+    calculate_cumulative_position_stats, calculate_pitch_count_summary
 )
 
 # --- Blueprint Imports ---
@@ -39,9 +40,13 @@ def create_app():
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
     app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # Initialize extensions with the app
+    db.init_app(app)
     socketio.init_app(app)
+    migrate.init_app(app, db, render_as_batch=True)
 
     # Register Blueprints
     app.register_blueprint(auth_bp)
@@ -69,117 +74,117 @@ def create_app():
     @app.context_processor
     def inject_team_info():
         if 'team_id' in session:
-            db = SessionLocal()
-            try:
-                team = db.query(Team).filter_by(id=session['team_id']).first()
-                return {'current_team': team}
-            finally:
-                db.close()
+            team = db.session.get(Team, session['team_id'])
+            return {'current_team': team}
         return {}
 
     # --- CORE APP ROUTES ---
     @app.route('/')
     @login_required
     def home():
-        db = SessionLocal()
-        try:
-            user = db.query(User).options(joinedload(User.team)).filter_by(username=session['username']).first()
-            if not user or not user.team:
-                flash('User or team not found.', 'danger')
-                return redirect(url_for('auth.login'))
+        user = db.session.query(User).options(joinedload(User.team)).filter_by(username=session['username']).first()
+        if not user or not user.team:
+            flash('User or team not found.', 'danger')
+            return redirect(url_for('auth.login'))
 
-            roster_players = db.query(Player).filter_by(team_id=user.team_id).all()
-            lineups = db.query(Lineup).filter_by(team_id=user.team_id).all()
-            pitching_outings = db.query(PitchingOuting).filter_by(team_id=user.team_id).all()
-            
-            pitcher_names = sorted([p.name for p in roster_players if p.pitcher_role != 'Not a Pitcher'])
-            cumulative_pitching_data = {name: calculate_cumulative_pitching_stats(name, pitching_outings) for name in pitcher_names}
+        roster_players = db.session.query(Player).filter_by(team_id=user.team_id).all()
+        lineups = db.session.query(Lineup).filter_by(team_id=user.team_id).all()
+        pitching_outings = db.session.query(PitchingOuting).filter_by(team_id=user.team_id).all()
+        
+        pitcher_names = sorted([p.name for p in roster_players if p.pitcher_role != 'Not a Pitcher'])
+        cumulative_pitching_data = {name: calculate_cumulative_pitching_stats(name, pitching_outings) for name in pitcher_names}
+        cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
+        
+        game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=user.team_id).group_by(PlayerGameAbsence.player_id).all()
+        practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=user.team_id).group_by(PlayerPracticeAbsence.player_id).all()
+        
+        attendance_stats = {p.id: {'name': p.name, 'games_missed': 0, 'practices_missed': 0} for p in roster_players}
+        for player_id, count in game_absences:
+            if player_id in attendance_stats:
+                attendance_stats[player_id]['games_missed'] = count
+        for player_id, count in practice_absences:
+            if player_id in attendance_stats:
+                attendance_stats[player_id]['practices_missed'] = count
 
-            cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
-            
-            all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
+        all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
 
-            return render_template('index.html',
-                                   session=session,
-                                   roster_players=roster_players,
-                                   cumulative_position_data=cumulative_position_data,
-                                   cumulative_pitching_data=cumulative_pitching_data,
-                                   tab_order=json.loads(user.tab_order or "[]"),
-                                   all_tabs=all_tabs
-                                   )
-        finally:
-            db.close()
+        return render_template('index.html',
+                               session=session,
+                               roster_players=roster_players,
+                               cumulative_position_data=cumulative_position_data,
+                               cumulative_pitching_data=cumulative_pitching_data,
+                               attendance_stats=attendance_stats,
+                               tab_order=json.loads(user.tab_order or "[]"),
+                               all_tabs=all_tabs)
 
     @app.route('/get_app_data')
     @login_required
     def get_app_data():
-        db = SessionLocal()
-        try:
-            team_id = session['team_id']
-            user = db.query(User).filter_by(username=session['username']).first()
-            team = db.query(Team).filter_by(id=team_id).first()
+        team_id = session['team_id']
+        user = db.session.query(User).filter_by(username=session['username']).first()
+        team = db.session.get(Team, team_id)
 
-            # --- Data Queries ---
-            roster_db = db.query(Player).filter_by(team_id=team_id).all()
-            roster = [p.to_dict() for p in roster_db]
-            lineups = [l.to_dict() for l in db.query(Lineup).filter_by(team_id=team_id).all()]
-            pitching_outings_db = db.query(PitchingOuting).filter_by(team_id=team_id).all()
-            pitching_outings = [po.to_dict() for po in pitching_outings_db]
-            scouted_players = db.query(ScoutedPlayer).filter_by(team_id=team_id).all()
-            rotations = [r.to_dict() for r in db.query(Rotation).filter_by(team_id=team_id).all()]
-            games = [g.to_dict() for g in db.query(Game).filter_by(team_id=team_id).all()]
-            collaboration_notes = db.query(CollaborationNote).filter_by(team_id=team_id).all()
-            practice_plans_q = db.query(PracticePlan).filter_by(team_id=team_id).options(joinedload(PracticePlan.tasks)).all()
-            player_dev_focuses = db.query(PlayerDevelopmentFocus).filter_by(team_id=team_id).all()
-            signs = [s.to_dict() for s in db.query(Sign).filter_by(team_id=team_id).all()]
-            
-            # --- Data Processing ---
-            player_dev_by_name = {}
-            for p in roster:
-                player_dev_by_name[p['name']] = []
-            
-            for focus in player_dev_focuses:
-                player = db.query(Player).filter_by(id=focus.player_id).first()
-                if player and player.name in player_dev_by_name:
-                    player_dev_by_name[player.name].append({
-                        'id': focus.id, 'type': 'Development', 'subtype': focus.skill_type.capitalize(),
-                        'text': focus.focus, 'status': focus.status, 'notes': focus.notes,
-                        'date': focus.created_date, 'completed_date': focus.completed_date, 'author': focus.author
-                    })
-            
-            rules = get_pitching_rules_for_team(team)
-            pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules)
+        # --- Data Queries ---
+        roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
+        lineups = db.session.query(Lineup).filter_by(team_id=team_id).all()
+        pitching_outings_db = db.session.query(PitchingOuting).filter_by(team_id=team_id).all()
+        scouted_players = db.session.query(ScoutedPlayer).filter_by(team_id=team_id).all()
+        rotations = db.session.query(Rotation).filter_by(team_id=team_id).all()
+        games = db.session.query(Game).filter_by(team_id=team_id).all()
+        collaboration_notes = db.session.query(CollaborationNote).filter_by(team_id=team_id).all()
+        practice_plans_q = db.session.query(PracticePlan).filter_by(team_id=team_id).options(joinedload(PracticePlan.tasks), joinedload(PracticePlan.absences)).all()
+        player_dev_focuses = db.session.query(PlayerDevelopmentFocus).filter_by(team_id=team_id).all()
+        signs = db.session.query(Sign).filter_by(team_id=team_id).all()
+        
+        # --- Data Processing ---
+        player_dev_by_name = {p.name: [] for p in roster_db}
+        player_id_to_name = {p.id: p.name for p in roster_db}
+        
+        for focus in player_dev_focuses:
+            player_name = player_id_to_name.get(focus.player_id)
+            if player_name:
+                player_dev_by_name[player_name].append({
+                    'id': focus.id, 'type': 'Development', 'subtype': focus.skill_type.capitalize(),
+                    'text': focus.focus, 'status': focus.status, 'notes': focus.notes,
+                    'date': focus.created_date, 'completed_date': focus.completed_date, 'author': focus.author
+                })
+        
+        rules = get_pitching_rules_for_team(team)
+        pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules)
 
-            full_data = {
-                'roster': roster,
-                'lineups': lineups,
-                'pitching': pitching_outings,
-                'scouting_list': {
-                    'targets': [sp.to_dict() for sp in scouted_players if sp.list_type == 'targets'],
-                    'committed': [sp.to_dict() for sp in scouted_players if sp.list_type == 'committed'],
-                    'not_interested': [sp.to_dict() for sp in scouted_players if sp.list_type == 'not_interested']
-                },
-                'rotations': rotations,
-                'games': games,
-                'collaboration_notes': {
-                    'team_notes': [cn.to_dict() for cn in collaboration_notes if cn.note_type == 'team_notes'],
-                    'player_notes': [cn.to_dict() for cn in collaboration_notes if cn.note_type == 'player_notes']
-                },
-                'practice_plans': [
-                    {**p.to_dict(), 'tasks': [t.to_dict() for t in p.tasks]} for p in practice_plans_q
-                ],
-                'player_development': player_dev_by_name,
-                'signs': signs
-            }
+        practice_plans_list = []
+        for p in practice_plans_q:
+            plan_dict = {c.name: getattr(p, c.name) for c in p.__table__.columns}
+            plan_dict['tasks'] = [{c.name: getattr(t, c.name) for c in t.__table__.columns} for t in p.tasks]
+            plan_dict['absent_player_ids'] = [a.player_id for a in p.absences]
+            practice_plans_list.append(plan_dict)
 
-            return jsonify({
-                'full_data': full_data,
-                'player_order': json.loads(user.player_order or "[]"),
-                'session': {'username': session.get('username'), 'role': session.get('role')},
-                'pitch_count_summary': pitch_count_summary
-            })
-        finally:
-            db.close()
+        full_data = {
+            'roster': [{c.name: getattr(p, c.name) for c in p.__table__.columns} for p in roster_db],
+            'lineups': [{c.name: getattr(l, c.name) for c in l.__table__.columns} for l in lineups],
+            'pitching': [{c.name: getattr(po, c.name) for c in po.__table__.columns} for po in pitching_outings_db],
+            'scouting_list': {
+                'targets': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'targets'],
+                'committed': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'committed'],
+                'not_interested': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'not_interested']
+            },
+            'rotations': [{c.name: getattr(r, c.name) for c in r.__table__.columns} for r in rotations],
+            'games': [{c.name: getattr(g, c.name) for c in g.__table__.columns} for g in games],
+            'collaboration_notes': {
+                'team_notes': [{c.name: getattr(cn, c.name) for c in cn.__table__.columns} for cn in collaboration_notes if cn.note_type == 'team_notes'],
+                'player_notes': [{c.name: getattr(cn, c.name) for c in cn.__table__.columns} for cn in collaboration_notes if cn.note_type == 'player_notes']
+            },
+            'practice_plans': practice_plans_list,
+            'player_development': player_dev_by_name,
+            'signs': [{c.name: getattr(s, c.name) for c in s.__table__.columns} for s in signs]
+        }
+
+        return jsonify({
+            'full_data': full_data,
+            'player_order': json.loads(user.player_order or "[]"),
+            'session': {'username': session.get('username'), 'role': session.get('role')},
+            'pitch_count_summary': pitch_count_summary
+        })
         
     @app.route('/manifest.json')
     def serve_manifest():
@@ -188,24 +193,32 @@ def create_app():
     @app.route('/stats')
     @login_required
     def stats_page():
-        db = SessionLocal()
-        try:
-            team_id = session['team_id']
-            roster_players = db.query(Player).filter_by(team_id=team_id).all()
-            lineups = db.query(Lineup).filter_by(team_id=team_id).all()
-            pitching_outings = db.query(PitchingOuting).filter_by(team_id=team_id).all()
-            pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
-            
-            cumulative_pitching_data = {name: calculate_cumulative_pitching_stats(name, pitching_outings) for name in pitcher_names}
-            cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
+        team_id = session['team_id']
+        roster_players = db.session.query(Player).filter_by(team_id=team_id).all()
+        lineups = db.session.query(Lineup).filter_by(team_id=team_id).all()
+        pitching_outings = db.session.query(PitchingOuting).filter_by(team_id=team_id).all()
+        pitcher_names = sorted(list(set(po.pitcher for po in pitching_outings if po.pitcher)))
+        
+        cumulative_pitching_data = {name: calculate_cumulative_pitching_stats(name, pitching_outings) for name in pitcher_names}
+        cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
 
-            return render_template('stats.html',
-                                   roster_players=roster_players,
-                                   cumulative_pitching_data=cumulative_pitching_data,
-                                   cumulative_position_data=cumulative_position_data,
-                                   session=session)
-        finally:
-            db.close()
+        game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=team_id).group_by(PlayerGameAbsence.player_id).all()
+        practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=team_id).group_by(PlayerPracticeAbsence.player_id).all()
+        
+        attendance_stats = {p.id: {'name': p.name, 'games_missed': 0, 'practices_missed': 0} for p in roster_players}
+        for player_id, count in game_absences:
+            if player_id in attendance_stats:
+                attendance_stats[player_id]['games_missed'] = count
+        for player_id, count in practice_absences:
+            if player_id in attendance_stats:
+                attendance_stats[player_id]['practices_missed'] = count
+
+        return render_template('stats.html',
+                               roster_players=roster_players,
+                               cumulative_pitching_data=cumulative_pitching_data,
+                               cumulative_position_data=cumulative_position_data,
+                               attendance_stats=attendance_stats,
+                               session=session)
 
     return app
 

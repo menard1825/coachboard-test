@@ -1,0 +1,521 @@
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 248-317-580
+(375463) wsgi starting up on http://0.0.0.0:5002
+(375463) accepted ('192.168.86.240', 54623)
+192.168.86.240 - - [27/Jul/2025 01:32:36] "GET / HTTP/1.1" 200 35298 0.167650
+192.168.86.240 - - [27/Jul/2025 01:32:36] "GET /static/css/main.css HTTP/1.1" 304 513 0.005475
+(375463) accepted ('192.168.86.240', 54624)
+192.168.86.240 - - [27/Jul/2025 01:32:36] "GET /static/js/main.js HTTP/1.1" 304 513 0.001123
+(375463) accepted ('192.168.86.240', 54625)
+192.168.86.240 - - [27/Jul/2025 01:32:36] "GET /get_app_data HTTP/1.1" 200 915 0.027805
+192.168.86.240 - - [27/Jul/2025 01:32:36] "GET /socket.io/?EIO=4&transport=polling&t=PX9Wgnh HTTP/1.1" 200 300 0.000486
+(375463) accepted ('192.168.86.240', 54627)
+192.168.86.240 - - [27/Jul/2025 01:32:36] "GET /static/logo.png HTTP/1.1" 304 519 0.001371
+192.168.86.240 - - [27/Jul/2025 01:32:36] "POST /socket.io/?EIO=4&transport=polling&t=PX9Wgnp&sid=KdTEMU1JObvH2ZusAAAA HTTP/1.1" 200 223 0.000859
+(375463) accepted ('192.168.86.240', 54628)
+(375463) accepted ('192.168.86.240', 54629)
+192.168.86.240 - - [27/Jul/2025 01:32:36] "GET /socket.io/?EIO=4&transport=polling&t=PX9Wgnq&sid=KdTEMU1JObvH2ZusAAAA HTTP/1.1" 200 181 0.000192
+192.168.86.240 - - [27/Jul/2025 01:32:36] "GET /socket.io/?EIO=4&transport=polling&t=PX9Wgnu&sid=KdTEMU1JObvH2ZusAAAA HTTP/1.1" 200 181 0.000173
+192.168.86.240 - - [27/Jul/2025 01:32:37] "GET / HTTP/1.1" 200 35298 0.015097
+192.168.86.240 - - [27/Jul/2025 01:32:37] "GET /socket.io/?EIO=4&transport=websocket&sid=KdTEMU1JObvH2ZusAAAA HTTP/1.1" 200 0 0.785331
+192.168.86.240 - - [27/Jul/2025 01:32:37] "GET /static/css/main.css HTTP/1.1" 304 513 0.002788
+192.168.86.240 - - [27/Jul/2025 01:32:37] "GET /static/js/main.js HTTP/1.1" 304 513 0.002607
+(375463) accepted ('192.168.86.240', 54630)
+192.168.86.240 - - [27/Jul/2025 01:32:37] "GET /get_app_data HTTP/1.1" 200 915 0.016833
+192.168.86.240 - - [27/Jul/2025 01:32:37] "GET /socket.io/?EIO=4&transport=polling&t=PX9Wh2H HTTP/1.1" 200 300 0.000622
+192.168.86.240 - - [27/Jul/2025 01:32:37] "POST /socket.io/?EIO=4&transport=polling&t=PX9Wh2U&sid=pTqybiioG_rSep8yAAAC HTTP/1.1" 200 223 0.001089
+(375463) accepted ('192.168.86.240', 54631)
+(375463) accepted ('192.168.86.240', 54632)
+192.168.86.240 - - [27/Jul/2025 01:32:37] "GET /socket.io/?EIO=4&transport=polling&t=PX9Wh2U.0&sid=pTqybiioG_rSep8yAAAC HTTP/1.1" 200 181 0.000329
+192.168.86.240 - - [27/Jul/2025 01:32:37] "GET /socket.io/?EIO=4&transport=polling&t=PX9Wh2a&sid=pTqybiioG_rSep8yAAAC HTTP/1.1" 200 181 0.000383
+192.168.86.240 - - [27/Jul/2025 01:33:00] "GET /socket.io/?EIO=4&transport=websocket&sid=pTqybiioG_rSep8yAAAC HTTP/1.1" 200 0 23.359434
+(375463) accepted ('192.168.84.156', 54714)
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET / HTTP/1.1" 200 35462 0.014710
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET /static/css/main.css HTTP/1.1" 200 6664 0.003461
+(375463) accepted ('192.168.84.156', 54715)
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET /manifest.json HTTP/1.1" 200 1000 0.003241
+(375463) accepted ('192.168.84.156', 54716)
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003774
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET /get_app_data HTTP/1.1" 200 1072 0.017411
+(375463) accepted ('192.168.84.156', 51199)
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET /static/logo.png HTTP/1.1" 200 28239 0.001897
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET /socket.io/?EIO=4&transport=polling&t=PX9Xv2H HTTP/1.1" 200 300 0.000619
+192.168.84.156 - - [27/Jul/2025 01:37:57] "POST /socket.io/?EIO=4&transport=polling&t=PX9Xv2Z&sid=nefJjl_QYo-Z4_4nAAAE HTTP/1.1" 200 223 0.001111
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET /socket.io/?EIO=4&transport=polling&t=PX9Xv2b&sid=nefJjl_QYo-Z4_4nAAAE HTTP/1.1" 200 213 0.000348
+(375463) accepted ('192.168.84.156', 54717)
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET /socket.io/?EIO=4&transport=polling&t=PX9Xv2i&sid=nefJjl_QYo-Z4_4nAAAE HTTP/1.1" 200 181 0.000329
+192.168.84.156 - - [27/Jul/2025 01:37:57] "GET /socket.io/?EIO=4&transport=polling&t=PX9Xv2q&sid=nefJjl_QYo-Z4_4nAAAE HTTP/1.1" 200 181 0.000465
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET / HTTP/1.1" 200 35462 0.012526
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002865
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET /manifest.json HTTP/1.1" 200 1000 0.002735
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003102
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET /socket.io/?EIO=4&transport=websocket&sid=nefJjl_QYo-Z4_4nAAAE HTTP/1.1" 200 0 1.515418
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET /get_app_data HTTP/1.1" 200 1072 0.017448
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET /static/logo.png HTTP/1.1" 304 240 0.001801
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET /socket.io/?EIO=4&transport=polling&t=PX9XvQn HTTP/1.1" 200 300 0.000546
+192.168.84.156 - - [27/Jul/2025 01:37:59] "POST /socket.io/?EIO=4&transport=polling&t=PX9XvQy&sid=Wy4wBLZ54c9iv5r_AAAG HTTP/1.1" 200 223 0.003491
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET /socket.io/?EIO=4&transport=polling&t=PX9XvQy.0&sid=Wy4wBLZ54c9iv5r_AAAG HTTP/1.1" 200 213 0.002267
+(375463) accepted ('192.168.84.156', 54725)
+192.168.84.156 - - [27/Jul/2025 01:37:59] "GET /socket.io/?EIO=4&transport=polling&t=PX9XvR6&sid=Wy4wBLZ54c9iv5r_AAAG HTTP/1.1" 200 181 0.012483
+(375463) accepted ('192.168.84.156', 51202)
+192.168.84.156 - - [27/Jul/2025 01:38:00] "GET /static/logo.png HTTP/1.1" 304 240 0.002328
+192.168.84.156 - - [27/Jul/2025 01:38:05] "GET /admin/settings HTTP/1.1" 200 11405 0.026709
+192.168.84.156 - - [27/Jul/2025 01:38:05] "GET /socket.io/?EIO=4&transport=websocket&sid=Wy4wBLZ54c9iv5r_AAAG HTTP/1.1" 200 0 6.007695
+192.168.84.156 - - [27/Jul/2025 01:38:05] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002964
+192.168.84.156 - - [27/Jul/2025 01:38:05] "GET /manifest.json HTTP/1.1" 200 1000 0.002571
+(375463) accepted ('192.168.84.156', 51203)
+192.168.84.156 - - [27/Jul/2025 01:38:05] "GET /static/logo.png HTTP/1.1" 304 240 0.001822
+192.168.84.156 - - [27/Jul/2025 01:38:18] "POST /admin/settings/update HTTP/1.1" 302 877 0.126555
+192.168.84.156 - - [27/Jul/2025 01:38:18] "GET /admin/settings HTTP/1.1" 200 11764 0.005780
+192.168.84.156 - - [27/Jul/2025 01:38:18] "GET /manifest.json HTTP/1.1" 200 1000 0.002789
+192.168.84.156 - - [27/Jul/2025 01:38:18] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002734
+(375463) accepted ('192.168.84.156', 51204)
+192.168.84.156 - - [27/Jul/2025 01:38:18] "GET /static/logo.png HTTP/1.1" 304 240 0.001768
+192.168.84.156 - - [27/Jul/2025 01:38:31] "POST /admin/upload_logo HTTP/1.1" 302 875 0.261604
+192.168.84.156 - - [27/Jul/2025 01:38:31] "GET /admin/settings HTTP/1.1" 200 11928 0.005941
+192.168.84.156 - - [27/Jul/2025 01:38:31] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002257
+192.168.84.156 - - [27/Jul/2025 01:38:31] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.017191
+192.168.84.156 - - [27/Jul/2025 01:38:31] "GET /manifest.json HTTP/1.1" 200 1000 0.002867
+(375463) accepted ('192.168.84.156', 51205)
+192.168.84.156 - - [27/Jul/2025 01:38:31] "GET /static/logo.png HTTP/1.1" 304 240 0.001875
+192.168.84.156 - - [27/Jul/2025 01:38:43] "GET / HTTP/1.1" 200 35550 0.015421
+192.168.84.156 - - [27/Jul/2025 01:38:43] "GET /static/css/main.css HTTP/1.1" 200 6664 0.003065
+192.168.84.156 - - [27/Jul/2025 01:38:43] "GET /manifest.json HTTP/1.1" 200 1000 0.002564
+(375463) accepted ('192.168.84.156', 54734)
+192.168.84.156 - - [27/Jul/2025 01:38:43] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003135
+192.168.84.156 - - [27/Jul/2025 01:38:43] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.003708
+192.168.84.156 - - [27/Jul/2025 01:38:43] "GET /get_app_data HTTP/1.1" 200 1072 0.016490
+(375463) accepted ('192.168.84.156', 51237)
+192.168.84.156 - - [27/Jul/2025 01:38:43] "GET /static/logo.png HTTP/1.1" 304 240 0.001734
+192.168.84.156 - - [27/Jul/2025 01:38:43] "GET /socket.io/?EIO=4&transport=polling&t=PX9Y4I7 HTTP/1.1" 200 300 0.000618
+192.168.84.156 - - [27/Jul/2025 01:38:43] "POST /socket.io/?EIO=4&transport=polling&t=PX9Y4IN&sid=vO2nIDmFR6UciCS5AAAI HTTP/1.1" 200 223 0.001107
+192.168.84.156 - - [27/Jul/2025 01:38:43] "GET /socket.io/?EIO=4&transport=polling&t=PX9Y4IN.0&sid=vO2nIDmFR6UciCS5AAAI HTTP/1.1" 200 213 0.000348
+(375463) accepted ('192.168.84.156', 51238)
+192.168.84.156 - - [27/Jul/2025 01:38:44] "GET /static/logo.png HTTP/1.1" 304 240 0.001742
+(375463) accepted ('192.168.84.156', 54735)
+192.168.84.156 - - [27/Jul/2025 01:38:44] "GET /socket.io/?EIO=4&transport=polling&t=PX9Y4IV&sid=vO2nIDmFR6UciCS5AAAI HTTP/1.1" 200 181 0.007550
+(375463) accepted ('192.168.84.156', 51249)
+192.168.84.156 - - [27/Jul/2025 01:38:47] "GET /static/logo.png HTTP/1.1" 304 240 0.002485
+(375463) accepted ('192.168.84.156', 51259)
+192.168.84.156 - - [27/Jul/2025 01:38:48] "GET /static/logo.png HTTP/1.1" 304 240 0.002083
+(375463) accepted ('192.168.84.156', 51260)
+192.168.84.156 - - [27/Jul/2025 01:38:49] "GET /static/logo.png HTTP/1.1" 304 240 0.001858
+(375463) accepted ('192.168.84.156', 51280)
+192.168.84.156 - - [27/Jul/2025 01:38:52] "GET /static/logo.png HTTP/1.1" 304 240 0.002594
+192.168.84.156 - - [27/Jul/2025 01:38:57] "GET /admin/users HTTP/1.1" 200 19023 0.070844
+192.168.84.156 - - [27/Jul/2025 01:38:57] "GET /socket.io/?EIO=4&transport=websocket&sid=vO2nIDmFR6UciCS5AAAI HTTP/1.1" 200 0 13.906420
+192.168.84.156 - - [27/Jul/2025 01:38:57] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002962
+192.168.84.156 - - [27/Jul/2025 01:38:57] "GET /manifest.json HTTP/1.1" 200 1000 0.002623
+192.168.84.156 - - [27/Jul/2025 01:38:57] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.003759
+(375463) accepted ('192.168.84.156', 51305)
+192.168.84.156 - - [27/Jul/2025 01:38:57] "GET /static/logo.png HTTP/1.1" 304 240 0.001768
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET / HTTP/1.1" 200 35550 0.014728
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /manifest.json HTTP/1.1" 200 1000 0.002898
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002703
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003079
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.003807
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /get_app_data HTTP/1.1" 200 1072 0.016500
+(375463) accepted ('192.168.84.156', 51316)
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /static/logo.png HTTP/1.1" 304 240 0.001750
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /socket.io/?EIO=4&transport=polling&t=PX9Y86n HTTP/1.1" 200 300 0.000588
+192.168.84.156 - - [27/Jul/2025 01:38:59] "POST /socket.io/?EIO=4&transport=polling&t=PX9Y870&sid=8eKRcLwwhu84aT-LAAAK HTTP/1.1" 200 223 0.002310
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /socket.io/?EIO=4&transport=polling&t=PX9Y870.0&sid=8eKRcLwwhu84aT-LAAAK HTTP/1.1" 200 213 0.000403
+(375463) accepted ('192.168.84.156', 51317)
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /static/logo.png HTTP/1.1" 304 240 0.001746
+(375463) accepted ('192.168.84.156', 54736)
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /socket.io/?EIO=4&transport=polling&t=PX9Y87A&sid=8eKRcLwwhu84aT-LAAAK HTTP/1.1" 200 181 0.000348
+192.168.84.156 - - [27/Jul/2025 01:38:59] "GET /socket.io/?EIO=4&transport=polling&t=PX9Y87F&sid=8eKRcLwwhu84aT-LAAAK HTTP/1.1" 200 181 0.000384
+192.168.84.156 - - [27/Jul/2025 01:39:25] "POST /add_player HTTP/1.1" 302 858 0.148916
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET / HTTP/1.1" 200 38202 0.016121
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /socket.io/?EIO=4&transport=websocket&sid=8eKRcLwwhu84aT-LAAAK HTTP/1.1" 200 0 26.008657
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002913
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /manifest.json HTTP/1.1" 200 1000 0.002541
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003030
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.003857
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /get_app_data HTTP/1.1" 200 1762 0.016733
+(375463) accepted ('192.168.84.156', 51360)
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /static/logo.png HTTP/1.1" 304 240 0.001794
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /socket.io/?EIO=4&transport=polling&t=PX9YEUo HTTP/1.1" 200 300 0.000588
+192.168.84.156 - - [27/Jul/2025 01:39:25] "POST /socket.io/?EIO=4&transport=polling&t=PX9YEUu&sid=LuzbeE1Kx_7gCxcsAAAM HTTP/1.1" 200 223 0.001067
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /socket.io/?EIO=4&transport=polling&t=PX9YEUu.0&sid=LuzbeE1Kx_7gCxcsAAAM HTTP/1.1" 200 213 0.000346
+(375463) accepted ('192.168.84.156', 54739)
+192.168.84.156 - - [27/Jul/2025 01:39:25] "GET /socket.io/?EIO=4&transport=polling&t=PX9YEV0&sid=LuzbeE1Kx_7gCxcsAAAM HTTP/1.1" 200 181 0.008329
+(375463) accepted ('192.168.84.156', 51361)
+192.168.84.156 - - [27/Jul/2025 01:39:29] "GET /static/logo.png HTTP/1.1" 304 240 0.002293
+(375463) accepted ('192.168.84.156', 51362)
+192.168.84.156 - - [27/Jul/2025 01:39:35] "GET /static/logo.png HTTP/1.1" 304 240 0.002344
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET / HTTP/1.1" 200 37857 0.016124
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /socket.io/?EIO=4&transport=websocket&sid=LuzbeE1Kx_7gCxcsAAAM HTTP/1.1" 200 0 12.733555
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /manifest.json HTTP/1.1" 200 1000 0.002797
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002819
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003078
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.004002
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /get_app_data HTTP/1.1" 200 1762 0.017785
+(375463) accepted ('192.168.84.156', 51363)
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /static/logo.png HTTP/1.1" 304 240 0.001837
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /socket.io/?EIO=4&transport=polling&t=PX9YHd6 HTTP/1.1" 200 300 0.000624
+(375463) accepted ('192.168.84.156', 51364)
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /static/logo.png HTTP/1.1" 304 240 0.001955
+192.168.84.156 - - [27/Jul/2025 01:39:38] "POST /socket.io/?EIO=4&transport=polling&t=PX9YHdQ&sid=RvxZgGAwIGyUgE4CAAAO HTTP/1.1" 200 223 0.000936
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /socket.io/?EIO=4&transport=polling&t=PX9YHdR&sid=RvxZgGAwIGyUgE4CAAAO HTTP/1.1" 200 213 0.000446
+(375463) accepted ('192.168.84.156', 54741)
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /socket.io/?EIO=4&transport=polling&t=PX9YHda&sid=RvxZgGAwIGyUgE4CAAAO HTTP/1.1" 200 181 0.000378
+192.168.84.156 - - [27/Jul/2025 01:39:38] "GET /socket.io/?EIO=4&transport=polling&t=PX9YHdf&sid=RvxZgGAwIGyUgE4CAAAO HTTP/1.1" 200 181 0.000340
+(375463) accepted ('192.168.84.156', 51365)
+192.168.84.156 - - [27/Jul/2025 01:39:55] "GET /static/logo.png HTTP/1.1" 304 240 0.002401
+(375463) accepted ('192.168.84.156', 54749)
+192.168.84.156 - - [27/Jul/2025 01:40:11] "POST /add_focus/Graham%20Menard HTTP/1.1" 302 898 0.073592
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET / HTTP/1.1" 200 38195 0.014144
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /socket.io/?EIO=4&transport=websocket&sid=RvxZgGAwIGyUgE4CAAAO HTTP/1.1" 200 0 33.458716
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002902
+(375463) accepted ('192.168.84.156', 54750)
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /manifest.json HTTP/1.1" 200 1000 0.002671
+(375463) accepted ('192.168.84.156', 54751)
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003109
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.003924
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /get_app_data HTTP/1.1" 200 2060 0.021576
+(375463) accepted ('192.168.84.156', 51366)
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /static/logo.png HTTP/1.1" 304 240 0.002349
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /socket.io/?EIO=4&transport=polling&t=PX9YPq6 HTTP/1.1" 200 300 0.000269
+192.168.84.156 - - [27/Jul/2025 01:40:12] "POST /socket.io/?EIO=4&transport=polling&t=PX9YPqF&sid=jzXQusUE4bDYv5c0AAAQ HTTP/1.1" 200 223 0.000670
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /socket.io/?EIO=4&transport=polling&t=PX9YPqG&sid=jzXQusUE4bDYv5c0AAAQ HTTP/1.1" 200 213 0.000210
+(375463) accepted ('192.168.84.156', 54752)
+192.168.84.156 - - [27/Jul/2025 01:40:12] "GET /socket.io/?EIO=4&transport=polling&t=PX9YPqO&sid=jzXQusUE4bDYv5c0AAAQ HTTP/1.1" 200 181 0.000202
+(375463) accepted ('192.168.84.156', 51367)
+192.168.84.156 - - [27/Jul/2025 01:40:17] "GET /static/logo.png HTTP/1.1" 304 240 0.002280
+192.168.84.156 - - [27/Jul/2025 01:40:32] "POST /add_game HTTP/1.1" 302 881 0.078568
+Traceback (most recent call last):
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 2193, in wsgi_app
+    response = self.handle_exception(e)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 2190, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 1486, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 1484, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 1469, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/blueprints/gameday.py", line 39, in game_management
+    return render_template('game_management.html',
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/templating.py", line 151, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/templating.py", line 132, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/environment.py", line 1304, in render
+    self.environment.handle_exception()
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/environment.py", line 939, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/mike1825/team-coach-app-dev/templates/game_management.html", line 106, in top-level template code
+    game: {{ game|tojson }},
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/filters.py", line 1714, in do_tojson
+    return htmlsafe_json_dumps(value, dumps=dumps, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/utils.py", line 658, in htmlsafe_json_dumps
+    dumps(obj, **kwargs)
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/json/provider.py", line 180, in dumps
+    return json.dumps(obj, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/json/provider.py", line 120, in _default
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+TypeError: Object of type Game is not JSON serializable
+192.168.84.156 - - [27/Jul/2025 01:40:32] "GET /game/1 HTTP/1.1" 500 35103 0.129422
+192.168.84.156 - - [27/Jul/2025 01:40:32] "GET /socket.io/?EIO=4&transport=websocket&sid=jzXQusUE4bDYv5c0AAAQ HTTP/1.1" 200 0 20.417958
+192.168.84.156 - - [27/Jul/2025 01:40:32] "GET /game/1?__debugger__=yes&cmd=resource&f=style.css HTTP/1.1" 200 6312 0.001194
+192.168.84.156 - - [27/Jul/2025 01:40:32] "GET /game/1?__debugger__=yes&cmd=resource&f=debugger.js HTTP/1.1" 200 10807 0.001208
+192.168.84.156 - - [27/Jul/2025 01:40:32] "GET /game/1?__debugger__=yes&cmd=resource&f=console.png HTTP/1.1" 200 729 0.001053
+(375463) accepted ('192.168.84.156', 51368)
+192.168.84.156 - - [27/Jul/2025 01:40:32] "GET /game/1?__debugger__=yes&cmd=resource&f=console.png HTTP/1.1" 200 729 0.001022
+(375463) accepted ('192.168.84.156', 55113)
+Traceback (most recent call last):
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 2193, in wsgi_app
+    response = self.handle_exception(e)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 2190, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 1486, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 1484, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 1469, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/blueprints/gameday.py", line 39, in game_management
+    return render_template('game_management.html',
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/templating.py", line 151, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/templating.py", line 132, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/environment.py", line 1304, in render
+    self.environment.handle_exception()
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/environment.py", line 939, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/mike1825/team-coach-app-dev/templates/game_management.html", line 106, in top-level template code
+    game: {{ game|tojson }},
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/filters.py", line 1714, in do_tojson
+    return htmlsafe_json_dumps(value, dumps=dumps, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/utils.py", line 658, in htmlsafe_json_dumps
+    dumps(obj, **kwargs)
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/json/provider.py", line 180, in dumps
+    return json.dumps(obj, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/json/provider.py", line 120, in _default
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+TypeError: Object of type Game is not JSON serializable
+192.168.84.156 - - [27/Jul/2025 02:17:20] "GET /game/1 HTTP/1.1" 500 35103 0.035597
+(375463) accepted ('192.168.84.156', 55237)
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET / HTTP/1.1" 200 38218 0.015773
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /manifest.json HTTP/1.1" 200 1000 0.003290
+(375463) accepted ('192.168.84.156', 55238)
+(375463) accepted ('192.168.84.156', 55240)
+(375463) accepted ('192.168.84.156', 55239)
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.004132
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003958
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002796
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /get_app_data HTTP/1.1" 200 2330 0.018697
+(375463) accepted ('192.168.84.156', 62410)
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /static/logo.png HTTP/1.1" 304 240 0.001812
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-r2P HTTP/1.1" 200 300 0.000605
+192.168.84.156 - - [29/Jul/2025 02:20:35] "POST /socket.io/?EIO=4&transport=polling&t=PXJ-r2W&sid=3XeBEppJ6MjYYBo9AAAS HTTP/1.1" 200 223 0.001961
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-r2Y&sid=3XeBEppJ6MjYYBo9AAAS HTTP/1.1" 200 213 0.000395
+(375463) accepted ('192.168.84.156', 55242)
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-r2e&sid=3XeBEppJ6MjYYBo9AAAS HTTP/1.1" 200 181 0.000391
+192.168.84.156 - - [29/Jul/2025 02:20:35] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-r2j&sid=3XeBEppJ6MjYYBo9AAAS HTTP/1.1" 200 181 0.000342
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET / HTTP/1.1" 200 37857 0.014607
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /manifest.json HTTP/1.1" 200 1000 0.002943
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002851
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003172
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.003891
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /get_app_data HTTP/1.1" 200 2330 0.021823
+(375463) accepted ('192.168.84.156', 62411)
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /static/logo.png HTTP/1.1" 304 240 0.001451
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-r6h HTTP/1.1" 200 300 0.000419
+(375463) accepted ('192.168.84.156', 62412)
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /static/logo.png HTTP/1.1" 304 240 0.001799
+192.168.84.156 - - [29/Jul/2025 02:20:36] "POST /socket.io/?EIO=4&transport=polling&t=PXJ-r6z&sid=x5gJiuBWEzPoS9quAAAU HTTP/1.1" 200 223 0.000937
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-r6z.0&sid=x5gJiuBWEzPoS9quAAAU HTTP/1.1" 200 213 0.002280
+(375463) accepted ('192.168.84.156', 55243)
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-r77&sid=x5gJiuBWEzPoS9quAAAU HTTP/1.1" 200 181 0.000386
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-r7B&sid=x5gJiuBWEzPoS9quAAAU HTTP/1.1" 200 181 0.000345
+192.168.84.156 - - [29/Jul/2025 02:20:36] "GET /socket.io/?EIO=4&transport=websocket&sid=3XeBEppJ6MjYYBo9AAAS HTTP/1.1" 200 0 0.844067
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /socket.io/?EIO=4&transport=websocket&sid=x5gJiuBWEzPoS9quAAAU HTTP/1.1" 200 0 1.952037
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET / HTTP/1.1" 200 37857 0.014037
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.004169
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003041
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /manifest.json HTTP/1.1" 200 1000 0.002725
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /static/css/main.css HTTP/1.1" 200 6664 0.002574
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /get_app_data HTTP/1.1" 200 2330 0.009357
+(375463) accepted ('192.168.84.156', 62413)
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /static/logo.png HTTP/1.1" 304 240 0.000973
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-rdK HTTP/1.1" 200 300 0.000548
+192.168.84.156 - - [29/Jul/2025 02:20:38] "POST /socket.io/?EIO=4&transport=polling&t=PXJ-rdQ&sid=7fCq-47yxt_o4RKOAAAW HTTP/1.1" 200 223 0.002640
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-rdQ.0&sid=7fCq-47yxt_o4RKOAAAW HTTP/1.1" 200 213 0.002494
+(375463) accepted ('192.168.84.156', 55244)
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-rdY&sid=7fCq-47yxt_o4RKOAAAW HTTP/1.1" 200 181 0.000254
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-rdb&sid=7fCq-47yxt_o4RKOAAAW HTTP/1.1" 200 181 0.000361
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-rdt&sid=7fCq-47yxt_o4RKOAAAW HTTP/1.1" 200 181 0.000343
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET / HTTP/1.1" 200 37857 0.015068
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /static/css/main.css HTTP/1.1" 304 670 0.002952
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /manifest.json HTTP/1.1" 304 677 0.002622
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 304 708 0.002731
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /static/js/main.js HTTP/1.1" 304 670 0.002816
+(375463) accepted ('192.168.84.156', 55245)
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /get_app_data HTTP/1.1" 200 2330 0.016736
+(375463) accepted ('192.168.84.156', 62414)
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /static/logo.png HTTP/1.1" 304 240 0.001658
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-rjE HTTP/1.1" 200 300 0.000595
+(375463) accepted ('192.168.84.156', 62415)
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /static/logo.png HTTP/1.1" 304 240 0.001800
+192.168.84.156 - - [29/Jul/2025 02:20:38] "POST /socket.io/?EIO=4&transport=polling&t=PXJ-rjK&sid=yU8DGmDCtqmE6oHUAAAY HTTP/1.1" 200 223 0.000884
+(375463) accepted ('192.168.84.156', 55246)
+(375463) accepted ('192.168.84.156', 55247)
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-rjK.0&sid=yU8DGmDCtqmE6oHUAAAY HTTP/1.1" 200 181 0.000374
+192.168.84.156 - - [29/Jul/2025 02:20:38] "GET /socket.io/?EIO=4&transport=polling&t=PXJ-rjX&sid=yU8DGmDCtqmE6oHUAAAY HTTP/1.1" 200 181 0.000341
+192.168.84.156 - - [29/Jul/2025 02:20:39] "GET /socket.io/?EIO=4&transport=websocket&sid=7fCq-47yxt_o4RKOAAAW HTTP/1.1" 200 0 0.949914
+192.168.84.156 - - [29/Jul/2025 02:20:42] "GET /socket.io/?EIO=4&transport=websocket&sid=yU8DGmDCtqmE6oHUAAAY HTTP/1.1" 200 0 4.192119
+(375463) accepted ('192.168.3.3', 61542)
+192.168.3.3 - - [29/Jul/2025 13:09:27] "GET / HTTP/1.1" 302 361 0.002011
+(375463) accepted ('192.168.3.3', 61543)
+192.168.3.3 - - [29/Jul/2025 13:09:27] "GET /login HTTP/1.1" 200 1478 0.010307
+192.168.3.3 - - [29/Jul/2025 13:09:27] "GET /favicon.ico HTTP/1.1" 404 355 0.001681
+192.168.3.3 - - [29/Jul/2025 13:09:34] "POST /login HTTP/1.1" 302 691 1.024170
+192.168.3.3 - - [29/Jul/2025 13:09:34] "GET / HTTP/1.1" 200 38032 0.011723
+192.168.3.3 - - [29/Jul/2025 13:09:34] "GET /static/css/main.css HTTP/1.1" 200 6519 0.002219
+192.168.3.3 - - [29/Jul/2025 13:09:34] "GET /static/js/main.js HTTP/1.1" 200 45327 0.002792
+(375463) accepted ('192.168.3.3', 61568)
+192.168.3.3 - - [29/Jul/2025 13:09:34] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100124 0.053371
+192.168.3.3 - - [29/Jul/2025 13:09:34] "GET /get_app_data HTTP/1.1" 200 2185 0.009597
+192.168.3.3 - - [29/Jul/2025 13:09:35] "GET /socket.io/?EIO=4&transport=polling&t=PXMJNj7 HTTP/1.1" 200 300 0.000579
+192.168.3.3 - - [29/Jul/2025 13:09:35] "POST /socket.io/?EIO=4&transport=polling&t=PXMJNjS&sid=iW1DSyfrir90rAXFAAAa HTTP/1.1" 200 223 0.001007
+192.168.3.3 - - [29/Jul/2025 13:09:35] "GET /socket.io/?EIO=4&transport=polling&t=PXMJNjW&sid=iW1DSyfrir90rAXFAAAa HTTP/1.1" 200 213 0.000376
+(375463) accepted ('192.168.3.3', 61571)
+192.168.3.3 - - [29/Jul/2025 13:09:35] "GET /socket.io/?EIO=4&transport=polling&t=PXMJNjn&sid=iW1DSyfrir90rAXFAAAa HTTP/1.1" 200 181 0.020295
+192.168.3.3 - - [29/Jul/2025 13:09:35] "GET /static/logo.png HTTP/1.1" 200 28530 0.003268
+192.168.3.3 - - [29/Jul/2025 13:09:49] "GET /static/css/main.css HTTP/1.1" 304 525 0.003404
+(375463) accepted ('192.168.3.3', 61601)
+192.168.3.3 - - [29/Jul/2025 13:09:49] "GET /manifest.json HTTP/1.1" 200 564 0.001662
+(375463) accepted ('192.168.3.4', 50947)
+(375463) accepted ('192.168.3.4', 50949)
+192.168.3.4 - - [29/Jul/2025 13:11:12] "GET / HTTP/1.1" 302 361 0.001627
+192.168.3.4 - - [29/Jul/2025 13:11:12] "GET /login HTTP/1.1" 200 1478 0.001585
+(375463) accepted ('192.168.3.4', 63791)
+192.168.3.4 - - [29/Jul/2025 13:11:13] "GET /favicon.ico HTTP/1.1" 404 355 0.001381
+192.168.3.4 - - [29/Jul/2025 13:11:13] "GET / HTTP/1.1" 302 361 0.001103
+192.168.3.4 - - [29/Jul/2025 13:11:13] "GET /login HTTP/1.1" 200 1478 0.001345
+192.168.3.4 - - [29/Jul/2025 13:11:13] "GET /favicon.ico HTTP/1.1" 404 355 0.001200
+192.168.3.4 - - [29/Jul/2025 13:11:16] "GET / HTTP/1.1" 200 37857 0.019128
+192.168.3.4 - - [29/Jul/2025 13:11:16] "GET /static/css/main.css HTTP/1.1" 200 6664 0.003042
+(375463) accepted ('192.168.3.4', 50963)
+192.168.3.4 - - [29/Jul/2025 13:11:16] "GET /manifest.json HTTP/1.1" 200 1000 0.002738
+192.168.3.4 - - [29/Jul/2025 13:11:16] "GET /static/js/main.js HTTP/1.1" 200 45472 0.003563
+192.168.3.4 - - [29/Jul/2025 13:11:16] "GET /static/uploads/logos/1_b868c7370d89442fa610679a7de8d2af.jpeg HTTP/1.1" 200 100269 0.130698
+192.168.3.4 - - [29/Jul/2025 13:11:17] "GET /get_app_data HTTP/1.1" 200 2330 0.018749
+192.168.3.4 - - [29/Jul/2025 13:11:17] "GET /static/logo.png HTTP/1.1" 304 240 0.001886
+192.168.3.4 - - [29/Jul/2025 13:11:17] "GET /socket.io/?EIO=4&transport=polling&t=PXMJmdE HTTP/1.1" 200 300 0.000586
+(375463) accepted ('192.168.3.4', 63794)
+192.168.3.4 - - [29/Jul/2025 13:11:17] "GET /static/logo.png HTTP/1.1" 304 240 0.001845
+192.168.3.4 - - [29/Jul/2025 13:11:17] "POST /socket.io/?EIO=4&transport=polling&t=PXMJmem&sid=D9mbPIQ5Hugc_w4sAAAc HTTP/1.1" 200 223 0.000906
+192.168.3.4 - - [29/Jul/2025 13:11:17] "GET /socket.io/?EIO=4&transport=polling&t=PXMJmeo&sid=D9mbPIQ5Hugc_w4sAAAc HTTP/1.1" 200 213 0.000378
+(375463) accepted ('192.168.3.4', 50964)
+192.168.3.4 - - [29/Jul/2025 13:11:17] "GET /socket.io/?EIO=4&transport=polling&t=PXMJmgP&sid=D9mbPIQ5Hugc_w4sAAAc HTTP/1.1" 200 181 0.000371
+192.168.3.4 - - [29/Jul/2025 13:11:17] "GET /socket.io/?EIO=4&transport=polling&t=PXMJmi7&sid=D9mbPIQ5Hugc_w4sAAAc HTTP/1.1" 200 181 0.000345
+(375463) accepted ('192.168.3.4', 63795)
+192.168.3.4 - - [29/Jul/2025 13:11:20] "GET /static/logo.png HTTP/1.1" 304 240 0.002480
+(375463) accepted ('192.168.3.4', 63796)
+192.168.3.4 - - [29/Jul/2025 13:11:21] "GET /static/logo.png HTTP/1.1" 304 240 0.001972
+(375463) accepted ('192.168.3.4', 63797)
+192.168.3.4 - - [29/Jul/2025 13:11:22] "GET /static/logo.png HTTP/1.1" 304 240 0.001855
+(375463) accepted ('192.168.3.4', 63798)
+192.168.3.4 - - [29/Jul/2025 13:11:24] "GET /static/logo.png HTTP/1.1" 304 240 0.002456
+(375463) accepted ('192.168.3.4', 63799)
+192.168.3.4 - - [29/Jul/2025 13:11:26] "GET /static/logo.png HTTP/1.1" 304 240 0.072983
+(375463) accepted ('192.168.3.4', 63800)
+192.168.3.4 - - [29/Jul/2025 13:11:28] "GET /static/logo.png HTTP/1.1" 304 240 0.002197
+(375463) accepted ('192.168.3.4', 63801)
+192.168.3.4 - - [29/Jul/2025 13:11:30] "GET /static/logo.png HTTP/1.1" 304 240 0.002036
+(375463) accepted ('192.168.3.4', 63802)
+192.168.3.4 - - [29/Jul/2025 13:11:32] "GET /static/logo.png HTTP/1.1" 304 240 0.001903
+(375463) accepted ('192.168.3.4', 63803)
+192.168.3.4 - - [29/Jul/2025 13:11:41] "GET /static/logo.png HTTP/1.1" 304 240 0.002390
+192.168.3.4 - - [29/Jul/2025 13:11:47] "GET /socket.io/?EIO=4&transport=websocket&sid=D9mbPIQ5Hugc_w4sAAAc HTTP/1.1" 200 0 29.857171
+(375463) accepted ('192.168.3.4', 50976)
+192.168.3.4 - - [29/Jul/2025 13:12:00] "GET /socket.io/?EIO=4&transport=polling&t=PXMJx2_ HTTP/1.1" 200 300 0.000710
+192.168.3.4 - - [29/Jul/2025 13:12:00] "POST /socket.io/?EIO=4&transport=polling&t=PXMJx6x&sid=sYEjpnQ0hxGeCao_AAAe HTTP/1.1" 200 223 0.001060
+(375463) accepted ('192.168.3.4', 50978)
+192.168.3.4 - - [29/Jul/2025 13:12:00] "GET /socket.io/?EIO=4&transport=polling&t=PXMJx6z&sid=sYEjpnQ0hxGeCao_AAAe HTTP/1.1" 200 213 0.000432
+(375463) accepted ('192.168.3.4', 50977)
+192.168.3.4 - - [29/Jul/2025 13:12:00] "GET /socket.io/?EIO=4&transport=polling&t=PXMJx9w&sid=sYEjpnQ0hxGeCao_AAAe HTTP/1.1" 200 181 0.000447
+Traceback (most recent call last):
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 2193, in wsgi_app
+    response = self.handle_exception(e)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 2190, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 1486, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 1484, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/app.py", line 1469, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/blueprints/gameday.py", line 39, in game_management
+    return render_template('game_management.html',
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/templating.py", line 151, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/templating.py", line 132, in _render
+    rv = template.render(context)
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/environment.py", line 1304, in render
+    self.environment.handle_exception()
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/environment.py", line 939, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/home/mike1825/team-coach-app-dev/templates/game_management.html", line 106, in top-level template code
+    game: {{ game|tojson }},
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/filters.py", line 1714, in do_tojson
+    return htmlsafe_json_dumps(value, dumps=dumps, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/jinja2/utils.py", line 658, in htmlsafe_json_dumps
+    dumps(obj, **kwargs)
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/json/provider.py", line 180, in dumps
+    return json.dumps(obj, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/encoder.py", line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File "/home/mike1825/team-coach-app-dev/venv/lib/python3.12/site-packages/flask/json/provider.py", line 120, in _default
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+TypeError: Object of type Game is not JSON serializable
+192.168.3.4 - - [29/Jul/2025 13:12:03] "GET /game/1 HTTP/1.1" 500 35103 0.023391
+192.168.3.4 - - [29/Jul/2025 13:12:03] "GET /socket.io/?EIO=4&transport=websocket&sid=sYEjpnQ0hxGeCao_AAAe HTTP/1.1" 200 0 3.229742
+192.168.3.4 - - [29/Jul/2025 13:12:03] "GET /game/1?__debugger__=yes&cmd=resource&f=style.css HTTP/1.1" 200 6312 0.001236
+(375463) accepted ('192.168.3.4', 50979)
+192.168.3.4 - - [29/Jul/2025 13:12:03] "GET /game/1?__debugger__=yes&cmd=resource&f=debugger.js HTTP/1.1" 200 10807 0.001133
+192.168.3.4 - - [29/Jul/2025 13:12:03] "GET /game/1?__debugger__=yes&cmd=resource&f=console.png HTTP/1.1" 200 729 0.000764
+ * Detected change in '/home/mike1825/team-coach-app-dev/blueprints/pitching.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 248-317-580
+(737709) wsgi starting up on http://0.0.0.0:5002
+(737709) accepted ('192.168.3.3', 50267)
+192.168.3.3 - - [29/Jul/2025 13:38:41] "GET /socket.io/?EIO=4&transport=polling&t=PXMQ2C4 HTTP/1.1" 200 300 0.000968
+192.168.3.3 - - [29/Jul/2025 13:38:41] "POST /socket.io/?EIO=4&transport=polling&t=PXMQ2Cq&sid=H5jnDVUB1LCcgfmBAAAA HTTP/1.1" 200 223 0.001868
+(737709) accepted ('192.168.3.3', 50268)
+(737709) accepted ('192.168.3.3', 50269)
+192.168.3.3 - - [29/Jul/2025 13:38:41] "GET /socket.io/?EIO=4&transport=polling&t=PXMQ2Cu&sid=H5jnDVUB1LCcgfmBAAAA HTTP/1.1" 200 181 0.000448
+192.168.3.3 - - [29/Jul/2025 13:38:41] "GET /socket.io/?EIO=4&transport=polling&t=PXMQ2DX&sid=H5jnDVUB1LCcgfmBAAAA HTTP/1.1" 200 181 0.000342
+ * Detected change in '/home/mike1825/team-coach-app-dev/db.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 248-317-580
+(737741) wsgi starting up on http://0.0.0.0:5002
+(737741) accepted ('192.168.3.3', 50289)
+192.168.3.3 - - [29/Jul/2025 13:38:54] "GET /socket.io/?EIO=4&transport=polling&t=PXMQ5ND HTTP/1.1" 200 300 0.000999
+192.168.3.3 - - [29/Jul/2025 13:38:54] "POST /socket.io/?EIO=4&transport=polling&t=PXMQ5OA&sid=tlMJNUQ4oZki_PpYAAAA HTTP/1.1" 200 223 0.002040
+(737741) accepted ('192.168.3.3', 50290)
+(737741) accepted ('192.168.3.3', 50292)
+192.168.3.3 - - [29/Jul/2025 13:38:54] "GET /socket.io/?EIO=4&transport=polling&t=PXMQ5OC&sid=tlMJNUQ4oZki_PpYAAAA HTTP/1.1" 200 213 0.000556
+192.168.3.3 - - [29/Jul/2025 13:38:55] "GET /socket.io/?EIO=4&transport=polling&t=PXMQ5Os&sid=tlMJNUQ4oZki_PpYAAAA HTTP/1.1" 200 181 0.000318
