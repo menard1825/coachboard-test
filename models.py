@@ -1,3 +1,4 @@
+# menard1825/coachboard-test/coachboard-test-structure-overhaul/models.py
 # models.py
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float
 from sqlalchemy.orm import relationship
@@ -69,6 +70,11 @@ class Player(db.Model):
     development_focuses = relationship("PlayerDevelopmentFocus", back_populates="player", cascade="all, delete-orphan")
     game_absences = relationship("PlayerGameAbsence", back_populates="player", cascade="all, delete-orphan")
     practice_absences = relationship("PlayerPracticeAbsence", back_populates="player", cascade="all, delete-orphan")
+    
+    def to_dict(self):
+        """Return a dictionary representation of the Player object."""
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 
 class Lineup(db.Model):
     __tablename__ = 'lineups'
@@ -79,6 +85,16 @@ class Lineup(db.Model):
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="lineups")
+
+    def to_dict(self):
+        """Return a dictionary representation of the Lineup object."""
+        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        if d.get('lineup_positions'):
+            try:
+                d['lineup_positions'] = json.loads(d['lineup_positions'])
+            except (json.JSONDecodeError, TypeError):
+                d['lineup_positions'] = [] # Default to empty list on error
+        return d
 
 class PitchingOuting(db.Model):
     __tablename__ = 'pitching_outings'
@@ -117,6 +133,16 @@ class Rotation(db.Model):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
 
+    def to_dict(self):
+        """Return a dictionary representation of the Rotation object."""
+        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        if d.get('innings'):
+            try:
+                d['innings'] = json.loads(d['innings'])
+            except (json.JSONDecodeError, TypeError):
+                d['innings'] = {} # Default to empty dict on error
+        return d
+
 class Game(db.Model):
     __tablename__ = 'games'
     id = Column(Integer, primary_key=True)
@@ -130,6 +156,10 @@ class Game(db.Model):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="games")
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
+    
+    def to_dict(self):
+        """Return a dictionary representation of the Game object."""
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class CollaborationNote(db.Model):
     __tablename__ = 'collaboration_notes'

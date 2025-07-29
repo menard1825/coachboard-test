@@ -1,8 +1,9 @@
+<!-- menard1825/coachboard-test/coachboard-test-structure-overhaul/templates/game_management.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Game Management - {{ game.opponent }}</title>
+    <title>Game Management - {{ game['opponent'] }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -16,7 +17,7 @@
             <i class="bi bi-arrow-left"></i> Back to All Games
         </a>
         <span class="navbar-text fw-bold">
-            vs {{ game.opponent }} on {{ game.date }}
+            vs {{ game['opponent'] }} on {{ game['date'] }}
         </span>
     </div>
 </nav>
@@ -47,14 +48,14 @@
                         </div>
                         <div class="card-body">
                             <p class="text-muted">Check the box next to any player who will be absent for this game. This will remove them from the lineup and rotation builders.</p>
-                            <form action="{{ url_for('gameday.update_absences', game_id=game.id) }}" method="POST">
+                            <form action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
                                 <ul class="list-group mb-3">
                                     {% for player in roster %}
                                     <li class="list-group-item">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player.id }}" id="player-{{ player.id }}" {% if player.id in absent_player_ids %}checked{% endif %}>
-                                            <label class="form-check-label" for="player-{{ player.id }}">
-                                                {{ player.name }}
+                                            <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player['id'] }}" id="player-{{ player['id'] }}" {% if player['id'] in absent_player_ids %}checked{% endif %}>
+                                            <label class="form-check-label" for="player-{{ player['id'] }}">
+                                                {{ player['name'] }}
                                             </label>
                                         </div>
                                     </li>

@@ -1,3 +1,4 @@
+# menard1825/coachboard-test/coachboard-test-structure-overhaul/blueprints/gameday.py
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify, render_template
 from models import (
     Game, Player, Lineup, Rotation, PitchingOuting, Team, PlayerGameAbsence
@@ -37,10 +38,10 @@ def game_management(game_id):
     pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules)
 
     return render_template('game_management.html', 
-                           game=game, 
-                           roster=roster_objects, 
-                           lineup=lineup_obj, 
-                           rotation=rotation_obj, 
+                           game=game.to_dict(), 
+                           roster=[p.to_dict() for p in roster_objects], 
+                           lineup=lineup_obj.to_dict() if lineup_obj else None, 
+                           rotation=rotation_obj.to_dict() if rotation_obj else None, 
                            game_pitching_log=game_pitching_log, 
                            session=session, 
                            absent_player_ids=absent_player_ids,
