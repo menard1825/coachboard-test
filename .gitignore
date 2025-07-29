@@ -19,3 +19,4 @@ __pycache__/
 team-coach-app-test/
 app.db
 app.log
+nohup.out
