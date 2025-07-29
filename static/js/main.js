@@ -474,6 +474,37 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         
+        // MODIFIED: Added event listener for the scouted player form
+        const addScoutedPlayerForm = document.getElementById('addScoutedPlayerForm');
+        if (addScoutedPlayerForm) {
+            addScoutedPlayerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(addScoutedPlayerForm);
+                const data = Object.fromEntries(formData.entries());
+                const feedbackDiv = document.getElementById('addScoutedPlayerFeedback');
+
+                try {
+                    const response = await fetch('/add_scouted_player', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        feedbackDiv.className = 'alert alert-success';
+                        addScoutedPlayerForm.reset();
+                    } else {
+                        feedbackDiv.className = 'alert alert-danger';
+                    }
+                    feedbackDiv.textContent = result.message;
+                } catch (error) {
+                    feedbackDiv.className = 'alert alert-danger';
+                    feedbackDiv.textContent = 'A network error occurred.';
+                }
+            });
+        }
+
+
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
             document.getElementById('playerNameToDelete').textContent = e.relatedTarget.dataset.playerName;
             document.getElementById('confirmDeleteButton').href = `/delete_player/${e.relatedTarget.dataset.playerId}`;

@@ -122,6 +122,10 @@ class ScoutedPlayer(db.Model):
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="scouted_players")
+    
+    def to_dict(self):
+        """Return a dictionary representation of the ScoutedPlayer object."""
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class Rotation(db.Model):
     __tablename__ = 'rotations'
