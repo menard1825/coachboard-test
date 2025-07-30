@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, make_response # MODIFIED: Import make_response
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from werkzeug.security import generate_password_hash
@@ -9,6 +9,7 @@ import random
 import string
 import json
 from functools import wraps
+from datetime import datetime
 
 from db import db
 from models import User, Team
@@ -17,7 +18,7 @@ from utils import PITCHING_RULES, allowed_file
 
 # Define role constants
 SUPER_ADMIN = 'Super Admin'
-HEAD_COACH = 'Head Coach'
+HEAD_COACH = 'Head COACH'
 
 # Create the Blueprint
 admin_bp = Blueprint('admin', __name__, template_folder='templates', url_prefix='/admin')
@@ -202,7 +203,12 @@ def update_user_details(username):
 @admin_required
 def admin_settings():
     team_settings = db.session.get(Team, session['team_id'])
-    return render_template('admin_settings.html', session=session, settings=team_settings, all_rules=PITCHING_RULES)
+    # NEW: Create a response object and add Cache-Control headers
+    response = make_response(render_template('admin_settings.html', session=session, settings=team_settings, all_rules=PITCHING_RULES))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @admin_bp.route('/settings/update', methods=['POST'])
@@ -223,9 +229,12 @@ def update_admin_settings():
     team_settings.secondary_color = request.form.get('secondary_color', team_settings.secondary_color)
     
     db.session.commit()
+    # NEW: Explicitly refresh the team object in the session to ensure it's up-to-date
+    db.session.refresh(team_settings) 
     flash('Team settings updated successfully!', 'success')
     socketio.emit('data_updated', {'message': 'Team settings updated.'})
-    return redirect(url_for('.admin_settings'))
+    # MODIFIED: Redirect to home with a cache-busting timestamp
+    return redirect(url_for('home', _t=datetime.now().timestamp()))
 
 
 @admin_bp.route('/upload_logo', methods=['POST'])
