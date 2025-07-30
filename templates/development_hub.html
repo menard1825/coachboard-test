@@ -3,7 +3,8 @@
 {% block title %}Development Hub - {{ super() }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<!-- MODIFIED: Changed div to main tag and kept the container and mt-4 classes -->
+<main class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h2">Development Hub</h1>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFocusModal">
@@ -38,7 +39,7 @@
             {% endif %}
         </div>
     </div>
-</div>
+</main>
 
 <!-- Add New Focus Modal -->
 <div class="modal fade" id="addFocusModal" tabindex="-1" role="dialog" aria-labelledby="addFocusModalLabel" aria-hidden="true">

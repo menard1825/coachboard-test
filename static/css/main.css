@@ -289,17 +289,53 @@ body {
         overflow: hidden; /* Prevent scrolling on the root elements */
         position: relative;
         width: 100%;
+        display: flex; /* Use flexbox for the body */
+        flex-direction: column; /* Stack children vertically */
+    }
+
+    /* Top Navbar: Keep its height fixed */
+    .navbar.sticky-top {
+        flex-shrink: 0; /* Prevent it from shrinking */
+        height: 56px; /* Explicit height, match your design if different */
     }
 
     main.container-fluid {
-        height: calc(100vh - 56px - 85px); /* 56px for top nav, 85px for bottom nav */
+        flex-grow: 1; /* Allow main content to take up remaining space */
         overflow-y: auto; /* Makes the main content scrollable */
         -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-        padding-bottom: 2rem; /* Add some space at the bottom */
+        /* MODIFIED: Increased padding-bottom to ensure content clears the bottom nav */
+        padding-bottom: calc(85px + env(safe-area-inset-bottom) + 1.5rem); 
+        width: 100%; /* Ensure it takes full width */
+    }
+
+    /* Bottom Nav: Keep its height fixed */
+    .bottom-nav {
+        flex-shrink: 0; /* Prevent it from shrinking */
+        height: calc(85px + env(safe-area-inset-bottom)); /* Your original calculation */
+        padding-bottom: env(safe-area-inset-bottom);
     }
 
     /* When a modal is open, lock the scrolling of the main content area */
     body.modal-open main.container-fluid {
         overflow: hidden;
+    }
+
+    /* Adjust tab-content padding for mobile as it now lives inside a scrollable main */
+    .tab-content {
+        padding: 1rem 0; /* Reduced horizontal padding for mobile tabs */
+        /* NEW: Make tab-content a flex container and scrollable */
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* NEW: Ensure individual tab panes also fill height and can scroll if needed */
+    .tab-pane {
+        flex-shrink: 0; /* Don't let them shrink */
+        width: 100%; /* Take full width */
+        /* If content within a tab-pane is still cut off, consider adding overflow-y: auto here */
+        /* overflow-y: auto; */ /* Only if content inside tab-pane overflows its own height */
     }
 }

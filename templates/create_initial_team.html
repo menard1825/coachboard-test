@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h2 class="text-center mb-0">Create Your Team</h2>
+            </div>
+            <div class="card-body">
+                <p class="text-center">Welcome to CoachBoard! To get started, please enter the name of your team.</p>
+                <form method="POST" action="{{ url_for('team_management.create_team_initial') }}" class="mt-4">
+                    <div class="form-group">
+                        <label for="team_name" class="font-weight-bold">Team Name</label>
+                        <input type="text" class="form-control" id="team_name" name="team_name" placeholder="e.g., Westfield Shamrocks 12U" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block mt-4">Create Team and Continue</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,7 +1,7 @@
 <!-- menard1825/coachboard-test/coachboard-test-structure-overhaul/templates/_pitching_log.html -->
 <div class="row">
     <div class="col-lg-5 mb-4">
-        <div class="card h-100">
+        <div class="card"> <!-- MODIFIED: Removed h-100 -->
             <div class="card-header"><strong>Add New Outing for this Game</strong></div>
             <div class="card-body">
                 <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
@@ -50,7 +50,7 @@
         </div>
     </div>
     <div class="col-lg-7 mb-4">
-        <div class="card h-100">
+        <div class="card"> <!-- MODIFIED: Removed h-100 -->
             <div class="card-header"><strong>Outings Logged for this Game</strong></div>
             <div class="card-body p-0">
                 <ul class="list-group list-group-flush" id="recorded-outings-list">
