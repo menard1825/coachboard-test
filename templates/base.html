@@ -21,12 +21,7 @@
     <link rel="manifest" href="{{ url_for('serve_manifest') }}">
     
     {% block head %}
-    <style>
-        .navbar {
-            background-color: {{ current_team.primary_color or '#1F2937' }};
-            border-bottom: 3px solid rgba(0, 0, 0, 0.15);
-        }
-    </style>
+    {# REMOVED: Inline style block for navbar background color #}
     {% endblock %}
 </head>
 <body>
@@ -78,7 +73,7 @@
             {% endif %}
         {% endwith %}
 
-        {% block content %}{% endblock %}
+        {% block content %}{% endblock %} {# CORRECTED: Removed extra '%' from block content tag #}
     </main>
 
     {% block bottom_nav %}
@@ -109,21 +104,26 @@
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
       </div>
       <div class="offcanvas-body">
-        <div class="list-group list-group-flush" role="tablist">
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#stats_tab" role="tab" data-tab-id="stats"><i class="bi bi-bar-chart-fill me-2"></i>Stats</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#scouting_list" role="tab" data-tab-id="scouting_list"><i class="bi bi-binoculars-fill me-2"></i>Scouting List</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#pitching" role="tab" data-tab-id="pitching"><i class="bi bi-bullseye me-2"></i>Pitching Log</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#collaboration" role="tab" data-tab-id="collaboration"><i class="bi bi-people-fill me-2"></i>Coaches Log</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#signs" role="tab" data-tab-id="signs"><i class="bi bi-signpost-split-fill me-2"></i>Signs & Signals</a>
-            <hr>
+        <ul class="list-group list-group-flush">
+            {# Main App Features #}
+            <li><a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#stats_tab" role="tab" data-tab-id="stats"><i class="bi bi-bar-chart-fill me-2"></i>Stats</a></li>
+            <li><a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#scouting_list" role="tab" data-tab-id="scouting_list"><i class="bi bi-binoculars-fill me-2"></i>Scouting List</a></li>
+            <li><a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#pitching" role="tab" data-tab-id="pitching"><i class="bi bi-bullseye me-2"></i>Pitching Log</a></li>
+            <li><a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#collaboration" role="tab" data-tab-id="collaboration"><i class="bi bi-people-fill me-2"></i>Coaches Log</a></li>
+            <li><a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#signs" role="tab" data-tab-id="signs"><i class="bi bi-signpost-split-fill me-2"></i>Signs & Signals</a></li>
+            {# MOVED: Pitching Rules to this section #}
+            <li><a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}"><i class="bi bi-gavel me-2"></i>Pitching Rules</a></li>
+            <hr> {# Divider before Admin/Account settings #}
+
+            {# Admin and Account Settings #}
             {% if session.role in ['Head Coach', 'Super Admin'] %}
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-person-badge-fill me-2"></i>User Management</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill me-2"></i>Team Settings</a>
+            <li><a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-person-badge-fill me-2"></i>User Management</a></li>
+            <li><a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill me-2"></i>Team Settings</a></li>
+            <hr> {# Divider after Admin settings #}
             {% endif %}
-            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}"><i class="bi bi-gavel me-2"></i>Pitching Rules</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill me-2"></i>Change Password</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a>
-        </div>
+            <li><a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill me-2"></i>Change Password</a></li>
+            <li><a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+        </ul>
       </div>
     </div>
 

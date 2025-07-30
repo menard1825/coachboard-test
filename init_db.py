@@ -30,7 +30,8 @@ def initialize_database():
                 print(f"Creating default team: {DEFAULT_TEAM_NAME}")
                 team = Team(
                     team_name=DEFAULT_TEAM_NAME,
-                    registration_code=DEFAULT_REG_CODE
+                    registration_code=DEFAULT_REG_CODE,
+                    primary_color="#212529" # MODIFIED: Set default primary color here
                 )
                 db.session.add(team)
                 db.session.flush()

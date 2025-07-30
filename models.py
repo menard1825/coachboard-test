@@ -14,7 +14,7 @@ class Team(db.Model):
     registration_code = Column(String, nullable=False)
     logo_path = Column(String)
     display_coach_names = Column(Boolean, default=False, nullable=False)
-    primary_color = Column(String, default="#1F2937")
+    primary_color = Column(String, default="#212529") # MODIFIED: Changed default primary color
     secondary_color = Column(String, default="#E5E7EB")
     age_group = Column(String, default='12U', nullable=False)
     pitching_rule_set = Column(String, default='USSSA', nullable=False)
