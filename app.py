@@ -92,27 +92,21 @@ def create_app():
     @app.context_processor
     def inject_team_info():
         if 'team_id' in session:
-            # NEW: Expire all objects in the session to force a fresh load from DB
             db.session.expire_all()
             team = db.session.get(Team, session['team_id'])
             return {'current_team': team}
         return {}
 
-    # NEW: Context processor for CSS version
     @app.context_processor
     def inject_css_version():
-        # Use a timestamp to force browser to reload CSS on server restart or significant change
-        # In a production environment, you might use a build hash for better cache control
         return {'css_version': datetime.now().strftime('%Y%m%d%H%M%S')}
 
-    # NEW: Context processor for timestamp for cache-busting links
     @app.context_processor
     def inject_current_year_and_timestamp():
         return {
             'current_year': datetime.now().year,
-            'current_year_timestamp': datetime.now().timestamp() # New timestamp for cache-busting links
+            'current_year_timestamp': datetime.now().timestamp()
         }
-
 
     # --- CORE APP ROUTES ---
     @app.route('/')
@@ -179,25 +173,21 @@ def create_app():
     @app.route('/get_app_data')
     @login_required
     def get_app_data():
-        print("DEBUG: Attempting to load app data via /get_app_data")
-
         team_id = session['team_id']
         user = db.session.query(User).filter_by(username=session['username']).first()
         team = db.session.get(Team, team_id)
 
-        # --- Data Queries ---
         roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
-        lineups = db.session.query(Lineup).filter_by(team_id=team_id).all()
+        lineups_db = db.session.query(Lineup).filter_by(team_id=team_id).all()
         pitching_outings_db = db.session.query(PitchingOuting).filter_by(team_id=team_id).all()
         scouted_players = db.session.query(ScoutedPlayer).filter_by(team_id=team_id).all()
-        rotations = db.session.query(Rotation).filter_by(team_id=team_id).all()
+        rotations_db = db.session.query(Rotation).filter_by(team_id=team_id).all()
         games = db.session.query(Game).filter_by(team_id=team_id).all()
         collaboration_notes = db.session.query(CollaborationNote).filter_by(team_id=team_id).all()
         practice_plans_q = db.session.query(PracticePlan).filter_by(team_id=team_id).options(joinedload(PracticePlan.tasks), joinedload(PracticePlan.absences)).all()
         player_dev_focuses = db.session.query(PlayerDevelopmentFocus).filter_by(team_id=team_id).all()
         signs = db.session.query(Sign).filter_by(team_id=team_id).all()
         
-        # --- Data Processing ---
         player_dev_by_name = {p.name: [] for p in roster_db}
         player_id_to_name = {p.id: p.name for p in roster_db}
         
@@ -219,17 +209,35 @@ def create_app():
             plan_dict['tasks'] = [{c.name: getattr(t, c.name) for c in t.__table__.columns} for t in p.tasks]
             plan_dict['absent_player_ids'] = [a.player_id for a in p.absences]
             practice_plans_list.append(plan_dict)
+            
+        lineups_list = []
+        for l in lineups_db:
+            lineup_dict = {c.name: getattr(l, c.name) for c in l.__table__.columns}
+            try:
+                lineup_dict['lineup_positions'] = json.loads(lineup_dict['lineup_positions'] or '[]')
+            except (json.JSONDecodeError, TypeError):
+                lineup_dict['lineup_positions'] = []
+            lineups_list.append(lineup_dict)
+
+        rotations_list = []
+        for r in rotations_db:
+            rotation_dict = {c.name: getattr(r, c.name) for c in r.__table__.columns}
+            try:
+                rotation_dict['innings'] = json.loads(rotation_dict['innings'] or '{}')
+            except (json.JSONDecodeError, TypeError):
+                rotation_dict['innings'] = {}
+            rotations_list.append(rotation_dict)
 
         full_data = {
             'roster': [{c.name: getattr(p, c.name) for c in p.__table__.columns} for p in roster_db],
-            'lineups': [{c.name: getattr(l, c.name) for c in l.__table__.columns} for l in lineups],
+            'lineups': lineups_list,
             'pitching': [{c.name: getattr(po, c.name) for c in po.__table__.columns} for po in pitching_outings_db],
             'scouting_list': {
                 'targets': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'targets'],
                 'committed': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'committed'],
                 'not_interested': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'not_interested']
             },
-            'rotations': [{c.name: getattr(r, c.name) for c in r.__table__.columns} for r in rotations],
+            'rotations': rotations_list,
             'games': [{c.name: getattr(g, c.name) for c in g.__table__.columns} for g in games],
             'collaboration_notes': {
                 'team_notes': [{c.name: getattr(cn, c.name) for c in cn.__table__.columns} for cn in collaboration_notes if cn.note_type == 'team_notes'],
@@ -248,10 +256,3 @@ def create_app():
         })
 
     return app
-
-def allowed_file(filename):
-    """Check if the filename has an allowed extension."""
-    app = Flask(__name__)
-    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
