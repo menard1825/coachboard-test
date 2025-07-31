@@ -1,6 +1,14 @@
 // static/js/main.js
 document.addEventListener('DOMContentLoaded', () => {
 
+    // MODIFICATION: Make the switchTab function globally accessible
+    window.switchTab = function(tabElement) {
+        if (tabElement) {
+            // Programmatically click the tab to trigger Bootstrap's built-in handling
+            tabElement.click();
+        }
+    };
+
     const AppState = {
         full_data: {},
         player_order: [],
@@ -194,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">Fielding Focus</a></li>
                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">Baserunning Focus</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; switchTab(document.querySelector('a[href=\\'#collaboration\\']'));">Coach Note</a></li>
+                        <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; window.switchTab(document.querySelector('a[href=\\'#collaboration\\']'));">Coach Note</a></li>
                     </ul>
                 </div>
             </div>
@@ -344,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = games.map(game => {
             const lineup = AppState.full_data.lineups.find(l => l.associated_game_id === game.id);
             const rotation = AppState.full_data.rotations.find(r => r.associated_game_id === game.id);
-            const lineupHTML = lineup ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
+            const lineupHTML = lineup && lineup.lineup_positions && lineup.lineup_positions.length > 0 ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
             const rotationHTML = rotation ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
             return `<li class="list-group-item"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${formatDateTime(game.date)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm"><a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a><button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_game/${game.id}"><i class="bi bi-trash"></i></button></div></div></div></li>`;
         }).join('');
@@ -580,24 +588,20 @@ document.addEventListener('DOMContentLoaded', () => {
             form.querySelector('#editSignIndicator').value = sign.indicator;
         });
 
-        // MODIFICATION: Add event listener for the new edit pitching outing modal
         document.getElementById('editPitchingOutingModal')?.addEventListener('show.bs.modal', (e) => {
             const btn = e.relatedTarget;
             const modal = e.target;
             const form = modal.querySelector('form');
             
-            // Set the form action URL
             const outingId = btn.dataset.outingId;
             form.action = `/edit_pitching/${outingId}`;
 
-            // Populate the pitcher dropdown
             const pitcherSelect = modal.querySelector('#edit_pitcher');
             pitcherSelect.innerHTML = AppState.full_data.roster
                 .filter(p => p.pitcher_role !== 'Not a Pitcher')
                 .map(p => `<option value="${escapeHTML(p.name)}">${escapeHTML(p.name)}</option>`)
                 .join('');
 
-            // Pre-fill the form fields with data from the button
             modal.querySelector('#edit_pitch_date').value = btn.dataset.date;
             pitcherSelect.value = btn.dataset.pitcher;
             modal.querySelector('#edit_opponent').value = btn.dataset.opponent;
@@ -672,13 +676,46 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     
-        const hash = window.location.hash || '#roster';
-        const tabEl = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
-        if (tabEl) {
-            tabEl.click();
-        } else {
-            const defaultTab = document.querySelector('a[href="#roster"]');
-            if (defaultTab) defaultTab.click();
+        let hash = window.location.hash;
+        if (!hash) {
+            hash = '#roster';
+        }
+
+        let tabToActivate = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
+        let elementToScrollTo = null;
+
+        if (!tabToActivate) {
+            const targetElement = document.getElementById(hash.substring(1));
+            if (targetElement) {
+                elementToScrollTo = targetElement;
+                const parentTabPane = targetElement.closest('.tab-pane');
+                if (parentTabPane) {
+                    tabToActivate = document.querySelector(`a[data-bs-toggle="tab"][href="#${parentTabPane.id}"]`);
+                }
+            }
+        }
+
+        if (!tabToActivate) {
+            tabToActivate = document.querySelector('a[data-bs-toggle="tab"][href="#roster"]');
+        }
+
+        if (tabToActivate) {
+            const tab = new bootstrap.Tab(tabToActivate);
+            tab.show();
+        }
+
+        if (elementToScrollTo && elementToScrollTo.classList.contains('accordion-collapse')) {
+            setTimeout(() => {
+                const bsCollapse = new bootstrap.Collapse(elementToScrollTo, {
+                    toggle: false
+                });
+                bsCollapse.show();
+                
+                elementToScrollTo.addEventListener('shown.bs.collapse', () => {
+                     elementToScrollTo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, { once: true });
+
+            }, 200);
         }
     }
     

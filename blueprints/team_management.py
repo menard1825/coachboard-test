@@ -117,7 +117,7 @@ def edit_practice_plan(plan_id):
         socketio.emit('data_updated', {'message': 'Practice plan updated.'})
     else:
         flash('Practice plan not found.', 'danger')
-    return redirect(url_for('home', _anchor='practice_plan'))
+    return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
 @team_management_bp.route('/delete_practice_plan/<int:plan_id>')
 def delete_practice_plan(plan_id):
@@ -152,7 +152,7 @@ def update_practice_attendance(plan_id):
     db.session.commit()
     flash('Practice attendance updated successfully!', 'success')
     socketio.emit('data_updated', {'message': f'Attendance updated for plan {plan_id}.'})
-    return redirect(url_for('home', _anchor='practice_plan'))
+    return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
 # --- Practice Task Routes ---
 @team_management_bp.route('/add_task_to_plan/<int:plan_id>', methods=['POST'])
@@ -160,7 +160,7 @@ def add_task_to_plan(plan_id):
     task_text = request.form.get('task_text')
     if not task_text:
         flash('Task cannot be empty.', 'warning')
-        return redirect(url_for('home', _anchor='practice_plan'))
+        return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
     plan = db.session.query(PracticePlan).filter_by(id=plan_id, team_id=session['team_id']).first()
     if not plan:
@@ -181,7 +181,7 @@ def add_task_to_plan(plan_id):
     
     flash('Task added to plan.', 'success')
     socketio.emit('data_updated', {'message': 'Task added to plan.'})
-    return redirect(url_for('home', _anchor='practice_plan'))
+    return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
 @team_management_bp.route('/delete_task/<int:plan_id>/<int:task_id>')
 def delete_task(plan_id, task_id):
@@ -197,7 +197,7 @@ def delete_task(plan_id, task_id):
         socketio.emit('data_updated', {'message': 'Task deleted from plan.'})
     else: 
         flash('Task not found.', 'danger')
-    return redirect(url_for('home', _anchor='practice_plan'))
+    return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
 @team_management_bp.route('/update_task_status/<int:plan_id>/<int:task_id>', methods=['POST'])
 def update_task_status(plan_id, task_id):
