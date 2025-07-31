@@ -13,7 +13,6 @@ function initializeGameManagement(gameData) {
     // Safely initialize the game object first to prevent errors
     const game = gameData.game || {};
     
-    // MODIFIED: Filter the roster to only include available players
     const availableRoster = (gameData.roster || []).filter(p => !(gameData.absent_player_ids || []).includes(p.id));
 
     // Update AppState properties
@@ -32,7 +31,34 @@ function initializeGameManagement(gameData) {
     // --- Utility Functions ---
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
     
-    const isMobile = () => window.innerWidth < 768;
+    // --- NEW HELPER FUNCTION ---
+    function updateLineupPlaceholders() {
+        const bench = document.getElementById('lineup-bench');
+        const order = document.getElementById('lineup-order');
+        if (!bench || !order) return;
+
+        // Remove existing placeholders to avoid duplicates
+        const existingBenchPlaceholder = bench.querySelector('.placeholder-text');
+        if (existingBenchPlaceholder) existingBenchPlaceholder.remove();
+        const existingOrderPlaceholder = order.querySelector('.placeholder-text');
+        if (existingOrderPlaceholder) existingOrderPlaceholder.remove();
+
+        // Add placeholder to batting order if it's empty
+        if (order.children.length === 0) {
+            order.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text">
+                                   <i class="bi bi-arrow-left-square" style="font-size: 2rem;"></i>
+                                   <p class="mt-2 mb-0">Drag players from the bench to build your batting order.</p>
+                               </div>`;
+        }
+
+        // Add placeholder to bench if it's empty
+        if (bench.children.length === 0) {
+            bench.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text">
+                                   <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                                   <p class="mt-2 mb-0">All available players are in the lineup.</p>
+                               </div>`;
+        }
+    }
 
     // --- Lineup Editor Functions ---
     function renderLineupEditor() {
@@ -58,6 +84,7 @@ function initializeGameManagement(gameData) {
         });
         
         initializeLineupSortables();
+        updateLineupPlaceholders(); // Call after initial render
     }
     
     function initializeLineupSortables() {
@@ -69,18 +96,34 @@ function initializeGameManagement(gameData) {
 
         if (!bench || !order) return;
 
+        const onEndHandler = () => {
+            updateLineupPlaceholders(); // Call after any drag operation
+        };
+
         window.sortableInstances.lineupBench = new Sortable(bench, {
             group: 'lineup',
             animation: 150,
+            onAdd: (evt) => {
+                const placeholder = bench.querySelector('.placeholder-text');
+                if (placeholder) placeholder.remove();
+
+                const player = window.AppState.roster.find(p => p.name === evt.item.dataset.playerName);
+                if (player) evt.item.replaceWith(createBenchPlayerItem(player));
+            },
+            onEnd: onEndHandler
         });
         window.sortableInstances.lineupOrder = new Sortable(order, {
             group: 'lineup',
             handle: '.lineup-drag-handle',
             animation: 150,
             onAdd: (evt) => {
+                const placeholder = order.querySelector('.placeholder-text');
+                if (placeholder) placeholder.remove();
+
                 const player = window.AppState.roster.find(p => p.name === evt.item.dataset.playerName);
                 if (player) evt.item.replaceWith(createBattingOrderItem(player));
-            }
+            },
+            onEnd: onEndHandler
         });
     }
 
@@ -114,6 +157,8 @@ function initializeGameManagement(gameData) {
     // --- Rotation Editor Functions ---
     function renderRotationEditor() {
         if (!window.AppState.rotation) return;
+        const container = document.getElementById('inning-btn-group');
+        if (!container) return; // Exit if rotation editor isn't on the page
         renderInningSelector();
         renderRotationDiamondAndBench();
         updatePlayingTimeSummary();
@@ -207,8 +252,10 @@ function initializeGameManagement(gameData) {
 
         tableHtml += `</tbody></table></div>`;
         
-        document.getElementById('summary-desktop').innerHTML = tableHtml;
-        document.getElementById('summary-mobile').innerHTML = tableHtml;
+        const summaryDesktop = document.getElementById('summary-desktop');
+        const summaryMobile = document.getElementById('summary-mobile');
+        if (summaryDesktop) summaryDesktop.innerHTML = tableHtml;
+        if (summaryMobile) summaryMobile.innerHTML = tableHtml;
     }
 
     function initializeRotationSortables() {
@@ -260,13 +307,12 @@ function initializeGameManagement(gameData) {
         btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
 
         window.AppState.lineup.title = document.getElementById('lineupTitle').value;
-        // MODIFICATION: Save an array of names instead of objects with positions
         window.AppState.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => item.dataset.playerName);
         
         const url = window.AppState.lineup.id ? `/edit_lineup/${window.AppState.lineup.id}` : '/add_lineup';
         const payload = {
             title: window.AppState.lineup.title,
-            lineup_data: window.AppState.lineup.lineup_positions, // This is now just an array of names
+            lineup_data: window.AppState.lineup.lineup_positions,
             associated_game_id: window.AppState.game.id
         };
 
@@ -283,7 +329,6 @@ function initializeGameManagement(gameData) {
                 window.AppState.lineup.id = result.new_id;
             }
             lineupEditorModal.hide();
-            // Manually reload the page to show the updated lineup display
             window.location.reload();
 
         } catch (error) {
@@ -319,7 +364,7 @@ function initializeGameManagement(gameData) {
             if (result.status === 'success') {
                 if (result.new_id) window.AppState.rotation.id = result.new_id;
                 btn.textContent = 'Saved!';
-                renderRotationEditor(); // Re-render to show updated state
+                renderRotationEditor();
             } else { throw new Error(result.message); }
         } catch (error) {
             alert('Error saving rotation: ' + error.message);
@@ -348,9 +393,9 @@ function initializeGameManagement(gameData) {
                 const playerItem = removeButton.closest('.list-group-item');
                 const bench = document.getElementById('lineup-bench');
                 playerItem.remove();
-                // Re-create bench item and add it back
                 const player = window.AppState.roster.find(p => p.name === playerItem.dataset.playerName);
                 if(player) bench.appendChild(createBenchPlayerItem(player));
+                updateLineupPlaceholders(); // Call after removing a player
             }
         });
         
