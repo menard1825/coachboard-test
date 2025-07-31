@@ -126,23 +126,18 @@ def create_app():
         all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
         default_tab_order = list(all_tabs.keys())
 
-        # *** MODIFICATION START: More robust tab order handling ***
         final_tab_order = []
         try:
             user_tab_order = json.loads(user.tab_order or '[]')
-            # If the saved order is not a list or is empty, reset to default
             if not isinstance(user_tab_order, list) or not user_tab_order:
                 final_tab_order = default_tab_order
             else:
-                # Use the user's order, but ensure all default tabs are present
                 final_tab_order = user_tab_order
                 for tab in default_tab_order:
                     if tab not in final_tab_order:
                         final_tab_order.append(tab)
         except (json.JSONDecodeError, TypeError):
-            # If JSON is corrupted for any reason, reset to default
             final_tab_order = default_tab_order
-        # *** MODIFICATION END ***
 
         roster_players = db.session.query(Player).filter_by(team_id=user.team_id).all()
         rotations = db.session.query(Rotation).filter_by(team_id=user.team_id).all()

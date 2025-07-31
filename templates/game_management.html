@@ -23,10 +23,13 @@
 </nav>
 
 <main class="container-fluid mt-3">
-    <!-- MODIFICATION: Changed tabs to remove Lineup -->
+    <!-- MODIFICATION: Added "Lineup" back to the tab list -->
     <ul class="nav nav-tabs nav-fill mb-3" id="gameTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="availability-tab" data-bs-toggle="tab" data-bs-target="#availability" type="button" role="tab">Availability</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="lineup-tab" data-bs-toggle="tab" data-bs-target="#lineup" type="button" role="tab">Lineup</button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="rotation-tab" data-bs-toggle="tab" data-bs-target="#rotation" type="button" role="tab">Rotation</button>
@@ -37,13 +40,16 @@
     </ul>
 
     <div class="tab-content" id="gameTabsContent">
+        <!-- MODIFICATION: Availability is now in its own tab pane -->
         <div class="tab-pane fade show active" id="availability" role="tabpanel" aria-labelledby="availability-tab">
-            <div class="row">
-                <div class="col-lg-6 mb-4">
+            <div class="row justify-content-center">
+                <div class="col-lg-8 col-md-10">
                     <div class="card">
-                        <div class="card-header"><h5 class="mb-0">Set Player Availability</h5></div>
+                        <div class="card-header">
+                            <h5 class="mb-0">Set Player Availability</h5>
+                        </div>
                         <div class="card-body">
-                            <p class="text-muted">Check the box for any player who will be absent for this game. This will remove them from the lineup and rotation builders.</p>
+                            <p class="text-muted">Check the box next to any player who will be absent for this game. This will remove them from the lineup and rotation builders.</p>
                             <form action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
                                 <ul class="list-group mb-3">
                                     {% for player in roster %}
@@ -62,8 +68,13 @@
                         </div>
                     </div>
                 </div>
-                <!-- MODIFICATION: Added Lineup Display Card -->
-                <div class="col-lg-6 mb-4">
+            </div>
+        </div>
+
+        <!-- MODIFICATION: Lineup is now in its own tab pane -->
+        <div class="tab-pane fade" id="lineup" role="tabpanel" aria-labelledby="lineup-tab">
+            <div class="row justify-content-center">
+                <div class="col-lg-8 col-md-10">
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Batting Lineup</h5>
@@ -94,6 +105,7 @@
                 </div>
             </div>
         </div>
+
         <div class="tab-pane fade" id="rotation" role="tabpanel" aria-labelledby="rotation-tab">
             {% include '_rotation_editor.html' %}
         </div>
@@ -103,7 +115,6 @@
     </div>
 </main>
 
-<!-- MODIFICATION: Include the lineup editor modal -->
 {% include '_lineup_editor.html' %}
 
 <div class="modal fade" id="assignPlayerModal" tabindex="-1">

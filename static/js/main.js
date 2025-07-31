@@ -268,7 +268,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const outingsList = document.getElementById('recorded-outings-list');
         if (outingsList) {
             const outings = (AppState.full_data.pitching || []).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
-            outingsList.innerHTML = outings.map((o) => `<li class="list-group-item d-flex justify-content-between align-items-center"><span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.pitcher)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}"><i class="bi bi-trash"></i></button></li>`).join('') || `<li class="list-group-item text-muted">No outings recorded.</li>`;
+            outingsList.innerHTML = outings.map((o) => `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.pitcher)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
+                            data-outing-id="${o.id}"
+                            data-date="${o.date}"
+                            data-pitcher="${escapeHTML(o.pitcher)}"
+                            data-opponent="${escapeHTML(o.opponent)}"
+                            data-pitches="${o.pitches}"
+                            data-innings="${o.innings}"
+                            data-outing-type="${o.outing_type}"
+                            data-pitcher-type="${o.pitcher_type}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </li>`).join('') || `<li class="list-group-item text-muted">No outings recorded.</li>`;
         }
     }
 
@@ -527,16 +546,15 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.querySelector('#editNoteText').value = e.relatedTarget.dataset.noteText;
         });
 
-        // --- MODIFICATION START: Consolidated logic for the focus modal ---
         document.getElementById('editFocusModal')?.addEventListener('show.bs.modal', (e) => {
             const btn = e.relatedTarget;
-            if (!btn) return; // Exit if modal was opened without a trigger button
+            if (!btn) return;
 
             const form = e.target.querySelector('form');
             form.reset();
             const focusId = btn.dataset.focusId;
 
-            if (focusId) { // This is an EDIT operation
+            if (focusId) {
                 e.target.querySelector('.modal-title').textContent = 'Edit Focus';
                 form.action = `/update_focus/${focusId}`;
                 const focusItem = AppState.full_data.player_development[btn.dataset.playerName]?.find(item => item.id == focusId);
@@ -545,16 +563,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     form.querySelector('#focusText').value = focusItem.text;
                     form.querySelector('#focusNotes').value = focusItem.notes || '';
                 }
-            } else { // This is an ADD operation
+            } else {
                 e.target.querySelector('.modal-title').textContent = 'Add Focus';
                 form.action = `/add_focus/${encodeURIComponent(btn.dataset.playerName)}`;
-                // Pre-select the skill based on the button that was clicked
                 if (btn.dataset.skill) {
                     form.querySelector('#focusSkill').value = btn.dataset.skill;
                 }
             }
         });
-        // --- MODIFICATION END ---
         
         document.getElementById('editSignModal')?.addEventListener('show.bs.modal', (e) => {
             const sign = AppState.full_data.signs.find(s => s.id == e.relatedTarget.dataset.signId);
@@ -562,6 +578,33 @@ document.addEventListener('DOMContentLoaded', () => {
             form.action = `/update_sign/${sign.id}`;
             form.querySelector('#editSignName').value = sign.name;
             form.querySelector('#editSignIndicator').value = sign.indicator;
+        });
+
+        // MODIFICATION: Add event listener for the new edit pitching outing modal
+        document.getElementById('editPitchingOutingModal')?.addEventListener('show.bs.modal', (e) => {
+            const btn = e.relatedTarget;
+            const modal = e.target;
+            const form = modal.querySelector('form');
+            
+            // Set the form action URL
+            const outingId = btn.dataset.outingId;
+            form.action = `/edit_pitching/${outingId}`;
+
+            // Populate the pitcher dropdown
+            const pitcherSelect = modal.querySelector('#edit_pitcher');
+            pitcherSelect.innerHTML = AppState.full_data.roster
+                .filter(p => p.pitcher_role !== 'Not a Pitcher')
+                .map(p => `<option value="${escapeHTML(p.name)}">${escapeHTML(p.name)}</option>`)
+                .join('');
+
+            // Pre-fill the form fields with data from the button
+            modal.querySelector('#edit_pitch_date').value = btn.dataset.date;
+            pitcherSelect.value = btn.dataset.pitcher;
+            modal.querySelector('#edit_opponent').value = btn.dataset.opponent;
+            modal.querySelector('#edit_pitches').value = btn.dataset.pitches;
+            modal.querySelector('#edit_innings').value = btn.dataset.innings;
+            modal.querySelector('#edit_outing_type').value = btn.dataset.outingType;
+            modal.querySelector('#edit_pitcher_type').value = btn.dataset.pitcherType;
         });
     }
     

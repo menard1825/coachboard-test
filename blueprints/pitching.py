@@ -35,6 +35,34 @@ def add_pitching():
         return redirect(url_for('gameday.game_management', game_id=game_id, _anchor='pitching'))
     return redirect(url_for('home', _anchor='pitching'))
 
+@pitching_bp.route('/edit_pitching/<int:outing_id>', methods=['POST'])
+def edit_pitching(outing_id):
+    outing_to_edit = db.session.get(PitchingOuting, outing_id)
+    if not outing_to_edit or outing_to_edit.team_id != session['team_id']:
+        flash('Pitching outing not found or you do not have permission to edit it.', 'danger')
+        return redirect(url_for('home', _anchor='pitching'))
+    
+    try:
+        outing_to_edit.date = request.form.get('pitch_date', outing_to_edit.date)
+        outing_to_edit.pitcher = request.form.get('pitcher', outing_to_edit.pitcher)
+        outing_to_edit.opponent = request.form.get('opponent', outing_to_edit.opponent)
+        outing_to_edit.pitches = int(request.form.get('pitches', outing_to_edit.pitches))
+        outing_to_edit.innings = float(request.form.get('innings', outing_to_edit.innings))
+        outing_to_edit.pitcher_type = request.form.get('pitcher_type', outing_to_edit.pitcher_type)
+        outing_to_edit.outing_type = request.form.get('outing_type', outing_to_edit.outing_type)
+        
+        db.session.commit()
+        flash(f'Successfully updated outing for {outing_to_edit.pitcher}.', 'success')
+        socketio.emit('data_updated', {'message': 'Pitching outing updated.'})
+    except ValueError:
+        flash('Invalid number format for pitches or innings.', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'An error occurred: {e}', 'danger')
+        
+    return redirect(url_for('home', _anchor='pitching'))
+
+
 @pitching_bp.route('/delete_pitching/<int:outing_id>')
 def delete_pitching(outing_id):
     outing_to_delete = db.session.query(PitchingOuting).filter_by(id=outing_id, team_id=session['team_id']).first()

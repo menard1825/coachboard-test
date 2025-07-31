@@ -324,6 +324,65 @@
         </form>
     </div></div>
 </div>
+
+<!-- MODIFICATION START: Add Modal for Editing Pitching Outings -->
+<div class="modal fade" id="editPitchingOutingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Pitching Outing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editPitchingOutingForm" method="POST">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label for="edit_pitch_date" class="form-label">Date</label>
+                            <input type="date" id="edit_pitch_date" name="pitch_date" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_pitcher" class="form-label">Pitcher</label>
+                            <select name="pitcher" class="form-select" required id="edit_pitcher"></select>
+                        </div>
+                        <div class="col-12">
+                            <label for="edit_opponent" class="form-label">Opponent / Context</label>
+                            <input type="text" id="edit_opponent" name="opponent" class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_pitches" class="form-label">Pitch Count</label>
+                            <input type="number" id="edit_pitches" name="pitches" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_innings" class="form-label">Innings</label>
+                            <input type="text" id="edit_innings" name="innings" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_outing_type" class="form-label">Outing Type</label>
+                            <select name="outing_type" id="edit_outing_type" class="form-select">
+                                <option value="Game">Game</option>
+                                <option value="External/Lesson">External/Lesson</option>
+                                <option value="Practice">Practice</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_pitcher_type" class="form-label">Pitcher Type</label>
+                            <select name="pitcher_type" id="edit_pitcher_type" class="form-select">
+                                <option value="Starter">Starter</option>
+                                <option value="Reliever">Reliever</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- MODIFICATION END -->
+
 {% endblock %}
 
 {% block scripts %}
