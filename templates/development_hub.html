@@ -1,82 +1,233 @@
 {% extends "base.html" %}
 
-{% block title %}Development Hub - {{ super() }}{% endblock %}
+{% block styles %}
+{{ super() }}
+<style>
+    /* Add a smooth transition for when the player details appear */
+    #player-details-container {
+        transition: opacity 0.5s ease-in-out;
+    }
+
+    .card-title {
+        color: #007bff; /* A nice blue for the titles */
+    }
+
+    /* On smaller screens, add some extra margin to the player selector */
+    @media (max-width: 768px) {
+        #player-select-container {
+            margin-bottom: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<!-- MODIFIED: Changed div to main tag and kept the container and mt-4 classes -->
-<main class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h2">Development Hub</h1>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFocusModal">
-            <i class="fas fa-plus-circle mr-2"></i>Add New Focus
-        </button>
-    </div>
+<div class="container">
+    <h1 class="my-4 text-center">Player Development Hub</h1>
 
-    <!-- Display Existing Focus Areas -->
-    <div class="card">
-        <div class="card-header">
-            Current Focus Areas
-        </div>
-        <div class="card-body">
-            {% if focus_areas %}
-                <ul class="list-group list-group-flush">
-                    {% for focus in focus_areas %}
-                        <li class="list-group-item">
-                            <h5>{{ focus.name }}</h5>
-                            <p>{{ focus.description }}</p>
-                            <small class="text-muted">Assigned to: 
-                                {% if focus.players %}
-                                    {{ focus.players|map(attribute='name')|join(', ') }}
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </small>
-                        </li>
+    <!-- Player Selection Dropdown -->
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6" id="player-select-container">
+            <div class="form-group">
+                <label for="player-select"><strong>Select a Player</strong></label>
+                <select class="form-control form-control-lg" id="player-select">
+                    <option value="" selected disabled>-- Choose a player to train --</option>
+                    {% for player in players %}
+                        <option value="{{ player.id }}">{{ player.name }}</option>
                     {% endfor %}
-                </ul>
-            {% else %}
-                <p class="text-center text-muted">No development focus areas have been created yet. Click "Add New Focus" to get started.</p>
-            {% endif %}
+                </select>
+            </div>
         </div>
     </div>
-</main>
 
-<!-- Add New Focus Modal -->
-<div class="modal fade" id="addFocusModal" tabindex="-1" role="dialog" aria-labelledby="addFocusModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addFocusModalLabel">Add New Development Focus</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <!-- The form posts to the add_focus route in your development blueprint -->
-                <form action="{{ url_for('development.add_focus') }}" method="post">
-                    <div class="form-group mb-3">
-                        <label for="focus_name">Focus Name</label>
-                        <input type="text" class="form-control" id="focus_name" name="focus_name" placeholder="e.g., Base Running, Pitch Recognition" required>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="description">Description</label>
-                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Describe the focus and its goals."></textarea>
-                    </div>
-                    <div class="form-group mb-3">
-                        <label for="players">Assign to Players (Optional)</label>
-                        <small class="form-text text-muted">Select one or more players to assign this focus to. Use Ctrl-Click (or Cmd-Click) to select multiple.</small>
-                        <select multiple class="form-control" id="players" name="players" style="height: 150px;">
-                            {% for player in players %}
-                                <option value="{{ player.id }}">{{ player.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+    <!-- Player Development Details -->
+    <div id="player-details-container" style="display: none; opacity: 0;">
+        <h2 id="player-name" class="text-center mb-4"></h2>
+        <form id="development-form">
+            <input type="hidden" name="player_id" id="player_id">
+            
+            <!-- Hitting Skills Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h4 class="card-title">Hitting Attributes</h4>
                     <hr>
-                    <div class="text-end">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Focus</button>
+                    <div class="form-row">
+                        <div class="form-group col-sm-6">
+                            <label for="contact">Contact</label>
+                            <input type="number" class="form-control" name="contact" id="contact" min="20" max="80" required>
+                        </div>
+                        <div class="form-group col-sm-6">
+                            <label for="power">Power</label>
+                            <input type="number" class="form-control" name="power" id="power" min="20" max="80" required>
+                        </div>
+                        <div class="form-group col-sm-6">
+                            <label for="eye">Eye/Discipline</label>
+                            <input type="number" class="form-control" name="eye" id="eye" min="20" max="80" required>
+                        </div>
+                        <div class="form-group col-sm-6">
+                            <label for="speed">Speed</label>
+                            <input type="number" class="form-control" name="speed" id="speed" min="20" max="99" required>
+                        </div>
+                         <div class="form-group col-sm-6">
+                            <label for="gap_power">Gap Power</label>
+                            <input type="number" class="form-control" name="gap_power" id="gap_power" min="20" max="80" required>
+                        </div>
+                        <div class="form-group col-sm-6">
+                            <label for="avoid_k">Avoid K's</label>
+                            <input type="number" class="form-control" name="avoid_k" id="avoid_k" min="20" max="80" required>
+                        </div>
                     </div>
-                </form>
+                </div>
             </div>
-        </div>
+
+            <!-- Pitching Skills Card -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="card-title">Pitching Attributes</h4>
+                    <hr>
+                    <div class="form-row">
+                        <div class="form-group col-sm-6">
+                            <label for="stamina">Stamina</label>
+                            <input type="number" class="form-control" name="stamina" id="stamina" min="20" max="80" required>
+                        </div>
+                        <div class="form-group col-sm-6">
+                            <label for="velocity">Velocity</label>
+                            <input type="number" class="form-control" name="velocity" id="velocity" min="20" max="80" required>
+                        </div>
+                        <div class="form-group col-sm-6">
+                            <label for="movement">Movement</label>
+                            <input type="number" class="form-control" name="movement" id="movement" min="20" max="80" required>
+                        </div>
+                        <div class="form-group col-sm-6">
+                            <label for="control">Control</label>
+                            <input type="number" class="form-control" name="control" id="control" min="20" max="80" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Submit Button -->
+            <div class="text-center mt-4">
+                <button type="submit" class="btn btn-primary btn-lg px-5">Save Changes</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Initial Prompt -->
+    <div id="select-player-prompt" class="text-center mt-5">
+        <p class="lead text-muted">Select a player to get started.</p>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const playerSelect = document.getElementById('player-select');
+    const playerDetailsContainer = document.getElementById('player-details-container');
+    const selectPlayerPrompt = document.getElementById('select-player-prompt');
+    const playerNameEl = document.getElementById('player-name');
+    const form = document.getElementById('development-form');
+    const playerIdInput = document.getElementById('player_id');
+
+    playerSelect.addEventListener('change', function() {
+        const playerId = this.value;
+        if (!playerId) {
+            playerDetailsContainer.style.display = 'none';
+            playerDetailsContainer.style.opacity = '0';
+            selectPlayerPrompt.style.display = 'block';
+            return;
+        }
+
+        // Show a simple loading state
+        selectPlayerPrompt.innerHTML = '<p class="lead text-muted">Loading player data...</p>';
+        selectPlayerPrompt.style.display = 'block';
+        playerDetailsContainer.style.display = 'none';
+
+
+        // Fetch player data from the server
+        fetch(`/development/player/${playerId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Network response was not ok (${response.status})`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    selectPlayerPrompt.innerHTML = '<p class="lead text-danger">Could not load player data.</p>';
+                    return;
+                }
+                
+                // Populate the form with the fetched data
+                playerNameEl.textContent = `Training: ${data.name}`;
+                playerIdInput.value = data.id;
+                
+                const attributes = data.attributes || {};
+                for (const key in attributes) {
+                    const input = form.querySelector(`[name="${key}"]`);
+                    if (input) {
+                        input.value = attributes[key];
+                    }
+                }
+
+                // Show the form and hide the prompt
+                playerDetailsContainer.style.display = 'block';
+                selectPlayerPrompt.style.display = 'none';
+                
+                // Fade in the details for a smooth effect
+                setTimeout(() => {
+                    playerDetailsContainer.style.opacity = '1';
+                }, 10);
+
+                // On mobile devices, scroll down to the form automatically
+                if (window.innerWidth < 768) {
+                    playerDetailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching player data:', error);
+                selectPlayerPrompt.innerHTML = '<p class="lead text-danger">An error occurred while fetching player data.</p>';
+                alert('An error occurred. Please check the console for more details.');
+            });
+    });
+
+    // Handle the form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const submitButton = this.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        submitButton.textContent = 'Saving...';
+
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+
+        fetch('/development/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                // You could replace this alert with a more subtle notification
+                alert('Player updated successfully!');
+            } else {
+                alert('Error updating player: ' + (result.message || 'An unknown error occurred.'));
+            }
+        })
+        .catch(error => {
+             console.error('Error submitting form:', error);
+             alert('An error occurred while saving. Please check the console.');
+        })
+        .finally(() => {
+            // Re-enable the button
+            submitButton.disabled = false;
+            submitButton.textContent = 'Save Changes';
+        });
+    });
+});
+</script>
 {% endblock %}
