@@ -6,7 +6,7 @@ body {
 
 /* MODIFIED: Added a default background color for the navbar */
 .navbar {
-    background-color: #1F2937; /* Default dark blue */
+    background-color: #343A40; /* Changed to a lighter dark grey */
     border-bottom: 3px solid rgba(0, 0, 0, 0.15);
 }
 
@@ -30,18 +30,27 @@ body {
     box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15);
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
+    background-color: #343A40; /* Darker background for dropdown */
 }
 
 .navbar-dark .dropdown-item {
     padding: 0.5rem 1rem;
     display: flex;
     align-items: center;
+    color: rgba(255, 255, 255, 0.75); /* Lighter text for contrast */
+}
+.navbar-dark .dropdown-item:hover {
+    background-color: rgba(255, 255, 255, 0.1); /* Subtle hover effect */
+    color: white;
 }
 
 .navbar-dark .dropdown-item i {
     width: 28px; /* Align text by giving icon a fixed width */
     font-size: 1.1rem;
-    color: #6c757d;
+    color: rgba(255, 255, 255, 0.5); /* Lighter icons */
+}
+.navbar-dark .dropdown-item:hover i {
+    color: white; /* White icons on hover */
 }
 
 .btn-primary { background-color: #c8102e; border-color: #c8102e; }
@@ -337,5 +346,51 @@ body {
         width: 100%; /* Take full width */
         /* If content within a tab-pane is still cut off, consider adding overflow-y: auto here */
         /* overflow-y: auto; */ /* Only if content inside tab-pane overflows its own height */
+    }
+
+    /* NEW: Styling for icons within the offcanvas list group items */
+    .offcanvas-body .list-group-item i {
+        font-size: 1.1rem; /* Set a consistent icon size */
+        color: #6c757d; /* A neutral grey color for the icons */
+        margin-right: 0.5rem; /* Add some spacing between icon and text */
+        width: 24px; /* Ensure consistent alignment */
+        text-align: center; /* Center the icon within its allocated space */
+    }
+    
+    /* MODIFIED: Target icons within dropdown-items specifically inside the offcanvas */
+    #mobileMoreMenu .dropdown-item i {
+        font-size: 1.1rem;
+        color: #6c757d; /* Match the color of other offcanvas icons */
+        margin-right: 0.5rem;
+        width: 24px;
+        text-align: center;
+    }
+
+    /* Ensure text is visible and aligned */
+    .offcanvas-body .list-group-item {
+        display: flex;
+        align-items: center;
+    }
+
+    /* NEW: Remove list-style from all list items in the offcanvas body */
+    #mobileMoreMenu .list-group-flush li {
+        list-style: none;
+        /* Ensure padding and alignment are correct for list-group-item */
+        padding: 0.5rem 1rem; /* Restore Bootstrap's default list-group-item padding */
+    }
+
+    /* NEW: Explicitly remove list-style markers in the mobile offcanvas menu */
+    #mobileMoreMenu .list-group-flush li::marker {
+        content: "";
+        display: none;
+    }
+
+    /* Ensure the anchor tags inside the list items also stretch and align */
+    #mobileMoreMenu .list-group-flush li a {
+        display: flex;
+        align-items: center;
+        width: 100%; /* Make the link fill the li */
+        text-decoration: none; /* Remove underline */
+        color: inherit; /* Inherit color from parent li or default */
     }
 }

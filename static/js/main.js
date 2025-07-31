@@ -52,10 +52,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const pNotesSafe = escapeHTML(p.notes || '');
         const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
-        // --- MODIFICATION START: Use data-delete-url for the delete button ---
+        // --- MODIFICATION START: Changed padding on drag handle to fix height issue ---
         return `
         <div class="accordion-item" data-player-name="${pNameSafe}">
-            <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-roster-${p.id}"><i class="bi bi-grip-vertical me-2 drag-handle"></i><strong>${pNameSafe}</strong>&nbsp;(#${p.number || 'N/A'})<span class="ms-auto text-muted small d-none d-sm-inline">${[p.position1, p.position2, p.position3].filter(Boolean).join(', ') || 'N/A'} | ${p.bats || 'N/A'} / ${p.throws || 'N/A'}</span></button></h2>
+            <h2 class="accordion-header d-flex align-items-center">
+                <i class="bi bi-grip-vertical px-3 text-muted drag-handle" style="cursor: move;" title="Drag to reorder"></i>
+                <button class="accordion-button collapsed flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-roster-${p.id}" style="border-top-left-radius: 0; border-bottom-left-radius: 0;">
+                    <strong>${pNameSafe}</strong>&nbsp;(#${p.number || 'N/A'})
+                    <span class="ms-auto text-muted small d-none d-sm-inline ps-2">${[p.position1, p.position2, p.position3].filter(Boolean).join(', ') || 'N/A'} | ${p.bats || 'N/A'} / ${p.throws || 'N/A'}</span>
+                </button>
+            </h2>
             <div id="collapse-roster-${p.id}" class="accordion-collapse collapse" data-bs-parent="#rosterAccordion"><div class="accordion-body">
                 <div class="row g-3 align-items-end">
                     <div class="col-12"><h5>Player Notes</h5></div>
@@ -81,9 +87,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('rosterAccordion');
         if (!container) return;
         const searchTerm = document.getElementById('rosterSearch').value.toLowerCase();
-        const filteredRoster = (AppState.full_data.roster || []).filter(p => 
+        
+        // --- MODIFICATION START: Sort roster by player_order before filtering and rendering ---
+        let rosterToSort = [...(AppState.full_data.roster || [])];
+
+        rosterToSort.sort((a, b) => {
+            const indexA = AppState.player_order.indexOf(a.name);
+            const indexB = AppState.player_order.indexOf(b.name);
+            if (indexA === -1 && indexB === -1) return a.name.localeCompare(b.name);
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+        });
+        
+        const filteredRoster = rosterToSort.filter(p => 
             !searchTerm || p.name.toLowerCase().includes(searchTerm) || (p.number || '').toString().includes(searchTerm)
         );
+        // --- MODIFICATION END ---
+
         container.innerHTML = filteredRoster.length > 0 ? filteredRoster.map(playerTemplate).join('') : `<div class="p-3 text-center text-muted">No players found.</div>`;
         attachRosterSaveListeners();
     }

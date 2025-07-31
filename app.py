@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, render_template, session, jsonify, send_from_directory, redirect, url_for, flash
+from flask import Flask, render_template, session, jsonify, send_from_directory, redirect, url_for, flash, make_response
 from datetime import datetime, timedelta, date
 from functools import wraps
 from sqlalchemy.orm import joinedload
@@ -14,6 +14,7 @@ from models import (
     PlayerGameAbsence, PlayerPracticeAbsence
 )
 from extensions import socketio, migrate
+
 from utils import (
     get_pitching_rules_for_team, calculate_cumulative_pitching_stats,
     calculate_cumulative_position_stats, calculate_pitch_count_summary
@@ -91,9 +92,27 @@ def create_app():
     @app.context_processor
     def inject_team_info():
         if 'team_id' in session:
+            # NEW: Expire all objects in the session to force a fresh load from DB
+            db.session.expire_all()
             team = db.session.get(Team, session['team_id'])
             return {'current_team': team}
         return {}
+
+    # NEW: Context processor for CSS version
+    @app.context_processor
+    def inject_css_version():
+        # Use a timestamp to force browser to reload CSS on server restart or significant change
+        # In a production environment, you might use a build hash for better cache control
+        return {'css_version': datetime.now().strftime('%Y%m%d%H%M%S')}
+
+    # NEW: Context processor for timestamp for cache-busting links
+    @app.context_processor
+    def inject_current_year_and_timestamp():
+        return {
+            'current_year': datetime.now().year,
+            'current_year_timestamp': datetime.now().timestamp() # New timestamp for cache-busting links
+        }
+
 
     # --- CORE APP ROUTES ---
     @app.route('/')
@@ -104,17 +123,22 @@ def create_app():
             flash('User or team not found.', 'danger')
             return redirect(url_for('auth.login'))
 
+        # Get tab order and ensure 'stats' is always included for display
+        tab_order_list = json.loads(user.tab_order or "[]")
+        if 'stats' not in tab_order_list:
+            tab_order_list.append('stats')
+
         roster_players = db.session.query(Player).filter_by(team_id=user.team_id).all()
         lineups = db.session.query(Lineup).filter_by(team_id=user.team_id).all()
         pitching_outings = db.session.query(PitchingOuting).filter_by(team_id=user.team_id).all()
-        
+
         pitcher_names = sorted([p.name for p in roster_players if p.pitcher_role != 'Not a Pitcher'])
         cumulative_pitching_data = {name: calculate_cumulative_pitching_stats(name, pitching_outings) for name in pitcher_names}
         cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
-        
+
         game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=user.team_id).group_by(PlayerGameAbsence.player_id).all()
         practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=user.team_id).group_by(PlayerPracticeAbsence.player_id).all()
-        
+
         attendance_stats = {p.id: {'name': p.name, 'games_missed': 0, 'practices_missed': 0} for p in roster_players}
         for player_id, count in game_absences:
             if player_id in attendance_stats:
@@ -125,18 +149,36 @@ def create_app():
 
         all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
 
-        return render_template('index.html',
+        # MODIFIED: Create a response object and add Cache-Control headers
+        response = make_response(render_template('index.html',
                                session=session,
                                roster_players=roster_players,
                                cumulative_position_data=cumulative_position_data,
                                cumulative_pitching_data=cumulative_pitching_data,
                                attendance_stats=attendance_stats,
-                               tab_order=json.loads(user.tab_order or "[]"),
-                               all_tabs=all_tabs)
+                               tab_order=tab_order_list,
+                               all_tabs=all_tabs))
 
+        # NEW: Add Cache-Control headers to prevent caching of this page
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+
+    @app.route('/manifest.json')
+    def serve_manifest():
+        return send_from_directory('static', 'manifest.json')
+
+    # NEW: Moved get_app_data route definition to the end of create_app()
     @app.route('/get_app_data')
     @login_required
     def get_app_data():
+        # DEBUG: This print statement will help us confirm if this route is being hit.
+        # If you see this in your server logs, the route is registered, and the issue
+        # is likely within the function's logic or data fetching.
+        # If you DO NOT see this, the route is not being registered by Flask.
+        print("DEBUG: Attempting to load app data via /get_app_data")
+
         team_id = session['team_id']
         user = db.session.query(User).filter_by(username=session['username']).first()
         team = db.session.get(Team, team_id)
@@ -202,10 +244,6 @@ def create_app():
             'session': {'username': session.get('username'), 'role': session.get('role')},
             'pitch_count_summary': pitch_count_summary
         })
-        
-    @app.route('/manifest.json')
-    def serve_manifest():
-        return send_from_directory('static', 'manifest.json')
 
     return app
 
