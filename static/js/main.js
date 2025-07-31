@@ -189,10 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="btn-group">
                     <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown">Add New</button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">Hitting Focus</a></li>
-                        <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">Pitching Focus</a></li>
-                        <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">Fielding Focus</a></li>
-                        <li><a class="dropdown-item add-focus-btn" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">Baserunning Focus</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">Hitting Focus</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">Pitching Focus</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">Fielding Focus</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">Baserunning Focus</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; switchTab(document.querySelector('a[href=\\'#collaboration\\']'));">Coach Note</a></li>
                     </ul>
@@ -202,7 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    // MODIFICATION: Updated to render a simple ordered list for the lineup
     function renderLineups() {
         const container = document.getElementById('lineupsAccordion');
         if (!container) return;
@@ -527,11 +526,17 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.querySelector('#editNoteType').value = e.relatedTarget.dataset.noteType;
             e.target.querySelector('#editNoteText').value = e.relatedTarget.dataset.noteText;
         });
+
+        // --- MODIFICATION START: Consolidated logic for the focus modal ---
         document.getElementById('editFocusModal')?.addEventListener('show.bs.modal', (e) => {
-            const btn = e.relatedTarget, form = e.target.querySelector('form');
+            const btn = e.relatedTarget;
+            if (!btn) return; // Exit if modal was opened without a trigger button
+
+            const form = e.target.querySelector('form');
             form.reset();
             const focusId = btn.dataset.focusId;
-            if (focusId) {
+
+            if (focusId) { // This is an EDIT operation
                 e.target.querySelector('.modal-title').textContent = 'Edit Focus';
                 form.action = `/update_focus/${focusId}`;
                 const focusItem = AppState.full_data.player_development[btn.dataset.playerName]?.find(item => item.id == focusId);
@@ -540,12 +545,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     form.querySelector('#focusText').value = focusItem.text;
                     form.querySelector('#focusNotes').value = focusItem.notes || '';
                 }
-            } else {
+            } else { // This is an ADD operation
                 e.target.querySelector('.modal-title').textContent = 'Add Focus';
                 form.action = `/add_focus/${encodeURIComponent(btn.dataset.playerName)}`;
-                form.querySelector('#focusSkill').value = btn.dataset.skill;
+                // Pre-select the skill based on the button that was clicked
+                if (btn.dataset.skill) {
+                    form.querySelector('#focusSkill').value = btn.dataset.skill;
+                }
             }
         });
+        // --- MODIFICATION END ---
+        
         document.getElementById('editSignModal')?.addEventListener('show.bs.modal', (e) => {
             const sign = AppState.full_data.signs.find(s => s.id == e.relatedTarget.dataset.signId);
             const form = e.target.querySelector('form');
@@ -553,23 +563,8 @@ document.addEventListener('DOMContentLoaded', () => {
             form.querySelector('#editSignName').value = sign.name;
             form.querySelector('#editSignIndicator').value = sign.indicator;
         });
-
-        document.body.addEventListener('click', function(e) {
-            if (e.target.matches('.add-focus-btn')) {
-                e.preventDefault();
-                const editFocusModal = new bootstrap.Modal(document.getElementById('editFocusModal'));
-                const btn = e.target;
-                const form = document.getElementById('editFocusModal').querySelector('form');
-                form.reset();
-                form.querySelector('.modal-title').textContent = 'Add Focus';
-                form.action = `/add_focus/${encodeURIComponent(btn.dataset.playerName)}`;
-                form.querySelector('#focusSkill').value = btn.dataset.skill;
-                editFocusModal.show();
-            }
-        });
     }
     
-    // MODIFICATION: Simplified to no longer handle positions
     function openLineupEditor(lineup = null) {
         const modal = document.getElementById('lineupEditorModal');
         modal.querySelector('#lineupId').value = lineup ? lineup.id : '';
