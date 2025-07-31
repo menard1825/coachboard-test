@@ -111,25 +111,6 @@ def update_absences(game_id):
     socketio.emit('data_updated', {'message': f'Availability updated for game {game_id}.'})
     return redirect(url_for('.game_management', game_id=game_id, _anchor='availability'))
 
-# --- Lineup & Rotation Helper ---
-def _sync_lineup_to_rotation(lineup):
-    if not lineup.associated_game_id: return
-    game = db.session.query(Game).filter_by(id=lineup.associated_game_id, team_id=lineup.team_id).first()
-    if not game: return
-
-    lineup_positions = json.loads(lineup.lineup_positions or "[]")
-    inning_1_data = {item['position']: item['name'] for item in lineup_positions if item.get('position') and item.get('name')}
-    if not inning_1_data: return
-    
-    rotation_for_game = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=lineup.team_id).first()
-    if rotation_for_game:
-        current_innings = json.loads(rotation_for_game.innings or "{}")
-        current_innings['1'] = inning_1_data
-        rotation_for_game.innings = json.dumps(current_innings)
-    else:
-        new_rotation = Rotation(title=f"vs {game.opponent} ({game.date})", associated_game_id=game.id, innings=json.dumps({'1': inning_1_data}), team_id=lineup.team_id)
-        db.session.add(new_rotation)
-
 # --- Lineup & Rotation API-like routes ---
 @gameday_bp.route('/add_lineup', methods=['POST'])
 def add_lineup():
@@ -144,7 +125,6 @@ def add_lineup():
         team_id=session['team_id']
     )
     db.session.add(new_lineup)
-    _sync_lineup_to_rotation(new_lineup)
     db.session.commit()
     socketio.emit('data_updated', {'message': 'New lineup added.'})
     return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id})
@@ -162,7 +142,6 @@ def edit_lineup(lineup_id):
     lineup_to_edit.title = payload['title']
     lineup_to_edit.lineup_positions = json.dumps(payload['lineup_data'])
     lineup_to_edit.associated_game_id = int(payload.get('associated_game_id')) if payload.get('associated_game_id') else None
-    _sync_lineup_to_rotation(lineup_to_edit)
     db.session.commit()
     socketio.emit('data_updated', {'message': 'Lineup updated.'})
     return jsonify({'status': 'success', 'message': f'Lineup "{lineup_to_edit.title}" updated successfully!'})

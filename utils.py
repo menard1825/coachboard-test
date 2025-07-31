@@ -47,16 +47,27 @@ def calculate_cumulative_pitching_stats(pitcher_name, all_outings):
     stats['total_innings_pitched'] = round(stats['total_innings_pitched'], 1)
     return stats
 
-def calculate_cumulative_position_stats(roster_players, lineups):
-    """Calculates the number of games each player played at each position."""
+def calculate_cumulative_position_stats(roster_players, rotations):
+    """Calculates the number of games/rotations a player appeared at each position."""
     stats = {player.name: {} for player in roster_players}
-    for lineup in lineups:
+    for rotation in rotations:
         try:
-            positions = json.loads(lineup.lineup_positions or "[]")
-            for item in positions:
-                if item.get('name') in stats and item.get('position'):
-                    pos = item['position']
-                    stats[item['name']][pos] = stats[item['name']].get(pos, 0) + 1
+            innings = json.loads(rotation.innings or "{}")
+            # Find all unique positions a player played in this single rotation
+            player_positions_in_rotation = {} # player_name -> set of positions
+            for inning_data in innings.values():
+                if not isinstance(inning_data, dict):
+                    continue
+                for pos, player_name in inning_data.items():
+                    if player_name not in player_positions_in_rotation:
+                        player_positions_in_rotation[player_name] = set()
+                    player_positions_in_rotation[player_name].add(pos)
+
+            # Add one to the count for each unique position played in this rotation
+            for player_name, positions in player_positions_in_rotation.items():
+                if player_name in stats:
+                    for pos in positions:
+                        stats[player_name][pos] = stats[player_name].get(pos, 0) + 1
         except (json.JSONDecodeError, TypeError):
             continue
     return stats

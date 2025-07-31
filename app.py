@@ -123,18 +123,34 @@ def create_app():
             flash('User or team not found.', 'danger')
             return redirect(url_for('auth.login'))
 
-        # Get tab order and ensure 'stats' is always included for display
-        tab_order_list = json.loads(user.tab_order or "[]")
-        if 'stats' not in tab_order_list:
-            tab_order_list.append('stats')
+        all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
+        default_tab_order = list(all_tabs.keys())
+
+        # *** MODIFICATION START: More robust tab order handling ***
+        final_tab_order = []
+        try:
+            user_tab_order = json.loads(user.tab_order or '[]')
+            # If the saved order is not a list or is empty, reset to default
+            if not isinstance(user_tab_order, list) or not user_tab_order:
+                final_tab_order = default_tab_order
+            else:
+                # Use the user's order, but ensure all default tabs are present
+                final_tab_order = user_tab_order
+                for tab in default_tab_order:
+                    if tab not in final_tab_order:
+                        final_tab_order.append(tab)
+        except (json.JSONDecodeError, TypeError):
+            # If JSON is corrupted for any reason, reset to default
+            final_tab_order = default_tab_order
+        # *** MODIFICATION END ***
 
         roster_players = db.session.query(Player).filter_by(team_id=user.team_id).all()
-        lineups = db.session.query(Lineup).filter_by(team_id=user.team_id).all()
+        rotations = db.session.query(Rotation).filter_by(team_id=user.team_id).all()
         pitching_outings = db.session.query(PitchingOuting).filter_by(team_id=user.team_id).all()
 
         pitcher_names = sorted([p.name for p in roster_players if p.pitcher_role != 'Not a Pitcher'])
         cumulative_pitching_data = {name: calculate_cumulative_pitching_stats(name, pitching_outings) for name in pitcher_names}
-        cumulative_position_data = calculate_cumulative_position_stats(roster_players, lineups)
+        cumulative_position_data = calculate_cumulative_position_stats(roster_players, rotations)
 
         game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=user.team_id).group_by(PlayerGameAbsence.player_id).all()
         practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=user.team_id).group_by(PlayerPracticeAbsence.player_id).all()
@@ -147,19 +163,15 @@ def create_app():
             if player_id in attendance_stats:
                 attendance_stats[player_id]['practices_missed'] = count
 
-        all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
-
-        # MODIFIED: Create a response object and add Cache-Control headers
         response = make_response(render_template('index.html',
                                session=session,
                                roster_players=roster_players,
                                cumulative_position_data=cumulative_position_data,
                                cumulative_pitching_data=cumulative_pitching_data,
                                attendance_stats=attendance_stats,
-                               tab_order=tab_order_list,
+                               tab_order=final_tab_order,
                                all_tabs=all_tabs))
 
-        # NEW: Add Cache-Control headers to prevent caching of this page
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
@@ -169,14 +181,9 @@ def create_app():
     def serve_manifest():
         return send_from_directory('static', 'manifest.json')
 
-    # NEW: Moved get_app_data route definition to the end of create_app()
     @app.route('/get_app_data')
     @login_required
     def get_app_data():
-        # DEBUG: This print statement will help us confirm if this route is being hit.
-        # If you see this in your server logs, the route is registered, and the issue
-        # is likely within the function's logic or data fetching.
-        # If you DO NOT see this, the route is not being registered by Flask.
         print("DEBUG: Attempting to load app data via /get_app_data")
 
         team_id = session['team_id']

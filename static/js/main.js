@@ -13,9 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let sortableInstances = {};
     let lineupEditorModal;
-    // --- MODIFICATION START: Add variable for the generic delete modal ---
     let confirmDeleteModal;
-    // --- MODIFICATION END ---
     
     // --- UTILITY FUNCTIONS ---
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
@@ -52,7 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const pNotesSafe = escapeHTML(p.notes || '');
         const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
-        // --- MODIFICATION START: Changed padding on drag handle to fix height issue ---
         return `
         <div class="accordion-item" data-player-name="${pNameSafe}">
             <h2 class="accordion-header d-flex align-items-center">
@@ -80,7 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div></div>
         </div>`;
-        // --- MODIFICATION END ---
     }
 
     function renderRoster() {
@@ -88,7 +84,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!container) return;
         const searchTerm = document.getElementById('rosterSearch').value.toLowerCase();
         
-        // --- MODIFICATION START: Sort roster by player_order before filtering and rendering ---
         let rosterToSort = [...(AppState.full_data.roster || [])];
 
         rosterToSort.sort((a, b) => {
@@ -103,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const filteredRoster = rosterToSort.filter(p => 
             !searchTerm || p.name.toLowerCase().includes(searchTerm) || (p.number || '').toString().includes(searchTerm)
         );
-        // --- MODIFICATION END ---
 
         container.innerHTML = filteredRoster.length > 0 ? filteredRoster.map(playerTemplate).join('') : `<div class="p-3 text-center text-muted">No players found.</div>`;
         attachRosterSaveListeners();
@@ -177,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const pNameSafe = escapeHTML(playerName);
         
         const getIconForType = (type) => ({'Development': '<i class="bi bi-graph-up-arrow text-primary"></i>', 'Coach Note': '<i class="bi bi-chat-left-text-fill text-info"></i>', 'Lessons': '<i class="bi bi-person-video3 text-success"></i>'}[type] || '<i class="bi bi-record-circle"></i>');
-        // --- MODIFICATION START: Use data-delete-url for delete actions ---
         const activityHtml = activityLog.length > 0 ? `<ul class="list-group">${activityLog.map(log => {
             let itemClass = '', statusText = '', mainText = escapeHTML(log.text);
             if (log.type === 'Development') itemClass = log.status === 'completed' ? (statusText=`<span class="badge bg-success ms-2">Completed: ${formatDateTime(log.completed_date)}</span>`, 'completed-focus') : 'active-focus';
@@ -190,7 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return `<li class="list-group-item ${itemClass}"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${mainText}</span>${statusText}</h6><small>${formatDateTime(log.date)}</small></div>${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}<small class="text-muted">By: ${escapeHTML(log.author)}</small>${actions ? `<div class="mt-2">${actions}</div>` : ''}</li>`;
         }).join('')}</ul>` : `<div class="text-center p-3 border rounded"><p class="mb-0">No activity logged.</p></div>`;
-        // --- MODIFICATION END ---
         container.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="mb-0">${pNameSafe} - Development Log</h4>
@@ -210,12 +202,34 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
-    // --- MODIFICATION START: Use data-delete-url for delete actions ---
+    // MODIFICATION: Updated to render a simple ordered list for the lineup
     function renderLineups() {
         const container = document.getElementById('lineupsAccordion');
         if (!container) return;
         const lineups = AppState.full_data.lineups.filter(l => !l.associated_game_id) || [];
-        container.innerHTML = lineups.length === 0 ? `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned lineups saved yet.</p></div>` : lineups.map((l) => `<div class="accordion-item" data-lineup-id="${l.id}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#lineup-collapse-${l.id}"><strong>${escapeHTML(l.title)}</strong></button></h2><div id="lineup-collapse-${l.id}" class="accordion-collapse collapse" data-bs-parent="#lineupsAccordion"><div class="accordion-body"><div class="d-flex justify-content-end mb-3"><button class="btn btn-sm btn-info me-2 edit-lineup-btn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal" data-lineup-id="${l.id}">Edit</button><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_lineup/${l.id}">Delete</button></div><table class="table table-striped table-sm"><thead><tr><th style="width: 5%;">#</th><th>Player</th><th style="width: 15%;">Position</th></tr></thead><tbody>${(l.lineup_positions || []).map((spot, i) => `<tr><td><strong>${i + 1}</strong></td><td>${escapeHTML(spot.name)}</td><td>${spot.position}</td></tr>`).join('') || `<tr><td colspan="3" class="text-center text-muted">This lineup is empty.</td></tr>`}</tbody></table></div></div></div>`).join('');
+        container.innerHTML = lineups.length === 0 
+            ? `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned lineups saved yet.</p></div>` 
+            : lineups.map((l) => {
+                const lineupHtml = (l.lineup_positions && l.lineup_positions.length > 0)
+                    ? `<ol class="list-group list-group-numbered">${l.lineup_positions.map(name => `<li class="list-group-item">${escapeHTML(name)}</li>`).join('')}</ol>`
+                    : `<p class="text-center text-muted">This lineup is empty.</p>`;
+
+                return `<div class="accordion-item" data-lineup-id="${l.id}">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#lineup-collapse-${l.id}">
+                                    <strong>${escapeHTML(l.title)}</strong>
+                                </button>
+                            </h2>
+                            <div id="lineup-collapse-${l.id}" class="accordion-collapse collapse" data-bs-parent="#lineupsAccordion">
+                                <div class="accordion-body">
+                                    <div class="d-flex justify-content-end mb-3">
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_lineup/${l.id}">Delete</button>
+                                    </div>
+                                    ${lineupHtml}
+                                </div>
+                            </div>
+                        </div>`;
+            }).join('');
     }
     
     function renderRotations() {
@@ -337,7 +351,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
         attachTaskListeners();
     }
-    // --- MODIFICATION END ---
 
     function renderAll() {
         renderRoster();
@@ -405,9 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
-        // --- MODIFICATION START: Initialize the generic delete modal ---
         confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-        // --- MODIFICATION END ---
         setupEventListeners();
         renderAll();
         initializeSortables();
@@ -496,7 +507,6 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPlayerDevelopmentList();
         });
 
-        // --- MODIFICATION START: Replace specific delete modal listener with a generic one ---
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
             const deleteButton = document.getElementById('confirmDeleteButton');
             const url = e.relatedTarget.dataset.deleteUrl;
@@ -507,7 +517,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
             }
         });
-        // --- MODIFICATION END ---
 
         document.getElementById('lineupEditorModal')?.addEventListener('show.bs.modal', (e) => {
             const lineupId = e.relatedTarget ? e.relatedTarget.dataset.lineupId : null;
@@ -545,7 +554,6 @@ document.addEventListener('DOMContentLoaded', () => {
             form.querySelector('#editSignIndicator').value = sign.indicator;
         });
 
-        // --- MODIFICATION START: Add event delegation for the "Add Focus" button to fix iOS bug ---
         document.body.addEventListener('click', function(e) {
             if (e.target.matches('.add-focus-btn')) {
                 e.preventDefault();
@@ -559,17 +567,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 editFocusModal.show();
             }
         });
-        // --- MODIFICATION END ---
     }
     
+    // MODIFICATION: Simplified to no longer handle positions
     function openLineupEditor(lineup = null) {
         const modal = document.getElementById('lineupEditorModal');
         modal.querySelector('#lineupId').value = lineup ? lineup.id : '';
         modal.querySelector('#lineupTitle').value = lineup ? lineup.title : 'New Unassigned Lineup';
         const bench = modal.querySelector('#lineup-bench'), order = modal.querySelector('#lineup-order');
-        const lineupPlayerNames = new Set((lineup?.lineup_positions || []).map(p => p.name));
+        const lineupPlayerNames = new Set(lineup?.lineup_positions || []);
         bench.innerHTML = AppState.full_data.roster.filter(p => !lineupPlayerNames.has(p.name)).map(p => `<div class="list-group-item" data-player-name="${p.name}">${p.name}</div>`).join('');
-        order.innerHTML = (lineup?.lineup_positions || []).map(spot => `<div class="list-group-item" data-player-name="${spot.name}">${spot.name}</div>`).join('');
+        order.innerHTML = (lineup?.lineup_positions || []).map(name => `<div class="list-group-item" data-player-name="${name}">${name}</div>`).join('');
         if(sortableInstances.lineupBench) sortableInstances.lineupBench.destroy();
         if(sortableInstances.lineupOrder) sortableInstances.lineupOrder.destroy();
         sortableInstances.lineupBench = new Sortable(bench, { group: 'lineup', animation: 150 });

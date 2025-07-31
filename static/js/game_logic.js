@@ -27,43 +27,35 @@ function initializeGameManagement(gameData) {
     });
 
     let assignPlayerModal;
-    let addPlayerToLineupModal;
+    let lineupEditorModal;
 
     // --- Utility Functions ---
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
     
-    const renderPositionSelect = (name, id, selectedVal = '', title = 'Pos', classes = 'form-select form-select-sm') => {
-        const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'];
-        let optionsHtml = `<option value="" ${!selectedVal ? 'selected' : ''}>${title}</option>`;
-        positions.forEach(pos => {
-            optionsHtml += `<option value="${pos}" ${selectedVal === pos ? 'selected' : ''}>${pos}</option>`;
-        });
-        return `<select name="${name}" id="${id}" class="${classes}" title="${title}">${optionsHtml}</select>`;
-    };
     const isMobile = () => window.innerWidth < 768;
 
     // --- Lineup Editor Functions ---
     function renderLineupEditor() {
         const bench = document.getElementById('lineup-bench');
         const order = document.getElementById('lineup-order');
+        if (!bench || !order) return;
+
         bench.innerHTML = '';
         order.innerHTML = '';
 
-        const lineupPlayerNames = new Set((window.AppState.lineup.lineup_positions || []).map(p => p.name));
+        const lineupPlayerNames = new Set(window.AppState.lineup.lineup_positions || []);
         
-        (window.AppState.lineup.lineup_positions || []).forEach(spot => {
-            const player = window.AppState.roster.find(p => p.name === spot.name);
-            if (player) order.appendChild(createBattingOrderItem(player, spot.position));
+        (window.AppState.lineup.lineup_positions || []).forEach(playerName => {
+            const player = window.AppState.roster.find(p => p.name === playerName);
+            if (player) order.appendChild(createBattingOrderItem(player));
         });
 
-        if (!isMobile()) {
-            window.AppState.roster.forEach(player => {
-                if (!lineupPlayerNames.has(player.name)) {
-                    const playerEl = createBenchPlayerItem(player);
-                    bench.appendChild(playerEl);
-                }
-            });
-        }
+        window.AppState.roster.forEach(player => {
+            if (!lineupPlayerNames.has(player.name)) {
+                const playerEl = createBenchPlayerItem(player);
+                bench.appendChild(playerEl);
+            }
+        });
         
         initializeLineupSortables();
     }
@@ -75,26 +67,21 @@ function initializeGameManagement(gameData) {
         const order = document.getElementById('lineup-order');
         const bench = document.getElementById('lineup-bench');
 
-        if (isMobile()) {
-            window.sortableInstances.lineupOrder = new Sortable(order, {
-                handle: '.lineup-drag-handle',
-                animation: 150,
-            });
-        } else {
-            window.sortableInstances.lineupBench = new Sortable(bench, {
-                group: 'lineup',
-                animation: 150,
-            });
-            window.sortableInstances.lineupOrder = new Sortable(order, {
-                group: 'lineup',
-                handle: '.lineup-drag-handle',
-                animation: 150,
-                onAdd: (evt) => {
-                    const player = window.AppState.roster.find(p => p.name === evt.item.dataset.playerName);
-                    if (player) evt.item.replaceWith(createBattingOrderItem(player, player.position1));
-                }
-            });
-        }
+        if (!bench || !order) return;
+
+        window.sortableInstances.lineupBench = new Sortable(bench, {
+            group: 'lineup',
+            animation: 150,
+        });
+        window.sortableInstances.lineupOrder = new Sortable(order, {
+            group: 'lineup',
+            handle: '.lineup-drag-handle',
+            animation: 150,
+            onAdd: (evt) => {
+                const player = window.AppState.roster.find(p => p.name === evt.item.dataset.playerName);
+                if (player) evt.item.replaceWith(createBattingOrderItem(player));
+            }
+        });
     }
 
     function createBenchPlayerItem(player) {
@@ -105,7 +92,7 @@ function initializeGameManagement(gameData) {
         return item;
     }
 
-    function createBattingOrderItem(player, selectedPosition) {
+    function createBattingOrderItem(player) {
         const item = document.createElement('div');
         item.className = 'list-group-item';
         item.dataset.playerName = player.name;
@@ -120,33 +107,10 @@ function initializeGameManagement(gameData) {
                     <i class="bi bi-x-circle-fill" style="font-size: 1.1rem;"></i>
                 </button>
             </div>
-            ${renderPositionSelect(`position_${player.id}`, `pos_select_${player.id}`, selectedPosition || player.position1, player.position1 || 'Pos')}
         `;
         return item;
     };
     
-    function openAddPlayerToLineupModal() {
-        const modalList = document.getElementById('lineup-modal-bench-list');
-        const lineupPlayerNames = new Set(
-            Array.from(document.querySelectorAll('#lineup-order .list-group-item'))
-                 .map(item => item.dataset.playerName)
-        );
-
-        const availablePlayers = window.AppState.roster.filter(p => !lineupPlayerNames.has(p.name));
-        
-        if (availablePlayers.length > 0) {
-            modalList.innerHTML = availablePlayers.map(p => `
-                <a href="#" class="list-group-item list-group-item-action" data-player-name="${escapeHTML(p.name)}">
-                    ${escapeHTML(p.name)} (#${escapeHTML(p.number) || 'N/A'})
-                </a>
-            `).join('');
-        } else {
-            modalList.innerHTML = `<div class="list-group-item text-muted">All available players are in the lineup.</div>`;
-        }
-
-        addPlayerToLineupModal.show();
-    }
-
     // --- Rotation Editor Functions ---
     function renderRotationEditor() {
         if (!window.AppState.rotation) return;
@@ -296,15 +260,13 @@ function initializeGameManagement(gameData) {
         btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
 
         window.AppState.lineup.title = document.getElementById('lineupTitle').value;
-        window.AppState.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
-            name: item.dataset.playerName,
-            position: item.querySelector('select')?.value || ''
-        }));
+        // MODIFICATION: Save an array of names instead of objects with positions
+        window.AppState.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => item.dataset.playerName);
         
         const url = window.AppState.lineup.id ? `/edit_lineup/${window.AppState.lineup.id}` : '/add_lineup';
         const payload = {
             title: window.AppState.lineup.title,
-            lineup_data: window.AppState.lineup.lineup_positions,
+            lineup_data: window.AppState.lineup.lineup_positions, // This is now just an array of names
             associated_game_id: window.AppState.game.id
         };
 
@@ -317,11 +279,13 @@ function initializeGameManagement(gameData) {
             const result = await response.json();
             if(!response.ok) throw new Error(result.message);
             
-            // Update lineup ID if it was a new lineup
             if (result.new_id) {
                 window.AppState.lineup.id = result.new_id;
             }
-            alert('Lineup saved successfully!');
+            lineupEditorModal.hide();
+            // Manually reload the page to show the updated lineup display
+            window.location.reload();
+
         } catch (error) {
             alert('An error occurred while saving the lineup: ' + error.message);
             console.error(error);
@@ -371,58 +335,22 @@ function initializeGameManagement(gameData) {
     // --- Event Listeners ---
     function setupEventListeners() {
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
-        addPlayerToLineupModal = new bootstrap.Modal(document.getElementById('addPlayerToLineupModal'));
+        lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
         
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
 
-        document.getElementById('addPlayerToLineupBtn')?.addEventListener('click', openAddPlayerToLineupModal);
-        
-        document.getElementById('lineup-modal-bench-list')?.addEventListener('click', (event) => {
-            event.preventDefault();
-            const playerLink = event.target.closest('a');
-            if (!playerLink) return;
+        document.getElementById('lineupEditorModal')?.addEventListener('shown.bs.modal', renderLineupEditor);
 
-            const playerName = playerLink.dataset.playerName;
-            const player = window.AppState.roster.find(p => p.name === playerName);
-            if (player) {
-                const orderList = document.getElementById('lineup-order');
-                orderList.appendChild(createBattingOrderItem(player, player.position1));
-                addPlayerToLineupModal.hide();
-            }
-        });
-        
         document.getElementById('lineup-order')?.addEventListener('click', (event) => {
             const removeButton = event.target.closest('.remove-player-btn');
             if (removeButton) {
                 const playerItem = removeButton.closest('.list-group-item');
+                const bench = document.getElementById('lineup-bench');
                 playerItem.remove();
-            }
-        });
-        
-        document.getElementById('syncRotationBtn')?.addEventListener('click', async () => {
-            const lineupPositions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => ({
-                name: item.dataset.playerName,
-                position: item.querySelector('select')?.value || ''
-            }));
-            const inning1Data = {};
-            lineupPositions.forEach(item => {
-                if(item.position && item.name) inning1Data[item.position] = item.name;
-            });
-
-            if (Object.keys(inning1Data).length > 0) {
-                window.AppState.rotation.innings['1'] = inning1Data;
-                
-                // Automatically save the rotation
-                await saveRotation(); 
-                
-                alert('Inning 1 of the rotation has been updated and saved based on the current lineup.');
-                
-                const rotationTab = new bootstrap.Tab(document.getElementById('rotation-tab'));
-                rotationTab.show();
-                renderRotationEditor();
-            } else {
-                alert('No positions set in the lineup to sync.');
+                // Re-create bench item and add it back
+                const player = window.AppState.roster.find(p => p.name === playerItem.dataset.playerName);
+                if(player) bench.appendChild(createBenchPlayerItem(player));
             }
         });
         
@@ -520,7 +448,6 @@ function initializeGameManagement(gameData) {
     }
 
     // --- Initial Page Render ---
-    renderLineupEditor();
     renderRotationEditor();
     setupEventListeners();
 }

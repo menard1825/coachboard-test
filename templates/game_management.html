@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Game Management - {{ game['opponent'] }}</title>
-    <!-- MODIFIED: Added viewport-fit=cover for better safe area handling on iOS -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -23,14 +22,11 @@
     </div>
 </nav>
 
-<!-- MODIFIED: Changed div to main tag and kept the container-fluid and mt-3 classes -->
 <main class="container-fluid mt-3">
+    <!-- MODIFICATION: Changed tabs to remove Lineup -->
     <ul class="nav nav-tabs nav-fill mb-3" id="gameTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="availability-tab" data-bs-toggle="tab" data-bs-target="#availability" type="button" role="tab">Availability</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="lineup-tab" data-bs-toggle="tab" data-bs-target="#lineup" type="button" role="tab">Lineup</button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="rotation-tab" data-bs-toggle="tab" data-bs-target="#rotation" type="button" role="tab">Rotation</button>
@@ -42,14 +38,12 @@
 
     <div class="tab-content" id="gameTabsContent">
         <div class="tab-pane fade show active" id="availability" role="tabpanel" aria-labelledby="availability-tab">
-            <div class="row justify-content-center">
-                <div class="col-lg-6 col-md-8">
+            <div class="row">
+                <div class="col-lg-6 mb-4">
                     <div class="card">
-                        <div class="card-header">
-                            <h5 class="mb-0">Set Player Availability</h5>
-                        </div>
+                        <div class="card-header"><h5 class="mb-0">Set Player Availability</h5></div>
                         <div class="card-body">
-                            <p class="text-muted">Check the box next to any player who will be absent for this game. This will remove them from the lineup and rotation builders.</p>
+                            <p class="text-muted">Check the box for any player who will be absent for this game. This will remove them from the lineup and rotation builders.</p>
                             <form action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
                                 <ul class="list-group mb-3">
                                     {% for player in roster %}
@@ -68,10 +62,37 @@
                         </div>
                     </div>
                 </div>
+                <!-- MODIFICATION: Added Lineup Display Card -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Batting Lineup</h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">
+                                <i class="bi bi-pencil-square"></i> Edit Lineup
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            {% if lineup and lineup.lineup_positions %}
+                                <ol class="list-group list-group-numbered">
+                                    {% for player_name in lineup.lineup_positions %}
+                                        <li class="list-group-item">{{ player_name }}</li>
+                                    {% endfor %}
+                                </ol>
+                            {% else %}
+                                <div class="text-center p-3 text-muted">
+                                    <p class="mb-1">No lineup has been set for this game yet.</p>
+                                    <p class="mb-0">Click "Edit Lineup" to create one.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% if lineup and lineup.id %}
+                        <div class="card-footer text-end">
+                             <a href="{{ url_for('gameday.delete_lineup', lineup_id=lineup.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this lineup?');">Delete Lineup</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="tab-pane fade" id="lineup" role="tabpanel" aria-labelledby="lineup-tab">
-            {% include '_lineup_editor.html' %}
         </div>
         <div class="tab-pane fade" id="rotation" role="tabpanel" aria-labelledby="rotation-tab">
             {% include '_rotation_editor.html' %}
@@ -81,6 +102,9 @@
         </div>
     </div>
 </main>
+
+<!-- MODIFICATION: Include the lineup editor modal -->
+{% include '_lineup_editor.html' %}
 
 <div class="modal fade" id="assignPlayerModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -96,26 +120,21 @@
     </div>
 </div>
 
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-
 <script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
 
 <script>
-    // This script block passes data from your Flask template to the JavaScript file
     document.addEventListener('DOMContentLoaded', () => {
         const gameData = {
             game: {{ game|tojson }},
             roster: {{ roster|tojson }},
             lineup: {{ lineup|tojson }},
             rotation: {{ rotation|tojson }},
-            // MODIFIED: Pass the list of absent player IDs to the script
             absent_player_ids: {{ absent_player_ids|tojson }}
         };
         initializeGameManagement(gameData);
 
-        // Logic to remember and open the last active tab
         const gameTabs = document.querySelectorAll('#gameTabs button[data-bs-toggle="tab"]');
         gameTabs.forEach(tab => {
             tab.addEventListener('shown.bs.tab', event => {
