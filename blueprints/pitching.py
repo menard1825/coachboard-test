@@ -10,6 +10,10 @@ pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 @pitching_bp.route('/add_pitching', methods=['POST'])
 def add_pitching():
     game_id = request.form.get('game_id')
+    game = None
+    if game_id:
+        game = db.session.get(Game, game_id)
+
     try:
         pitch_count = int(request.form['pitches'])
         innings_pitched = float(request.form['innings'])
@@ -18,16 +22,21 @@ def add_pitching():
         pitch_date_str = request.form.get('pitch_date')
         if pitch_date_str:
             pitch_date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
-        elif game_id:
-            game = db.session.get(Game, game_id)
-            if game:
-                pitch_date = game.date
+        elif game:
+            pitch_date = game.date
 
         if not pitch_date:
             raise ValueError("Date is required and could not be determined.")
 
+        opponent = request.form.get('opponent')
+        if not opponent and game:
+            opponent = game.opponent
+
+        if not opponent:
+            raise ValueError("Opponent is required.")
+
     except (ValueError, KeyError):
-        flash('Pitch count and innings must be valid numbers, and a valid date is required.', 'danger')
+        flash('Pitch count, innings, opponent, and a valid date are required.', 'danger')
         if game_id:
             return redirect(url_for('gameday.game_management', game_id=game_id, _anchor='pitching'))
         return redirect(url_for('home', _anchor='pitching'))
@@ -35,7 +44,7 @@ def add_pitching():
     new_outing = PitchingOuting(
         date=pitch_date,
         pitcher=request.form['pitcher'], 
-        opponent=request.form['opponent'],
+        opponent=opponent,
         pitches=pitch_count, 
         innings=innings_pitched, 
         pitcher_type=request.form.get('pitcher_type', 'Starter'),
