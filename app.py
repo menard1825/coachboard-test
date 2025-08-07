@@ -34,6 +34,21 @@ from blueprints.team_management import team_management_bp
 SUPER_ADMIN = 'Super Admin'
 HEAD_COACH = 'Head Coach'
 
+def model_to_dict(obj):
+    """Converts a SQLAlchemy model instance into a dictionary."""
+    if obj is None:
+        return None
+
+    d = {}
+    for column in obj.__table__.columns:
+        val = getattr(obj, column.name)
+        if isinstance(val, (datetime, date)):
+            # Format dates and datetimes as 'YYYY-MM-DD'
+            d[column.name] = val.strftime('%Y-%m-%d')
+        else:
+            d[column.name] = val
+    return d
+
 def create_app():
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
@@ -188,40 +203,43 @@ def create_app():
         for focus in player_dev_focuses:
             player_name = player_id_to_name.get(focus.player_id)
             if player_name:
-                player_dev_by_name[player_name].append({
-                    'id': focus.id, 'type': 'Development', 'subtype': focus.skill_type.capitalize(),
-                    'text': focus.focus, 'status': focus.status, 'notes': focus.notes,
-                    'date': focus.created_date, 'completed_date': focus.completed_date, 'author': focus.author
+                focus_dict = model_to_dict(focus)
+                focus_dict.update({
+                    'type': 'Development',
+                    'subtype': focus.skill_type.capitalize(),
+                    'text': focus.focus,
+                    'date': focus.created_date.strftime('%Y-%m-%d')
                 })
-        
+                player_dev_by_name[player_name].append(focus_dict)
+
         rules = get_pitching_rules_for_team(team)
         pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules)
 
         practice_plans_list = []
         for p in practice_plans_q:
-            plan_dict = {c.name: getattr(p, c.name) for c in p.__table__.columns}
-            plan_dict['tasks'] = [{c.name: getattr(t, c.name) for c in t.__table__.columns} for t in p.tasks]
+            plan_dict = model_to_dict(p)
+            plan_dict['tasks'] = [model_to_dict(t) for t in p.tasks]
             plan_dict['absent_player_ids'] = [a.player_id for a in p.absences]
             practice_plans_list.append(plan_dict)
 
         full_data = {
-            'roster': [{c.name: getattr(p, c.name) for c in p.__table__.columns} for p in roster_db],
-            'lineups': [{c.name: getattr(l, c.name) for c in l.__table__.columns} for l in lineups_db],
-            'pitching': [{c.name: getattr(po, c.name) for c in po.__table__.columns} for po in pitching_outings_db],
+            'roster': [model_to_dict(p) for p in roster_db],
+            'lineups': [model_to_dict(l) for l in lineups_db],
+            'pitching': [model_to_dict(po) for po in pitching_outings_db],
             'scouting_list': {
-                'targets': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'targets'],
-                'committed': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'committed'],
-                'not_interested': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'not_interested']
+                'targets': [model_to_dict(sp) for sp in scouted_players if sp.list_type == 'targets'],
+                'committed': [model_to_dict(sp) for sp in scouted_players if sp.list_type == 'committed'],
+                'not_interested': [model_to_dict(sp) for sp in scouted_players if sp.list_type == 'not_interested']
             },
-            'rotations': [{c.name: getattr(r, c.name) for c in r.__table__.columns} for r in rotations_db],
-            'games': [{c.name: getattr(g, c.name) for c in g.__table__.columns} for g in games],
+            'rotations': [model_to_dict(r) for r in rotations_db],
+            'games': [model_to_dict(g) for g in games],
             'collaboration_notes': {
-                'team_notes': [{c.name: getattr(cn, c.name) for c in cn.__table__.columns} for cn in collaboration_notes if cn.note_type == 'team_notes'],
-                'player_notes': [{c.name: getattr(cn, c.name) for c in cn.__table__.columns} for cn in collaboration_notes if cn.note_type == 'player_notes']
+                'team_notes': [model_to_dict(cn) for cn in collaboration_notes if cn.note_type == 'team_notes'],
+                'player_notes': [model_to_dict(cn) for cn in collaboration_notes if cn.note_type == 'player_notes']
             },
             'practice_plans': practice_plans_list,
             'player_development': player_dev_by_name,
-            'signs': [{c.name: getattr(s, c.name) for c in s.__table__.columns} for s in signs]
+            'signs': [model_to_dict(s) for s in signs]
         }
 
         return jsonify({
