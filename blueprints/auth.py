@@ -13,6 +13,19 @@ SUPER_ADMIN = 'Super Admin'
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
 
+def get_player_order_as_list(player_order_data):
+    """Safely returns player_order as a list, decoding from JSON if necessary."""
+    if not player_order_data:
+        return []
+    if isinstance(player_order_data, list):
+        return player_order_data
+    if isinstance(player_order_data, str):
+        try:
+            return json.loads(player_order_data)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return [] # default to empty list
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -29,7 +42,7 @@ def login():
             session['full_name'] = user.full_name or ''
             session['role'] = user.role
             session['team_id'] = user.team_id
-            session['player_order'] = user.player_order or []
+            session['player_order'] = get_player_order_as_list(user.player_order)
             session.permanent = True
             flash('You were successfully logged in.', 'success')
             return redirect(url_for('home'))

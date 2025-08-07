@@ -3,8 +3,22 @@ from models import ScoutedPlayer, Player, User
 from db import db
 from extensions import socketio
 from datetime import datetime
+import json
 
 scouting_bp = Blueprint('scouting', __name__, template_folder='templates')
+
+def get_player_order_as_list(player_order_data):
+    """Safely returns player_order as a list, decoding from JSON if necessary."""
+    if not player_order_data:
+        return []
+    if isinstance(player_order_data, list):
+        return player_order_data
+    if isinstance(player_order_data, str):
+        try:
+            return json.loads(player_order_data)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return [] # default to empty list
 
 @scouting_bp.route('/add_scouted_player', methods=['POST'])
 def add_scouted_player():
@@ -79,14 +93,17 @@ def move_scouted_player_to_roster(player_id):
     db.session.delete(scouted_player)
     
     for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
-        current_order = user_obj.player_order or []
+        current_order = get_player_order_as_list(user_obj.player_order)
         if new_roster_player.id not in current_order:
             current_order.append(new_roster_player.id)
             user_obj.player_order = current_order
 
-    if 'player_order' in session and new_roster_player.id not in session['player_order']:
-        session['player_order'].append(new_roster_player.id)
-        session.modified = True
+    if 'player_order' in session:
+        session_order = get_player_order_as_list(session['player_order'])
+        if new_roster_player.id not in session_order:
+            session_order.append(new_roster_player.id)
+            session['player_order'] = session_order
+            session.modified = True
         
     db.session.commit()
     flash(f'Player "{new_roster_player.name}" moved to Roster. Please assign a number.', 'success')
