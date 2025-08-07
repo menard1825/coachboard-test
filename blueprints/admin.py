@@ -86,7 +86,8 @@ def add_user():
         password_hash=hashed_password,
         role=role,
         tab_order=json.dumps(default_tab_keys),
-        last_login='Never',
+        last_login=None,
+        player_order=[],
         team_id=team_id_for_new_user
     )
     db.session.add(new_user)

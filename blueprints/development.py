@@ -28,7 +28,7 @@ def add_focus(player_name):
         status="active",
         notes=request.form.get('notes', ''), 
         author=author_name,
-        created_date=date.today().strftime('%Y-%m-%d'), 
+        created_date=date.today(),
         team_id=session['team_id']
     )
     db.session.add(new_focus)
@@ -49,7 +49,7 @@ def update_focus(focus_id):
     focus_item.focus = request.form.get('focus_text', focus_item.focus)
     focus_item.notes = request.form.get('notes', focus_item.notes)
     focus_item.last_edited_by = editor_name
-    focus_item.last_edited_date = datetime.now().strftime('%Y-%m-%d %H:%M')
+    focus_item.last_edited_date = datetime.now()
     db.session.commit()
     flash('Focus item updated successfully.', 'success')
     socketio.emit('data_updated', {'message': 'Focus item updated.'})
@@ -63,7 +63,7 @@ def complete_focus(focus_id):
         return redirect(url_for('home', _anchor='player_development'))
 
     focus_item.status = 'completed'
-    focus_item.completed_date = date.today().strftime('%Y-%m-%d')
+    focus_item.completed_date = date.today()
     db.session.commit()
     flash('Focus marked as complete!', 'success')
     socketio.emit('data_updated', {'message': 'Focus marked complete.'})
@@ -90,7 +90,7 @@ def update_lesson_info(player_id):
         
     player.has_lessons = request.form.get('has_lessons')
     player.lesson_focus = request.form.get('lesson_focus')
-    player.notes_timestamp=datetime.now().strftime("%Y-%m-%d %H:%M")
+    player.notes_timestamp=datetime.now()
     db.session.commit()
     flash(f'Lesson info for {player.name} updated.', 'success')
     socketio.emit('data_updated', {'message': f'Lesson info for {player.name} updated.'})

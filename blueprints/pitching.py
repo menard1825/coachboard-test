@@ -3,6 +3,7 @@ from models import PitchingOuting, Team
 from db import db
 from extensions import socketio
 from utils import get_pitching_rules_for_team
+from datetime import datetime
 
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 
@@ -11,12 +12,14 @@ def add_pitching():
     try:
         pitch_count = int(request.form['pitches'])
         innings_pitched = float(request.form['innings'])
+        pitch_date_str = request.form['pitch_date']
+        pitch_date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
     except ValueError:
-        flash('Pitch count and innings must be valid numbers.', 'danger')
+        flash('Pitch count and innings must be valid numbers, and date must be in YYYY-MM-DD format.', 'danger')
         return redirect(url_for('home', _anchor='pitching'))
 
     new_outing = PitchingOuting(
-        date=request.form['pitch_date'], 
+        date=pitch_date,
         pitcher=request.form['pitcher'], 
         opponent=request.form['opponent'],
         pitches=pitch_count, 
@@ -43,7 +46,10 @@ def edit_pitching(outing_id):
         return redirect(url_for('home', _anchor='pitching'))
     
     try:
-        outing_to_edit.date = request.form.get('pitch_date', outing_to_edit.date)
+        pitch_date_str = request.form.get('pitch_date')
+        if pitch_date_str:
+            outing_to_edit.date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
+
         outing_to_edit.pitcher = request.form.get('pitcher', outing_to_edit.pitcher)
         outing_to_edit.opponent = request.form.get('opponent', outing_to_edit.opponent)
         outing_to_edit.pitches = int(request.form.get('pitches', outing_to_edit.pitches))
@@ -55,7 +61,7 @@ def edit_pitching(outing_id):
         flash(f'Successfully updated outing for {outing_to_edit.pitcher}.', 'success')
         socketio.emit('data_updated', {'message': 'Pitching outing updated.'})
     except ValueError:
-        flash('Invalid number format for pitches or innings.', 'danger')
+        flash('Invalid number format for pitches or innings, or invalid date format.', 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f'An error occurred: {e}', 'danger')

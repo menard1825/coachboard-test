@@ -25,7 +25,7 @@ def add_note(note_type):
         note_type=note_type, 
         text=note_text, 
         author=author_name, 
-        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M"), 
+        timestamp=datetime.now(),
         team_id=session['team_id']
     )
 
@@ -81,10 +81,16 @@ def delete_note(note_type, note_id):
 # --- Practice Plan Routes ---
 @team_management_bp.route('/add_practice_plan', methods=['POST'])
 def add_practice_plan():
-    plan_date = request.form.get('plan_date')
-    if not plan_date:
+    plan_date_str = request.form.get('plan_date')
+    if not plan_date_str:
         flash('Practice date is required.', 'danger')
         return redirect(url_for('home', _anchor='practice_plan'))
+    try:
+        plan_date = datetime.strptime(plan_date_str, '%Y-%m-%d')
+    except ValueError:
+        flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+        return redirect(url_for('home', _anchor='practice_plan'))
+
     new_plan = PracticePlan(
         date=plan_date, 
         general_notes=request.form.get('general_notes', ''),
@@ -105,7 +111,14 @@ def add_practice_plan():
 def edit_practice_plan(plan_id):
     plan_to_edit = db.session.get(PracticePlan, plan_id)
     if plan_to_edit and plan_to_edit.team_id == session['team_id']:
-        plan_to_edit.date = request.form.get('plan_date', plan_to_edit.date)
+        plan_date_str = request.form.get('plan_date')
+        if plan_date_str:
+            try:
+                plan_to_edit.date = datetime.strptime(plan_date_str, '%Y-%m-%d')
+            except ValueError:
+                flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+                return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
+
         plan_to_edit.general_notes = request.form.get('general_notes', plan_to_edit.general_notes)
         plan_to_edit.emphasis = request.form.get('emphasis', plan_to_edit.emphasis)
         plan_to_edit.warm_up = request.form.get('warm_up', plan_to_edit.warm_up)
@@ -173,7 +186,7 @@ def add_task_to_plan(plan_id):
         text=task_text, 
         status="pending", 
         author=author_name, 
-        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M"), 
+        timestamp=datetime.now(),
         practice_plan_id=plan.id
     )
     db.session.add(new_task)

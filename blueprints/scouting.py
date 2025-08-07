@@ -3,7 +3,6 @@ from models import ScoutedPlayer, Player, User
 from db import db
 from extensions import socketio
 from datetime import datetime
-import json
 
 scouting_bp = Blueprint('scouting', __name__, template_folder='templates')
 
@@ -73,18 +72,20 @@ def move_scouted_player_to_roster(player_id):
     new_roster_player = Player(
         name=scouted_player.name, number="", position1=scouted_player.position1, position2=scouted_player.position2,
         throws=scouted_player.throws, bats=scouted_player.bats, notes="", pitcher_role="Not a Pitcher", has_lessons="No",
-        lesson_focus="", notes_author=session['username'], notes_timestamp=datetime.now().strftime("%Y-%m-%d %H:%M"), team_id=session['team_id']
+        lesson_focus="", notes_author=session['username'], notes_timestamp=datetime.now(), team_id=session['team_id']
     )
     db.session.add(new_roster_player)
+    db.session.flush() # to get the new player's ID
     db.session.delete(scouted_player)
     
     for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
-        current_order = json.loads(user_obj.player_order or "[]")
-        if new_roster_player.name not in current_order:
-            current_order.append(new_roster_player.name)
-            user_obj.player_order = json.dumps(current_order)
-    if 'player_order' in session and new_roster_player.name not in session['player_order']:
-        session['player_order'].append(new_roster_player.name)
+        current_order = user_obj.player_order or []
+        if new_roster_player.id not in current_order:
+            current_order.append(new_roster_player.id)
+            user_obj.player_order = current_order
+
+    if 'player_order' in session and new_roster_player.id not in session['player_order']:
+        session['player_order'].append(new_roster_player.id)
         session.modified = True
         
     db.session.commit()

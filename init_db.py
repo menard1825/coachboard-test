@@ -7,6 +7,11 @@ import json
 # Create an application instance to work with
 app = create_app()
 
+with app.app_context():
+    print(app.config['SQLALCHEMY_DATABASE_URI'])
+    import os
+    print(os.path.abspath('app.db'))
+
 # --- Configuration ---
 DEFAULT_TEAM_NAME = "Marucci Prospects Midwest 11u"
 DEFAULT_REG_CODE = "Westfield"

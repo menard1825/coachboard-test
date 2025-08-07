@@ -1,10 +1,10 @@
 # menard1825/coachboard-test/coachboard-test-structure-overhaul/models.py
 # models.py
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float, DateTime, JSON
 from sqlalchemy.orm import relationship
-# MODIFIED: Changed from relative to absolute import
 from db import db
 import json
+from datetime import datetime
 
 # All models now inherit from db.Model
 class Team(db.Model):
@@ -40,9 +40,9 @@ class User(db.Model):
     full_name = Column(String(100), nullable=True)
     password_hash = Column(String, nullable=False)
     role = Column(String, default='Coach')
-    last_login = Column(String)
-    tab_order = Column(Text)
-    player_order = Column(Text)
+    last_login = Column(DateTime)
+    tab_order = Column(Text) # Keeping as text for simplicity
+    player_order = Column(JSON) # Changed to JSON
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="users")
@@ -62,7 +62,7 @@ class Player(db.Model):
     has_lessons = Column(String)
     lesson_focus = Column(Text)
     notes_author = Column(String)
-    notes_timestamp = Column(String)
+    notes_timestamp = Column(DateTime) # Changed to DateTime
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="players")
@@ -80,26 +80,16 @@ class Lineup(db.Model):
     __tablename__ = 'lineups'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
-    lineup_positions = Column(Text)
+    lineup_positions = Column(JSON) # Changed to JSON
     associated_game_id = Column(Integer)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="lineups")
 
-    def to_dict(self):
-        """Return a dictionary representation of the Lineup object."""
-        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
-        if d.get('lineup_positions'):
-            try:
-                d['lineup_positions'] = json.loads(d['lineup_positions'])
-            except (json.JSONDecodeError, TypeError):
-                d['lineup_positions'] = [] # Default to empty list on error
-        return d
-
 class PitchingOuting(db.Model):
     __tablename__ = 'pitching_outings'
     id = Column(Integer, primary_key=True)
-    date = Column(String, nullable=False)
+    date = Column(DateTime, nullable=False) # Changed to DateTime
     pitcher = Column(String, nullable=False)
     opponent = Column(String)
     pitches = Column(Integer)
@@ -131,26 +121,16 @@ class Rotation(db.Model):
     __tablename__ = 'rotations'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
-    innings = Column(Text)
+    innings = Column(JSON) # Changed to JSON
     associated_game_id = Column(Integer, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
 
-    def to_dict(self):
-        """Return a dictionary representation of the Rotation object."""
-        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
-        if d.get('innings'):
-            try:
-                d['innings'] = json.loads(d['innings'])
-            except (json.JSONDecodeError, TypeError):
-                d['innings'] = {} # Default to empty dict on error
-        return d
-
 class Game(db.Model):
     __tablename__ = 'games'
     id = Column(Integer, primary_key=True)
-    date = Column(String, nullable=False)
+    date = Column(DateTime, nullable=False) # Changed to DateTime
     opponent = Column(String, nullable=False)
     location = Column(String)
     game_notes = Column(Text)
@@ -171,7 +151,7 @@ class CollaborationNote(db.Model):
     note_type = Column(String, nullable=False)
     text = Column(Text, nullable=False)
     author = Column(String)
-    timestamp = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
     player_name = Column(String, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
@@ -180,7 +160,7 @@ class CollaborationNote(db.Model):
 class PracticePlan(db.Model):
     __tablename__ = 'practice_plans'
     id = Column(Integer, primary_key=True)
-    date = Column(String, nullable=False)
+    date = Column(DateTime, nullable=False) # Changed to DateTime
     general_notes = Column(Text)
     emphasis = Column(Text)
     warm_up = Column(Text)
@@ -199,7 +179,7 @@ class PracticeTask(db.Model):
     text = Column(Text, nullable=False)
     status = Column(String, default="pending")
     author = Column(String)
-    timestamp = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
 
     practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
     practice_plan = relationship("PracticePlan", back_populates="tasks")
@@ -210,11 +190,11 @@ class PlayerDevelopmentFocus(db.Model):
     focus = Column(Text, nullable=False)
     status = Column(String, default="active")
     notes = Column(Text)
-    created_date = Column(String)
-    completed_date = Column(String, nullable=True)
+    created_date = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
+    completed_date = Column(DateTime, nullable=True) # Changed to DateTime
     author = Column(String)
     last_edited_by = Column(String)
-    last_edited_date = Column(String)
+    last_edited_date = Column(DateTime) # Changed to DateTime
 
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
     player = relationship("Player", back_populates="development_focuses")

@@ -61,20 +61,14 @@ def create_app():
 
     # --- Custom Jinja Filter for Date/Time Formatting ---
     @app.template_filter('format_datetime')
-    def format_datetime_filter(s):
-        if not s or s == 'Never':
-            return s
-        try:
-            # Handle full datetime strings like '2025-07-24 23:55'
-            dt = datetime.strptime(s, '%Y-%m-%d %H:%M')
+    def format_datetime_filter(dt):
+        if not dt or not isinstance(dt, (datetime, date)):
+            return dt
+        if isinstance(dt, datetime):
             return dt.strftime('%A, %m/%d/%y, %I:%M %p')
-        except ValueError:
-            try:
-                # Handle date-only strings like '2025-07-24'
-                dt = datetime.strptime(s, '%Y-%m-%d')
-                return dt.strftime('%A, %m/%d/%y')
-            except ValueError:
-                return s # Return original string if format is unexpected
+        if isinstance(dt, date):
+            return dt.strftime('%A, %m/%d/%y')
+        return dt
 
     # --- Decorators & Context Processors ---
     def login_required(f):
@@ -209,35 +203,17 @@ def create_app():
             plan_dict['tasks'] = [{c.name: getattr(t, c.name) for c in t.__table__.columns} for t in p.tasks]
             plan_dict['absent_player_ids'] = [a.player_id for a in p.absences]
             practice_plans_list.append(plan_dict)
-            
-        lineups_list = []
-        for l in lineups_db:
-            lineup_dict = {c.name: getattr(l, c.name) for c in l.__table__.columns}
-            try:
-                lineup_dict['lineup_positions'] = json.loads(lineup_dict['lineup_positions'] or '[]')
-            except (json.JSONDecodeError, TypeError):
-                lineup_dict['lineup_positions'] = []
-            lineups_list.append(lineup_dict)
-
-        rotations_list = []
-        for r in rotations_db:
-            rotation_dict = {c.name: getattr(r, c.name) for c in r.__table__.columns}
-            try:
-                rotation_dict['innings'] = json.loads(rotation_dict['innings'] or '{}')
-            except (json.JSONDecodeError, TypeError):
-                rotation_dict['innings'] = {}
-            rotations_list.append(rotation_dict)
 
         full_data = {
             'roster': [{c.name: getattr(p, c.name) for c in p.__table__.columns} for p in roster_db],
-            'lineups': lineups_list,
+            'lineups': [{c.name: getattr(l, c.name) for c in l.__table__.columns} for l in lineups_db],
             'pitching': [{c.name: getattr(po, c.name) for c in po.__table__.columns} for po in pitching_outings_db],
             'scouting_list': {
                 'targets': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'targets'],
                 'committed': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'committed'],
                 'not_interested': [{c.name: getattr(sp, c.name) for c in sp.__table__.columns} for sp in scouted_players if sp.list_type == 'not_interested']
             },
-            'rotations': rotations_list,
+            'rotations': [{c.name: getattr(r, c.name) for c in r.__table__.columns} for r in rotations_db],
             'games': [{c.name: getattr(g, c.name) for c in g.__table__.columns} for g in games],
             'collaboration_notes': {
                 'team_notes': [{c.name: getattr(cn, c.name) for c in cn.__table__.columns} for cn in collaboration_notes if cn.note_type == 'team_notes'],
@@ -250,7 +226,7 @@ def create_app():
 
         return jsonify({
             'full_data': full_data,
-            'player_order': json.loads(user.player_order or "[]"),
+            'player_order': user.player_order or [],
             'session': {'username': session.get('username'), 'role': session.get('role')},
             'pitch_count_summary': pitch_count_summary
         })

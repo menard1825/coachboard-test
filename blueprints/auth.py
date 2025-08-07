@@ -21,9 +21,7 @@ def login():
         user = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
 
         if user and check_password_hash(user.password_hash, password):
-            # REMOVED: Automatic role-changing logic. Roles are now managed solely by admins.
-            # The role assigned in the database is the role the user gets.
-            user.last_login = datetime.now().strftime("%Y-%m-%d %H:%M")
+            user.last_login = datetime.now()
             db.session.commit()
 
             session['logged_in'] = True
@@ -31,7 +29,7 @@ def login():
             session['full_name'] = user.full_name or ''
             session['role'] = user.role
             session['team_id'] = user.team_id
-            session['player_order'] = json.loads(user.player_order or "[]")
+            session['player_order'] = user.player_order or []
             session.permanent = True
             flash('You were successfully logged in.', 'success')
             return redirect(url_for('home'))
@@ -81,7 +79,7 @@ def register():
             role=user_role,
             team_id=team.id,
             tab_order=json.dumps(default_tab_keys),
-            player_order=json.dumps([])
+            player_order=[]
         )
         db.session.add(new_user)
         db.session.commit()

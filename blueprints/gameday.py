@@ -1,14 +1,22 @@
-# menard1825/coachboard-test/coachboard-test-structure-overhaul/blueprints/gameday.py
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify, render_template
 from models import (
     Game, Player, Lineup, Rotation, PitchingOuting, Team, PlayerGameAbsence
 )
 from db import db
 from extensions import socketio
-import json
+from datetime import datetime
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
 
 gameday_bp = Blueprint('gameday', __name__, template_folder='templates')
+
+def model_to_dict(model_instance):
+    if not model_instance:
+        return None
+    d = {c.name: getattr(model_instance, c.name) for c in model_instance.__table__.columns}
+    for key, value in d.items():
+        if isinstance(value, datetime):
+            d[key] = value.isoformat()
+    return d
 
 # --- Game Management ---
 @gameday_bp.route('/game/<int:game_id>')
@@ -29,7 +37,7 @@ def game_management(game_id):
     rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
     
     all_pitching_outings = db.session.query(PitchingOuting).filter_by(team_id=team.id).all()
-    game_pitching_log = [o for o in all_pitching_outings if o.opponent == game.opponent and o.date == game.date]
+    game_pitching_log = [o for o in all_pitching_outings if o.opponent == game.opponent and o.date.date() == game.date.date()]
     
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
     absent_player_ids = [absence.player_id for absence in absences]
@@ -38,19 +46,26 @@ def game_management(game_id):
     pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules)
 
     return render_template('game_management.html', 
-                           game=game.to_dict(), 
-                           roster=[p.to_dict() for p in roster_objects], 
-                           lineup=lineup_obj.to_dict() if lineup_obj else None, 
-                           rotation=rotation_obj.to_dict() if rotation_obj else None, 
-                           game_pitching_log=game_pitching_log, 
+                           game=model_to_dict(game),
+                           roster=[model_to_dict(p) for p in roster_objects],
+                           lineup=model_to_dict(lineup_obj),
+                           rotation=model_to_dict(rotation_obj),
+                           game_pitching_log=[model_to_dict(o) for o in game_pitching_log],
                            session=session, 
                            absent_player_ids=absent_player_ids,
                            pitch_count_summary=pitch_count_summary)
 
 @gameday_bp.route('/add_game', methods=['POST'])
 def add_game():
+    game_date_str = request.form['game_date']
+    try:
+        game_date = datetime.strptime(game_date_str, '%Y-%m-%d')
+    except ValueError:
+        flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+        return redirect(url_for('home', _anchor='games'))
+
     new_game = Game(
-        date=request.form['game_date'], 
+        date=game_date,
         opponent=request.form['game_opponent'], 
         location=request.form.get('game_location', ''),
         game_notes=request.form.get('game_notes', ''),
@@ -58,7 +73,7 @@ def add_game():
     )
     db.session.add(new_game)
     db.session.commit()
-    flash(f'Game vs "{new_game.opponent}" on {new_game.date} added successfully!', 'success')
+    flash(f'Game vs "{new_game.opponent}" on {new_game.date.strftime("%m/%d/%Y")} added successfully!', 'success')
     socketio.emit('data_updated', {'message': 'New game added.'})
     return redirect(url_for('gameday.game_management', game_id=new_game.id))
 
@@ -68,7 +83,15 @@ def edit_game(game_id):
     if not game_to_edit:
         flash('Game not found.', 'danger')
         return redirect(url_for('home', _anchor='games'))
-    game_to_edit.date = request.form.get('game_date', game_to_edit.date)
+
+    game_date_str = request.form.get('game_date')
+    if game_date_str:
+        try:
+            game_to_edit.date = datetime.strptime(game_date_str, '%Y-%m-%d')
+        except ValueError:
+            flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+            return redirect(url_for('.game_management', game_id=game_id))
+
     game_to_edit.opponent = request.form.get('game_opponent', game_to_edit.opponent)
     game_to_edit.location = request.form.get('game_location', game_to_edit.location)
     game_to_edit.game_notes = request.form.get('game_notes', game_to_edit.game_notes)
@@ -81,9 +104,10 @@ def edit_game(game_id):
 def delete_game(game_id):
     game_to_delete = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
     if game_to_delete:
+        game_date_str = game_to_delete.date.strftime('%m/%d/%Y')
         db.session.delete(game_to_delete)
         db.session.commit()
-        flash(f'Game vs "{game_to_delete.opponent}" on {game_to_delete.date} removed successfully!', 'success')
+        flash(f'Game vs "{game_to_delete.opponent}" on {game_date_str} removed successfully!', 'success')
         socketio.emit('data_updated', {'message': 'Game deleted.'})
     else:
         flash('Game not found.', 'danger')
@@ -120,7 +144,7 @@ def add_lineup():
     
     new_lineup = Lineup(
         title=payload['title'], 
-        lineup_positions=json.dumps(payload['lineup_data']),
+        lineup_positions=payload['lineup_data'],
         associated_game_id=int(payload['associated_game_id']) if payload.get('associated_game_id') else None, 
         team_id=session['team_id']
     )
@@ -140,7 +164,7 @@ def edit_lineup(lineup_id):
         return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
         
     lineup_to_edit.title = payload['title']
-    lineup_to_edit.lineup_positions = json.dumps(payload['lineup_data'])
+    lineup_to_edit.lineup_positions = payload['lineup_data']
     lineup_to_edit.associated_game_id = int(payload.get('associated_game_id')) if payload.get('associated_game_id') else None
     db.session.commit()
     socketio.emit('data_updated', {'message': 'Lineup updated.'})
@@ -174,7 +198,7 @@ def save_rotation():
         rotation_to_update = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
         if rotation_to_update:
             rotation_to_update.title = title
-            rotation_to_update.innings = json.dumps(innings_data)
+            rotation_to_update.innings = innings_data
             rotation_to_update.associated_game_id = associated_game_id
             message = 'Rotation updated successfully!'
             new_rotation_id = rotation_id
@@ -184,7 +208,7 @@ def save_rotation():
     if not rotation_id:
         new_rotation = Rotation(
             title=title, 
-            innings=json.dumps(innings_data), 
+            innings=innings_data,
             associated_game_id=associated_game_id, 
             team_id=session['team_id']
         )
