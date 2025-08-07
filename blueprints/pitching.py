@@ -1,5 +1,5 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, render_template
-from models import PitchingOuting, Team
+from models import PitchingOuting, Team, Game
 from db import db
 from extensions import socketio
 from utils import get_pitching_rules_for_team
@@ -9,13 +9,27 @@ pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 
 @pitching_bp.route('/add_pitching', methods=['POST'])
 def add_pitching():
+    game_id = request.form.get('game_id')
     try:
         pitch_count = int(request.form['pitches'])
         innings_pitched = float(request.form['innings'])
-        pitch_date_str = request.form['pitch_date']
-        pitch_date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
-    except ValueError:
-        flash('Pitch count and innings must be valid numbers, and date must be in YYYY-MM-DD format.', 'danger')
+
+        pitch_date = None
+        pitch_date_str = request.form.get('pitch_date')
+        if pitch_date_str:
+            pitch_date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
+        elif game_id:
+            game = db.session.get(Game, game_id)
+            if game:
+                pitch_date = game.date
+
+        if not pitch_date:
+            raise ValueError("Date is required and could not be determined.")
+
+    except (ValueError, KeyError):
+        flash('Pitch count and innings must be valid numbers, and a valid date is required.', 'danger')
+        if game_id:
+            return redirect(url_for('gameday.game_management', game_id=game_id, _anchor='pitching'))
         return redirect(url_for('home', _anchor='pitching'))
 
     new_outing = PitchingOuting(
@@ -33,7 +47,6 @@ def add_pitching():
     flash(f'Pitching outing for "{new_outing.pitcher}" added successfully!', 'success')
     socketio.emit('data_updated', {'message': 'New pitching outing added.'})
     
-    game_id = request.form.get('game_id')
     if game_id:
         return redirect(url_for('gameday.game_management', game_id=game_id, _anchor='pitching'))
     return redirect(url_for('home', _anchor='pitching'))
