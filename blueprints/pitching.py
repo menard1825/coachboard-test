@@ -29,10 +29,9 @@ def add_pitching():
             raise ValueError("Date is required and could not be determined.")
 
         opponent = request.form.get('opponent')
-        if not opponent and game:
+        if game:
             opponent = game.opponent
-
-        if not opponent:
+        elif not opponent:
             raise ValueError("Opponent is required.")
 
     except (ValueError, KeyError):
