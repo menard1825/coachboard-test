@@ -74,7 +74,7 @@ def calculate_cumulative_position_stats(roster_players, rotations):
 
 def calculate_pitch_count_summary(roster, all_outings, rules):
     """Calculates the daily/weekly pitch counts and availability for all pitchers."""
-    summary_list = []
+    summary = {}
     today = date.today()
     for player in roster:
         if player.pitcher_role == 'Not a Pitcher':
@@ -108,14 +108,12 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                 status = 'Resting'
                 next_available_str = next_available_date.strftime('%a, %b %d')
             
-        summary_list.append({
-            'player_id': player.id,
-            'name': player.name,
+        summary[player.name] = {
             'daily': daily_pitches,
             'weekly': weekly_pitches,
             'status': status,
             'next_available': next_available_str,
             'max_daily': rules.get('max_daily', 85),
             'pitches_remaining_today': max(0, rules.get('max_daily', 85) - daily_pitches)
-        })
-    return summary_list
+        }
+    return summary
