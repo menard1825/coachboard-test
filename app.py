@@ -146,8 +146,8 @@ def create_app():
         rotations = db.session.query(Rotation).filter_by(team_id=user.team_id).all()
         pitching_outings = db.session.query(PitchingOuting).filter_by(team_id=user.team_id).all()
 
-        pitcher_names = sorted([p.name for p in roster_players if p.pitcher_role != 'Not a Pitcher'])
-        cumulative_pitching_data = {name: calculate_cumulative_pitching_stats(name, pitching_outings) for name in pitcher_names}
+        pitchers = [p for p in roster_players if p.pitcher_role != 'Not a Pitcher']
+        cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings) for p in pitchers}
         cumulative_position_data = calculate_cumulative_position_stats(roster_players, rotations)
 
         game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=user.team_id).group_by(PlayerGameAbsence.player_id).all()

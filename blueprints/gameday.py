@@ -6,6 +6,7 @@ from db import db
 from extensions import socketio
 from datetime import datetime
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
+from sqlalchemy.orm import joinedload
 
 gameday_bp = Blueprint('gameday', __name__, template_folder='templates')
 
@@ -16,6 +17,13 @@ def model_to_dict(model_instance):
     for key, value in d.items():
         if isinstance(value, datetime):
             d[key] = value.isoformat()
+    return d
+
+def pitching_outing_to_dict(outing):
+    if not outing:
+        return None
+    d = model_to_dict(outing)
+    d['pitcher_name'] = outing.player.name if outing.player else "Unknown"
     return d
 
 # --- Game Management ---
@@ -31,12 +39,12 @@ def game_management(game_id):
         flash('Game not found.', 'danger')
         return redirect(url_for('home', _anchor='games'))
     
-    roster_objects = db.session.query(Player).filter_by(team_id=team.id).all()
+    roster_objects = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
     
     lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
     rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
     
-    all_pitching_outings = db.session.query(PitchingOuting).filter_by(team_id=team.id).all()
+    all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all()
     game_pitching_log = [o for o in all_pitching_outings if o.opponent == game.opponent and o.date.date() == game.date.date()]
     
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
@@ -50,7 +58,7 @@ def game_management(game_id):
                            roster=[model_to_dict(p) for p in roster_objects],
                            lineup=model_to_dict(lineup_obj),
                            rotation=model_to_dict(rotation_obj),
-                           game_pitching_log=[model_to_dict(o) for o in game_pitching_log],
+                           game_pitching_log=[pitching_outing_to_dict(o) for o in game_pitching_log],
                            session=session, 
                            absent_player_ids=absent_player_ids,
                            pitch_count_summary=pitch_count_summary)

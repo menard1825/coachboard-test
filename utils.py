@@ -33,11 +33,11 @@ def get_pitching_rules_for_team(team):
     rule_set = PITCHING_RULES.get(rule_set_name, PITCHING_RULES['USSSA'])
     return rule_set.get(age_group, rule_set.get('default'))
 
-def calculate_cumulative_pitching_stats(pitcher_name, all_outings):
+def calculate_cumulative_pitching_stats(player_id, all_outings):
     """Calculates total innings, pitches, and appearances for a pitcher."""
     stats = {'total_innings_pitched': 0.0, 'total_pitches_thrown': 0, 'appearances': 0}
     for outing in all_outings:
-        if outing.pitcher == pitcher_name:
+        if outing.player_id == player_id:
             try:
                 stats['total_innings_pitched'] += float(outing.innings or 0.0)
                 stats['total_pitches_thrown'] += int(outing.pitches or 0)
@@ -52,7 +52,7 @@ def calculate_cumulative_position_stats(roster_players, rotations):
     stats = {player.name: {} for player in roster_players}
     for rotation in rotations:
         try:
-            innings = json.loads(rotation.innings or "{}")
+            innings = rotation.innings or {}
             # Find all unique positions a player played in this single rotation
             player_positions_in_rotation = {} # player_name -> set of positions
             for inning_data in innings.values():
@@ -80,17 +80,17 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
         if player.pitcher_role == 'Not a Pitcher':
             continue
         
-        player_outings = sorted([o for o in all_outings if o.pitcher == player.name], key=lambda x: datetime.strptime(x.date, '%Y-%m-%d'), reverse=True)
+        player_outings = sorted([o for o in all_outings if o.player_id == player.id], key=lambda x: x.date, reverse=True)
         
-        daily_pitches = sum(o.pitches for o in player_outings if datetime.strptime(o.date, '%Y-%m-%d').date() == today)
-        weekly_pitches = sum(o.pitches for o in player_outings if (today - datetime.strptime(o.date, '%Y-%m-%d').date()).days < 7)
+        daily_pitches = sum(o.pitches for o in player_outings if o.date.date() == today)
+        weekly_pitches = sum(o.pitches for o in player_outings if (today - o.date.date()).days < 7)
 
         status, next_available_str = 'Available', 'Today'
         required_rest = 0
         
         if player_outings:
             last_outing = player_outings[0]
-            last_outing_date = datetime.strptime(last_outing.date, '%Y-%m-%d').date()
+            last_outing_date = last_outing.date.date()
             pitches_in_last_outing = last_outing.pitches
             
             # Determine rest days based on the rules thresholds

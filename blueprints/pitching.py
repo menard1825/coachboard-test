@@ -1,5 +1,5 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, render_template
-from models import PitchingOuting, Team, Game
+from models import PitchingOuting, Team, Game, Player
 from db import db
 from extensions import socketio
 from utils import get_pitching_rules_for_team
@@ -17,6 +17,7 @@ def add_pitching():
     try:
         pitch_count = int(request.form['pitches'])
         innings_pitched = float(request.form['innings'])
+        player_id = int(request.form['player_id'])
 
         pitch_date = None
         pitch_date_str = request.form.get('pitch_date')
@@ -35,14 +36,19 @@ def add_pitching():
             raise ValueError("Opponent is required.")
 
     except (ValueError, KeyError):
-        flash('Pitch count, innings, opponent, and a valid date are required.', 'danger')
+        flash('Pitch count, innings, pitcher, opponent, and a valid date are required.', 'danger')
         if game_id:
             return redirect(url_for('gameday.game_management', game_id=game_id, _anchor='pitching'))
         return redirect(url_for('home', _anchor='pitching'))
 
+    player = db.session.get(Player, player_id)
+    if not player:
+        flash('Selected pitcher not found.', 'danger')
+        return redirect(url_for('home', _anchor='pitching'))
+
     new_outing = PitchingOuting(
         date=pitch_date,
-        pitcher=request.form['pitcher'], 
+        player_id=player_id,
         opponent=opponent,
         pitches=pitch_count, 
         innings=innings_pitched, 
@@ -52,7 +58,7 @@ def add_pitching():
     )
     db.session.add(new_outing)
     db.session.commit()
-    flash(f'Pitching outing for "{new_outing.pitcher}" added successfully!', 'success')
+    flash(f'Pitching outing for "{player.name}" added successfully!', 'success')
     socketio.emit('data_updated', {'message': 'New pitching outing added.'})
     
     if game_id:
@@ -71,7 +77,10 @@ def edit_pitching(outing_id):
         if pitch_date_str:
             outing_to_edit.date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
 
-        outing_to_edit.pitcher = request.form.get('pitcher', outing_to_edit.pitcher)
+        player_id = request.form.get('player_id')
+        if player_id:
+            outing_to_edit.player_id = int(player_id)
+
         outing_to_edit.opponent = request.form.get('opponent', outing_to_edit.opponent)
         outing_to_edit.pitches = int(request.form.get('pitches', outing_to_edit.pitches))
         outing_to_edit.innings = float(request.form.get('innings', outing_to_edit.innings))
@@ -79,7 +88,7 @@ def edit_pitching(outing_id):
         outing_to_edit.outing_type = request.form.get('outing_type', outing_to_edit.outing_type)
         
         db.session.commit()
-        flash(f'Successfully updated outing for {outing_to_edit.pitcher}.', 'success')
+        flash(f'Successfully updated outing for {outing_to_edit.player.name}.', 'success')
         socketio.emit('data_updated', {'message': 'Pitching outing updated.'})
     except ValueError:
         flash('Invalid number format for pitches or innings, or invalid date format.', 'danger')
@@ -94,9 +103,10 @@ def edit_pitching(outing_id):
 def delete_pitching(outing_id):
     outing_to_delete = db.session.query(PitchingOuting).filter_by(id=outing_id, team_id=session['team_id']).first()
     if outing_to_delete:
+        player_name = outing_to_delete.player.name
         db.session.delete(outing_to_delete)
         db.session.commit()
-        flash(f'Pitching outing for "{outing_to_delete.pitcher}" removed successfully!', 'success')
+        flash(f'Pitching outing for "{player_name}" removed successfully!', 'success')
         socketio.emit('data_updated', {'message': 'Pitching outing deleted.'})
     else:
         flash('Pitching outing not found.', 'danger')

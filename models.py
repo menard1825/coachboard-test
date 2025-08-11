@@ -70,6 +70,7 @@ class Player(db.Model):
     development_focuses = relationship("PlayerDevelopmentFocus", back_populates="player", cascade="all, delete-orphan")
     game_absences = relationship("PlayerGameAbsence", back_populates="player", cascade="all, delete-orphan")
     practice_absences = relationship("PlayerPracticeAbsence", back_populates="player", cascade="all, delete-orphan")
+    pitching_outings = relationship("PitchingOuting", back_populates="player")
     
     def to_dict(self):
         """Return a dictionary representation of the Player object."""
@@ -89,8 +90,7 @@ class Lineup(db.Model):
 class PitchingOuting(db.Model):
     __tablename__ = 'pitching_outings'
     id = Column(Integer, primary_key=True)
-    date = Column(DateTime, nullable=False) # Changed to DateTime
-    pitcher = Column(String, nullable=False)
+    date = Column(DateTime, nullable=False)
     opponent = Column(String)
     pitches = Column(Integer)
     innings = Column(Float)
@@ -98,7 +98,10 @@ class PitchingOuting(db.Model):
     outing_type = Column(String)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+
     team = relationship("Team", back_populates="pitching_outings")
+    player = relationship("Player")
 
 class ScoutedPlayer(db.Model):
     __tablename__ = 'scouted_players'
