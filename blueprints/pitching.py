@@ -1,6 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, render_template
 from models import PitchingOuting, Team, Game, Player
 from db import db
+from sqlalchemy import func
 from extensions import socketio
 from utils import get_pitching_rules_for_team
 from datetime import datetime
@@ -17,7 +18,19 @@ def add_pitching():
     try:
         pitch_count = int(request.form['pitches'])
         innings_pitched = float(request.form['innings'])
-        player_id = int(request.form['player_id'])
+
+        player_id = request.form.get('player_id')
+        if player_id:
+            player_id = int(player_id)
+        else:
+            pitcher_name = request.form.get('pitcher')
+            if pitcher_name:
+                player = db.session.query(Player).filter(func.lower(Player.name) == func.lower(pitcher_name), Player.team_id == session['team_id']).first()
+                if player:
+                    player_id = player.id
+
+        if not player_id:
+            raise ValueError("Pitcher not found or not provided.")
 
         pitch_date = None
         pitch_date_str = request.form.get('pitch_date')
