@@ -8,6 +8,17 @@ from datetime import datetime
 
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 
+def parse_date(date_str):
+    """Tries to parse a date string with multiple formats."""
+    if not date_str:
+        return None
+    for fmt in ('%Y-%m-%d', '%A, %m/%d/%y, %I:%M %p', '%A, %m/%d/%y'):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            pass
+    return None
+
 @pitching_bp.route('/add_pitching', methods=['POST'])
 def add_pitching():
     game_id = request.form.get('game_id')
@@ -43,17 +54,14 @@ def add_pitching():
         return redirect(request.referrer or url_for('home', _anchor='pitching'))
 
     pitch_date_str = request.form.get('pitch_date')
-    if pitch_date_str:
-        try:
-            pitch_date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
-        except ValueError:
-            flash('Date must be in YYYY-MM-DD format.', 'danger')
+    pitch_date = parse_date(pitch_date_str)
+
+    if not pitch_date:
+        if game:
+            pitch_date = game.date
+        else:
+            flash('A valid date is required.', 'danger')
             return redirect(request.referrer or url_for('home', _anchor='pitching'))
-    elif game:
-        pitch_date = game.date
-    else:
-        flash('A valid date is required.', 'danger')
-        return redirect(request.referrer or url_for('home', _anchor='pitching'))
 
     opponent = request.form.get('opponent')
     if game:
@@ -96,7 +104,12 @@ def edit_pitching(outing_id):
     try:
         pitch_date_str = request.form.get('pitch_date')
         if pitch_date_str:
-            outing_to_edit.date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
+            parsed_date = parse_date(pitch_date_str)
+            if parsed_date:
+                outing_to_edit.date = parsed_date
+            else:
+                flash('Invalid date format.', 'danger')
+                return redirect(request.referrer or url_for('home', _anchor='pitching'))
 
         player_id = request.form.get('player_id')
         if player_id:
@@ -112,7 +125,7 @@ def edit_pitching(outing_id):
         flash(f'Successfully updated outing for {outing_to_edit.player.name}.', 'success')
         socketio.emit('data_updated', {'message': 'Pitching outing updated.'})
     except ValueError:
-        flash('Invalid number format for pitches or innings, or invalid date format.', 'danger')
+        flash('Invalid number format for pitches or innings.', 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f'An error occurred: {e}', 'danger')
