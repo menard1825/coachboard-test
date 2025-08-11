@@ -108,7 +108,8 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                 status = 'Resting'
                 next_available_str = next_available_date.strftime('%a, %b %d')
             
-        summary[player.name] = {
+        summary[player.id] = {
+            'name': player.name,
             'daily': daily_pitches,
             'weekly': weekly_pitches,
             'status': status,
