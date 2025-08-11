@@ -49,6 +49,13 @@ def model_to_dict(obj):
             d[column.name] = val
     return d
 
+def pitching_outing_to_dict(outing):
+    if not outing:
+        return None
+    d = model_to_dict(outing)
+    d['pitcher_name'] = outing.player.name if outing.player else "Unknown"
+    return d
+
 def create_app():
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
@@ -144,7 +151,7 @@ def create_app():
 
         roster_players = db.session.query(Player).filter_by(team_id=user.team_id).all()
         rotations = db.session.query(Rotation).filter_by(team_id=user.team_id).all()
-        pitching_outings = db.session.query(PitchingOuting).filter_by(team_id=user.team_id).all()
+        pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=user.team_id).all()
 
         pitchers = [p for p in roster_players if p.pitcher_role != 'Not a Pitcher']
         cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings) for p in pitchers}
@@ -188,7 +195,7 @@ def create_app():
 
         roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
         lineups_db = db.session.query(Lineup).filter_by(team_id=team_id).all()
-        pitching_outings_db = db.session.query(PitchingOuting).filter_by(team_id=team_id).all()
+        pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
         scouted_players = db.session.query(ScoutedPlayer).filter_by(team_id=team_id).all()
         rotations_db = db.session.query(Rotation).filter_by(team_id=team_id).all()
         games = db.session.query(Game).filter_by(team_id=team_id).all()
@@ -225,7 +232,7 @@ def create_app():
         full_data = {
             'roster': [model_to_dict(p) for p in roster_db],
             'lineups': [model_to_dict(l) for l in lineups_db],
-            'pitching': [model_to_dict(po) for po in pitching_outings_db],
+            'pitching': [pitching_outing_to_dict(po) for po in pitching_outings_db],
             'scouting_list': {
                 'targets': [model_to_dict(sp) for sp in scouted_players if sp.list_type == 'targets'],
                 'committed': [model_to_dict(sp) for sp in scouted_players if sp.list_type == 'committed'],
