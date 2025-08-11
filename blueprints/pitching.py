@@ -15,49 +15,57 @@ def add_pitching():
     if game_id:
         game = db.session.get(Game, game_id)
 
+    # Validate form fields one by one to provide specific error messages
     try:
         pitch_count = int(request.form['pitches'])
-        innings_pitched = float(request.form['innings'])
-
-        player_id = request.form.get('player_id')
-        if player_id:
-            player_id = int(player_id)
-        else:
-            pitcher_name = request.form.get('pitcher')
-            if pitcher_name:
-                player = db.session.query(Player).filter(func.lower(Player.name) == func.lower(pitcher_name), Player.team_id == session['team_id']).first()
-                if player:
-                    player_id = player.id
-
-        if not player_id:
-            raise ValueError("Pitcher not found or not provided.")
-
-        pitch_date = None
-        pitch_date_str = request.form.get('pitch_date')
-        if pitch_date_str:
-            pitch_date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
-        elif game:
-            pitch_date = game.date
-
-        if not pitch_date:
-            raise ValueError("Date is required and could not be determined.")
-
-        opponent = request.form.get('opponent')
-        if game:
-            opponent = game.opponent
-        elif not opponent:
-            raise ValueError("Opponent is required.")
-
     except (ValueError, KeyError):
-        flash('Pitch count, innings, pitcher, opponent, and a valid date are required.', 'danger')
-        if game_id:
-            return redirect(url_for('gameday.game_management', game_id=game_id, _anchor='pitching'))
-        return redirect(url_for('home', _anchor='pitching'))
+        flash('Pitch count must be a valid number.', 'danger')
+        return redirect(request.referrer or url_for('home', _anchor='pitching'))
+
+    try:
+        innings_pitched = float(request.form['innings'])
+    except (ValueError, KeyError):
+        flash('Innings pitched must be a valid number.', 'danger')
+        return redirect(request.referrer or url_for('home', _anchor='pitching'))
+
+    player_id = request.form.get('player_id')
+    if player_id:
+        player_id = int(player_id)
+    else:
+        pitcher_name = request.form.get('pitcher')
+        if pitcher_name:
+            player = db.session.query(Player).filter(func.lower(Player.name) == func.lower(pitcher_name), Player.team_id == session['team_id']).first()
+            if player:
+                player_id = player.id
+
+    if not player_id:
+        flash('A valid pitcher must be selected.', 'danger')
+        return redirect(request.referrer or url_for('home', _anchor='pitching'))
+
+    pitch_date_str = request.form.get('pitch_date')
+    if pitch_date_str:
+        try:
+            pitch_date = datetime.strptime(pitch_date_str, '%Y-%m-%d')
+        except ValueError:
+            flash('Date must be in YYYY-MM-DD format.', 'danger')
+            return redirect(request.referrer or url_for('home', _anchor='pitching'))
+    elif game:
+        pitch_date = game.date
+    else:
+        flash('A valid date is required.', 'danger')
+        return redirect(request.referrer or url_for('home', _anchor='pitching'))
+
+    opponent = request.form.get('opponent')
+    if game:
+        opponent = game.opponent
+    elif not opponent:
+        flash('Opponent is required.', 'danger')
+        return redirect(request.referrer or url_for('home', _anchor='pitching'))
 
     player = db.session.get(Player, player_id)
     if not player:
         flash('Selected pitcher not found.', 'danger')
-        return redirect(url_for('home', _anchor='pitching'))
+        return redirect(request.referrer or url_for('home', _anchor='pitching'))
 
     new_outing = PitchingOuting(
         date=pitch_date,
