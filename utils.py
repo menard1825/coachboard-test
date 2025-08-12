@@ -82,8 +82,8 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
         
         player_outings = sorted([o for o in all_outings if o.player_id == player.id], key=lambda x: x.date, reverse=True)
         
-        daily_pitches = sum(o.pitches for o in player_outings if o.date.date() == today)
-        weekly_pitches = sum(o.pitches for o in player_outings if (today - o.date.date()).days < 7)
+        daily_pitches = sum(o.pitches or 0 for o in player_outings if o.date.date() == today)
+        weekly_pitches = sum(o.pitches or 0 for o in player_outings if (today - o.date.date()).days < 7)
 
         status, next_available_str = 'Available', 'Today'
         required_rest = 0
@@ -91,7 +91,7 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
         if player_outings:
             last_outing = player_outings[0]
             last_outing_date = last_outing.date.date()
-            pitches_in_last_outing = last_outing.pitches
+            pitches_in_last_outing = last_outing.pitches or 0
             
             # Determine rest days based on the rules thresholds
             for threshold, rest_days in rules.get('rest_thresholds', []):
