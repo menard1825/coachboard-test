@@ -11,12 +11,12 @@
 
                     <div class="row g-3">
                         <div class="col-12">
-                           <label for="pitching-log-pitcher-select" class="form-label">Pitcher</label>
-                           <select name="pitcher" class="form-select" required id="pitching-log-pitcher-select">
-                               <option value="">Select Pitcher...</option>
+                           <label for="gameday-player-select" class="form-label">Player</label>
+                           <select name="player_id" class="form-select" required id="gameday-player-select">
+                               <option value="">Select Player...</option>
                                {% for p in roster %}
                                    {% if p['pitcher_role'] != 'Not a Pitcher' %}
-                                   <option value="{{ p['name'] }}">{{ p['name'] }}</option>
+                                   <option value="{{ p['id'] }}">{{ p['name'] }}</option>
                                    {% endif %}
                                {% endfor %}
                            </select>
@@ -57,7 +57,7 @@
                     {% if game_pitching_log %}
                         {% for o in game_pitching_log %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span><strong>{{ o.pitcher }}</strong> ({{ o.pitcher_type }}) - {{ o.pitches }} pitches ({{ o.innings }} IP)</span>
+                            <span><strong>{{ o.player_name }}</strong> ({{ o.pitcher_type }}) - {{ o.pitches }} pitches ({{ o.innings }} IP)</span>
                             <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">Delete</a>
                         </li>
                         {% endfor %}

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, render_template
 from models import PitchingOuting, Team, Game, Player
 from db import db
-from sqlalchemy import func
+from sqlalchemy import func, case
 from sqlalchemy.orm import joinedload
 from extensions import socketio
 from utils import get_pitching_rules_for_team
@@ -167,7 +167,7 @@ def login_required(f):
 def pitching_page():
     team_id = session['team_id']
     today = date.today()
-    start_of_week = today - timedelta(days=today.weekday())
+    six_days_ago = today - timedelta(days=6)
 
     recent_outings = (
         PitchingOuting.query
@@ -178,51 +178,28 @@ def pitching_page():
         .all()
     )
 
-    daily_counts = (
+    summary_stats = (
         db.session.query(
-            Player.id,
-            Player.name.label("full_name"),
-            func.coalesce(func.sum(PitchingOuting.pitches), 0).label("pitches"),
+            PitchingOuting.player_id,
+            func.sum(case((func.date(PitchingOuting.date) == today, PitchingOuting.pitches), else_=0)).label('daily'),
+            func.sum(case((func.date(PitchingOuting.date) >= six_days_ago, PitchingOuting.pitches), else_=0)).label('weekly')
         )
-        .join(PitchingOuting, PitchingOuting.player_id == Player.id)
-        .filter(
-            PitchingOuting.team_id == team_id,
-            func.date(PitchingOuting.date) == today,
-        )
-        .group_by(Player.id, Player.name)
+        .filter(PitchingOuting.team_id == team_id)
+        .group_by(PitchingOuting.player_id)
         .all()
     )
 
-    weekly_counts = (
-        db.session.query(
-            Player.id,
-            Player.name.label("full_name"),
-            func.coalesce(func.sum(PitchingOuting.pitches), 0).label("pitches"),
-        )
-        .join(PitchingOuting, PitchingOuting.player_id == Player.id)
-        .filter(
-            PitchingOuting.team_id == team_id,
-            func.date(PitchingOuting.date) >= start_of_week,
-        )
-        .group_by(Player.id, Player.name)
-        .all()
-    )
+    all_players = Player.query.filter_by(team_id=team_id).all()
+    players_by_id = {p.id: p.to_dict() for p in all_players}
+    pitchers = [p for p in all_players if p.pitcher_role != 'Not a Pitcher']
 
-    # A helper to get the current team, useful for the template's base layout
     current_team = db.session.get(Team, team_id)
-
-    pitchers = (
-        Player.query
-        .filter(Player.team_id == team_id, Player.pitcher_role != 'Not a Pitcher')
-        .order_by(Player.name)
-        .all()
-    )
 
     return render_template(
         "pitching.html",
         recent_outings=recent_outings,
-        daily_counts=daily_counts,
-        weekly_counts=weekly_counts,
+        summary_stats=summary_stats,
+        players_by_id=players_by_id,
         current_team=current_team,
         pitchers=pitchers
     )

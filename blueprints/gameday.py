@@ -23,7 +23,7 @@ def pitching_outing_to_dict(outing):
     if not outing:
         return None
     d = model_to_dict(outing)
-    d['pitcher_name'] = outing.player.name if outing.player else "Unknown"
+    d['player_name'] = outing.player.name if outing.player else "Unknown"
     return d
 
 # --- Game Management ---
