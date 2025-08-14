@@ -72,6 +72,10 @@ class Player(db.Model):
     practice_absences = relationship("PlayerPracticeAbsence", back_populates="player", cascade="all, delete-orphan")
     pitching_outings = relationship("PitchingOuting", back_populates="player")
     
+    @property
+    def full_name(self):
+        return self.name.strip() if self.name else None
+
     def to_dict(self):
         """Return a dictionary representation of the Player object."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -102,6 +106,19 @@ class PitchingOuting(db.Model):
 
     team = relationship("Team", back_populates="pitching_outings")
     player = relationship("Player")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "date": self.date.isoformat() if self.date else None,
+            "opponent": self.opponent,
+            "pitches": self.pitches,
+            "innings": self.innings,
+            "outing_type": self.outing_type,
+            "pitcher_type": self.pitcher_type,
+            "player_id": self.player_id,
+            "player_name": self.player.full_name if self.player else None,
+        }
 
 class ScoutedPlayer(db.Model):
     __tablename__ = 'scouted_players'

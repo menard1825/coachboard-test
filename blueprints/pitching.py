@@ -2,9 +2,11 @@ from flask import Blueprint, request, redirect, url_for, flash, session, render_
 from models import PitchingOuting, Team, Game, Player
 from db import db
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from extensions import socketio
 from utils import get_pitching_rules_for_team
-from datetime import datetime
+from datetime import datetime, date, timedelta
+from functools import wraps
 
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 
@@ -145,8 +147,86 @@ def delete_pitching(outing_id):
     else:
         flash('Pitching outing not found.', 'danger')
     
-    redirect_url = request.referrer or url_for('home', _anchor='pitching')
+    redirect_url = request.referrer or url_for('pitching.pitching_page')
     return redirect(redirect_url)
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('auth.login'))
+        if 'team_id' not in session:
+            flash('Please select a team first.', 'warning')
+            return redirect(url_for('team_management.team_select'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@pitching_bp.route("/pitching", methods=["GET"])
+@login_required
+def pitching_page():
+    team_id = session['team_id']
+    today = date.today()
+    start_of_week = today - timedelta(days=today.weekday())
+
+    recent_outings = (
+        PitchingOuting.query
+        .filter(PitchingOuting.team_id == team_id)
+        .options(joinedload(PitchingOuting.player))
+        .order_by(PitchingOuting.date.desc())
+        .limit(10)
+        .all()
+    )
+
+    daily_counts = (
+        db.session.query(
+            Player.id,
+            Player.name.label("full_name"),
+            func.coalesce(func.sum(PitchingOuting.pitches), 0).label("pitches"),
+        )
+        .join(PitchingOuting, PitchingOuting.player_id == Player.id)
+        .filter(
+            PitchingOuting.team_id == team_id,
+            func.date(PitchingOuting.date) == today,
+        )
+        .group_by(Player.id, Player.name)
+        .all()
+    )
+
+    weekly_counts = (
+        db.session.query(
+            Player.id,
+            Player.name.label("full_name"),
+            func.coalesce(func.sum(PitchingOuting.pitches), 0).label("pitches"),
+        )
+        .join(PitchingOuting, PitchingOuting.player_id == Player.id)
+        .filter(
+            PitchingOuting.team_id == team_id,
+            func.date(PitchingOuting.date) >= start_of_week,
+        )
+        .group_by(Player.id, Player.name)
+        .all()
+    )
+
+    # A helper to get the current team, useful for the template's base layout
+    current_team = db.session.get(Team, team_id)
+
+    pitchers = (
+        Player.query
+        .filter(Player.team_id == team_id, Player.pitcher_role != 'Not a Pitcher')
+        .order_by(Player.name)
+        .all()
+    )
+
+    return render_template(
+        "pitching.html",
+        recent_outings=recent_outings,
+        daily_counts=daily_counts,
+        weekly_counts=weekly_counts,
+        current_team=current_team,
+        pitchers=pitchers
+    )
+
 
 @pitching_bp.route('/rules')
 def pitching_rules():
