@@ -33,13 +33,13 @@ def add_pitching():
         pitch_count = int(request.form['pitches'])
     except (ValueError, KeyError):
         flash('Pitch count must be a valid number.', 'danger')
-        return redirect(request.referrer or url_for('home', _anchor='pitching'))
+        return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     try:
         innings_pitched = float(request.form['innings'])
     except (ValueError, KeyError):
         flash('Innings pitched must be a valid number.', 'danger')
-        return redirect(request.referrer or url_for('home', _anchor='pitching'))
+        return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     player_id = request.form.get('player_id')
     if player_id:
@@ -53,7 +53,7 @@ def add_pitching():
 
     if not player_id:
         flash('A valid pitcher must be selected.', 'danger')
-        return redirect(request.referrer or url_for('home', _anchor='pitching'))
+        return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     pitch_date_str = request.form.get('pitch_date')
     pitch_date = parse_date(pitch_date_str)
@@ -63,19 +63,19 @@ def add_pitching():
             pitch_date = game.date
         else:
             flash('A valid date is required.', 'danger')
-            return redirect(request.referrer or url_for('home', _anchor='pitching'))
+            return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     opponent = request.form.get('opponent')
     if game:
         opponent = game.opponent
     elif not opponent:
         flash('Opponent is required.', 'danger')
-        return redirect(request.referrer or url_for('home', _anchor='pitching'))
+        return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     player = db.session.get(Player, player_id)
     if not player:
         flash('Selected pitcher not found.', 'danger')
-        return redirect(request.referrer or url_for('home', _anchor='pitching'))
+        return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     new_outing = PitchingOuting(
         date=pitch_date,
@@ -89,19 +89,19 @@ def add_pitching():
     )
     db.session.add(new_outing)
     db.session.commit()
-    flash(f'Pitching outing for "{player.name}" added successfully!', 'success')
+    flash(f'Pitching outing for "{player.full_name}" added successfully!', 'success')
     socketio.emit('data_updated', {'message': 'New pitching outing added.'})
     
     if game_id:
         return redirect(url_for('gameday.game_management', game_id=game_id, _anchor='pitching'))
-    return redirect(url_for('home', _anchor='pitching'))
+    return redirect(url_for('pitching.pitching_page'))
 
 @pitching_bp.route('/edit_pitching/<int:outing_id>', methods=['POST'])
 def edit_pitching(outing_id):
     outing_to_edit = db.session.get(PitchingOuting, outing_id)
     if not outing_to_edit or outing_to_edit.team_id != session['team_id']:
         flash('Pitching outing not found or you do not have permission to edit it.', 'danger')
-        return redirect(url_for('home', _anchor='pitching'))
+        return redirect(url_for('pitching.pitching_page'))
     
     try:
         pitch_date_str = request.form.get('pitch_date')
@@ -111,7 +111,7 @@ def edit_pitching(outing_id):
                 outing_to_edit.date = parsed_date
             else:
                 flash('Invalid date format.', 'danger')
-                return redirect(request.referrer or url_for('home', _anchor='pitching'))
+                return redirect(request.referrer or url_for('pitching.pitching_page'))
 
         player_id = request.form.get('player_id')
         if player_id:
@@ -124,7 +124,7 @@ def edit_pitching(outing_id):
         outing_to_edit.outing_type = request.form.get('outing_type', outing_to_edit.outing_type)
         
         db.session.commit()
-        flash(f'Successfully updated outing for {outing_to_edit.player.name}.', 'success')
+        flash(f'Successfully updated outing for {outing_to_edit.player.full_name}.', 'success')
         socketio.emit('data_updated', {'message': 'Pitching outing updated.'})
     except ValueError:
         flash('Invalid number format for pitches or innings.', 'danger')
@@ -132,14 +132,14 @@ def edit_pitching(outing_id):
         db.session.rollback()
         flash(f'An error occurred: {e}', 'danger')
         
-    return redirect(url_for('home', _anchor='pitching'))
+    return redirect(url_for('pitching.pitching_page'))
 
 
 @pitching_bp.route('/delete_pitching/<int:outing_id>')
 def delete_pitching(outing_id):
     outing_to_delete = db.session.query(PitchingOuting).filter_by(id=outing_id, team_id=session['team_id']).first()
     if outing_to_delete:
-        player_name = outing_to_delete.player.name
+        player_name = outing_to_delete.player.full_name
         db.session.delete(outing_to_delete)
         db.session.commit()
         flash(f'Pitching outing for "{player_name}" removed successfully!', 'success')
