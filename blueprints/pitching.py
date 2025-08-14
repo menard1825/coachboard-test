@@ -1,7 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, render_template
 from models import PitchingOuting, Team, Game, Player
 from db import db
-from sqlalchemy import func, case
+from sqlalchemy import func, case, cast, Date
 from sqlalchemy.orm import joinedload
 from extensions import socketio
 from utils import get_pitching_rules_for_team
@@ -178,16 +178,35 @@ def pitching_page():
         .all()
     )
 
-    summary_stats = (
+    rows = (
         db.session.query(
-            PitchingOuting.player_id,
-            func.sum(case((func.date(PitchingOuting.date) == today, PitchingOuting.pitches), else_=0)).label('daily'),
-            func.sum(case((func.date(PitchingOuting.date) >= six_days_ago, PitchingOuting.pitches), else_=0)).label('weekly')
+            PitchingOuting.player_id.label("player_id"),
+            func.sum(
+                case((cast(PitchingOuting.date, Date) == today, PitchingOuting.pitches), else_=0)
+            ).label("daily"),
+            func.sum(
+                case((cast(PitchingOuting.date, Date) >= six_days_ago, PitchingOuting.pitches), else_=0)
+            ).label("weekly"),
         )
         .filter(PitchingOuting.team_id == team_id)
         .group_by(PitchingOuting.player_id)
         .all()
     )
+
+    # ✅ Convert Row → dict of primitives
+    summary_stats = []
+    for r in rows:
+        # SQLAlchemy 2.x Row has ._mapping (dict-like). Fallback to tuple indexing if needed.
+        m = getattr(r, "_mapping", None)
+        if m is not None:
+            pid = int(m["player_id"])
+            daily = int((m["daily"] or 0))
+            weekly = int((m["weekly"] or 0))
+        else:
+            pid = int(r[0])
+            daily = int((r[1] or 0))
+            weekly = int((r[2] or 0))
+        summary_stats.append({"player_id": pid, "daily": daily, "weekly": weekly})
 
     all_players = Player.query.filter_by(team_id=team_id).all()
     players_by_id = {p.id: p.to_dict() for p in all_players}
