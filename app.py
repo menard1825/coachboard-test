@@ -49,11 +49,18 @@ def model_to_dict(obj):
             d[column.name] = val
     return d
 
+import logging
+
 def pitching_outing_to_dict(outing):
     if not outing:
         return None
+
+    if not outing.player:
+        logging.warning(f"Orphaned pitching outing found: ID {outing.id} points to non-existent player ID {outing.player_id}")
+        return None
+
     d = model_to_dict(outing)
-    d['pitcher_name'] = outing.player.name if outing.player else "Unknown"
+    d['pitcher_name'] = outing.player.name
     return d
 
 def create_app():
@@ -232,7 +239,7 @@ def create_app():
         full_data = {
             'roster': [model_to_dict(p) for p in roster_db],
             'lineups': [model_to_dict(l) for l in lineups_db],
-            'pitching': [pitching_outing_to_dict(po) for po in pitching_outings_db],
+            'pitching': [po_dict for po in pitching_outings_db if (po_dict := pitching_outing_to_dict(po)) is not None],
             'scouting_list': {
                 'targets': [model_to_dict(sp) for sp in scouted_players if sp.list_type == 'targets'],
                 'committed': [model_to_dict(sp) for sp in scouted_players if sp.list_type == 'committed'],

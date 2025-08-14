@@ -70,7 +70,7 @@ class Player(db.Model):
     development_focuses = relationship("PlayerDevelopmentFocus", back_populates="player", cascade="all, delete-orphan")
     game_absences = relationship("PlayerGameAbsence", back_populates="player", cascade="all, delete-orphan")
     practice_absences = relationship("PlayerPracticeAbsence", back_populates="player", cascade="all, delete-orphan")
-    pitching_outings = relationship("PitchingOuting", back_populates="player")
+    pitching_outings = relationship("PitchingOuting", back_populates="player", cascade="all, delete-orphan")
     
     def to_dict(self):
         """Return a dictionary representation of the Player object."""
