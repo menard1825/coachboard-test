@@ -272,18 +272,18 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryContainer.innerHTML = summaryHtml;
         }
         const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
-        if (pitcherSelect) pitcherSelect.innerHTML = `<option value="">Select Pitcher</option>` + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${escapeHTML(p.name)}">${escapeHTML(p.name)}</option>`).join('');
+        if (pitcherSelect) pitcherSelect.innerHTML = `<option value="">Select Pitcher</option>` + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
         const outingsList = document.getElementById('recorded-outings-list');
         if (outingsList) {
             const outings = (AppState.full_data.pitching || []).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
             outingsList.innerHTML = outings.map((o) => `
                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.pitcher)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
+                    <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.pitcher_name)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
                     <div class="btn-group btn-group-sm">
                         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
                             data-outing-id="${o.id}"
                             data-date="${o.date}"
-                            data-pitcher="${escapeHTML(o.pitcher)}"
+                            data-pitcher="${escapeHTML(o.pitcher_name)}"
                             data-opponent="${escapeHTML(o.opponent)}"
                             data-pitches="${o.pitches}"
                             data-innings="${o.innings}"
