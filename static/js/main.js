@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const pNotesSafe = escapeHTML(p.notes || '');
         const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
+        // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
+        const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}" data-delete-name="${pNameSafe}">Delete</button>`;
         return `
         <div class="accordion-item" data-player-name="${pNameSafe}">
             <h2 class="accordion-header d-flex align-items-center">
@@ -81,7 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="col-6 col-md-3"><label class="form-label">Throws</label><select name="throws" class="form-select"><option value="Right" ${p.throws === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.throws === 'Left' ? 'selected' : ''}>Left</option></select></div>
                     <div class="col-6 col-md-3"><label class="form-label">Bats</label><select name="bats" class="form-select"><option value="Right" ${p.bats === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.bats === 'Left' ? 'selected' : ''}>Left</option></select></div>
                     <div class="col-6 col-md-3"><label class="form-label">Pitcher Role</label><select name="pitcher_role" class="form-select"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Not a Pitcher</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starter</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Reliever</option></select></div>
-                    <div class="col-12 d-flex justify-content-end mt-3"><button type="button" class="btn btn-sm btn-primary me-2 save-player-btn" data-player-id="${p.id}">Save</button><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}">Delete</button></div>
+                    <div class="col-12 d-flex justify-content-end mt-3"><button type="button" class="btn btn-sm btn-primary me-2 save-player-btn" data-player-id="${p.id}">Save</button>${deleteButtonHtml}</div>
+                    <div class="col-12 mt-2"><div class="save-feedback" style="display: none;"></div></div>
                 </div>
             </div></div>
         </div>`;
@@ -186,8 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let actions = '';
             if (canEdit(log.author) || log.type === 'Development') {
-                if (log.type === 'Development') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-focus-id="${log.id}" data-player-name="${pNameSafe}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_focus/${log.id}">Delete</button>`;
-                else if (log.type === 'Coach Note') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${log.id}" data-note-type="player_notes" data-note-text="${escapeHTML(log.text)}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_note/player_notes/${log.id}">Delete</button>`;
+                if (log.type === 'Development') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-focus-id="${log.id}" data-player-name="${pNameSafe}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_focus/${log.id}" data-delete-name="this focus">Delete</button>`;
+                else if (log.type === 'Coach Note') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${log.id}" data-note-type="player_notes" data-note-text="${escapeHTML(log.text)}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_note/player_notes/${log.id}" data-delete-name="this note">Delete</button>`;
             }
             return `<li class="list-group-item ${itemClass}"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${mainText}</span>${statusText}</h6><small>${formatDateTime(log.date)}</small></div>${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}<small class="text-muted">By: ${escapeHTML(log.author)}</small>${actions ? `<div class="mt-2">${actions}</div>` : ''}</li>`;
         }).join('')}</ul>` : `<div class="text-center p-3 border rounded"><p class="mb-0">No activity logged.</p></div>`;
@@ -220,7 +223,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lineupHtml = (l.lineup_positions && l.lineup_positions.length > 0)
                     ? `<ol class="list-group list-group-numbered">${l.lineup_positions.map(name => `<li class="list-group-item">${escapeHTML(name)}</li>`).join('')}</ol>`
                     : `<p class="text-center text-muted">This lineup is empty.</p>`;
-
+                // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
+                const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_lineup/${l.id}" data-delete-name="${escapeHTML(l.title)}">Delete</button>`;
                 return `<div class="accordion-item" data-lineup-id="${l.id}">
                             <h2 class="accordion-header">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#lineup-collapse-${l.id}">
@@ -230,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div id="lineup-collapse-${l.id}" class="accordion-collapse collapse" data-bs-parent="#lineupsAccordion">
                                 <div class="accordion-body">
                                     <div class="d-flex justify-content-end mb-3">
-                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_lineup/${l.id}">Delete</button>
+                                        ${deleteButtonHtml}
                                     </div>
                                     ${lineupHtml}
                                 </div>
@@ -245,7 +249,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const rotations = AppState.full_data.rotations.filter(r => !r.associated_game_id) || [];
         container.innerHTML = rotations.length === 0 ? `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned rotations saved.</p><p class="small text-muted">Create rotations from the 'Manage' screen of any game.</p></div>` : rotations.map((r) => {
             const inningsCount = r.innings ? Object.keys(r.innings).length : 0;
-            return `<div class="accordion-item" data-rotation-id="${r.id}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rotation-collapse-${r.id}"><strong>${escapeHTML(r.title)}</strong></button></h2><div id="rotation-collapse-${r.id}" class="accordion-collapse collapse" data-bs-parent="#rotationsAccordion"><div class="accordion-body"><div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_rotation/${r.id}">Delete</button></div><p>This rotation has <strong>${inningsCount}</strong> inning(s) defined. You can manage this rotation by assigning it to a game.</p></div></div></div>`;
+            // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
+            const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_rotation/${r.id}" data-delete-name="${escapeHTML(r.title)}">Delete</button>`;
+            return `<div class="accordion-item" data-rotation-id="${r.id}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rotation-collapse-${r.id}"><strong>${escapeHTML(r.title)}</strong></button></h2><div id="rotation-collapse-${r.id}" class="accordion-collapse collapse" data-bs-parent="#rotationsAccordion"><div class="accordion-body"><div class="d-flex justify-content-end mb-3">${deleteButtonHtml}</div><p>This rotation has <strong>${inningsCount}</strong> inning(s) defined. You can manage this rotation by assigning it to a game.</p></div></div></div>`;
         }).join('');
     }
 
@@ -273,10 +279,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
         if (pitcherSelect) pitcherSelect.innerHTML = `<option value="">Select Pitcher</option>` + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
+        
+        // UX IMPROVEMENT: Set default date for new pitching outings to today
+        const pitchDateInput = document.getElementById('pitch_date');
+        if (pitchDateInput && !pitchDateInput.value) {
+            pitchDateInput.value = new Date().toISOString().split('T')[0];
+        }
+
         const outingsList = document.getElementById('recorded-outings-list');
         if (outingsList) {
             const outings = (AppState.full_data.pitching || []).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
-            outingsList.innerHTML = outings.map((o) => `
+            outingsList.innerHTML = outings.map((o) => {
+                // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
+                const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}" data-delete-name="this pitching outing for ${escapeHTML(o.player_name)}"><i class="bi bi-trash"></i></button>`;
+                return `
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.player_name)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
                     <div class="btn-group btn-group-sm">
@@ -291,11 +307,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             data-pitcher-type="${o.pitcher_type}">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}">
-                            <i class="bi bi-trash"></i>
-                        </button>
+                        ${deleteButtonHtml}
                     </div>
-                </li>`).join('') || `<li class="list-group-item text-muted">No outings recorded.</li>`;
+                </li>`
+            }).join('') || `<li class="list-group-item text-muted">No outings recorded.</li>`;
         }
     }
 
@@ -303,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('signs-list-container');
         if (!container) return;
         const signs = AppState.full_data.signs || [];
-        container.innerHTML = signs.length > 0 ? signs.map((sign) => `<li class="list-group-item d-flex justify-content-between align-items-center"><div><strong>${escapeHTML(sign.name)}:</strong> ${escapeHTML(sign.indicator)}</div><div><button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-id="${sign.id}">Edit</button><button type="button" class="btn btn-sm btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_sign/${sign.id}">Delete</button></div></li>`).join('') : `<li class="list-group-item">No signs added.</li>`;
+        container.innerHTML = signs.length > 0 ? signs.map((sign) => `<li class="list-group-item d-flex justify-content-between align-items-center"><div><strong>${escapeHTML(sign.name)}:</strong> ${escapeHTML(sign.indicator)}</div><div><button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-id="${sign.id}">Edit</button><button type="button" class="btn btn-sm btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_sign/${sign.id}" data-delete-name="the '${escapeHTML(sign.name)}' sign">Delete</button></div></li>`).join('') : `<li class="list-group-item">No signs added.</li>`;
     }
 
     function renderCollaborationNotes() {
@@ -316,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const author = escapeHTML(note.author);
             let actions = '';
             if (canEdit(note.author)) {
-                actions = `<button class="btn btn-sm btn-link text-secondary" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${note.id}" data-note-type="${note_type}" data-note-text="${noteText}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_note/${note_type}/${note.id}">Delete</button>`;
+                actions = `<button class="btn btn-sm btn-link text-secondary" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${note.id}" data-note-type="${note_type}" data-note-text="${noteText}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_note/${note_type}/${note.id}" data-delete-name="this note">Delete</button>`;
             }
             return `<div class="card mb-2"><div class="card-body pb-2"><p class="card-text" style="white-space: pre-wrap;">${noteText}</p><small class="text-muted">By ${author} on ${formatDateTime(note.timestamp)}${note.player_name ? ` for <strong>${escapeHTML(note.player_name)}</strong>` : ''}</small></div>${actions ? `<div class="card-footer bg-white border-top-0 text-end py-2">${actions}</div>` : ''}</div>`;
         };
@@ -338,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (key === 'targets') moveOptions = `<li><form action="/move_scouted_player/targets/committed/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Committed</button></form></li><li><form action="/move_scouted_player/targets/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
                 else if (key === 'committed') moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item fw-bold">To Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
                 const positions = [p.position1, p.position2].filter(Boolean).join(' / ') || 'N/A';
-                return `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${positions} | T/B: ${p.throws || 'N'}/${p.bats || 'N'}</small></div><div class="btn-group"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_scouted_player/${key}/${p.id}"><i class="bi bi-trash"></i></button>${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
+                return `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${positions} | T/B: ${p.throws || 'N'}/${p.bats || 'N'}</small></div><div class="btn-group"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_scouted_player/${key}/${p.id}" data-delete-name="${escapeHTML(p.name)}"><i class="bi bi-trash"></i></button>${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
             }).join('') : `<li class="list-group-item text-center text-muted">No players.</li>`;
             return `<div class="col-md-4 mb-3"><div class="card h-100"><div class="card-header fw-bold">${title}</div><ul class="list-group list-group-flush">${playerHtml}</ul></div></div>`;
         }).join('');
@@ -354,7 +369,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const rotation = AppState.full_data.rotations.find(r => r.associated_game_id === game.id);
             const lineupHTML = lineup && lineup.lineup_positions && lineup.lineup_positions.length > 0 ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
             const rotationHTML = rotation ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
-            return `<li class="list-group-item"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${formatDateTime(game.date)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm"><a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a><button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_game/${game.id}"><i class="bi bi-trash"></i></button></div></div></div></li>`;
+            // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
+            const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_game/${game.id}" data-delete-name="the game against ${escapeHTML(game.opponent)}"><i class="bi bi-trash"></i></button>`;
+            return `<li class="list-group-item"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${formatDateTime(game.date)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm"><a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a>${deleteButtonHtml}</div></div></div></li>`;
         }).join('');
     }
     
@@ -372,8 +389,8 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = plans.map(plan => {
             const absentPlayerIds = new Set(plan.absent_player_ids || []);
             const attendanceHtml = roster.map(player => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="absent_players" value="${player.id}" id="attendance-${plan.id}-${player.id}" ${absentPlayerIds.has(player.id) ? 'checked' : ''}><label class="form-check-label" for="attendance-${plan.id}-${player.id}">${escapeHTML(player.name)}</label></div>`).join('');
-            const tasksHtml = (plan.tasks || []).map(task => `<li class="list-group-item d-flex justify-content-between align-items-center task-item ${task.status === 'complete' ? 'complete' : ''}" data-task-id="${task.id}" data-plan-id="${plan.id}"><div class="form-check"><input class="form-check-input task-checkbox" type="checkbox" ${task.status === 'complete' ? 'checked' : ''} id="task-${task.id}"><label class="form-check-label" for="task-${task.id}">${escapeHTML(task.text)}<div class="text-muted small">By ${escapeHTML(task.author)}</div></label></div><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_task/${plan.id}/${task.id}"><i class="bi bi-trash"></i></button></li>`).join('') || '<li class="list-group-item text-muted text-center">No tasks.</li>';
-            return `<div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}"><strong>${formatDateTime(plan.date)}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}</button></h2><div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body"><form action="/edit_practice_plan/${plan.id}" method="POST" class="practice-plan-details-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" value="${plan.date}" required></div><div class="col-md-8"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}"></div><div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2">${escapeHTML(plan.emphasis || '')}</textarea></div><div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3">${escapeHTML(plan.warm_up || '')}</textarea></div><div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3">${escapeHTML(plan.infield_outfield || '')}</textarea></div><div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3">${escapeHTML(plan.hitting || '')}</textarea></div><div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3">${escapeHTML(plan.pitching_catching || '')}</textarea></div><div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_practice_plan/${plan.id}">Delete Plan</button><button type="submit" class="btn btn-sm btn-primary">Save Plan Details</button></div></div></form><hr><div class="row mt-4"><div class="col-lg-6"><h5>Attendance</h5><p class="text-muted small">Check the box for any player who is absent.</p><form action="/update_practice_attendance/${plan.id}" method="POST"><div class="mb-3">${attendanceHtml}</div><button type="submit" class="btn btn-sm btn-primary">Save Attendance</button></form></div><div class="col-lg-6"><h5>Tasks / To-Do</h5><form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add task..." required><button type="submit" class="btn btn-primary">Add</button></div></form><ul class="list-group task-list">${tasksHtml}</ul></div></div></div></div></div>`;
+            const tasksHtml = (plan.tasks || []).map(task => `<li class="list-group-item d-flex justify-content-between align-items-center task-item ${task.status === 'complete' ? 'complete' : ''}" data-task-id="${task.id}" data-plan-id="${plan.id}"><div class="form-check"><input class="form-check-input task-checkbox" type="checkbox" ${task.status === 'complete' ? 'checked' : ''} id="task-${task.id}"><label class="form-check-label" for="task-${task.id}">${escapeHTML(task.text)}<div class="text-muted small">By ${escapeHTML(task.author)}</div></label></div><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_task/${plan.id}/${task.id}" data-delete-name="this task"><i class="bi bi-trash"></i></button></li>`).join('') || '<li class="list-group-item text-muted text-center">No tasks.</li>';
+            return `<div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}"><strong>${formatDateTime(plan.date)}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}</button></h2><div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body"><form action="/edit_practice_plan/${plan.id}" method="POST" class="practice-plan-details-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" value="${plan.date}" required></div><div class="col-md-8"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}"></div><div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2">${escapeHTML(plan.emphasis || '')}</textarea></div><div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3">${escapeHTML(plan.warm_up || '')}</textarea></div><div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3">${escapeHTML(plan.infield_outfield || '')}</textarea></div><div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3">${escapeHTML(plan.hitting || '')}</textarea></div><div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3">${escapeHTML(plan.pitching_catching || '')}</textarea></div><div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_practice_plan/${plan.id}" data-delete-name="this practice plan">Delete Plan</button><button type="submit" class="btn btn-sm btn-primary">Save Plan Details</button></div></div></form><hr><div class="row mt-4"><div class="col-lg-6"><h5>Attendance</h5><p class="text-muted small">Check the box for any player who is absent.</p><form action="/update_practice_attendance/${plan.id}" method="POST"><div class="mb-3">${attendanceHtml}</div><button type="submit" class="btn btn-sm btn-primary">Save Attendance</button></form></div><div class="col-lg-6"><h5>Tasks / To-Do</h5><form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add task..." required><button type="submit" class="btn btn-primary">Add</button></div></form><ul class="list-group task-list">${tasksHtml}</ul></div></div></div></div></div>`;
         }).join('');
         attachTaskListeners();
     }
@@ -400,17 +417,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // UX IMPROVEMENT: Reworked this function for better user feedback
     async function handleRosterSave(event) {
         const btn = event.target.closest('button');
-        const playerId = btn.dataset.playerId;
         const accordionBody = btn.closest('.accordion-body');
+        const feedbackDiv = accordionBody.querySelector('.save-feedback');
+        const playerId = btn.dataset.playerId;
+        const originalButtonText = btn.innerHTML;
+
         const formData = new FormData();
         accordionBody.querySelectorAll('input, select, textarea').forEach(input => formData.append(input.name, input.value));
+        
         btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
+        feedbackDiv.style.display = 'none';
+
         try {
             const response = await fetch(`/update_player_inline/${playerId}`, { method: 'POST', body: formData });
-            if (!response.ok) throw new Error((await response.json()).message);
-        } catch (err) { alert(`Error: ${err.message}`); } finally { btn.disabled = false; }
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message);
+            
+            // Optimistic success feedback
+            btn.innerHTML = `Saved!`;
+            setTimeout(() => {
+                btn.innerHTML = originalButtonText;
+                btn.disabled = false;
+            }, 2000);
+
+        } catch (err) {
+            // Display error message gracefully instead of an alert
+            feedbackDiv.textContent = `Error: ${err.message}`;
+            feedbackDiv.className = 'save-feedback alert alert-danger';
+            feedbackDiv.style.display = 'block';
+            btn.innerHTML = originalButtonText; // Restore button text on error
+            btn.disabled = false;
+        }
     }
 
     function attachTaskListeners() {
@@ -428,11 +469,22 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`/update_task_status/${planId}/${taskId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
             if (!response.ok) throw new Error((await response.json()).message);
-        } catch (error) { alert('Error: ' + error.message); event.target.checked = !event.target.checked; }
+        } catch (error) { 
+            // UX IMPROVEMENT: Better error feedback than an alert
+            console.error('Error updating task:', error.message);
+            // Revert the checkbox optimistically
+            event.target.checked = !event.target.checked;
+        }
     }
     
     // --- INITIALIZATION ---
     async function init() {
+        // UX IMPROVEMENT: Show loading indicator
+        const mainContent = document.getElementById('mainTabContent');
+        if (mainContent) {
+            mainContent.innerHTML = `<div class="d-flex justify-content-center p-5"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
+        }
+
         try {
             const response = await fetch('/get_app_data');
             if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
@@ -440,9 +492,16 @@ document.addEventListener('DOMContentLoaded', () => {
             Object.assign(AppState, serverData);
         } catch (error) {
             console.error("Init Error:", error);
-            document.querySelector('main').innerHTML = `<div class="alert alert-danger">Could not load app data. Refresh page.</div>`;
+            if(mainContent) mainContent.innerHTML = `<div class="alert alert-danger">Could not load app data. Please refresh the page.</div>`;
             return;
         }
+
+        // UX IMPROVEMENT: Restore original content structure before rendering
+        if(mainContent) {
+            const originalContent = document.getElementById('original-content-structure').innerHTML;
+            mainContent.innerHTML = originalContent;
+        }
+        
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
         confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
         setupEventListeners();
@@ -454,6 +513,8 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('data_updated', async (msg) => {
             console.log('Update received:', msg.message);
             try {
+                // UX IMPROVEMENT: A more efficient data refresh could be implemented here
+                // For now, the full refresh is kept, but it's a known area for future optimization.
                 const response = await fetch('/get_app_data');
                 const serverData = await response.json();
                 Object.assign(AppState, serverData);
@@ -533,11 +594,16 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPlayerDevelopmentList();
         });
 
+        // UX IMPROVEMENT: Make the confirmation modal dynamic
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
             const deleteButton = document.getElementById('confirmDeleteButton');
+            const modalBody = e.target.querySelector('.modal-body');
             const url = e.relatedTarget.dataset.deleteUrl;
+            const name = e.relatedTarget.dataset.deleteName;
+
             if (url) {
                 deleteButton.href = url;
+                modalBody.innerHTML = `Are you sure you want to delete <strong>${name || 'this item'}</strong>? This action cannot be undone.`;
             } else {
                 console.error("Delete modal opened without a data-delete-url attribute on the trigger.");
                 e.preventDefault();
