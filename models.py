@@ -70,7 +70,7 @@ class Player(db.Model):
     development_focuses = relationship("PlayerDevelopmentFocus", back_populates="player", cascade="all, delete-orphan")
     game_absences = relationship("PlayerGameAbsence", back_populates="player", cascade="all, delete-orphan")
     practice_absences = relationship("PlayerPracticeAbsence", back_populates="player", cascade="all, delete-orphan")
-    pitching_outings = relationship("PitchingOuting", back_populates="player")
+    pitching_outings = relationship("PitchingOuting", back_populates="player", cascade="all, delete-orphan")
     
     @property
     def full_name(self):
@@ -105,7 +105,7 @@ class PitchingOuting(db.Model):
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
 
     team = relationship("Team", back_populates="pitching_outings")
-    player = relationship("Player")
+    player = relationship("Player", back_populates="pitching_outings")
 
     def to_dict(self):
         return {

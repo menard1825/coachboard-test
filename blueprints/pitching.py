@@ -4,7 +4,7 @@ from db import db
 from sqlalchemy import func, case, cast, Date
 from sqlalchemy.orm import joinedload
 from extensions import socketio
-from utils import get_pitching_rules_for_team
+from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
 from datetime import datetime, date, timedelta
 from functools import wraps
 
@@ -42,14 +42,11 @@ def add_pitching():
         return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     player_id = request.form.get('player_id')
-    if player_id:
-        player_id = int(player_id)
-    else:
-        pitcher_name = request.form.get('pitcher')
-        if pitcher_name:
-            player = db.session.query(Player).filter(func.lower(Player.name) == func.lower(pitcher_name), Player.team_id == session['team_id']).first()
-            if player:
-                player_id = player.id
+    if not player_id:
+        flash('A valid pitcher must be selected.', 'danger')
+        return redirect(request.referrer or url_for('pitching.pitching_page'))
+    player_id = int(player_id)
+
 
     if not player_id:
         flash('A valid pitcher must be selected.', 'danger')
@@ -116,6 +113,12 @@ def edit_pitching(outing_id):
         player_id = request.form.get('player_id')
         if player_id:
             outing_to_edit.player_id = int(player_id)
+        else:
+            pitcher_name = request.form.get('pitcher')
+            if pitcher_name:
+                player = db.session.query(Player).filter(func.lower(Player.name) == func.lower(pitcher_name), Player.team_id == session['team_id']).first()
+                if player:
+                    outing_to_edit.player_id = player.id
 
         outing_to_edit.opponent = request.form.get('opponent', outing_to_edit.opponent)
         outing_to_edit.pitches = int(request.form.get('pitches', outing_to_edit.pitches))
@@ -139,7 +142,7 @@ def edit_pitching(outing_id):
 def delete_pitching(outing_id):
     outing_to_delete = db.session.query(PitchingOuting).filter_by(id=outing_id, team_id=session['team_id']).first()
     if outing_to_delete:
-        player_name = outing_to_delete.player.full_name
+        player_name = outing_to_delete.player.full_name if outing_to_delete.player else "An unknown player"
         db.session.delete(outing_to_delete)
         db.session.commit()
         flash(f'Pitching outing for "{player_name}" removed successfully!', 'success')
@@ -157,7 +160,7 @@ def login_required(f):
             return redirect(url_for('auth.login'))
         if 'team_id' not in session:
             flash('Please select a team first.', 'warning')
-            return redirect(url_for('team_management.team_select'))
+            return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -166,60 +169,23 @@ def login_required(f):
 @login_required
 def pitching_page():
     team_id = session['team_id']
-    today = date.today()
-    six_days_ago = today - timedelta(days=6)
-
-    recent_outings = (
-        PitchingOuting.query
-        .filter(PitchingOuting.team_id == team_id)
-        .options(joinedload(PitchingOuting.player))
-        .order_by(PitchingOuting.date.desc())
-        .limit(10)
-        .all()
-    )
-
-    rows = (
-        db.session.query(
-            PitchingOuting.player_id.label("player_id"),
-            func.sum(
-                case((cast(PitchingOuting.date, Date) == today, PitchingOuting.pitches), else_=0)
-            ).label("daily"),
-            func.sum(
-                case((cast(PitchingOuting.date, Date) >= six_days_ago, PitchingOuting.pitches), else_=0)
-            ).label("weekly"),
-        )
-        .filter(PitchingOuting.team_id == team_id)
-        .group_by(PitchingOuting.player_id)
-        .all()
-    )
-
-    # ✅ Convert Row → dict of primitives
-    summary_stats = []
-    for r in rows:
-        # SQLAlchemy 2.x Row has ._mapping (dict-like). Fallback to tuple indexing if needed.
-        m = getattr(r, "_mapping", None)
-        if m is not None:
-            pid = int(m["player_id"])
-            daily = int((m["daily"] or 0))
-            weekly = int((m["weekly"] or 0))
-        else:
-            pid = int(r[0])
-            daily = int((r[1] or 0))
-            weekly = int((r[2] or 0))
-        summary_stats.append({"player_id": pid, "daily": daily, "weekly": weekly})
+    team = db.session.get(Team, team_id)
 
     all_players = Player.query.filter_by(team_id=team_id).all()
-    players_by_id = {p.id: p.to_dict() for p in all_players}
-    pitchers = [p for p in all_players if p.pitcher_role != 'Not a Pitcher']
+    all_outings = PitchingOuting.query.filter_by(team_id=team_id).options(joinedload(PitchingOuting.player)).all()
 
-    current_team = db.session.get(Team, team_id)
+    recent_outings = sorted(all_outings, key=lambda o: o.date, reverse=True)[:10]
+
+    rules = get_pitching_rules_for_team(team)
+    pitch_count_summary = calculate_pitch_count_summary(all_players, all_outings, rules)
+
+    pitchers = [p for p in all_players if p.pitcher_role != 'Not a Pitcher']
 
     return render_template(
         "pitching.html",
         recent_outings=recent_outings,
-        summary_stats=summary_stats,
-        players_by_id=players_by_id,
-        current_team=current_team,
+        pitch_count_summary=pitch_count_summary,
+        current_team=team,
         pitchers=pitchers
     )
 

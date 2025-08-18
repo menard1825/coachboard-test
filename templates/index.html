@@ -122,7 +122,7 @@
                 <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
                   <div class="row g-3">
                     <div class="col-6"><label for="pitch_date" class="form-label">Date</label><input type="date" id="pitch_date" name="pitch_date" class="form-control" required></div>
-                    <div class="col-6"><label for="pitching-log-pitcher-select" class="form-label">Pitcher</label><select name="pitcher" class="form-select" required id="pitching-log-pitcher-select"></select></div>
+                    <div class="col-6"><label for="pitching-log-pitcher-select" class="form-label">Pitcher</label><select name="player_id" class="form-select" required id="pitching-log-pitcher-select"></select></div>
                     <div class="col-12"><label for="opponent" class="form-label">Opponent / Context</label><input type="text" id="opponent" name="opponent" class="form-control" placeholder="e.g., Scrimmage vs. Tigers"></div>
                     <div class="col-6"><label for="pitches" class="form-label">Pitch Count</label><input type="number" id="pitches" name="pitches" class="form-control" required></div>
                     <div class="col-6"><label for="innings" class="form-label">Innings Pitched</label><input type="text" id="innings" name="innings" class="form-control" placeholder="e.g., 2.1" required></div>
@@ -332,7 +332,6 @@
     </div></div>
 </div>
 
-<!-- MODIFICATION START: Add Modal for Editing Pitching Outings -->
 <div class="modal fade" id="editPitchingOutingModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -349,7 +348,7 @@
                         </div>
                         <div class="col-6">
                             <label for="edit_pitcher" class="form-label">Pitcher</label>
-                            <select name="pitcher" class="form-select" required id="edit_pitcher"></select>
+                            <select name="player_id" class="form-select" required id="edit_pitcher"></select>
                         </div>
                         <div class="col-12">
                             <label for="edit_opponent" class="form-label">Opponent / Context</label>
@@ -388,8 +387,6 @@
         </div>
     </div>
 </div>
-<!-- MODIFICATION END -->
-
 {% endblock %}
 
 {% block scripts %}
