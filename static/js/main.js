@@ -58,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const pNotesSafe = escapeHTML(p.notes || '');
         const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
-        // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
         const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}" data-delete-name="${pNameSafe}">Delete</button>`;
         return `
         <div class="accordion-item" data-player-name="${pNameSafe}">
@@ -223,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lineupHtml = (l.lineup_positions && l.lineup_positions.length > 0)
                     ? `<ol class="list-group list-group-numbered">${l.lineup_positions.map(name => `<li class="list-group-item">${escapeHTML(name)}</li>`).join('')}</ol>`
                     : `<p class="text-center text-muted">This lineup is empty.</p>`;
-                // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
                 const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_lineup/${l.id}" data-delete-name="${escapeHTML(l.title)}">Delete</button>`;
                 return `<div class="accordion-item" data-lineup-id="${l.id}">
                             <h2 class="accordion-header">
@@ -249,7 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const rotations = AppState.full_data.rotations.filter(r => !r.associated_game_id) || [];
         container.innerHTML = rotations.length === 0 ? `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned rotations saved.</p><p class="small text-muted">Create rotations from the 'Manage' screen of any game.</p></div>` : rotations.map((r) => {
             const inningsCount = r.innings ? Object.keys(r.innings).length : 0;
-            // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
             const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_rotation/${r.id}" data-delete-name="${escapeHTML(r.title)}">Delete</button>`;
             return `<div class="accordion-item" data-rotation-id="${r.id}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rotation-collapse-${r.id}"><strong>${escapeHTML(r.title)}</strong></button></h2><div id="rotation-collapse-${r.id}" class="accordion-collapse collapse" data-bs-parent="#rotationsAccordion"><div class="accordion-body"><div class="d-flex justify-content-end mb-3">${deleteButtonHtml}</div><p>This rotation has <strong>${inningsCount}</strong> inning(s) defined. You can manage this rotation by assigning it to a game.</p></div></div></div>`;
         }).join('');
@@ -280,7 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
         if (pitcherSelect) pitcherSelect.innerHTML = `<option value="">Select Pitcher</option>` + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
         
-        // UX IMPROVEMENT: Set default date for new pitching outings to today
         const pitchDateInput = document.getElementById('pitch_date');
         if (pitchDateInput && !pitchDateInput.value) {
             pitchDateInput.value = new Date().toISOString().split('T')[0];
@@ -290,7 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (outingsList) {
             const outings = (AppState.full_data.pitching || []).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
             outingsList.innerHTML = outings.map((o) => {
-                // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
                 const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}" data-delete-name="this pitching outing for ${escapeHTML(o.player_name)}"><i class="bi bi-trash"></i></button>`;
                 return `
                 <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -314,49 +309,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // BUG FIX: Added the missing renderSigns function
     function renderSigns() {
         const container = document.getElementById('signs-list-container');
         if (!container) return;
         const signs = AppState.full_data.signs || [];
-        container.innerHTML = signs.length > 0 ? signs.map((sign) => `<li class="list-group-item d-flex justify-content-between align-items-center"><div><strong>${escapeHTML(sign.name)}:</strong> ${escapeHTML(sign.indicator)}</div><div><button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-id="${sign.id}">Edit</button><button type="button" class="btn btn-sm btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_sign/${sign.id}" data-delete-name="the '${escapeHTML(sign.name)}' sign">Delete</button></div></li>`).join('') : `<li class="list-group-item">No signs added.</li>`;
-    }
-
-    function renderCollaborationNotes() {
-        const teamContainer = document.getElementById('team-notes-container');
-        const playerContainer = document.getElementById('player-notes-container');
-        if (!teamContainer || !playerContainer) return;
-        const collabData = AppState.full_data.collaboration_notes || {};
-        const createNoteHTML = (note, note_type) => {
-            const noteText = escapeHTML(note.text);
-            const author = escapeHTML(note.author);
-            let actions = '';
-            if (canEdit(note.author)) {
-                actions = `<button class="btn btn-sm btn-link text-secondary" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${note.id}" data-note-type="${note_type}" data-note-text="${noteText}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_note/${note_type}/${note.id}" data-delete-name="this note">Delete</button>`;
-            }
-            return `<div class="card mb-2"><div class="card-body pb-2"><p class="card-text" style="white-space: pre-wrap;">${noteText}</p><small class="text-muted">By ${author} on ${formatDateTime(note.timestamp)}${note.player_name ? ` for <strong>${escapeHTML(note.player_name)}</strong>` : ''}</small></div>${actions ? `<div class="card-footer bg-white border-top-0 text-end py-2">${actions}</div>` : ''}</div>`;
-        };
-        const teamNotes = (collabData.team_notes || []).sort((a,b) => b.timestamp.localeCompare(a.timestamp));
-        teamContainer.innerHTML = teamNotes.map(note => createNoteHTML(note, 'team_notes')).join('') || '<div class="text-center p-3 border rounded text-muted">No team notes.</div>';
-        const playerNotes = (collabData.player_notes || []).sort((a,b) => b.timestamp.localeCompare(a.timestamp));
-        playerContainer.innerHTML = playerNotes.map(note => createNoteHTML(note, 'player_notes')).join('') || '<div class="text-center p-3 border rounded text-muted">No player notes.</div>';
-        document.getElementById('collab-player-select').innerHTML = '<option value="">Select a player...</option>' + AppState.player_order.map(name => `<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`).join('');
+        container.innerHTML = signs.length > 0 ? signs.map((sign) => {
+            const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_sign/${sign.id}" data-delete-name="the '${escapeHTML(sign.name)}' sign">Delete</button>`;
+            const editButtonHtml = `<button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-id="${sign.id}">Edit</button>`;
+            return `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div><strong>${escapeHTML(sign.name)}:</strong> ${escapeHTML(sign.indicator)}</div>
+                        <div>${editButtonHtml}${deleteButtonHtml}</div>
+                    </li>`;
+        }).join('') : `<li class="list-group-item text-center text-muted">No signs added.</li>`;
     }
 
     function renderScoutingList() {
-        const container = document.getElementById('scouting-list-container');
-        if (!container) return;
         const scoutingData = AppState.full_data.scouting_list || {};
-        container.innerHTML = Object.entries({'targets': 'Targets', 'committed': 'Committed', 'not_interested': 'Not Interested'}).map(([key, title]) => {
+        
+        const renderList = (key, containerId) => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
             const players = scoutingData[key] || [];
             let playerHtml = players.length > 0 ? players.map(p => {
                 let moveOptions = '';
-                if (key === 'targets') moveOptions = `<li><form action="/move_scouted_player/targets/committed/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Committed</button></form></li><li><form action="/move_scouted_player/targets/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
-                else if (key === 'committed') moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item fw-bold">To Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
+                if (key === 'targets') {
+                    moveOptions = `<li><form action="/move_scouted_player/targets/committed/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Committed</button></form></li><li><form action="/move_scouted_player/targets/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
+                } else if (key === 'committed') {
+                    moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item fw-bold">To Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
+                }
                 const positions = [p.position1, p.position2].filter(Boolean).join(' / ') || 'N/A';
-                return `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${positions} | T/B: ${p.throws || 'N'}/${p.bats || 'N'}</small></div><div class="btn-group"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_scouted_player/${key}/${p.id}" data-delete-name="${escapeHTML(p.name)}"><i class="bi bi-trash"></i></button>${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
-            }).join('') : `<li class="list-group-item text-center text-muted">No players.</li>`;
-            return `<div class="col-md-4 mb-3"><div class="card h-100"><div class="card-header fw-bold">${title}</div><ul class="list-group list-group-flush">${playerHtml}</ul></div></div>`;
-        }).join('');
+                const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_scouted_player/${key}/${p.id}" data-delete-name="${escapeHTML(p.name)}"><i class="bi bi-trash"></i></button>`;
+                return `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${positions} | T/B: ${p.throws || 'N'}/${p.bats || 'N'}</small></div><div class="btn-group">${deleteButtonHtml}${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
+            }).join('') : `<li class="list-group-item text-center text-muted">No players in this list.</li>`;
+            container.innerHTML = playerHtml;
+        };
+
+        renderList('targets', 'scouting-list-targets');
+        renderList('committed', 'scouting-list-committed');
+        renderList('not_interested', 'scouting-list-not_interested');
     }
 
     function renderGames() {
@@ -369,7 +361,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const rotation = AppState.full_data.rotations.find(r => r.associated_game_id === game.id);
             const lineupHTML = lineup && lineup.lineup_positions && lineup.lineup_positions.length > 0 ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
             const rotationHTML = rotation ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
-            // UX IMPROVEMENT: Added a data-delete-name attribute for the confirmation modal
             const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_game/${game.id}" data-delete-name="the game against ${escapeHTML(game.opponent)}"><i class="bi bi-trash"></i></button>`;
             return `<li class="list-group-item"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${formatDateTime(game.date)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm"><a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a>${deleteButtonHtml}</div></div></div></li>`;
         }).join('');
@@ -417,7 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // UX IMPROVEMENT: Reworked this function for better user feedback
     async function handleRosterSave(event) {
         const btn = event.target.closest('button');
         const accordionBody = btn.closest('.accordion-body');
@@ -437,7 +427,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             
-            // Optimistic success feedback
             btn.innerHTML = `Saved!`;
             setTimeout(() => {
                 btn.innerHTML = originalButtonText;
@@ -445,11 +434,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 2000);
 
         } catch (err) {
-            // Display error message gracefully instead of an alert
             feedbackDiv.textContent = `Error: ${err.message}`;
             feedbackDiv.className = 'save-feedback alert alert-danger';
             feedbackDiv.style.display = 'block';
-            btn.innerHTML = originalButtonText; // Restore button text on error
+            btn.innerHTML = originalButtonText;
             btn.disabled = false;
         }
     }
@@ -470,16 +458,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/update_task_status/${planId}/${taskId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
             if (!response.ok) throw new Error((await response.json()).message);
         } catch (error) { 
-            // UX IMPROVEMENT: Better error feedback than an alert
             console.error('Error updating task:', error.message);
-            // Revert the checkbox optimistically
             event.target.checked = !event.target.checked;
         }
     }
     
     // --- INITIALIZATION ---
     async function init() {
-        // UX IMPROVEMENT: Show loading indicator
         const mainContent = document.getElementById('mainTabContent');
         if (mainContent) {
             mainContent.innerHTML = `<div class="d-flex justify-content-center p-5"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
@@ -496,7 +481,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // UX IMPROVEMENT: Restore original content structure before rendering
         if(mainContent) {
             const originalContent = document.getElementById('original-content-structure').innerHTML;
             mainContent.innerHTML = originalContent;
@@ -513,8 +497,6 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('data_updated', async (msg) => {
             console.log('Update received:', msg.message);
             try {
-                // UX IMPROVEMENT: A more efficient data refresh could be implemented here
-                // For now, the full refresh is kept, but it's a known area for future optimization.
                 const response = await fetch('/get_app_data');
                 const serverData = await response.json();
                 Object.assign(AppState, serverData);
@@ -594,7 +576,6 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPlayerDevelopmentList();
         });
 
-        // UX IMPROVEMENT: Make the confirmation modal dynamic
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
             const deleteButton = document.getElementById('confirmDeleteButton');
             const modalBody = e.target.querySelector('.modal-body');

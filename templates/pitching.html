@@ -9,8 +9,12 @@
         <a href="{{ url_for('home') }}" class="btn btn-sm btn-outline-secondary">Back to Dashboard</a>
     </div>
 
+    <!-- Pitch Count Summary Card -->
     <div class="card mb-4">
-      <div class="card-header"><strong>Pitch Count Summary</strong></div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Pitch Count Summary</h5>
+        <a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-sm btn-outline-info">View Rules</a>
+      </div>
       <div class="card-body p-2">
           <div class="table-responsive">
               <table class="table table-sm table-bordered table-striped mb-0">
@@ -31,14 +35,14 @@
                                   <td class="align-middle">
                                       {% set daily_pct = ([100, (summary.daily / summary.max_daily * 100)] | min) | int %}
                                       {% set daily_bg = 'bg-danger' if daily_pct > 80 else 'bg-warning' if daily_pct > 60 else 'bg-success' %}
-                                      <div class="progress" style="height: 20px;">
+                                      <div class="progress" style="height: 20px;" title="{{ summary.daily }} pitches">
                                           <div class="progress-bar {{ daily_bg }}" role="progressbar" style="width: {{ daily_pct }}%;" aria-valuenow="{{ summary.daily }}">{{ summary.daily }}</div>
                                       </div>
-                                      <small class="text-muted">{{ summary.pitches_remaining_today }} remaining</small>
+                                      <small class="text-muted">{{ summary.pitches_remaining_today }} remaining today</small>
                                   </td>
                                   <td class="align-middle">
                                       {% set weekly_pct = ([100, (summary.weekly / 100 * 100)] | min) | int %}
-                                      <div class="progress" style="height: 20px;">
+                                      <div class="progress" style="height: 20px;" title="{{ summary.weekly }} pitches">
                                           <div class="progress-bar" role="progressbar" style="width: {{ weekly_pct }}%;" aria-valuenow="{{ summary.weekly }}">{{ summary.weekly }}</div>
                                       </div>
                                   </td>
@@ -63,10 +67,11 @@
       </div>
     </div>
 
+    <!-- Add Outing & History Row -->
     <div class="row">
       <div class="col-lg-5 mb-4">
         <div class="card h-100">
-          <div class="card-header"><strong>Add New Outing</strong></div>
+          <div class="card-header"><h5 class="mb-0">Add New Outing</h5></div>
           <div class="card-body">
             <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
               <div class="row g-3">
@@ -93,42 +98,40 @@
       </div>
       <div class="col-lg-7 mb-4">
          <div class="card h-100">
-            <div class="card-header"><strong>Recent Outing History</strong></div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush">
-                    {% for o in recent_outings %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span>
-                                {{ o.date | format_datetime }}: 
-                                <strong>{{ o.player.full_name if o.player else 'Unknown' }}</strong> vs {{ o.opponent }} - {{ o.pitches }} pitches 
-                                <span class="badge bg-info">{{ o.outing_type }}</span>
-                            </span>
-                            <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
-                                    data-outing-id="{{ o.id }}"
-                                    data-date="{{ o.date.strftime('%Y-%m-%d') }}"
-                                    data-player-id="{{ o.player_id }}"
-                                    data-opponent="{{ o.opponent }}"
-                                    data-pitches="{{ o.pitches }}"
-                                    data-innings="{{ o.innings }}"
-                                    data-outing-type="{{ o.outing_type }}"
-                                    data-pitcher-type="{{ o.pitcher_type }}">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-outline-danger" onclick="return confirm('Are you sure?')"><i class="bi bi-trash"></i></a>
-                            </div>
-                        </li>
-                    {% else %}
-                        <li class="list-group-item text-muted">No outings recorded.</li>
-                    {% endfor %}
-                </ul>
-            </div>
+            <div class="card-header"><h5 class="mb-0">Recent Outing History</h5></div>
+            <ul class="list-group list-group-flush">
+                {% for o in recent_outings %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>
+                            {{ o.date | format_datetime }}: 
+                            <strong>{{ o.player.full_name if o.player else 'Unknown' }}</strong> vs {{ o.opponent }} - {{ o.pitches }} pitches 
+                            <span class="badge bg-info">{{ o.outing_type }}</span>
+                        </span>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
+                                data-outing-id="{{ o.id }}"
+                                data-date="{{ o.date.strftime('%Y-%m-%d') }}"
+                                data-player-id="{{ o.player_id }}"
+                                data-opponent="{{ o.opponent }}"
+                                data-pitches="{{ o.pitches }}"
+                                data-innings="{{ o.innings }}"
+                                data-outing-type="{{ o.outing_type }}"
+                                data-pitcher-type="{{ o.pitcher_type }}">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-outline-danger" onclick="return confirm('Are you sure?')"><i class="bi bi-trash"></i></a>
+                        </div>
+                    </li>
+                {% else %}
+                    <li class="list-group-item text-muted text-center p-3">No recent outings recorded.</li>
+                {% endfor %}
+            </ul>
          </div>
       </div>
     </div>
 </div>
 
-<!-- Edit Modal needs to be included on this page -->
+<!-- Edit Modal -->
 <div class="modal fade" id="editPitchingOutingModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -194,6 +197,12 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Set default date for new pitching outings to today
+    const pitchDateInput = document.getElementById('pitch_date');
+    if (pitchDateInput && !pitchDateInput.value) {
+        pitchDateInput.value = new Date().toISOString().split('T')[0];
+    }
+
     const editModal = document.getElementById('editPitchingOutingModal');
     if (editModal) {
         editModal.addEventListener('show.bs.modal', function (event) {

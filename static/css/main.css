@@ -1,19 +1,32 @@
 /* static/css/main.css */
-/* Shared application styles */
-body {
-    background-color: #f9f9f9;
+/* ==========================================================================
+   Base Styles & Variables
+   ========================================================================== */
+:root {
+    --primary-color: #c8102e;
+    --primary-color-hover: #a30e25;
+    --body-bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --card-border-color: #dee2e6;
+    --text-muted: #6c757d;
 }
 
-/* MODIFIED: Added a default background color for the navbar */
+body {
+    background-color: var(--body-bg);
+}
+
+/* ==========================================================================
+   Navbar Styles (Top - Desktop)
+   ========================================================================== */
 .navbar {
-    background-color: #343A40; /* Changed to a lighter dark grey */
+    background-color: #343A40;
     border-bottom: 3px solid rgba(0, 0, 0, 0.15);
 }
 
 .navbar-logo {
     height: 40px;
     margin-right: 10px;
-    background-color: white; /* Add a background for logos with transparency */
+    background-color: white;
     border-radius: 5px;
     padding: 2px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
@@ -28,43 +41,70 @@ body {
     border-radius: 0.375rem;
     border: 1px solid rgba(0,0,0,.15);
     box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15);
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-    background-color: #343A40; /* Darker background for dropdown */
+    padding: 0.5rem 0;
+    background-color: #343A40;
 }
 
 .navbar-dark .dropdown-item {
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 1.25rem;
     display: flex;
     align-items: center;
-    color: rgba(255, 255, 255, 0.75); /* Lighter text for contrast */
+    color: rgba(255, 255, 255, 0.85);
 }
-.navbar-dark .dropdown-item:hover {
-    background-color: rgba(255, 255, 255, 0.1); /* Subtle hover effect */
+.navbar-dark .dropdown-item:hover, .navbar-dark .dropdown-item:focus {
+    background-color: rgba(255, 255, 255, 0.1);
     color: white;
 }
 
 .navbar-dark .dropdown-item i {
-    width: 28px; /* Align text by giving icon a fixed width */
+    width: 28px;
     font-size: 1.1rem;
-    color: rgba(255, 255, 255, 0.5); /* Lighter icons */
+    color: rgba(255, 255, 255, 0.6);
+    margin-right: 0.5rem;
 }
 .navbar-dark .dropdown-item:hover i {
-    color: white; /* White icons on hover */
+    color: white;
 }
 
-.btn-primary { background-color: #c8102e; border-color: #c8102e; }
-.btn-outline-danger { border-color: #c8102e; color: #c8102e; }
-.btn-outline-danger:hover { background-color: #c8102e; color: white; }
-.drag-handle { cursor: move; }
-.accordion-button:not(.collapsed) { background-color: #fcebeb; color: #c8102e; }
+/* ==========================================================================
+   UI Component Styles (Buttons, Accordions, etc.)
+   ========================================================================== */
+.btn-primary { 
+    background-color: var(--primary-color); 
+    border-color: var(--primary-color); 
+}
+.btn-primary:hover {
+    background-color: var(--primary-color-hover);
+    border-color: var(--primary-color-hover);
+}
 
-/* Fix for stacked tab content on mobile */
+.btn-outline-danger { 
+    border-color: var(--primary-color); 
+    color: var(--primary-color); 
+}
+.btn-outline-danger:hover { 
+    background-color: var(--primary-color); 
+    color: white; 
+}
+
+.drag-handle { 
+    cursor: move; 
+}
+.accordion-button:not(.collapsed) { 
+    background-color: #fcebeb; 
+    color: var(--primary-color); 
+}
+
+/* ==========================================================================
+   Tab Navigation Styles
+   ========================================================================== */
+
+/* Hide inactive tabs to prevent content stacking issues */
 .tab-content > .tab-pane:not(.active) {
     display: none;
 }
 
-/* --- Desktop Tab Navigation --- */
+/* Desktop Top Tab Bar */
 .desktop-nav-tabs {
     border-bottom: 0;
 }
@@ -76,19 +116,21 @@ body {
 }
 .desktop-nav-tabs .nav-link.active {
     color: #000;
-    background-color: #ffffff; /* Was #f8f9fa */
-    border-color: #dee2e6 #dee2e6 transparent;
+    background-color: var(--card-bg);
+    border-color: var(--card-border-color) var(--card-border-color) transparent;
 }
 
-/* --- Main Content Area Styling --- */
+/* Main content area that holds all the tabs */
 .tab-content {
-    background-color: #ffffff; /* Was #f8f9fa */
-    border: 1px solid #dee2e6;
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border-color);
     border-top: none;
     padding: 1.5rem;
     border-radius: 0 .375rem .375rem;
 }
- @media (max-width: 991.98px) {
+
+/* On mobile, the tab content has no border/padding as it's inside the scrolling main area */
+@media (max-width: 991.98px) {
     .tab-content {
         border: none;
         padding: 0;
@@ -96,7 +138,9 @@ body {
     }
 }
 
-/* Interactive Diamond Styles */
+/* ==========================================================================
+   Interactive Diamond (Rotation Editor) Styles
+   ========================================================================== */
 .diamond-container-interactive {
     position: relative;
     max-width: 500px;
@@ -111,8 +155,8 @@ body {
 .position-dropzone {
     position: absolute;
     background-color: rgba(255, 255, 255, 0.7);
-    border: 2px dashed #c8102e;
-    color: #c8102e;
+    border: 2px dashed var(--primary-color);
+    color: var(--primary-color);
     padding: 5px;
     border-radius: 8px;
     font-weight: bold;
@@ -132,7 +176,7 @@ body {
 .position-dropzone .pos-abbr { font-size: 0.75rem; display: block; margin-bottom: 3px; }
 
 .player-tag {
-    background-color: #c8102e;
+    background-color: var(--primary-color);
     color: white;
     padding: 3px 8px;
     border-radius: 4px;
@@ -140,12 +184,12 @@ body {
     cursor: grab;
     width: 100%;
     text-align: center;
-    border: 1px solid #a30e25;
+    border: 1px solid var(--primary-color-hover);
     margin-top: 2px;
 }
 
 .d-lg-none .player-tag { cursor: pointer; }
-.bench-list .player-tag { background-color: #6c757d; border-color: #5c636a; }
+.bench-list .player-tag { background-color: var(--text-muted); border-color: #5c636a; }
 
 /* Position coordinates for the diamond */
 .pos-P  { top: 52%; left: 50%; }
@@ -160,8 +204,8 @@ body {
 
 /* Inning selector styles */
 #inning-btn-group .btn-check:checked+.btn-outline-primary {
-    background-color: #c8102e;
-    border-color: #c8102e;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
     color: white;
 }
 .copy-mode #inning-btn-group,
@@ -184,213 +228,121 @@ body {
     top: 50%;
     transform: translateY(-50%);
     font-weight: bold;
-    color: #6c757d;
+    color: var(--text-muted);
 }
 
-/* --- Enhanced Mobile Bottom Bar Styles --- */
-.bottom-nav {
-    width: 100%;
-    height: calc(85px + env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
-    background-color: #ffffff;
-    border-top: 1px solid #dee2e6;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-    border-radius: 15px 15px 0 0;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-}
-
-.bottom-nav .nav-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    text-decoration: none;
-    color: #495057;
-    font-weight: 500;
-    position: relative;
-    transition: color 0.2s ease-in-out, transform 0.1s ease;
-}
-
-.bottom-nav .nav-item i {
-    font-size: 1.8rem;
-    margin-bottom: 4px;
-}
-
-.bottom-nav .nav-item .nav-label {
-    font-size: 0.8rem;
-}
-
-.bottom-nav .nav-item:active {
-    transform: scale(0.95);
-}
-
-.bottom-nav .nav-item.active {
-    color: #c8102e;
-    font-weight: 700;
-}
-
-.bottom-nav .nav-item::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0.9);
-    width: 85%;
-    height: 70%;
-    background-color: #fcebeb;
-    border-radius: 20px;
-    z-index: -1;
-    opacity: 0;
-    transition: all 0.2s ease-in-out;
-}
-
-.bottom-nav .nav-item.active::before {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-}
-
-/* --- Player Development Page --- */
-.player-dev-container {
-    display: flex;
-    gap: 1.5rem;
-}
-
-.player-list-column {
-    flex: 0 0 300px;
-}
-
-.player-dev-details-column {
-    flex: 1 1 auto;
-}
-
-#dev-player-list .list-group-item {
-    cursor: pointer;
-    transition: background-color: 0.2s ease;
-}
-
-#dev-player-list .list-group-item.active {
-    background-color: #c8102e;
-    border-color: #c8102e;
-}
-
-#player-dev-content .card {
-    margin-bottom: 1rem;
-}
-
+/* ==========================================================================
+   Mobile Layout & Navigation
+   ========================================================================== */
 @media (max-width: 991.98px) {
-    .player-dev-container {
+    /* --- Full Height, Scrollable Layout --- */
+    html, body {
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+        width: 100%;
+        display: flex;
         flex-direction: column;
     }
 
-    .player-list-column {
-        flex: 0 0 auto;
-    }
-}
-
-/* --- Mobile Viewport & Scrolling Fix --- */
-@media (max-width: 991.98px) {
-    html, body {
-        height: 100%;
-        overflow: hidden; /* Prevent scrolling on the root elements */
-        position: relative;
-        width: 100%;
-        display: flex; /* Use flexbox for the body */
-        flex-direction: column; /* Stack children vertically */
-    }
-
-    /* Top Navbar: Keep its height fixed */
     .navbar.sticky-top {
-        flex-shrink: 0; /* Prevent it from shrinking */
-        height: 56px; /* Explicit height, match your design if different */
+        flex-shrink: 0;
     }
 
+    /* Main content area scrolls, leaving navbars fixed */
     main.container-fluid {
-        flex-grow: 1; /* Allow main content to take up remaining space */
-        overflow-y: auto; /* Makes the main content scrollable */
-        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-        /* MODIFIED: Increased padding-bottom to ensure content clears the bottom nav */
+        flex-grow: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        /* Padding to clear the bottom nav */
         padding-bottom: calc(85px + env(safe-area-inset-bottom) + 1.5rem); 
-        width: 100%; /* Ensure it takes full width */
+        width: 100%;
     }
 
-    /* Bottom Nav: Keep its height fixed */
-    .bottom-nav {
-        flex-shrink: 0; /* Prevent it from shrinking */
-        height: calc(85px + env(safe-area-inset-bottom)); /* Your original calculation */
-        padding-bottom: env(safe-area-inset-bottom);
-    }
-
-    /* When a modal is open, lock the scrolling of the main content area */
+    /* Prevent main content scroll when a modal is open */
     body.modal-open main.container-fluid {
         overflow: hidden;
     }
+    
+    /* --- Mobile Bottom Navigation Bar --- */
+    .bottom-nav {
+        flex-shrink: 0;
+        width: 100%;
+        height: calc(85px + env(safe-area-inset-bottom));
+        padding-bottom: env(safe-area-inset-bottom);
+        background-color: var(--card-bg);
+        border-top: 1px solid var(--card-border-color);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+    }
 
-    /* Adjust tab-content padding for mobile as it now lives inside a scrollable main */
-    .tab-content {
-        padding: 1rem 0; /* Reduced horizontal padding for mobile tabs */
-        /* NEW: Make tab-content a flex container and scrollable */
-        flex-grow: 1;
+    .bottom-nav .nav-item {
+        flex: 1;
         display: flex;
         flex-direction: column;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* NEW: Ensure individual tab panes also fill height and can scroll if needed */
-    .tab-pane {
-        flex-shrink: 0; /* Don't let them shrink */
-        width: 100%; /* Take full width */
-        /* If content within a tab-pane is still cut off, consider adding overflow-y: auto here */
-        /* overflow-y: auto; */ /* Only if content inside tab-pane overflows its own height */
-    }
-
-    /* NEW: Styling for icons within the offcanvas list group items */
-    .offcanvas-body .list-group-item i {
-        font-size: 1.1rem; /* Set a consistent icon size */
-        color: #6c757d; /* A neutral grey color for the icons */
-        margin-right: 0.5rem; /* Add some spacing between icon and text */
-        width: 24px; /* Ensure consistent alignment */
-        text-align: center; /* Center the icon within its allocated space */
-    }
-    
-    /* MODIFIED: Target icons within dropdown-items specifically inside the offcanvas */
-    #mobileMoreMenu .dropdown-item i {
-        font-size: 1.1rem;
-        color: #6c757d; /* Match the color of other offcanvas icons */
-        margin-right: 0.5rem;
-        width: 24px;
+        justify-content: center;
+        align-items: center;
         text-align: center;
+        text-decoration: none;
+        color: #495057;
+        font-weight: 500;
+        position: relative;
+        transition: color 0.2s ease-in-out, transform 0.1s ease;
     }
 
-    /* Ensure text is visible and aligned */
+    .bottom-nav .nav-item i {
+        font-size: 1.8rem;
+        margin-bottom: 4px;
+    }
+
+    .bottom-nav .nav-item .nav-label {
+        font-size: 0.8rem;
+    }
+
+    .bottom-nav .nav-item:active {
+        transform: scale(0.95);
+    }
+
+    .bottom-nav .nav-item.active {
+        color: var(--primary-color);
+        font-weight: 700;
+    }
+
+    .bottom-nav .nav-item::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.9);
+        width: 85%;
+        height: 70%;
+        background-color: #fcebeb;
+        border-radius: 20px;
+        z-index: -1;
+        opacity: 0;
+        transition: all 0.2s ease-in-out;
+    }
+
+    .bottom-nav .nav-item.active::before {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+
+    /* --- Mobile "More" Offcanvas Menu --- */
     .offcanvas-body .list-group-item {
         display: flex;
         align-items: center;
+        font-size: 1.1rem;
+        padding: 0.75rem 1rem;
     }
 
-    /* NEW: Remove list-style from all list items in the offcanvas body */
-    #mobileMoreMenu .list-group-flush li {
-        list-style: none;
-        /* Ensure padding and alignment are correct for list-group-item */
-        padding: 0.5rem 1rem; /* Restore Bootstrap's default list-group-item padding */
-    }
-
-    /* NEW: Explicitly remove list-style markers in the mobile offcanvas menu */
-    #mobileMoreMenu .list-group-flush li::marker {
-        content: "";
-        display: none;
-    }
-
-    /* Ensure the anchor tags inside the list items also stretch and align */
-    #mobileMoreMenu .list-group-flush li a {
-        display: flex;
-        align-items: center;
-        width: 100%; /* Make the link fill the li */
-        text-decoration: none; /* Remove underline */
-        color: inherit; /* Inherit color from parent li or default */
+    .offcanvas-body .list-group-item i {
+        font-size: 1.3rem;
+        color: var(--text-muted);
+        margin-right: 1rem;
+        width: 28px;
+        text-align: center;
     }
 }
