@@ -189,6 +189,7 @@ def create_app():
     @app.route('/get_app_data')
     @login_required
     def get_app_data():
+        db.session.expire_all() # <-- THIS IS THE FIX
         team_id = session['team_id']
         user = db.session.query(User).filter_by(username=session['username']).first()
         team = db.session.get(Team, team_id)
