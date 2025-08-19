@@ -183,9 +183,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const getIconForType = (type) => ({'Development': '<i class="bi bi-graph-up-arrow text-primary"></i>', 'Coach Note': '<i class="bi bi-chat-left-text-fill text-info"></i>', 'Lessons': '<i class="bi bi-person-video3 text-success"></i>'}[type] || '<i class="bi bi-record-circle"></i>');
         const activityHtml = activityLog.length > 0 ? `<ul class="list-group">${activityLog.map(log => {
-            let itemClass = '', statusText = '', mainText = escapeHTML(log.text);
-            if (log.type === 'Development') itemClass = log.status === 'completed' ? (statusText=`<span class="badge bg-success ms-2">Completed: ${formatDateTime(log.completed_date)}</span>`, 'completed-focus') : 'active-focus';
-            else if (log.type === 'Lessons') itemClass = 'lesson-entry'; else if (log.type === 'Coach Note') itemClass = 'coach-note-entry';
+            let itemClass = '', statusText = '', mainText = escapeHTML(log.text || log.focus); // FIX: check for log.focus as well
+            if (log.type === 'Development') {
+                itemClass = log.status === 'completed' ? 'completed-focus' : 'active-focus';
+                if (log.status === 'completed') {
+                    statusText = `<span class="badge bg-success ms-2">Completed: ${formatDateTime(log.completed_date)}</span>`;
+                }
+            } else if (log.type === 'Lessons') {
+                itemClass = 'lesson-entry';
+            } else if (log.type === 'Coach Note') {
+                itemClass = 'coach-note-entry';
+            }
             
             let actions = '';
             if (canEdit(log.author) || log.type === 'Development') {
@@ -381,12 +389,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const absentPlayerIds = new Set(plan.absent_player_ids || []);
             const attendanceHtml = roster.map(player => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="absent_players" value="${player.id}" id="attendance-${plan.id}-${player.id}" ${absentPlayerIds.has(player.id) ? 'checked' : ''}><label class="form-check-label" for="attendance-${plan.id}-${player.id}">${escapeHTML(player.name)}</label></div>`).join('');
             const tasksHtml = (plan.tasks || []).map(task => `<li class="list-group-item d-flex justify-content-between align-items-center task-item ${task.status === 'complete' ? 'complete' : ''}" data-task-id="${task.id}" data-plan-id="${plan.id}"><div class="form-check"><input class="form-check-input task-checkbox" type="checkbox" ${task.status === 'complete' ? 'checked' : ''} id="task-${task.id}"><label class="form-check-label" for="task-${task.id}">${escapeHTML(task.text)}<div class="text-muted small">By ${escapeHTML(task.author)}</div></label></div><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_task/${plan.id}/${task.id}" data-delete-name="this task"><i class="bi bi-trash"></i></button></li>`).join('') || '<li class="list-group-item text-muted text-center">No tasks.</li>';
-            return `<div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}"><strong>${formatDateTime(plan.date)}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}</button></h2><div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body"><form action="/edit_practice_plan/${plan.id}" method="POST" class="practice-plan-details-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" value="${plan.date}" required></div><div class="col-md-8"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}"></div><div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2">${escapeHTML(plan.emphasis || '')}</textarea></div><div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3">${escapeHTML(plan.warm_up || '')}</textarea></div><div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3">${escapeHTML(plan.infield_outfield || '')}</textarea></div><div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3">${escapeHTML(plan.hitting || '')}</textarea></div><div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3">${escapeHTML(plan.pitching_catching || '')}</textarea></div><div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_practice_plan/${plan.id}" data-delete-name="this practice plan">Delete Plan</button><button type="submit" class="btn btn-sm btn-primary">Save Plan Details</button></div></div></form><hr><div class="row mt-4"><div class="col-lg-6"><h5>Attendance</h5><p class="text-muted small">Check the box for any player who is absent.</p><form action="/update_practice_attendance/${plan.id}" method="POST"><div class="mb-3">${attendanceHtml}</div><button type="submit" class="btn btn-sm btn-primary">Save Attendance</button></form></div><div class="col-lg-6"><h5>Tasks / To-Do</h5><form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add task..." required><button type="submit" class="btn btn-primary">Add</button></div></form><ul class="list-group task-list">${tasksHtml}</ul></div></div></div></div></div>`;
+            return `<div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}"><strong>${formatDateTime(plan.date)}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}</button></h2><div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body"><form action="/edit_practice_plan/${plan.id}" method="POST" class="practice-plan-details-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" value="${plan.date.split('T')[0]}" required></div><div class="col-md-8"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}"></div><div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2">${escapeHTML(plan.emphasis || '')}</textarea></div><div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3">${escapeHTML(plan.warm_up || '')}</textarea></div><div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3">${escapeHTML(plan.infield_outfield || '')}</textarea></div><div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3">${escapeHTML(plan.hitting || '')}</textarea></div><div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3">${escapeHTML(plan.pitching_catching || '')}</textarea></div><div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_practice_plan/${plan.id}" data-delete-name="this practice plan">Delete Plan</button><button type="submit" class="btn btn-sm btn-primary">Save Plan Details</button></div></div></form><hr><div class="row mt-4"><div class="col-lg-6"><h5>Attendance</h5><p class="text-muted small">Check the box for any player who is absent.</p><form action="/update_practice_attendance/${plan.id}" method="POST"><div class="mb-3">${attendanceHtml}</div><button type="submit" class="btn btn-sm btn-primary">Save Attendance</button></form></div><div class="col-lg-6"><h5>Tasks / To-Do</h5><form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add task..." required><button type="submit" class="btn btn-primary">Add</button></div></form><ul class="list-group task-list">${tasksHtml}</ul></div></div></div></div></div>`;
         }).join('');
         attachTaskListeners();
     }
     
-    // *** FIX: Added the missing renderCollaborationNotes function ***
     function renderCollaborationNotes() {
         const teamNotesContainer = document.getElementById('team-notes-container');
         const playerNotesContainer = document.getElementById('player-notes-container');
@@ -425,6 +432,97 @@ document.addEventListener('DOMContentLoaded', () => {
         playerNotesContainer.innerHTML = renderNotesList(notesData.player_notes, 'player_notes');
     }
 
+    function renderStats() {
+        const container = document.getElementById('stats-content-container');
+        if (!container) return;
+
+        const {
+            attendance_stats = {},
+            roster = [],
+            cumulative_pitching_data = {},
+            cumulative_position_data = {}
+        } = AppState.full_data;
+
+        const attendanceTable = `
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Attendance Statistics</h5></div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead><tr><th>Player</th><th>Games Missed</th><th>Practices Missed</th></tr></thead>
+                                <tbody>
+                                    ${roster.map(player => `
+                                        <tr>
+                                            <td><strong>${escapeHTML(player.name)}</strong></td>
+                                            <td>${attendance_stats[player.id] ? attendance_stats[player.id].games_missed : 0}</td>
+                                            <td>${attendance_stats[player.id] ? attendance_stats[player.id].practices_missed : 0}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+        const pitchingTable = `
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Cumulative Pitching Statistics</h5></div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead><tr><th>Pitcher</th><th>Total Innings Pitched</th><th>Total Pitches Thrown</th><th>Appearances</th></tr></thead>
+                                <tbody>
+                                    ${roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(player => {
+                                        const stats = cumulative_pitching_data[player.name] || { total_innings_pitched: 0, total_pitches_thrown: 0, appearances: 0 };
+                                        return `<tr>
+                                            <td><strong>${escapeHTML(player.name)}</strong></td>
+                                            <td>${stats.total_innings_pitched}</td>
+                                            <td>${stats.total_pitches_thrown}</td>
+                                            <td>${stats.appearances}</td>
+                                        </tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        
+        const allPositions = [...new Set(Object.values(cumulative_position_data).flatMap(Object.keys))].sort();
+        const positionTable = `
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Cumulative Games Played by Position</h5></div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Player</th>
+                                        ${allPositions.map(pos => `<th>${escapeHTML(pos)}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${roster.map(player => `
+                                        <tr>
+                                            <td><strong>${escapeHTML(player.name)}</strong></td>
+                                            ${allPositions.map(pos => `<td>${(cumulative_position_data[player.name] && cumulative_position_data[player.name][pos]) || 0}</td>`).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-muted mt-3">* "Games Played by Position" counts the number of games a player appeared in a lineup at that specific position. It does not reflect actual innings played at that position within a game.</p>
+                    </div>
+                </div>
+            </div>`;
+
+        container.innerHTML = `<div class="row">${attendanceTable}${pitchingTable}${positionTable}</div>`;
+    }
+
     function renderAll() {
         renderRoster();
         renderPlayerDevelopmentList();
@@ -437,6 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderScoutingList();
         renderGames();
         renderPracticePlans();
+        renderStats();
     }
 
     // --- EVENT HANDLERS & LISTENERS ---
@@ -718,8 +817,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleTabLogic() {
         const allTabs = document.querySelectorAll('a[data-bs-toggle="tab"]');
-        
+    
         allTabs.forEach(tab => {
+            // FIX: Use 'mousedown' which fires before SortableJS can interfere.
+            tab.addEventListener('mousedown', function (event) {
+                // Only act on left mouse button clicks and ignore if a drag handle was clicked
+                if (event.button === 0 && !event.target.classList.contains('drag-handle')) {
+                    event.preventDefault();
+                    const tabInstance = bootstrap.Tab.getOrCreateInstance(this);
+                    tabInstance.show();
+                }
+            });
+    
             // This event fires just before a new tab is shown
             tab.addEventListener('show.bs.tab', (e) => {
                 const newTabTarget = e.target.getAttribute('href');
@@ -730,13 +839,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     window.location.hash = newTabTarget;
                 }
-
+    
                 // Update the active state on the bottom nav
                 const newTabId = newTabTarget.substring(1);
                 const mainNavItems = document.querySelectorAll('.bottom-nav > .nav-item[data-tab-id]');
                 const moreMenuButton = document.querySelector('.bottom-nav > .nav-item[data-bs-toggle="offcanvas"]');
                 const moreMenuTabIds = Array.from(document.querySelectorAll('#mobileMoreMenu a[data-tab-id]')).map(a => a.dataset.tabId);
-
+    
                 mainNavItems.forEach(item => {
                     item.classList.toggle('active', item.dataset.tabId === newTabId);
                 });
@@ -744,7 +853,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (moreMenuButton) {
                     moreMenuButton.classList.toggle('active', moreMenuTabIds.includes(newTabId));
                 }
-
+    
                 // If the click came from inside the "More" menu, close the menu
                 const offcanvasEl = document.getElementById('mobileMoreMenu');
                 if (offcanvasEl && e.target.closest('#mobileMoreMenu')) {

@@ -36,7 +36,6 @@
           </span>
         </a>
 
-        <!-- Desktop User Menu -->
         <div class="collapse navbar-collapse" id="navbarResponsive">
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item dropdown">
@@ -75,11 +74,9 @@
     </main>
 
     {% block bottom_nav %}
-    <!-- Mobile Bottom Navigation -->
-    <!-- UI FIX: Removed the "navbar" class to prevent unwanted background styles -->
     <nav class="fixed-bottom d-lg-none">
         <div class="bottom-nav" role="tablist">
-             <a class="nav-item active" data-bs-toggle="tab" href="#roster" role="tab" data-tab-id="roster">
+             <a class="nav-item" data-bs-toggle="tab" href="#roster" role="tab" data-tab-id="roster">
                 <i class="bi bi-people-fill"></i><span class="nav-label">Roster</span>
             </a>
             <a class="nav-item" data-bs-toggle="tab" href="#player_development" role="tab" data-tab-id="player_development">
@@ -98,7 +95,6 @@
     </nav>
     {% endblock %}
 
-    <!-- Mobile "More" Offcanvas Menu -->
     <div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileMoreMenu" style="height: auto; max-height: 80vh;">
       <div class="offcanvas-header">
         <h5 class="offcanvas-title">More Options</h5>
@@ -128,7 +124,6 @@
       </div>
     </div>
 
-    <!-- Generic Confirmation Modal for All Deletions -->
     <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">

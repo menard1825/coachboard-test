@@ -149,38 +149,8 @@ def create_app():
         except (json.JSONDecodeError, TypeError):
             final_tab_order = default_tab_order
 
-        roster_players = db.session.query(Player).filter_by(team_id=user.team_id).all()
-        rotations = db.session.query(Rotation).filter_by(team_id=user.team_id).all()
-        pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=user.team_id).all()
-        
-        # *** FIX: Added queries for games and practice_plans ***
-        games = db.session.query(Game).filter_by(team_id=user.team_id).order_by(Game.date.desc()).all()
-        practice_plans = db.session.query(PracticePlan).filter_by(team_id=user.team_id).order_by(PracticePlan.date.desc()).all()
-
-
-        pitchers = [p for p in roster_players if p.pitcher_role != 'Not a Pitcher']
-        cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings) for p in pitchers}
-        cumulative_position_data = calculate_cumulative_position_stats(roster_players, rotations)
-
-        game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=user.team_id).group_by(PlayerGameAbsence.player_id).all()
-        practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=user.team_id).group_by(PlayerPracticeAbsence.player_id).all()
-
-        attendance_stats = {p.id: {'name': p.name, 'games_missed': 0, 'practices_missed': 0} for p in roster_players}
-        for player_id, count in game_absences:
-            if player_id in attendance_stats:
-                attendance_stats[player_id]['games_missed'] = count
-        for player_id, count in practice_absences:
-            if player_id in attendance_stats:
-                attendance_stats[player_id]['practices_missed'] = count
-
         response = make_response(render_template('index.html',
                                session=session,
-                               roster_players=roster_players,
-                               games=games, # *** FIX: Pass games to the template ***
-                               practice_plans=practice_plans, # *** FIX: Pass practice_plans to the template ***
-                               cumulative_position_data=cumulative_position_data,
-                               cumulative_pitching_data=cumulative_pitching_data,
-                               attendance_stats=attendance_stats,
                                tab_order=final_tab_order,
                                all_tabs=all_tabs))
 
@@ -237,6 +207,22 @@ def create_app():
             plan_dict['absent_player_ids'] = [a.player_id for a in p.absences]
             practice_plans_list.append(plan_dict)
 
+        # --- STATS CALCULATIONS ---
+        pitchers = [p for p in roster_db if p.pitcher_role != 'Not a Pitcher']
+        cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings_db) for p in pitchers}
+        cumulative_position_data = calculate_cumulative_position_stats(roster_db, rotations_db)
+
+        game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=team_id).group_by(PlayerGameAbsence.player_id).all()
+        practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=team_id).group_by(PlayerPracticeAbsence.player_id).all()
+
+        attendance_stats = {p.id: {'name': p.name, 'games_missed': 0, 'practices_missed': 0} for p in roster_db}
+        for player_id, count in game_absences:
+            if player_id in attendance_stats:
+                attendance_stats[player_id]['games_missed'] = count
+        for player_id, count in practice_absences:
+            if player_id in attendance_stats:
+                attendance_stats[player_id]['practices_missed'] = count
+
         full_data = {
             'roster': [model_to_dict(p) for p in roster_db],
             'lineups': [model_to_dict(l) for l in lineups_db],
@@ -254,7 +240,11 @@ def create_app():
             },
             'practice_plans': practice_plans_list,
             'player_development': player_dev_by_name,
-            'signs': [model_to_dict(s) for s in signs]
+            'signs': [model_to_dict(s) for s in signs],
+            # Add calculated stats to the payload
+            'cumulative_pitching_data': cumulative_pitching_data,
+            'cumulative_position_data': cumulative_position_data,
+            'attendance_stats': attendance_stats
         }
 
         response = make_response(jsonify({
