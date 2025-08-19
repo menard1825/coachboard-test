@@ -1,10 +1,8 @@
 // static/js/main.js
 document.addEventListener('DOMContentLoaded', () => {
 
-    // MODIFICATION: Make the switchTab function globally accessible
     window.switchTab = function(tabElement) {
         if (tabElement) {
-            // Programmatically click the tab to trigger Bootstrap's built-in handling
             const tab = bootstrap.Tab.getOrCreateInstance(tabElement);
             tab.show();
         }
@@ -604,10 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- INITIALIZATION ---
     async function init() {
         const mainContent = document.getElementById('mainTabContent');
-        if (mainContent) {
-            mainContent.innerHTML = `<div class="d-flex justify-content-center p-5"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>`;
-        }
-
+        
         try {
             const response = await fetch('/get_app_data');
             if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
@@ -617,11 +612,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Init Error:", error);
             if(mainContent) mainContent.innerHTML = `<div class="alert alert-danger">Could not load app data. Please refresh the page.</div>`;
             return;
-        }
-
-        if(mainContent) {
-            const originalContent = document.getElementById('original-content-structure').innerHTML;
-            mainContent.innerHTML = originalContent;
         }
         
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
@@ -816,66 +806,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTabLogic() {
-        const allTabs = document.querySelectorAll('a[data-bs-toggle="tab"]');
-    
-        allTabs.forEach(tab => {
-            tab.addEventListener('click', function (event) {
-                // Prevent the default anchor link behavior
-                event.preventDefault();
-    
-                // Only act on left mouse button clicks and ignore if a drag handle was clicked
-                if (event.button === 0 && !event.target.classList.contains('drag-handle')) {
-                    const tabInstance = bootstrap.Tab.getOrCreateInstance(this);
-                    tabInstance.show();
-                }
-            });
-    
-            // This event fires just before a new tab is shown
-            tab.addEventListener('show.bs.tab', (e) => {
-                const newTabTarget = e.target.getAttribute('href');
-                
-                // Update the URL hash
+        // Listen for Bootstrap's native tab showing event.
+        document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('show.bs.tab', (event) => {
+                // When a tab is about to be shown, update the URL hash.
+                const newTabTarget = event.target.getAttribute('href');
                 if (history.pushState) {
                     history.pushState(null, null, newTabTarget);
                 } else {
                     window.location.hash = newTabTarget;
                 }
-    
-                // Update the active state on the bottom nav
-                const newTabId = newTabTarget.substring(1);
-                const mainNavItems = document.querySelectorAll('.bottom-nav > .nav-item[data-tab-id]');
-                const moreMenuButton = document.querySelector('.bottom-nav > .nav-item[data-bs-toggle="offcanvas"]');
-                const moreMenuTabIds = Array.from(document.querySelectorAll('#mobileMoreMenu a[data-tab-id]')).map(a => a.dataset.tabId);
-    
-                mainNavItems.forEach(item => {
-                    item.classList.toggle('active', item.dataset.tabId === newTabId);
-                });
-                
-                if (moreMenuButton) {
-                    moreMenuButton.classList.toggle('active', moreMenuTabIds.includes(newTabId));
-                }
-    
-                // If the click came from inside the "More" menu, close the menu
-                const offcanvasEl = document.getElementById('mobileMoreMenu');
-                if (offcanvasEl && e.target.closest('#mobileMoreMenu')) {
-                    const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
-                    if (offcanvas && offcanvas._isShown) {
-                        offcanvas.hide();
-                    }
-                }
             });
         });
     
-        // On initial page load, activate the tab from the URL hash or default to #roster
+        // On initial page load, check the URL hash and activate the correct tab.
         let hash = window.location.hash || '#roster';
-        let elementToScrollTo = null;
-
         let tabToActivate = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
-
+    
+        // If the hash points to something inside a tab (like an accordion), find its parent tab.
         if (!tabToActivate) {
             const targetElement = document.getElementById(hash.substring(1));
             if (targetElement) {
-                elementToScrollTo = targetElement;
                 const parentTabPane = targetElement.closest('.tab-pane');
                 if (parentTabPane) {
                     tabToActivate = document.querySelector(`a[data-bs-toggle="tab"][href="#${parentTabPane.id}"]`);
@@ -883,23 +834,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
+        // If still no tab is found, default to the roster.
         if (!tabToActivate) {
             tabToActivate = document.querySelector('a[data-bs-toggle="tab"][href="#roster"]');
         }
 
+        // Use Bootstrap's own API to programmatically show the tab.
         if (tabToActivate) {
             const tab = bootstrap.Tab.getOrCreateInstance(tabToActivate);
             tab.show();
-        }
-
-        if (elementToScrollTo && elementToScrollTo.classList.contains('accordion-collapse')) {
-            setTimeout(() => {
-                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(elementToScrollTo, { toggle: false });
-                bsCollapse.show();
-                elementToScrollTo.addEventListener('shown.bs.collapse', () => {
-                     elementToScrollTo.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, { once: true });
-            }, 200);
         }
     }
     

@@ -17,6 +17,7 @@
     <ul class="nav nav-tabs desktop-nav-tabs" id="mainTabsDesktop" role="tablist">
         {% for tab_key in tab_order %}
         <li class="nav-item" role="presentation">
+            {# The Pitching Log is a separate page, so it's a direct link, not a tab toggle #}
             {% if tab_key == 'pitching' %}
                 <a class="nav-link" href="{{ url_for('pitching.pitching_page') }}">
                     <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
@@ -33,8 +34,12 @@
     </ul>
 </div>
 
-<script type="text/template" id="original-content-structure">
-    <div class="tab-pane fade" id="roster" role="tabpanel">
+{# REMOVED: The <script type="text/template"> is no longer needed. #}
+
+{# MODIFIED: Tab panes are now directly in the tab-content container. #}
+<div class="tab-content" id="mainTabContent">
+    {# Roster is the default active tab #}
+    <div class="tab-pane fade show active" id="roster" role="tabpanel">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0">Current Roster</h5>
@@ -46,7 +51,12 @@
                 </div>
             </div>
             <div class="accordion accordion-flush" id="rosterAccordion">
+                <div class="d-flex justify-content-center p-5">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading Roster...</span>
+                    </div>
                 </div>
+            </div>
         </div>
     </div>
 
@@ -64,14 +74,12 @@
                     </div>
                     <div class="card-body">
                         <input type="search" id="devPlayerSearch" class="form-control mb-3" placeholder="Search players...">
-                        <div class="list-group" id="dev-player-list">
-                            </div>
+                        <div class="list-group" id="dev-player-list"></div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-8">
-                <div id="player-dev-content">
-                    </div>
+                <div id="player-dev-content"></div>
             </div>
         </div>
     </div>
@@ -93,16 +101,14 @@
                 <h5 class="mb-0">Unassigned Lineups</h5>
                 <button class="btn btn-primary btn-sm" id="createLineupBtn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal"><i class="bi bi-plus-circle"></i> Create New</button>
             </div>
-            <div class="accordion accordion-flush" id="lineupsAccordion">
-                </div>
+            <div class="accordion accordion-flush" id="lineupsAccordion"></div>
         </div>
     </div>
     
     <div class="tab-pane fade" id="rotations" role="tabpanel">
         <div class="card">
             <div class="card-header"><h5 class="mb-0">Unassigned Rotations</h5></div>
-            <div class="accordion accordion-flush" id="rotationsAccordion">
-                </div>
+            <div class="accordion accordion-flush" id="rotationsAccordion"></div>
         </div>
     </div>
 
@@ -159,8 +165,7 @@
         </div>
         <div class="card">
             <div class="card-header"><h5 class="mb-0">Game Schedule</h5></div>
-            <ul class="list-group list-group-flush" id="games-list-container">
-                </ul>
+            <ul class="list-group list-group-flush" id="games-list-container"></ul>
         </div>
     </div>
 
@@ -245,10 +250,7 @@
             </div>
         </div>
     </div>
-</script>
-
-<div class="tab-content" id="mainTabContent">
-    </div>
+</div>
 
 <div class="modal fade" id="addPlayerModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
@@ -382,4 +384,28 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}
+
+{# ========================================================================================= #}
+{# NEW BOTTOM NAVIGATION FOR MOBILE - REPLACES THE OLD "MORE" MENU                         #}
+{# This block overrides the empty `bottom_nav` block in base.html                          #}
+{# ========================================================================================= #}
+{% block bottom_nav %}
+<nav class="fixed-bottom d-lg-none bottom-nav-scrollable shadow-lg">
+    <ul class="nav nav-tabs flex-nowrap" role="tablist">
+        {% for tab_key in tab_order %}
+            <li class="nav-item">
+                {% if tab_key == 'pitching' %}
+                    <a class="nav-link" href="{{ url_for('pitching.pitching_page') }}">
+                        <span>{{ all_tabs[tab_key] }}</span>
+                    </a>
+                {% else %}
+                    <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
+                        <span>{{ all_tabs[tab_key] }}</span>
+                    </a>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</nav>
 {% endblock %}

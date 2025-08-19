@@ -99,11 +99,6 @@ body {
    Tab Navigation Styles
    ========================================================================== */
 
-/* FIX: This rule was overriding Bootstrap's default tab functionality and causing
-rendering glitches. By removing it, we let Bootstrap's JS handle showing and
-hiding tab panes correctly.
-*/
-
 /* Desktop Top Tab Bar */
 .desktop-nav-tabs {
     border-bottom: 0;
@@ -232,7 +227,7 @@ hiding tab panes correctly.
 }
 
 /* ==========================================================================
-   Mobile Layout & Navigation
+   Mobile Layout & Navigation (REVAMPED)
    ========================================================================== */
 @media (max-width: 991.98px) {
     /* --- Full Height, Scrollable Layout --- */
@@ -254,8 +249,8 @@ hiding tab panes correctly.
         flex-grow: 1;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        /* Padding to clear the bottom nav */
-        padding-bottom: calc(85px + env(safe-area-inset-bottom) + 1.5rem); 
+        /* Padding to clear the new, shorter bottom nav */
+        padding-bottom: calc(60px + env(safe-area-inset-bottom) + 1rem); 
         width: 100%;
     }
 
@@ -264,85 +259,40 @@ hiding tab panes correctly.
         overflow: hidden;
     }
     
-    /* --- Mobile Bottom Navigation Bar --- */
-    .bottom-nav {
-        flex-shrink: 0;
-        width: 100%;
-        height: calc(85px + env(safe-area-inset-bottom));
-        padding-bottom: env(safe-area-inset-bottom);
+    /* --- NEW: Mobile Scrollable Bottom Navigation Bar --- */
+    .bottom-nav-scrollable {
         background-color: var(--card-bg);
         border-top: 1px solid var(--card-border-color);
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
+        height: calc(60px + env(safe-area-inset-bottom));
+        padding-bottom: env(safe-area-inset-bottom);
     }
-
-    .bottom-nav .nav-item {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        text-decoration: none;
-        color: #495057;
-        font-weight: 500;
-        position: relative;
-        transition: color 0.2s ease-in-out, transform 0.1s ease;
+    .bottom-nav-scrollable .nav-tabs {
+        border-bottom: none;
+        overflow-x: auto;
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
     }
-
-    .bottom-nav .nav-item i {
-        font-size: 1.8rem;
-        margin-bottom: 4px;
+    .bottom-nav-scrollable .nav-tabs::-webkit-scrollbar {
+        display: none; /* Hide scrollbar for Chrome, Safari, Opera */
     }
-
-    .bottom-nav .nav-item .nav-label {
-        font-size: 0.8rem;
+    .bottom-nav-scrollable .nav-item {
+        flex-shrink: 0; /* Prevent items from shrinking */
     }
-
-    .bottom-nav .nav-item:active {
-        transform: scale(0.95);
-    }
-
-    .bottom-nav .nav-item.active {
-        color: var(--primary-color);
-        font-weight: 700;
-    }
-
-    .bottom-nav .nav-item::before {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) scale(0.9);
-        width: 85%;
-        height: 70%;
-        background-color: #fcebeb;
-        border-radius: 20px;
-        z-index: -1;
-        opacity: 0;
-        transition: all 0.2s ease-in-out;
-    }
-
-    .bottom-nav .nav-item.active::before {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
-    }
-
-    /* --- Mobile "More" Offcanvas Menu --- */
-    .offcanvas-body .list-group-item {
-        display: flex;
-        align-items: center;
-        font-size: 1.1rem;
-        padding: 0.75rem 1rem;
-    }
-
-    .offcanvas-body .list-group-item i {
-        font-size: 1.3rem;
+    .bottom-nav-scrollable .nav-link {
         color: var(--text-muted);
-        margin-right: 1rem;
-        width: 28px;
+        font-weight: 500;
         text-align: center;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 0.8rem 1rem;
+        white-space: nowrap;
+        height: 60px;
+        display: flex;
+        align-items: center;
+    }
+    .bottom-nav-scrollable .nav-link.active {
+        color: var(--primary-color);
+        border-bottom: 3px solid var(--primary-color);
+        background-color: transparent;
     }
 }

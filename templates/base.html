@@ -36,25 +36,31 @@
           </span>
         </a>
 
-        <div class="collapse navbar-collapse" id="navbarResponsive">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="userMenuDesktop" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-person-circle me-1"></i> Welcome, {{ session.full_name or session.username }}!
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDesktop">
-                        {% if session.role in ['Head Coach', 'Super Admin'] %}
-                        <li><a class="dropdown-item" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i>User Management</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i>Team Settings</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        {% endif %}
-                        <li><a class="dropdown-item" href="{{ url_for('pitching.pitching_rules') }}"><i class="bi bi-gavel"></i>Pitching Rules</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i>Change Password</a></li>
-                        <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i>Logout</a></li>
-                    </ul>
-                </li>
-            </ul>
-        </div>
+        {# MODIFIED: Combined desktop and a new mobile user menu #}
+        <ul class="navbar-nav ms-auto flex-row">
+            {# Desktop User Menu (Visible on large screens) #}
+            <li class="nav-item dropdown d-none d-lg-block">
+                <a class="nav-link dropdown-toggle" href="#" id="userMenuDesktop" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-person-circle me-1"></i> Welcome, {{ session.full_name or session.username }}!
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDesktop">
+                    {% if session.role in ['Head Coach', 'Super Admin'] %}
+                    <li><a class="dropdown-item" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i>User Management</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i>Team Settings</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    {% endif %}
+                    <li><a class="dropdown-item" href="{{ url_for('pitching.pitching_rules') }}"><i class="bi bi-gavel"></i>Pitching Rules</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i>Change Password</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i>Logout</a></li>
+                </ul>
+            </li>
+            {# Mobile User Menu Button (Visible on small screens) #}
+            <li class="nav-item d-lg-none">
+                <a class="nav-link" href="#userOffcanvas" data-bs-toggle="offcanvas" role="button" aria-controls="userOffcanvas">
+                    <i class="bi bi-person-circle" style="font-size: 1.5rem;"></i>
+                </a>
+            </li>
+        </ul>
       </div>
     </nav>
     
@@ -74,50 +80,27 @@
     </main>
 
     {% block bottom_nav %}
-    <nav class="fixed-bottom d-lg-none">
-        <div class="bottom-nav" role="tablist">
-             <a class="nav-item" data-bs-toggle="tab" href="#roster" role="tab" data-tab-id="roster">
-                <i class="bi bi-people-fill"></i><span class="nav-label">Roster</span>
-            </a>
-            <a class="nav-item" data-bs-toggle="tab" href="#player_development" role="tab" data-tab-id="player_development">
-                <i class="bi bi-graph-up-arrow"></i><span class="nav-label">Development</span>
-            </a>
-            <a class="nav-item" data-bs-toggle="tab" href="#games" role="tab" data-tab-id="games">
-                <i class="bi bi-calendar-event"></i><span class="nav-label">Games</span>
-            </a>
-            <a class="nav-item" data-bs-toggle="tab" href="#practice_plan" role="tab" data-tab-id="practice_plan">
-                <i class="bi bi-clipboard-check"></i><span class="nav-label">Practice</span>
-            </a>
-             <a class="nav-item" data-bs-toggle="offcanvas" href="#mobileMoreMenu" role="button">
-                <i class="bi bi-three-dots"></i><span class="nav-label">More</span>
-            </a>
-        </div>
-    </nav>
+    {# This block is intentionally empty here. Child templates like index.html will fill it. #}
     {% endblock %}
 
-    <div class="offcanvas offcanvas-bottom" tabindex="-1" id="mobileMoreMenu" style="height: auto; max-height: 80vh;">
+    {# NEW: Off-canvas Menu for Mobile User Actions #}
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="userOffcanvas" aria-labelledby="userOffcanvasLabel">
       <div class="offcanvas-header">
-        <h5 class="offcanvas-title">More Options</h5>
+        <h5 class="offcanvas-title" id="userOffcanvasLabel">Menu</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
       </div>
       <div class="offcanvas-body">
         <div class="list-group list-group-flush">
-            {# Main App Features #}
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#stats" role="tab" data-tab-id="stats"><i class="bi bi-bar-chart-fill"></i>Stats</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#scouting_list" role="tab" data-tab-id="scouting_list"><i class="bi bi-binoculars-fill"></i>Scouting List</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_page') }}"><i class="bi bi-bullseye"></i>Pitching Log</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#collaboration" role="tab" data-tab-id="collaboration"><i class="bi bi-chat-left-text-fill"></i>Coaches Log</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#signs" role="tab" data-tab-id="signs"><i class="bi bi-signpost-split-fill"></i>Signs & Signals</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}"><i class="bi bi-gavel"></i>Pitching Rules</a>
-            
-            <hr class="my-2">
-
-            {# Admin and Account Settings #}
             {% if session.role in ['Head Coach', 'Super Admin'] %}
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-person-badge-fill"></i>User Management</a>
+            <h6 class="text-muted ps-3 mt-2 mb-1">Admin Tools</h6>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i>User Management</a>
             <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i>Team Settings</a>
             <hr class="my-2">
             {% endif %}
+            <h6 class="text-muted ps-3 mt-2 mb-1">Resources</h6>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}"><i class="bi bi-gavel"></i>Pitching Rules</a>
+             <hr class="my-2">
+            <h6 class="text-muted ps-3 mt-2 mb-1">Account</h6>
             <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i>Change Password</a>
             <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i>Logout</a>
         </div>
