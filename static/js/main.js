@@ -819,11 +819,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const allTabs = document.querySelectorAll('a[data-bs-toggle="tab"]');
     
         allTabs.forEach(tab => {
-            // FIX: Use 'mousedown' which fires before SortableJS can interfere.
-            tab.addEventListener('mousedown', function (event) {
+            tab.addEventListener('click', function (event) {
+                // Prevent the default anchor link behavior
+                event.preventDefault();
+    
                 // Only act on left mouse button clicks and ignore if a drag handle was clicked
                 if (event.button === 0 && !event.target.classList.contains('drag-handle')) {
-                    event.preventDefault();
                     const tabInstance = bootstrap.Tab.getOrCreateInstance(this);
                     tabInstance.show();
                 }
