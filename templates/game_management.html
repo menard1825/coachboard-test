@@ -33,7 +33,6 @@
     </ul>
 
     <div class="tab-content p-0 border-0" id="gameTabsContent">
-        <!-- Availability Tab -->
         <div class="tab-pane fade show active" id="availability" role="tabpanel">
             <div class="card">
                 <div class="card-header">
@@ -60,7 +59,6 @@
             </div>
         </div>
 
-        <!-- Lineup Tab -->
         <div class="tab-pane fade" id="lineup" role="tabpanel">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -91,12 +89,10 @@
             </div>
         </div>
 
-        <!-- Rotation Tab -->
         <div class="tab-pane fade" id="rotation" role="tabpanel">
             {% include '_rotation_editor.html' %}
         </div>
         
-        <!-- Pitching Log Tab -->
         <div class="tab-pane fade" id="pitching" role="tabpanel">
             {% include '_pitching_log.html' %}
         </div>
@@ -105,7 +101,6 @@
 
 {% include '_lineup_editor.html' %}
 
-<!-- This modal is for the mobile rotation editor -->
 <div class="modal fade" id="assignPlayerModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -133,6 +128,7 @@
             rotation: {{ rotation|tojson }},
             absent_player_ids: {{ absent_player_ids|tojson }}
         };
+        // This now initializes a self-contained script, preventing data leaks.
         initializeGameManagement(gameData);
 
         // Save the last active tab to localStorage to remember the user's place

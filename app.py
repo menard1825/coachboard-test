@@ -189,7 +189,7 @@ def create_app():
     @app.route('/get_app_data')
     @login_required
     def get_app_data():
-        db.session.expire_all() # <-- THIS IS THE FIX
+        db.session.expire_all()
         team_id = session['team_id']
         user = db.session.query(User).filter_by(username=session['username']).first()
         team = db.session.get(Team, team_id)
@@ -250,11 +250,16 @@ def create_app():
             'signs': [model_to_dict(s) for s in signs]
         }
 
-        return jsonify({
+        response = make_response(jsonify({
             'full_data': full_data,
             'player_order': user.player_order or [],
             'session': {'username': session.get('username'), 'role': session.get('role')},
             'pitch_count_summary': pitch_count_summary
-        })
+        }))
+        # FIX: Add headers to prevent browser from caching this API response
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
 
     return app

@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.switchTab = function(tabElement) {
         if (tabElement) {
             // Programmatically click the tab to trigger Bootstrap's built-in handling
-            tabElement.click();
+            const tab = bootstrap.Tab.getOrCreateInstance(tabElement);
+            tab.show();
         }
     };
 
@@ -679,46 +680,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleTabLogic() {
         const allTabs = document.querySelectorAll('a[data-bs-toggle="tab"]');
+        
         allTabs.forEach(tab => {
-            tab.addEventListener('click', e => {
-                e.preventDefault();
-    
-                const newTabTarget = e.currentTarget.getAttribute('href');
-                const newTabId = newTabTarget.substring(1);
+            // This event fires just before a new tab is shown
+            tab.addEventListener('show.bs.tab', (e) => {
+                const newTabTarget = e.target.getAttribute('href');
                 
-                document.querySelectorAll('.tab-pane').forEach(pane => {
-                    pane.style.display = 'none';
-                    pane.classList.remove('show', 'active');
-                });
-    
-                const newPane = document.getElementById(newTabId);
-                if (newPane) {
-                    newPane.style.display = 'block';
-                    newPane.classList.add('show', 'active');
-                }
-    
+                // Update the URL hash
                 if (history.pushState) {
                     history.pushState(null, null, newTabTarget);
                 } else {
                     window.location.hash = newTabTarget;
                 }
-    
+
+                // Update the active state on the bottom nav
+                const newTabId = newTabTarget.substring(1);
                 const mainNavItems = document.querySelectorAll('.bottom-nav > .nav-item[data-tab-id]');
                 const moreMenuButton = document.querySelector('.bottom-nav > .nav-item[data-bs-toggle="offcanvas"]');
                 const moreMenuTabIds = Array.from(document.querySelectorAll('#mobileMoreMenu a[data-tab-id]')).map(a => a.dataset.tabId);
-    
-                let isMoreTabActive = moreMenuTabIds.includes(newTabId);
-    
+
                 mainNavItems.forEach(item => {
                     item.classList.toggle('active', item.dataset.tabId === newTabId);
                 });
-    
+                
                 if (moreMenuButton) {
-                    moreMenuButton.classList.toggle('active', isMoreTabActive);
+                    moreMenuButton.classList.toggle('active', moreMenuTabIds.includes(newTabId));
                 }
-    
+
+                // If the click came from inside the "More" menu, close the menu
                 const offcanvasEl = document.getElementById('mobileMoreMenu');
-                if (offcanvasEl && e.currentTarget.closest('#mobileMoreMenu')) {
+                if (offcanvasEl && e.target.closest('#mobileMoreMenu')) {
                     const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
                     if (offcanvas && offcanvas._isShown) {
                         offcanvas.hide();
@@ -727,13 +718,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     
-        let hash = window.location.hash;
-        if (!hash) {
-            hash = '#roster';
-        }
+        // On initial page load, activate the tab from the URL hash or default to #roster
+        let hash = window.location.hash || '#roster';
+        let elementToScrollTo = null;
 
         let tabToActivate = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
-        let elementToScrollTo = null;
 
         if (!tabToActivate) {
             const targetElement = document.getElementById(hash.substring(1));
@@ -745,27 +734,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
-
+        
         if (!tabToActivate) {
             tabToActivate = document.querySelector('a[data-bs-toggle="tab"][href="#roster"]');
         }
 
         if (tabToActivate) {
-            const tab = new bootstrap.Tab(tabToActivate);
+            const tab = bootstrap.Tab.getOrCreateInstance(tabToActivate);
             tab.show();
         }
 
         if (elementToScrollTo && elementToScrollTo.classList.contains('accordion-collapse')) {
             setTimeout(() => {
-                const bsCollapse = new bootstrap.Collapse(elementToScrollTo, {
-                    toggle: false
-                });
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(elementToScrollTo, { toggle: false });
                 bsCollapse.show();
-                
                 elementToScrollTo.addEventListener('shown.bs.collapse', () => {
                      elementToScrollTo.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }, { once: true });
-
             }, 200);
         }
     }

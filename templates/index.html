@@ -13,7 +13,6 @@
 {%- endmacro %}
 
 {% block content %}
-<!-- Desktop Top Tab Navigation -->
 <div class="d-none d-lg-block mb-3">
     <ul class="nav nav-tabs desktop-nav-tabs" id="mainTabsDesktop" role="tablist">
         {% for tab_key in tab_order %}
@@ -34,10 +33,8 @@
     </ul>
 </div>
 
-<!-- This template holds the structure that main.js will populate -->
 <script type="text/template" id="original-content-structure">
-    <!-- Roster Tab -->
-    <div class="tab-pane fade" id="roster" role="tabpanel">
+    <div class="tab-pane fade show active" id="roster" role="tabpanel">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0">Current Roster</h5>
@@ -49,12 +46,10 @@
                 </div>
             </div>
             <div class="accordion accordion-flush" id="rosterAccordion">
-                <!-- Roster content will be rendered here by JS -->
-            </div>
+                </div>
         </div>
     </div>
 
-    <!-- Player Development Tab -->
     <div class="tab-pane fade" id="player_development" role="tabpanel">
         <div class="row">
             <div class="col-lg-4 mb-3 mb-lg-0">
@@ -70,25 +65,21 @@
                     <div class="card-body">
                         <input type="search" id="devPlayerSearch" class="form-control mb-3" placeholder="Search players...">
                         <div class="list-group" id="dev-player-list">
-                            <!-- Player list rendered by JS -->
-                        </div>
+                            </div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-8">
                 <div id="player-dev-content">
-                    <!-- Player dev details rendered by JS -->
-                </div>
+                    </div>
             </div>
         </div>
     </div>
 
-    <!-- Stats Tab -->
     <div class="tab-pane fade" id="stats" role="tabpanel">
         {% include '_stats_content.html' %}
     </div>
 
-    <!-- Lineups Tab -->
     <div class="tab-pane fade" id="lineups" role="tabpanel">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -96,22 +87,18 @@
                 <button class="btn btn-primary btn-sm" id="createLineupBtn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal"><i class="bi bi-plus-circle"></i> Create New</button>
             </div>
             <div class="accordion accordion-flush" id="lineupsAccordion">
-                <!-- Lineups content rendered by JS -->
-            </div>
+                </div>
         </div>
     </div>
     
-    <!-- Rotations Tab -->
     <div class="tab-pane fade" id="rotations" role="tabpanel">
         <div class="card">
             <div class="card-header"><h5 class="mb-0">Unassigned Rotations</h5></div>
             <div class="accordion accordion-flush" id="rotationsAccordion">
-                <!-- Rotations content rendered by JS -->
-            </div>
+                </div>
         </div>
     </div>
 
-    <!-- BUG FIX: Added the missing scouting_list tab pane -->
     <div class="tab-pane fade" id="scouting_list" role="tabpanel">
         <div class="card mb-4">
             <div class="card-header"><h5 class="mb-0">Add New Scouted Player</h5></div>
@@ -150,7 +137,6 @@
         </div>
     </div>
 
-    <!-- Games Tab -->
     <div class="tab-pane fade" id="games" role="tabpanel">
         <div class="card mb-4">
             <div class="card-header"><h5 class="mb-0">Add New Game</h5></div>
@@ -167,12 +153,10 @@
         <div class="card">
             <div class="card-header"><h5 class="mb-0">Game Schedule</h5></div>
             <ul class="list-group list-group-flush" id="games-list-container">
-                <!-- Games list rendered by JS -->
-            </ul>
+                </ul>
         </div>
     </div>
 
-    <!-- Collaboration Tab -->
     <div class="tab-pane fade" id="collaboration" role="tabpanel">
         <div class="row">
             <div class="col-md-6 mb-3 mb-md-0">
@@ -203,7 +187,6 @@
         </div>
     </div>
 
-    <!-- Practice Plan Tab -->
     <div class="tab-pane fade" id="practice_plan" role="tabpanel">
         <button class="btn btn-primary d-lg-none mb-3 w-100" type="button" data-bs-toggle="collapse" data-bs-target="#createPracticePlanForm">
             <i class="bi bi-plus-circle"></i> Create New Plan
@@ -233,7 +216,6 @@
         </div>
     </div>
 
-    <!-- Signs Tab -->
     <div class="tab-pane fade" id="signs" role="tabpanel">
         <div class="row">
             <div class="col-lg-5 mb-3 mb-lg-0">
@@ -258,12 +240,9 @@
     </div>
 </script>
 
-<!-- This is where the JS will render the content from the template above -->
 <div class="tab-content" id="mainTabContent">
-    <!-- Content will be loaded here by main.js -->
-</div>
+    </div>
 
-<!-- Modals -->
 <div class="modal fade" id="addPlayerModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">

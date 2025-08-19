@@ -83,7 +83,8 @@ def add_game():
     db.session.commit()
     flash(f'Game vs "{new_game.opponent}" on {new_game.date.strftime("%m/%d/%Y")} added successfully!', 'success')
     socketio.emit('data_updated', {'message': 'New game added.'})
-    return redirect(url_for('gameday.game_management', game_id=new_game.id))
+    # FIX: Redirect back to the games list on the main page
+    return redirect(url_for('home', _anchor='games'))
 
 @gameday_bp.route('/edit_game/<int:game_id>', methods=['POST'])
 def edit_game(game_id):
