@@ -152,6 +152,11 @@ def create_app():
         roster_players = db.session.query(Player).filter_by(team_id=user.team_id).all()
         rotations = db.session.query(Rotation).filter_by(team_id=user.team_id).all()
         pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=user.team_id).all()
+        
+        # *** FIX: Added queries for games and practice_plans ***
+        games = db.session.query(Game).filter_by(team_id=user.team_id).order_by(Game.date.desc()).all()
+        practice_plans = db.session.query(PracticePlan).filter_by(team_id=user.team_id).order_by(PracticePlan.date.desc()).all()
+
 
         pitchers = [p for p in roster_players if p.pitcher_role != 'Not a Pitcher']
         cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings) for p in pitchers}
@@ -171,6 +176,8 @@ def create_app():
         response = make_response(render_template('index.html',
                                session=session,
                                roster_players=roster_players,
+                               games=games, # *** FIX: Pass games to the template ***
+                               practice_plans=practice_plans, # *** FIX: Pass practice_plans to the template ***
                                cumulative_position_data=cumulative_position_data,
                                cumulative_pitching_data=cumulative_pitching_data,
                                attendance_stats=attendance_stats,

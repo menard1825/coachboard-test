@@ -99,10 +99,14 @@ body {
    Tab Navigation Styles
    ========================================================================== */
 
-/* Hide inactive tabs to prevent content stacking issues */
+/* FIX: This rule was overriding Bootstrap's default tab functionality and causing
+rendering glitches. By removing it, we let Bootstrap's JS handle showing and
+hiding tab panes correctly.
+
 .tab-content > .tab-pane:not(.active) {
     display: none;
-}
+} 
+*/
 
 /* Desktop Top Tab Bar */
 .desktop-nav-tabs {

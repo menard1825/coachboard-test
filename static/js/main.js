@@ -310,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // BUG FIX: Added the missing renderSigns function
     function renderSigns() {
         const container = document.getElementById('signs-list-container');
         if (!container) return;
@@ -385,6 +384,45 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}"><strong>${formatDateTime(plan.date)}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}</button></h2><div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body"><form action="/edit_practice_plan/${plan.id}" method="POST" class="practice-plan-details-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" value="${plan.date}" required></div><div class="col-md-8"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}"></div><div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2">${escapeHTML(plan.emphasis || '')}</textarea></div><div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3">${escapeHTML(plan.warm_up || '')}</textarea></div><div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3">${escapeHTML(plan.infield_outfield || '')}</textarea></div><div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3">${escapeHTML(plan.hitting || '')}</textarea></div><div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3">${escapeHTML(plan.pitching_catching || '')}</textarea></div><div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_practice_plan/${plan.id}" data-delete-name="this practice plan">Delete Plan</button><button type="submit" class="btn btn-sm btn-primary">Save Plan Details</button></div></div></form><hr><div class="row mt-4"><div class="col-lg-6"><h5>Attendance</h5><p class="text-muted small">Check the box for any player who is absent.</p><form action="/update_practice_attendance/${plan.id}" method="POST"><div class="mb-3">${attendanceHtml}</div><button type="submit" class="btn btn-sm btn-primary">Save Attendance</button></form></div><div class="col-lg-6"><h5>Tasks / To-Do</h5><form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add task..." required><button type="submit" class="btn btn-primary">Add</button></div></form><ul class="list-group task-list">${tasksHtml}</ul></div></div></div></div></div>`;
         }).join('');
         attachTaskListeners();
+    }
+    
+    // *** FIX: Added the missing renderCollaborationNotes function ***
+    function renderCollaborationNotes() {
+        const teamNotesContainer = document.getElementById('team-notes-container');
+        const playerNotesContainer = document.getElementById('player-notes-container');
+        const collabPlayerSelect = document.getElementById('collab-player-select');
+
+        if (!teamNotesContainer || !playerNotesContainer || !collabPlayerSelect) return;
+
+        const notesData = AppState.full_data.collaboration_notes || { team_notes: [], player_notes: [] };
+        const roster = AppState.full_data.roster || [];
+
+        // Populate player dropdown
+        collabPlayerSelect.innerHTML = '<option value="">Select Player...</option>' +
+            roster.map(p => `<option value="${escapeHTML(p.name)}">${escapeHTML(p.name)}</option>`).join('');
+
+        const renderNotesList = (notes, noteType) => {
+            if (!notes || notes.length === 0) {
+                return '<div class="text-center p-3 text-muted border rounded">No notes yet.</div>';
+            }
+            return notes.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map(note => {
+                const canUserEdit = canEdit(note.author);
+                const editButton = canUserEdit ? `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${note.id}" data-note-type="${noteType}" data-note-text="${escapeHTML(note.text)}">Edit</button>` : '';
+                const deleteButton = canUserEdit ? `<button class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_note/${noteType}/${note.id}" data-delete-name="this note">Delete</button>` : '';
+                const playerTitle = noteType === 'player_notes' && note.player_name ? `<strong>${escapeHTML(note.player_name)}:</strong> ` : '';
+                
+                return `<div class="card mb-2">
+                            <div class="card-body p-2">
+                                <p class="card-text mb-1">${playerTitle}${escapeHTML(note.text)}</p>
+                                <small class="text-muted d-block">By ${escapeHTML(note.author)} on ${formatDateTime(note.timestamp)}</small>
+                                ${canUserEdit ? `<div class="mt-1">${editButton}${deleteButton}</div>` : ''}
+                            </div>
+                        </div>`;
+            }).join('');
+        };
+
+        teamNotesContainer.innerHTML = renderNotesList(notesData.team_notes, 'team_notes');
+        playerNotesContainer.innerHTML = renderNotesList(notesData.player_notes, 'player_notes');
     }
 
     function renderAll() {
