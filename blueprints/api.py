@@ -89,12 +89,23 @@ def get_games():
 @api_bp.route('/collaboration_notes')
 @login_required
 def get_collaboration_notes():
-    db.session.expire_all()
-    notes = db.session.query(CollaborationNote).filter_by(team_id=session['team_id']).all()
-    return jsonify({
-        'team_notes': [model_to_dict(cn) for cn in notes if cn.note_type == 'team_notes'],
-        'player_notes': [model_to_dict(cn) for cn in notes if cn.note_type == 'player_notes']
-    })
+    try:
+        db.session.expire_all()
+        notes = db.session.query(CollaborationNote).filter_by(team_id=session['team_id']).all()
+
+        team_notes_list = [model_to_dict(cn) for cn in notes if cn.note_type == 'team_notes']
+        player_notes_list = [model_to_dict(cn) for cn in notes if cn.note_type == 'player_notes']
+
+        return jsonify({
+            'team_notes': team_notes_list,
+            'player_notes': player_notes_list
+        })
+    except Exception as e:
+        import traceback
+        print("--- ERROR IN get_collaboration_notes ---")
+        print(traceback.format_exc())
+        print("------------------------------------")
+        return jsonify({"error": "An internal error occurred while processing collaboration notes.", "details": str(e)}), 500
 
 @api_bp.route('/practice_plans')
 @login_required
