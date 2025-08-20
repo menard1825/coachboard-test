@@ -17,9 +17,9 @@ depends_on = None
 
 
 def upgrade():
-    # Add the player_id column as nullable first
-    op.add_column('pitching_outings', sa.Column('player_id', sa.Integer(), nullable=True))
-    op.create_foreign_key('fk_pitching_outings_player_id', 'pitching_outings', 'players', ['player_id'], ['id'])
+    with op.batch_alter_table('pitching_outings', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('player_id', sa.Integer(), nullable=True))
+        batch_op.create_foreign_key('fk_pitching_outings_player_id', 'players', ['player_id'], ['id'])
 
     # Data migration
     bind = op.get_bind()
@@ -34,21 +34,21 @@ def upgrade():
 
     outings = session.execute(sa.select(pitching_outings_table)).fetchall()
     for outing in outings:
-        player_id = player_map.get(outing.pitcher.lower())
+        player_id = player_map.get(str(outing.pitcher).lower()) if outing.pitcher else None
         if player_id:
             session.execute(
                 pitching_outings_table.update().where(pitching_outings_table.c.id == outing.id).values(player_id=player_id)
             )
-
     session.commit()
 
-    # Now make player_id non-nullable and drop the old pitcher column
-    op.alter_column('pitching_outings', 'player_id', existing_type=sa.Integer(), nullable=False)
-    op.drop_column('pitching_outings', 'pitcher')
+    with op.batch_alter_table('pitching_outings', schema=None) as batch_op:
+        batch_op.alter_column('player_id', existing_type=sa.Integer(), nullable=False)
+        batch_op.drop_column('pitcher')
 
 
 def downgrade():
-    op.add_column('pitching_outings', sa.Column('pitcher', sa.String(), nullable=True))
+    with op.batch_alter_table('pitching_outings', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('pitcher', sa.String(), nullable=True))
 
     # Data migration back to names (best effort)
     bind = op.get_bind()
@@ -68,9 +68,9 @@ def downgrade():
             session.execute(
                 pitching_outings_table.update().where(pitching_outings_table.c.id == outing.id).values(pitcher=player_name)
             )
-
     session.commit()
 
-    op.alter_column('pitching_outings', 'pitcher', existing_type=sa.String(), nullable=False)
-    op.drop_constraint('fk_pitching_outings_player_id', 'pitching_outings', type_='foreignkey')
-    op.drop_column('pitching_outings', 'player_id')
+    with op.batch_alter_table('pitching_outings', schema=None) as batch_op:
+        batch_op.alter_column('pitcher', existing_type=sa.String(), nullable=False)
+        batch_op.drop_constraint('fk_pitching_outings_player_id', type_='foreignkey')
+        batch_op.drop_column('player_id')
