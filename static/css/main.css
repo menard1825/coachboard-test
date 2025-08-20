@@ -250,7 +250,7 @@ body {
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
         /* Padding to clear the new, shorter bottom nav */
-        padding-bottom: calc(60px + env(safe-area-inset-bottom) + 1rem); 
+        padding-bottom: calc(50px + env(safe-area-inset-bottom) + 1rem);
         width: 100%;
     }
 
@@ -259,40 +259,18 @@ body {
         overflow: hidden;
     }
     
-    /* --- NEW: Mobile Scrollable Bottom Navigation Bar --- */
-    .bottom-nav-scrollable {
-        background-color: var(--card-bg);
-        border-top: 1px solid var(--card-border-color);
-        height: calc(60px + env(safe-area-inset-bottom));
+    /* --- NEW: Mobile Bottom Navigation Bar --- */
+    .bottom-nav {
+        height: calc(50px + env(safe-area-inset-bottom));
         padding-bottom: env(safe-area-inset-bottom);
     }
-    .bottom-nav-scrollable .nav-tabs {
-        border-bottom: none;
-        overflow-x: auto;
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
-    }
-    .bottom-nav-scrollable .nav-tabs::-webkit-scrollbar {
-        display: none; /* Hide scrollbar for Chrome, Safari, Opera */
-    }
-    .bottom-nav-scrollable .nav-item {
-        flex-shrink: 0; /* Prevent items from shrinking */
-    }
-    .bottom-nav-scrollable .nav-link {
+    .bottom-nav .nav-link {
         color: var(--text-muted);
         font-weight: 500;
-        text-align: center;
-        border: none;
-        border-bottom: 3px solid transparent;
-        padding: 0.8rem 1rem;
-        white-space: nowrap;
-        height: 60px;
-        display: flex;
-        align-items: center;
+        padding: .5rem;
+        flex-grow: 1;
     }
-    .bottom-nav-scrollable .nav-link.active {
+    .bottom-nav .nav-link.active {
         color: var(--primary-color);
-        border-bottom: 3px solid var(--primary-color);
-        background-color: transparent;
     }
 }

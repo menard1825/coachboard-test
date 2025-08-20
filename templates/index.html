@@ -17,18 +17,10 @@
     <ul class="nav nav-tabs desktop-nav-tabs" id="mainTabsDesktop" role="tablist">
         {% for tab_key in tab_order %}
         <li class="nav-item" role="presentation">
-            {# The Pitching Log is a separate page, so it's a direct link, not a tab toggle #}
-            {% if tab_key == 'pitching' %}
-                <a class="nav-link" href="{{ url_for('pitching.pitching_page') }}">
-                    <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
-                    {{ all_tabs[tab_key] }}
-                </a>
-            {% else %}
-                <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
-                    <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
-                    {{ all_tabs[tab_key] }}
-                </a>
-            {% endif %}
+            <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
+                <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
+                {{ all_tabs[tab_key] }}
+            </a>
         </li>
         {% endfor %}
     </ul>
@@ -248,6 +240,45 @@
                     <ul class="list-group list-group-flush" id="signs-list-container"></ul>
                 </div>
             </div>
+
+    <div class="tab-pane fade" id="pitching" role="tabpanel">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Pitch Count Summary</h5>
+                <a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-sm btn-outline-info">View Rules</a>
+            </div>
+            <div class="card-body p-2" id="pitch-count-summary-container">
+                <div class="d-flex justify-content-center p-5"><div class="spinner-border"></div></div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-5 mb-4">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Add New Outing</h5></div>
+                    <div class="card-body">
+                        <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
+                            <div class="row g-3">
+                                <div class="col-6"><label for="pitch_date" class="form-label">Date</label><input type="date" id="pitch_date" name="pitch_date" class="form-control" required></div>
+                                <div class="col-6"><label for="pitching-log-pitcher-select" class="form-label">Pitcher</label><select name="player_id" id="pitching-log-pitcher-select" class="form-select" required></select></div>
+                                <div class="col-12"><label for="opponent" class="form-label">Opponent / Context</label><input type="text" id="opponent" name="opponent" class="form-control" placeholder="e.g., Scrimmage vs. Tigers"></div>
+                                <div class="col-6"><label for="pitches" class="form-label">Pitch Count</label><input type="number" id="pitches" name="pitches" class="form-control" required></div>
+                                <div class="col-6"><label for="innings" class="form-label">Innings Pitched</label><input type="text" id="innings" name="innings" class="form-control" placeholder="e.g., 2.1" required></div>
+                                <div class="col-6"><label for="outing_type" class="form-label">Outing Type</label><select name="outing_type" id="outing_type" class="form-select"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div>
+                                <div class="col-6"><label for="pitcher_type" class="form-label">Pitcher Type</label><select name="pitcher_type" id="pitcher_type" class="form-select"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 mt-3">Log Outing</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7 mb-4">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Recent Outing History</h5></div>
+                    <ul class="list-group list-group-flush" id="recorded-outings-list"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
         </div>
     </div>
 </div>
@@ -391,21 +422,33 @@
 {# This block overrides the empty `bottom_nav` block in base.html                          #}
 {# ========================================================================================= #}
 {% block bottom_nav %}
-<nav class="fixed-bottom d-lg-none bottom-nav-scrollable shadow-lg">
-    <ul class="nav nav-tabs flex-nowrap" role="tablist">
-        {% for tab_key in tab_order %}
-            <li class="nav-item">
-                {% if tab_key == 'pitching' %}
-                    <a class="nav-link" href="{{ url_for('pitching.pitching_page') }}">
-                        <span>{{ all_tabs[tab_key] }}</span>
-                    </a>
-                {% else %}
-                    <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
-                        <span>{{ all_tabs[tab_key] }}</span>
-                    </a>
-                {% endif %}
-            </li>
+<nav class="fixed-bottom d-lg-none bg-light shadow-lg bottom-nav">
+    <div class="d-flex justify-content-around">
+        {% for tab_key in tab_order | slice(4) %}
+            <a class="nav-link text-center pt-2 pb-1" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
+                {# You can add icons here later if you want #}
+                <span class="d-block small">{{ all_tabs[tab_key] }}</span>
+            </a>
         {% endfor %}
-    </ul>
+        <a class="nav-link text-center pt-2 pb-1" data-bs-toggle="offcanvas" href="#offcanvasMoreMenu" role="button">
+            <span class="d-block small">More</span>
+        </a>
+    </div>
 </nav>
+
+<div class="offcanvas offcanvas-bottom" tabindex="-1" id="offcanvasMoreMenu" style="height: auto;">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title">More Options</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="list-group list-group-flush">
+            {% for tab_key in tab_order | slice(4, 99) %}
+                 <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab" data-bs-dismiss="offcanvas">
+                    {{ all_tabs[tab_key] }}
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
 {% endblock %}

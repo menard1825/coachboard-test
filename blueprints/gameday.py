@@ -5,26 +5,10 @@ from models import (
 from db import db
 from extensions import socketio
 from datetime import datetime
-from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
+from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict, pitching_outing_to_dict
 from sqlalchemy.orm import joinedload
 
 gameday_bp = Blueprint('gameday', __name__, template_folder='templates')
-
-def model_to_dict(model_instance):
-    if not model_instance:
-        return None
-    d = {c.name: getattr(model_instance, c.name) for c in model_instance.__table__.columns}
-    for key, value in d.items():
-        if isinstance(value, datetime):
-            d[key] = value.isoformat()
-    return d
-
-def pitching_outing_to_dict(outing):
-    if not outing:
-        return None
-    d = model_to_dict(outing)
-    d['player_name'] = outing.player.name if outing.player else "Unknown"
-    return d
 
 # --- Game Management ---
 @gameday_bp.route('/game/<int:game_id>')
@@ -82,8 +66,7 @@ def add_game():
     db.session.add(new_game)
     db.session.commit()
     flash(f'Game vs "{new_game.opponent}" on {new_game.date.strftime("%m/%d/%Y")} added successfully!', 'success')
-    socketio.emit('data_updated', {'message': 'New game added.'})
-    # FIX: Redirect back to the games list on the main page
+    socketio.emit('game_add', {'game': model_to_dict(new_game)})
     return redirect(url_for('home', _anchor='games'))
 
 @gameday_bp.route('/edit_game/<int:game_id>', methods=['POST'])
@@ -106,7 +89,7 @@ def edit_game(game_id):
     game_to_edit.game_notes = request.form.get('game_notes', game_to_edit.game_notes)
     db.session.commit()
     flash('Game details updated successfully!', 'success')
-    socketio.emit('data_updated', {'message': 'Game details updated.'})
+    socketio.emit('game_update', {'game': model_to_dict(game_to_edit)})
     return redirect(url_for('.game_management', game_id=game_id))
 
 @gameday_bp.route('/delete_game/<int:game_id>')
@@ -117,7 +100,7 @@ def delete_game(game_id):
         db.session.delete(game_to_delete)
         db.session.commit()
         flash(f'Game vs "{game_to_delete.opponent}" on {game_date_str} removed successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Game deleted.'})
+        socketio.emit('game_delete', {'game_id': game_id})
     else:
         flash('Game not found.', 'danger')
     return redirect(url_for('home', _anchor='games'))
@@ -141,7 +124,7 @@ def update_absences(game_id):
 
     db.session.commit()
     flash('Player availability updated for this game.', 'success')
-    socketio.emit('data_updated', {'message': f'Availability updated for game {game_id}.'})
+    socketio.emit('game_update', {'game': model_to_dict(game)})
     return redirect(url_for('.game_management', game_id=game_id, _anchor='availability'))
 
 # --- Lineup & Rotation API-like routes ---
@@ -159,7 +142,7 @@ def add_lineup():
     )
     db.session.add(new_lineup)
     db.session.commit()
-    socketio.emit('data_updated', {'message': 'New lineup added.'})
+    socketio.emit('lineup_add', {'lineup': model_to_dict(new_lineup)})
     return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id})
 
 @gameday_bp.route('/edit_lineup/<int:lineup_id>', methods=['POST'])
@@ -176,7 +159,7 @@ def edit_lineup(lineup_id):
     lineup_to_edit.lineup_positions = payload['lineup_data']
     lineup_to_edit.associated_game_id = int(payload.get('associated_game_id')) if payload.get('associated_game_id') else None
     db.session.commit()
-    socketio.emit('data_updated', {'message': 'Lineup updated.'})
+    socketio.emit('lineup_update', {'lineup': model_to_dict(lineup_to_edit)})
     return jsonify({'status': 'success', 'message': f'Lineup "{lineup_to_edit.title}" updated successfully!'})
 
 @gameday_bp.route('/delete_lineup/<int:lineup_id>')
@@ -186,7 +169,7 @@ def delete_lineup(lineup_id):
         db.session.delete(lineup_to_delete)
         db.session.commit()
         flash(f'Lineup "{lineup_to_delete.title}" deleted successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Lineup deleted.'})
+        socketio.emit('lineup_delete', {'lineup_id': lineup_id})
     else:
         flash('Lineup not found.', 'danger')
     redirect_url = request.referrer or url_for('home', _anchor='lineups')
@@ -203,33 +186,28 @@ def save_rotation():
     if not title or not isinstance(innings_data, dict):
         return jsonify({'status': 'error', 'message': 'Invalid data provided.'}), 400
 
+    rotation_to_save = None
     if rotation_id:
-        rotation_to_update = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
-        if rotation_to_update:
-            rotation_to_update.title = title
-            rotation_to_update.innings = innings_data
-            rotation_to_update.associated_game_id = associated_game_id
-            message = 'Rotation updated successfully!'
-            new_rotation_id = rotation_id
-        else: 
-            rotation_id = None
-    
-    if not rotation_id:
-        new_rotation = Rotation(
+        rotation_to_save = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
+
+    if rotation_to_save:
+        rotation_to_save.title = title
+        rotation_to_save.innings = innings_data
+        rotation_to_save.associated_game_id = associated_game_id
+        message = 'Rotation updated successfully!'
+    else:
+        rotation_to_save = Rotation(
             title=title, 
             innings=innings_data,
             associated_game_id=associated_game_id, 
             team_id=session['team_id']
         )
-        db.session.add(new_rotation)
-        db.session.commit()
-        new_rotation_id = new_rotation.id
+        db.session.add(rotation_to_save)
         message = 'Rotation saved successfully!'
-    else:
-         db.session.commit()
 
-    socketio.emit('data_updated', {'message': 'Rotation saved/updated.'})
-    return jsonify({'status': 'success', 'message': message, 'new_id': new_rotation_id})
+    db.session.commit()
+    socketio.emit('rotation_save', {'rotation': model_to_dict(rotation_to_save)})
+    return jsonify({'status': 'success', 'message': message, 'new_id': rotation_to_save.id})
 
 @gameday_bp.route('/delete_rotation/<int:rotation_id>')
 def delete_rotation(rotation_id):
@@ -238,7 +216,7 @@ def delete_rotation(rotation_id):
         db.session.delete(rotation_to_delete)
         db.session.commit()
         flash('Rotation deleted successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Rotation deleted.'})
+        socketio.emit('rotation_delete', {'rotation_id': rotation_id})
     else:
         flash('Rotation not found.', 'danger')
     redirect_url = request.referrer or url_for('home', _anchor='rotations')

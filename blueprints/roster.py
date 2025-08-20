@@ -4,6 +4,7 @@ from db import db
 from extensions import socketio
 import json
 from datetime import datetime
+from utils import model_to_dict
 
 roster_bp = Blueprint('roster', __name__, template_folder='templates')
 
@@ -48,20 +49,20 @@ def add_player():
         team_id=session['team_id']
     )
     db.session.add(new_player)
-    db.session.flush() # Flush to get the new player's ID
+    db.session.flush()
 
     for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
         current_order = get_player_order_as_list(user_obj.player_order)
-        if new_player.id not in current_order:
-            current_order.append(new_player.id)
-            user_obj.player_order = current_order
+        if new_player.name not in current_order:
+             current_order.append(new_player.name)
+             user_obj.player_order = current_order
 
     db.session.commit()
     flash(f'Player "{name}" added successfully!', 'success')
-    socketio.emit('data_updated', {'message': f'Player {name} added.'})
+    socketio.emit('roster_add', {'player': model_to_dict(new_player)})
     
     if 'X-Requested-With' in request.headers and request.headers['X-Requested-With'] == 'XMLHttpRequest':
-         return jsonify({'status': 'success'})
+         return jsonify({'status': 'success', 'player': model_to_dict(new_player)})
 
     return redirect(url_for('home', _anchor='roster'))
 
@@ -89,7 +90,7 @@ def update_player_inline(player_id):
     player_to_edit.notes_timestamp = datetime.now()
 
     db.session.commit()
-    socketio.emit('data_updated', {'message': f'Player {new_name} updated.'})
+    socketio.emit('roster_update', {'player': model_to_dict(player_to_edit)})
     return jsonify({'status': 'success', 'message': f'Player "{new_name}" updated successfully!'})
 
 @roster_bp.route('/delete_player/<int:player_id>')
@@ -102,17 +103,12 @@ def delete_player(player_id):
 
         for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
             current_order = get_player_order_as_list(user_obj.player_order)
-            updated_order = [pid for pid in current_order if pid != player_id_to_delete]
+            updated_order = [name for name in current_order if name != player_name]
             user_obj.player_order = updated_order
         
-        if 'player_order' in session:
-            session_order = get_player_order_as_list(session['player_order'])
-            session['player_order'] = [pid for pid in session_order if pid != player_id_to_delete]
-            session.modified = True
-
         db.session.commit()
         flash(f'Player "{player_name}" removed successfully!', 'success')
-        socketio.emit('data_updated', {'message': f'Player {player_name} deleted.'})
+        socketio.emit('roster_delete', {'player_id': player_id_to_delete})
     else:
         flash('Player not found.', 'danger')
     return redirect(url_for('home', _anchor=request.args.get('active_tab', 'roster').lstrip('#')))
@@ -127,9 +123,7 @@ def save_player_order():
         return jsonify({'status': 'error', 'message': 'Invalid order format'}), 400
     
     user.player_order = new_order
-    session['player_order'] = new_order
-    session.modified = True
     db.session.commit()
     
-    socketio.emit('data_updated', {'message': 'Player order saved.'})
+    socketio.emit('player_order_update', {'order': new_order})
     return jsonify({'status': 'success', 'message': 'Player order saved.'})

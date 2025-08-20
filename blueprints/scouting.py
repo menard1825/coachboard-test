@@ -4,21 +4,9 @@ from db import db
 from extensions import socketio
 from datetime import datetime
 import json
+from utils import model_to_dict
 
 scouting_bp = Blueprint('scouting', __name__, template_folder='templates')
-
-def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list, decoding from JSON if necessary."""
-    if not player_order_data:
-        return []
-    if isinstance(player_order_data, list):
-        return player_order_data
-    if isinstance(player_order_data, str):
-        try:
-            return json.loads(player_order_data)
-        except (json.JSONDecodeError, TypeError):
-            return []
-    return [] # default to empty list
 
 @scouting_bp.route('/add_scouted_player', methods=['POST'])
 def add_scouted_player():
@@ -42,10 +30,10 @@ def add_scouted_player():
         )
         db.session.add(new_player)
         db.session.commit()
-        socketio.emit('data_updated', {'message': 'New scouted player added.'})
+        socketio.emit('scouting_update')
         return jsonify({'status': 'success', 'message': f'Player "{new_player.name}" added to {scouted_player_type.replace("_", " ").title()} list.'})
     except Exception as e:
-        print(f"Error adding scouted player: {e}")
+        db.session.rollback()
         return jsonify({'status': 'error', 'message': 'An internal server error occurred.'}), 500
 
 @scouting_bp.route('/delete_scouted_player/<list_type>/<int:player_id>')
@@ -56,7 +44,7 @@ def delete_scouted_player(list_type, player_id):
         db.session.delete(player_to_delete)
         db.session.commit()
         flash(f'Removed {player_name} from the scouting list.', 'success')
-        socketio.emit('data_updated', {'message': f'Scouted player {player_name} removed.'})
+        socketio.emit('scouting_update')
     else:
         flash(f'Could not find the player to remove.', 'warning')
     return redirect(url_for('home', _anchor='scouting_list'))
@@ -68,7 +56,7 @@ def move_scouted_player(from_type, to_type, player_id):
         player_to_move.list_type = to_type
         db.session.commit()
         flash(f'Player "{player_to_move.name}" moved to {to_type.replace("_", " ").title()} list.', 'success')
-        socketio.emit('data_updated', {'message': f'Scouted player {player_to_move.name} moved.'})
+        socketio.emit('scouting_update')
     else:
         flash('Could not move player.', 'danger')
     return redirect(url_for('home', _anchor='scouting_list'))
@@ -89,23 +77,17 @@ def move_scouted_player_to_roster(player_id):
         lesson_focus="", notes_author=session['username'], notes_timestamp=datetime.now(), team_id=session['team_id']
     )
     db.session.add(new_roster_player)
-    db.session.flush() # to get the new player's ID
+    db.session.flush()
     db.session.delete(scouted_player)
     
     for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
         current_order = get_player_order_as_list(user_obj.player_order)
-        if new_roster_player.id not in current_order:
-            current_order.append(new_roster_player.id)
+        if new_roster_player.name not in current_order:
+            current_order.append(new_roster_player.name)
             user_obj.player_order = current_order
-
-    if 'player_order' in session:
-        session_order = get_player_order_as_list(session['player_order'])
-        if new_roster_player.id not in session_order:
-            session_order.append(new_roster_player.id)
-            session['player_order'] = session_order
-            session.modified = True
         
     db.session.commit()
     flash(f'Player "{new_roster_player.name}" moved to Roster. Please assign a number.', 'success')
-    socketio.emit('data_updated', {'message': f'Scouted player {new_roster_player.name} moved to roster.'})
+    socketio.emit('roster_add', {'player': model_to_dict(new_roster_player)})
+    socketio.emit('scouting_update')
     return redirect(url_for('home', _anchor='scouting_list'))

@@ -5,6 +5,7 @@ from models import (
 from db import db
 from extensions import socketio
 from datetime import datetime
+from utils import model_to_dict
 
 team_management_bp = Blueprint('team_management', __name__, template_folder='templates')
 
@@ -38,7 +39,7 @@ def add_note(note_type):
     db.session.add(new_note)
     db.session.commit()
     flash('Note added successfully!', 'success')
-    socketio.emit('data_updated', {'message': 'New note added.'})
+    socketio.emit('notes_update')
     return redirect(url_for('home', _anchor='collaboration'))
 
 @team_management_bp.route('/edit_note', methods=['POST'])
@@ -57,7 +58,7 @@ def edit_note():
         note_to_edit.text = new_text
         db.session.commit()
         flash('Note updated successfully.', 'success')
-        socketio.emit('data_updated', {'message': 'Note updated.'})
+        socketio.emit('notes_update')
     else:
         flash('You do not have permission to edit this note.', 'danger')
     return redirect(url_for('home', _anchor='collaboration'))
@@ -71,7 +72,7 @@ def delete_note(note_type, note_id):
             db.session.delete(note_to_delete)
             db.session.commit()
             flash('Note deleted successfully.', 'success')
-            socketio.emit('data_updated', {'message': 'Note deleted.'})
+            socketio.emit('notes_update')
         else:
             flash('You do not have permission to delete this note.', 'danger')
     else:
@@ -104,7 +105,7 @@ def add_practice_plan():
     db.session.add(new_plan)
     db.session.commit()
     flash('New practice plan created!', 'success')
-    socketio.emit('data_updated', {'message': 'New practice plan created.'})
+    socketio.emit('plans_update')
     return redirect(url_for('home', _anchor='practice_plan'))
 
 @team_management_bp.route('/edit_practice_plan/<int:plan_id>', methods=['POST'])
@@ -127,7 +128,7 @@ def edit_practice_plan(plan_id):
         plan_to_edit.pitching_catching = request.form.get('pitching_catching', plan_to_edit.pitching_catching)
         db.session.commit()
         flash('Practice plan updated successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Practice plan updated.'})
+        socketio.emit('plans_update')
     else:
         flash('Practice plan not found.', 'danger')
     return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
@@ -140,7 +141,7 @@ def delete_practice_plan(plan_id):
         db.session.delete(plan_to_delete)
         db.session.commit()
         flash('Practice plan deleted successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Practice plan deleted.'})
+        socketio.emit('plans_update')
     else:
         flash('Practice plan not found.', 'danger')
     return redirect(url_for('home', _anchor='practice_plan'))
@@ -164,7 +165,8 @@ def update_practice_attendance(plan_id):
     
     db.session.commit()
     flash('Practice attendance updated successfully!', 'success')
-    socketio.emit('data_updated', {'message': f'Attendance updated for plan {plan_id}.'})
+    socketio.emit('plans_update')
+    socketio.emit('stats_update')
     return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
 # --- Practice Task Routes ---
@@ -193,7 +195,7 @@ def add_task_to_plan(plan_id):
     db.session.commit()
     
     flash('Task added to plan.', 'success')
-    socketio.emit('data_updated', {'message': 'Task added to plan.'})
+    socketio.emit('plans_update')
     return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
 @team_management_bp.route('/delete_task/<int:plan_id>/<int:task_id>')
@@ -207,7 +209,7 @@ def delete_task(plan_id, task_id):
         db.session.delete(task_to_delete)
         db.session.commit()
         flash('Task deleted.', 'success')
-        socketio.emit('data_updated', {'message': 'Task deleted from plan.'})
+        socketio.emit('plans_update')
     else: 
         flash('Task not found.', 'danger')
     return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
@@ -228,7 +230,7 @@ def update_task_status(plan_id, task_id):
     
     task.status = new_status
     db.session.commit()
-    socketio.emit('data_updated', {'message': 'Task status updated.'})
+    socketio.emit('plans_update')
     return jsonify({'status': 'success', 'message': 'Task status updated.'})
 
 # --- Signs Routes ---
@@ -241,7 +243,7 @@ def add_sign():
         db.session.add(new_sign)
         db.session.commit()
         flash('Sign added successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'New sign added.'})
+        socketio.emit('signs_update')
     else:
         flash('Sign Name and Indicator are required.', 'danger')
     return redirect(url_for('home', _anchor='signs'))
@@ -259,7 +261,7 @@ def update_sign(sign_id):
         sign_to_update.indicator = sign_indicator
         db.session.commit()
         flash('Sign updated successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Sign updated.'})
+        socketio.emit('signs_update')
     else:
         flash('Sign Name and Indicator are required.', 'danger')
     return redirect(url_for('home', _anchor='signs'))
@@ -271,7 +273,7 @@ def delete_sign(sign_id):
         db.session.delete(sign_to_delete)
         db.session.commit()
         flash('Sign deleted successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Sign deleted.'})
+        socketio.emit('signs_update')
     else:
         flash('Sign not found.', 'danger')
     return redirect(url_for('home', _anchor='signs'))
