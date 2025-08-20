@@ -89,6 +89,7 @@ def get_games():
 @api_bp.route('/collaboration_notes')
 @login_required
 def get_collaboration_notes():
+    db.session.expire_all()
     notes = db.session.query(CollaborationNote).filter_by(team_id=session['team_id']).all()
     return jsonify({
         'team_notes': [model_to_dict(cn) for cn in notes if cn.note_type == 'team_notes'],
