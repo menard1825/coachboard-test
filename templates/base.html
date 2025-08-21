@@ -96,30 +96,13 @@
                 </li>
             {% endfor %}
             <li class="nav-item">
-                <a class="nav-link text-center pt-2 pb-1" data-bs-toggle="offcanvas" href="#offcanvasMoreMenu" role="button">
+                <a class="nav-link text-center pt-2 pb-1" data-bs-toggle="offcanvas" href="#userOffcanvas" role="button">
                     <span class="d-block small">More</span>
                 </a>
             </li>
         </ul>
     </nav>
 
-    <div class="offcanvas offcanvas-bottom" tabindex="-1" id="offcanvasMoreMenu" style="height: auto;">
-        <div class="offcanvas-header">
-            <h5 class="offcanvas-title">More Options</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-        </div>
-        <div class="offcanvas-body">
-            <div class="list-group list-group-flush">
-                {% for tab_key in tab_order[4:] %}
-                     <a class="list-group-item list-group-item-action"
-                        href="{% if request.endpoint == 'home' %}#{{ tab_key }}{% else %}{{ url_for('home') }}#{{ tab_key }}{% endif %}"
-                        {% if request.endpoint == 'home' %}data-bs-toggle="tab" role="tab"{% endif %} data-bs-dismiss="offcanvas">
-                        {{ all_tabs[tab_key] }}
-                    </a>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
     {% endif %}
 
     {# NEW: Off-canvas Menu for Mobile User Actions #}
@@ -130,6 +113,18 @@
       </div>
       <div class="offcanvas-body">
         <div class="list-group list-group-flush">
+            {% if tab_order and all_tabs %}
+            <h6 class="text-muted ps-3 mt-2 mb-1">Navigation</h6>
+            {% for tab_key in tab_order[4:] %}
+                 <a class="list-group-item list-group-item-action"
+                    href="{% if request.endpoint == 'home' %}#{{ tab_key }}{% else %}{{ url_for('home') }}#{{ tab_key }}{% endif %}"
+                    {% if request.endpoint == 'home' %}data-bs-toggle="tab" role="tab"{% endif %} data-bs-dismiss="offcanvas">
+                    {{ all_tabs[tab_key] }}
+                </a>
+            {% endfor %}
+            <hr class="my-2">
+            {% endif %}
+
             {% if session.role in ['Head Coach', 'Super Admin'] %}
             <h6 class="text-muted ps-3 mt-2 mb-1">Admin Tools</h6>
             <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i>User Management</a>
