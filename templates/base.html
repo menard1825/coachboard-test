@@ -86,9 +86,11 @@
     {% if session.logged_in and tab_order and all_tabs %}
     <nav class="fixed-bottom d-lg-none bg-light shadow-lg bottom-nav">
         <ul class="nav nav-tabs justify-content-around w-100" role="tablist">
-            {% for tab_key in tab_order | slice(4) %}
+            {% for tab_key in tab_order[:4] %}
                 <li class="nav-item">
-                    <a class="nav-link text-center pt-2 pb-1" href="{{ url_for('home') }}#{{ tab_key }}">
+                    <a class="nav-link text-center pt-2 pb-1"
+                       href="{% if request.endpoint == 'home' %}#{{ tab_key }}{% else %}{{ url_for('home') }}#{{ tab_key }}{% endif %}"
+                       {% if request.endpoint == 'home' %}data-bs-toggle="tab" role="tab"{% endif %}>
                         <span class="d-block small">{{ all_tabs[tab_key] }}</span>
                     </a>
                 </li>
@@ -108,8 +110,10 @@
         </div>
         <div class="offcanvas-body">
             <div class="list-group list-group-flush">
-                {% for tab_key in tab_order | slice(4, 99) %}
-                     <a class="list-group-item list-group-item-action" href="{{ url_for('home') }}#{{ tab_key }}" data-bs-dismiss="offcanvas">
+                {% for tab_key in tab_order[4:] %}
+                     <a class="list-group-item list-group-item-action"
+                        href="{% if request.endpoint == 'home' %}#{{ tab_key }}{% else %}{{ url_for('home') }}#{{ tab_key }}{% endif %}"
+                        {% if request.endpoint == 'home' %}data-bs-toggle="tab" role="tab"{% endif %} data-bs-dismiss="offcanvas">
                         {{ all_tabs[tab_key] }}
                     </a>
                 {% endfor %}
