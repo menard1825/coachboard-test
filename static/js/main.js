@@ -259,62 +259,62 @@ function initializeApp() {
         }).join('');
     }
 
-    function renderPitchingLog() {
-        const summaryContainer = document.getElementById('pitch-count-summary-container');
-        if (summaryContainer) {
-            const summaryData = AppState.pitch_count_summary || {};
-            const firstPitcher = Object.values(summaryData)[0];
-            const maxDaily = firstPitcher ? firstPitcher.max_daily : 85;
-            let summaryHtml = `<table class="table table-sm table-bordered table-striped"><thead class="table-light"><tr><th>Pitcher</th><th>Daily (${maxDaily} max)</th><th>Weekly</th><th>Status</th></tr></thead><tbody>`;
-            if (Object.keys(summaryData).length > 0) {
-                const sortedPitchers = AppState.player_order.filter(name => summaryData[name]);
-                for (const name of sortedPitchers) {
-                    const counts = summaryData[name];
-                    const dailyPct = Math.min((counts.daily / counts.max_daily * 100), 100);
-                    const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
-                    const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
-                    const statusBadge = counts.status === 'Available' ? `<span class="badge bg-success">Available</span>` : `<span class="badge bg-danger">Resting</span>`;
-                    const nextAvailableText = counts.status === 'Resting' ? `<br><small class="text-muted">Next up: ${counts.next_available}</small>` : '';
-                    summaryHtml += `<tr><td class="align-middle"><strong>${escapeHTML(name)}</strong></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div><small class="text-muted">${counts.pitches_remaining_today} remaining</small></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div></div></td><td class="text-center align-middle">${statusBadge}${nextAvailableText}</td></tr>`;
-                }
-            } else { summaryHtml += `<tr><td colspan="4" class="text-center text-muted">No pitching data.</td></tr>`; }
-            summaryHtml += `</tbody></table>`;
-            summaryContainer.innerHTML = summaryHtml;
-        }
-        const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
-        if (pitcherSelect) pitcherSelect.innerHTML = `<option value="">Select Pitcher</option>` + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
-        
-        const pitchDateInput = document.getElementById('pitch_date');
-        if (pitchDateInput && !pitchDateInput.value) {
-            pitchDateInput.value = new Date().toISOString().split('T')[0];
-        }
-
-        const outingsList = document.getElementById('recorded-outings-list');
-        if (outingsList) {
-            const outings = (AppState.full_data.pitching || []).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
-            outingsList.innerHTML = outings.map((o) => {
-                const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}" data-delete-name="this pitching outing for ${escapeHTML(o.player_name)}"><i class="bi bi-trash"></i></button>`;
-                return `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.player_name)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
-                    <div class="btn-group btn-group-sm">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
-                            data-outing-id="${o.id}"
-                            data-date="${o.date}"
-                            data-pitcher="${escapeHTML(o.player_name)}"
-                            data-opponent="${escapeHTML(o.opponent)}"
-                            data-pitches="${o.pitches}"
-                            data-innings="${o.innings}"
-                            data-outing-type="${o.outing_type}"
-                            data-pitcher-type="${o.pitcher_type}">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        ${deleteButtonHtml}
-                    </div>
-                </li>`
-            }).join('') || `<li class="list-group-item text-muted">No outings recorded.</li>`;
-        }
+function renderPitchingLog() {
+    const summaryContainer = document.getElementById('pitch-count-summary-container');
+    if (summaryContainer) {
+        const summaryData = AppState.pitch_count_summary || {};
+        let summaryHtml = '<div class="table-responsive"><table class="table table-sm table-bordered table-striped"><thead class="table-light"><tr><th>Pitcher</th><th>Daily Max</th><th>Weekly</th><th>Status</th></tr></thead><tbody>';
+        if (Object.keys(summaryData).length > 0) {
+            const sortedPitchers = AppState.player_order.filter(name => summaryData[name]);
+            for (const name of sortedPitchers) {
+                const counts = summaryData[name];
+                const dailyPct = Math.min((counts.daily / counts.max_daily * 100), 100);
+                const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
+                const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
+                const statusBadge = counts.status === 'Available' ? '<span class="badge bg-success">Available</span>' : '<span class="badge bg-danger">Resting</span>';
+                const nextAvailableText = counts.status === 'Resting' ? `<br><small class="text-muted">Next up: ${counts.next_available}</small>` : '';
+                summaryHtml += `<tr><td class="align-middle"><strong>${escapeHTML(name)}</strong></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div><small class="text-muted">${counts.pitches_remaining_today} remaining</small></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div></div></td><td class="text-center align-middle">${statusBadge}${nextAvailableText}</td></tr>`;
+            }
+        } else { summaryHtml += '<tr><td colspan="4" class="text-center text-muted">No pitching data.</td></tr>'; }
+        summaryHtml += '</tbody></table></div>';
+        summaryContainer.innerHTML = summaryHtml;
     }
+    const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
+    if (pitcherSelect) {
+        pitcherSelect.innerHTML = '<option value="">Select Pitcher</option>' + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
+    }
+
+    const pitchDateInput = document.getElementById('pitch_date');
+    if (pitchDateInput && !pitchDateInput.value) {
+        pitchDateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    const outingsList = document.getElementById('recorded-outings-list');
+    if (outingsList) {
+        const outings = (AppState.full_data.pitching || []).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+        outingsList.innerHTML = outings.map((o) => {
+            const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}" data-delete-name="this pitching outing for ${escapeHTML(o.player_name)}"><i class="bi bi-trash"></i></button>`;
+            return `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.player_name)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
+                        data-outing-id="${o.id}"
+                        data-date="${o.date}"
+                        data-pitcher="${escapeHTML(o.player_name)}"
+                        data-opponent="${escapeHTML(o.opponent)}"
+                        data-pitches="${o.pitches}"
+                        data-innings="${o.innings}"
+                        data-outing-type="${o.outing_type}"
+                        data-pitcher-type="${o.pitcher_type}">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    ${deleteButtonHtml}
+                </div>
+            </li>`;
+        }).join('') || '<li class="list-group-item text-muted">No outings recorded.</li>';
+    }
+}
 
     function renderSigns() {
         const container = document.getElementById('signs-list-container');
@@ -706,7 +706,6 @@ function initializeApp() {
             }
             renderRoster();
             renderPlayerDevelopmentList();
-            renderStats();
         });
         socket.on('roster_update', (data) => {
             console.log('roster_update received', data);
@@ -715,7 +714,6 @@ function initializeApp() {
                 AppState.full_data.roster[index] = data.player;
                 renderRoster();
                 renderPlayerDevelopmentList();
-                renderStats();
             }
         });
         socket.on('roster_delete', (data) => {
@@ -727,7 +725,6 @@ function initializeApp() {
             AppState.full_data.roster = AppState.full_data.roster.filter(p => p.id !== data.player_id);
             renderRoster();
             renderPlayerDevelopmentList();
-            renderStats();
         });
         socket.on('player_order_update', (data) => {
             console.log('player_order_update received', data);
