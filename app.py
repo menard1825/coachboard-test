@@ -122,24 +122,14 @@ def create_app():
             'signs': 'Signs', 'stats': 'Stats'
         }
         default_tab_order = list(all_tabs.keys())
-        final_tab_order = []
 
         try:
             user_tab_order = json.loads(user.tab_order or '[]')
             if not isinstance(user_tab_order, list) or not user_tab_order:
                 final_tab_order = default_tab_order
             else:
-                # FIX: Flatten corrupted nested list structure
-                if any(isinstance(i, list) for i in user_tab_order):
-                    flat_list = [item for sublist in user_tab_order for item in sublist if isinstance(item, str)]
-                    seen = set()
-                    final_tab_order = [x for x in flat_list if not (x in seen or seen.add(x))]
-                    user.tab_order = json.dumps(final_tab_order)
-                    db.session.commit()
-                else:
-                    final_tab_order = user_tab_order
-
-                # Ensure all default tabs are present
+                # Ensure all default tabs are present, preserving user order
+                final_tab_order = user_tab_order
                 for tab in default_tab_order:
                     if tab not in final_tab_order:
                         final_tab_order.append(tab)

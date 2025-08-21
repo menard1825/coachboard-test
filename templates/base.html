@@ -118,7 +118,7 @@
             {% for tab_key in tab_order[4:] %}
                  <a class="list-group-item list-group-item-action"
                     href="{% if request.endpoint == 'home' %}#{{ tab_key }}{% else %}{{ url_for('home') }}#{{ tab_key }}{% endif %}"
-                    {% if request.endpoint == 'home' %}data-bs-toggle="tab" role="tab"{% endif %} data-bs-dismiss="offcanvas">
+                    {% if request.endpoint == 'home' %}data-bs-toggle="tab"{% endif %} role="tab" data-bs-dismiss="offcanvas">
                     {{ all_tabs[tab_key] }}
                 </a>
             {% endfor %}
