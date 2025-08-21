@@ -119,7 +119,8 @@ body {
 .tab-content > .tab-pane {
     display: none;
 }
-.tab-content > .active {
+.tab-content > .active,
+.tab-content .tab-pane.show {
     display: block;
 }
 .tab-content {
