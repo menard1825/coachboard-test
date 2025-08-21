@@ -881,6 +881,24 @@ function renderPitchingLog() {
     }
 
     function setupEventListeners() {
+        // Add a listener to all tabs to handle potential DOM issues
+        document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tabEl => {
+            tabEl.addEventListener('shown.bs.tab', event => {
+                const newTabPaneId = event.target.getAttribute('href');
+                document.querySelectorAll('.tab-pane').forEach(pane => {
+                    if (`#${pane.id}` !== newTabPaneId) {
+                        pane.classList.remove('show', 'active');
+                        // Also ensure non-active panes are not displayed
+                        if (!pane.classList.contains('active')) {
+                           pane.style.display = 'none';
+                        }
+                    } else {
+                        pane.style.display = 'block';
+                    }
+                });
+            });
+        });
+
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         
         const addScoutedPlayerForm = document.getElementById('addScoutedPlayerForm');
