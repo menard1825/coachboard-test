@@ -1,6 +1,6 @@
 // static/js/main.js
-document.addEventListener('DOMContentLoaded', () => {
-
+function initializeApp() {
+    // This function will be called to set up the application logic
     window.switchTab = function(tabElement) {
         if (tabElement) {
             const tab = bootstrap.Tab.getOrCreateInstance(tabElement);
@@ -1029,46 +1029,58 @@ document.addEventListener('DOMContentLoaded', () => {
         sortableInstances.lineupOrder = new Sortable(order, { group: 'lineup', animation: 150 });
     }
 
-    function handleTabLogic() {
-        // Listen for Bootstrap's native tab showing event.
-        document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tab => {
-            tab.addEventListener('show.bs.tab', (event) => {
-                // When a tab is about to be shown, update the URL hash.
-                const newTabTarget = event.target.getAttribute('href');
-                if (history.pushState) {
-                    history.pushState(null, null, newTabTarget);
-                } else {
-                    window.location.hash = newTabTarget;
-                }
-            });
-        });
-    
-        // On initial page load, check the URL hash and activate the correct tab.
+    function activateTabFromHash() {
         let hash = window.location.hash || '#roster';
-        let tabToActivate = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
-    
-        // If the hash points to something inside a tab (like an accordion), find its parent tab.
-        if (!tabToActivate) {
-            const targetElement = document.getElementById(hash.substring(1));
-            if (targetElement) {
-                const parentTabPane = targetElement.closest('.tab-pane');
-                if (parentTabPane) {
-                    tabToActivate = document.querySelector(`a[data-bs-toggle="tab"][href="#${parentTabPane.id}"]`);
-                }
-            }
-        }
-        
-        // If still no tab is found, default to the roster.
-        if (!tabToActivate) {
-            tabToActivate = document.querySelector('a[data-bs-toggle="tab"][href="#roster"]');
-        }
+        // We need to find a link that can activate the tab.
+        // The desktop tabs are a reliable source for this.
+        let tabToActivate = document.querySelector(`.desktop-nav-tabs a[href="${hash}"]`);
 
-        // Use Bootstrap's own API to programmatically show the tab.
         if (tabToActivate) {
             const tab = bootstrap.Tab.getOrCreateInstance(tabToActivate);
             tab.show();
+        } else {
+            // Fallback to roster if hash is for a non-existent tab
+            const rosterTab = document.querySelector('.desktop-nav-tabs a[href="#roster"]');
+            if (rosterTab) {
+                const tab = bootstrap.Tab.getOrCreateInstance(rosterTab);
+                tab.show();
+            }
         }
+    }
+
+    function handleTabLogic() {
+        // When a tab is shown (either by click or programmatically), update the URL hash
+        document.querySelectorAll('.desktop-nav-tabs a[data-bs-toggle="tab"]').forEach(tabEl => {
+            tabEl.addEventListener('show.bs.tab', event => {
+                const newHash = event.target.getAttribute('href');
+                if (window.location.hash !== newHash) {
+                    if (history.pushState) {
+                        history.pushState(null, null, newHash);
+                    } else {
+                        window.location.hash = newHash;
+                    }
+                }
+            });
+        });
+
+        // Activate tab on initial load
+        activateTabFromHash();
+
+        // Handle hash changes to switch tabs
+        window.addEventListener('hashchange', activateTabFromHash);
     }
     
     init(); // Start the app
+}
+
+// Initial load
+document.addEventListener('DOMContentLoaded', initializeApp);
+
+// Handle back/forward cache
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        // Page was loaded from the bfcache
+        console.log('Page loaded from bfcache. Re-initializing.');
+        initializeApp();
+    }
 });
