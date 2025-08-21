@@ -127,16 +127,16 @@
 
             {% if session.role in ['Head Coach', 'Super Admin'] %}
             <h6 class="text-muted ps-3 mt-2 mb-1">Admin Tools</h6>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i>User Management</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i>Team Settings</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}" data-bs-dismiss="offcanvas"><i class="bi bi-people-fill"></i>User Management</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}" data-bs-dismiss="offcanvas"><i class="bi bi-gear-fill"></i>Team Settings</a>
             <hr class="my-2">
             {% endif %}
             <h6 class="text-muted ps-3 mt-2 mb-1">Resources</h6>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}"><i class="bi bi-gavel"></i>Pitching Rules</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}" data-bs-dismiss="offcanvas"><i class="bi bi-gavel"></i>Pitching Rules</a>
              <hr class="my-2">
             <h6 class="text-muted ps-3 mt-2 mb-1">Account</h6>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i>Change Password</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i>Logout</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}" data-bs-dismiss="offcanvas"><i class="bi bi-key-fill"></i>Change Password</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}" data-bs-dismiss="offcanvas"><i class="bi bi-box-arrow-right"></i>Logout</a>
         </div>
       </div>
     </div>
