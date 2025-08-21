@@ -88,7 +88,7 @@
         <ul class="nav nav-tabs justify-content-around w-100" role="tablist">
             {% for tab_key in tab_order | slice(4) %}
                 <li class="nav-item">
-                    <a class="nav-link text-center pt-2 pb-1" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
+                    <a class="nav-link text-center pt-2 pb-1" href="{{ url_for('home') }}#{{ tab_key }}">
                         <span class="d-block small">{{ all_tabs[tab_key] }}</span>
                     </a>
                 </li>
@@ -109,7 +109,7 @@
         <div class="offcanvas-body">
             <div class="list-group list-group-flush">
                 {% for tab_key in tab_order | slice(4, 99) %}
-                     <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab" data-bs-dismiss="offcanvas">
+                     <a class="list-group-item list-group-item-action" href="{{ url_for('home') }}#{{ tab_key }}" data-bs-dismiss="offcanvas">
                         {{ all_tabs[tab_key] }}
                     </a>
                 {% endfor %}
