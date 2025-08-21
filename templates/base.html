@@ -83,6 +83,41 @@
     {# This block is intentionally empty here. Child templates like index.html will fill it. #}
     {% endblock %}
 
+    {% if session.logged_in and tab_order and all_tabs %}
+    <nav class="fixed-bottom d-lg-none bg-light shadow-lg bottom-nav">
+        <ul class="nav nav-tabs justify-content-around w-100" role="tablist">
+            {% for tab_key in tab_order | slice(4) %}
+                <li class="nav-item">
+                    <a class="nav-link text-center pt-2 pb-1" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
+                        <span class="d-block small">{{ all_tabs[tab_key] }}</span>
+                    </a>
+                </li>
+            {% endfor %}
+            <li class="nav-item">
+                <a class="nav-link text-center pt-2 pb-1" data-bs-toggle="offcanvas" href="#offcanvasMoreMenu" role="button">
+                    <span class="d-block small">More</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="offcanvas offcanvas-bottom" tabindex="-1" id="offcanvasMoreMenu" style="height: auto;">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title">More Options</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body">
+            <div class="list-group list-group-flush">
+                {% for tab_key in tab_order | slice(4, 99) %}
+                     <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab" data-bs-dismiss="offcanvas">
+                        {{ all_tabs[tab_key] }}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {# NEW: Off-canvas Menu for Mobile User Actions #}
     <div class="offcanvas offcanvas-end" tabindex="-1" id="userOffcanvas" aria-labelledby="userOffcanvasLabel">
       <div class="offcanvas-header">

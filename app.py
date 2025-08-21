@@ -105,28 +105,33 @@ def create_app():
             'current_year_timestamp': datetime.now().timestamp()
         }
 
-    # --- CORE APP ROUTES ---
-    @app.route('/')
-    @login_required
-    def home():
-        user = db.session.query(User).options(joinedload(User.team)).filter_by(username=session['username']).first()
-        if not user or not user.team:
-            flash('User or team not found.', 'danger')
-            return redirect(url_for('auth.login'))
+    @app.context_processor
+    def inject_navigation_tabs():
+        """Injects tab configuration into all templates."""
+        if 'logged_in' not in session:
+            return {}
 
-        all_tabs = {'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
+        user = db.session.query(User).filter_by(username=session['username']).first()
+        if not user:
+            return {}
+
+        all_tabs = {
+            'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineups',
+            'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations',
+            'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan',
+            'signs': 'Signs', 'stats': 'Stats'
+        }
         default_tab_order = list(all_tabs.keys())
-
         final_tab_order = []
+
         try:
             user_tab_order = json.loads(user.tab_order or '[]')
             if not isinstance(user_tab_order, list) or not user_tab_order:
                 final_tab_order = default_tab_order
             else:
-                # FIX: Check for and flatten corrupted nested list structure
+                # FIX: Flatten corrupted nested list structure
                 if any(isinstance(i, list) for i in user_tab_order):
                     flat_list = [item for sublist in user_tab_order for item in sublist if isinstance(item, str)]
-                    # Deduplicate while preserving order
                     seen = set()
                     final_tab_order = [x for x in flat_list if not (x in seen or seen.add(x))]
                     user.tab_order = json.dumps(final_tab_order)
@@ -141,10 +146,18 @@ def create_app():
         except (json.JSONDecodeError, TypeError):
             final_tab_order = default_tab_order
 
-        response = make_response(render_template('index.html',
-                               session=session,
-                               tab_order=final_tab_order,
-                               all_tabs=all_tabs))
+        return {'all_tabs': all_tabs, 'tab_order': final_tab_order}
+
+    # --- CORE APP ROUTES ---
+    @app.route('/')
+    @login_required
+    def home():
+        user = db.session.query(User).options(joinedload(User.team)).filter_by(username=session['username']).first()
+        if not user or not user.team:
+            flash('User or team not found.', 'danger')
+            return redirect(url_for('auth.login'))
+
+        response = make_response(render_template('index.html', session=session))
 
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
