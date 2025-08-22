@@ -84,20 +84,35 @@
     {% endblock %}
 
     {% if session.logged_in and tab_order and all_tabs %}
-    <nav class="fixed-bottom d-lg-none bg-light shadow-lg bottom-nav">
-        <ul class="nav nav-tabs justify-content-around w-100" role="tablist">
+    {% set tab_icons = {
+        'roster': 'bi-people-fill',
+        'games': 'bi-calendar-event',
+        'lineups': 'bi-list-ol',
+        'rotations': 'bi-arrow-repeat',
+        'practice_plans': 'bi-clipboard-check-fill',
+        'pitching': 'bi-bullseye',
+        'scouting': 'bi-binoculars-fill',
+        'collaboration': 'bi-chat-dots-fill',
+        'player_development': 'bi-graph-up-arrow',
+        'signs': 'bi-signpost-split-fill',
+        'stats': 'bi-bar-chart-line-fill'
+    } %}
+    <nav class="fixed-bottom d-lg-none shadow-lg bottom-nav">
+        <ul class="nav justify-content-around w-100" role="tablist">
             {% for tab_key in tab_order[:4] %}
-                <li class="nav-item">
-                    <a class="nav-link text-center pt-2 pb-1"
+                <li class="nav-item flex-fill">
+                    <a class="nav-link"
                        href="{% if request.endpoint == 'home' %}#{{ tab_key }}{% else %}{{ url_for('home') }}#{{ tab_key }}{% endif %}"
                        {% if request.endpoint == 'home' %}data-bs-toggle="tab" role="tab"{% endif %}>
-                        <span class="d-block small">{{ all_tabs[tab_key] }}</span>
+                        <i class="bi {{ tab_icons.get(tab_key, 'bi-app-indicator') }}"></i>
+                        <span class="bottom-nav-label">{{ all_tabs[tab_key] }}</span>
                     </a>
                 </li>
             {% endfor %}
-            <li class="nav-item">
-                <a class="nav-link text-center pt-2 pb-1" data-bs-toggle="offcanvas" href="#userOffcanvas" role="button">
-                    <span class="d-block small">More</span>
+            <li class="nav-item flex-fill">
+                <a class="nav-link" data-bs-toggle="offcanvas" href="#userOffcanvas" role="button">
+                    <i class="bi bi-three-dots"></i>
+                    <span class="bottom-nav-label">More</span>
                 </a>
             </li>
         </ul>
@@ -114,29 +129,30 @@
       <div class="offcanvas-body">
         <div class="list-group list-group-flush">
             {% if tab_order and all_tabs %}
-            <h6 class="text-muted ps-3 mt-2 mb-1">Navigation</h6>
+            <h6 class="text-muted ps-3 mt-2 mb-1 offcanvas-heading">Navigation</h6>
             {% for tab_key in tab_order[4:] %}
                  <a class="list-group-item list-group-item-action"
                     href="{% if request.endpoint == 'home' %}#{{ tab_key }}{% else %}{{ url_for('home') }}#{{ tab_key }}{% endif %}"
                     {% if request.endpoint == 'home' %}data-bs-toggle="tab"{% endif %} role="tab" data-bs-dismiss="offcanvas">
-                    {{ all_tabs[tab_key] }}
+                    <i class="bi {{ tab_icons.get(tab_key, 'bi-app-indicator') }} me-3"></i>
+                    <span>{{ all_tabs[tab_key] }}</span>
                 </a>
             {% endfor %}
             <hr class="my-2">
             {% endif %}
 
             {% if session.role in ['Head Coach', 'Super Admin'] %}
-            <h6 class="text-muted ps-3 mt-2 mb-1">Admin Tools</h6>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}" data-bs-dismiss="offcanvas"><i class="bi bi-people-fill"></i>User Management</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}" data-bs-dismiss="offcanvas"><i class="bi bi-gear-fill"></i>Team Settings</a>
+            <h6 class="text-muted ps-3 mt-2 mb-1 offcanvas-heading">Admin Tools</h6>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}" data-bs-dismiss="offcanvas"><i class="bi bi-people-fill me-3"></i><span>User Management</span></a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}" data-bs-dismiss="offcanvas"><i class="bi bi-gear-fill me-3"></i><span>Team Settings</span></a>
             <hr class="my-2">
             {% endif %}
-            <h6 class="text-muted ps-3 mt-2 mb-1">Resources</h6>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}" data-bs-dismiss="offcanvas"><i class="bi bi-gavel"></i>Pitching Rules</a>
+            <h6 class="text-muted ps-3 mt-2 mb-1 offcanvas-heading">Resources</h6>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}" data-bs-dismiss="offcanvas"><i class="bi bi-gavel me-3"></i><span>Pitching Rules</span></a>
              <hr class="my-2">
-            <h6 class="text-muted ps-3 mt-2 mb-1">Account</h6>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}" data-bs-dismiss="offcanvas"><i class="bi bi-key-fill"></i>Change Password</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}" data-bs-dismiss="offcanvas"><i class="bi bi-box-arrow-right"></i>Logout</a>
+            <h6 class="text-muted ps-3 mt-2 mb-1 offcanvas-heading">Account</h6>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}" data-bs-dismiss="offcanvas"><i class="bi bi-key-fill me-3"></i><span>Change Password</span></a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}" data-bs-dismiss="offcanvas"><i class="bi bi-box-arrow-right me-3"></i><span>Logout</span></a>
         </div>
       </div>
     </div>

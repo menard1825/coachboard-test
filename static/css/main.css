@@ -256,8 +256,8 @@ body {
         flex-grow: 1;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        /* Padding to clear the new, shorter bottom nav */
-        padding-bottom: calc(50px + env(safe-area-inset-bottom) + 1rem);
+        /* Padding to clear the new, taller bottom nav */
+        padding-bottom: calc(65px + env(safe-area-inset-bottom) + 1rem);
         width: 100%;
     }
 
@@ -268,16 +268,109 @@ body {
     
     /* --- NEW: Mobile Bottom Navigation Bar --- */
     .bottom-nav {
-        height: calc(50px + env(safe-area-inset-bottom));
+        background-color: var(--card-bg);
+        border-top: 1px solid var(--card-border-color);
+        height: calc(60px + env(safe-area-inset-bottom));
+        padding: 0 0.5rem;
         padding-bottom: env(safe-area-inset-bottom);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
     }
+
+    .bottom-nav .nav {
+        height: 100%;
+    }
+
     .bottom-nav .nav-link {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
         color: var(--text-muted);
-        font-weight: 500;
-        padding: .5rem;
-        flex-grow: 1;
+        height: 100%;
+        padding-top: 0.5rem;
+        padding-bottom: 0.25rem;
+        border-radius: 8px;
+        transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
     }
+
+    .bottom-nav .nav-link i {
+        font-size: 1.5rem; /* Larger icons */
+        line-height: 1;
+        transition: transform 0.15s ease-in-out;
+    }
+
+    .bottom-nav .bottom-nav-label {
+        font-size: 0.7rem;
+        margin-top: 4px;
+        font-weight: 500;
+    }
+
     .bottom-nav .nav-link.active {
         color: var(--primary-color);
+    }
+
+    .bottom-nav .nav-link.active i {
+        transform: translateY(-2px); /* Give active icon a little "pop" */
+    }
+
+    .bottom-nav .nav-link:not(.active):hover {
+        color: var(--primary-color);
+    }
+
+    /* --- Off-canvas Menu --- */
+    .offcanvas {
+        --bs-offcanvas-bg: var(--body-bg);
+        border-left: 1px solid var(--card-border-color);
+        box-shadow: 0 0 20px rgba(0,0,0,0.15);
+    }
+    .offcanvas-header {
+        border-bottom: 1px solid var(--card-border-color);
+        padding: 1rem 1.25rem;
+    }
+    .offcanvas-title {
+        font-weight: 600;
+    }
+    .offcanvas-body {
+        padding: 0.5rem 0;
+    }
+    .offcanvas-body .list-group-item {
+        background-color: transparent;
+        border: none;
+        padding: 0.85rem 1.25rem;
+        font-weight: 500;
+        color: #495057;
+        display: flex;
+        align-items: center;
+        border-radius: 0;
+        transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    }
+    .offcanvas-body .list-group-item i {
+        font-size: 1.2rem;
+        color: var(--text-muted);
+        width: 28px; /* Ensure alignment */
+        text-align: center;
+        transition: color 0.15s ease-in-out;
+    }
+    .offcanvas-body .list-group-item-action:hover,
+    .offcanvas-body .list-group-item-action:focus {
+        background-color: #f0f0f0;
+        color: var(--primary-color);
+    }
+    .offcanvas-body .list-group-item-action:hover i,
+    .offcanvas-body .list-group-item-action:focus i {
+        color: var(--primary-color);
+    }
+    .offcanvas-heading {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        padding: 1rem 1.25rem 0.5rem;
+    }
+    .offcanvas-body hr.my-2 {
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.5rem !important;
+        border-top: 1px solid var(--card-border-color);
     }
 }
