@@ -414,5 +414,10 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    const PITCHING_LOGS = JSON.parse('{{ pitching_logs_json|safe }}');
+    const AVAILABLE_PITCHERS = JSON.parse('{{ available_pitchers_json|safe }}');
+    const PITCH_COUNT_SUMMARY = JSON.parse('{{ pitch_count_summary_json|safe }}');
+</script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}

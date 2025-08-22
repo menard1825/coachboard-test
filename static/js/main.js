@@ -262,7 +262,7 @@ function initializeApp() {
 function renderPitchingLog() {
     const summaryContainer = document.getElementById('pitch-count-summary-container');
     if (summaryContainer) {
-        const summaryData = AppState.pitch_count_summary || {};
+        const summaryData = PITCH_COUNT_SUMMARY || {};
         let summaryHtml = '<div class="table-responsive"><table class="table table-sm table-bordered table-striped"><thead class="table-light"><tr><th>Pitcher</th><th>Daily Max</th><th>Weekly</th><th>Status</th></tr></thead><tbody>';
         if (Object.keys(summaryData).length > 0) {
             const sortedPitchers = AppState.player_order.filter(name => summaryData[name]);
@@ -281,7 +281,7 @@ function renderPitchingLog() {
     }
     const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
     if (pitcherSelect) {
-        pitcherSelect.innerHTML = '<option value="">Select Pitcher</option>' + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
+        pitcherSelect.innerHTML = '<option value="">Select Pitcher</option>' + AVAILABLE_PITCHERS.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
     }
 
     const pitchDateInput = document.getElementById('pitch_date');
@@ -291,7 +291,7 @@ function renderPitchingLog() {
 
     const outingsList = document.getElementById('recorded-outings-list');
     if (outingsList) {
-        const outings = (AppState.full_data.pitching || []).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+        const outings = (PITCHING_LOGS || []).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
         outingsList.innerHTML = outings.map((o) => {
             const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}" data-delete-name="this pitching outing for ${escapeHTML(o.player_name)}"><i class="bi bi-trash"></i></button>`;
             return `
@@ -605,7 +605,6 @@ function renderPitchingLog() {
             session_data: '/api/session_data',
             roster: '/api/roster',
             lineups: '/api/lineups',
-            pitching_data: '/api/pitching_data',
             scouting_list: '/api/scouting_list',
             rotations: '/api/rotations',
             games: '/api/games',
@@ -627,17 +626,16 @@ function renderPitchingLog() {
         const dataKeys = Object.keys(endpoints);
 
         const sessionData = results[dataKeys.indexOf('session_data')];
-        const pitchingData = results[dataKeys.indexOf('pitching_data')];
         const statsData = results[dataKeys.indexOf('stats')];
 
         Object.assign(AppState, {
             session: sessionData.session,
             player_order: sessionData.player_order,
-            pitch_count_summary: pitchingData.pitch_count_summary,
+            pitch_count_summary: PITCH_COUNT_SUMMARY,
             full_data: {
                 roster: results[dataKeys.indexOf('roster')],
                 lineups: results[dataKeys.indexOf('lineups')],
-                pitching: pitchingData.pitching,
+                pitching: PITCHING_LOGS,
                 scouting_list: results[dataKeys.indexOf('scouting_list')],
                 rotations: results[dataKeys.indexOf('rotations')],
                 games: results[dataKeys.indexOf('games')],

@@ -147,7 +147,28 @@ def create_app():
             flash('User or team not found.', 'danger')
             return redirect(url_for('auth.login'))
 
-        response = make_response(render_template('index.html', session=session))
+        team_id = user.team_id
+
+        # Fetch data
+        pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).order_by(PitchingOuting.date.desc()).all()
+        available_pitchers_db = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
+
+        # Serialize data
+        pitching_logs_json = json.dumps([pitching_outing_to_dict(po) for po in pitching_outings_db])
+        available_pitchers_json = json.dumps([model_to_dict(p) for p in available_pitchers_db])
+
+        # Calculate pitch count summary
+        rules = get_pitching_rules_for_team(user.team)
+        pitch_count_summary = calculate_pitch_count_summary(available_pitchers_db, pitching_outings_db, rules)
+        pitch_count_summary_json = json.dumps(pitch_count_summary)
+
+        response = make_response(render_template(
+            'index.html',
+            session=session,
+            pitching_logs_json=pitching_logs_json,
+            available_pitchers_json=available_pitchers_json,
+            pitch_count_summary_json=pitch_count_summary_json
+        ))
 
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
