@@ -263,9 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const summaryContainer = document.getElementById('pitch-count-summary-container');
         if (summaryContainer) {
             const summaryData = AppState.pitch_count_summary || {};
-            const firstPitcher = Object.values(summaryData)[0];
-            const maxDaily = firstPitcher ? firstPitcher.max_daily : 85;
-            let summaryHtml = `<table class="table table-sm table-bordered table-striped"><thead class="table-light"><tr><th>Pitcher</th><th>Daily (${maxDaily} max)</th><th>Weekly</th><th>Status</th></tr></thead><tbody>`;
+            let summaryHtml = '<div class="table-responsive"><table class="table table-sm table-bordered table-striped"><thead class="table-light"><tr><th>Pitcher</th><th>Daily Max</th><th>Weekly</th><th>Status</th></tr></thead><tbody>';
             if (Object.keys(summaryData).length > 0) {
                 const sortedPitchers = AppState.player_order.filter(name => summaryData[name]);
                 for (const name of sortedPitchers) {
@@ -273,17 +271,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     const dailyPct = Math.min((counts.daily / counts.max_daily * 100), 100);
                     const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
                     const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
-                    const statusBadge = counts.status === 'Available' ? `<span class="badge bg-success">Available</span>` : `<span class="badge bg-danger">Resting</span>`;
+                    const statusBadge = counts.status === 'Available' ? '<span class="badge bg-success">Available</span>' : '<span class="badge bg-danger">Resting</span>';
                     const nextAvailableText = counts.status === 'Resting' ? `<br><small class="text-muted">Next up: ${counts.next_available}</small>` : '';
                     summaryHtml += `<tr><td class="align-middle"><strong>${escapeHTML(name)}</strong></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div><small class="text-muted">${counts.pitches_remaining_today} remaining</small></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div></div></td><td class="text-center align-middle">${statusBadge}${nextAvailableText}</td></tr>`;
                 }
-            } else { summaryHtml += `<tr><td colspan="4" class="text-center text-muted">No pitching data.</td></tr>`; }
-            summaryHtml += `</tbody></table>`;
+            } else { summaryHtml += '<tr><td colspan="4" class="text-center text-muted">No pitching data.</td></tr>'; }
+            summaryHtml += '</tbody></table></div>';
             summaryContainer.innerHTML = summaryHtml;
         }
         const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
-        if (pitcherSelect) pitcherSelect.innerHTML = `<option value="">Select Pitcher</option>` + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
-        
+        if (pitcherSelect) {
+            pitcherSelect.innerHTML = '<option value="">Select Pitcher</option>' + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
+        }
+
         const pitchDateInput = document.getElementById('pitch_date');
         if (pitchDateInput && !pitchDateInput.value) {
             pitchDateInput.value = new Date().toISOString().split('T')[0];
@@ -291,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const outingsList = document.getElementById('recorded-outings-list');
         if (outingsList) {
-            const outings = (AppState.full_data.pitching || []).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
+            const outings = (AppState.full_data.pitching || []).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
             outingsList.innerHTML = outings.map((o) => {
                 const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}" data-delete-name="this pitching outing for ${escapeHTML(o.player_name)}"><i class="bi bi-trash"></i></button>`;
                 return `
@@ -311,8 +311,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                         ${deleteButtonHtml}
                     </div>
-                </li>`
-            }).join('') || `<li class="list-group-item text-muted">No outings recorded.</li>`;
+                </li>`;
+            }).join('') || '<li class="list-group-item text-muted">No outings recorded.</li>';
         }
     }
 
@@ -600,17 +600,66 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- INITIALIZATION ---
+    async function fetchData() {
+        const endpoints = {
+            session_data: '/api/session_data',
+            roster: '/api/roster',
+            lineups: '/api/lineups',
+            pitching_data: '/api/pitching_data',
+            scouting_list: '/api/scouting_list',
+            rotations: '/api/rotations',
+            games: '/api/games',
+            collaboration_notes: '/api/collaboration_notes',
+            practice_plans: '/api/practice_plans',
+            player_development: '/api/player_development',
+            signs: '/api/signs',
+            stats: '/api/stats'
+        };
+
+        const requests = Object.entries(endpoints).map(([key, url]) =>
+            fetch(url).then(res => {
+                if (!res.ok) throw new Error(`Failed to fetch ${key}`);
+                return res.json();
+            })
+        );
+
+        const results = await Promise.all(requests);
+        const dataKeys = Object.keys(endpoints);
+
+        const sessionData = results[dataKeys.indexOf('session_data')];
+        const statsData = results[dataKeys.indexOf('stats')];
+        const pitchingData = results[dataKeys.indexOf('pitching_data')];
+
+        Object.assign(AppState, {
+            session: sessionData.session,
+            player_order: sessionData.player_order,
+            pitch_count_summary: pitchingData.pitch_count_summary,
+            full_data: {
+                roster: results[dataKeys.indexOf('roster')],
+                lineups: results[dataKeys.indexOf('lineups')],
+                pitching: pitchingData.pitching,
+                scouting_list: results[dataKeys.indexOf('scouting_list')],
+                rotations: results[dataKeys.indexOf('rotations')],
+                games: results[dataKeys.indexOf('games')],
+                collaboration_notes: results[dataKeys.indexOf('collaboration_notes')],
+                practice_plans: results[dataKeys.indexOf('practice_plans')],
+                player_development: results[dataKeys.indexOf('player_development')],
+                signs: results[dataKeys.indexOf('signs')],
+                cumulative_pitching_data: statsData.cumulative_pitching_data,
+                cumulative_position_data: statsData.cumulative_position_data,
+                attendance_stats: statsData.attendance_stats
+            }
+        });
+    }
+
     async function init() {
         const mainContent = document.getElementById('mainTabContent');
         
         try {
-            const response = await fetch('/get_app_data');
-            if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
-            const serverData = await response.json();
-            Object.assign(AppState, serverData);
+            await fetchData();
         } catch (error) {
             console.error("Init Error:", error);
-            if(mainContent) mainContent.innerHTML = `<div class="alert alert-danger">Could not load app data. Please refresh the page.</div>`;
+            if(mainContent) mainContent.innerHTML = `<div class="alert alert-danger">Could not load app data. Please refresh the page. Error: ${error.message}</div>`;
             return;
         }
         
@@ -622,14 +671,186 @@ document.addEventListener('DOMContentLoaded', () => {
         handleTabLogic();
         
         const socket = io();
-        socket.on('data_updated', async (msg) => {
-            console.log('Update received:', msg.message);
-            try {
-                const response = await fetch('/get_app_data');
-                const serverData = await response.json();
-                Object.assign(AppState, serverData);
-                renderAll();
-            } catch (error) { console.error("Error refreshing data:", error); }
+
+        // --- Data Fetch Helpers for Sockets ---
+        const fetchPitchingData = async () => {
+            const data = await fetch('/api/pitching_data').then(res => res.json());
+            AppState.full_data.pitching = data.pitching;
+            AppState.pitch_count_summary = data.pitch_count_summary;
+        };
+        const fetchScoutingData = async () => {
+            AppState.full_data.scouting_list = await fetch('/api/scouting_list').then(res => res.json());
+        };
+        const fetchNotesData = async () => {
+            AppState.full_data.collaboration_notes = await fetch('/api/collaboration_notes').then(res => res.json());
+        };
+        const fetchPlansData = async () => {
+            AppState.full_data.practice_plans = await fetch('/api/practice_plans').then(res => res.json());
+        };
+        const fetchSignsData = async () => {
+            AppState.full_data.signs = await fetch('/api/signs').then(res => res.json());
+        };
+        const fetchStatsData = async () => {
+            const statsData = await fetch('/api/stats').then(res => res.json());
+            AppState.full_data.cumulative_pitching_data = statsData.cumulative_pitching_data;
+            AppState.full_data.cumulative_position_data = statsData.cumulative_position_data;
+            AppState.full_data.attendance_stats = statsData.attendance_stats;
+        };
+
+        // --- Roster Sockets ---
+        socket.on('roster_add', (data) => {
+            console.log('roster_add received', data);
+            AppState.full_data.roster.push(data.player);
+            if (!AppState.player_order.includes(data.player.name)) {
+                AppState.player_order.push(data.player.name);
+            }
+            renderRoster();
+            renderPlayerDevelopmentList();
+        });
+        socket.on('roster_update', (data) => {
+            console.log('roster_update received', data);
+            const index = AppState.full_data.roster.findIndex(p => p.id === data.player.id);
+            if (index > -1) {
+                AppState.full_data.roster[index] = data.player;
+                renderRoster();
+                renderPlayerDevelopmentList();
+            }
+        });
+        socket.on('roster_delete', (data) => {
+            console.log('roster_delete received', data);
+            const playerToDelete = AppState.full_data.roster.find(p => p.id === data.player_id);
+            if(playerToDelete) {
+                AppState.player_order = AppState.player_order.filter(name => name !== playerToDelete.name);
+            }
+            AppState.full_data.roster = AppState.full_data.roster.filter(p => p.id !== data.player_id);
+            renderRoster();
+            renderPlayerDevelopmentList();
+        });
+        socket.on('player_order_update', (data) => {
+            console.log('player_order_update received', data);
+            AppState.player_order = data.order;
+            renderRoster();
+            renderPlayerDevelopmentList();
+        });
+
+        // --- Game, Lineup, Rotation Sockets ---
+        socket.on('game_add', (data) => {
+            console.log('game_add received', data);
+            AppState.full_data.games.push(data.game);
+            renderGames();
+        });
+        socket.on('game_update', (data) => {
+            console.log('game_update received', data);
+            const index = AppState.full_data.games.findIndex(g => g.id === data.game.id);
+            if (index > -1) AppState.full_data.games[index] = data.game;
+            renderGames();
+        });
+        socket.on('game_delete', (data) => {
+            console.log('game_delete received', data);
+            AppState.full_data.games = AppState.full_data.games.filter(g => g.id !== data.game_id);
+            renderGames();
+        });
+        socket.on('lineup_add', (data) => {
+            console.log('lineup_add received', data);
+            AppState.full_data.lineups.push(data.lineup);
+            renderLineups();
+            renderGames();
+        });
+        socket.on('lineup_update', (data) => {
+            console.log('lineup_update received', data);
+            const index = AppState.full_data.lineups.findIndex(l => l.id === data.lineup.id);
+            if (index > -1) AppState.full_data.lineups[index] = data.lineup;
+            else AppState.full_data.lineups.push(data.lineup);
+            renderLineups();
+            renderGames();
+        });
+        socket.on('lineup_delete', (data) => {
+            console.log('lineup_delete received', data);
+            AppState.full_data.lineups = AppState.full_data.lineups.filter(l => l.id !== data.lineup_id);
+            renderLineups();
+            renderGames();
+        });
+        socket.on('rotation_save', (data) => {
+            console.log('rotation_save received', data);
+            const index = AppState.full_data.rotations.findIndex(r => r.id === data.rotation.id);
+            if (index > -1) AppState.full_data.rotations[index] = data.rotation;
+            else AppState.full_data.rotations.push(data.rotation);
+            renderRotations();
+            renderGames();
+        });
+        socket.on('rotation_delete', (data) => {
+            console.log('rotation_delete received', data);
+            AppState.full_data.rotations = AppState.full_data.rotations.filter(r => r.id !== data.rotation_id);
+            renderRotations();
+            renderGames();
+        });
+
+        // --- Player Development Sockets ---
+        socket.on('dev_focus_add', (data) => {
+            console.log('dev_focus_add received', data);
+            const { player_name, focus } = data;
+            if (!AppState.full_data.player_development[player_name]) {
+                AppState.full_data.player_development[player_name] = [];
+            }
+            AppState.full_data.player_development[player_name].push(focus);
+            renderPlayerDevelopmentList();
+            if (AppState.active_player_dev_name === player_name) {
+                renderPlayerDevelopmentDetails();
+            }
+        });
+        socket.on('dev_focus_update', (data) => {
+            console.log('dev_focus_update received', data);
+            const { player_name, focus } = data;
+            const playerDevList = AppState.full_data.player_development[player_name];
+            if (playerDevList) {
+                const index = playerDevList.findIndex(f => f.id === focus.id);
+                if (index > -1) playerDevList[index] = focus;
+                renderPlayerDevelopmentList();
+                if (AppState.active_player_dev_name === player_name) renderPlayerDevelopmentDetails();
+            }
+        });
+        socket.on('dev_focus_delete', (data) => {
+            console.log('dev_focus_delete received', data);
+            const { player_name, focus_id } = data;
+            const playerDevList = AppState.full_data.player_development[player_name];
+            if (playerDevList) {
+                AppState.full_data.player_development[player_name] = playerDevList.filter(f => f.id !== focus_id);
+                renderPlayerDevelopmentList();
+                if (AppState.active_player_dev_name === player_name) renderPlayerDevelopmentDetails();
+            }
+        });
+
+        // --- Other Data Sockets ---
+        socket.on('pitching_update', async () => {
+            console.log('pitching_update received');
+            await fetchPitchingData();
+            renderPitchingLog();
+            renderStats();
+        });
+        socket.on('scouting_update', async () => {
+            console.log('scouting_update received');
+            await fetchScoutingData();
+            renderScoutingList();
+        });
+        socket.on('notes_update', async () => {
+            console.log('notes_update received');
+            await fetchNotesData();
+            renderCollaborationNotes();
+        });
+        socket.on('plans_update', async () => {
+            console.log('plans_update received');
+            await fetchPlansData();
+            renderPracticePlans();
+        });
+        socket.on('signs_update', async () => {
+            console.log('signs_update received');
+            await fetchSignsData();
+            renderSigns();
+        });
+        socket.on('stats_update', async () => {
+            console.log('stats_update received');
+            await fetchStatsData();
+            renderStats();
         });
     }
 
