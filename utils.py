@@ -2,6 +2,28 @@ import json
 from datetime import date, timedelta, datetime
 from models import Player, PitchingOuting
 
+def model_to_dict(obj):
+    """Converts a SQLAlchemy model instance into a dictionary."""
+    if obj is None:
+        return None
+
+    d = {}
+    for column in obj.__table__.columns:
+        val = getattr(obj, column.name)
+        if isinstance(val, (datetime, date)):
+            # Format dates and datetimes as 'YYYY-MM-DD'
+            d[column.name] = val.strftime('%Y-%m-%d')
+        else:
+            d[column.name] = val
+    return d
+
+def pitching_outing_to_dict(outing):
+    if not outing:
+        return None
+    d = model_to_dict(outing)
+    d['player_name'] = outing.player.name if outing.player else "Unknown"
+    return d
+
 # This dictionary was originally in app.py
 # MODIFIED: Expanded to include a full range of age groups for USSSA rules.
 PITCHING_RULES = {
