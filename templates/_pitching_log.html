@@ -15,9 +15,7 @@
                            <select name="player_id" class="form-select" required id="gameday-player-select">
                                <option value="">Select Player...</option>
                                {% for p in roster %}
-                                   {% if p['pitcher_role'] != 'Not a Pitcher' %}
                                    <option value="{{ p['id'] }}">{{ p['name'] }}</option>
-                                   {% endif %}
                                {% endfor %}
                            </select>
                         </div>
@@ -72,7 +70,6 @@
                     <table class="table table-sm table-bordered">
                         <tbody>
                         {% for p in roster %}
-                            {% if p['pitcher_role'] != 'Not a Pitcher' %}
                             <tr>
                                 <td><strong>{{ p['name'] }}</strong></td>
                                 <td>
@@ -85,7 +82,6 @@
                                 </td>
                                 <td>Next Available: {{ summary.next_available }}</td>
                             </tr>
-                            {% endif %}
                         {% endfor %}
                         </tbody>
                     </table>
