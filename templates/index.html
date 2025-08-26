@@ -252,6 +252,19 @@
             </div>
         </div>
     </div>
+
+    <div class="tab-pane fade" id="more" role="tabpanel" aria-labelledby="more-tab">
+        <div class="list-group">
+            <h5 class="text-muted ps-3 mt-2 mb-2">More Sections</h5>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#lineups" role="tab">Lineups</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#rotations" role="tab">Rotations</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#scouting_list" role="tab">Scouting List</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#signs" role="tab">Signs</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#stats" role="tab">Stats</a>
+            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#collaboration" role="tab">Collaboration</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}">Pitching Rules</a>
+        </div>
+    </div>
 </div>
 
 <div class="modal fade" id="addPlayerModal" tabindex="-1">
@@ -393,21 +406,39 @@
 {# This block overrides the empty `bottom_nav` block in base.html                          #}
 {# ========================================================================================= #}
 {% block bottom_nav %}
-<nav class="fixed-bottom d-lg-none bottom-nav-scrollable shadow-lg">
-    <ul class="nav nav-tabs flex-nowrap" role="tablist">
-        {% for tab_key in tab_order %}
-            <li class="nav-item">
-                {% if tab_key == 'pitching' %}
-                    <a class="nav-link" href="{{ url_for('pitching.pitching_page') }}">
-                        <span>{{ all_tabs[tab_key] }}</span>
-                    </a>
-                {% else %}
-                    <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
-                        <span>{{ all_tabs[tab_key] }}</span>
-                    </a>
-                {% endif %}
-            </li>
-        {% endfor %}
+<nav class="fixed-bottom d-lg-none bottom-nav-fixed shadow-lg">
+    <ul class="nav nav-tabs" role="tablist">
+        {# Roster is active by default, matching the JS logic #}
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#roster" role="tab" aria-selected="true">
+                <i class="bi bi-people"></i>
+                <span>Roster</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#games" role="tab">
+                <i class="bi bi-calendar4-event"></i>
+                <span>Games</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#practice_plan" role="tab">
+                <i class="bi bi-clipboard-check"></i>
+                <span>Practice</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#player_development" role="tab">
+                <i class="bi bi-graph-up-arrow"></i>
+                <span>Development</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#more" role="tab">
+                <i class="bi bi-three-dots"></i>
+                <span>More</span>
+            </a>
+        </li>
     </ul>
 </nav>
 {% endblock %}

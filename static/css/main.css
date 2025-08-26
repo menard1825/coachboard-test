@@ -298,40 +298,46 @@ body {
         overflow: hidden;
     }
     
-    /* --- NEW: Mobile Scrollable Bottom Navigation Bar --- */
-    .bottom-nav-scrollable {
+    /* --- NEW: Mobile Fixed Bottom Navigation Bar --- */
+    .bottom-nav-fixed {
         background-color: var(--card-bg);
         border-top: 1px solid var(--card-border-color);
         height: calc(60px + env(safe-area-inset-bottom));
         padding-bottom: env(safe-area-inset-bottom);
     }
-    .bottom-nav-scrollable .nav-tabs {
+    .bottom-nav-fixed .nav-tabs {
+        display: flex;
+        justify-content: space-around;
+        height: 100%;
         border-bottom: none;
-        overflow-x: auto;
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
     }
-    .bottom-nav-scrollable .nav-tabs::-webkit-scrollbar {
-        display: none; /* Hide scrollbar for Chrome, Safari, Opera */
+    .bottom-nav-fixed .nav-item {
+        flex: 1; /* Distribute space evenly */
     }
-    .bottom-nav-scrollable .nav-item {
-        flex-shrink: 0; /* Prevent items from shrinking */
-    }
-    .bottom-nav-scrollable .nav-link {
+    .bottom-nav-fixed .nav-link {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 60px;
+        padding: 0.5rem 0.25rem;
+        border: none;
+        /* Use a top border for the active indicator */
+        border-top: 3px solid transparent;
         color: var(--text-muted);
+        font-size: 0.7rem;
         font-weight: 500;
         text-align: center;
-        border: none;
-        border-bottom: 3px solid transparent;
-        padding: 0.8rem 1rem;
+        /* Prevent wrapping on small screens */
         white-space: nowrap;
-        height: 60px;
-        display: flex;
-        align-items: center;
     }
-    .bottom-nav-scrollable .nav-link.active {
+    .bottom-nav-fixed .nav-link i {
+        font-size: 1.4rem;
+        margin-bottom: 2px;
+    }
+    .bottom-nav-fixed .nav-link.active {
         color: var(--primary-color);
-        border-bottom: 3px solid var(--primary-color);
+        border-top-color: var(--primary-color);
         background-color: transparent;
     }
 }
