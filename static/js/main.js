@@ -292,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
         if (pitcherSelect) {
-            pitcherSelect.innerHTML = '<option value="">Select Pitcher</option>' + AppState.full_data.roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
+            pitcherSelect.innerHTML = '<option value="">Select Pitcher</option>' + AppState.full_data.roster.map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
         }
 
         const pitchDateInput = document.getElementById('pitch_date');
@@ -1005,7 +1005,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const pitcherSelect = modal.querySelector('#edit_pitcher');
             pitcherSelect.innerHTML = AppState.full_data.roster
-                .filter(p => p.pitcher_role !== 'Not a Pitcher')
                 .map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`)
                 .join('');
             
