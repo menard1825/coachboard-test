@@ -100,53 +100,57 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
     summary = {}
     today = date.today()
     for player in roster:
-        player_outings = sorted([o for o in all_outings if o.player_id == player.id], key=lambda x: x.date, reverse=True)
-        
-        daily_pitches = sum(o.pitches or 0 for o in player_outings if o.date.date() == today)
-        weekly_pitches = sum(o.pitches or 0 for o in player_outings if (today - o.date.date()).days < 7)
-
-        status, next_available_str = 'Available', 'Today'
-        required_rest = 0
-        
-        if player_outings:
-            last_outing = player_outings[0]
-            last_outing_date = last_outing.date.date()
+        try:
+            player_outings = sorted([o for o in all_outings if o.player_id == player.id], key=lambda x: x.date, reverse=True)
             
-            # Sum pitches on the last day the pitcher threw
-            pitches_on_last_day = sum(o.pitches or 0 for o in player_outings if o.date.date() == last_outing_date)
+            daily_pitches = sum(o.pitches or 0 for o in player_outings if o.date.date() == today)
+            weekly_pitches = sum(o.pitches or 0 for o in player_outings if (today - o.date.date()).days < 7)
 
-            # Determine rest days based on the total pitches on that day
-            for threshold, rest_days in rules.get('rest_thresholds', []):
-                if pitches_on_last_day <= threshold:
-                    required_rest = rest_days
-                    break
-            else: # If pitch count is over the highest threshold
-                if rules.get('rest_thresholds'):
-                    required_rest = rules['rest_thresholds'][-1][1] + 1
+            status, next_available_str = 'Available', 'Today'
+            required_rest = 0
             
-            next_available_date = last_outing_date + timedelta(days=required_rest + 1)
-            
-            if today < next_available_date:
-                status = 'Resting'
-                next_available_str = next_available_date.strftime('%a, %b %d')
+            if player_outings:
+                last_outing = player_outings[0]
+                last_outing_date = last_outing.date.date()
 
-            # New logic: If the last outing was today, check if they can still pitch.
-            if last_outing_date == today:
-                if daily_pitches < rules.get('max_daily', 85):
-                    status = 'Available'
-                    next_available_str = 'Today'
-                else:
-                    # They've hit their daily max, so they are resting.
-                    # The next_available_date calculated earlier is correct.
+                # Sum pitches on the last day the pitcher threw
+                pitches_on_last_day = sum(o.pitches or 0 for o in player_outings if o.date.date() == last_outing_date)
+
+                # Determine rest days based on the total pitches on that day
+                for threshold, rest_days in rules.get('rest_thresholds', []):
+                    if pitches_on_last_day <= threshold:
+                        required_rest = rest_days
+                        break
+                else: # If pitch count is over the highest threshold
+                    if rules.get('rest_thresholds'):
+                        required_rest = rules['rest_thresholds'][-1][1] + 1
+
+                next_available_date = last_outing_date + timedelta(days=required_rest + 1)
+
+                if today < next_available_date:
                     status = 'Resting'
                     next_available_str = next_available_date.strftime('%a, %b %d')
-            
-        summary[player.name] = {
-            'daily': daily_pitches,
-            'weekly': weekly_pitches,
-            'status': status,
-            'next_available': next_available_str,
-            'max_daily': rules.get('max_daily', 85),
-            'pitches_remaining_today': max(0, rules.get('max_daily', 85) - daily_pitches)
-        }
+
+                # New logic: If the last outing was today, check if they can still pitch.
+                if last_outing_date == today:
+                    if daily_pitches < rules.get('max_daily', 85):
+                        status = 'Available'
+                        next_available_str = 'Today'
+                    else:
+                        # They've hit their daily max, so they are resting.
+                        # The next_available_date calculated earlier is correct.
+                        status = 'Resting'
+                        next_available_str = next_available_date.strftime('%a, %b %d')
+
+            summary[player.name] = {
+                'daily': daily_pitches,
+                'weekly': weekly_pitches,
+                'status': status,
+                'next_available': next_available_str,
+                'max_daily': rules.get('max_daily', 85),
+                'pitches_remaining_today': max(0, rules.get('max_daily', 85) - daily_pitches)
+            }
+        except Exception as e:
+            print(f"Error calculating pitch count summary for player {player.name} (ID: {player.id}): {e}")
+            continue
     return summary

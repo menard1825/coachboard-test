@@ -72,15 +72,19 @@
                         {% for p in roster %}
                             <tr>
                                 <td><strong>{{ p['name'] }}</strong></td>
-                                <td>
-                                    {% set summary = pitch_count_summary.get(p['name']) %}
-                                    {% if summary.status == 'Available' %}
-                                        <span class="badge bg-success">Available</span>
-                                    {% else %}
-                                        <span class="badge bg-danger">Resting</span>
-                                    {% endif %}
-                                </td>
-                                <td>Next Available: {{ summary.next_available }}</td>
+                                {% set summary = pitch_count_summary.get(p['name']) %}
+                                {% if summary %}
+                                    <td>
+                                        {% if summary.status == 'Available' %}
+                                            <span class="badge bg-success">Available</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Resting</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>Next Available: {{ summary.next_available }}</td>
+                                {% else %}
+                                    <td colspan="2" class="text-center text-muted">No summary data available.</td>
+                                {% endif %}
                             </tr>
                         {% endfor %}
                         </tbody>
