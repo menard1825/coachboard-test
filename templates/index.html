@@ -459,7 +459,7 @@
         {% for tab_key in tab_order[:4] %}
         <li class="nav-item">
             <a class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab" aria-selected="{% if loop.first %}true{% else %}false{% endif %}">
-                <i class="bi bi-{{ {'roster': 'people', 'games': 'calendar4-event', 'practice_plan': 'clipboard-check', 'player_development': 'graph-up-arrow'}.get(tab_key, 'question-circle') }}"></i>
+                <i class="bi bi-{{ {'roster': 'people', 'games': 'calendar4-event', 'practice_plan': 'clipboard-check', 'player_development': 'graph-up-arrow', 'lineups': 'list-ol', 'pitching': 'baseball'}.get(tab_key, 'question-circle') }}"></i>
                 <span>{{ all_tabs[tab_key] }}</span>
             </a>
         </li>
