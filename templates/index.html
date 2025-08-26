@@ -303,13 +303,12 @@
     <div class="tab-pane fade" id="more" role="tabpanel" aria-labelledby="more-tab">
         <div class="list-group">
             <h5 class="text-muted ps-3 mt-2 mb-2">More Sections</h5>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#lineups" role="tab">Lineups</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#rotations" role="tab">Rotations</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#scouting_list" role="tab">Scouting List</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#signs" role="tab">Signs</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#stats" role="tab">Stats</a>
-            <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#collaboration" role="tab">Collaboration</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_rules') }}">Pitching Rules</a>
+            {% set mobile_main_tabs = ['roster', 'player_development', 'games', 'practice_plan'] %}
+            {% for tab_key in tab_order %}
+                {% if tab_key not in mobile_main_tabs %}
+                    <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">{{ all_tabs[tab_key] }}</a>
+                {% endif %}
+            {% endfor %}
         </div>
     </div>
 </div>
@@ -455,11 +454,12 @@
 {% block bottom_nav %}
 <nav class="fixed-bottom d-lg-none bottom-nav-fixed shadow-lg">
     <ul class="nav nav-tabs" role="tablist">
-        {# Dynamically display the first 4 tabs from the user's order #}
-        {% for tab_key in tab_order[:4] %}
+        {# Display the fixed primary tabs for mobile #}
+        {% set mobile_tabs = ['roster', 'player_development', 'games', 'practice_plan'] %}
+        {% for tab_key in mobile_tabs %}
         <li class="nav-item">
             <a class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab" aria-selected="{% if loop.first %}true{% else %}false{% endif %}">
-                <i class="bi bi-{{ {'roster': 'people', 'games': 'calendar4-event', 'practice_plan': 'clipboard-check', 'player_development': 'graph-up-arrow', 'lineups': 'list-ol', 'pitching': 'baseball'}.get(tab_key, 'question-circle') }}"></i>
+                <i class="bi bi-{{ {'roster': 'people', 'games': 'calendar4-event', 'practice_plan': 'clipboard-check', 'player_development': 'graph-up-arrow', 'lineups': 'list-ol', 'pitching': 'bullseye'}.get(tab_key, 'question-circle') }}"></i>
                 <span>{{ all_tabs[tab_key] }}</span>
             </a>
         </li>
