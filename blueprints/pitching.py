@@ -87,7 +87,7 @@ def add_pitching():
     db.session.add(new_outing)
     db.session.commit()
     flash(f'Pitching outing for "{player.full_name}" added successfully!', 'success')
-    socketio.emit('data_updated', {'message': 'New pitching outing added.'})
+    socketio.emit('pitching_update', {'message': 'New pitching outing added.'})
     
     if game_id:
         return redirect(url_for('gameday.game_management', game_id=game_id, _anchor='pitching'))
@@ -128,7 +128,7 @@ def edit_pitching(outing_id):
         
         db.session.commit()
         flash(f'Successfully updated outing for {outing_to_edit.player.full_name}.', 'success')
-        socketio.emit('data_updated', {'message': 'Pitching outing updated.'})
+        socketio.emit('pitching_update', {'message': 'Pitching outing updated.'})
     except ValueError:
         flash('Invalid number format for pitches or innings.', 'danger')
     except Exception as e:
@@ -146,7 +146,7 @@ def delete_pitching(outing_id):
         db.session.delete(outing_to_delete)
         db.session.commit()
         flash(f'Pitching outing for "{player_name}" removed successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Pitching outing deleted.'})
+        socketio.emit('pitching_update', {'message': 'Pitching outing deleted.'})
     else:
         flash('Pitching outing not found.', 'danger')
     
