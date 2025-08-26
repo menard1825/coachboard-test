@@ -248,6 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const lineupHtml = (l.lineup_positions && l.lineup_positions.length > 0)
                     ? `<ol class="list-group list-group-numbered">${l.lineup_positions.map(name => `<li class="list-group-item">${escapeHTML(name)}</li>`).join('')}</ol>`
                     : `<p class="text-center text-muted">This lineup is empty.</p>`;
+                const editButtonHtml = `<button type="button" class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#lineupEditorModal" data-lineup-id="${l.id}">Edit</button>`;
                 const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_lineup/${l.id}" data-delete-name="${escapeHTML(l.title)}">Delete</button>`;
                 return `<div class="accordion-item" data-lineup-id="${l.id}">
                             <h2 class="accordion-header">
@@ -258,6 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div id="lineup-collapse-${l.id}" class="accordion-collapse collapse" data-bs-parent="#lineupsAccordion">
                                 <div class="accordion-body">
                                     <div class="d-flex justify-content-end mb-3">
+                                        ${editButtonHtml}
                                         ${deleteButtonHtml}
                                     </div>
                                     ${lineupHtml}
@@ -925,7 +927,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
 
-            // The socket event ('lineup_add' or 'lineup_update') will handle the UI update.
+            // The socket event will update other clients, but we can update the UI immediately.
+            if (lineupId) { // Edit
+                const index = AppState.full_data.lineups.findIndex(l => l.id == lineupId);
+                if (index > -1) AppState.full_data.lineups[index] = result.lineup;
+            } else { // Add
+                AppState.full_data.lineups.push(result.lineup);
+            }
+            renderLineups();
             lineupEditorModal.hide();
 
         } catch (error) {
