@@ -167,6 +167,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderPlayerDevelopmentDetails();
                 container.querySelector('.active')?.classList.remove('active');
                 item.classList.add('active');
+
+                // On mobile, scroll down to the details view automatically
+                if (window.innerWidth < 992) { // Corresponds to Bootstrap's 'lg' breakpoint
+                    const detailsContainer = document.getElementById('player-dev-content');
+                    if (detailsContainer) {
+                        detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
             });
         });
 
