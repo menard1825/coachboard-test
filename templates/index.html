@@ -17,9 +17,8 @@
     <ul class="nav nav-tabs desktop-nav-tabs" id="mainTabsDesktop" role="tablist">
         {% for tab_key in tab_order %}
         <li class="nav-item" role="presentation">
-            {# The Pitching Log is a separate page, so it's a direct link, not a tab toggle #}
             {% if tab_key == 'pitching' %}
-                <a class="nav-link" href="{{ url_for('pitching.pitching_page') }}">
+                <a class="nav-link" data-bs-toggle="tab" href="#pitching" role="tab">
                     <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
                     {{ all_tabs[tab_key] }}
                 </a>
@@ -253,6 +252,54 @@
         </div>
     </div>
 
+    <div class="tab-pane fade" id="pitching" role="tabpanel">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Pitch Count Summary</h5>
+                <a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-sm btn-outline-info">View Rules</a>
+            </div>
+            <div class="card-body p-2" id="pitch-count-summary-container">
+                <div class="d-flex justify-content-center p-5">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading Summary...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-5 mb-4">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Add New Outing</h5></div>
+                    <div class="card-body">
+                        <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
+                            <div class="row g-3">
+                                <div class="col-6"><label for="pitch_date" class="form-label">Date</label><input type="date" id="pitch_date" name="pitch_date" class="form-control" required></div>
+                                <div class="col-6">
+                                    <label for="pitching-log-pitcher-select" class="form-label">Pitcher</label>
+                                    <select name="player_id" id="pitching-log-pitcher-select" class="form-select" required></select>
+                                </div>
+                                <div class="col-12"><label for="opponent" class="form-label">Opponent / Context</label><input type="text" id="opponent" name="opponent" class="form-control" placeholder="e.g., Scrimmage vs. Tigers"></div>
+                                <div class="col-6"><label for="pitches" class="form-label">Pitch Count</label><input type="number" id="pitches" name="pitches" class="form-control" required></div>
+                                <div class="col-6"><label for="innings" class="form-label">Innings Pitched</label><input type="text" id="innings" name="innings" class="form-control" placeholder="e.g., 2.1" required></div>
+                                <div class="col-6"><label for="outing_type" class="form-label">Outing Type</label><select name="outing_type" id="outing_type" class="form-select"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div>
+                                <div class="col-6"><label for="pitcher_type" class="form-label">Pitcher Type</label><select name="pitcher_type" id="pitcher_type" class="form-select"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 mt-3">Log Outing</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7 mb-4">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Recent Outing History</h5></div>
+                    <ul class="list-group list-group-flush" id="recorded-outings-list">
+                         <li class="list-group-item text-muted">Loading history...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="tab-pane fade" id="more" role="tabpanel" aria-labelledby="more-tab">
         <div class="list-group">
             <h5 class="text-muted ps-3 mt-2 mb-2">More Sections</h5>
@@ -408,31 +455,16 @@
 {% block bottom_nav %}
 <nav class="fixed-bottom d-lg-none bottom-nav-fixed shadow-lg">
     <ul class="nav nav-tabs" role="tablist">
-        {# Roster is active by default, matching the JS logic #}
+        {# Dynamically display the first 4 tabs from the user's order #}
+        {% for tab_key in tab_order[:4] %}
         <li class="nav-item">
-            <a class="nav-link active" data-bs-toggle="tab" href="#roster" role="tab" aria-selected="true">
-                <i class="bi bi-people"></i>
-                <span>Roster</span>
+            <a class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab" aria-selected="{% if loop.first %}true{% else %}false{% endif %}">
+                <i class="bi bi-{{ {'roster': 'people', 'games': 'calendar4-event', 'practice_plan': 'clipboard-check', 'player_development': 'graph-up-arrow'}.get(tab_key, 'question-circle') }}"></i>
+                <span>{{ all_tabs[tab_key] }}</span>
             </a>
         </li>
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#games" role="tab">
-                <i class="bi bi-calendar4-event"></i>
-                <span>Games</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#practice_plan" role="tab">
-                <i class="bi bi-clipboard-check"></i>
-                <span>Practice</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" data-bs-toggle="tab" href="#player_development" role="tab">
-                <i class="bi bi-graph-up-arrow"></i>
-                <span>Development</span>
-            </a>
-        </li>
+        {% endfor %}
+        {# Add the "More" tab #}
         <li class="nav-item">
             <a class="nav-link" data-bs-toggle="tab" href="#more" role="tab">
                 <i class="bi bi-three-dots"></i>
