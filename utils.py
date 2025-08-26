@@ -1,5 +1,6 @@
 import json
 from datetime import date, timedelta, datetime
+from sqlalchemy import func
 from models import Player, PitchingOuting
 
 def model_to_dict(obj):

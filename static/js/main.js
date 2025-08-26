@@ -58,38 +58,57 @@ document.addEventListener('DOMContentLoaded', () => {
         const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
         const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}" data-delete-name="${pNameSafe}">Delete</button>`;
+
+        const positions = [p.position1, p.position2, p.position3].filter(Boolean).map(pos => `<span class="badge bg-secondary me-1">${pos}</span>`).join('') || '<span class="text-muted small">N/A</span>';
+        const batsThrows = `B/T: ${p.bats?.[0] || 'N'}/${p.throws?.[0] || 'N'}`;
+
         return `
-        <div class="accordion-item" data-player-name="${pNameSafe}">
-            <h2 class="accordion-header d-flex align-items-center">
-                <i class="bi bi-grip-vertical px-3 text-muted drag-handle" style="cursor: move;" title="Drag to reorder"></i>
-                <button class="accordion-button collapsed flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-roster-${p.id}" style="border-top-left-radius: 0; border-bottom-left-radius: 0;">
-                    <strong>${pNameSafe}</strong>&nbsp;(#${p.number || 'N/A'})
-                    <span class="ms-auto text-muted small d-none d-sm-inline ps-2">${[p.position1, p.position2, p.position3].filter(Boolean).join(', ') || 'N/A'} | ${p.bats || 'N/A'} / ${p.throws || 'N/A'}</span>
-                </button>
-            </h2>
-            <div id="collapse-roster-${p.id}" class="accordion-collapse collapse" data-bs-parent="#rosterAccordion"><div class="accordion-body">
-                <div class="row g-3 align-items-end">
-                    <div class="col-12"><h5>Player Notes</h5></div>
-                    <div class="col-12"><textarea class="form-control" name="notes" rows="2" placeholder="Notes">${pNotesSafe}</textarea></div>
-                    ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${formattedTimestamp}</small></div>` : ''}
-                    <hr class="my-3">
-                    <div class="col-12 col-md-4"><label class="form-label">Name</label><input type="text" class="form-control" name="name" value="${pNameSafe}"></div>
-                    <div class="col-6 col-md-2"><label class="form-label">J#</label><input type="number" class="form-control" name="number" value="${p.number || ''}"></div>
-                    <div class="col-6 col-md-3"><label class="form-label">Pos 1</label>${renderPositionSelect('position1', `position1_${p.id}`, p.position1, '', 'form-select')}</div>
-                    <div class="col-6 col-md-3"><label class="form-label">Pos 2</label>${renderPositionSelect('position2', `position2_${p.id}`, p.position2, '', 'form-select')}</div>
-                    <div class="col-6 col-md-3"><label class="form-label">Pos 3</label>${renderPositionSelect('position3', `position3_${p.id}`, p.position3, '', 'form-select')}</div>
-                    <div class="col-6 col-md-3"><label class="form-label">Throws</label><select name="throws" class="form-select"><option value="Right" ${p.throws === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.throws === 'Left' ? 'selected' : ''}>Left</option></select></div>
-                    <div class="col-6 col-md-3"><label class="form-label">Bats</label><select name="bats" class="form-select"><option value="Right" ${p.bats === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.bats === 'Left' ? 'selected' : ''}>Left</option></select></div>
-                    <div class="col-6 col-md-3"><label class="form-label">Pitcher Role</label><select name="pitcher_role" class="form-select"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Not a Pitcher</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starter</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Reliever</option></select></div>
-                    <div class="col-12 d-flex justify-content-end mt-3"><button type="button" class="btn btn-sm btn-primary me-2 save-player-btn" data-player-id="${p.id}">Save</button>${deleteButtonHtml}</div>
-                    <div class="col-12 mt-2"><div class="save-feedback" style="display: none;"></div></div>
+        <div class="col-md-6 col-lg-4" data-player-name="${pNameSafe}">
+            <div class="card player-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="bi bi-grip-vertical text-muted drag-handle" style="cursor: move;" title="Drag to reorder"></i>
+                        <strong class="ms-2">${pNameSafe}</strong>
+                    </h6>
+                    <span class="badge bg-primary rounded-pill">#${p.number || 'N/A'}</span>
                 </div>
-            </div></div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>${positions}</div>
+                        <small class="text-muted">${batsThrows}</small>
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-roster-${p.id}">
+                        Edit
+                    </button>
+                </div>
+                <div id="collapse-roster-${p.id}" class="collapse">
+                    <div class="card-body bg-light">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-12"><h5>Player Notes</h5></div>
+                            <div class="col-12"><textarea class="form-control" name="notes" rows="2" placeholder="Notes">${pNotesSafe}</textarea></div>
+                            ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${formattedTimestamp}</small></div>` : ''}
+                            <hr class="my-3">
+                            <div class="col-12 col-md-4"><label class="form-label">Name</label><input type="text" class="form-control" name="name" value="${pNameSafe}"></div>
+                            <div class="col-6 col-md-2"><label class="form-label">J#</label><input type="number" class="form-control" name="number" value="${p.number || ''}"></div>
+                            <div class="col-6 col-md-3"><label class="form-label">Pos 1</label>${renderPositionSelect('position1', `position1_${p.id}`, p.position1, '', 'form-select')}</div>
+                            <div class="col-6 col-md-3"><label class="form-label">Pos 2</label>${renderPositionSelect('position2', `position2_${p.id}`, p.position2, '', 'form-select')}</div>
+                            <div class="col-6 col-md-3"><label class="form-label">Pos 3</label>${renderPositionSelect('position3', `position3_${p.id}`, p.position3, '', 'form-select')}</div>
+                            <div class="col-6 col-md-3"><label class="form-label">Throws</label><select name="throws" class="form-select"><option value="Right" ${p.throws === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.throws === 'Left' ? 'selected' : ''}>Left</option></select></div>
+                            <div class="col-6 col-md-3"><label class="form-label">Bats</label><select name="bats" class="form-select"><option value="Right" ${p.bats === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.bats === 'Left' ? 'selected' : ''}>Left</option></select></div>
+                            <div class="col-6 col-md-3"><label class="form-label">Pitcher Role</label><select name="pitcher_role" class="form-select"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Not a Pitcher</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starter</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Reliever</option></select></div>
+                            <div class="col-12 d-flex justify-content-end mt-3"><button type="button" class="btn btn-sm btn-primary me-2 save-player-btn" data-player-id="${p.id}">Save</button>${deleteButtonHtml}</div>
+                            <div class="col-12 mt-2"><div class="save-feedback" style="display: none;"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>`;
     }
 
     function renderRoster() {
-        const container = document.getElementById('rosterAccordion');
+        const container = document.getElementById('roster-cards-container');
         if (!container) return;
         const searchTerm = document.getElementById('rosterSearch').value.toLowerCase();
         

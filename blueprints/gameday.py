@@ -5,19 +5,11 @@ from models import (
 from db import db
 from extensions import socketio
 from datetime import datetime
-from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
+from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
 from sqlalchemy.orm import joinedload
+from sqlalchemy import func
 
 gameday_bp = Blueprint('gameday', __name__, template_folder='templates')
-
-def model_to_dict(model_instance):
-    if not model_instance:
-        return None
-    d = {c.name: getattr(model_instance, c.name) for c in model_instance.__table__.columns}
-    for key, value in d.items():
-        if isinstance(value, datetime):
-            d[key] = value.isoformat()
-    return d
 
 def pitching_outing_to_dict(outing):
     if not outing:
@@ -44,9 +36,13 @@ def game_management(game_id):
     lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
     rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
     
-    all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all()
-    game_pitching_log = [o for o in all_pitching_outings if o.opponent == game.opponent and o.date.date() == game.date.date()]
-    
+    # MODIFIED: Optimized query to filter in the database
+    all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all() # Keep for summary stats
+    game_pitching_log = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(
+        team_id=team.id,
+        opponent=game.opponent
+    ).filter(db.func.date(PitchingOuting.date) == game.date.date()).all()
+
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
     absent_player_ids = [absence.player_id for absence in absences]
 

@@ -103,9 +103,13 @@ function initializeGameManagement(gameData) {
                     <i class="bi bi-grip-vertical lineup-drag-handle me-2" style="cursor: grab;"></i>
                     <span class="fw-bold">${escapeHTML(player.name)} (#${escapeHTML(player.number) || 'N/A'})</span>
                 </div>
-                <button type="button" class="btn btn-sm btn-link text-danger p-0 remove-player-btn" aria-label="Remove player">
-                    <i class="bi bi-x-circle-fill" style="font-size: 1.1rem;"></i>
-                </button>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary move-up-btn"><i class="bi bi-arrow-up"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary move-down-btn"><i class="bi bi-arrow-down"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-player-btn" aria-label="Remove player">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
             </div>`;
         return item;
     };
@@ -289,8 +293,21 @@ function initializeGameManagement(gameData) {
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
         document.getElementById('lineupEditorModal')?.addEventListener('shown.bs.modal', renderLineupEditor);
         document.getElementById('lineup-order')?.addEventListener('click', (event) => {
+            const moveUpButton = event.target.closest('.move-up-btn');
+            const moveDownButton = event.target.closest('.move-down-btn');
             const removeButton = event.target.closest('.remove-player-btn');
-            if (removeButton) {
+
+            if (moveUpButton) {
+                const playerItem = moveUpButton.closest('.list-group-item');
+                if (playerItem.previousElementSibling) {
+                    playerItem.parentNode.insertBefore(playerItem, playerItem.previousElementSibling);
+                }
+            } else if (moveDownButton) {
+                const playerItem = moveDownButton.closest('.list-group-item');
+                if (playerItem.nextElementSibling) {
+                    playerItem.parentNode.insertBefore(playerItem.nextElementSibling, playerItem);
+                }
+            } else if (removeButton) {
                 const playerItem = removeButton.closest('.list-group-item');
                 playerItem.remove();
                 const player = state.roster.find(p => p.name === playerItem.dataset.playerName);

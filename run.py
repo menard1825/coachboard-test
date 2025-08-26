@@ -1,4 +1,5 @@
 import eventlet
+print("Starting server...")
 eventlet.monkey_patch()
 
 from app import create_app
