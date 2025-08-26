@@ -3,6 +3,8 @@
 // =================================================================================
 
 // This script is now fully self-contained and does not use a global AppState.
+const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
+
 function initializeGameManagement(gameData) {
 
     // --- Page-Specific State ---
@@ -21,8 +23,6 @@ function initializeGameManagement(gameData) {
     let lineupEditorModal;
 
     // --- Utility Functions ---
-    const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
-
     function updateLineupPlaceholders() {
         const bench = document.getElementById('lineup-bench');
         const order = document.getElementById('lineup-order');
@@ -87,9 +87,14 @@ function initializeGameManagement(gameData) {
 
     function createBenchPlayerItem(player) {
         const item = document.createElement('div');
-        item.className = 'list-group-item';
-        item.textContent = `${player.name} (#${player.number || 'N/A'})`;
+        item.className = 'list-group-item d-flex justify-content-between align-items-center';
         item.dataset.playerName = player.name;
+        item.innerHTML = `
+            <span>${escapeHTML(player.name)} (#${escapeHTML(player.number) || 'N/A'})</span>
+            <button type="button" class="btn btn-sm btn-outline-primary add-to-lineup-btn" aria-label="Add to lineup">
+                <i class="bi bi-plus-lg"></i>
+            </button>
+        `;
         return item;
     }
 
@@ -292,6 +297,31 @@ function initializeGameManagement(gameData) {
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
         document.getElementById('lineupEditorModal')?.addEventListener('shown.bs.modal', renderLineupEditor);
+
+        document.getElementById('lineup-bench')?.addEventListener('click', (event) => {
+            const addButton = event.target.closest('.add-to-lineup-btn');
+            if (addButton) {
+                const playerItem = addButton.closest('.list-group-item');
+                const playerName = playerItem.dataset.playerName;
+                const player = state.roster.find(p => p.name === playerName);
+
+                if (player) {
+                    // Add to state
+                    state.lineup.lineup_positions.push(player.name);
+
+                    // Remove from bench view
+                    playerItem.remove();
+
+                    // Add to lineup view
+                    const lineupOrder = document.getElementById('lineup-order');
+                    lineupOrder.appendChild(createBattingOrderItem(player));
+
+                    // Update placeholders
+                    updateLineupPlaceholders();
+                }
+            }
+        });
+
         document.getElementById('lineup-order')?.addEventListener('click', (event) => {
             const moveUpButton = event.target.closest('.move-up-btn');
             const moveDownButton = event.target.closest('.move-down-btn');
