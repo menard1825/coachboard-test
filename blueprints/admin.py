@@ -98,7 +98,7 @@ def add_user():
     socketio.emit('data_updated', {'message': 'A new user was added.'})
     return redirect(url_for('.user_management'))
 
-@admin_bp.route('/delete_user/<username>')
+@admin_bp.route('/delete_user/<username>', methods=['POST'])
 @admin_required
 def delete_user(username):
     user_to_delete = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()

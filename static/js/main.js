@@ -899,7 +899,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function saveLineup() {
+        const btn = document.getElementById('saveLineupBtn');
+        const modal = btn.closest('.modal');
+        const lineupId = modal.querySelector('#lineupId').value;
+        const title = modal.querySelector('#lineupTitle').value;
+        const lineup_positions = Array.from(modal.querySelectorAll('#lineup-order .list-group-item')).map(item => item.dataset.playerName);
+
+        const url = lineupId ? `/edit_lineup/${lineupId}` : '/add_lineup';
+        const payload = {
+            title: title,
+            lineup_data: lineup_positions,
+            associated_game_id: null // Explicitly null for unassigned lineups
+        };
+
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message);
+
+            // The socket event ('lineup_add' or 'lineup_update') will handle the UI update.
+            lineupEditorModal.hide();
+
+        } catch (error) {
+            alert('Error saving lineup: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Save';
+        }
+    }
+
     function setupEventListeners() {
+        document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         
         const addScoutedPlayerForm = document.getElementById('addScoutedPlayerForm');
