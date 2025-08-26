@@ -179,7 +179,17 @@ def pitching_page():
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(all_players, all_outings, rules)
 
-    pitchers = [p for p in all_players if p.pitcher_role != 'Not a Pitcher']
+    # Get players designated as pitchers by their role
+    designated_pitchers = {p.id: p for p in all_players if p.pitcher_role != 'Not a Pitcher'}
+
+    # Get players who have any pitching outings logged
+    players_with_outings = {o.player_id: o.player for o in all_outings if o.player is not None}
+
+    # Combine the two lists (duplicates are handled automatically by using a dictionary)
+    combined_pitchers_dict = {**designated_pitchers, **players_with_outings}
+
+    # This is the final list of all players who should be in the summary
+    pitchers = list(combined_pitchers_dict.values())
 
     return render_template(
         "pitching.html",
