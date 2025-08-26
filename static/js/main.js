@@ -1040,16 +1040,33 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleTabLogic() {
         if (!document.getElementById('mainTabContent')) return;
 
-        // Listen for Bootstrap's native tab showing event.
-        document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tab => {
-            tab.addEventListener('show.bs.tab', (event) => {
-                // When a tab is about to be shown, update the URL hash.
-                const newTabTarget = event.target.getAttribute('href');
+        const activateTab = (tabEl) => {
+            if (!tabEl) return;
+            // Manually deactivate all tabs first to prevent sticking
+            document.querySelectorAll('#mainTabContent .tab-pane').forEach(pane => {
+                pane.classList.remove('active', 'show');
+            });
+            document.querySelectorAll('.nav-tabs .nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+
+            const targetPane = document.querySelector(tabEl.getAttribute('href'));
+            if (targetPane) {
+                tabEl.classList.add('active');
+                targetPane.classList.add('active', 'show');
                 if (history.pushState) {
-                    history.pushState(null, null, newTabTarget);
+                    history.pushState(null, null, tabEl.getAttribute('href'));
                 } else {
-                    window.location.hash = newTabTarget;
+                    window.location.hash = tabEl.getAttribute('href');
                 }
+            }
+        };
+
+        // Handle clicks on all tab links
+        document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tabEl => {
+            tabEl.addEventListener('click', (event) => {
+                event.preventDefault();
+                activateTab(tabEl);
             });
         });
     
@@ -1073,10 +1090,11 @@ document.addEventListener('DOMContentLoaded', () => {
             tabToActivate = document.querySelector('a[data-bs-toggle="tab"][href="#roster"]');
         }
 
-        // Use Bootstrap's own API to programmatically show the tab.
+        // Activate the initial tab
         if (tabToActivate) {
-            const tab = bootstrap.Tab.getOrCreateInstance(tabToActivate);
-            tab.show();
+            // We need to make sure the content is visible on first load, so we'll activate it directly.
+            // Using a small timeout allows the rest of the page to render first.
+            setTimeout(() => activateTab(tabToActivate), 0);
         }
     }
     
