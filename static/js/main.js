@@ -63,25 +63,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const batsThrows = `B/T: ${p.bats?.[0] || 'N'}/${p.throws?.[0] || 'N'}`;
 
         return `
-        <div class="col-md-6 col-lg-4" data-player-name="${pNameSafe}">
-            <div class="card player-card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="col-12" data-player-name="${pNameSafe}">
+            <div class="card player-card">
+                <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#collapse-roster-${p.id}" style="cursor: pointer;">
                     <h6 class="mb-0">
                         <i class="bi bi-grip-vertical text-muted drag-handle" style="cursor: move;" title="Drag to reorder"></i>
                         <strong class="ms-2">${pNameSafe}</strong>
                     </h6>
-                    <span class="badge bg-primary rounded-pill">#${p.number || 'N/A'}</span>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>${positions}</div>
-                        <small class="text-muted">${batsThrows}</small>
+                    <div class="d-flex align-items-center">
+                        <div class="me-3 d-none d-sm-block">${positions}</div>
+                        <span class="badge bg-primary rounded-pill">#${p.number || 'N/A'}</span>
                     </div>
-                </div>
-                <div class="card-footer text-end">
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-roster-${p.id}">
-                        Edit
-                    </button>
                 </div>
                 <div id="collapse-roster-${p.id}" class="collapse">
                     <div class="card-body bg-light">
@@ -565,13 +557,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleRosterSave(event) {
         const btn = event.target.closest('button');
-        const accordionBody = btn.closest('.accordion-body');
-        const feedbackDiv = accordionBody.querySelector('.save-feedback');
+        const cardBody = btn.closest('.card-body');
+        const feedbackDiv = cardBody.querySelector('.save-feedback');
         const playerId = btn.dataset.playerId;
         const originalButtonText = btn.innerHTML;
 
         const formData = new FormData();
-        accordionBody.querySelectorAll('input, select, textarea').forEach(input => formData.append(input.name, input.value));
+        cardBody.querySelectorAll('input, select, textarea').forEach(input => formData.append(input.name, input.value));
         
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
@@ -883,7 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
             AppState.dev_player_sort.key = 'custom';
             renderPlayerDevelopmentList();
         };
-        ['rosterAccordion', 'dev-player-list'].forEach(id => {
+        ['roster-cards-container', 'dev-player-list'].forEach(id => {
             const el = document.getElementById(id);
             if(el) sortableInstances[id] = new Sortable(el, { handle: '.drag-handle', animation: 150, onEnd: savePlayerOrder });
         });
@@ -1046,6 +1038,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTabLogic() {
+        if (!document.getElementById('mainTabContent')) return;
+
         // Listen for Bootstrap's native tab showing event.
         document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tab => {
             tab.addEventListener('show.bs.tab', (event) => {
