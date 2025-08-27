@@ -1079,16 +1079,17 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function openLineupEditor(lineup = null) {
         const modal = document.getElementById('lineupEditorModal');
-        modal.querySelector('#lineupId').value = lineup ? lineup.id : '';
-        modal.querySelector('#lineupTitle').value = lineup ? lineup.title : 'New Unassigned Lineup';
-        const bench = modal.querySelector('#lineup-bench'), order = modal.querySelector('#lineup-order');
-        const lineupPlayerNames = new Set(lineup?.lineup_positions || []);
-        bench.innerHTML = AppState.full_data.roster.filter(p => !lineupPlayerNames.has(p.name)).map(p => `<div class="list-group-item" data-player-name="${p.name}">${p.name}</div>`).join('');
-        order.innerHTML = (lineup?.lineup_positions || []).map(name => `<div class="list-group-item" data-player-name="${name}">${name}</div>`).join('');
-        if(sortableInstances.lineupBench) sortableInstances.lineupBench.destroy();
-        if(sortableInstances.lineupOrder) sortableInstances.lineupOrder.destroy();
-        sortableInstances.lineupBench = new Sortable(bench, { group: 'lineup', animation: 150 });
-        sortableInstances.lineupOrder = new Sortable(order, { group: 'lineup', animation: 150 });
+        const currentLineup = lineup || { id: null, title: 'New Unassigned Lineup', lineup_positions: [] };
+
+        modal.querySelector('#lineupId').value = currentLineup.id;
+        modal.querySelector('#lineupTitle').value = currentLineup.title;
+
+        initializeLineupEditor({
+            roster: AppState.full_data.roster,
+            lineup: currentLineup,
+            benchEl: modal.querySelector('#lineup-bench'),
+            orderEl: modal.querySelector('#lineup-order')
+        });
     }
 
     function handleTabLogic() {
