@@ -152,22 +152,28 @@ function initializeGameManagement(gameData) {
         });
     }
 
-    function applyOutOfPositionIndicators() {
-        document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => {
-            const playerName = tag.dataset.playerName;
-            const position = tag.closest('.position-dropzone').dataset.position;
-            const player = state.roster.find(p => p.name === playerName);
+function applyOutOfPositionIndicators() {
+    document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => {
+        const playerName = tag.dataset.playerName;
+        const position = tag.closest('.position-dropzone').dataset.position;
+        const player = state.roster.find(p => p.name === playerName);
 
-            if (player && position) {
-                const primaryPositions = [player.position1, player.position2, player.position3];
-                if (!primaryPositions.includes(position)) {
-                    tag.classList.add('out-of-position');
-                } else {
-                    tag.classList.remove('out-of-position');
-                }
+        // First, remove any existing position classes to reset the state
+        tag.classList.remove('natural-position', 'secondary-position');
+
+        if (player && position) {
+            const primaryPos = player.position1;
+            const secondaryPositions = [player.position2, player.position3];
+
+            if (position === primaryPos) {
+                tag.classList.add('natural-position');
+            } else if (secondaryPositions.includes(position)) {
+                tag.classList.add('secondary-position');
             }
-        });
-    }
+            // If it's not in any of the three, it will just have the default color
+        }
+    });
+}
 
     function exitCopyMode() {
         state.copiedInningData = null;

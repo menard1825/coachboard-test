@@ -186,7 +186,13 @@ body {
 .d-lg-none .player-tag { cursor: pointer; }
 .bench-list .player-tag { background-color: var(--text-muted); border-color: #5c636a; }
 
-.player-tag.out-of-position {
+.player-tag.natural-position {
+    background-color: #198754; /* A nice green */
+    color: white;
+    border-color: #157347;
+}
+
+.player-tag.secondary-position {
     background-color: #ffc107; /* A warning yellow */
     color: #000;
     border-color: #e6ac00;
