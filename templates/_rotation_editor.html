@@ -6,6 +6,8 @@
             <select id="rotationTemplateSelect" class="form-select form-select-sm me-2" style="width: auto;">
                 <option value="">-- Load from Template --</option>
             </select>
+            {# NEW: Add "Save as Template" button #}
+            <button id="saveAsTemplateBtn" class="btn btn-secondary btn-sm">Save as Template</button>
             <button id="saveRotationBtn" class="btn btn-primary btn-sm">Save Rotation</button>
             <button id="deleteRotationBtn" class="btn btn-outline-danger btn-sm" {% if not rotation.id %}disabled{% endif %}>Delete Rotation</button>
         </div>

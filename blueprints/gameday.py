@@ -253,3 +253,40 @@ def delete_rotation(rotation_id):
         flash('Rotation not found.', 'danger')
     redirect_url = request.referrer or url_for('home', _anchor='rotations')
     return redirect(redirect_url)
+
+@gameday_bp.route('/save_rotation_as_template', methods=['POST'])
+def save_rotation_as_template():
+    payload = request.get_json()
+    title = payload.get('title')
+    innings_data = payload.get('innings')
+
+    if not title or not isinstance(innings_data, dict):
+        return jsonify({'status': 'error', 'message': 'Invalid data provided.'}), 400
+
+    # Check for existing template with the same name to avoid duplicates
+    existing_template = db.session.query(Rotation).filter_by(
+        title=title,
+        team_id=session['team_id'],
+        associated_game_id=None
+    ).first()
+
+    if existing_template:
+        return jsonify({'status': 'error', 'message': f'A template with the name "{title}" already exists.'}), 400
+
+    new_template = Rotation(
+        title=title,
+        innings=innings_data,
+        associated_game_id=None, # This makes it a template
+        team_id=session['team_id']
+    )
+    db.session.add(new_template)
+    db.session.commit()
+
+    # Emit an update so other open tabs/users see the new template
+    socketio.emit('data_updated', {'message': 'New rotation template created.'})
+
+    return jsonify({
+        'status': 'success',
+        'message': 'Template saved successfully!',
+        'new_template': model_to_dict(new_template)
+    })

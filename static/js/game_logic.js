@@ -34,6 +34,7 @@ function initializeGameManagement(gameData) {
 
     let assignPlayerModal;
     let lineupEditorModal;
+    let saveTemplateModal;
 
     // --- Rotation Editor Functions ---
     function renderRotationEditor() {
@@ -248,6 +249,8 @@ function applyOutOfPositionIndicators() {
     function setupEventListeners() {
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
+        // NEW: Initialize the save template modal
+        saveTemplateModal = new bootstrap.Modal(document.getElementById('saveRotationTemplateModal'));
 
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
@@ -282,6 +285,64 @@ function applyOutOfPositionIndicators() {
                 }
             });
         }
+
+        // NEW: Add event listener for the "Save as Template" button
+        document.getElementById('saveAsTemplateBtn')?.addEventListener('click', () => {
+            // Pre-fill the input with a helpful suggestion
+            const suggestedName = `Template from vs ${state.game.opponent}`;
+            document.getElementById('rotationTemplateName').value = suggestedName;
+            saveTemplateModal.show();
+        });
+
+        // NEW: Add event listener for the confirm button inside the modal
+        document.getElementById('confirmSaveTemplateBtn')?.addEventListener('click', async () => {
+            const templateNameInput = document.getElementById('rotationTemplateName');
+            const templateName = templateNameInput.value.trim();
+
+            if (!templateName) {
+                templateNameInput.classList.add('is-invalid');
+                return;
+            }
+            templateNameInput.classList.remove('is-invalid');
+
+            const btn = document.getElementById('confirmSaveTemplateBtn');
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+
+            const payload = {
+                title: templateName,
+                innings: state.rotation.innings
+            };
+
+            try {
+                const response = await fetch('/save_rotation_as_template', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message);
+
+                // Add the new template to our dropdown without needing a page refresh
+                const select = document.getElementById('rotationTemplateSelect');
+                if (select && result.new_template) {
+                     const newTemplate = result.new_template;
+                     state.rotation_templates.push(newTemplate); // Update state
+                     const inningsCount = newTemplate.innings ? Object.keys(newTemplate.innings).length : 0;
+                     const option = new Option(`${newTemplate.title} (${inningsCount} innings)`, newTemplate.id);
+                     select.add(option);
+                }
+
+                saveTemplateModal.hide();
+                alert('Template saved successfully!');
+
+            } catch (error) {
+                alert('Error saving template: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Save Template';
+            }
+        });
 
         document.getElementById('lineupEditorModal')?.addEventListener('shown.bs.modal', () => {
             const templateSelect = document.getElementById('lineupTemplateSelect');
