@@ -109,10 +109,18 @@ function initializeLineupEditor(options) {
             if (addButton) {
                 const playerItem = addButton.closest('.list-group-item');
                 const playerName = playerItem.dataset.playerName;
+                const player = roster.find(p => p.name === playerName);
 
-                if (!lineup.lineup_positions.includes(playerName)) {
+                if (player && !lineup.lineup_positions.includes(playerName)) {
+                    // Update state
                     lineup.lineup_positions.push(playerName);
-                    renderLineup();
+
+                    // Manipulate DOM directly instead of full re-render
+                    const newOrderItem = createBattingOrderItem(player);
+                    orderEl.appendChild(newOrderItem);
+                    playerItem.remove();
+
+                    updatePlaceholders();
                 }
             }
         });
@@ -139,8 +147,19 @@ function initializeLineupEditor(options) {
                 }
             } else if (removeButton) {
                 const playerName = playerItem.dataset.playerName;
-                lineup.lineup_positions = lineup.lineup_positions.filter(p => p !== playerName);
-                renderLineup();
+                const player = roster.find(p => p.name === playerName);
+
+                if (player) {
+                    // Update state
+                    lineup.lineup_positions = lineup.lineup_positions.filter(p => p !== playerName);
+
+                    // Manipulate DOM directly
+                    const newBenchItem = createBenchPlayerItem(player);
+                    benchEl.appendChild(newBenchItem);
+                    playerItem.remove();
+
+                    updatePlaceholders();
+                }
             }
         });
     }
