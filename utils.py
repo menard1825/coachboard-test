@@ -99,7 +99,7 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
     today = date.today()
     for player in roster:
         try:
-            player_outings = sorted([o for o in all_outings if o.player_id == player.id], key=lambda x: x.date, reverse=True)
+            player_outings = sorted([o for o in all_outings if o.player_id == player.id and isinstance(o.date, (datetime, date))], key=lambda x: x.date, reverse=True)
             
             daily_pitches = sum(o.pitches or 0 for o in player_outings if o.date.date() == today)
             weekly_pitches = sum(o.pitches or 0 for o in player_outings if (today - o.date.date()).days < 7)
