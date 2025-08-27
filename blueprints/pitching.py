@@ -35,9 +35,10 @@ def add_pitching():
         flash('Pitch count must be a valid number.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
 
+    innings_str = request.form.get('innings', '0')
     try:
-        innings_pitched = float(request.form['innings'])
-    except (ValueError, KeyError):
+        innings_pitched = float(innings_str) if innings_str else 0.0
+    except (ValueError, TypeError):
         flash('Innings pitched must be a valid number.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
 
@@ -63,15 +64,11 @@ def add_pitching():
             return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     opponent = request.form.get('opponent')
-    outing_type = request.form.get('outing_type', 'Game')
     if game:
         opponent = game.opponent
     elif not opponent:
-        if outing_type != 'Game':
-            opponent = outing_type  # Default to the outing type if no opponent is given
-        else:
-            flash('Opponent is required for a game outing.', 'danger')
-            return redirect(request.referrer or url_for('pitching.pitching_page'))
+        flash('Opponent is required.', 'danger')
+        return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     player = db.session.get(Player, player_id)
     if not player:
@@ -124,14 +121,13 @@ def edit_pitching(outing_id):
                 if player:
                     outing_to_edit.player_id = player.id
 
-        new_opponent = request.form.get('opponent')
-        outing_type = request.form.get('outing_type', outing_to_edit.outing_type)
-        if new_opponent:
-            outing_to_edit.opponent = new_opponent
-        elif outing_type != 'Game':
-            outing_to_edit.opponent = outing_type
+        outing_to_edit.opponent = request.form.get('opponent', outing_to_edit.opponent)
         outing_to_edit.pitches = int(request.form.get('pitches', outing_to_edit.pitches))
-        outing_to_edit.innings = float(request.form.get('innings', outing_to_edit.innings))
+        innings_str = request.form.get('innings')
+        if innings_str:
+            outing_to_edit.innings = float(innings_str)
+        else:
+            outing_to_edit.innings = 0.0
         outing_to_edit.pitcher_type = request.form.get('pitcher_type', outing_to_edit.pitcher_type)
         outing_to_edit.outing_type = request.form.get('outing_type', outing_to_edit.outing_type)
         
