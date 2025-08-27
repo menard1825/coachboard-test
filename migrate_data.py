@@ -144,7 +144,7 @@ try:
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
         lineup = Lineup(
-            title=l_data['title'], lineup_positions=json.dumps(l_data.get('lineup_positions', [])),
+            title=l_data['title'], lineup_positions=l_data.get('lineup_positions', []),
             associated_game_id=l_data.get('associated_game_id'), team_id=new_team_id
         )
         session.add(lineup)
@@ -188,7 +188,7 @@ try:
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
         rotation = Rotation(
-            title=r_data['title'], innings=json.dumps(r_data.get('innings', {})),
+            title=r_data['title'], innings=r_data.get('innings', {}),
             associated_game_id=r_data.get('associated_game_id'), team_id=new_team_id
         )
         session.add(rotation)
