@@ -92,7 +92,7 @@ try:
                 role=u_data.get('role', 'Coach'),
                 last_login=parse_date(u_data.get('last_login')),
                 tab_order=json.dumps(u_data.get('tab_order', [])),
-                player_order=json.dumps(u_data.get('player_order', [])),
+                player_order=u_data.get('player_order', []),
                 team_id=new_team_id
             )
             session.add(user)

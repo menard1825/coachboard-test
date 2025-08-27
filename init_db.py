@@ -54,7 +54,7 @@ def initialize_database():
                     role='Super Admin',
                     team_id=team.id,
                     tab_order=json.dumps(default_tab_keys),
-                    player_order=json.dumps([])
+                    player_order=[]
                 )
                 db.session.add(new_user)
 

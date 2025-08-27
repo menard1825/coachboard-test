@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, session
 from db import db
 from models import User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer, Rotation, Game, CollaborationNote, PracticePlan, PlayerDevelopmentFocus, Sign, PlayerGameAbsence, PlayerPracticeAbsence
+from blueprints.auth import get_player_order_as_list
 from utils import model_to_dict, pitching_outing_to_dict, get_pitching_rules_for_team, calculate_pitch_count_summary, calculate_cumulative_pitching_stats, calculate_cumulative_position_stats
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
@@ -26,7 +27,8 @@ def get_session_data():
 
     return jsonify({
         'session': {'username': session.get('username'), 'role': session.get('role')},
-        'player_order': user.player_order or [],
+        # Use the helper function to ensure it's always a list
+        'player_order': get_player_order_as_list(user.player_order),
     })
 
 @api_bp.route('/roster')
