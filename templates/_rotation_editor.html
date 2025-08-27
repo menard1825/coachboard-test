@@ -1,15 +1,15 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="mb-0" id="rotation-editor-title">Defensive Rotation</h5>
-         <div class="btn-group">
-            {# NEW: Add a dropdown for templates #}
-            <select id="rotationTemplateSelect" class="form-select form-select-sm me-2" style="width: auto;">
+         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <select id="rotationTemplateSelect" class="form-select form-select-sm" style="width: auto;">
                 <option value="">-- Load from Template --</option>
             </select>
-            {# NEW: Add "Save as Template" button #}
-            <button id="saveAsTemplateBtn" class="btn btn-secondary btn-sm">Save as Template</button>
-            <button id="saveRotationBtn" class="btn btn-primary btn-sm">Save Rotation</button>
-            <button id="deleteRotationBtn" class="btn btn-outline-danger btn-sm" {% if not rotation.id %}disabled{% endif %}>Delete Rotation</button>
+            <div class="btn-group btn-group-sm" role="group">
+                <button id="saveAsTemplateBtn" class="btn btn-secondary">Save as Template</button>
+                <button id="saveRotationBtn" class="btn btn-primary">Save Rotation</button>
+                <button id="deleteRotationBtn" class="btn btn-outline-danger" {% if not rotation.id %}disabled{% endif %}>Delete</button>
+            </div>
         </div>
     </div>
     <div class="card-body" id="rotation-board">
