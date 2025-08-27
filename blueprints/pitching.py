@@ -63,11 +63,15 @@ def add_pitching():
             return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     opponent = request.form.get('opponent')
+    outing_type = request.form.get('outing_type', 'Game')
     if game:
         opponent = game.opponent
     elif not opponent:
-        flash('Opponent is required.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
+        if outing_type != 'Game':
+            opponent = outing_type  # Default to the outing type if no opponent is given
+        else:
+            flash('Opponent is required for a game outing.', 'danger')
+            return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     player = db.session.get(Player, player_id)
     if not player:
@@ -120,7 +124,12 @@ def edit_pitching(outing_id):
                 if player:
                     outing_to_edit.player_id = player.id
 
-        outing_to_edit.opponent = request.form.get('opponent', outing_to_edit.opponent)
+        new_opponent = request.form.get('opponent')
+        outing_type = request.form.get('outing_type', outing_to_edit.outing_type)
+        if new_opponent:
+            outing_to_edit.opponent = new_opponent
+        elif outing_type != 'Game':
+            outing_to_edit.opponent = outing_type
         outing_to_edit.pitches = int(request.form.get('pitches', outing_to_edit.pitches))
         outing_to_edit.innings = float(request.form.get('innings', outing_to_edit.innings))
         outing_to_edit.pitcher_type = request.form.get('pitcher_type', outing_to_edit.pitcher_type)
