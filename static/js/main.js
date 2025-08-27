@@ -513,10 +513,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             <table class="table table-striped table-hover">
                                 <thead><tr><th>Pitcher</th><th>Total Innings Pitched</th><th>Total Pitches Thrown</th><th>Appearances</th></tr></thead>
                                 <tbody>
-                                    ${roster.filter(p => p.pitcher_role !== 'Not a Pitcher').map(player => {
-                                        const stats = cumulative_pitching_data[player.name] || { total_innings_pitched: 0, total_pitches_thrown: 0, appearances: 0 };
+        ${Object.keys(cumulative_pitching_data).sort().map(playerName => {
+            const stats = cumulative_pitching_data[playerName] || { total_innings_pitched: 0, total_pitches_thrown: 0, appearances: 0 };
                                         return `<tr>
-                                            <td><strong>${escapeHTML(player.name)}</strong></td>
+                <td><strong>${escapeHTML(playerName)}</strong></td>
                                             <td>${stats.total_innings_pitched}</td>
                                             <td>${stats.total_pitches_thrown}</td>
                                             <td>${stats.appearances}</td>

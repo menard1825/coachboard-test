@@ -221,7 +221,17 @@ def get_stats():
     rotations_db = db.session.query(Rotation).filter_by(team_id=team_id).all()
     # --- MODIFICATION END ---
 
-    pitchers = [p for p in roster_db if p.pitcher_role != 'Not a Pitcher']
+    # Get players designated as pitchers
+    designated_pitchers = {p.id: p for p in roster_db if p.pitcher_role != 'Not a Pitcher'}
+
+    # Get players who have any pitching outings logged
+    players_with_outings = {o.player_id: o.player for o in pitching_outings_db if o.player is not None}
+
+    # Combine the two lists (duplicates are handled by the dictionary)
+    combined_pitchers_dict = {**designated_pitchers, **players_with_outings}
+
+    # This is the final list of all players who should be in the summary
+    pitchers = list(combined_pitchers_dict.values())
     cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings_db) for p in pitchers}
 
     # --- MODIFICATION START ---
