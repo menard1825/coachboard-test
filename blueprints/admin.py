@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from werkzeug.security import generate_password_hash
@@ -184,18 +184,15 @@ def change_user_role(username):
 def update_user_details(username):
     user_to_update = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
     if not user_to_update:
-        flash('User not found.', 'danger')
-        return redirect(url_for('.user_management'))
+        return jsonify({'status': 'error', 'message': 'User not found.'}), 404
     if session.get('role') == HEAD_COACH and user_to_update.team_id != session.get('team_id'):
-        flash('You do not have permission to edit this user.', 'danger')
-        return redirect(url_for('.user_management'))
+        return jsonify({'status': 'error', 'message': 'You do not have permission to edit this user.'}), 403
     user_to_update.full_name = request.form.get('full_name')
     db.session.commit()
     if session.get('username') == user_to_update.username:
         session['full_name'] = user_to_update.full_name
-    flash(f"Successfully updated details for {user_to_update.username}.", 'success')
     socketio.emit('data_updated', {'message': f"User {user_to_update.username}'s details updated."})
-    return redirect(url_for('.user_management'))
+    return jsonify({'status': 'success', 'message': f'Successfully updated details for {user_to_update.username}.'})
 
 
 # --- TEAM SETTINGS ROUTES ---

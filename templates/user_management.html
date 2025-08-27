@@ -154,7 +154,21 @@
     </div>
 
     <div class="card">
-        <div class="card-header"><h5 class="mb-0">Current Users</h5></div>
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Current Users</h5>
+                <div class="d-flex align-items-center">
+                    <input type="text" id="user-search" class="form-control form-control-sm me-2" placeholder="Search users...">
+                    <select id="role-filter" class="form-select form-select-sm">
+                        <option value="">All Roles</option>
+                        <option value="Super Admin">Super Admin</option>
+                        <option value="Head Coach">Head Coach</option>
+                        <option value="Assistant Coach">Assistant Coach</option>
+                        <option value="Game Changer">Game Changer</option>
+                    </select>
+                </div>
+            </div>
+        </div>
         <div class="table-responsive">
             <table class="table table-striped table-hover mb-0 align-middle responsive-stack-table">
                 <thead>
@@ -169,10 +183,10 @@
                 </thead>
                 <tbody>
                     {% for user in users %}
-                    <tr>
+                    <tr class="user-row" data-username="{{ user.username }}" data-role="{{ user.role }}">
                         <td data-label="Username"><strong>{{ user.username }}</strong></td>
                         <td data-label="Full Name">
-                            <form action="{{ url_for('admin.update_user_details', username=user.username) }}" method="POST">
+                            <form action="{{ url_for('admin.update_user_details', username=user.username) }}" method="POST" class="update-user-form">
                                 <div class="input-group input-group-sm">
                                     <input type="text" class="form-control" name="full_name" value="{{ user.full_name or '' }}" placeholder="N/A" aria-label="User's full name">
                                     <button class="btn btn-outline-secondary" type="submit" title="Save Name"><i class="bi bi-save"></i></button>
@@ -206,11 +220,91 @@
                         </td>
                     </tr>
                     <div class="modal fade" id="resetPasswordModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reset Password for {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>This will generate a new random password for <strong>{{ user.username }}</strong>. The new password will be displayed in a confirmation message after you click 'Reset'. Are you sure you want to continue?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form action="{{ url_for('admin.reset_password', username=user.username) }}" method="POST" style="display:inline;"><button type="submit" class="btn btn-warning">Reset Password</button></form></div></div></div></div>
-                    <div class="modal fade" id="deleteUserModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Delete User {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-danger"><strong>Warning:</strong> This action cannot be undone. Are you absolutely sure you want to delete the user <strong>{{ user.username }}</strong>?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form action="{{ url_for('admin.delete_user', username=user.username) }}" method="POST" style="display: inline;"><button type="submit" class="btn btn-danger">Delete User</button></form></div></div></div></div>
+                    <div class="modal fade" id="deleteUserModal-{{ user.username }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Delete User {{ user.username }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="text-danger"><strong>Warning:</strong> This action cannot be undone.</p>
+                                    <p>To confirm, please type the username "<strong>{{ user.username }}</strong>" in the box below.</p>
+                                    <input type="text" class="form-control" id="delete-user-confirmation-{{ user.username }}" data-username="{{ user.username }}">
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <form action="{{ url_for('admin.delete_user', username=user.username) }}" method="POST" style="display: inline;">
+                                        <button type="submit" class="btn btn-danger delete-user-button" disabled>Delete User</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userSearch = document.getElementById('user-search');
+    const roleFilter = document.getElementById('role-filter');
+    const userRows = document.querySelectorAll('.user-row');
+
+    function filterUsers() {
+        const searchTerm = userSearch.value.toLowerCase();
+        const selectedRole = roleFilter.value;
+
+        userRows.forEach(row => {
+            const username = row.dataset.username.toLowerCase();
+            const role = row.dataset.role;
+            const matchesSearch = username.includes(searchTerm);
+            const matchesRole = selectedRole === '' || role === selectedRole;
+
+            if (matchesSearch && matchesRole) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    userSearch.addEventListener('input', filterUsers);
+    roleFilter.addEventListener('change', filterUsers);
+
+    document.querySelectorAll('.update-user-form').forEach(form => {
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json()).then(data => {
+                const button = form.querySelector('button');
+                button.innerHTML = '<i class="bi bi-check"></i>';
+                setTimeout(() => {
+                    button.innerHTML = '<i class="bi bi-save"></i>';
+                }, 2000);
+            });
+        });
+    });
+
+    document.querySelectorAll('[id^=delete-user-confirmation-]').forEach(input => {
+        input.addEventListener('input', function() {
+            const username = this.dataset.username;
+            const deleteButton = this.closest('.modal-content').querySelector('.delete-user-button');
+            if (this.value === username) {
+                deleteButton.disabled = false;
+            } else {
+                deleteButton.disabled = true;
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
