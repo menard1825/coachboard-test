@@ -13,6 +13,9 @@
         <span class="navbar-text fw-bold text-truncate">
             vs {{ game['opponent'] }} on {{ game.date | format_datetime }}
         </span>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editGameModal">
+            <i class="bi bi-pencil-square"></i> Edit Game
+        </button>
     </div>
 </nav>
 
@@ -96,6 +99,42 @@
             </div>
         </div>
     </div>
+</div>
+
+{# Edit Game Modal #}
+<div class="modal fade" id="editGameModal" tabindex="-1" aria-labelledby="editGameModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editGameModalLabel">Edit Game</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('gameday.edit_game', game_id=game['id']) }}" method="POST">
+          <div class="modal-body">
+              <div class="mb-3">
+                  <label for="game_date" class="form-label">Date</label>
+                  <input type="date" class="form-control" id="game_date" name="game_date" value="{{ game['date'] }}">
+              </div>
+              <div class="mb-3">
+                  <label for="game_opponent" class="form-label">Opponent</label>
+                  <input type="text" class="form-control" id="game_opponent" name="game_opponent" value="{{ game['opponent'] }}">
+              </div>
+              <div class="mb-3">
+                  <label for="game_location" class="form-label">Location</label>
+                  <input type="text" class="form-control" id="game_location" name="game_location" value="{{ game['location'] }}">
+              </div>
+              <div class="mb-3">
+                  <label for="game_notes" class="form-label">Notes</label>
+                  <textarea class="form-control" id="game_notes" name="game_notes" rows="3">{{ game['game_notes'] }}</textarea>
+              </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="submit" class="btn btn-primary">Save changes</button>
+          </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 {# Modals for editing remain the same #}
