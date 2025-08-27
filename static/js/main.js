@@ -978,14 +978,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
 
-            // The socket event will update other clients, but we can update the UI immediately.
-            if (lineupId) { // Edit
-                const index = AppState.full_data.lineups.findIndex(l => l.id == lineupId);
-                if (index > -1) AppState.full_data.lineups[index] = result.lineup;
-            } else { // Add
-                AppState.full_data.lineups.push(result.lineup);
-            }
-            renderLineups();
+        // MODIFICATION: The local state update is removed.
+        // The websocket event will now solely handle updating the UI to prevent duplication.
             lineupEditorModal.hide();
 
         } catch (error) {
