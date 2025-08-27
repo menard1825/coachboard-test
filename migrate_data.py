@@ -143,8 +143,12 @@ try:
         old_team_id = l_data.get('team_id')
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
+        lineup_data = l_data.get('lineup_positions', [])
+        # Extract just the names to match the application's expected format
+        player_names = [p['name'] for p in lineup_data if isinstance(p, dict) and 'name' in p]
+
         lineup = Lineup(
-            title=l_data['title'], lineup_positions=l_data.get('lineup_positions', []),
+            title=l_data['title'], lineup_positions=player_names,
             associated_game_id=l_data.get('associated_game_id'), team_id=new_team_id
         )
         session.add(lineup)
