@@ -53,12 +53,15 @@
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDesktop">
                     {% if session.role in ['Head Coach', 'Super Admin'] %}
-                    <li><a class="dropdown-item" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i>User Management</a></li>
-                    <li><a class="dropdown-item" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i>Team Settings</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i> User Management</a></li>
+                    {% if session.role == 'Super Admin' %}
+                    <li><a class="dropdown-item" href="{{ url_for('admin.team_management') }}"><i class="bi bi-diagram-3-fill"></i> Team Management</a></li>
+                    {% endif %}
+                    <li><a class="dropdown-item" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i> Team Settings</a></li>
                     <li><hr class="dropdown-divider"></li>
                     {% endif %}
-                    <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i>Change Password</a></li>
-                    <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i>Logout</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i> Change Password</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
                 </ul>
             </li>
             {# Mobile User Menu Button (Visible on small screens) #}
@@ -100,13 +103,16 @@
         <div class="list-group list-group-flush">
             {% if session.role in ['Head Coach', 'Super Admin'] %}
             <h6 class="text-muted ps-3 mt-2 mb-1">Admin Tools</h6>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i>User Management</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i>Team Settings</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i> User Management</a>
+            {% if session.role == 'Super Admin' %}
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.team_management') }}"><i class="bi bi-diagram-3-fill"></i> Team Management</a>
+            {% endif %}
+            <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i> Team Settings</a>
             <hr class="my-2">
             {% endif %}
             <h6 class="text-muted ps-3 mt-2 mb-1">Account</h6>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i>Change Password</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i>Logout</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i> Change Password</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a>
         </div>
       </div>
     </div>

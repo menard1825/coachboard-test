@@ -30,127 +30,61 @@
         </div>
     </div>
 
-    <div class="row">
-        {% if session.role == 'Super Admin' %}
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header"><h5 class="mb-0">Create a New Team</h5></div>
-                <div class="card-body">
-                    <p class="card-text">Create a team to generate a unique registration code for its Head Coach.</p>
-                    <form action="{{ url_for('admin.create_team') }}" method="POST">
-                        <div class="form-floating mb-3">
-                            <input type="text" class="form-control" id="team_name" name="team_name" placeholder="New Team Name" required>
-                            <label for="team_name">New Team Name</label>
+
+    <!-- Add User Modal -->
+    <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="addUserModalLabel">Add a New User</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form action="{{ url_for('admin.add_user') }}" method="POST">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="form-floating"><input type="text" class="form-control" id="username" name="username" placeholder="Username" required><label for="username">Username</label></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="form-floating"><input type="text" class="form-control" id="full_name" name="full_name" placeholder="Full Name"><label for="full_name">Full Name</label></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="form-floating"><input type="password" class="form-control" id="password" name="password" placeholder="Password" required><label for="password">Password</label></div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="form-floating">
+                            <select class="form-select" id="role" name="role">
+                                {% if session.role == 'Super Admin' %}<option value="Super Admin">Super Admin</option>{% endif %}
+                                <option value="Head Coach">Head Coach</option>
+                                <option value="Assistant Coach" selected>Assistant Coach</option>
+                                <option value="Game Changer">Game Changer</option>
+                            </select>
+                            <label for="role">Role</label>
                         </div>
-                        <button type="submit" class="btn btn-success w-100">
-                            <i class="bi bi-plus-circle"></i>
-                            Create Team
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
+                    </div>
 
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header"><h5 class="mb-0">Existing Teams & Codes</h5></div>
-                <div class="card-body">
-                    <p class="card-text">A permanent list of all teams and their registration codes. A team can only be deleted if it has no users.</p>
-                     <ul class="list-group">
-                        {% for team in teams %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                {{ team.team_name }}
-                                <br>
-                                <small class="text-muted" style="font-family: monospace;">{{ team.registration_code }}</small>
-                            </div>
-                            
-                            <span class="d-inline-block" tabindex="0" {% if team.users|length > 0 %}data-bs-toggle="tooltip" title="Cannot delete a team with active users"{% endif %}>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTeamModal-{{ team.id }}" {% if team.users|length > 0 %}disabled style="pointer-events: none;"{% endif %}>
-                                    <i class="bi bi-trash-2"></i>
-                                </button>
-                            </span>
-                        </li>
-
-                        <div class="modal fade" id="deleteTeamModal-{{ team.id }}" tabindex="-1" aria-labelledby="deleteTeamModalLabel-{{ team.id }}" aria-hidden="true">
-                          <div class="modal-dialog">
-                            <div class="modal-content">
-                              <div class="modal-header">
-                                <h5 class="modal-title" id="deleteTeamModalLabel-{{ team.id }}">Delete Team: {{ team.team_name }}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div class="modal-body">
-                                <p class="text-danger"><strong>Warning:</strong> This action cannot be undone.</p>
-                                <p>Are you absolutely sure you want to delete the team <strong>{{ team.team_name }}</strong> and its registration code? This is only possible if no users are assigned to this team.</p>
-                              </div>
-                              <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <a href="{{ url_for('admin.delete_team', team_id=team.id) }}" class="btn btn-danger">Delete Team</a>
-                              </div>
-                            </div>
-                          </div>
+                    {% if session.role == 'Super Admin' %}
+                    <div class="col-md-6 mb-3">
+                        <div class="form-floating">
+                            <select class="form-select" id="team_id" name="team_id" required>
+                                <option value="" disabled selected>Select a Team</option>
+                                {% for team in teams %}
+                                <option value="{{ team.id }}">{{ team.team_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <label for="team_id">Assign to Team</label>
                         </div>
-                        {% else %}
-                        <li class="list-group-item">No teams created yet.</li>
-                        {% endfor %}
-                    </ul>
+                    </div>
+                    {% endif %}
                 </div>
-            </div>
+                <button type="submit" class="btn btn-primary w-100">
+                     <i class="bi bi-person-plus"></i>
+                     Add User
+                </button>
+            </form>
+          </div>
         </div>
-        {% endif %}
-    </div>
-
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="card h-100">
-                <div class="card-header"><h5 class="mb-0">Add a New User to Your Team</h5></div>
-                <div class="card-body">
-                    <form action="{{ url_for('admin.add_user') }}" method="POST">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <div class="form-floating"><input type="text" class="form-control" id="username" name="username" placeholder="Username" required><label for="username">Username</label></div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="form-floating"><input type="text" class="form-control" id="full_name" name="full_name" placeholder="Full Name"><label for="full_name">Full Name</label></div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="form-floating"><input type="password" class="form-control" id="password" name="password" placeholder="Password" required><label for="password">Password</label></div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="form-floating">
-                                    <select class="form-select" id="role" name="role">
-                                        {% if session.role == 'Super Admin' %}<option value="Super Admin">Super Admin</option>{% endif %}
-                                        <option value="Head Coach">Head Coach</option>
-                                        <option value="Assistant Coach" selected>Assistant Coach</option>
-                                        <option value="Game Changer">Game Changer</option>
-                                    </select>
-                                    <label for="role">Role</label>
-                                </div>
-                            </div>
-                            
-                            {% if session.role == 'Super Admin' %}
-                            <div class="col-md-6 mb-3">
-                                <div class="form-floating">
-                                    <select class="form-select" id="team_id" name="team_id" required>
-                                        <option value="" disabled selected>Select a Team</option>
-                                        {% for team in teams %}
-                                        <option value="{{ team.id }}">{{ team.team_name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    <label for="team_id">Assign to Team</label>
-                                </div>
-                            </div>
-                            {% endif %}
-
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">
-                             <i class="bi bi-person-plus"></i>
-                             Add User
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -159,13 +93,16 @@
                 <h5 class="mb-0">Current Users</h5>
                 <div class="d-flex align-items-center">
                     <input type="text" id="user-search" class="form-control form-control-sm me-2" placeholder="Search users...">
-                    <select id="role-filter" class="form-select form-select-sm">
+                    <select id="role-filter" class="form-select form-select-sm me-2">
                         <option value="">All Roles</option>
                         <option value="Super Admin">Super Admin</option>
                         <option value="Head Coach">Head Coach</option>
                         <option value="Assistant Coach">Assistant Coach</option>
                         <option value="Game Changer">Game Changer</option>
                     </select>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                        <i class="bi bi-person-plus"></i> Add New User
+                    </button>
                 </div>
             </div>
         </div>
@@ -185,40 +122,75 @@
                     {% for user in users %}
                     <tr class="user-row" data-username="{{ user.username }}" data-role="{{ user.role }}">
                         <td data-label="Username"><strong>{{ user.username }}</strong></td>
-                        <td data-label="Full Name">
-                            <form action="{{ url_for('admin.update_user_details', username=user.username) }}" method="POST" class="update-user-form">
-                                <div class="input-group input-group-sm">
-                                    <input type="text" class="form-control" name="full_name" value="{{ user.full_name or '' }}" placeholder="N/A" aria-label="User's full name">
-                                    <button class="btn btn-outline-secondary" type="submit" title="Save Name"><i class="bi bi-save"></i></button>
-                                </div>
-                            </form>
-                        </td>
+                        <td data-label="Full Name">{{ user.full_name or 'N/A' }}</td>
                         <td data-label="Role">
                             {% if user.username == session.username %}<span class="badge bg-success">{{ user.role }}</span>
-                            {% else %}
-                            <form action="{{ url_for('admin.change_user_role', username=user.username) }}" method="POST">
-                                <select class="form-select form-select-sm" name="role" onchange="this.form.submit()">
-                                    {% if session.role == 'Super Admin' %}<option value="Super Admin" {% if user.role == 'Super Admin' %}selected{% endif %}>Super Admin</option>{% endif %}
-                                    <option value="Head Coach" {% if user.role == 'Head Coach' %}selected{% endif %}>Head Coach</option>
-                                    <option value="Assistant Coach" {% if user.role == 'Assistant Coach' %}selected{% endif %}>Assistant Coach</option>
-                                    <option value="Game Changer" {% if user.role == 'Game Changer' %}selected{% endif %}>Game Changer</option>
-                                </select>
-                            </form>
-                            {% endif %}
+                            {% else %}{{ user.role }}{% endif %}
                         </td>
                         {% if session.role == 'Super Admin' %}
                         <td data-label="Team">{{ user.team.team_name if user.team else 'N/A' }}</td>
                         {% endif %}
                         <td data-label="Last Login">{{ user.last_login | format_datetime }}</td>
-                        <td data-label="Actions">
+                        <td data-label="Actions" class="text-center">
                             {% if user.username != session.username %}
-                            <div class="btn-group" role="group">
-                               <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resetPasswordModal-{{ user.username }}">Reset Pass</button>
-                               <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal-{{ user.username }}">Delete</button>
-                            </div>
-                            {% else %}<small class="text-muted">N/A</small>{% endif %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editUserModal-{{ user.username }}">
+                                <i class="bi bi-pencil-square"></i> Edit
+                            </button>
+                            {% else %}
+                            <small class="text-muted">N/A</small>
+                            {% endif %}
                         </td>
                     </tr>
+
+                    <!-- Edit User Modal -->
+                    <div class="modal fade" id="editUserModal-{{ user.username }}" tabindex="-1" aria-labelledby="editUserModalLabel-{{ user.username }}" aria-hidden="true">
+                      <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                          <form action="{{ url_for('admin.edit_user', username=user.username) }}" method="POST">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="editUserModalLabel-{{ user.username }}">Edit User: {{ user.username }}</h5>
+                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                              <div class="row">
+                                <div class="col-md-6 mb-3">
+                                  <div class="form-floating">
+                                    <input type="text" class="form-control" id="full_name-{{ user.username }}" name="full_name" value="{{ user.full_name or '' }}" placeholder="Full Name">
+                                    <label for="full_name-{{ user.username }}">Full Name</label>
+                                  </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                  <div class="form-floating">
+                                    <select class="form-select" id="role-{{ user.username }}" name="role">
+                                      {% if session.role == 'Super Admin' %}<option value="Super Admin" {% if user.role == 'Super Admin' %}selected{% endif %}>Super Admin</option>{% endif %}
+                                      <option value="Head Coach" {% if user.role == 'Head Coach' %}selected{% endif %}>Head Coach</option>
+                                      <option value="Assistant Coach" {% if user.role == 'Assistant Coach' %}selected{% endif %}>Assistant Coach</option>
+                                      <option value="Game Changer" {% if user.role == 'Game Changer' %}selected{% endif %}>Game Changer</option>
+                                    </select>
+                                    <label for="role-{{ user.username }}">Role</label>
+                                  </div>
+                                </div>
+                              </div>
+                              <hr>
+                              <h6>Management Actions</h6>
+                              <div class="d-flex flex-wrap gap-2">
+                                  <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resetPasswordModal-{{ user.username }}">
+                                      <i class="bi bi-key-fill"></i> Reset Password
+                                  </button>
+                                  <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal-{{ user.username }}">
+                                      <i class="bi bi-trash"></i> Delete User
+                                  </button>
+                              </div>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                              <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save Changes</button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+
                     <div class="modal fade" id="resetPasswordModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reset Password for {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>This will generate a new random password for <strong>{{ user.username }}</strong>. The new password will be displayed in a confirmation message after you click 'Reset'. Are you sure you want to continue?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form action="{{ url_for('admin.reset_password', username=user.username) }}" method="POST" style="display:inline;"><button type="submit" class="btn btn-warning">Reset Password</button></form></div></div></div></div>
                     <div class="modal fade" id="deleteUserModal-{{ user.username }}" tabindex="-1">
                         <div class="modal-dialog">

@@ -34,6 +34,18 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def super_admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('auth.login'))
+        if session.get('role') != SUPER_ADMIN:
+            flash('You must be a Super Admin to access this page.', 'danger')
+            return redirect(url_for('admin.user_management'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # --- USER & TEAM MANAGEMENT ROUTES ---
 @admin_bp.route('/users')
 @admin_required
@@ -41,11 +53,18 @@ def user_management():
     teams = []
     if session.get('role') == SUPER_ADMIN:
         users = db.session.query(User).options(joinedload(User.team)).all()
-        teams = db.session.query(Team).options(joinedload(Team.users)).order_by(Team.team_name).all()
+        teams = db.session.query(Team).order_by(Team.team_name).all()
     else:
         users = db.session.query(User).filter_by(team_id=session['team_id']).options(joinedload(User.team)).all()
 
     return render_template('user_management.html', users=users, teams=teams, session=session)
+
+
+@admin_bp.route('/teams')
+@super_admin_required
+def team_management():
+    teams = db.session.query(Team).options(joinedload(Team.users)).order_by(Team.team_name).all()
+    return render_template('team_management.html', teams=teams, session=session)
 
 
 @admin_bp.route('/add_user', methods=['POST'])
@@ -146,53 +165,53 @@ def reset_password(username):
     return redirect(url_for('.user_management'))
 
 
-@admin_bp.route('/change_role/<username>', methods=['POST'])
+@admin_bp.route('/edit_user/<username>', methods=['POST'])
 @admin_required
-def change_user_role(username):
-    user_to_change = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
-    if not user_to_change:
+def edit_user(username):
+    user_to_edit = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
+    if not user_to_edit:
         flash('User not found.', 'danger')
         return redirect(url_for('.user_management'))
-    if session.get('role') == HEAD_COACH and user_to_change.team_id != session.get('team_id'):
+
+    # Permission check: Head Coach can only edit users on their team
+    if session.get('role') == HEAD_COACH and user_to_edit.team_id != session.get('team_id'):
         flash('You do not have permission to edit this user.', 'danger')
         return redirect(url_for('.user_management'))
-    
-    # MODIFIED: Check against the user's role instead of hardcoded username
-    if user_to_change.role == SUPER_ADMIN and user_to_change.username == session['username']:
-        # This is a self-demotion attempt
-        if db.session.query(User).filter_by(role=SUPER_ADMIN).count() == 1:
-            flash('You cannot demote yourself as the sole Super Admin. Assign another Super Admin first.', 'danger')
-            return redirect(url_for('.user_management'))
-    
+
+    new_full_name = request.form.get('full_name')
     new_role = request.form.get('role')
-    if new_role == SUPER_ADMIN and session.get('role') != SUPER_ADMIN:
-        flash('Only a Super Admin can assign the Super Admin role.', 'danger')
-        return redirect(url_for('.user_management'))
-        
-    if new_role in [HEAD_COACH, 'Assistant Coach', 'Game Changer', SUPER_ADMIN]:
-        user_to_change.role = new_role
-        db.session.commit()
-        flash(f"Successfully changed {username}'s role to {new_role}.", 'success')
-        socketio.emit('data_updated', {'message': f"User {username}'s role changed."})
-    else:
-        flash('Invalid role selected.', 'danger')
-    return redirect(url_for('.user_management'))
 
+    # Update Full Name
+    user_to_edit.full_name = new_full_name
+    if session.get('username') == user_to_edit.username:
+        session['full_name'] = user_to_edit.full_name
 
-@admin_bp.route('/update_user_details/<username>', methods=['POST'])
-@admin_required
-def update_user_details(username):
-    user_to_update = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
-    if not user_to_update:
-        return jsonify({'status': 'error', 'message': 'User not found.'}), 404
-    if session.get('role') == HEAD_COACH and user_to_update.team_id != session.get('team_id'):
-        return jsonify({'status': 'error', 'message': 'You do not have permission to edit this user.'}), 403
-    user_to_update.full_name = request.form.get('full_name')
+    # Update Role
+    if new_role and new_role != user_to_edit.role:
+        # Prevent self-demotion if the user is the sole Super Admin
+        if user_to_edit.role == SUPER_ADMIN and user_to_edit.username == session['username']:
+            if db.session.query(User).filter_by(role=SUPER_ADMIN).count() == 1:
+                flash('You cannot demote yourself as the sole Super Admin. Assign another Super Admin first.', 'danger')
+                db.session.rollback() # Rollback name change
+                return redirect(url_for('.user_management'))
+
+        # Prevent non-Super Admins from assigning Super Admin role
+        if new_role == SUPER_ADMIN and session.get('role') != SUPER_ADMIN:
+            flash('Only a Super Admin can assign the Super Admin role.', 'danger')
+            db.session.rollback() # Rollback name change
+            return redirect(url_for('.user_management'))
+
+        if new_role in [HEAD_COACH, 'Assistant Coach', 'Game Changer', SUPER_ADMIN]:
+            user_to_edit.role = new_role
+        else:
+            flash('Invalid role selected.', 'danger')
+            db.session.rollback() # Rollback name change
+            return redirect(url_for('.user_management'))
+
     db.session.commit()
-    if session.get('username') == user_to_update.username:
-        session['full_name'] = user_to_update.full_name
-    socketio.emit('data_updated', {'message': f"User {user_to_update.username}'s details updated."})
-    return jsonify({'status': 'success', 'message': f'Successfully updated details for {user_to_update.username}.'})
+    flash(f"Successfully updated user {username}.", 'success')
+    socketio.emit('data_updated', {'message': f"User {username}'s details updated."})
+    return redirect(url_for('.user_management'))
 
 
 # --- TEAM SETTINGS ROUTES ---
@@ -270,51 +289,43 @@ def upload_logo():
     return redirect(url_for('.admin_settings'))
 
 @admin_bp.route('/create_team', methods=['POST'])
-@admin_required
+@super_admin_required
 def create_team():
-    if session.get('role') != SUPER_ADMIN:
-        flash('You do not have permission to perform this action.', 'danger')
-        return redirect(url_for('.user_management'))
-
     team_name = request.form.get('team_name')
     if not team_name:
         flash('Team Name is required.', 'danger')
-        return redirect(url_for('.user_management'))
+        return redirect(url_for('.team_management'))
 
     if db.session.query(Team).filter(func.lower(Team.team_name) == func.lower(team_name)).first():
         flash(f'A team with the name "{team_name}" already exists.', 'danger')
-        return redirect(url_for('.user_management'))
+        return redirect(url_for('.team_management'))
 
     new_team = Team(team_name=team_name, registration_code=str(uuid.uuid4()).split('-')[-1])
     db.session.add(new_team)
     db.session.commit()
 
     flash(f'Team "{new_team.team_name}" created successfully!', 'success')
-    return redirect(url_for('.user_management'))
+    return redirect(url_for('.team_management'))
 
 @admin_bp.route('/delete_team/<int:team_id>')
-@admin_required
+@super_admin_required
 def delete_team(team_id):
-    if session.get('role') != SUPER_ADMIN:
-        flash('You do not have permission to perform this action.', 'danger')
-        return redirect(url_for('.user_management'))
-
     team_to_delete = db.session.get(Team, team_id)
     if not team_to_delete:
         flash('Team not found.', 'danger')
-        return redirect(url_for('.user_management'))
+        return redirect(url_for('.team_management'))
 
     if team_to_delete.id == session.get('team_id'):
         flash('You cannot delete your own active team.', 'danger')
-        return redirect(url_for('.user_management'))
+        return redirect(url_for('.team_management'))
 
     user_count = db.session.query(User).filter_by(team_id=team_id).count()
     if user_count > 0:
         flash(f'Cannot delete team "{team_to_delete.team_name}" because it has {user_count} user(s).', 'danger')
-        return redirect(url_for('.user_management'))
+        return redirect(url_for('.team_management'))
 
     flash(f'Successfully deleted team "{team_to_delete.team_name}".', 'success')
     db.session.delete(team_to_delete)
     db.session.commit()
     socketio.emit('data_updated', {'message': f'Team {team_to_delete.team_name} deleted.'})
-    return redirect(url_for('.user_management'))
+    return redirect(url_for('.team_management'))
