@@ -186,6 +186,12 @@ body {
 .d-lg-none .player-tag { cursor: pointer; }
 .bench-list .player-tag { background-color: var(--text-muted); border-color: #5c636a; }
 
+.player-tag.out-of-position {
+    background-color: #ffc107; /* A warning yellow */
+    color: #000;
+    border-color: #e6ac00;
+}
+
 /* Position coordinates for the diamond */
 .pos-P  { top: 52%; left: 50%; }
 .pos-C  { top: 83%; left: 50%; }

@@ -63,20 +63,35 @@ function initializeGameManagement(gameData) {
 
     function renderRotationDiamondAndBench() {
         const currentInningData = state.rotation.innings[state.currentInning] || {};
-        const createPlayerTag = (playerName) => `<div class="player-tag" data-player-name="${escapeHTML(playerName)}">${escapeHTML(playerName)}</div>`;
+
+        // Note: The original createPlayerTag is now modified to accept a player object
+        const createPlayerTag = (player) => {
+            const primaryPos = player.position1 ? ` (${escapeHTML(player.position1)})` : '';
+            return `<div class="player-tag" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
+        };
+
+        // Modify the rendering of player tags on the diamond to pass the full player object
         document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => tag.remove());
         for (const [pos, playerName] of Object.entries(currentInningData)) {
-            const dropzoneDesktop = document.getElementById(`pos-desktop-${pos}`);
-            const dropzoneMobile = document.getElementById(`pos-mobile-${pos}`);
-            if (dropzoneDesktop) dropzoneDesktop.insertAdjacentHTML('beforeend', createPlayerTag(playerName));
-            if (dropzoneMobile) dropzoneMobile.insertAdjacentHTML('beforeend', createPlayerTag(playerName));
+            const player = state.roster.find(p => p.name === playerName);
+            if (player) {
+                const dropzoneDesktop = document.getElementById(`pos-desktop-${pos}`);
+                const dropzoneMobile = document.getElementById(`pos-mobile-${pos}`);
+                if (dropzoneDesktop) dropzoneDesktop.insertAdjacentHTML('beforeend', createPlayerTag(player));
+                if (dropzoneMobile) dropzoneMobile.insertAdjacentHTML('beforeend', createPlayerTag(player));
+            }
         }
+
+        // Update the bench rendering logic
         const assignedPlayers = new Set(Object.values(currentInningData));
         const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
         const benchDesktop = document.getElementById('bench-list-desktop');
         if(benchDesktop) {
-            benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p.name)).join('');
+            // Pass the full player object to the updated createPlayerTag function
+            benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p)).join('');
         }
+
+        applyOutOfPositionIndicators(); // Add this line at the end
     }
 
     function updatePlayingTimeSummary() {
@@ -134,6 +149,23 @@ function initializeGameManagement(gameData) {
                     }
                 }
             });
+        });
+    }
+
+    function applyOutOfPositionIndicators() {
+        document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => {
+            const playerName = tag.dataset.playerName;
+            const position = tag.closest('.position-dropzone').dataset.position;
+            const player = state.roster.find(p => p.name === playerName);
+
+            if (player && position) {
+                const primaryPositions = [player.position1, player.position2, player.position3];
+                if (!primaryPositions.includes(position)) {
+                    tag.classList.add('out-of-position');
+                } else {
+                    tag.classList.remove('out-of-position');
+                }
+            }
         });
     }
 
@@ -317,6 +349,33 @@ function initializeGameManagement(gameData) {
             updatePlayingTimeSummary();
         });
         document.getElementById('cancelPasteBtn')?.addEventListener('click', exitCopyMode);
+
+        document.getElementById('clearInningBtn')?.addEventListener('click', () => {
+            if (!state.rotation || !state.currentInning) return;
+            if (confirm(`Are you sure you want to clear all positions for inning ${state.currentInning}?`)) {
+                state.rotation.innings[state.currentInning] = {};
+                renderRotationEditor();
+            }
+        });
+
+        document.getElementById('copyPreviousInningBtn')?.addEventListener('click', () => {
+            if (!state.rotation) return;
+            const currentInningNum = parseInt(state.currentInning);
+            if (currentInningNum <= 1) {
+                alert("There is no previous inning to copy.");
+                return;
+            }
+            const previousInningNum = currentInningNum - 1;
+            const previousInningData = state.rotation.innings[previousInningNum];
+            if (previousInningData) {
+                 if (confirm(`This will overwrite inning ${currentInningNum} with the positions from inning ${previousInningNum}. Continue?`)) {
+                    state.rotation.innings[currentInningNum] = { ...previousInningData };
+                    renderRotationEditor();
+                }
+            } else {
+                alert(`Inning ${previousInningNum} has no data to copy.`);
+            }
+        });
     }
 
     // --- Initial Page Render ---
