@@ -42,7 +42,7 @@ def add_scouted_player():
         )
         db.session.add(new_player)
         db.session.commit()
-        socketio.emit('data_updated', {'message': 'New scouted player added.'})
+        socketio.emit('scouting_update', {'message': 'New scouted player added.'})
         return jsonify({'status': 'success', 'message': f'Player "{new_player.name}" added to {scouted_player_type.replace("_", " ").title()} list.'})
     except Exception as e:
         print(f"Error adding scouted player: {e}")
@@ -56,7 +56,7 @@ def delete_scouted_player(list_type, player_id):
         db.session.delete(player_to_delete)
         db.session.commit()
         flash(f'Removed {player_name} from the scouting list.', 'success')
-        socketio.emit('data_updated', {'message': f'Scouted player {player_name} removed.'})
+        socketio.emit('scouting_update', {'message': f'Scouted player {player_name} removed.'})
     else:
         flash(f'Could not find the player to remove.', 'warning')
     return redirect(url_for('home', _anchor='scouting_list'))
@@ -68,7 +68,7 @@ def move_scouted_player(from_type, to_type, player_id):
         player_to_move.list_type = to_type
         db.session.commit()
         flash(f'Player "{player_to_move.name}" moved to {to_type.replace("_", " ").title()} list.', 'success')
-        socketio.emit('data_updated', {'message': f'Scouted player {player_to_move.name} moved.'})
+        socketio.emit('scouting_update', {'message': f'Scouted player {player_to_move.name} moved.'})
     else:
         flash('Could not move player.', 'danger')
     return redirect(url_for('home', _anchor='scouting_list'))
@@ -107,5 +107,5 @@ def move_scouted_player_to_roster(player_id):
         
     db.session.commit()
     flash(f'Player "{new_roster_player.name}" moved to Roster. Please assign a number.', 'success')
-    socketio.emit('data_updated', {'message': f'Scouted player {new_roster_player.name} moved to roster.'})
+    socketio.emit('scouting_update', {'message': f'Scouted player {new_roster_player.name} moved to roster.'})
     return redirect(url_for('home', _anchor='scouting_list'))
