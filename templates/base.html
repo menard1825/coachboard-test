@@ -19,6 +19,14 @@
     {% endif %}
     
     <link rel="manifest" href="{{ url_for('serve_manifest') }}">
+
+    {# NEW: Apply team-specific colors as CSS variables #}
+    <style>
+      :root {
+        --primary-color: {{ current_team.primary_color|default('#343A40') }};
+        --secondary-color: {{ current_team.secondary_color|default('#E5E7EB') }};
+      }
+    </style>
     
     {% block head %}{% endblock %}
 </head>

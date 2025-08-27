@@ -19,7 +19,7 @@ body {
    Navbar Styles (Top - Desktop)
    ========================================================================== */
 .navbar {
-    background-color: #343A40;
+    background-color: var(--primary-color); /* MODIFIED: Was #343A40 */
     border-bottom: 3px solid rgba(0, 0, 0, 0.15);
 }
 
