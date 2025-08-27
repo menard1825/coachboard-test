@@ -138,6 +138,8 @@ function initializeLineupEditor(options) {
     benchEl.sortable = new Sortable(benchEl, {
         group: 'lineup',
         animation: 150,
+        filter: '.add-to-lineup-btn', // Prevent drag from starting on this button
+        preventOnFilter: true,      // Allow default click behavior on the button
         onEnd: () => {
             lineup.lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
             renderLineup();
