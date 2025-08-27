@@ -284,22 +284,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const summaryContainer = document.getElementById('pitch-count-summary-container');
         if (summaryContainer) {
             const summaryData = AppState.pitch_count_summary || {};
+            const roster = AppState.full_data.roster || [];
+
+            const pitchers = roster.filter(p => {
+                const summary = summaryData[p.name];
+                return p.pitcher_role !== 'Not a Pitcher' || (summary && (summary.daily > 0 || summary.weekly > 0));
+            });
+
+            const sortedPitchers = pitchers.sort((a, b) => {
+                const indexA = AppState.player_order.indexOf(a.name);
+                const indexB = AppState.player_order.indexOf(b.name);
+                if (indexA === -1 && indexB === -1) return a.name.localeCompare(b.name);
+                if (indexA === -1) return 1;
+                if (indexB === -1) return -1;
+                return indexA - indexB;
+            });
+
             let summaryHtml = '<div class="table-responsive"><table class="table table-sm table-bordered table-striped"><thead class="table-light"><tr><th>Pitcher</th><th>Daily Max</th><th>Weekly</th><th>Status</th></tr></thead><tbody>';
-            if (Object.keys(summaryData).length > 0) {
-                const sortedPitchers = AppState.player_order.filter(name => summaryData[name]);
-                for (const name of sortedPitchers) {
+            if (sortedPitchers.length > 0) {
+                for (const pitcher of sortedPitchers) {
+                    const name = pitcher.name;
                     const counts = summaryData[name];
-                    const dailyPct = Math.min((counts.daily / counts.max_daily * 100), 100);
-                    const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
-                    const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
-                    const statusBadge = counts.status === 'Available' ? '<span class="badge bg-success">Available</span>' : '<span class="badge bg-danger">Resting</span>';
-                    const nextAvailableText = counts.status === 'Resting' ? `<br><small class="text-muted">Next up: ${counts.next_available}</small>` : '';
-                    summaryHtml += `<tr><td class="align-middle"><strong>${escapeHTML(name)}</strong></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div><small class="text-muted">${counts.pitches_remaining_today} remaining</small></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div></div></td><td class="text-center align-middle">${statusBadge}${nextAvailableText}</td></tr>`;
+                    if (counts) {
+                        const dailyPct = Math.min((counts.daily / counts.max_daily * 100), 100);
+                        const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
+                        const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
+                        const statusBadge = counts.status === 'Available' ? '<span class="badge bg-success">Available</span>' : '<span class="badge bg-danger">Resting</span>';
+                        const nextAvailableText = counts.status === 'Resting' ? `<br><small class="text-muted">Next up: ${counts.next_available}</small>` : '';
+                        summaryHtml += `<tr><td class="align-middle"><strong>${escapeHTML(name)}</strong></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div><small class="text-muted">${counts.pitches_remaining_today} remaining</small></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div></div></td><td class="text-center align-middle">${statusBadge}${nextAvailableText}</td></tr>`;
+                    }
                 }
             } else { summaryHtml += '<tr><td colspan="4" class="text-center text-muted">No pitching data.</td></tr>'; }
             summaryHtml += '</tbody></table></div>';
             summaryContainer.innerHTML = summaryHtml;
         }
+
         const pitcherSelect = document.getElementById('pitching-log-pitcher-select');
         if (pitcherSelect) {
             pitcherSelect.innerHTML = '<option value="">Select Pitcher</option>' + AppState.full_data.roster.map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('');
