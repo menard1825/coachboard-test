@@ -114,7 +114,7 @@ def create_app():
             flash('User or team not found.', 'danger')
             return redirect(url_for('auth.login'))
 
-        all_tabs = {'overview': 'Overview', 'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineup Templates', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotations', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
+        all_tabs = {'overview': 'Overview', 'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineup Templates', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotation Templates', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
         default_tab_order = list(all_tabs.keys())
 
         final_tab_order = []

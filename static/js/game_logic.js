@@ -15,6 +15,8 @@ function initializeGameManagement(gameData) {
         rotation: gameData.rotation || { id: null, title: `Rotation for vs ${gameData.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
         game: gameData.game,
         lineup_templates: gameData.lineup_templates || [],
+        // NEW: Add rotation_templates to the state
+        rotation_templates: gameData.rotation_templates || [],
         currentInning: '1',
         copiedInningData: null,
         sortableInstances: {}
@@ -249,6 +251,37 @@ function applyOutOfPositionIndicators() {
 
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
+
+        // NEW: Populate and handle the rotation template dropdown
+        const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');
+        if (rotationTemplateSelect) {
+            state.rotation_templates.forEach(rt => {
+                const inningsCount = rt.innings ? Object.keys(rt.innings).length : 0;
+                const option = new Option(`${rt.title} (${inningsCount} innings)`, rt.id);
+                rotationTemplateSelect.add(option);
+            });
+
+            rotationTemplateSelect.addEventListener('change', (e) => {
+                const selectedTemplateId = e.target.value;
+                if (selectedTemplateId) {
+                    const selectedTemplate = state.rotation_templates.find(rt => rt.id == selectedTemplateId);
+                    if (selectedTemplate && confirm(`This will overwrite the current rotation with the "${selectedTemplate.title}" template. Are you sure?`)) {
+                        // Deep copy the innings data to avoid reference issues
+                        state.rotation.innings = JSON.parse(JSON.stringify(selectedTemplate.innings));
+                        // Ensure at least one inning exists
+                        if (Object.keys(state.rotation.innings).length === 0) {
+                            state.rotation.innings['1'] = {};
+                        }
+                        // Set the current inning to the first available inning from the template
+                        state.currentInning = Object.keys(state.rotation.innings).sort((a,b) => parseInt(a) - parseInt(b))[0];
+                        renderRotationEditor();
+                        alert('Rotation template loaded successfully!');
+                    }
+                    // Reset the select so you can re-apply the same template if needed
+                    e.target.value = '';
+                }
+            });
+        }
 
         document.getElementById('lineupEditorModal')?.addEventListener('shown.bs.modal', () => {
             const templateSelect = document.getElementById('lineupTemplateSelect');

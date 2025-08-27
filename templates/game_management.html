@@ -166,7 +166,9 @@
             lineup: {{ lineup|tojson }},
             rotation: {{ rotation|tojson }},
             absent_player_ids: {{ absent_player_ids|tojson }},
-            lineup_templates: {{ lineup_templates|tojson }}
+            lineup_templates: {{ lineup_templates|tojson }},
+            // NEW: Add rotation_templates to the data passed to the script
+            rotation_templates: {{ rotation_templates|tojson }}
         };
         initializeGameManagement(gameData);
     });

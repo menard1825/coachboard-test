@@ -51,6 +51,9 @@ def game_management(game_id):
 
     lineup_templates = db.session.query(Lineup).filter_by(team_id=team.id, associated_game_id=None).all()
 
+    # NEW: Query for unassigned rotations to use as templates
+    rotation_templates = db.session.query(Rotation).filter_by(team_id=team.id, associated_game_id=None).all()
+
     return render_template('game_management.html', 
                            game=model_to_dict(game),
                            roster=[model_to_dict(p) for p in roster_objects],
@@ -60,7 +63,9 @@ def game_management(game_id):
                            session=session, 
                            absent_player_ids=absent_player_ids,
                            pitch_count_summary=pitch_count_summary,
-                           lineup_templates=[model_to_dict(lt) for lt in lineup_templates])
+                           lineup_templates=[model_to_dict(lt) for lt in lineup_templates],
+                           # NEW: Pass rotation templates to the render_template call
+                           rotation_templates=[model_to_dict(rt) for rt in rotation_templates])
 
 @gameday_bp.route('/add_game', methods=['POST'])
 def add_game():
