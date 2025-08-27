@@ -35,10 +35,9 @@ def add_pitching():
         flash('Pitch count must be a valid number.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
 
-    innings_str = request.form.get('innings', '0')
     try:
-        innings_pitched = float(innings_str) if innings_str else 0.0
-    except (ValueError, TypeError):
+        innings_pitched = float(request.form['innings'])
+    except (ValueError, KeyError):
         flash('Innings pitched must be a valid number.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
 
@@ -123,11 +122,7 @@ def edit_pitching(outing_id):
 
         outing_to_edit.opponent = request.form.get('opponent', outing_to_edit.opponent)
         outing_to_edit.pitches = int(request.form.get('pitches', outing_to_edit.pitches))
-        innings_str = request.form.get('innings')
-        if innings_str:
-            outing_to_edit.innings = float(innings_str)
-        else:
-            outing_to_edit.innings = 0.0
+        outing_to_edit.innings = float(request.form.get('innings', outing_to_edit.innings))
         outing_to_edit.pitcher_type = request.form.get('pitcher_type', outing_to_edit.pitcher_type)
         outing_to_edit.outing_type = request.form.get('outing_type', outing_to_edit.outing_type)
         

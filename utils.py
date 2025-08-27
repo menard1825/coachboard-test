@@ -70,26 +70,46 @@ def calculate_cumulative_pitching_stats(player_id, all_outings):
     stats['total_innings_pitched'] = round(stats['total_innings_pitched'], 1)
     return stats
 
-def calculate_cumulative_position_stats(roster_players, lineups):
-    """Calculates the number of games a player appeared at each position in a lineup."""
+def calculate_cumulative_position_stats(roster_players, rotations):
+    """Calculates the number of games a player appeared at each position in a rotation."""
     stats = {player.name: {} for player in roster_players}
-    for lineup in lineups:
+
+    # Create a set to track which players have already been counted for a specific game
+    # to prevent counting them multiple times for the same game rotation.
+    game_rotations_counted = set()
+
+    for rotation in rotations:
+        # A rotation is tied to a single game, so we use its ID to track.
+        # If no associated game, we can use the rotation's own ID as a unique identifier.
+        rotation_key = rotation.associated_game_id or rotation.id
+
+        # Skip if we've already processed this game/rotation
+        if rotation_key in game_rotations_counted:
+            continue
+
         try:
-            # lineup_positions is a JSON list of dictionaries like:
-            # '[{"name": "Player A", "position": "1B"}, ...]'
-            lineup_data = lineup.lineup_positions or []
-            if not isinstance(lineup_data, list):
+            innings_data = rotation.innings or {}
+            if not isinstance(innings_data, dict):
                 continue
 
-            for player_info in lineup_data:
-                player_name = player_info.get('name')
-                position = player_info.get('position')
+            players_in_this_rotation = set()
+            # Iterate through each inning in the rotation
+            for inning, positions in innings_data.items():
+                # Iterate through each position assignment in the inning
+                for position, player_name in positions.items():
+                    # Add the player to a set for this rotation.
+                    # We only count a player once per position per game rotation.
+                    player_position_tuple = (player_name, position)
 
-                # Ensure the player is in the current roster and has a position
-                if player_name in stats and position:
-                    stats[player_name][position] = stats[player_name].get(position, 0) + 1
+                    if player_name in stats and player_position_tuple not in players_in_this_rotation:
+                        stats[player_name][position] = stats[player_name].get(position, 0) + 1
+                        players_in_this_rotation.add(player_position_tuple)
+
+            # Mark this game/rotation as counted
+            game_rotations_counted.add(rotation_key)
+
         except Exception:
-            # Safely skip any lineup that has malformed data
+            # Safely skip any rotation that has malformed data
             continue
     return stats
 
