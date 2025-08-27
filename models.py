@@ -210,6 +210,7 @@ class PlayerDevelopmentFocus(db.Model):
     focus = Column(Text, nullable=False)
     status = Column(String, default="active")
     notes = Column(Text)
+    progress_notes = Column(Text, nullable=True) # New field
     created_date = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
     completed_date = Column(DateTime, nullable=True) # Changed to DateTime
     author = Column(String)

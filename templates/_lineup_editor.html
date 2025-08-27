@@ -7,7 +7,15 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="text-muted">Drag and drop players between the bench and the batting order. Drag players within the batting order to rearrange them.</p>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="lineupTemplateSelect" class="form-label">Load from Template</label>
+                        <select id="lineupTemplateSelect" class="form-select">
+                            <option value="">-- Select a Template --</option>
+                            </select>
+                    </div>
+                </div>
+                <p class="text-muted">Or, build a new lineup below. Drag and drop players...</p>
                 <form onsubmit="return false;">
                     <input type="hidden" id="lineupId" name="lineup_id" value="{{ lineup.id or '' }}">
                     <div class="mb-3">

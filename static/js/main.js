@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (log.type === 'Development') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-focus-id="${log.id}" data-player-name="${pNameSafe}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_focus/${log.id}" data-delete-name="this focus">Delete</button>`;
                 else if (log.type === 'Coach Note') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${log.id}" data-note-type="player_notes" data-note-text="${escapeHTML(log.text)}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_note/player_notes/${log.id}" data-delete-name="this note">Delete</button>`;
             }
-            return `<li class="list-group-item ${itemClass}"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${mainText}</span>${statusText}</h6><small>${formatDateTime(log.date)}</small></div>${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}<small class="text-muted">By: ${escapeHTML(log.author)}</small>${actions ? `<div class="mt-2">${actions}</div>` : ''}</li>`;
+            return `<li class="list-group-item ${itemClass}"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${mainText}</span>${statusText}</h6><small>${formatDateTime(log.date)}</small></div>${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}${log.progress_notes ? `<p class="mb-1 text-muted small fst-italic">Progress: ${escapeHTML(log.progress_notes)}</p>` : ''}<small class="text-muted">By: ${escapeHTML(log.author)}</small>${actions ? `<div class="mt-2">${actions}</div>` : ''}</li>`;
         }).join('')}</ul>` : `<div class="text-center p-3 border rounded"><p class="mb-0">No activity logged.</p></div>`;
         container.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -542,7 +542,56 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = `<div class="row">${attendanceTable}${pitchingTable}${positionTable}</div>`;
     }
 
+    function renderOverview() {
+        const container = document.getElementById('overview-content-container');
+        if (!container) return;
+
+        // Since the data is already fetched in init(), we can access it from AppState
+        const { next_game, pitchers_on_rest, recent_notes } = AppState.full_data.overview || {};
+
+        if (!next_game && !pitchers_on_rest && !recent_notes) {
+            container.innerHTML = `<div class="p-3 text-center text-muted">Loading overview data...</div>`;
+            return;
+        }
+
+        let nextGameHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Next Game</h5></div><div class="card-body">';
+        if (next_game) {
+            nextGameHtml += `<h5 class="card-title">vs ${escapeHTML(next_game.opponent)}</h5>
+                             <p class="card-text">${formatDateTime(next_game.date)} at ${escapeHTML(next_game.location || 'TBD')}</p>
+                             <a href="/game/${next_game.id}" class="btn btn-primary">Manage Game</a>`;
+        } else {
+            nextGameHtml += '<p class="text-muted">No upcoming games scheduled.</p>';
+        }
+        nextGameHtml += '</div></div>';
+
+        let pitchersOnRestHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Pitchers on Rest</h5></div><ul class="list-group list-group-flush">';
+        if (pitchers_on_rest && Object.keys(pitchers_on_rest).length > 0) {
+            for (const [name, data] of Object.entries(pitchers_on_rest)) {
+                pitchersOnRestHtml += `<li class="list-group-item">${escapeHTML(name)} - Available on ${data.next_available}</li>`;
+            }
+        } else {
+            pitchersOnRestHtml += '<li class="list-group-item text-muted">All pitchers are available.</li>';
+        }
+        pitchersOnRestHtml += '</ul></div>';
+
+        let recentNotesHtml = '<div class="card"><div class="card-header"><h5 class="mb-0">Recent Coaches Log</h5></div><div class="card-body">';
+        if (recent_notes && recent_notes.length > 0) {
+            recentNotesHtml += recent_notes.map(note => `
+                <div class="mb-2">
+                    <p class="mb-0">${escapeHTML(note.text)}</p>
+                    <small class="text-muted">-- ${escapeHTML(note.author)} on ${formatDateTime(note.timestamp)}</small>
+                </div>
+            `).join('<hr>');
+        } else {
+            recentNotesHtml += '<p class="text-muted">No recent notes.</p>';
+        }
+        recentNotesHtml += '</div></div>';
+
+        container.innerHTML = `<div class="row"><div class="col-md-6">${nextGameHtml}${pitchersOnRestHtml}</div><div class="col-md-6">${recentNotesHtml}</div></div>`;
+    }
+
     function renderAll() {
+        renderOverview();
         renderRoster();
         renderPlayerDevelopmentList();
         renderPlayerDevelopmentDetails();
@@ -634,7 +683,8 @@ document.addEventListener('DOMContentLoaded', () => {
             practice_plans: '/api/practice_plans',
             player_development: '/api/player_development',
             signs: '/api/signs',
-            stats: '/api/stats'
+            stats: '/api/stats',
+            overview: '/api/overview_data'
         };
 
         const requests = Object.entries(endpoints).map(([key, url]) =>
@@ -668,7 +718,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 signs: results[dataKeys.indexOf('signs')],
                 cumulative_pitching_data: statsData.cumulative_pitching_data,
                 cumulative_position_data: statsData.cumulative_position_data,
-                attendance_stats: statsData.attendance_stats
+                attendance_stats: statsData.attendance_stats,
+                overview: results[dataKeys.indexOf('overview')]
             }
         });
     }
@@ -1032,6 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     form.querySelector('#focusSkill').value = focusItem.subtype;
                     form.querySelector('#focusText').value = focusItem.text;
                     form.querySelector('#focusNotes').value = focusItem.notes || '';
+                    form.querySelector('#focusProgressNotes').value = focusItem.progress_notes || '';
                 }
             } else {
                 e.target.querySelector('.modal-title').textContent = 'Add Focus';

@@ -1,11 +1,21 @@
 import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base, Team, User, Player, Lineup, PitchingOuting, ScoutedPlayer, \
+from models import Team, User, Player, Lineup, PitchingOuting, ScoutedPlayer, \
                    Rotation, Game, CollaborationNote, PracticePlan, PracticeTask, \
                    PlayerDevelopmentFocus, Sign
 from datetime import datetime
 import os
+
+def parse_date(date_str):
+    if not date_str or date_str == 'Never':
+        return None
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%Y-%m-%d %H:%M'):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except (ValueError, TypeError):
+            continue
+    return None
 
 # Get the directory where the script is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +30,9 @@ except FileNotFoundError:
     exit()
 
 # Set up DB session
-engine = create_engine('sqlite:///app.db')
+db_path = os.path.join(script_dir, 'app.db')
+db_uri = f'sqlite:///{db_path}'
+engine = create_engine(db_uri)
 Session = sessionmaker(bind=engine)
 session = Session()
 
@@ -78,7 +90,7 @@ try:
                 full_name=u_data.get('full_name'),
                 password_hash=u_data['password_hash'],
                 role=u_data.get('role', 'Coach'),
-                last_login=u_data.get('last_login', 'Never'),
+                last_login=parse_date(u_data.get('last_login')),
                 tab_order=json.dumps(u_data.get('tab_order', [])),
                 player_order=json.dumps(u_data.get('player_order', [])),
                 team_id=new_team_id
@@ -109,7 +121,7 @@ try:
                 throws=p_data.get('throws', ''), bats=p_data.get('bats', ''), notes=p_data.get('notes', ''),
                 pitcher_role=p_data.get('pitcher_role', 'Not a Pitcher'), has_lessons=p_data.get('has_lessons', 'No'),
                 lesson_focus=p_data.get('lesson_focus', ''), notes_author=p_data.get('notes_author', 'N/A'),
-                notes_timestamp=p_data.get('notes_timestamp', ''), team_id=new_team_id
+                notes_timestamp=parse_date(p_data.get('notes_timestamp')), team_id=new_team_id
             )
             session.add(player)
             session.flush()
@@ -143,11 +155,18 @@ try:
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
         outing = PitchingOuting(
-            date=po_data['date'], pitcher=po_data['pitcher'], opponent=po_data.get('opponent', ''),
+            date=parse_date(po_data['date']), opponent=po_data.get('opponent', ''),
             pitches=po_data.get('pitches', 0), innings=po_data.get('innings', 0.0),
             pitcher_type=po_data.get('pitcher_type', 'Starter'), outing_type=po_data.get('outing_type', 'Game'),
             team_id=new_team_id
         )
+        # The 'pitcher' text column is no longer in the model, but we need to find the player_id
+        player_id = player_name_to_id_map.get(po_data['pitcher'])
+        if player_id:
+            outing.player_id = player_id
+        else:
+            print(f"Warning: Could not find player ID for pitcher '{po_data['pitcher']}'. Skipping outing.")
+            continue
         session.add(outing)
 
     # Add scouted players
@@ -180,7 +199,7 @@ try:
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
         game = Game(
-            date=g_data['date'], opponent=g_data['opponent'], location=g_data.get('location', ''),
+            date=parse_date(g_data['date']), opponent=g_data['opponent'], location=g_data.get('location', ''),
             game_notes=g_data.get('game_notes', ''), team_id=new_team_id
         )
         session.add(game)
@@ -192,7 +211,7 @@ try:
             new_team_id = team_map.get(old_team_id)
             if not new_team_id: continue
             note = CollaborationNote(
-                text=cn_data['text'], author=cn_data['author'], timestamp=cn_data['timestamp'],
+                text=cn_data['text'], author=cn_data['author'], timestamp=parse_date(cn_data['timestamp']),
                 note_type=cn_type, player_name=cn_data.get('player_name'), team_id=new_team_id
             )
             session.add(note)
@@ -203,14 +222,14 @@ try:
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
         plan = PracticePlan(
-            date=pp_data['date'], general_notes=pp_data.get('general_notes', ''), team_id=new_team_id
+            date=parse_date(pp_data['date']), general_notes=pp_data.get('general_notes', ''), team_id=new_team_id
         )
         session.add(plan)
         session.flush()
         for task_data in pp_data.get('tasks', []):
             task = PracticeTask(
                 text=task_data['text'], status=task_data.get('status', 'pending'),
-                author=task_data.get('author', 'N/A'), timestamp=task_data.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M')),
+                author=task_data.get('author', 'N/A'), timestamp=parse_date(task_data.get('timestamp')),
                 practice_plan_id=plan.id
             )
             session.add(task)
@@ -232,9 +251,9 @@ try:
                 focus = PlayerDevelopmentFocus(
                     player_id=player_id, skill_type=skill_type, focus=f_data['focus'],
                     status=f_data.get('status', 'active'), notes=f_data.get('notes', ''),
-                    author=f_data.get('author', 'N/A'), created_date=f_data.get('created_date', datetime.now().strftime('%Y-%m-%d')),
-                    completed_date=f_data.get('completed_date'), last_edited_by=f_data.get('last_edited_by'),
-                    last_edited_date=f_data.get('last_edited_date'), team_id=new_team_id
+                    author=f_data.get('author', 'N/A'), created_date=parse_date(f_data.get('created_date')),
+                    completed_date=parse_date(f_data.get('completed_date')), last_edited_by=f_data.get('last_edited_by'),
+                    last_edited_date=parse_date(f_data.get('last_edited_date')), team_id=new_team_id
                 )
                 session.add(focus)
     

@@ -14,6 +14,7 @@ function initializeGameManagement(gameData) {
         lineup: gameData.lineup || { id: null, title: `Lineup for vs ${gameData.game.opponent}`, lineup_positions: [], associated_game_id: gameData.game.id },
         rotation: gameData.rotation || { id: null, title: `Rotation for vs ${gameData.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
         game: gameData.game,
+        lineup_templates: gameData.lineup_templates || [],
         currentInning: '1',
         copiedInningData: null,
         sortableInstances: {}
@@ -202,12 +203,34 @@ function initializeGameManagement(gameData) {
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
 
         document.getElementById('lineupEditorModal')?.addEventListener('shown.bs.modal', () => {
-            initializeLineupEditor({
-                roster: state.roster,
-                lineup: state.lineup,
-                benchEl: document.getElementById('lineup-bench'),
-                orderEl: document.getElementById('lineup-order')
+            const templateSelect = document.getElementById('lineupTemplateSelect');
+            templateSelect.innerHTML = '<option value="">-- Select a Template --</option>';
+            state.lineup_templates.forEach(lt => {
+                const option = new Option(`${lt.title} (${lt.lineup_positions.length} players)`, lt.id);
+                templateSelect.add(option);
             });
+
+            const renderLineup = () => {
+                 initializeLineupEditor({
+                    roster: state.roster,
+                    lineup: state.lineup,
+                    benchEl: document.getElementById('lineup-bench'),
+                    orderEl: document.getElementById('lineup-order')
+                });
+            };
+
+            templateSelect.addEventListener('change', (e) => {
+                const selectedTemplateId = e.target.value;
+                if (selectedTemplateId) {
+                    const selectedTemplate = state.lineup_templates.find(lt => lt.id == selectedTemplateId);
+                    if (selectedTemplate) {
+                        state.lineup.lineup_positions = [...selectedTemplate.lineup_positions];
+                        renderLineup();
+                    }
+                }
+            });
+
+            renderLineup();
         });
 
         document.getElementById('deleteRotationBtn')?.addEventListener('click', () => {

@@ -49,6 +49,8 @@ def game_management(game_id):
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules)
 
+    lineup_templates = db.session.query(Lineup).filter_by(team_id=team.id, associated_game_id=None).all()
+
     return render_template('game_management.html', 
                            game=model_to_dict(game),
                            roster=[model_to_dict(p) for p in roster_objects],
@@ -57,7 +59,8 @@ def game_management(game_id):
                            game_pitching_log=[pitching_outing_to_dict(o) for o in game_pitching_log],
                            session=session, 
                            absent_player_ids=absent_player_ids,
-                           pitch_count_summary=pitch_count_summary)
+                           pitch_count_summary=pitch_count_summary,
+                           lineup_templates=[model_to_dict(lt) for lt in lineup_templates])
 
 @gameday_bp.route('/add_game', methods=['POST'])
 def add_game():

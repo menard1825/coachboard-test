@@ -126,7 +126,8 @@
             roster: {{ roster|tojson }},
             lineup: {{ lineup|tojson }},
             rotation: {{ rotation|tojson }},
-            absent_player_ids: {{ absent_player_ids|tojson }}
+            absent_player_ids: {{ absent_player_ids|tojson }},
+            lineup_templates: {{ lineup_templates|tojson }}
         };
         initializeGameManagement(gameData);
     });

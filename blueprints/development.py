@@ -48,6 +48,7 @@ def update_focus(focus_id):
 
     focus_item.focus = request.form.get('focus_text', focus_item.focus)
     focus_item.notes = request.form.get('notes', focus_item.notes)
+    focus_item.progress_notes = request.form.get('progress_notes', focus_item.progress_notes)
     focus_item.last_edited_by = editor_name
     focus_item.last_edited_date = datetime.now()
     db.session.commit()

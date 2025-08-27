@@ -1,8 +1,8 @@
-"""Add practice plan details and fix structure
+"""Initial migration from current models
 
-Revision ID: 02b06584d4db
+Revision ID: 9612ed8d1988
 Revises: 
-Create Date: 2025-07-27 01:24:24.414074
+Create Date: 2025-08-27 06:33:03.863434
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '02b06584d4db'
+revision = '9612ed8d1988'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -35,7 +35,7 @@ def upgrade():
     sa.Column('note_type', sa.String(), nullable=False),
     sa.Column('text', sa.Text(), nullable=False),
     sa.Column('author', sa.String(), nullable=True),
-    sa.Column('timestamp', sa.String(), nullable=True),
+    sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('player_name', sa.String(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
@@ -43,7 +43,7 @@ def upgrade():
     )
     op.create_table('games',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('date', sa.String(), nullable=False),
+    sa.Column('date', sa.DateTime(), nullable=False),
     sa.Column('opponent', sa.String(), nullable=False),
     sa.Column('location', sa.String(), nullable=True),
     sa.Column('game_notes', sa.Text(), nullable=True),
@@ -56,21 +56,8 @@ def upgrade():
     op.create_table('lineups',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('title', sa.String(), nullable=False),
-    sa.Column('lineup_positions', sa.Text(), nullable=True),
+    sa.Column('lineup_positions', sa.JSON(), nullable=True),
     sa.Column('associated_game_id', sa.Integer(), nullable=True),
-    sa.Column('team_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('pitching_outings',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('date', sa.String(), nullable=False),
-    sa.Column('pitcher', sa.String(), nullable=False),
-    sa.Column('opponent', sa.String(), nullable=True),
-    sa.Column('pitches', sa.Integer(), nullable=True),
-    sa.Column('innings', sa.Float(), nullable=True),
-    sa.Column('pitcher_type', sa.String(), nullable=True),
-    sa.Column('outing_type', sa.String(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -89,14 +76,14 @@ def upgrade():
     sa.Column('has_lessons', sa.String(), nullable=True),
     sa.Column('lesson_focus', sa.Text(), nullable=True),
     sa.Column('notes_author', sa.String(), nullable=True),
-    sa.Column('notes_timestamp', sa.String(), nullable=True),
+    sa.Column('notes_timestamp', sa.DateTime(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('practice_plans',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('date', sa.String(), nullable=False),
+    sa.Column('date', sa.DateTime(), nullable=False),
     sa.Column('general_notes', sa.Text(), nullable=True),
     sa.Column('emphasis', sa.Text(), nullable=True),
     sa.Column('warm_up', sa.Text(), nullable=True),
@@ -110,7 +97,7 @@ def upgrade():
     op.create_table('rotations',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('title', sa.String(), nullable=False),
-    sa.Column('innings', sa.Text(), nullable=True),
+    sa.Column('innings', sa.JSON(), nullable=True),
     sa.Column('associated_game_id', sa.Integer(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
@@ -142,24 +129,39 @@ def upgrade():
     sa.Column('full_name', sa.String(length=100), nullable=True),
     sa.Column('password_hash', sa.String(), nullable=False),
     sa.Column('role', sa.String(), nullable=True),
-    sa.Column('last_login', sa.String(), nullable=True),
+    sa.Column('last_login', sa.DateTime(), nullable=True),
     sa.Column('tab_order', sa.Text(), nullable=True),
-    sa.Column('player_order', sa.Text(), nullable=True),
+    sa.Column('player_order', sa.JSON(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('username')
+    )
+    op.create_table('pitching_outings',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('date', sa.DateTime(), nullable=False),
+    sa.Column('opponent', sa.String(), nullable=True),
+    sa.Column('pitches', sa.Integer(), nullable=True),
+    sa.Column('innings', sa.Float(), nullable=True),
+    sa.Column('pitcher_type', sa.String(), nullable=True),
+    sa.Column('outing_type', sa.String(), nullable=True),
+    sa.Column('team_id', sa.Integer(), nullable=False),
+    sa.Column('player_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['player_id'], ['players.id'], ),
+    sa.ForeignKeyConstraint(['team_id'], ['teams.id'], ),
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('player_development_focuses',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('focus', sa.Text(), nullable=False),
     sa.Column('status', sa.String(), nullable=True),
     sa.Column('notes', sa.Text(), nullable=True),
-    sa.Column('created_date', sa.String(), nullable=True),
-    sa.Column('completed_date', sa.String(), nullable=True),
+    sa.Column('progress_notes', sa.Text(), nullable=True),
+    sa.Column('created_date', sa.DateTime(), nullable=True),
+    sa.Column('completed_date', sa.DateTime(), nullable=True),
     sa.Column('author', sa.String(), nullable=True),
     sa.Column('last_edited_by', sa.String(), nullable=True),
-    sa.Column('last_edited_date', sa.String(), nullable=True),
+    sa.Column('last_edited_date', sa.DateTime(), nullable=True),
     sa.Column('player_id', sa.Integer(), nullable=False),
     sa.Column('skill_type', sa.String(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=False),
@@ -192,7 +194,7 @@ def upgrade():
     sa.Column('text', sa.Text(), nullable=False),
     sa.Column('status', sa.String(), nullable=True),
     sa.Column('author', sa.String(), nullable=True),
-    sa.Column('timestamp', sa.String(), nullable=True),
+    sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('practice_plan_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['practice_plan_id'], ['practice_plans.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -206,13 +208,13 @@ def downgrade():
     op.drop_table('player_practice_absences')
     op.drop_table('player_game_absences')
     op.drop_table('player_development_focuses')
+    op.drop_table('pitching_outings')
     op.drop_table('users')
     op.drop_table('signs')
     op.drop_table('scouted_players')
     op.drop_table('rotations')
     op.drop_table('practice_plans')
     op.drop_table('players')
-    op.drop_table('pitching_outings')
     op.drop_table('lineups')
     op.drop_table('games')
     op.drop_table('collaboration_notes')
