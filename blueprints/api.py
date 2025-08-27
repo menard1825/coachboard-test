@@ -213,11 +213,19 @@ def get_stats():
 
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
-    rotations_db = db.session.query(Rotation).filter_by(team_id=team_id).all()
+
+    # --- MODIFICATION START ---
+    # Query for lineups instead of rotations for position stats
+    lineups_db = db.session.query(Lineup).filter_by(team_id=team_id).all()
+    # --- MODIFICATION END ---
 
     pitchers = [p for p in roster_db if p.pitcher_role != 'Not a Pitcher']
     cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings_db) for p in pitchers}
-    cumulative_position_data = calculate_cumulative_position_stats(roster_db, rotations_db)
+
+    # --- MODIFICATION START ---
+    # Pass lineups_db to the function
+    cumulative_position_data = calculate_cumulative_position_stats(roster_db, lineups_db)
+    # --- MODIFICATION END ---
 
     game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=team_id).group_by(PlayerGameAbsence.player_id).all()
     practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=team_id).group_by(PlayerPracticeAbsence.player_id).all()
