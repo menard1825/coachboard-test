@@ -151,23 +151,24 @@ function initializeLineupEditor(options) {
     if (benchEl.sortable) benchEl.sortable.destroy();
     if (orderEl.sortable) orderEl.sortable.destroy();
 
+    const onSortEnd = () => {
+        lineup.lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
+        renderLineup();
+        benchEl.scrollTop = 0; // Scroll to top of bench
+        orderEl.scrollTop = 0; // Scroll to top of lineup
+    };
+
     // Initialize SortableJS
     benchEl.sortable = new Sortable(benchEl, {
         group: 'lineup',
         animation: 150,
-        onEnd: () => {
-            lineup.lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
-            renderLineup();
-        }
+        onEnd: onSortEnd
     });
 
     orderEl.sortable = new Sortable(orderEl, {
         group: 'lineup',
         handle: '.lineup-drag-handle',
         animation: 150,
-        onEnd: () => {
-            lineup.lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
-            renderLineup();
-        }
+        onEnd: onSortEnd
     });
 }
