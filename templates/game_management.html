@@ -11,7 +11,7 @@
             <i class="bi bi-arrow-left"></i> Back to All Games
         </a>
         <span class="navbar-text fw-bold text-truncate">
-            vs {{ game['opponent'] }} on {{ game['date'] | format_datetime }}
+            vs {{ game['opponent'] }} on {{ game.date | format_datetime }}
         </span>
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editGameModal">
             <i class="bi bi-pencil-square"></i> Edit Game
@@ -113,7 +113,7 @@
           <div class="modal-body">
               <div class="mb-3">
                   <label for="game_date" class="form-label">Date</label>
-                  <input type="date" class="form-control" id="game_date" name="game_date" value="{{ game['date'] | format_date_for_input }}">
+                  <input type="date" class="form-control" id="game_date" name="game_date" value="{{ game_date_for_input }}">
               </div>
               <div class="mb-3">
                   <label for="game_opponent" class="form-label">Opponent</label>

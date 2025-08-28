@@ -54,9 +54,12 @@ def game_management(game_id):
     # NEW: Query for unassigned rotations to use as templates
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team.id, associated_game_id=None).all()
 
+    game_date_for_input = game.date.strftime('%Y-%m-%d')
+
     return render_template('game_management.html',
                            current_team=team,
                            game=model_to_dict(game),
+                           game_date_for_input=game_date_for_input,
                            roster=[model_to_dict(p) for p in roster_objects],
                            lineup=model_to_dict(lineup_obj),
                            rotation=model_to_dict(rotation_obj),
