@@ -94,7 +94,7 @@ function initializeLineupEditor(options) {
 
         // Add placeholder to order list if empty
         if (orderEl.children.length === 0) {
-            orderEl.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text"><i class="bi bi-arrow-left-square" style="font-size: 2rem;"></i><p class="mt-2 mb-0">Drag players from the bench to build the batting order.</p></div>`;
+            orderEl.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text"><i class="bi bi-people" style="font-size: 2rem;"></i><p class="mt-2 mb-0">Drag players from the bench to build the batting order.</p></div>`;
         }
 
         // Add placeholder to bench list if empty
