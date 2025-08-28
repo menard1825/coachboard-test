@@ -175,3 +175,17 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
             print(f"Error calculating pitch count summary for player {player.name} (ID: {player.id}): {e}")
             continue
     return summary
+
+def format_date_for_input_filter(dt_obj):
+    """Formats a datetime object or a date string into YYYY-MM-DD for form inputs."""
+    if not dt_obj:
+        return ""
+    if isinstance(dt_obj, str):
+        try:
+            # Handle ISO format with or without time part
+            dt_obj = datetime.fromisoformat(dt_obj.split(' ')[0])
+        except ValueError:
+            return "" # Return empty if string is not a valid date format
+    if isinstance(dt_obj, (datetime, date)):
+        return dt_obj.strftime('%Y-%m-%d')
+    return ""

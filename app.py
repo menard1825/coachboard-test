@@ -17,7 +17,8 @@ from extensions import socketio, migrate
 
 from utils import (
     get_pitching_rules_for_team, calculate_cumulative_pitching_stats,
-    calculate_cumulative_position_stats, calculate_pitch_count_summary
+    calculate_cumulative_position_stats, calculate_pitch_count_summary,
+    format_date_for_input_filter
 )
 
 # --- Blueprint Imports ---
@@ -72,6 +73,8 @@ def create_app():
         if isinstance(dt, date):
             return dt.strftime('%A, %m/%d/%y')
         return dt
+
+    app.jinja_env.filters['format_date_for_input'] = format_date_for_input_filter
 
     # --- Decorators & Context Processors ---
     def login_required(f):
