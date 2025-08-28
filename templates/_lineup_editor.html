@@ -19,7 +19,7 @@
                     <input type="hidden" id="lineupId" name="lineup_id" value="{{ lineup.id or '' }}">
                     <div class="mb-3">
                         <label for="lineupTitle" class="form-label visually-hidden">Lineup Title</label>
-                        <input type="text" class="form-control" id="lineupTitle" value="{{ lineup.title or 'Lineup for vs ' ~ game.opponent }}" required>
+                        <input type="text" class="form-control" id="lineupTitle" value="{{ lineup.title if lineup and lineup.title else '' }}" placeholder="Lineup Title" required>
                     </div>
                     
                     <div class="row" id="lineup-editor-lists">
