@@ -241,6 +241,12 @@ body {
 .pos-CF { top: 8%;  left: 50%; }
 .pos-RF { top: 15%; left: 85%; }
 
+/* Position coordinates for the 4-outfielder diamond */
+.pos-4-LF { top: 18%; left: 15%; }
+.pos-4-LCF { top: 10%; left: 35%; }
+.pos-4-RCF { top: 10%; left: 65%; }
+.pos-4-RF { top: 18%; left: 85%; }
+
 /* Inning selector styles */
 #inning-btn-group .btn-check:checked+.btn-outline-primary {
     background-color: var(--primary-color);

@@ -234,6 +234,7 @@ def update_admin_settings():
     team_settings.display_coach_names = 'display_coach_names' in request.form
     team_settings.age_group = request.form.get('age_group', team_settings.age_group)
     team_settings.pitching_rule_set = request.form.get('pitching_rule_set', team_settings.pitching_rule_set)
+    team_settings.outfielder_count = int(request.form.get('outfielder_count', 3))
     
     # ADDED: Handle the new color inputs
     team_settings.primary_color = request.form.get('primary_color', team_settings.primary_color)

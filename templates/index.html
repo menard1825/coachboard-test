@@ -5,7 +5,13 @@
 {% macro position_select(name, id, selected_val, title="Select Position", classes="form-select") -%}
     <select name="{{ name }}" id="{{ id }}" class="{{ classes }}" title="{{ title }}">
         <option value="" {% if not selected_val %}selected{% endif %}>{{ title }}</option>
-        {%- set positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'] -%}
+        {%- set positions = ['P', 'C', '1B', '2B', '3B', 'SS'] -%}
+        {%- if current_team and current_team.outfielder_count == 4 -%}
+            {%- set positions = positions + ['LF', 'LCF', 'RCF', 'RF'] -%}
+        {%- else -%}
+            {%- set positions = positions + ['LF', 'CF', 'RF'] -%}
+        {%- endif -%}
+        {%- set positions = positions + ['DH', 'EH'] -%}
         {%- for pos in positions -%}
             <option value="{{ pos }}" {% if selected_val == pos %}selected{% endif %}>{{ pos }}</option>
         {%- endfor -%}

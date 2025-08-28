@@ -18,6 +18,7 @@ class Team(db.Model):
     secondary_color = Column(String, default="#E5E7EB")
     age_group = Column(String, default='12U', nullable=False)
     pitching_rule_set = Column(String, default='USSSA', nullable=False)
+    outfielder_count = Column(Integer, default=3, nullable=False)
 
     users = relationship("User", back_populates="team")
     players = relationship("Player", back_populates="team")

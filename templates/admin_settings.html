@@ -45,6 +45,13 @@
                                     <input class="form-check-input" type="checkbox" id="display_coach_names" name="display_coach_names" {% if settings.display_coach_names %}checked{% endif %}>
                                     <label class="form-check-label" for="display_coach_names">Display Full Coach Names in Logs</label>
                                 </div>
+                                <div class="form-floating mb-3">
+                                    <select class="form-select" id="outfielder_count" name="outfielder_count">
+                                        <option value="3" {% if settings.outfielder_count == 3 %}selected{% endif %}>3 Outfielders (Standard)</option>
+                                        <option value="4" {% if settings.outfielder_count == 4 %}selected{% endif %}>4 Outfielders (Youth)</option>
+                                    </select>
+                                    <label for="outfielder_count">Defensive Setup</label>
+                                </div>
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                             </form>
                         </div>

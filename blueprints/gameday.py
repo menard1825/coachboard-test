@@ -54,7 +54,8 @@ def game_management(game_id):
     # NEW: Query for unassigned rotations to use as templates
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team.id, associated_game_id=None).all()
 
-    return render_template('game_management.html', 
+    return render_template('game_management.html',
+                           current_team=team,
                            game=model_to_dict(game),
                            roster=[model_to_dict(p) for p in roster_objects],
                            lineup=model_to_dict(lineup_obj),
@@ -87,8 +88,7 @@ def add_game():
     db.session.commit()
     flash(f'Game vs "{new_game.opponent}" on {new_game.date.strftime("%m/%d/%Y")} added successfully!', 'success')
     socketio.emit('data_updated', {'message': 'New game added.'})
-    # FIX: Redirect back to the games list on the main page
-    return redirect(url_for('home', _anchor='games'))
+    return redirect(url_for('gameday.game_management', game_id=new_game.id))
 
 @gameday_bp.route('/edit_game/<int:game_id>', methods=['POST'])
 def edit_game(game_id):

@@ -43,7 +43,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderPositionSelect = (name, id, selectedVal = '', title = 'Select Position', classes = 'form-select form-select-sm') => {
-        const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'EH'];
+        let positions = ['P', 'C', '1B', '2B', '3B', 'SS'];
+        if (AppState.session.outfielder_count === 4) {
+            positions.push('LF', 'LCF', 'RCF', 'RF');
+        } else {
+            positions.push('LF', 'CF', 'RF');
+        }
+        positions.push('DH', 'EH');
         let optionsHtml = `<option value="" ${!selectedVal ? 'selected' : ''}>${title}</option>`;
         positions.forEach(pos => {
             optionsHtml += `<option value="${pos}" ${selectedVal === pos ? 'selected' : ''}>${pos}</option>`;
