@@ -16,10 +16,10 @@
                 </div>
                 <p class="text-muted">Or, build a new lineup below. Drag and drop players...</p>
                 <form onsubmit="return false;">
-                    <input type="hidden" id="lineupId" name="lineup_id" value="{{ lineup.id or '' }}">
+                    <input type="hidden" id="lineupId" name="lineup_id" value="{{ lineup.id if lineup else '' }}">
                     <div class="mb-3">
                         <label for="lineupTitle" class="form-label visually-hidden">Lineup Title</label>
-                        <input type="text" class="form-control" id="lineupTitle" value="{{ lineup.title if lineup and lineup.title else '' }}" placeholder="Lineup Title" required>
+                        <input type="text" class="form-control" id="lineupTitle" value="{{ lineup.title if lineup else '' }}" placeholder="Lineup Title" required>
                     </div>
                     
                     <div class="row" id="lineup-editor-lists">
