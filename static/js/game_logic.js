@@ -17,6 +17,7 @@ function initializeGameManagement(gameData) {
         lineup_templates: gameData.lineup_templates || [],
         // NEW: Add rotation_templates to the state
         rotation_templates: gameData.rotation_templates || [],
+        outfielder_count: gameData.outfielder_count || 3,
         currentInning: '1',
         copiedInningData: null,
         sortableInstances: {}

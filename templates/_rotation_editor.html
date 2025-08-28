@@ -47,9 +47,16 @@
                         <div id="pos-desktop-2B" class="position-dropzone pos-2B" data-position="2B"><span class="pos-abbr">2B</span></div>
                         <div id="pos-desktop-3B" class="position-dropzone pos-3B" data-position="3B"><span class="pos-abbr">3B</span></div>
                         <div id="pos-desktop-SS" class="position-dropzone pos-SS" data-position="SS"><span class="pos-abbr">SS</span></div>
-                        <div id="pos-desktop-LF" class="position-dropzone pos-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
-                        <div id="pos-desktop-CF" class="position-dropzone pos-CF" data-position="CF"><span class="pos-abbr">CF</span></div>
-                        <div id="pos-desktop-RF" class="position-dropzone pos-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+                        {% if current_team and current_team.outfielder_count == 4 %}
+                            <div id="pos-desktop-LF" class="position-dropzone pos-4-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
+                            <div id="pos-desktop-LCF" class="position-dropzone pos-4-LCF" data-position="LCF"><span class="pos-abbr">LCF</span></div>
+                            <div id="pos-desktop-RCF" class="position-dropzone pos-4-RCF" data-position="RCF"><span class="pos-abbr">RCF</span></div>
+                            <div id="pos-desktop-RF" class="position-dropzone pos-4-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+                        {% else %}
+                            <div id="pos-desktop-LF" class="position-dropzone pos-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
+                            <div id="pos-desktop-CF" class="position-dropzone pos-CF" data-position="CF"><span class="pos-abbr">CF</span></div>
+                            <div id="pos-desktop-RF" class="position-dropzone pos-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -77,9 +84,16 @@
                     <div id="pos-mobile-2B" class="position-dropzone pos-2B" data-position="2B"><span class="pos-abbr">2B</span></div>
                     <div id="pos-mobile-3B" class="position-dropzone pos-3B" data-position="3B"><span class="pos-abbr">3B</span></div>
                     <div id="pos-mobile-SS" class="position-dropzone pos-SS" data-position="SS"><span class="pos-abbr">SS</span></div>
-                    <div id="pos-mobile-LF" class="position-dropzone pos-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
-                    <div id="pos-mobile-CF" class="position-dropzone pos-CF" data-position="CF"><span class="pos-abbr">CF</span></div>
-                    <div id="pos-mobile-RF" class="position-dropzone pos-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+                    {% if current_team and current_team.outfielder_count == 4 %}
+                        <div id="pos-mobile-LF" class="position-dropzone pos-4-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
+                        <div id="pos-mobile-LCF" class="position-dropzone pos-4-LCF" data-position="LCF"><span class="pos-abbr">LCF</span></div>
+                        <div id="pos-mobile-RCF" class="position-dropzone pos-4-RCF" data-position="RCF"><span class="pos-abbr">RCF</span></div>
+                        <div id="pos-mobile-RF" class="position-dropzone pos-4-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+                    {% else %}
+                        <div id="pos-mobile-LF" class="position-dropzone pos-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
+                        <div id="pos-mobile-CF" class="position-dropzone pos-CF" data-position="CF"><span class="pos-abbr">CF</span></div>
+                        <div id="pos-mobile-RF" class="position-dropzone pos-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+                    {% endif %}
                 </div>
             </div>
             <h5 class="mt-4">Legend</h5>
