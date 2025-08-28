@@ -34,13 +34,13 @@ function initializeLineupEditor(options) {
 
     function createBenchPlayerItem(player) {
         const item = document.createElement('div');
-        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+        item.className = 'list-group-item';
         item.dataset.playerName = player.name;
         item.innerHTML = `
-            <span>${escapeHTML(player.name)} (#${escapeHTML(player.number) || 'N/A'})</span>
-            <button type="button" class="btn btn-sm btn-outline-primary add-to-lineup-btn" aria-label="Add to lineup">
-                <i class="bi bi-plus-lg"></i>
-            </button>
+            <div class="d-flex align-items-center">
+                <i class="bi bi-grip-vertical me-2" style="cursor: grab;"></i>
+                <span>${escapeHTML(player.name)} (#${escapeHTML(player.number) || 'N/A'})</span>
+            </div>
         `;
         return item;
     }
@@ -94,7 +94,7 @@ function initializeLineupEditor(options) {
 
         // Add placeholder to order list if empty
         if (orderEl.children.length === 0) {
-            orderEl.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text"><i class="bi bi-arrow-left-square" style="font-size: 2rem;"></i><p class="mt-2 mb-0">Drag or tap players from the bench to build the batting order.</p></div>`;
+            orderEl.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text"><i class="bi bi-arrow-left-square" style="font-size: 2rem;"></i><p class="mt-2 mb-0">Drag players from the bench to build the batting order.</p></div>`;
         }
 
         // Add placeholder to bench list if empty
@@ -104,27 +104,6 @@ function initializeLineupEditor(options) {
     }
 
     function setupEventListeners() {
-        benchEl.addEventListener('click', (event) => {
-            const addButton = event.target.closest('.add-to-lineup-btn');
-            if (addButton) {
-                const playerItem = addButton.closest('.list-group-item');
-                const playerName = playerItem.dataset.playerName;
-                const player = roster.find(p => p.name === playerName);
-
-                if (player && !lineup.lineup_positions.includes(playerName)) {
-                    // Update state
-                    lineup.lineup_positions.push(playerName);
-
-                    // Manipulate DOM directly instead of full re-render
-                    const newOrderItem = createBattingOrderItem(player);
-                    orderEl.appendChild(newOrderItem);
-                    playerItem.remove();
-
-                    updatePlaceholders();
-                }
-            }
-        });
-
         orderEl.addEventListener('click', (event) => {
             const moveUpButton = event.target.closest('.move-up-btn');
             const moveDownButton = event.target.closest('.move-down-btn');
@@ -176,10 +155,6 @@ function initializeLineupEditor(options) {
     benchEl.sortable = new Sortable(benchEl, {
         group: 'lineup',
         animation: 150,
-        filter: '.add-to-lineup-btn', // Prevent drag from starting on this button
-        preventOnFilter: true,      // Allow default click behavior on the button
-        forceFallback: true,        // Recommended for better touch support
-        fallbackTolerance: 5,       // Prevents accidental drags when clicking
         onEnd: () => {
             lineup.lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
             renderLineup();

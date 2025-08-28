@@ -133,12 +133,6 @@ body {
     }
 }
 
-/* Fix for lineup editor button overlap on mobile */
-.add-to-lineup-btn {
-    position: relative;
-    z-index: 2;
-}
-
 /* ==========================================================================
    Table Styles
    ========================================================================== */
