@@ -1,38 +1,57 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="mb-0" id="rotation-editor-title">Defensive Rotation</h5>
-         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-            <select id="rotationTemplateSelect" class="form-select form-select-sm" style="width: auto;">
-                <option value="">-- Load from Template --</option>
-            </select>
-            <div class="btn-group btn-group-sm" role="group">
-                <button id="saveAsTemplateBtn" class="btn btn-secondary">Save as Template</button>
-                <button id="saveRotationBtn" class="btn btn-primary">Save Rotation</button>
-                <button id="deleteRotationBtn" class="btn btn-outline-danger" {% if not rotation.id %}disabled{% endif %}>Delete</button>
+        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <button id="saveRotationBtn" class="btn btn-primary btn-sm">
+                <i class="bi bi-save me-1"></i> Save Rotation
+            </button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    Actions
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li class="p-2">
+                        <select id="rotationTemplateSelect" class="form-select form-select-sm">
+                            <option value="">-- Load Template --</option>
+                        </select>
+                    </li>
+                    <li><a class="dropdown-item" href="#" id="saveAsTemplateBtn"><i class="bi bi-journal-plus me-1"></i> Save as Template</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="#" id="deleteRotationBtn" {% if not rotation or not rotation.id %}disabled{% endif %}><i class="bi bi-trash me-1"></i> Delete Rotation</a></li>
+                </ul>
             </div>
         </div>
     </div>
     <div class="card-body" id="rotation-board">
-        <div class="mb-3">
-            <h5>Inning</h5>
-            <div id="inning-selector" class="btn-toolbar mb-2" role="toolbar">
-                <div id="inning-btn-group" class="btn-group flex-wrap me-3 mb-2" role="group"></div>
-                <div id="copy-btn-group" class="btn-group flex-wrap mb-2">
-                    <button id="copyPreviousInningBtn" class="btn btn-sm btn-secondary">Copy Previous</button> <button id="copyInningBtn" class="btn btn-sm btn-info">Copy This Inning</button>
-                </div>
-            </div>
-            <div id="inning-paste-controls" class="alert alert-info p-2 d-none">
-                <p class="mb-1 fw-bold">Select one or more innings to paste to:</p>
-                <div id="inning-paste-checkboxes" class="mb-2"></div>
-                <button id="pasteToSelectedBtn" class="btn btn-sm btn-success">Paste to Selected</button>
-                <button id="cancelPasteBtn" class="btn btn-sm btn-secondary">Cancel</button>
+    <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div id="inning-btn-group" class="btn-group flex-wrap" role="group">
+                {# Inning radio buttons will be inserted here by JS #}
             </div>
             <div class="d-flex gap-2">
-                <button id="addInningBtn" class="btn btn-sm btn-success">Add Inning</button>
-                <button id="removeInningBtn" class="btn btn-sm btn-danger">Remove Last</button>
-                <button id="clearInningBtn" class="btn btn-sm btn-warning">Clear Inning</button>
+                <button id="addInningBtn" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-circle"></i> Add</button>
+                <button id="removeInningBtn" class="btn btn-sm btn-outline-danger"><i class="bi bi-dash-circle"></i> Remove Last</button>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-tools"></i> Tools
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" id="copyPreviousInningBtn">Copy Previous Inning</a></li>
+                        <li><a class="dropdown-item" href="#" id="copyInningBtn">Copy Current Inning</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-warning" href="#" id="clearInningBtn">Clear Current Inning</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
+        <div id="inning-paste-controls" class="alert alert-info p-2 d-none">
+            <span class="fw-bold">Pasting from Inning <span id="pasting-from-inning-display"></span>.</span>
+            <p class="mb-1">Select one or more innings to paste to:</p>
+            <div id="inning-paste-checkboxes" class="mb-2"></div>
+            <button id="pasteToSelectedBtn" class="btn btn-sm btn-success">Paste</button>
+            <button id="cancelPasteBtn" class="btn btn-sm btn-secondary">Cancel</button>
+        </div>
+    </div>
         <div class="row d-none d-lg-flex">
             <div class="col-lg-3">
                 <h5>Bench</h5>
