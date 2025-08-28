@@ -38,7 +38,7 @@ function initializeLineupEditor(options) {
         item.dataset.playerName = player.name;
         item.innerHTML = `
             <div class="d-flex align-items-center">
-                <i class="bi bi-grip-vertical me-2" style="cursor: grab;"></i>
+                <i class="bi bi-grip-vertical lineup-drag-handle me-2" style="cursor: grab;"></i>
                 <span>${escapeHTML(player.name)} (#${escapeHTML(player.number) || 'N/A'})</span>
             </div>
         `;
@@ -167,7 +167,6 @@ function initializeLineupEditor(options) {
 
     orderEl.sortable = new Sortable(orderEl, {
         group: 'lineup',
-        handle: '.lineup-drag-handle',
         animation: 150,
         onEnd: onSortEnd
     });

@@ -275,6 +275,10 @@ body {
     font-weight: bold;
     color: var(--text-muted);
 }
+.sortable-ghost {
+    background: #e9ecef;
+    border-radius: .25rem;
+}
 
 @media (max-width: 767.98px) {
     #lineup-editor-lists {
