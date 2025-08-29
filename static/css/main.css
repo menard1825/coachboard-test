@@ -263,11 +263,11 @@ body {
 /* Lineup Editor styles */
 #lineup-editor-lists { min-height: 400px; }
 #lineup-bench .list-group-item, #lineup-order .list-group-item { cursor: grab; }
-#lineup-order { counter-reset: batting-order; }
-#lineup-order .list-group-item { position: relative; padding-left: 35px !important; }
-#lineup-order .list-group-item::before {
-    counter-increment: batting-order;
-    content: counter(batting-order) ".";
+#lineup-order .list-group-item {
+    position: relative;
+    padding-left: 35px !important;
+}
+.lineup-number {
     position: absolute;
     left: 12px;
     top: 50%;

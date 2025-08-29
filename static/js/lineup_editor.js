@@ -50,6 +50,7 @@ function initializeLineupEditor(options) {
         item.className = 'list-group-item';
         item.dataset.playerName = player.name;
         item.innerHTML = `
+            <span class="lineup-number"></span>
             <div class="d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
                     <i class="bi bi-grip-vertical lineup-drag-handle me-2" style="cursor: grab;"></i>
@@ -64,6 +65,16 @@ function initializeLineupEditor(options) {
                 </div>
             </div>`;
         return item;
+    }
+
+    function updateLineupNumbers() {
+        const items = orderEl.querySelectorAll('.list-group-item');
+        items.forEach((item, index) => {
+            const numberEl = item.querySelector('.lineup-number');
+            if (numberEl) {
+                numberEl.textContent = `${index + 1}.`;
+            }
+        });
     }
 
     function renderLineup() {
@@ -85,6 +96,7 @@ function initializeLineupEditor(options) {
             }
         });
         updatePlaceholders();
+        updateLineupNumbers();
     }
 
     function updatePlaceholders() {
@@ -168,6 +180,7 @@ function initializeLineupEditor(options) {
     orderEl.sortable = new Sortable(orderEl, {
         group: 'lineup',
         animation: 150,
-        onEnd: onSortEnd
+        onEnd: onSortEnd,
+        onSort: updateLineupNumbers
     });
 }
