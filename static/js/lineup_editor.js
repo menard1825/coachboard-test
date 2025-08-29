@@ -181,12 +181,22 @@ function initializeLineupEditor(options) {
 
         if (ghostPositionEl) {
             if (evt.to === orderEl) {
-                // We are over the batting order list, so show the position
-                const pos = evt.newIndex + 1;
-                // Use non-breaking space to ensure it stays on the same line
-                ghostPositionEl.textContent = `${pos}.\u00A0`;
+                const newIndex = evt.newIndex;
+                if (typeof newIndex === 'number') {
+                    const pos = newIndex + 1;
+                    ghostPositionEl.textContent = `${pos}.\u00A0`;
+                } else {
+                    // This case handles dragging over an empty lineup list that has a placeholder.
+                    const isOrderEmpty = orderEl.children.length === 0 || orderEl.querySelector('.placeholder-text');
+                    if (isOrderEmpty) {
+                        ghostPositionEl.textContent = '1.\u00A0';
+                    } else {
+                        // If the index is invalid for any other reason, hide the number.
+                        ghostPositionEl.textContent = '';
+                    }
+                }
             } else {
-                // We are over the bench or somewhere else, so hide the position
+                // We are over the bench or somewhere else, so hide the position.
                 ghostPositionEl.textContent = '';
             }
         }
