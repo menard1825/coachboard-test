@@ -15,6 +15,10 @@ body {
     background-color: var(--body-bg);
 }
 
+.card {
+    margin-bottom: 1.5rem;
+}
+
 /* ==========================================================================
    Navbar Styles (Top - Desktop)
    ========================================================================== */
@@ -69,6 +73,15 @@ body {
 /* ==========================================================================
    UI Component Styles (Buttons, Accordions, etc.)
    ========================================================================== */
+.btn {
+    transition: all 0.2s ease-in-out;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
 .btn-primary { 
     background-color: var(--primary-color); 
     border-color: var(--primary-color); 
@@ -91,7 +104,7 @@ body {
     cursor: move; 
 }
 .accordion-button:not(.collapsed) { 
-    background-color: #fcebeb; 
+    background-color: var(--secondary-color);
     color: var(--primary-color); 
 }
 
@@ -337,6 +350,11 @@ body {
 
 .player-card:hover .drag-handle {
     opacity: 1;
+}
+
+.player-card .badge.bg-secondary {
+    background-color: var(--secondary-color) !important;
+    color: #000;
 }
 
 /* ==========================================================================
