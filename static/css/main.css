@@ -263,11 +263,11 @@ body {
 /* Lineup Editor styles */
 #lineup-editor-lists { min-height: 400px; }
 #lineup-bench .list-group-item, #lineup-order .list-group-item { cursor: grab; }
-#lineup-order .list-group-item {
-    position: relative;
-    padding-left: 35px !important;
-}
-.lineup-number {
+#lineup-order { counter-reset: batting-order; }
+#lineup-order .list-group-item { position: relative; padding-left: 35px !important; }
+#lineup-order .list-group-item::before {
+    counter-increment: batting-order;
+    content: counter(batting-order) ".";
     position: absolute;
     left: 12px;
     top: 50%;
@@ -275,14 +275,31 @@ body {
     font-weight: bold;
     color: var(--text-muted);
 }
-.sortable-ghost {
-    background: #e9ecef;
-    border-radius: .25rem;
-}
+
+/* Styles for drag-and-drop feedback */
 .sortable-drag {
     opacity: 0.9;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
+
+#lineup-order .sortable-ghost {
+    background: #e9ecef;
+    border-radius: .25rem;
+    padding-left: 35px !important;
+    position: relative;
+    counter-increment: batting-order; /* This is key for the live number */
+}
+
+#lineup-order .sortable-ghost::before {
+    content: counter(batting-order) ".";
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-weight: bold;
+    color: var(--text-muted);
+}
+
 
 @media (max-width: 767.98px) {
     #lineup-editor-lists {
