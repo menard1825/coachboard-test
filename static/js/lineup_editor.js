@@ -151,24 +151,76 @@ function initializeLineupEditor(options) {
     if (benchEl.sortable) benchEl.sortable.destroy();
     if (orderEl.sortable) orderEl.sortable.destroy();
 
-    const onSortEnd = () => {
+    let ghostPositionEl = null;
+
+    const onDragStart = (evt) => {
+        document.body.classList.add('dragging-lineup-player');
+    };
+
+    const onDragMove = (evt) => {
+        const ghostEl = document.querySelector('.lineup-ghost');
+        if (!ghostEl) return;
+
+        // Check if we've already modified this ghost to add our number element
+        if (!ghostEl.dataset.ghostModified) {
+            ghostEl.dataset.ghostModified = 'true';
+
+            // Find the main text span to insert our number before it
+            const mainContainer = ghostEl.querySelector('.d-flex.align-items-center');
+            if (mainContainer) {
+                ghostPositionEl = document.createElement('span');
+                ghostPositionEl.className = 'ghost-position-number';
+
+                // Insert the position number as the first element in the container
+                mainContainer.insertBefore(ghostPositionEl, mainContainer.firstChild);
+
+                // Add a class to the ghost itself to hide the default CSS counter
+                ghostEl.classList.add('sortable-ghost-custom');
+            }
+        }
+
+        if (ghostPositionEl) {
+            if (evt.to === orderEl) {
+                // We are over the batting order list, so show the position
+                const pos = evt.newIndex + 1;
+                // Use non-breaking space to ensure it stays on the same line
+                ghostPositionEl.textContent = `${pos}.\u00A0`;
+            } else {
+                // We are over the bench or somewhere else, so hide the position
+                ghostPositionEl.textContent = '';
+            }
+        }
+    };
+
+    const onSortEnd = (evt) => {
+        document.body.classList.remove('dragging-lineup-player');
+        ghostPositionEl = null; // Clear reference
+
+        // Update the lineup from the DOM
         lineup.lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
+
+        // Full re-render to ensure consistency
         renderLineup();
-        benchEl.scrollTop = 0; // Scroll to top of bench
-        orderEl.scrollTop = 0; // Scroll to top of lineup
+
+        // Reset scroll positions
+        benchEl.scrollTop = 0;
+        orderEl.scrollTop = 0;
+    };
+
+    const sortableOptions = {
+        group: 'lineup',
+        animation: 150,
+        ghostClass: 'lineup-ghost', // Custom ghost class
+        onStart: onDragStart,
+        onMove: onDragMove,
+        onEnd: onSortEnd,
     };
 
     // Initialize SortableJS
-    benchEl.sortable = new Sortable(benchEl, {
-        group: 'lineup',
-        animation: 150,
-        onEnd: onSortEnd
-    });
+    benchEl.sortable = new Sortable(benchEl, sortableOptions);
 
     orderEl.sortable = new Sortable(orderEl, {
-        group: 'lineup',
+        ...sortableOptions,
         handle: '.lineup-drag-handle',
-        animation: 150,
-        onEnd: onSortEnd
     });
 }

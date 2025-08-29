@@ -280,6 +280,26 @@ body {
     counter-increment: none;
 }
 
+/* Custom styles for SortableJS ghost element in the lineup editor */
+.lineup-ghost.sortable-ghost-custom {
+    background: #fff;
+    border: 1px dashed var(--primary-color);
+    opacity: 0.8;
+}
+
+/* Hide the original ::before pseudo-element on our custom ghost to prevent double numbering */
+.lineup-ghost.sortable-ghost-custom::before {
+    content: "" !important;
+}
+
+/* Style for the dynamically added position number span */
+.ghost-position-number {
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-right: 0.5rem; /* Space between number and player name */
+}
+
+
 @media (max-width: 767.98px) {
     #lineup-editor-lists {
         flex-direction: column;
