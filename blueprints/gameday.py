@@ -120,10 +120,15 @@ def edit_game(game_id):
 def delete_game(game_id):
     game_to_delete = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
     if game_to_delete:
+        # Find and delete the associated rotation
+        rotation_to_delete = db.session.query(Rotation).filter_by(associated_game_id=game_id, team_id=session['team_id']).first()
+        if rotation_to_delete:
+            db.session.delete(rotation_to_delete)
+
         game_date_str = game_to_delete.date.strftime('%m/%d/%Y')
         db.session.delete(game_to_delete)
         db.session.commit()
-        flash(f'Game vs "{game_to_delete.opponent}" on {game_date_str} removed successfully!', 'success')
+        flash(f'Game vs "{game_to_delete.opponent}" on {game_date_str} and its associated rotation data have been removed successfully!', 'success')
         socketio.emit('data_updated', {'message': 'Game deleted.'})
     else:
         flash('Game not found.', 'danger')
