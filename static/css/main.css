@@ -279,6 +279,10 @@ body {
     background: #e9ecef;
     border-radius: .25rem;
 }
+.sortable-drag {
+    opacity: 0.9;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
 
 @media (max-width: 767.98px) {
     #lineup-editor-lists {

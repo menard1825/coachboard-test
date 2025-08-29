@@ -37,6 +37,7 @@ function initializeLineupEditor(options) {
         item.className = 'list-group-item';
         item.dataset.playerName = player.name;
         item.innerHTML = `
+            <span class="lineup-number"></span>
             <div class="d-flex align-items-center">
                 <i class="bi bi-grip-vertical lineup-drag-handle me-2" style="cursor: grab;"></i>
                 <span>${escapeHTML(player.name)} (#${escapeHTML(player.number) || 'N/A'})</span>
@@ -68,13 +69,32 @@ function initializeLineupEditor(options) {
     }
 
     function updateLineupNumbers() {
-        const items = orderEl.querySelectorAll('.list-group-item');
-        items.forEach((item, index) => {
+        // First, number the items that are currently static in the batting order list
+        const staticItems = orderEl.querySelectorAll('.list-group-item:not(.sortable-drag)');
+        staticItems.forEach((item, index) => {
             const numberEl = item.querySelector('.lineup-number');
             if (numberEl) {
                 numberEl.textContent = `${index + 1}.`;
             }
         });
+
+        // Then, specifically handle the element being dragged
+        const draggedEl = document.querySelector('.sortable-drag');
+        if (draggedEl) {
+            const ghostEl = orderEl.querySelector('.sortable-ghost');
+            if (ghostEl) {
+                // Find the index of the placeholder to determine the dragged item's new position
+                const ghostIndex = Array.from(orderEl.children).indexOf(ghostEl);
+                const numberEl = draggedEl.querySelector('.lineup-number');
+                if (numberEl) {
+                    numberEl.textContent = `${ghostIndex + 1}.`;
+                    // Dynamically apply styles to make the number visible, as the cloned
+                    // dragged element doesn't inherit all parent styles.
+                    draggedEl.style.paddingLeft = '35px';
+                    draggedEl.style.position = 'relative';
+                }
+            }
+        }
     }
 
     function renderLineup() {
@@ -144,12 +164,13 @@ function initializeLineupEditor(options) {
                     // Update state
                     lineup.lineup_positions = lineup.lineup_positions.filter(p => p !== playerName);
 
-                    // Manipulate DOM directly
+                    // Manipulate DOM directly for responsiveness
                     const newBenchItem = createBenchPlayerItem(player);
                     benchEl.appendChild(newBenchItem);
                     playerItem.remove();
 
                     updatePlaceholders();
+                    updateLineupNumbers();
                 }
             }
         });
@@ -173,14 +194,27 @@ function initializeLineupEditor(options) {
     // Initialize SortableJS
     benchEl.sortable = new Sortable(benchEl, {
         group: 'lineup',
+        handle: '.lineup-drag-handle',
         animation: 150,
         onEnd: onSortEnd
     });
 
     orderEl.sortable = new Sortable(orderEl, {
         group: 'lineup',
+        handle: '.lineup-drag-handle',
         animation: 150,
         onEnd: onSortEnd,
-        onSort: updateLineupNumbers
+        onSort: updateLineupNumbers,
+        onRemove: function(evt) {
+            // When an item is moved from the order back to the bench,
+            // clear its number and reset styles.
+            const item = evt.item;
+            const numberEl = item.querySelector('.lineup-number');
+            if (numberEl) {
+                numberEl.textContent = '';
+            }
+            item.style.paddingLeft = '';
+            item.style.position = '';
+        }
     });
 }
