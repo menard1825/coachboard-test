@@ -104,9 +104,11 @@ class PitchingOuting(db.Model):
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
 
     team = relationship("Team", back_populates="pitching_outings")
     player = relationship("Player", back_populates="pitching_outings")
+    game = relationship("Game", back_populates="pitching_outings")
 
     def to_dict(self):
         return {
@@ -161,6 +163,7 @@ class Game(db.Model):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="games")
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
+    pitching_outings = relationship("PitchingOuting", back_populates="game", cascade="all, delete-orphan")
     
     def to_dict(self):
         """Return a dictionary representation of the Game object."""

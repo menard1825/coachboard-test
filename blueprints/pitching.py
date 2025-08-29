@@ -82,7 +82,8 @@ def add_pitching():
         innings=innings_pitched, 
         pitcher_type=request.form.get('pitcher_type', 'Starter'),
         outing_type=request.form.get('outing_type', 'Game'), 
-        team_id=session['team_id']
+        team_id=session['team_id'],
+        game_id=game.id if game else None
     )
     db.session.add(new_outing)
     db.session.commit()
