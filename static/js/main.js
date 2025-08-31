@@ -1,5 +1,6 @@
 // static/js/main.js
 document.addEventListener('DOMContentLoaded', () => {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
     window.switchTab = function(tabElement) {
         if (tabElement) {
@@ -19,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let sortableInstances = {};
-    let lineupEditorModal;
     let confirmDeleteModal;
     
     // --- UTILITY FUNCTIONS ---
@@ -654,7 +654,11 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackDiv.style.display = 'none';
 
         try {
-            const response = await fetch(`/update_player_inline/${playerId}`, { method: 'POST', body: formData });
+            const response = await fetch(`/update_player_inline/${playerId}`, {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': csrfToken },
+                body: formData
+            });
             const result = await response.json();
             if (!response.ok) throw new Error(result.message);
             
@@ -686,7 +690,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const planId = listItem.dataset.planId;
         const newStatus = event.target.checked ? 'complete' : 'pending';
         try {
-            const response = await fetch(`/update_task_status/${planId}/${taskId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
+            const response = await fetch(`/update_task_status/${planId}/${taskId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
             if (!response.ok) throw new Error((await response.json()).message);
         } catch (error) { 
             console.error('Error updating task:', error.message);
@@ -760,8 +771,18 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
-        confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+        // Initialize modals
+        if (typeof bootstrap.Modal.getOrCreateInstance === 'function') {
+            const lineupModalEl = document.getElementById('lineupEditorModal');
+            if (lineupModalEl) {
+                lineupEditorModal = bootstrap.Modal.getOrCreateInstance(lineupModalEl);
+            }
+            const confirmDeleteModalEl = document.getElementById('confirmDeleteModal');
+            if (confirmDeleteModalEl) {
+                confirmDeleteModal = bootstrap.Modal.getOrCreateInstance(confirmDeleteModalEl);
+            }
+        }
+
         setupEventListeners();
         renderAll();
         initializeSortables();
@@ -957,7 +978,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const savePlayerOrder = (evt) => {
             const newOrder = Array.from(evt.from.children).map(item => item.dataset.playerName);
             AppState.player_order = newOrder;
-            fetch('/save_player_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_order: newOrder }) });
+            fetch('/save_player_order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({ player_order: newOrder })
+            });
             AppState.dev_player_sort.key = 'custom';
             renderPlayerDevelopmentList();
         };
@@ -971,52 +999,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 handle: '.drag-handle', animation: 150,
                 onEnd: () => {
                     const newOrder = Array.from(desktopTabEl.querySelectorAll('a[data-bs-toggle="tab"]')).map(a => a.getAttribute('href').substring(1)).filter(id => id !== 'stats_tab');
-                    fetch('/save_tab_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order: newOrder }) });
+                    fetch('/save_tab_order', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
+                        body: JSON.stringify({ order: newOrder })
+                    });
                 }
             });
         }
     }
 
-    async function saveLineup() {
-        const btn = document.getElementById('saveLineupBtn');
-        const modal = btn.closest('.modal');
-        const lineupId = modal.querySelector('#lineupId').value;
-        const title = modal.querySelector('#lineupTitle').value;
-        const lineup_positions = Array.from(modal.querySelectorAll('#lineup-order .list-group-item')).map(item => item.dataset.playerName);
-
-        const url = lineupId ? `/edit_lineup/${lineupId}` : '/add_lineup';
-        const payload = {
-            title: title,
-            lineup_data: lineup_positions,
-            associated_game_id: null // Explicitly null for unassigned lineups
-        };
-
-        btn.disabled = true;
-        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.message);
-
-        // MODIFICATION: The local state update is removed.
-        // The websocket event will now solely handle updating the UI to prevent duplication.
-            lineupEditorModal.hide();
-
-        } catch (error) {
-            alert('Error saving lineup: ' + error.message);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = 'Save';
-        }
-    }
-
     function setupEventListeners() {
-        document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         
         const addScoutedPlayerForm = document.getElementById('addScoutedPlayerForm');
@@ -1029,7 +1025,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const response = await fetch('/add_scouted_player', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
                         body: JSON.stringify(data)
                     });
                     const result = await response.json();
@@ -1078,7 +1077,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('lineupEditorModal')?.addEventListener('show.bs.modal', (e) => {
             const lineupId = e.relatedTarget ? e.relatedTarget.dataset.lineupId : null;
-            openLineupEditor(lineupId ? AppState.full_data.lineups.find(l => l.id == lineupId) : null);
+            const lineup = lineupId ? AppState.full_data.lineups.find(l => l.id == lineupId) : null;
+            openLineupEditor(lineup, AppState.full_data.roster);
         });
         document.getElementById('editNoteModal')?.addEventListener('show.bs.modal', (e) => {
             e.target.querySelector('#editNoteId').value = e.relatedTarget.dataset.noteId;
@@ -1148,21 +1148,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    function openLineupEditor(lineup = null) {
-        const modal = document.getElementById('lineupEditorModal');
-        const currentLineup = lineup || { id: null, title: 'New Unassigned Lineup', lineup_positions: [] };
-
-        modal.querySelector('#lineupId').value = currentLineup.id;
-        modal.querySelector('#lineupTitle').value = currentLineup.title;
-
-        initializeLineupEditor({
-            roster: AppState.full_data.roster,
-            lineup: currentLineup,
-            benchEl: modal.querySelector('#lineup-bench'),
-            orderEl: modal.querySelector('#lineup-order')
-        });
-    }
-
     function handleTabLogic() {
         if (!document.getElementById('mainTabContent')) return;
 

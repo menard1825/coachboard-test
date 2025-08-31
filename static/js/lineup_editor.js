@@ -1,5 +1,65 @@
 // static/js/lineup_editor.js
 
+let lineupEditorModal;
+
+async function saveLineup() {
+    const btn = document.getElementById('saveLineupBtn');
+    const modal = btn.closest('.modal');
+    const lineupId = modal.querySelector('#lineupId').value;
+    const title = modal.querySelector('#lineupTitle').value;
+    const lineup_positions = Array.from(modal.querySelectorAll('#lineup-order .list-group-item')).map(item => item.dataset.playerName);
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    const url = lineupId ? `/edit_lineup/${lineupId}` : '/add_lineup';
+    const payload = {
+        title: title,
+        lineup_data: lineup_positions,
+        // This modal is for creating unassigned lineup templates, so game ID is always null.
+        // Lineups are associated with games from the game-specific management page.
+        associated_game_id: null
+    };
+
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message);
+
+        lineupEditorModal.hide();
+
+    } catch (error) {
+        alert('Error saving lineup: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Save';
+    }
+}
+
+function openLineupEditor(lineupData, rosterData) {
+    const modal = document.getElementById('lineupEditorModal');
+    const currentLineup = lineupData || { id: null, title: 'New Unassigned Lineup', lineup_positions: [] };
+
+    modal.querySelector('#lineupId').value = currentLineup.id;
+    modal.querySelector('#lineupTitle').value = currentLineup.title;
+
+    initializeLineupEditor({
+        roster: rosterData,
+        lineup: currentLineup,
+        benchEl: modal.querySelector('#lineup-bench'),
+        orderEl: modal.querySelector('#lineup-order')
+    });
+}
+
+
 // Using a global function for now, assuming this file is loaded via a script tag.
 // A more robust solution might use ES6 modules.
 function initializeLineupEditor(options) {
@@ -234,3 +294,12 @@ function initializeLineupEditor(options) {
         handle: '.lineup-drag-handle',
     });
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const lineupModalEl = document.getElementById('lineupEditorModal');
+    if (lineupModalEl) {
+        // Initialize the modal instance and attach the save listener
+        lineupEditorModal = new bootstrap.Modal(lineupModalEl);
+        document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
+    }
+});

@@ -13,6 +13,7 @@ from models import (
     Rotation, Game, CollaborationNote, PracticePlan, PlayerDevelopmentFocus, Sign,
     PlayerGameAbsence, PlayerPracticeAbsence
 )
+from flask_wtf.csrf import CSRFProtect
 from extensions import socketio, migrate
 
 from utils import (
@@ -45,8 +46,10 @@ def create_app():
     app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['WTF_CSRF_ENABLED'] = True
 
     # Initialize extensions with the app
+    csrf = CSRFProtect(app)
     db.init_app(app)
     socketio.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)

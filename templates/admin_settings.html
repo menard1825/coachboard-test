@@ -36,6 +36,7 @@
                     <div class="tab-content">
                         <div class="tab-pane fade show active" id="general-settings">
                             <form action="{{ url_for('admin.update_admin_settings') }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <h6 class="text-muted">General</h6>
                                 <div class="form-floating mb-3">
                                     <input type="text" class="form-control" id="team_name" name="team_name" value="{{ settings.team_name }}" required>
@@ -57,6 +58,7 @@
                         </div>
                         <div class="tab-pane fade" id="appearance-settings">
                             <form action="{{ url_for('admin.update_admin_settings') }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <h6 class="text-muted">Team Colors</h6>
                                 <div class="row mb-3">
                                     <div class="col">
@@ -73,6 +75,7 @@
                         </div>
                         <div class="tab-pane fade" id="pitching-rules-settings">
                             <form action="{{ url_for('admin.update_admin_settings') }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <h6 class="text-muted">Pitching Rules</h6>
                                 <div class="form-floating mb-3">
                                     <select class="form-select" id="pitching_rule_set" name="pitching_rule_set">
@@ -119,6 +122,7 @@
                     {% endif %}
                     
                     <form action="{{ url_for('admin.upload_logo') }}" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="mb-3">
                             <label for="logo" class="form-label">Upload New Logo</label>
                             <input class="form-control" type="file" id="logo" name="logo" required>
