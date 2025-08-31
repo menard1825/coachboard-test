@@ -4,7 +4,10 @@ from sqlalchemy import func
 from models import Player, PitchingOuting
 
 def model_to_dict(obj):
-    """Converts a SQLAlchemy model instance into a dictionary."""
+    """
+    Converts a SQLAlchemy model instance into a dictionary.
+    Handles JSON stored as strings for legacy data.
+    """
     if obj is None:
         return None
 
@@ -12,9 +15,18 @@ def model_to_dict(obj):
     for column in obj.__table__.columns:
         val = getattr(obj, column.name)
         if isinstance(val, (datetime, date)):
-            # Format dates and datetimes as 'YYYY-MM-DD'
             d[column.name] = val.strftime('%Y-%m-%d')
+        elif isinstance(val, str):
+            try:
+                # Try to parse the string as JSON.
+                parsed_val = json.loads(val)
+                # If successful, use the parsed value.
+                d[column.name] = parsed_val
+            except json.JSONDecodeError:
+                # If it's not a valid JSON string, keep the original string.
+                d[column.name] = val
         else:
+            # For other types (int, bool, already parsed JSON, etc.), assign directly.
             d[column.name] = val
     return d
 
