@@ -120,11 +120,6 @@ def edit_game(game_id):
 def delete_game(game_id):
     game_to_delete = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
     if game_to_delete:
-        # Find and delete all associated rotations
-        rotations_to_delete = db.session.query(Rotation).filter_by(associated_game_id=game_id, team_id=session['team_id']).all()
-        for rotation in rotations_to_delete:
-            db.session.delete(rotation)
-
         game_date_str = game_to_delete.date.strftime('%m/%d/%Y')
         db.session.delete(game_to_delete)
         db.session.commit()

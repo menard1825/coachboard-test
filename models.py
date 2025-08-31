@@ -145,10 +145,11 @@ class Rotation(db.Model):
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     innings = Column(JSON) # Changed to JSON
-    associated_game_id = Column(Integer, nullable=True)
+    associated_game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
+    game = relationship("Game", back_populates="rotations")
 
 class Game(db.Model):
     __tablename__ = 'games'
@@ -164,6 +165,7 @@ class Game(db.Model):
     team = relationship("Team", back_populates="games")
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
     pitching_outings = relationship("PitchingOuting", back_populates="game", cascade="all, delete-orphan")
+    rotations = relationship("Rotation", back_populates="game", cascade="all, delete-orphan")
     
     def to_dict(self):
         """Return a dictionary representation of the Game object."""
