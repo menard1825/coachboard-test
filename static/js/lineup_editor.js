@@ -10,8 +10,22 @@ function initializeLineupEditor(options) {
         orderEl
     } = options;
 
-    // Ensure lineup_positions is a valid array, defaulting to an empty array if it's not.
-    if (!Array.isArray(lineup.lineup_positions)) {
+    // FIX: Ensure lineup_positions is always a valid array, parsing from JSON if necessary.
+    if (typeof lineup.lineup_positions === 'string') {
+        try {
+            // Attempt to parse the string as JSON.
+            lineup.lineup_positions = JSON.parse(lineup.lineup_positions);
+            // Further check if the parsed result is actually an array.
+            if (!Array.isArray(lineup.lineup_positions)) {
+                lineup.lineup_positions = [];
+            }
+        } catch (e) {
+            console.error("Error parsing lineup_positions JSON:", e);
+            // If parsing fails, default to an empty array.
+            lineup.lineup_positions = [];
+        }
+    } else if (!Array.isArray(lineup.lineup_positions)) {
+        // If it's not a string and not an array (e.g., null, undefined), default to an empty array.
         lineup.lineup_positions = [];
     }
 

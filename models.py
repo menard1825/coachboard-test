@@ -86,11 +86,36 @@ class Lineup(db.Model):
     __tablename__ = 'lineups'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
-    lineup_positions = Column(JSON) # Changed to JSON
+    # Use a private attribute to map to the 'lineup_positions' column in the DB
+    _lineup_positions_db = Column('lineup_positions', JSON)
     associated_game_id = Column(Integer)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="lineups")
+
+    @property
+    def lineup_positions(self):
+        """
+        Getter for lineup_positions.
+        Handles legacy data that might be stored as a JSON string.
+        """
+        db_val = self._lineup_positions_db
+        if isinstance(db_val, str):
+            try:
+                return json.loads(db_val)
+            except json.JSONDecodeError:
+                # If it's a string but not valid JSON, return an empty list as a safe fallback.
+                return []
+        # Return the value if it's already a list/dict, or an empty list if it's None.
+        return db_val if db_val is not None else []
+
+    @lineup_positions.setter
+    def lineup_positions(self, value):
+        """
+        Setter for lineup_positions.
+        The SQLAlchemy JSON type handles serialization of the Python object (list/dict).
+        """
+        self._lineup_positions_db = value
 
 class PitchingOuting(db.Model):
     __tablename__ = 'pitching_outings'

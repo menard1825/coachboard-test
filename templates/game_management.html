@@ -107,7 +107,10 @@
           <div class="modal-body">
               <div class="mb-3">
                   <label for="game_date" class="form-label">Date</label>
-                  <input type="date" class="form-control" id="game_date" name="game_date" value="{{ game_date_for_input }}">
+                  <div class="input-group">
+                      <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
+                      <input type="date" class="form-control" id="game_date" name="game_date" value="{{ game_date_for_input }}">
+                  </div>
               </div>
               <div class="mb-3">
                   <label for="game_opponent" class="form-label">Opponent</label>
