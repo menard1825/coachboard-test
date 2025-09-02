@@ -481,3 +481,49 @@ body {
     margin: 0.5rem auto 1.5rem;
 }
 }
+
+/* ==========================================================================
+   Statistics Page Enhancements
+   ========================================================================== */
+.stats-card {
+    margin-bottom: 1rem;
+}
+
+.stats-card .card-header {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+}
+.stat-item:last-child {
+    border-bottom: none;
+}
+.stat-item .stat-label {
+    color: var(--text-muted);
+}
+.stat-item .stat-value {
+    font-weight: 600;
+}
+
+.position-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.5rem;
+}
+.position-stat {
+    background-color: #f8f9fa;
+    border-radius: .25rem;
+    padding: 0.25rem 0.5rem;
+    text-align: center;
+    font-size: 0.9rem;
+}
+.position-stat .pos-label {
+    font-weight: bold;
+    display: block;
+    font-size: 1rem;
+}
