@@ -432,4 +432,52 @@ body {
         border-top-color: var(--primary-color);
         background-color: transparent;
     }
+
+/* ==========================================================================
+   Jules's UI/UX Enhancements
+   ========================================================================== */
+
+/* Add a subtle shadow to cards for a modern, lifted feel */
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid var(--card-border-color);
+}
+
+/* Improve visual hierarchy of card titles */
+.card-header h5 {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* Helper class to add vertical spacing in dense forms */
+.form-row-spaced > .col,
+.form-row-spaced > [class*="col-"] {
+    margin-bottom: 1rem;
+}
+
+/* Styling for the new, more engaging empty state messages */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    border: 2px dashed var(--card-border-color);
+    border-radius: .375rem;
+    background-color: #f8f9fa;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    color: var(--text-muted);
+}
+
+.empty-state h5 {
+    font-size: 1.25rem;
+    margin-top: 1rem;
+    font-weight: 600;
+}
+
+.empty-state p {
+    color: var(--text-muted);
+    max-width: 450px;
+    margin: 0.5rem auto 1.5rem;
+}
 }

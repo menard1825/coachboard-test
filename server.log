@@ -1,1 +1,35 @@
  * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 141-289-218
+(5312) wsgi starting up on http://0.0.0.0:5002
+(5312) accepted ('127.0.0.1', 33616)
+127.0.0.1 - - [02/Sep/2025 14:39:57] "GET /login HTTP/1.1" 200 1792 0.045629
+127.0.0.1 - - [02/Sep/2025 14:39:59] "POST /login HTTP/1.1" 302 738 0.634021
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET / HTTP/1.1" 200 40898 0.083094
+(5312) accepted ('127.0.0.1', 33632)
+(5312) accepted ('127.0.0.1', 33646)
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /static/css/main.css?v=20250902143959 HTTP/1.1" 200 13495 0.010121
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /static/js/lineup_editor.js HTTP/1.1" 200 12893 0.003533
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /static/js/main.js HTTP/1.1" 200 77269 0.006453
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/session_data HTTP/1.1" 200 592 0.017057
+(5312) accepted ('127.0.0.1', 33648)
+(5312) accepted ('127.0.0.1', 33662)
+(5312) accepted ('127.0.0.1', 33672)
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/lineups HTTP/1.1" 200 467 0.005777
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/roster HTTP/1.1" 200 467 0.006507
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/pitching_data HTTP/1.1" 200 515 0.012253
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/scouting_list HTTP/1.1" 200 528 0.006178
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/rotations HTTP/1.1" 200 467 0.004157
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/collaboration_notes HTTP/1.1" 200 510 0.007342
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/games HTTP/1.1" 200 467 0.006100
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/player_development HTTP/1.1" 200 467 0.007099
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/signs HTTP/1.1" 200 467 0.004195
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/practice_plans HTTP/1.1" 200 467 0.015619
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/overview_data HTTP/1.1" 200 537 0.007882
+127.0.0.1 - - [02/Sep/2025 14:39:59] "GET /api/stats HTTP/1.1" 200 562 0.010556
+127.0.0.1 - - [02/Sep/2025 14:40:00] "GET /socket.io/?EIO=4&transport=polling&t=PaAtjOC HTTP/1.1" 200 300 0.000757
+127.0.0.1 - - [02/Sep/2025 14:40:00] "POST /socket.io/?EIO=4&transport=polling&t=PaAtjP3&sid=h7ed6PgTU90QMC0yAAAA HTTP/1.1" 200 219 0.001444
+127.0.0.1 - - [02/Sep/2025 14:40:00] "GET /socket.io/?EIO=4&transport=polling&t=PaAtjPY&sid=h7ed6PgTU90QMC0yAAAA HTTP/1.1" 200 213 0.000319
+(5312) accepted ('127.0.0.1', 33682)
+127.0.0.1 - - [02/Sep/2025 14:40:00] "GET /socket.io/?EIO=4&transport=polling&t=PaAtjPi&sid=h7ed6PgTU90QMC0yAAAA HTTP/1.1" 200 181 0.026237
+127.0.0.1 - - [02/Sep/2025 14:40:00] "GET /socket.io/?EIO=4&transport=websocket&sid=h7ed6PgTU90QMC0yAAAA HTTP/1.1" 200 0 0.443529
