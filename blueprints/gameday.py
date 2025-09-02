@@ -149,45 +149,53 @@ def update_absences(game_id):
 def add_lineup():
     if 'logged_in' not in session:
         return jsonify({'status': 'error', 'message': 'Authentication required.'}), 401
-    payload = request.get_json()
-    if not payload or 'title' not in payload or 'lineup_data' not in payload:
-        return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
-    
-    new_lineup = Lineup(
-        title=payload['title'], 
-        lineup_positions=payload['lineup_data'],
-        associated_game_id=int(payload['associated_game_id']) if payload.get('associated_game_id') else None, 
-        team_id=session['team_id']
-    )
-    db.session.add(new_lineup)
-    db.session.commit()
+    try:
+        payload = request.get_json()
+        if not payload or 'title' not in payload or 'lineup_data' not in payload:
+            return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
 
-    lineup_dict = model_to_dict(new_lineup)
-    socketio.emit('lineup_add', {'lineup': lineup_dict})
+        new_lineup = Lineup(
+            title=payload['title'],
+            lineup_positions=payload['lineup_data'],
+            associated_game_id=int(payload['associated_game_id']) if payload.get('associated_game_id') else None,
+            team_id=session['team_id']
+        )
+        db.session.add(new_lineup)
+        db.session.commit()
 
-    return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id, 'lineup': lineup_dict})
+        lineup_dict = model_to_dict(new_lineup)
+        socketio.emit('lineup_add', {'lineup': lineup_dict})
+
+        return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id, 'lineup': lineup_dict})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': 'An unexpected error occurred while adding the lineup.'}), 500
 
 @gameday_bp.route('/edit_lineup/<int:lineup_id>', methods=['POST'])
 def edit_lineup(lineup_id):
     if 'logged_in' not in session:
         return jsonify({'status': 'error', 'message': 'Authentication required.'}), 401
-    lineup_to_edit = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
-    if not lineup_to_edit:
-        return jsonify({'status': 'error', 'message': 'Lineup not found.'}), 404
-    
-    payload = request.get_json()
-    if not payload or 'title' not in payload or 'lineup_data' not in payload:
-        return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
+    try:
+        lineup_to_edit = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
+        if not lineup_to_edit:
+            return jsonify({'status': 'error', 'message': 'Lineup not found.'}), 404
         
-    lineup_to_edit.title = payload['title']
-    lineup_to_edit.lineup_positions = payload['lineup_data']
-    lineup_to_edit.associated_game_id = int(payload.get('associated_game_id')) if payload.get('associated_game_id') else None
-    db.session.commit()
+        payload = request.get_json()
+        if not payload or 'title' not in payload or 'lineup_data' not in payload:
+            return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
 
-    lineup_dict = model_to_dict(lineup_to_edit)
-    socketio.emit('lineup_update', {'lineup': lineup_dict})
+        lineup_to_edit.title = payload['title']
+        lineup_to_edit.lineup_positions = payload['lineup_data']
+        lineup_to_edit.associated_game_id = int(payload.get('associated_game_id')) if payload.get('associated_game_id') else None
+        db.session.commit()
 
-    return jsonify({'status': 'success', 'message': f'Lineup "{lineup_to_edit.title}" updated successfully!', 'lineup': lineup_dict})
+        lineup_dict = model_to_dict(lineup_to_edit)
+        socketio.emit('lineup_update', {'lineup': lineup_dict})
+
+        return jsonify({'status': 'success', 'message': f'Lineup "{lineup_to_edit.title}" updated successfully!', 'lineup': lineup_dict})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': 'An unexpected error occurred while editing the lineup.'}), 500
 
 @gameday_bp.route('/delete_lineup/<int:lineup_id>')
 def delete_lineup(lineup_id):
