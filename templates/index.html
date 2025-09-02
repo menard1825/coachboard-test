@@ -23,44 +23,54 @@
     <ul class="nav nav-tabs desktop-nav-tabs" id="mainTabsDesktop" role="tablist">
         {% for tab_key in tab_order %}
         <li class="nav-item" role="presentation">
-            <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
-                <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
-                {{ all_tabs[tab_key] }}
-            </a>
+            {% if tab_key == 'pitching' %}
+                <a class="nav-link" data-bs-toggle="tab" href="#pitching" role="tab">
+                    <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
+                    {{ all_tabs[tab_key] }}
+                </a>
+            {% else %}
+                <a class="nav-link" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">
+                    <i class="bi bi-grip-vertical me-1 drag-handle" title="Drag to reorder"></i>
+                    {{ all_tabs[tab_key] }}
+                </a>
+            {% endif %}
         </li>
         {% endfor %}
     </ul>
 </div>
 
-{# NEW: Reusable template for empty states #}
-<script type="text/template" id="empty-state-template">
-    <div class="empty-state">
-        <i class="bi {icon_class}"></i>
-        <h5>{title}</h5>
-        <p>{message}</p>
-        <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#{modal_id}">{button_text}</button>
-    </div>
-</script>
+{# REMOVED: The <script type="text/template"> is no longer needed. #}
 
+{# MODIFIED: Tab panes are now directly in the tab-content container. #}
 <div class="tab-content" id="mainTabContent">
     <div class="tab-pane fade" id="overview" role="tabpanel">
         <div id="overview-content-container">
-            <div class="d-flex justify-content-center p-5"><div class="spinner-border" role="status"><span class="visually-hidden">Loading Overview...</span></div></div>
+            <div class="d-flex justify-content-center p-5">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading Overview...</span>
+                </div>
+            </div>
         </div>
     </div>
-
+    {# Roster is the default active tab #}
     <div class="tab-pane fade" id="roster" role="tabpanel">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0">Current Roster</h5>
                 <div class="d-flex align-items-center gap-2">
                     <input type="search" id="rosterSearch" class="form-control form-control-sm" placeholder="Search roster...">
-                    <button class="btn btn-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#addPlayerModal"><i class="bi bi-plus-circle"></i> New Player</button>
+                    <button class="btn btn-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#addPlayerModal">
+                        <i class="bi bi-plus-circle"></i> New Player
+                    </button>
                 </div>
             </div>
             <div class="card-body">
                 <div id="roster-cards-container" class="row g-3">
-                    <div class="d-flex justify-content-center p-5"><div class="spinner-border" role="status"><span class="visually-hidden">Loading Roster...</span></div></div>
+                    <div class="d-flex justify-content-center p-5">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading Roster...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -68,55 +78,167 @@
 
     <div class="tab-pane fade" id="player_development" role="tabpanel">
         <div class="row">
-            <div class="col-lg-4 mb-3 mb-lg-0"><div class="card"><div class="card-header d-flex justify-content-between align-items-center"><h5 class="mb-0">Players</h5><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" id="dev-sort-az" title="Sort A-Z"><i class="bi bi-sort-alpha-down"></i></button><button class="btn btn-outline-secondary" id="dev-sort-za" title="Sort Z-A"><i class="bi bi-sort-alpha-up"></i></button><button class="btn btn-outline-secondary" id="dev-sort-custom" title="Custom Sort"><i class="bi bi-arrow-down-up"></i></button></div></div><div class="card-body"><input type="search" id="devPlayerSearch" class="form-control mb-3" placeholder="Search players..."><div class="list-group" id="dev-player-list"></div></div></div></div>
-            <div class="col-lg-8"><div id="player-dev-content"></div></div>
+            <div class="col-lg-4 mb-3 mb-lg-0">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Players</h5>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary" id="dev-sort-az" title="Sort A-Z"><i class="bi bi-sort-alpha-down"></i></button>
+                            <button class="btn btn-outline-secondary" id="dev-sort-za" title="Sort Z-A"><i class="bi bi-sort-alpha-up"></i></button>
+                            <button class="btn btn-outline-secondary" id="dev-sort-custom" title="Custom Sort"><i class="bi bi-arrow-down-up"></i></button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <input type="search" id="devPlayerSearch" class="form-control mb-3" placeholder="Search players...">
+                        <div class="list-group" id="dev-player-list"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div id="player-dev-content"></div>
+            </div>
         </div>
     </div>
 
     <div class="tab-pane fade" id="stats" role="tabpanel">
         <h2 class="mb-4">Cumulative Player Statistics</h2>
-        <div id="stats-content-container"><div class="d-flex justify-content-center p-5"><div class="spinner-border" role="status"><span class="visually-hidden">Loading Stats...</span></div></div></div>
-    </div>
-
-    <div class="tab-pane fade" id="lineups" role="tabpanel">
-        <div class="alert alert-info"><i class="bi bi-info-circle-fill"></i> Create and manage reusable lineup templates here. You can then load a template into any game from its 'Manage' screen.</div>
-        <div class="card"><div class="card-header d-flex justify-content-between align-items-center"><h5 class="mb-0">Unassigned Lineups</h5><button class="btn btn-primary btn-sm" id="createLineupBtn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal"><i class="bi bi-plus-circle"></i> Create New</button></div><div class="accordion accordion-flush" id="lineupsAccordion"></div></div>
-    </div>
-    
-    <div class="tab-pane fade" id="rotations" role="tabpanel">
-        <div class="alert alert-info"><i class="bi bi-info-circle-fill"></i> Create and manage reusable defensive rotation templates here. You can then load a template into any game from its 'Manage' screen.</div>
-        <div class="card"><div class="card-header"><h5 class="mb-0">Rotation Templates</h5></div><div class="accordion accordion-flush" id="rotationsAccordion"></div></div>
-    </div>
-
-    <div class="tab-pane fade" id="scouting_list" role="tabpanel">
-        <div class="card mb-4"><div class="card-header"><h5 class="mb-0">Add New Scouted Player</h5></div><div class="card-body"><form id="addScoutedPlayerForm" class="row g-3 align-items-end"><div class="col-md-4"><label class="form-label">Player Name</label><input type="text" class="form-control" name="scouted_player_name" required></div><div class="col-md-2"><label class="form-label">Pos 1</label>{{ position_select('scouted_player_pos1', 'scouted_player_pos1', '', title='') }}</div><div class="col-md-2"><label class="form-label">Pos 2</label>{{ position_select('scouted_player_pos2', 'scouted_player_pos2', '', title='') }}</div><div class="col-md-2"><label class="form-label">Throws</label><select name="scouted_player_throws" class="form-select"><option value="">N/A</option><option value="Right">Right</option><option value="Left">Left</option></select></div><div class="col-md-2"><label class="form-label">Bats</label><select name="scouted_player_bats" class="form-select"><option value="">N/A</option><option value="Right">Right</option><option value="Left">Left</option></select></div><div class="col-md-4"><label class="form-label">Add to List</label><select name="scouted_player_type" class="form-select"><option value="targets">Targets</option><option value="committed">Committed</option><option value="not_interested">Not Interested</option></select></div><div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Add</button></div></form><div id="addScoutedPlayerFeedback" class="mt-2"></div></div></div>
-        <div class="row" id="scouting-list-container"><div class="col-lg-4 mb-3 mb-lg-0"><div class="card"><div class="card-header"><h5 class="mb-0">Targets</h5></div><ul class="list-group list-group-flush" id="scouting-list-targets"></ul></div></div><div class="col-lg-4 mb-3 mb-lg-0"><div class="card"><div class="card-header"><h5 class="mb-0">Committed</h5></div><ul class="list-group list-group-flush" id="scouting-list-committed"></ul></div></div><div class="col-lg-4"><div class="card"><div class="card-header"><h5 class="mb-0">Not Interested</h5></div><ul class="list-group list-group-flush" id="scouting-list-not_interested"></ul></div></div></div>
-    </div>
-
-    <div class="tab-pane fade" id="games" role="tabpanel">
-        <div class="card mb-4"><div class="card-header"><h5 class="mb-0">Add New Game</h5></div><div class="card-body"><form action="{{ url_for('gameday.add_game') }}" method="POST" class="row g-3"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="col-md-3"><input type="date" name="game_date" id="add_game_date" class="form-control" required></div><div class="col-md-3"><input type="text" name="game_opponent" class="form-control" placeholder="Opponent" required></div><div class="col-md-3"><input type="text" name="game_location" class="form-control" placeholder="Location"></div><div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add & Manage</button></div><div class="col-12"><textarea name="game_notes" class="form-control" rows="1" placeholder="Notes (e.g., arrival time)"></textarea></div></form></div></div>
-        <div class="card">
-            <div class="card-header"><h5 class="mb-0">Game Schedule</h5></div>
-            <div id="games-list-container">
-                {# This will be populated by main.js, which will now use the empty-state template if no games are found. #}
+        <div id="stats-content-container">
+            <div class="d-flex justify-content-center p-5">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading Stats...</span>
+                </div>
             </div>
         </div>
     </div>
 
+    <div class="tab-pane fade" id="lineups" role="tabpanel">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle-fill"></i>
+            Create and manage reusable lineup templates here. You can then load a template into any game from its 'Manage' screen.
+        </div>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Unassigned Lineups</h5>
+                <button class="btn btn-primary btn-sm" id="createLineupBtn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal"><i class="bi bi-plus-circle"></i> Create New</button>
+            </div>
+            <div class="accordion accordion-flush" id="lineupsAccordion"></div>
+        </div>
+    </div>
+    
+    <div class="tab-pane fade" id="rotations" role="tabpanel">
+        {# NEW: Add an informational alert #}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle-fill"></i>
+            Create and manage reusable defensive rotation templates here. You can then load a template into any game from its 'Manage' screen.
+        </div>
+        <div class="card">
+            {# MODIFICATION: Update the card header text #}
+            <div class="card-header"><h5 class="mb-0">Rotation Templates</h5></div>
+            <div class="accordion accordion-flush" id="rotationsAccordion"></div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="scouting_list" role="tabpanel">
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Add New Scouted Player</h5></div>
+            <div class="card-body">
+                <form id="addScoutedPlayerForm" class="row g-3 align-items-end">
+                    <div class="col-md-4"><label class="form-label">Player Name</label><input type="text" class="form-control" name="scouted_player_name" required></div>
+                    <div class="col-md-2"><label class="form-label">Pos 1</label>{{ position_select('scouted_player_pos1', 'scouted_player_pos1', '', title='') }}</div>
+                    <div class="col-md-2"><label class="form-label">Pos 2</label>{{ position_select('scouted_player_pos2', 'scouted_player_pos2', '', title='') }}</div>
+                    <div class="col-md-2"><label class="form-label">Throws</label><select name="scouted_player_throws" class="form-select"><option value="">N/A</option><option value="Right">Right</option><option value="Left">Left</option></select></div>
+                    <div class="col-md-2"><label class="form-label">Bats</label><select name="scouted_player_bats" class="form-select"><option value="">N/A</option><option value="Right">Right</option><option value="Left">Left</option></select></div>
+                    <div class="col-md-4"><label class="form-label">Add to List</label><select name="scouted_player_type" class="form-select"><option value="targets">Targets</option><option value="committed">Committed</option><option value="not_interested">Not Interested</option></select></div>
+                    <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Add</button></div>
+                </form>
+                <div id="addScoutedPlayerFeedback" class="mt-2"></div>
+            </div>
+        </div>
+        <div class="row" id="scouting-list-container">
+            <div class="col-lg-4 mb-3 mb-lg-0">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Targets</h5></div>
+                    <ul class="list-group list-group-flush" id="scouting-list-targets"></ul>
+                </div>
+            </div>
+            <div class="col-lg-4 mb-3 mb-lg-0">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Committed</h5></div>
+                    <ul class="list-group list-group-flush" id="scouting-list-committed"></ul>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Not Interested</h5></div>
+                    <ul class="list-group list-group-flush" id="scouting-list-not_interested"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="games" role="tabpanel">
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Add New Game</h5></div>
+            <div class="card-body">
+                <form action="{{ url_for('gameday.add_game') }}" method="POST" class="row g-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="col-md-3"><input type="date" name="game_date" id="add_game_date" class="form-control" required></div>
+                    <div class="col-md-3"><input type="text" name="game_opponent" class="form-control" placeholder="Opponent" required></div>
+                    <div class="col-md-3"><input type="text" name="game_location" class="form-control" placeholder="Location"></div>
+                    <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add & Manage</button></div>
+                    <div class="col-12"><textarea name="game_notes" class="form-control" rows="1" placeholder="Notes (e.g., arrival time)"></textarea></div>
+                </form>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h5 class="mb-0">Game Schedule</h5></div>
+            <ul class="list-group list-group-flush" id="games-list-container"></ul>
+        </div>
+    </div>
+
     <div class="tab-pane fade" id="collaboration" role="tabpanel">
-        <div class="row"><div class="col-md-6 mb-3 mb-md-0"><div class="card"><div class="card-header"><h5 class="mb-0">Team Notes</h5></div><div class="card-body"><form action="{{ url_for('team_management.add_note', note_type='team_notes') }}" method="POST" class="mb-3"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new team note..."></textarea><button type="submit" class="btn btn-primary btn-sm">Add Team Note</button></form><div id="team-notes-container"></div></div></div></div><div class="col-md-6"><div class="card"><div class="card-header"><h5 class="mb-0">Player Notes</h5></div><div class="card-body"><form action="{{ url_for('team_management.add_note', note_type='player_notes') }}" method="POST" class="mb-3"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><select name="player_name" class="form-select mb-2" required id="collab-player-select"></select><textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note for the selected player..."></textarea><button type="submit" class="btn btn-primary btn-sm">Add Player Note</button></form><div id="player-notes-container"></div></div></div></div></div>
+        <div class="row">
+            <div class="col-md-6 mb-3 mb-md-0">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Team Notes</h5></div>
+                    <div class="card-body">
+                        <form action="{{ url_for('team_management.add_note', note_type='team_notes') }}" method="POST" class="mb-3">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new team note..."></textarea>
+                            <button type="submit" class="btn btn-primary btn-sm">Add Team Note</button>
+                        </form>
+                        <div id="team-notes-container"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Player Notes</h5></div>
+                    <div class="card-body">
+                        <form action="{{ url_for('team_management.add_note', note_type='player_notes') }}" method="POST" class="mb-3">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <select name="player_name" class="form-select mb-2" required id="collab-player-select"></select>
+                            <textarea name="note_text" class="form-control mb-2" rows="3" placeholder="Add a new note for the selected player..."></textarea>
+                            <button type="submit" class="btn btn-primary btn-sm">Add Player Note</button>
+                        </form>
+                        <div id="player-notes-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="tab-pane fade" id="practice_plan" role="tabpanel">
-        <button class="btn btn-primary d-lg-none mb-3 w-100" type="button" data-bs-toggle="collapse" data-bs-target="#createPracticePlanForm"><i class="bi bi-plus-circle"></i> Create New Plan</button>
+        <button class="btn btn-primary d-lg-none mb-3 w-100" type="button" data-bs-toggle="collapse" data-bs-target="#createPracticePlanForm">
+            <i class="bi bi-plus-circle"></i> Create New Plan
+        </button>
         <div class="collapse d-lg-block" id="createPracticePlanForm">
             <div class="card mb-4">
                 <div class="card-header"><h5 class="mb-0">Create New Practice Plan</h5></div>
                 <div class="card-body">
                     <form action="{{ url_for('team_management.add_practice_plan') }}" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        {# MODIFIED: Added form-row-spaced for better vertical spacing #}
-                        <div class="row g-3 form-row-spaced">
+                        <div class="row g-3">
                             <div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" required></div>
                             <div class="col-md-8"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" placeholder="e.g., Pre-tournament tune-up"></div>
                             <div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2" placeholder="e.g., First-pitch strikes, aggressive baserunning"></textarea></div>
@@ -124,7 +246,7 @@
                             <div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3" placeholder="Ground balls, fly balls..."></textarea></div>
                             <div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3" placeholder="Tee work, soft toss, live BP..."></textarea></div>
                             <div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3" placeholder="Bullpens, blocking drills..."></textarea></div>
-                            <div class="col-12 d-flex justify-content-end"><button type="submit" class="btn btn-primary btn-lg">Create Plan</button></div>
+                            <div class="col-12 d-flex justify-content-end"><button type="submit" class="btn btn-primary">Create Plan</button></div>
                         </div>
                     </form>
                 </div>
@@ -132,26 +254,93 @@
         </div>
         <div class="card">
             <div class="card-header"><h5 class="mb-0">Saved Practice Plans</h5></div>
-            <div class="accordion accordion-flush" id="practicePlanAccordion">
-                {# This will be populated by main.js, which will now use the empty-state template if no plans are found. #}
-            </div>
+            <div class="accordion accordion-flush" id="practicePlanAccordion"></div>
         </div>
     </div>
 
     <div class="tab-pane fade" id="signs" role="tabpanel">
-        <div class="row"><div class="col-lg-5 mb-3 mb-lg-0"><div class="card"><div class="card-header"><h5 class="mb-0">Add New Sign</h5></div><div class="card-body"><form action="{{ url_for('team_management.add_sign') }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="mb-2"><input type="text" name="sign_name" class="form-control" placeholder="Sign Name" required></div><div class="mb-2"><input type="text" name="sign_indicator" class="form-control" placeholder="Indicator" required></div><button type="submit" class="btn btn-primary w-100">Add Sign</button></form></div></div></div><div class="col-lg-7"><div class="card"><div class="card-header"><h5 class="mb-0">Saved Signs</h5></div><ul class="list-group list-group-flush" id="signs-list-container"></ul></div></div></div>
+        <div class="row">
+            <div class="col-lg-5 mb-3 mb-lg-0">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Add New Sign</h5></div>
+                    <div class="card-body">
+                        <form action="{{ url_for('team_management.add_sign') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <div class="mb-2"><input type="text" name="sign_name" class="form-control" placeholder="Sign Name" required></div>
+                            <div class="mb-2"><input type="text" name="sign_indicator" class="form-control" placeholder="Indicator" required></div>
+                            <button type="submit" class="btn btn-primary w-100">Add Sign</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Saved Signs</h5></div>
+                    <ul class="list-group list-group-flush" id="signs-list-container"></ul>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="tab-pane fade" id="pitching" role="tabpanel">
-        <div class="card mb-4"><div class="card-header d-flex justify-content-between align-items-center"><h5 class="mb-0">Pitch Count Summary</h5><a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-sm btn-outline-info">View Rules</a></div><div class="card-body p-2" id="pitch-count-summary-container"><div class="d-flex justify-content-center p-5"><div class="spinner-border" role="status"><span class="visually-hidden">Loading Summary...</span></div></div></div></div>
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Pitch Count Summary</h5>
+                <a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-sm btn-outline-info">View Rules</a>
+            </div>
+            <div class="card-body p-2" id="pitch-count-summary-container">
+                <div class="d-flex justify-content-center p-5">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading Summary...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="row">
-            <div class="col-lg-5 mb-4"><div class="card h-100"><div class="card-header"><h5 class="mb-0">Add New Outing</h5></div><div class="card-body"><form action="{{ url_for('pitching.add_pitching') }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="row g-3"><div class="col-6"><label for="pitch_date" class="form-label">Date</label><input type="date" id="pitch_date" name="pitch_date" class="form-control" required></div><div class="col-6"><label for="pitching-log-pitcher-select" class="form-label">Pitcher</label><select name="player_id" id="pitching-log-pitcher-select" class="form-select" required></select></div><div class="col-12"><label for="opponent" class="form-label">Opponent / Context</label><input type="text" id="opponent" name="opponent" class="form-control" placeholder="e.g., Scrimmage vs. Tigers"></div><div class="col-6"><label for="pitches" class="form-label">Pitch Count</label><input type="number" id="pitches" name="pitches" class="form-control" required></div><div class="col-6"><label for="innings" class="form-label">Innings Pitched</label><input type="text" id="innings" name="innings" class="form-control" placeholder="e.g., 2.1" required></div><div class="col-6"><label for="outing_type" class="form-label">Outing Type</label><select name="outing_type" id="outing_type" class="form-select"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div><div class="col-6"><label for="pitcher_type" class="form-label">Pitcher Type</label><select name="pitcher_type" id="pitcher_type" class="form-select"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div></div><button type="submit" class="btn btn-primary w-100 mt-3">Log Outing</button></form></div></div></div>
-            <div class="col-lg-7 mb-4"><div class="card h-100"><div class="card-header"><h5 class="mb-0">Recent Outing History</h5></div><ul class="list-group list-group-flush" id="recorded-outings-list"><li class="list-group-item text-muted">Loading history...</li></ul></div></div>
+            <div class="col-lg-5 mb-4">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Add New Outing</h5></div>
+                    <div class="card-body">
+                        <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <div class="row g-3">
+                                <div class="col-6"><label for="pitch_date" class="form-label">Date</label><input type="date" id="pitch_date" name="pitch_date" class="form-control" required></div>
+                                <div class="col-6">
+                                    <label for="pitching-log-pitcher-select" class="form-label">Pitcher</label>
+                                    <select name="player_id" id="pitching-log-pitcher-select" class="form-select" required></select>
+                                </div>
+                                <div class="col-12"><label for="opponent" class="form-label">Opponent / Context</label><input type="text" id="opponent" name="opponent" class="form-control" placeholder="e.g., Scrimmage vs. Tigers"></div>
+                                <div class="col-6"><label for="pitches" class="form-label">Pitch Count</label><input type="number" id="pitches" name="pitches" class="form-control" required></div>
+                                <div class="col-6"><label for="innings" class="form-label">Innings Pitched</label><input type="text" id="innings" name="innings" class="form-control" placeholder="e.g., 2.1" required></div>
+                                <div class="col-6"><label for="outing_type" class="form-label">Outing Type</label><select name="outing_type" id="outing_type" class="form-select"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div>
+                                <div class="col-6"><label for="pitcher_type" class="form-label">Pitcher Type</label><select name="pitcher_type" id="pitcher_type" class="form-select"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 mt-3">Log Outing</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7 mb-4">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Recent Outing History</h5></div>
+                    <ul class="list-group list-group-flush" id="recorded-outings-list">
+                         <li class="list-group-item text-muted">Loading history...</li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="tab-pane fade" id="more" role="tabpanel" aria-labelledby="more-tab">
-        <div class="list-group"><h5 class="text-muted ps-3 mt-2 mb-2">More Sections</h5>{% set mobile_main_tabs = ['roster', 'player_development', 'games', 'practice_plan'] %}{% for tab_key in tab_order %}{% if tab_key not in mobile_main_tabs %}<a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">{{ all_tabs[tab_key] }}</a>{% endif %}{% endfor %}</div>
+        <div class="list-group">
+            <h5 class="text-muted ps-3 mt-2 mb-2">More Sections</h5>
+            {% set mobile_main_tabs = ['roster', 'player_development', 'games', 'practice_plan'] %}
+            {% for tab_key in tab_order %}
+                {% if tab_key not in mobile_main_tabs %}
+                    <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab">{{ all_tabs[tab_key] }}</a>
+                {% endif %}
+            {% endfor %}
+        </div>
     </div>
 </div>
 
@@ -181,10 +370,100 @@
 </div>
 
 {% include '_lineup_editor.html' %}
-<div class="modal fade" id="editNoteModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="{{ url_for('team_management.edit_note') }}" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-body"><input type="hidden" name="note_id" id="editNoteId"><input type="hidden" name="note_type" id="editNoteType"><textarea class="form-control" name="note_text" id="editNoteText" rows="5" required></textarea></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></form></div></div></div>
-<div class="modal fade" id="editFocusModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-header"><h5 class="modal-title">Development Focus</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">Skill</label><select name="skill" id="focusSkill" class="form-select" required><option value="hitting">Hitting</option><option value="pitching">Pitching</option><option value="fielding">Fielding</option><option value="baserunning">Baserunning</option></select></div><div class="mb-3"><label class="form-label">Focus / Goal</label><input type="text" class="form-control" name="focus_text" id="focusText" required></div><div class="mb-3"><label class="form-label">Notes</label><textarea class="form-control" name="notes" id="focusNotes" rows="3"></textarea></div><div class="mb-3"><label class="form-label">Progress Notes</label><textarea class="form-control" name="progress_notes" id="focusProgressNotes" rows="3"></textarea></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></form></div></div></div>
-<div class="modal fade" id="editSignModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Edit Sign</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form id="editSignForm" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-body"><div class="mb-2"><label class="form-label">Sign Name</label><input type="text" name="sign_name" id="editSignName" class="form-control" required></div><div class="mb-2"><label class="form-label">Indicator</label><input type="text" name="sign_indicator" id="editSignIndicator" class="form-control" required></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></form></div></div></div>
-<div class="modal fade" id="editPitchingOutingModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Edit Pitching Outing</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form id="editPitchingOutingForm" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-body"><div class="row g-3"><div class="col-6"><label for="edit_pitch_date" class="form-label">Date</label><input type="date" id="edit_pitch_date" name="pitch_date" class="form-control" required></div><div class="col-6"><label for="edit_pitcher" class="form-label">Pitcher</label><select name="player_id" class="form-select" required id="edit_pitcher"></select></div><div class="col-12"><label for="edit_opponent" class="form-label">Opponent / Context</label><input type="text" id="edit_opponent" name="opponent" class="form-control"></div><div class="col-6"><label for="edit_pitches" class="form-label">Pitch Count</label><input type="number" id="edit_pitches" name="pitches" class="form-control" required></div><div class="col-6"><label for="edit_innings" class="form-label">Innings</label><input type="text" id="edit_innings" name="innings" class="form-control" required></div><div class="col-6"><label for="edit_outing_type" class="form-label">Outing Type</label><select name="outing_type" id="edit_outing_type" class="form-select"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div><div class="col-6"><label for="edit_pitcher_type" class="form-label">Pitcher Type</label><select name="pitcher_type" id="edit_pitcher_type" class="form-select"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save Changes</button></div></form></div></div></div>
+<div class="modal fade" id="editNoteModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form action="{{ url_for('team_management.edit_note') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <div class="modal-body"><input type="hidden" name="note_id" id="editNoteId"><input type="hidden" name="note_type" id="editNoteType"><textarea class="form-control" name="note_text" id="editNoteText" rows="5" required></textarea></div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
+    </form>
+  </div></div>
+</div>
+<div class="modal fade" id="editFocusModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <div class="modal-header"><h5 class="modal-title">Development Focus</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-3"><label class="form-label">Skill</label><select name="skill" id="focusSkill" class="form-select" required><option value="hitting">Hitting</option><option value="pitching">Pitching</option><option value="fielding">Fielding</option><option value="baserunning">Baserunning</option></select></div>
+        <div class="mb-3"><label class="form-label">Focus / Goal</label><input type="text" class="form-control" name="focus_text" id="focusText" required></div>
+        <div class="mb-3"><label class="form-label">Notes</label><textarea class="form-control" name="notes" id="focusNotes" rows="3"></textarea></div>
+        <div class="mb-3"><label class="form-label">Progress Notes</label><textarea class="form-control" name="progress_notes" id="focusProgressNotes" rows="3"></textarea></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
+    </form>
+  </div></div>
+</div>
+<div class="modal fade" id="editSignModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title">Edit Sign</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <form id="editSignForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="modal-body">
+                <div class="mb-2"><label class="form-label">Sign Name</label><input type="text" name="sign_name" id="editSignName" class="form-control" required></div>
+                <div class="mb-2"><label class="form-label">Indicator</label><input type="text" name="sign_indicator" id="editSignIndicator" class="form-control" required></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
+        </form>
+    </div></div>
+</div>
+
+<div class="modal fade" id="editPitchingOutingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Pitching Outing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editPitchingOutingForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label for="edit_pitch_date" class="form-label">Date</label>
+                            <input type="date" id="edit_pitch_date" name="pitch_date" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_pitcher" class="form-label">Pitcher</label>
+                            <select name="player_id" class="form-select" required id="edit_pitcher"></select>
+                        </div>
+                        <div class="col-12">
+                            <label for="edit_opponent" class="form-label">Opponent / Context</label>
+                            <input type="text" id="edit_opponent" name="opponent" class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_pitches" class="form-label">Pitch Count</label>
+                            <input type="number" id="edit_pitches" name="pitches" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_innings" class="form-label">Innings</label>
+                            <input type="text" id="edit_innings" name="innings" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_outing_type" class="form-label">Outing Type</label>
+                            <select name="outing_type" id="edit_outing_type" class="form-select">
+                                <option value="Game">Game</option>
+                                <option value="External/Lesson">External/Lesson</option>
+                                <option value="Practice">Practice</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label for="edit_pitcher_type" class="form-label">Pitcher Type</label>
+                            <select name="pitcher_type" id="edit_pitcher_type" class="form-select">
+                                <option value="Starter">Starter</option>
+                                <option value="Reliever">Reliever</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -192,18 +471,24 @@
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}
 
+{# ========================================================================================= #}
+{# NEW BOTTOM NAVIGATION FOR MOBILE - REPLACES THE OLD "MORE" MENU                         #}
+{# This block overrides the empty `bottom_nav` block in base.html                          #}
+{# ========================================================================================= #}
 {% block bottom_nav %}
 <nav class="fixed-bottom d-lg-none bottom-nav-fixed shadow-lg">
     <ul class="nav nav-tabs" role="tablist">
+        {# Display the fixed primary tabs for mobile #}
         {% set mobile_tabs = ['roster', 'player_development', 'games', 'practice_plan'] %}
         {% for tab_key in mobile_tabs %}
         <li class="nav-item">
             <a class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="tab" href="#{{ tab_key }}" role="tab" aria-selected="{% if loop.first %}true{% else %}false{% endif %}">
-                <i class="bi bi-{{ {'roster': 'people', 'games': 'calendar4-event', 'practice_plan': 'clipboard-check', 'player_development': 'graph-up-arrow'}.get(tab_key, 'question-circle') }}"></i>
+                <i class="bi bi-{{ {'roster': 'people', 'games': 'calendar4-event', 'practice_plan': 'clipboard-check', 'player_development': 'graph-up-arrow', 'lineups': 'list-ol', 'pitching': 'bullseye'}.get(tab_key, 'question-circle') }}"></i>
                 <span>{{ all_tabs[tab_key] }}</span>
             </a>
         </li>
         {% endfor %}
+        {# Add the "More" tab #}
         <li class="nav-item">
             <a class="nav-link" data-bs-toggle="tab" href="#more" role="tab">
                 <i class="bi bi-three-dots"></i>

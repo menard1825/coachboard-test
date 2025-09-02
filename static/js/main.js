@@ -42,17 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    function renderEmptyState(container, { iconClass, title, message, modal_id, button_text }) {
-        const template = document.getElementById('empty-state-template').innerHTML;
-        const html = template
-            .replace('{icon_class}', iconClass)
-            .replace('{title}', title)
-            .replace('{message}', message)
-            .replace('{modal_id}', modal_id)
-            .replace('{button_text}', button_text);
-        container.innerHTML = html;
-    }
-
     const renderPositionSelect = (name, id, selectedVal = '', title = 'Select Position', classes = 'form-select form-select-sm') => {
         let positions = ['P', 'C', '1B', '2B', '3B', 'SS'];
         if (AppState.session.outfielder_count === 4) {
@@ -136,17 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
             !searchTerm || p.name.toLowerCase().includes(searchTerm) || (p.number || '').toString().includes(searchTerm)
         );
 
-        if (filteredRoster.length > 0) {
-            container.innerHTML = filteredRoster.map(playerTemplate).join('');
-        } else {
-            renderEmptyState(container, {
-                iconClass: 'bi-people-fill',
-                title: 'No Players Found',
-                message: 'Your roster is empty. Add your first player to get started with lineups, stats, and more!',
-                modal_id: 'addPlayerModal',
-                button_text: 'Add New Player'
-            });
-        }
+        container.innerHTML = filteredRoster.length > 0 ? filteredRoster.map(playerTemplate).join('') : `<div class="p-3 text-center text-muted">No players found.</div>`;
         attachRosterSaveListeners();
     }
 
@@ -359,31 +338,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const outingsList = document.getElementById('recorded-outings-list');
         if (outingsList) {
             const outings = (AppState.full_data.pitching || []).sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
-            if (outings.length === 0) {
-                outingsList.innerHTML = `<li class="list-group-item"><div class="empty-state" style="padding: 2rem 1rem; background: none; border: none;"><i class="bi bi-bullseye"></i><h5>No Outings Logged</h5><p>Log a pitching outing using the form to see recent history here.</p></div></li>`;
-            } else {
-                outingsList.innerHTML = outings.map((o) => {
-                    const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}" data-delete-name="this pitching outing for ${escapeHTML(o.player_name)}"><i class="bi bi-trash"></i></button>`;
-                    return `
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.player_name)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
-                        <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
-                                data-outing-id="${o.id}"
-                                data-date="${o.date}"
-                                data-pitcher="${escapeHTML(o.player_name)}"
-                                data-opponent="${escapeHTML(o.opponent)}"
-                                data-pitches="${o.pitches}"
-                                data-innings="${o.innings}"
-                                data-outing-type="${o.outing_type}"
-                                data-pitcher-type="${o.pitcher_type}">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            ${deleteButtonHtml}
-                        </div>
-                    </li>`;
-                }).join('');
-            }
+            outingsList.innerHTML = outings.map((o) => {
+                const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}" data-delete-name="this pitching outing for ${escapeHTML(o.player_name)}"><i class="bi bi-trash"></i></button>`;
+                return `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.player_name)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
+                            data-outing-id="${o.id}"
+                            data-date="${o.date}"
+                            data-pitcher="${escapeHTML(o.player_name)}"
+                            data-opponent="${escapeHTML(o.opponent)}"
+                            data-pitches="${o.pitches}"
+                            data-innings="${o.innings}"
+                            data-outing-type="${o.outing_type}"
+                            data-pitcher-type="${o.pitcher_type}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        ${deleteButtonHtml}
+                    </div>
+                </li>`;
+            }).join('') || '<li class="list-group-item text-muted">No outings recorded.</li>';
         }
     }
 
@@ -391,18 +366,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('signs-list-container');
         if (!container) return;
         const signs = AppState.full_data.signs || [];
-        if (signs.length === 0) {
-            container.innerHTML = `<li class="list-group-item"><div class="empty-state" style="padding: 2rem 1rem; background: none; border: none;"><i class="bi bi-signpost-split-fill"></i><h5>No Signs Added</h5><p>Add a sign using the form to get started.</p></div></li>`;
-        } else {
-            container.innerHTML = signs.map((sign) => {
-                const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_sign/${sign.id}" data-delete-name="the '${escapeHTML(sign.name)}' sign">Delete</button>`;
-                const editButtonHtml = `<button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-id="${sign.id}">Edit</button>`;
-                return `<li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div><strong>${escapeHTML(sign.name)}:</strong> ${escapeHTML(sign.indicator)}</div>
-                            <div>${editButtonHtml}${deleteButtonHtml}</div>
-                        </li>`;
-            }).join('');
-        }
+        container.innerHTML = signs.length > 0 ? signs.map((sign) => {
+            const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_sign/${sign.id}" data-delete-name="the '${escapeHTML(sign.name)}' sign">Delete</button>`;
+            const editButtonHtml = `<button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editSignModal" data-sign-id="${sign.id}">Edit</button>`;
+            return `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div><strong>${escapeHTML(sign.name)}:</strong> ${escapeHTML(sign.indicator)}</div>
+                        <div>${editButtonHtml}${deleteButtonHtml}</div>
+                    </li>`;
+        }).join('') : `<li class="list-group-item text-center text-muted">No signs added.</li>`;
     }
 
     function renderScoutingList() {
@@ -413,21 +384,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!container) return;
 
             const players = scoutingData[key] || [];
-            if (players.length === 0) {
-                container.innerHTML = `<li class="list-group-item text-center text-muted">No players in this list.</li>`;
-            } else {
-                container.innerHTML = players.map(p => {
-                    let moveOptions = '';
-                    if (key === 'targets') {
-                        moveOptions = `<li><form action="/move_scouted_player/targets/committed/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Committed</button></form></li><li><form action="/move_scouted_player/targets/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
-                    } else if (key === 'committed') {
-                        moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item fw-bold">To Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
-                    }
-                    const positions = [p.position1, p.position2].filter(Boolean).join(' / ') || 'N/A';
-                    const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_scouted_player/${key}/${p.id}" data-delete-name="${escapeHTML(p.name)}"><i class="bi bi-trash"></i></button>`;
-                    return `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${positions} | T/B: ${p.throws || 'N'}/${p.bats || 'N'}</small></div><div class="btn-group">${deleteButtonHtml}${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
-                }).join('');
-            }
+            let playerHtml = players.length > 0 ? players.map(p => {
+                let moveOptions = '';
+                if (key === 'targets') {
+                    moveOptions = `<li><form action="/move_scouted_player/targets/committed/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Committed</button></form></li><li><form action="/move_scouted_player/targets/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
+                } else if (key === 'committed') {
+                    moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item fw-bold">To Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
+                }
+                const positions = [p.position1, p.position2].filter(Boolean).join(' / ') || 'N/A';
+                const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_scouted_player/${key}/${p.id}" data-delete-name="${escapeHTML(p.name)}"><i class="bi bi-trash"></i></button>`;
+                return `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${positions} | T/B: ${p.throws || 'N'}/${p.bats || 'N'}</small></div><div class="btn-group">${deleteButtonHtml}${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
+            }).join('') : `<li class="list-group-item text-center text-muted">No players in this list.</li>`;
+            container.innerHTML = playerHtml;
         };
 
         renderList('targets', 'scouting-list-targets');
@@ -439,16 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('games-list-container');
         if (!container) return;
         const games = (AppState.full_data.games || []).sort((a,b) => b.date.localeCompare(a.date));
-        if (games.length === 0) {
-            container.innerHTML = `<li class="list-group-item">
-                <div class="empty-state" style="padding: 2rem 1rem; background: none; border: none;">
-                    <i class="bi bi-calendar4-event"></i>
-                    <h5>No Games Scheduled</h5>
-                    <p>Your schedule is clear. Add your first game using the form above.</p>
-                </div>
-            </li>`;
-            return;
-        }
+        if (games.length === 0) { container.innerHTML = `<li class="list-group-item text-center text-muted">No games scheduled.</li>`; return; }
         container.innerHTML = games.map(game => {
             const lineup = AppState.full_data.lineups.find(l => l.associated_game_id === game.id);
             const rotation = AppState.full_data.rotations.find(r => r.associated_game_id === game.id);
@@ -466,20 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const roster = AppState.full_data.roster || [];
 
         if (plans.length === 0) {
-            renderEmptyState(container, {
-                iconClass: 'bi-clipboard-check-fill',
-                title: 'No Practice Plans Created',
-                message: 'Create your first practice plan to keep your team organized and focused.',
-                modal_id: 'createPracticePlanForm', // This is a collapse element, not a modal
-                button_text: 'Create a New Plan'
-            });
-            // Add a click listener for the collapse toggle
-            const button = container.querySelector('.btn');
-            if (button) {
-                button.setAttribute('data-bs-toggle', 'collapse');
-                button.setAttribute('data-bs-target', '#createPracticePlanForm');
-                button.removeAttribute('data-bs-target'); // remove modal attribute
-            }
+            container.innerHTML = `<div class="text-center p-4 border rounded"><p class="mb-0">No practice plans saved.</p></div>`;
             return;
         }
 
