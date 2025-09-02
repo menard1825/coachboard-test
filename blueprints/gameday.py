@@ -59,7 +59,7 @@ def game_management(game_id):
                            rotation=model_to_dict(rotation_obj),
                            game_pitching_log=[pitching_outing_to_dict(o) for o in game_pitching_log],
                            session=session, 
-                           absent_player_ids=absent_player_ids,
+                           absent_player_ids=list(absent_player_ids),
                            pitch_count_summary=pitch_count_summary,
                            lineup_templates=[model_to_dict(lt) for lt in lineup_templates],
                            rotation_templates=[model_to_dict(rt) for rt in rotation_templates])
