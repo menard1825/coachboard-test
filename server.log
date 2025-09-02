@@ -1,21 +1,17 @@
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 141-289-218
-(9965) wsgi starting up on http://0.0.0.0:5002
-(9965) accepted ('127.0.0.1', 45540)
-(9965) accepted ('127.0.0.1', 45542)
-127.0.0.1 - - [02/Sep/2025 15:21:30] "GET /static/js/lineup_editor.js HTTP/1.1" 200 12896 0.038564
-127.0.0.1 - - [02/Sep/2025 15:21:30] "GET /static/js/main.js HTTP/1.1" 200 79029 0.007025
-127.0.0.1 - - [02/Sep/2025 15:21:31] "GET /api/session_data HTTP/1.1" 200 595 0.188762
-127.0.0.1 - - [02/Sep/2025 15:21:31] "GET /api/roster HTTP/1.1" 200 816 0.006518
-(9965) accepted ('127.0.0.1', 45552)
-(9965) accepted ('127.0.0.1', 45554)
-127.0.0.1 - - [02/Sep/2025 15:21:31] "GET /api/pitching_data HTTP/1.1" 200 6815 0.026315
-127.0.0.1 - - [02/Sep/2025 15:21:31] "GET /api/scouting_list HTTP/1.1" 200 531 0.006439
-127.0.0.1 - - [02/Sep/2025 15:21:31] "GET /socket.io/?EIO=4&transport=polling&t=PaB1DhN HTTP/1.1" 200 300 0.000643
-127.0.0.1 - - [02/Sep/2025 15:21:31] "POST /socket.io/?EIO=4&transport=polling&t=PaB1Di4&sid=40RI1wWy-4X-veqMAAAA HTTP/1.1" 200 219 0.003711
-(9965) accepted ('127.0.0.1', 45568)
-127.0.0.1 - - [02/Sep/2025 15:21:31] "GET /socket.io/?EIO=4&transport=polling&t=PaB1DiA&sid=40RI1wWy-4X-veqMAAAA HTTP/1.1" 200 213 0.000302
-127.0.0.1 - - [02/Sep/2025 15:21:31] "GET /socket.io/?EIO=4&transport=polling&t=PaB1Dib&sid=40RI1wWy-4X-veqMAAAA HTTP/1.1" 200 181 0.000211
-127.0.0.1 - - [02/Sep/2025 15:21:31] "GET /socket.io/?EIO=4&transport=polling&t=PaB1Dis&sid=40RI1wWy-4X-veqMAAAA HTTP/1.1" 200 181 0.000196
-127.0.0.1 - - [02/Sep/2025 15:21:36] "GET /socket.io/?EIO=4&transport=websocket&sid=40RI1wWy-4X-veqMAAAA HTTP/1.1" 200 0 5.198895
+(25413) wsgi starting up on http://0.0.0.0:5002
+(25413) accepted ('127.0.0.1', 60914)
+127.0.0.1 - - [02/Sep/2025 19:01:53] "GET /login HTTP/1.1" 200 1792 0.014060
+127.0.0.1 - - [02/Sep/2025 19:01:54] "POST /login HTTP/1.1" 302 737 0.603412
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET / HTTP/1.1" 200 46885 0.086210
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET /static/css/main.css?v=20250902190155 HTTP/1.1" 200 12368 0.010572
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET /api/lineups HTTP/1.1" 200 469 0.007468
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET /api/games HTTP/1.1" 200 469 0.007406
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET /api/collaboration_notes HTTP/1.1" 200 512 0.007512
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET /api/practice_plans HTTP/1.1" 200 469 0.015330
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET /api/player_development HTTP/1.1" 200 469 0.015973
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET /api/signs HTTP/1.1" 200 469 0.004365
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET /api/stats HTTP/1.1" 200 564 0.018090
+127.0.0.1 - - [02/Sep/2025 19:01:55] "GET /api/overview_data HTTP/1.1" 200 539 0.009549

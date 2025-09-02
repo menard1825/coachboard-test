@@ -23,6 +23,9 @@ def parse_date(date_str):
 
 @pitching_bp.route('/add_pitching', methods=['POST'])
 def add_pitching():
+    print("--- ADD PITCHING ROUTE ---")
+    print("Form data received:", request.form)
+
     game_id = request.form.get('game_id')
     game = None
     if game_id:
