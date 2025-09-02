@@ -487,73 +487,84 @@ document.addEventListener('DOMContentLoaded', () => {
             cumulative_position_data = {}
         } = AppState.full_data;
 
-        if (roster.length === 0) {
-            container.innerHTML = `<div class="p-3 text-center text-muted">No players on the roster to show stats for.</div>`;
-            return;
-        }
-
-        const playerStatsHtml = roster.map(player => {
-            const attendance = attendance_stats[player.id] || { games_missed: 0, practices_missed: 0 };
-            const pitching = cumulative_pitching_data[player.name];
-            const positions = cumulative_position_data[player.name];
-
-            let attendanceHtml = `
-                <div class="stat-item">
-                    <span class="stat-label">Games Missed</span>
-                    <span class="stat-value">${attendance.games_missed}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Practices Missed</span>
-                    <span class="stat-value">${attendance.practices_missed}</span>
-                </div>`;
-
-            let pitchingHtml = '';
-            if (pitching) {
-                pitchingHtml = `
-                    <h6 class="mt-3 text-muted">Pitching</h6>
-                    <div class="stat-item">
-                        <span class="stat-label">Total Pitches</span>
-                        <span class="stat-value">${pitching.total_pitches_thrown}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Total Innings</span>
-                        <span class="stat-value">${pitching.total_innings_pitched}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Appearances</span>
-                        <span class="stat-value">${pitching.appearances}</span>
-                    </div>`;
-            }
-
-            let positionHtml = '';
-            if (positions && Object.keys(positions).length > 0) {
-                positionHtml = `
-                    <h6 class="mt-3 text-muted">Innings by Position</h6>
-                    <div class="position-stats-grid">
-                        ${Object.entries(positions).map(([pos, innings]) => `
-                            <div class="position-stat">
-                                <span class="pos-label">${escapeHTML(pos)}</span>
-                                <span>${innings} inn.</span>
-                            </div>
-                        `).join('')}
-                    </div>`;
-            }
-
-            return `
-                <div class="col-12 col-md-6 col-lg-4">
-                    <div class="card stats-card">
-                        <div class="card-header">${escapeHTML(player.name)}</div>
-                        <div class="card-body">
-                            <h6 class="text-muted">Attendance</h6>
-                            ${attendanceHtml}
-                            ${pitchingHtml}
-                            ${positionHtml || ''}
+        const attendanceTable = `
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Attendance Statistics</h5></div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead><tr><th>Player</th><th>Games Missed</th><th>Practices Missed</th></tr></thead>
+                                <tbody>
+                                    ${roster.map(player => `
+                                        <tr>
+                                            <td><strong>${escapeHTML(player.name)}</strong></td>
+                                            <td>${attendance_stats[player.id] ? attendance_stats[player.id].games_missed : 0}</td>
+                                            <td>${attendance_stats[player.id] ? attendance_stats[player.id].practices_missed : 0}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                </div>`;
-        }).join('');
+                </div>
+            </div>`;
 
-        container.innerHTML = `<div class="row">${playerStatsHtml}</div>`;
+        const pitchingTable = `
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Cumulative Pitching Statistics</h5></div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead><tr><th>Pitcher</th><th>Total Innings Pitched</th><th>Total Pitches Thrown</th><th>Appearances</th></tr></thead>
+                                <tbody>
+        ${Object.keys(cumulative_pitching_data).sort().map(playerName => {
+            const stats = cumulative_pitching_data[playerName] || { total_innings_pitched: 0, total_pitches_thrown: 0, appearances: 0 };
+                                        return `<tr>
+                <td><strong>${escapeHTML(playerName)}</strong></td>
+                                            <td>${stats.total_innings_pitched}</td>
+                                            <td>${stats.total_pitches_thrown}</td>
+                                            <td>${stats.appearances}</td>
+                                        </tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+        const allPositions = [...new Set(Object.values(cumulative_position_data).flatMap(Object.keys))].sort();
+        const positionTable = `
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Cumulative Innings Played by Position</h5></div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Player</th>
+                                        ${allPositions.map(pos => `<th>${escapeHTML(pos)}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${roster.map(player => `
+                                        <tr>
+                                            <td><strong>${escapeHTML(player.name)}</strong></td>
+                                            ${allPositions.map(pos => `<td>${(cumulative_position_data[player.name] && cumulative_position_data[player.name][pos]) || 0}</td>`).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-muted mt-3">* "Innings Played by Position" counts the total number of innings a player has been assigned to each defensive position across all game rotations.</p>
+                    </div>
+                </div>
+            </div>`;
+
+        container.innerHTML = `<div class="row">${attendanceTable}${pitchingTable}${positionTable}</div>`;
     }
 
     function renderOverview() {
