@@ -151,8 +151,13 @@ def update_absences(game_id):
     socketio.emit('data_updated', {'message': f'Availability updated for game {game_id}.'})
     return redirect(url_for('.game_management', game_id=game_id, _anchor='availability'))
 
+from flask_wtf.csrf import CSRFProtect
+
+csrf = CSRFProtect()
+
 # --- Lineup & Rotation API-like routes ---
 @gameday_bp.route('/add_lineup', methods=['POST'])
+@csrf.exempt
 def add_lineup():
     payload = request.get_json()
     if not payload or 'title' not in payload or 'lineup_data' not in payload:
@@ -173,6 +178,7 @@ def add_lineup():
     return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id, 'lineup': lineup_dict})
 
 @gameday_bp.route('/edit_lineup/<int:lineup_id>', methods=['POST'])
+@csrf.exempt
 def edit_lineup(lineup_id):
     lineup_to_edit = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
     if not lineup_to_edit:
