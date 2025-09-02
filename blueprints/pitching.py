@@ -23,32 +23,21 @@ def parse_date(date_str):
 
 @pitching_bp.route('/add_pitching', methods=['POST'])
 def add_pitching():
-    print("--- ADD PITCHING ROUTE ---")
-    print("Form data received:", request.form)
-
     game_id = request.form.get('game_id')
     game = None
     if game_id:
         game = db.session.get(Game, game_id)
 
     # Validate form fields one by one to provide specific error messages
-    pitches_str = request.form.get('pitches')
-    if not pitches_str or not pitches_str.strip():
-        flash('Pitch count is required.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
     try:
-        pitch_count = int(pitches_str)
-    except ValueError:
+        pitch_count = int(request.form['pitches'])
+    except (ValueError, KeyError):
         flash('Pitch count must be a valid number.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
 
-    innings_str = request.form.get('innings')
-    if not innings_str or not innings_str.strip():
-        flash('Innings pitched is required.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
     try:
-        innings_pitched = float(innings_str)
-    except ValueError:
+        innings_pitched = float(request.form['innings'])
+    except (ValueError, KeyError):
         flash('Innings pitched must be a valid number.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
 

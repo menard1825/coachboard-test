@@ -36,22 +36,16 @@ def game_management(game_id):
     lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
     rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
     
-    # MODIFIED: Optimized query to filter in the database
-    all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all() # Keep for summary stats
-    game_pitching_log = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(
-        team_id=team.id,
-        opponent=game.opponent
-    ).filter(db.func.date(PitchingOuting.date) == game.date.date()).all()
+    all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all()
+    game_pitching_log = [o for o in all_pitching_outings if o.game_id == game.id]
 
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
-    absent_player_ids = [absence.player_id for absence in absences]
+    absent_player_ids = {absence.player_id for absence in absences}
 
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules)
 
     lineup_templates = db.session.query(Lineup).filter_by(team_id=team.id, associated_game_id=None).all()
-
-    # NEW: Query for unassigned rotations to use as templates
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team.id, associated_game_id=None).all()
 
     game_date_for_input = game.date.strftime('%Y-%m-%d')
@@ -68,7 +62,6 @@ def game_management(game_id):
                            absent_player_ids=absent_player_ids,
                            pitch_count_summary=pitch_count_summary,
                            lineup_templates=[model_to_dict(lt) for lt in lineup_templates],
-                           # NEW: Pass rotation templates to the render_template call
                            rotation_templates=[model_to_dict(rt) for rt in rotation_templates])
 
 @gameday_bp.route('/add_game', methods=['POST'])
@@ -151,14 +144,11 @@ def update_absences(game_id):
     socketio.emit('data_updated', {'message': f'Availability updated for game {game_id}.'})
     return redirect(url_for('.game_management', game_id=game_id, _anchor='availability'))
 
-from flask_wtf.csrf import CSRFProtect
-
-csrf = CSRFProtect()
-
 # --- Lineup & Rotation API-like routes ---
 @gameday_bp.route('/add_lineup', methods=['POST'])
-@csrf.exempt
 def add_lineup():
+    if 'logged_in' not in session:
+        return jsonify({'status': 'error', 'message': 'Authentication required.'}), 401
     payload = request.get_json()
     if not payload or 'title' not in payload or 'lineup_data' not in payload:
         return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
@@ -178,8 +168,9 @@ def add_lineup():
     return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id, 'lineup': lineup_dict})
 
 @gameday_bp.route('/edit_lineup/<int:lineup_id>', methods=['POST'])
-@csrf.exempt
 def edit_lineup(lineup_id):
+    if 'logged_in' not in session:
+        return jsonify({'status': 'error', 'message': 'Authentication required.'}), 401
     lineup_to_edit = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
     if not lineup_to_edit:
         return jsonify({'status': 'error', 'message': 'Lineup not found.'}), 404
