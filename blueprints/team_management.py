@@ -76,7 +76,7 @@ def delete_note(note_type, note_id):
             flash('You do not have permission to delete this note.', 'danger')
     else:
         flash('Note not found or invalid note type.', 'danger')
-    return redirect(url_for('home', _anchor='collaboration'))
+    return redirect(request.referrer or url_for('home', _anchor='collaboration'))
 
 # --- Practice Plan Routes ---
 @team_management_bp.route('/add_practice_plan', methods=['POST'])
