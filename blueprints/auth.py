@@ -82,7 +82,7 @@ def register():
         is_first_user = db.session.query(User).filter_by(team_id=team.id).count() == 0
         user_role = HEAD_COACH if is_first_user else ASSISTANT_COACH
 
-        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+        hashed_password = generate_password_hash(password)
         default_tab_keys = ['roster', 'player_development', 'games', 'pitching', 'practice_plan', 'collaboration']
 
         new_user = User(
@@ -130,7 +130,7 @@ def change_password():
             flash('New password must be at least 4 characters long.', 'danger')
             return redirect(url_for('auth.change_password'))
 
-        user.password_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+        user.password_hash = generate_password_hash(new_password)
         db.session.commit()
 
         flash('Your password has been updated successfully!', 'success')

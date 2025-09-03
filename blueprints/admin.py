@@ -96,7 +96,7 @@ def add_user():
         flash('Only a Super Admin can create another Super Admin.', 'danger')
         return redirect(url_for('.user_management'))
         
-    hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+    hashed_password = generate_password_hash(password)
     default_tab_keys = ['roster', 'lineups', 'pitching', 'scouting_list', 'rotations', 'games', 'collaboration', 'practice_plan']
     
     new_user = User(
@@ -158,7 +158,7 @@ def reset_password(username):
         return redirect(url_for('.user_management'))
         
     temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-    user_to_reset.password_hash = generate_password_hash(temp_password, method='pbkdf2:sha256')
+    user_to_reset.password_hash = generate_password_hash(temp_password)
     db.session.commit()
     flash(f"Password for {username} has been reset. The temporary password is: {temp_password}", 'success')
     socketio.emit('data_updated', {'message': f"Password for {username} reset."})

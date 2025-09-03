@@ -44,7 +44,7 @@ def initialize_database():
             admin_user = db.session.query(User).filter(User.username.ilike(SUPER_ADMIN_USERNAME)).first()
             if not admin_user:
                 print(f"Creating Super Admin user: {SUPER_ADMIN_USERNAME}")
-                hashed_password = generate_password_hash(SUPER_ADMIN_PASSWORD, method='pbkdf2:sha256')
+                hashed_password = generate_password_hash(SUPER_ADMIN_PASSWORD)
                 default_tab_keys = ['roster', 'player_development', 'lineups', 'pitching', 'scouting_list', 'rotations', 'games', 'collaboration', 'practice_plan', 'signs']
                 
                 new_user = User(
