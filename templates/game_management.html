@@ -221,15 +221,7 @@
         const fetchWeather = async () => {
             const location = gameData.game.location;
             const weatherWidget = document.getElementById('weather-widget-content');
-
-            // --- START OF CHANGES ---
-            let gameDate = weatherWidget.dataset.gameDate;
-            // Sanitize the date string to remove any unexpected characters after the date
-            if (gameDate) {
-                gameDate = gameDate.split(' ')[0].split('T')[0];
-            }
-            // --- END OF CHANGES ---
-
+            const gameDate = weatherWidget.dataset.gameDate.split('T')[0];
             if (!location) {
                 weatherWidget.innerHTML = '<p class="text-muted">No location set for this game.</p>';
                 return;
@@ -248,10 +240,6 @@
                     throw new Error('Failed to fetch weather');
                 }
                 const weather = await response.json();
-
-                if (weather.error) {
-                    throw new Error(weather.error);
-                }
 
                 const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
 

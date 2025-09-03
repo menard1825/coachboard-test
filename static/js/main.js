@@ -1,49 +1,38 @@
 // static/js/main.js
-function fetchPracticeWeather(widget) {
-    const location = widget.dataset.location;
+    function fetchPracticeWeather(widget) {
+        const location = widget.dataset.location;
+        const date = widget.dataset.date;
 
-    // --- START OF CHANGES ---
-    let date = widget.dataset.date;
-    // Sanitize the date string
-    if (date) {
-        date = date.split(' ')[0].split('T')[0];
+        if (!location) {
+            widget.innerHTML = '<p class="text-muted">No location set for this practice.</p>';
+            return;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const isToday = date === today;
+        const url = isToday
+            ? `/api/weather/${encodeURIComponent(location)}`
+            : `/api/weather/${encodeURIComponent(location)}?date=${date}`;
+
+        fetch(url)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(weather => {
+                 const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
+                 widget.innerHTML = `
+                    <p>
+                        <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay}<br>
+                        <strong>Wind:</strong> ${weather.wind || 'N/A'}<br>
+                        <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
+                    </p>`;
+            })
+            .catch(error => {
+                widget.innerHTML = '<p class="text-danger">Could not load weather data.</p>';
+                console.error('Weather fetch error:', error);
+            });
     }
-    // --- END OF CHANGES ---
-
-    if (!location) {
-        widget.innerHTML = '<p class="text-muted">No location set for this practice.</p>';
-        return;
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-    const isToday = date === today;
-    const url = isToday
-        ? `/api/weather/${encodeURIComponent(location)}`
-        : `/api/weather/${encodeURIComponent(location)}?date=${date}`;
-
-    fetch(url)
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(weather => {
-             if (weather.error) {
-                 throw new Error(weather.error);
-             }
-             const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
-             widget.innerHTML = `
-                <p>
-                    <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay}<br>
-                    <strong>Wind:</strong> ${weather.wind || 'N/A'}<br>
-                    <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
-                </p>`;
-        })
-        .catch(error => {
-            widget.innerHTML = '<p class="text-danger">Could not load weather data.</p>';
-            console.error('Weather fetch error:', error);
-        });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
