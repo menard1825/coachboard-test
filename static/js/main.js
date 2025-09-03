@@ -864,6 +864,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setupEventListeners();
+
+        // --- NEW CODE TO SET DEFAULT DATES ---
+        // Set default date for new games and practice plans to today
+        const today = new Date().toISOString().split('T')[0];
+        const gameDateInput = document.getElementById('add_game_date');
+        const planDateInput = document.getElementById('add_plan_date');
+        if (gameDateInput) {
+            gameDateInput.value = today;
+        }
+        if (planDateInput) {
+            planDateInput.value = today;
+        }
+        // --- END OF NEW CODE ---
+
         renderAll();
         initializeSortables();
         handleTabLogic();

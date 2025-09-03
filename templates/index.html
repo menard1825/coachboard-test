@@ -244,7 +244,7 @@
                     <form action="{{ url_for('team_management.add_practice_plan') }}" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="row g-3">
-                            <div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" required></div>
+                            <div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" id="add_plan_date" class="form-control" required></div>
                             <div class="col-md-4"><label class="form-label">Location</label><input type="text" name="location" class="form-control" placeholder="e.g., Grand Park"></div>
                             <div class="col-md-4"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" placeholder="e.g., Pre-tournament tune-up"></div>
                             <div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2" placeholder="e.g., First-pitch strikes, aggressive baserunning"></textarea></div>

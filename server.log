@@ -1,4 +1,1 @@
-[2025-09-03 19:00:02 +0000] [16254] [INFO] Starting gunicorn 23.0.0
-[2025-09-03 19:00:02 +0000] [16254] [INFO] Listening at: http://0.0.0.0:5005 (16254)
-[2025-09-03 19:00:02 +0000] [16254] [INFO] Using worker: eventlet
-[2025-09-03 19:00:02 +0000] [16376] [INFO] Booting worker with pid: 16376
+ * Restarting with stat
