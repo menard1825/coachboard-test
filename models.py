@@ -212,6 +212,7 @@ class PracticePlan(db.Model):
     __tablename__ = 'practice_plans'
     id = Column(Integer, primary_key=True)
     date = Column(DateTime, nullable=False) # Changed to DateTime
+    location = Column(String) # ADDED
     general_notes = Column(Text)
     emphasis = Column(Text)
     warm_up = Column(Text)

@@ -33,7 +33,7 @@
                 </div>
                 <div class="col-md-6">
                 <h6><i class="bi bi-thermometer-sun me-2"></i>Weather</h6>
-                <div id="weather-widget-content">
+                <div id="weather-widget-content" data-game-date="{{ game.date }}">
                     <p><em>Loading weather...</em></p>
                 </div>
                 </div>
@@ -221,22 +221,32 @@
         const fetchWeather = async () => {
             const location = gameData.game.location;
             const weatherWidget = document.getElementById('weather-widget-content');
+            const gameDate = weatherWidget.dataset.gameDate.split('T')[0];
             if (!location) {
                 weatherWidget.innerHTML = '<p class="text-muted">No location set for this game.</p>';
                 return;
             }
 
+            const today = new Date().toISOString().split('T')[0];
+            const isToday = gameDate === today;
+            const url = isToday
+                ? `/api/weather/${encodeURIComponent(location)}`
+                : `/api/weather/${encodeURIComponent(location)}?date=${gameDate}`;
+
+
             try {
-                const response = await fetch(`/api/weather/${encodeURIComponent(location)}`);
+                const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error('Failed to fetch weather');
                 }
                 const weather = await response.json();
+
+                const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
+
                 weatherWidget.innerHTML = `
                     <p>
-                        <strong>Current:</strong> ${weather.current_temp || 'N/A'}, ${weather.condition || 'N/A'} <br>
+                        <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay}, ${weather.condition || 'N/A'} <br>
                         <strong>Wind:</strong> ${weather.wind || 'N/A'} <br>
-                        <strong>High/Low:</strong> ${weather.high_temp || 'N/A'} / ${weather.low_temp || 'N/A'} <br>
                         <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
                     </p>
                 `;
@@ -247,6 +257,15 @@
         };
 
         fetchWeather();
+
+        // Add event listener for when the game date changes in the modal
+        const gameDateInput = document.getElementById('game_date');
+        const weatherWidgetContent = document.getElementById('weather-widget-content');
+
+        gameDateInput.addEventListener('change', () => {
+            weatherWidgetContent.dataset.gameDate = gameDateInput.value;
+            fetchWeather();
+        });
     });
 </script>
 {% endblock %}

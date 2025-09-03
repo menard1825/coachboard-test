@@ -1,22 +1,26 @@
-from flask import jsonify
+from flask import jsonify, request
 from . import api_bp
 from .decorators import login_required
 import requests
+from datetime import datetime
 
 @api_bp.route('/weather/<location>')
 @login_required
 def get_weather(location):
     """
     Fetches weather data for a given location using the Open-Meteo API.
+    Now accepts an optional 'date' query parameter.
     """
     if not location:
         return jsonify({"error": "Location is required"}), 400
+
+    forecast_date_str = request.args.get('date')
 
     try:
         # Step 1: Geocode the location to get latitude and longitude
         geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1"
         geo_response = requests.get(geocoding_url)
-        geo_response.raise_for_status()  # Raise an exception for bad status codes
+        geo_response.raise_for_status()
         geo_data = geo_response.json()
 
         if not geo_data.get("results"):
@@ -25,24 +29,49 @@ def get_weather(location):
         lat = geo_data["results"][0]["latitude"]
         lon = geo_data["results"][0]["longitude"]
 
-        # Step 2: Get weather forecast for the coordinates
-        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto"
-        weather_response = requests.get(weather_url)
+        # Step 2: Get weather forecast
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "temperature_unit": "fahrenheit",
+            "windspeed_unit": "mph",
+            "precipitation_unit": "inch",
+            "timezone": "auto"
+        }
+        if forecast_date_str:
+            params["start_date"] = forecast_date_str
+            params["end_date"] = forecast_date_str
+        else:
+            params["current_weather"] = "true"
+
+        weather_url = f"https://api.open-meteo.com/v1/forecast"
+        weather_response = requests.get(weather_url, params=params)
         weather_response.raise_for_status()
         weather_data = weather_response.json()
 
-        current_weather = weather_data.get("current_weather", {})
-        daily_weather = weather_data.get("daily", {})
-
         # Step 3: Simplify the data for the frontend
-        simplified_data = {
-            "current_temp": f"{current_weather.get('temperature')}°C",
-            "wind": f"{current_weather.get('windspeed')} km/h",
-            "condition": "N/A",  # Open-Meteo doesn't provide a simple condition string in the free tier
-            "high_temp": f"{daily_weather.get('temperature_2m_max', [None])[0]}°C",
-            "low_temp": f"{daily_weather.get('temperature_2m_min', [None])[0]}°C",
-            "precipitation": f"{daily_weather.get('precipitation_probability_max', [None])[0]}%"
-        }
+        if forecast_date_str:
+            daily_weather = weather_data.get("daily", {})
+            simplified_data = {
+                "current_temp": "N/A",
+                "wind": "N/A",
+                "condition": "Forecast",
+                "high_temp": f"{daily_weather.get('temperature_2m_max', [None])[0]}°F",
+                "low_temp": f"{daily_weather.get('temperature_2m_min', [None])[0]}°F",
+                "precipitation": f"{daily_weather.get('precipitation_probability_max', [None])[0]}%"
+            }
+        else:
+            current_weather = weather_data.get("current_weather", {})
+            daily_weather = weather_data.get("daily", {})
+            simplified_data = {
+                "current_temp": f"{current_weather.get('temperature')}°F",
+                "wind": f"{current_weather.get('windspeed')} mph",
+                "condition": "Current",
+                "high_temp": f"{daily_weather.get('temperature_2m_max', [None])[0]}°F",
+                "low_temp": f"{daily_weather.get('temperature_2m_min', [None])[0]}°F",
+                "precipitation": f"{daily_weather.get('precipitation_probability_max', [None])[0]}%"
+            }
 
         return jsonify(simplified_data)
 

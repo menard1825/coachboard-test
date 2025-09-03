@@ -92,7 +92,8 @@ def add_practice_plan():
         return redirect(url_for('home', _anchor='practice_plan'))
 
     new_plan = PracticePlan(
-        date=plan_date, 
+        date=plan_date,
+        location=request.form.get('location', ''),
         general_notes=request.form.get('general_notes', ''),
         emphasis=request.form.get('emphasis', ''),
         warm_up=request.form.get('warm_up', ''),
@@ -119,6 +120,7 @@ def edit_practice_plan(plan_id):
                 flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
                 return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
+        plan_to_edit.location = request.form.get('location', plan_to_edit.location)
         plan_to_edit.general_notes = request.form.get('general_notes', plan_to_edit.general_notes)
         plan_to_edit.emphasis = request.form.get('emphasis', plan_to_edit.emphasis)
         plan_to_edit.warm_up = request.form.get('warm_up', plan_to_edit.warm_up)
