@@ -32,6 +32,7 @@
           </div>
           <div class="modal-body">
             <form action="{{ url_for('admin.add_user') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <div class="form-floating"><input type="text" class="form-control" id="username" name="username" placeholder="Username" required><label for="username">Username</label></div>
@@ -145,6 +146,7 @@
           <div class="modal-dialog modal-lg">
             <div class="modal-content">
               <form action="{{ url_for('admin.edit_user', username=user.username) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-header">
                   <h5 class="modal-title" id="editUserModalLabel-{{ user.username }}">Edit User: {{ user.username }}</h5>
                   <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -189,7 +191,7 @@
           </div>
         </div>
 
-        <div class="modal fade" id="resetPasswordModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reset Password for {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>This will generate a new random password for <strong>{{ user.username }}</strong>. The new password will be displayed in a confirmation message after you click 'Reset'. Are you sure you want to continue?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form action="{{ url_for('admin.reset_password', username=user.username) }}" method="POST" style="display:inline;"><button type="submit" class="btn btn-warning">Reset Password</button></form></div></div></div></div>
+        <div class="modal fade" id="resetPasswordModal-{{ user.username }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Reset Password for {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p>This will generate a new random password for <strong>{{ user.username }}</strong>. The new password will be displayed in a confirmation message after you click 'Reset'. Are you sure you want to continue?</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form action="{{ url_for('admin.reset_password', username=user.username) }}" method="POST" style="display:inline;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><button type="submit" class="btn btn-warning">Reset Password</button></form></div></div></div></div>
         <div class="modal fade" id="deleteUserModal-{{ user.username }}" tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
@@ -205,6 +207,7 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <form action="{{ url_for('admin.delete_user', username=user.username) }}" method="POST" style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" class="btn btn-danger delete-user-button" disabled>Delete User</button>
                         </form>
                     </div>
