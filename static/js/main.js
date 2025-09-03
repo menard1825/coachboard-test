@@ -55,6 +55,66 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let sortableInstances = {};
     let confirmDeleteModal;
+
+    const setupAutocomplete = (inputElement) => {
+        const suggestionsWrapper = document.createElement('div');
+        suggestionsWrapper.className = 'list-group position-absolute w-100';
+        suggestionsWrapper.style.zIndex = '1050';
+        // Make sure the parent is positioned relatively to contain the absolute suggestions
+        if (getComputedStyle(inputElement.parentNode).position === 'static') {
+            inputElement.parentNode.style.position = 'relative';
+        }
+        inputElement.parentNode.appendChild(suggestionsWrapper);
+
+        let autocompleteTimeout;
+        inputElement.addEventListener('input', () => {
+            clearTimeout(autocompleteTimeout);
+            const query = inputElement.value;
+
+            if (query.length < 2) { // Start searching after 2 characters
+                suggestionsWrapper.innerHTML = '';
+                return;
+            }
+
+            autocompleteTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(query)}`);
+                    if (!response.ok) throw new Error('Autocomplete fetch failed');
+
+                    const suggestions = await response.json();
+                    if (!suggestions || suggestions.length === 0) {
+                        suggestionsWrapper.innerHTML = '';
+                        return;
+                    }
+
+                    let suggestionsHtml = suggestions.map(suggestion =>
+                        `<a href="#" class="list-group-item list-group-item-action">${escapeHTML(suggestion)}</a>`
+                    ).join('');
+                    suggestionsWrapper.innerHTML = suggestionsHtml;
+
+                } catch (error) {
+                    console.error('Autocomplete error:', error);
+                    suggestionsWrapper.innerHTML = '';
+                }
+            }, 300); // 300ms debounce
+        });
+
+        suggestionsWrapper.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (e.target.classList.contains('list-group-item')) {
+                inputElement.value = e.target.textContent;
+                suggestionsWrapper.innerHTML = '';
+            }
+        });
+
+        // Hide suggestions when clicking away
+        inputElement.addEventListener('blur', () => {
+            // Use a small timeout to allow click event on suggestion to fire
+            setTimeout(() => {
+                suggestionsWrapper.innerHTML = '';
+            }, 150);
+        });
+    };
     
     // --- UTILITY FUNCTIONS ---
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
@@ -474,7 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const absentPlayerIds = new Set(plan.absent_player_ids || []);
             const attendanceHtml = roster.map(player => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="absent_players" value="${player.id}" id="attendance-${plan.id}-${player.id}" ${absentPlayerIds.has(player.id) ? 'checked' : ''}><label class="form-check-label" for="attendance-${plan.id}-${player.id}">${escapeHTML(player.name)}</label></div>`).join('');
             const tasksHtml = (plan.tasks || []).map(task => `<li class="list-group-item d-flex justify-content-between align-items-center task-item ${task.status === 'complete' ? 'complete' : ''}" data-task-id="${task.id}" data-plan-id="${plan.id}"><div class="form-check"><input class="form-check-input task-checkbox" type="checkbox" ${task.status === 'complete' ? 'checked' : ''} id="task-${task.id}"><label class="form-check-label" for="task-${task.id}">${escapeHTML(task.text)}<div class="text-muted small">By ${escapeHTML(task.author)}</div></label></div><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_task/${plan.id}/${task.id}" data-delete-name="this task"><i class="bi bi-trash"></i></button></li>`).join('') || '<li class="list-group-item text-muted text-center">No tasks.</li>';
-            return `<div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}"><strong>${formatDateTime(plan.date)}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}</button></h2><div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body"><form action="/edit_practice_plan/${plan.id}" method="POST" class="practice-plan-details-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" value="${plan.date.split('T')[0]}" required></div><div class="col-md-8"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}"></div><div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2">${escapeHTML(plan.emphasis || '')}</textarea></div><div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3">${escapeHTML(plan.warm_up || '')}</textarea></div><div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3">${escapeHTML(plan.infield_outfield || '')}</textarea></div><div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3">${escapeHTML(plan.hitting || '')}</textarea></div><div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3">${escapeHTML(plan.pitching_catching || '')}</textarea></div><div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_practice_plan/${plan.id}" data-delete-name="this practice plan">Delete Plan</button><button type="submit" class="btn btn-sm btn-primary">Save Plan Details</button></div></div></form><hr>
+            return `<div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}"><strong>${formatDateTime(plan.date)}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}</button></h2><div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body"><form action="/edit_practice_plan/${plan.id}" method="POST" class="practice-plan-details-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" value="${plan.date.split('T')[0]}" required></div><div class="col-md-4"><label class="form-label">Location</label><input type="text" name="location" class="form-control practice-location-input" value="${escapeHTML(plan.location || '')}"></div><div class="col-md-4"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}"></div><div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2">${escapeHTML(plan.emphasis || '')}</textarea></div><div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3">${escapeHTML(plan.warm_up || '')}</textarea></div><div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3">${escapeHTML(plan.infield_outfield || '')}</textarea></div><div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3">${escapeHTML(plan.hitting || '')}</textarea></div><div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3">${escapeHTML(plan.pitching_catching || '')}</textarea></div><div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_practice_plan/${plan.id}" data-delete-name="this practice plan">Delete Plan</button><button type="submit" class="btn btn-sm btn-primary">Save Plan Details</button></div></div></form><hr>
             <div class="row mt-4">
                 <div class="col-lg-6">
                     <h5>Attendance</h5>
@@ -508,6 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>`;
         }).join('');
         attachTaskListeners();
+        document.querySelectorAll('.practice-location-input').forEach(setupAutocomplete);
         document.querySelectorAll('.accordion-collapse').forEach(collapseEl => {
             collapseEl.addEventListener('shown.bs.collapse', event => {
                 const weatherWidget = event.target.querySelector('.weather-widget');
@@ -1107,6 +1168,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupEventListeners() {
+        // Setup autocomplete for static forms
+        const addGameLocationInput = document.getElementById('add_game_location');
+        if (addGameLocationInput) {
+            setupAutocomplete(addGameLocationInput);
+        }
+        const addPracticeLocationInput = document.getElementById('add_practice_location');
+        if (addPracticeLocationInput) {
+            setupAutocomplete(addPracticeLocationInput);
+        }
+
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         

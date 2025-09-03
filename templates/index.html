@@ -189,7 +189,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="col-md-3"><input type="date" name="game_date" id="add_game_date" class="form-control" required></div>
                     <div class="col-md-3"><input type="text" name="game_opponent" class="form-control" placeholder="Opponent" required></div>
-                    <div class="col-md-3"><input type="text" name="game_location" class="form-control" placeholder="Location"></div>
+                    <div class="col-md-3"><input type="text" name="game_location" id="add_game_location" class="form-control" placeholder="Location"></div>
                     <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add & Manage</button></div>
                     <div class="col-12"><textarea name="game_notes" class="form-control" rows="1" placeholder="Notes (e.g., arrival time)"></textarea></div>
                 </form>
@@ -245,7 +245,7 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="row g-3">
                             <div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" id="add_plan_date" class="form-control" required></div>
-                            <div class="col-md-4"><label class="form-label">Location</label><input type="text" name="location" class="form-control" placeholder="e.g., Grand Park"></div>
+                            <div class="col-md-4"><label class="form-label">Location</label><input type="text" name="location" id="add_practice_location" class="form-control" placeholder="e.g., Grand Park"></div>
                             <div class="col-md-4"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" placeholder="e.g., Pre-tournament tune-up"></div>
                             <div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2" placeholder="e.g., First-pitch strikes, aggressive baserunning"></textarea></div>
                             <div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3" placeholder="Dynamic warm-up, band work..."></textarea></div>

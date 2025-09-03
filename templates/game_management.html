@@ -217,6 +217,12 @@
         };
         initializeGameManagement(gameData);
 
+        // The setupAutocomplete function is defined in main.js and is globally available.
+        const gameLocationInput = document.getElementById('game_location');
+        if (gameLocationInput) {
+            setupAutocomplete(gameLocationInput);
+        }
+
         // NEW: Weather fetching logic
         const fetchWeather = async () => {
             const location = gameData.game.location;
