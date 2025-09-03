@@ -126,7 +126,9 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                         break
                 else: # If pitch count is over the highest threshold
                     if rules.get('rest_thresholds'):
-                        required_rest = rules['rest_thresholds'][-1][1] + 1
+                        # Per user request, if pitch count is over the highest threshold,
+                        # the pitcher is assigned the same number of rest days as the highest threshold.
+                        required_rest = rules['rest_thresholds'][-1][1]
 
                 next_available_date = last_outing_date + timedelta(days=required_rest + 1)
 
