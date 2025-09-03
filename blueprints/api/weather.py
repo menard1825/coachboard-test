@@ -14,6 +14,10 @@ def get_weather(location):
     Fetches weather data for a given location using the Open-Meteo API.
     Now accepts an optional 'date' query parameter.
     """
+    print(f"--- WEATHER API: Received request for location: {location} ---")
+    forecast_date_str = request.args.get('date')
+    print(f"--- WEATHER API: Date parameter: {forecast_date_str} ---")
+
     if not location or not location.strip():
         return jsonify({"error": "Location is required"}), 400
 
@@ -30,7 +34,7 @@ def get_weather(location):
     elif "grand park" in parsed_location.lower():
         parsed_location = "Grand Park Sports Campus"
 
-    forecast_date_str = request.args.get('date')
+    print(f"--- WEATHER API: Parsed location for geocoding: {parsed_location} ---")
 
     try:
         # Step 1: Geocode the location to get latitude and longitude
@@ -39,6 +43,7 @@ def get_weather(location):
         geo_response = requests.get(geocoding_url, params=geo_params, timeout=10)
         geo_response.raise_for_status()
         geo_data = geo_response.json()
+        print(f"--- WEATHER API: Geocoding response: {geo_data} ---")
 
         if not geo_data.get("results"):
             return jsonify({"error": f"Location '{parsed_location}' not found"}), 404
@@ -66,6 +71,7 @@ def get_weather(location):
         weather_response = requests.get(weather_url, params=params, timeout=10)
         weather_response.raise_for_status()
         weather_data = weather_response.json()
+        print(f"--- WEATHER API: Weather data response: {weather_data} ---")
 
         #
         # --- START OF CHANGES ---
