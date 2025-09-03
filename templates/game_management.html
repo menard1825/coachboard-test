@@ -38,7 +38,7 @@
                 </div>
                 </div>
             </div>
-             <a href="#" class="btn btn-secondary mt-2" onclick="window.print();"><i class="bi bi-printer-fill me-2"></i> Print Lineup Card</a>
+             <a href="{{ url_for('gameday.print_lineup', game_id=game.id) }}" class="btn btn-secondary mt-2" target="_blank"><i class="bi bi-printer-fill me-2"></i> Print Lineup Card</a>
         </div>
     </div>
     <div class="row">

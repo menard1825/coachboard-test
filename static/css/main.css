@@ -146,6 +146,16 @@ body {
     }
 }
 
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    .lineup-card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+}
+
 /* ==========================================================================
    Table Styles
    ========================================================================== */

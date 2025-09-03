@@ -300,3 +300,23 @@ def save_rotation_as_template():
         'message': 'Template saved successfully!',
         'new_template': model_to_dict(new_template)
     })
+
+@gameday_bp.route('/game/<int:game_id>/print_lineup')
+def print_lineup(game_id):
+    team = db.session.get(Team, session['team_id'])
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
+    lineup = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
+    roster = db.session.query(Player).filter_by(team_id=team.id).all()
+
+    if not game:
+        flash('Game not found.', 'danger')
+        return redirect(url_for('home', _anchor='games'))
+
+    # Create a dictionary to map player names to their numbers for easy lookup
+    player_numbers = {player.name: player.number for player in roster}
+
+    return render_template('lineup_card.html',
+                           team=team,
+                           game=game,
+                           lineup=lineup,
+                           player_numbers=player_numbers)
