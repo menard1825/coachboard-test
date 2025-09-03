@@ -4,6 +4,7 @@ from .decorators import login_required
 import requests
 from datetime import datetime
 import re
+import os
 from models import Team
 from db import db
 
@@ -28,23 +29,32 @@ def get_weather(location):
         else:
             return jsonify({"error": "Shorthand location used, but no default practice location is set in Team Settings."}), 400
     elif "grand park" in parsed_location.lower():
-        parsed_location = "Grand Park"
+        parsed_location = "Grand Park Sports Campus"
 
     forecast_date_str = request.args.get('date')
 
     try:
         # Step 1: Geocode the location to get latitude and longitude
-        geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
-        geo_params = {'name': parsed_location, 'count': 1, 'format': 'json'}
+        geocoding_url = "https://maps.googleapis.com/maps/api/geocode/json"
+
+        # It is recommended to store your API key in a configuration file
+        # and not directly in the code.
+        api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+        if not api_key:
+            return jsonify({"error": "Google Maps API key is not configured on the server."}), 500
+
+        geo_params = {'address': parsed_location, 'key': api_key}
         geo_response = requests.get(geocoding_url, params=geo_params, timeout=10)
         geo_response.raise_for_status()
         geo_data = geo_response.json()
 
-        if not geo_data.get("results"):
-            return jsonify({"error": f"Location '{parsed_location}' not found"}), 404
+        if geo_data.get('status') != 'OK' or not geo_data.get("results"):
+            return jsonify({"error": f"Location '{parsed_location}' not found", "details": geo_data.get('error_message', '')}), 404
 
-        lat = geo_data["results"][0]["latitude"]
-        lon = geo_data["results"][0]["longitude"]
+        location_data = geo_data["results"][0]["geometry"]["location"]
+        lat = location_data["lat"]
+        lon = location_data["lng"]
+
 
         # Step 2: Get weather forecast
         params = {
@@ -107,8 +117,8 @@ def get_weather(location):
         #
 
     except requests.exceptions.RequestException as e:
-        return jsonify({"error": "Could not connect to weather service.", "details": str(e)}), 500
+        return jsonify({"error": "Could not connect to an external service.", "details": str(e)}), 500
     except (IndexError, KeyError) as e:
-        return jsonify({"error": "Could not parse weather data.", "details": str(e)}), 500
+        return jsonify({"error": "Could not parse API data.", "details": str(e)}), 500
     except Exception as e:
         return jsonify({"error": "An unexpected error occurred.", "details": str(e)}), 500
