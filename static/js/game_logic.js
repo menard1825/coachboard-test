@@ -227,6 +227,12 @@ function applyOutOfPositionIndicators() {
         const originalText = btn.textContent;
         btn.disabled = true;
         btn.textContent = 'Saving...';
+
+    // *** MODIFICATION START ***
+    // Retrieve the CSRF token from the meta tag in the page's <head>
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    // *** MODIFICATION END ***
+
         const payload = {
             id: state.rotation.id,
             title: state.rotation.title || `Rotation for vs ${state.game.opponent}`,
@@ -234,7 +240,14 @@ function applyOutOfPositionIndicators() {
             associated_game_id: state.game.id
         };
         try {
-            const response = await fetch('/save_rotation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const response = await fetch('/save_rotation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
             if (!response.ok) throw new Error('Failed to save rotation.');
             const result = await response.json();
             if (result.status === 'success') {
