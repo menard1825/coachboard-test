@@ -14,36 +14,29 @@ def get_weather(location):
     Fetches weather data for a given location using the Open-Meteo API.
     Now accepts an optional 'date' query parameter.
     """
-    #
-    # --- START OF CHANGES ---
-    #
     if not location or not location.strip():
         return jsonify({"error": "Location is required"}), 400
 
     team_id = session.get('team_id')
     team = db.session.get(Team, team_id) if team_id else None
-    default_location = team.default_practice_location if team else None
+    default_location = team.default_practice_location if team and team.default_practice_location and team.default_practice_location.strip() else None
 
     parsed_location = location.strip()
-    # Handle shorthand like "D1", "d2", etc.
     if re.match(r'^[Dd]\d+$', parsed_location):
         if default_location:
             parsed_location = default_location
         else:
-            # If there's no default location set, we can't resolve the shorthand.
             return jsonify({"error": "Shorthand location used, but no default practice location is set in Team Settings."}), 400
     elif "grand park" in parsed_location.lower():
         parsed_location = "Grand Park Sports Campus"
-    #
-    # --- END OF CHANGES ---
-    #
 
     forecast_date_str = request.args.get('date')
 
     try:
         # Step 1: Geocode the location to get latitude and longitude
-        geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={parsed_location}&count=1"
-        geo_response = requests.get(geocoding_url, timeout=10) # Added timeout
+        geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
+        geo_params = {'name': parsed_location, 'count': 1, 'format': 'json'}
+        geo_response = requests.get(geocoding_url, params=geo_params, timeout=10)
         geo_response.raise_for_status()
         geo_data = geo_response.json()
 
@@ -69,35 +62,49 @@ def get_weather(location):
         else:
             params["current_weather"] = "true"
 
-        weather_url = f"https://api.open-meteo.com/v1/forecast"
-        weather_response = requests.get(weather_url, params=params, timeout=10) # Added timeout
+        weather_url = "https://api.open-meteo.com/v1/forecast"
+        weather_response = requests.get(weather_url, params=params, timeout=10)
         weather_response.raise_for_status()
         weather_data = weather_response.json()
 
-        # Step 3: Simplify the data for the frontend
+        #
+        # --- START OF CHANGES ---
+        #
+        # Step 3: More robustly simplify the data for the frontend
+        simplified_data = {
+            "current_temp": "N/A", "wind": "N/A", "condition": "N/A",
+            "high_temp": "N/A", "low_temp": "N/A", "precipitation": "N/A"
+        }
+
+        daily_weather = weather_data.get("daily", {})
+        if daily_weather:
+            high_temps = daily_weather.get('temperature_2m_max', [])
+            if high_temps and high_temps[0] is not None:
+                simplified_data["high_temp"] = f"{round(high_temps[0])}°F"
+
+            low_temps = daily_weather.get('temperature_2m_min', [])
+            if low_temps and low_temps[0] is not None:
+                simplified_data["low_temp"] = f"{round(low_temps[0])}°F"
+
+            precip_probs = daily_weather.get('precipitation_probability_max', [])
+            if precip_probs and precip_probs[0] is not None:
+                simplified_data["precipitation"] = f"{precip_probs[0]}%"
+
         if forecast_date_str:
-            daily_weather = weather_data.get("daily", {})
-            simplified_data = {
-                "current_temp": "N/A",
-                "wind": "N/A",
-                "condition": "Forecast",
-                "high_temp": f"{daily_weather.get('temperature_2m_max', [None])[0]}°F",
-                "low_temp": f"{daily_weather.get('temperature_2m_min', [None])[0]}°F",
-                "precipitation": f"{daily_weather.get('precipitation_probability_max', [None])[0]}%"
-            }
+            simplified_data["condition"] = "Forecast"
         else:
             current_weather = weather_data.get("current_weather", {})
-            daily_weather = weather_data.get("daily", {})
-            simplified_data = {
-                "current_temp": f"{current_weather.get('temperature')}°F",
-                "wind": f"{current_weather.get('windspeed')} mph",
-                "condition": "Current",
-                "high_temp": f"{daily_weather.get('temperature_2m_max', [None])[0]}°F",
-                "low_temp": f"{daily_weather.get('temperature_2m_min', [None])[0]}°F",
-                "precipitation": f"{daily_weather.get('precipitation_probability_max', [None])[0]}%"
-            }
+            if current_weather:
+                simplified_data["condition"] = "Current"
+                if current_weather.get('temperature') is not None:
+                    simplified_data["current_temp"] = f"{round(current_weather.get('temperature'))}°F"
+                if current_weather.get('windspeed') is not None:
+                    simplified_data["wind"] = f"{round(current_weather.get('windspeed'))} mph"
 
         return jsonify(simplified_data)
+        #
+        # --- END OF CHANGES ---
+        #
 
     except requests.exceptions.RequestException as e:
         return jsonify({"error": "Could not connect to weather service.", "details": str(e)}), 500
