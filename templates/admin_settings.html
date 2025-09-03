@@ -42,6 +42,10 @@
                                     <input type="text" class="form-control" id="team_name" name="team_name" value="{{ settings.team_name }}" required>
                                     <label for="team_name">Team Name</label>
                                 </div>
+                                <div class="form-floating mb-3">
+                                    <input type="text" class="form-control" id="default_practice_location" name="default_practice_location" value="{{ settings.default_practice_location or '' }}" placeholder="Default Practice Location">
+                                    <label for="default_practice_location">Default Practice Location</label>
+                                </div>
                                 <div class="form-check form-switch mb-3">
                                     <input class="form-check-input" type="checkbox" id="display_coach_names" name="display_coach_names" {% if settings.display_coach_names %}checked{% endif %}>
                                     <label class="form-check-label" for="display_coach_names">Display Full Coach Names in Logs</label>

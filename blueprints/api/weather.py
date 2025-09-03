@@ -1,8 +1,11 @@
-from flask import jsonify, request
+from flask import jsonify, request, session
 from . import api_bp
 from .decorators import login_required
 import requests
 from datetime import datetime
+import re
+from models import Team
+from db import db
 
 @api_bp.route('/weather/<location>')
 @login_required
@@ -14,11 +17,23 @@ def get_weather(location):
     if not location:
         return jsonify({"error": "Location is required"}), 400
 
+    team_id = session.get('team_id')
+    team = db.session.get(Team, team_id) if team_id else None
+    default_location = team.default_practice_location if team else None
+
+    # Parse the location string
+    parsed_location = location
+    if re.match(r'^[Dd]\d+$', location) and default_location: # Matches "D" followed by digits, case-insensitive
+        parsed_location = default_location
+    elif "grand park" in location.lower():
+        parsed_location = "Grand Park Sports Campus"
+
+
     forecast_date_str = request.args.get('date')
 
     try:
         # Step 1: Geocode the location to get latitude and longitude
-        geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1"
+        geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={parsed_location}&count=1"
         geo_response = requests.get(geocoding_url)
         geo_response.raise_for_status()
         geo_data = geo_response.json()

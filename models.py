@@ -19,6 +19,7 @@ class Team(db.Model):
     age_group = Column(String, default='12U', nullable=False)
     pitching_rule_set = Column(String, default='USSSA', nullable=False)
     outfielder_count = Column(Integer, default=3, nullable=False)
+    default_practice_location = Column(String, nullable=True)
 
     users = relationship("User", back_populates="team")
     players = relationship("Player", back_populates="team")

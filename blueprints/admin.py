@@ -231,6 +231,7 @@ def update_admin_settings():
         return redirect(url_for('.admin_settings'))
 
     team_settings.team_name = request.form.get('team_name', team_settings.team_name)
+    team_settings.default_practice_location = request.form.get('default_practice_location', team_settings.default_practice_location)
     team_settings.display_coach_names = 'display_coach_names' in request.form
     team_settings.age_group = request.form.get('age_group', team_settings.age_group)
     team_settings.pitching_rule_set = request.form.get('pitching_rule_set', team_settings.pitching_rule_set)
