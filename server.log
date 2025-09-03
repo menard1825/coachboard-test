@@ -1,31 +1,4 @@
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: 141-289-218
-(28314) wsgi starting up on http://0.0.0.0:5002
-(28314) accepted ('127.0.0.1', 53786)
-127.0.0.1 - - [02/Sep/2025 19:25:29] "GET /api/rotations HTTP/1.1" 200 469 0.156357
-127.0.0.1 - - [02/Sep/2025 19:25:29] "GET /socket.io/?EIO=4&transport=polling&t=PaBv3Iw HTTP/1.1" 200 300 0.000453
-127.0.0.1 - - [02/Sep/2025 19:25:29] "POST /socket.io/?EIO=4&transport=polling&t=PaBv3JH&sid=Azeow0o-AGURUfbjAAAA HTTP/1.1" 200 219 0.001180
-Invalid session -es9hGNUlX5KPCisAAAA (further occurrences of this error will be logged with level INFO)
-127.0.0.1 - - [02/Sep/2025 19:25:30] "GET /socket.io/?EIO=4&transport=polling&t=PaBv3a_&sid=-es9hGNUlX5KPCisAAAA HTTP/1.1" 400 213 0.000380
-127.0.0.1 - - [02/Sep/2025 19:25:30] "POST /socket.io/?EIO=4&transport=polling&t=PaBv3bC&sid=-es9hGNUlX5KPCisAAAA HTTP/1.1" 400 265 0.000222
-127.0.0.1 - - [02/Sep/2025 19:25:31] "GET /socket.io/?EIO=4&transport=polling&t=PaBv3qP HTTP/1.1" 200 300 0.000382
-127.0.0.1 - - [02/Sep/2025 19:25:31] "POST /socket.io/?EIO=4&transport=polling&t=PaBv3qU&sid=TgRYqBvvq3CkREkZAAAC HTTP/1.1" 200 219 0.001175
-127.0.0.1 - - [02/Sep/2025 19:25:32] "GET /socket.io/?EIO=4&transport=polling&t=PaBv40W&sid=uAZLyX7m3ESBFOObAAAC HTTP/1.1" 400 213 0.000248
-127.0.0.1 - - [02/Sep/2025 19:25:33] "GET /socket.io/?EIO=4&transport=polling&t=PaBv4KJ&sid=Ch8GWOMxbn_16W0MAAAE HTTP/1.1" 400 213 0.000214
-127.0.0.1 - - [02/Sep/2025 19:25:33] "POST /socket.io/?EIO=4&transport=polling&t=PaBv4KT&sid=Ch8GWOMxbn_16W0MAAAE HTTP/1.1" 400 265 0.000209
-127.0.0.1 - - [02/Sep/2025 19:25:34] "GET /socket.io/?EIO=4&transport=polling&t=PaBv4bC HTTP/1.1" 200 300 0.000314
-127.0.0.1 - - [02/Sep/2025 19:25:34] "POST /socket.io/?EIO=4&transport=polling&t=PaBv4bH&sid=LI44FDuoMRcPc5EjAAAE HTTP/1.1" 200 219 0.001225
-127.0.0.1 - - [02/Sep/2025 19:25:35] "GET /socket.io/?EIO=4&transport=polling&t=PaBv4nc&sid=KHHPNv3SlBc2Xz9AAAAG HTTP/1.1" 400 213 0.000199
-127.0.0.1 - - [02/Sep/2025 19:25:35] "POST /socket.io/?EIO=4&transport=polling&t=PaBv4nk&sid=KHHPNv3SlBc2Xz9AAAAG HTTP/1.1" 400 265 0.000260
-127.0.0.1 - - [02/Sep/2025 19:25:36] "GET /socket.io/?EIO=4&transport=polling&t=PaBv52Z HTTP/1.1" 200 300 0.000335
-127.0.0.1 - - [02/Sep/2025 19:25:36] "POST /socket.io/?EIO=4&transport=polling&t=PaBv52g&sid=EwwqiRGuqj6Ij_F3AAAG HTTP/1.1" 200 219 0.000685
-(28314) accepted ('127.0.0.1', 47332)
-127.0.0.1 - - [02/Sep/2025 19:25:36] "GET /socket.io/?EIO=4&transport=websocket&sid=EwwqiRGuqj6Ij_F3AAAG HTTP/1.1" 200 0 0.005864
-127.0.0.1 - - [02/Sep/2025 19:25:37] "GET /socket.io/?EIO=4&transport=polling&t=PaBv5GS&sid=do56EcAdjNl5TrJDAAAI HTTP/1.1" 400 213 0.000178
-127.0.0.1 - - [02/Sep/2025 19:25:37] "POST /socket.io/?EIO=4&transport=polling&t=PaBv5Gc&sid=do56EcAdjNl5TrJDAAAI HTTP/1.1" 400 265 0.000226
-127.0.0.1 - - [02/Sep/2025 19:25:37] "GET /socket.io/?EIO=4&transport=polling&t=PaBv5PV HTTP/1.1" 200 300 0.000343
-127.0.0.1 - - [02/Sep/2025 19:25:37] "POST /socket.io/?EIO=4&transport=polling&t=PaBv5PZ&sid=bOlE48GI4ScklwTZAAAI HTTP/1.1" 200 219 0.000892
-(28314) accepted ('127.0.0.1', 47348)
-127.0.0.1 - - [02/Sep/2025 19:25:37] "GET /socket.io/?EIO=4&transport=polling&t=PaBv5Pa&sid=bOlE48GI4ScklwTZAAAI HTTP/1.1" 200 181 0.000185
-127.0.0.1 - - [02/Sep/2025 19:25:59] "GET /socket.io/?EIO=4&transport=websocket&sid=bOlE48GI4ScklwTZAAAI HTTP/1.1" 200 0 21.874064
+[2025-09-03 19:00:02 +0000] [16254] [INFO] Starting gunicorn 23.0.0
+[2025-09-03 19:00:02 +0000] [16254] [INFO] Listening at: http://0.0.0.0:5005 (16254)
+[2025-09-03 19:00:02 +0000] [16254] [INFO] Using worker: eventlet
+[2025-09-03 19:00:02 +0000] [16376] [INFO] Booting worker with pid: 16376

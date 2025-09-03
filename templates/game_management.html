@@ -32,12 +32,10 @@
                     <p><strong>Notes:</strong> {{ game['game_notes'] or 'No notes for this game.' }}</p>
                 </div>
                 <div class="col-md-6">
-                    <h6><i class="bi bi-thermometer-sun me-2"></i>Weather in Westfield, IN</h6>
-                    <p>
-                        <strong>Current:</strong> 78°F, Wind: 10 mph from SW <br>
-                        <strong>Forecast:</strong> Light rain, High: 79°F, Low: 58°F <br>
-                        <strong>Precipitation Chance:</strong> 5% during the day, 70% at night
-                    </p>
+                <h6><i class="bi bi-thermometer-sun me-2"></i>Weather</h6>
+                <div id="weather-widget-content">
+                    <p><em>Loading weather...</em></p>
+                </div>
                 </div>
             </div>
              <a href="#" class="btn btn-secondary mt-2" onclick="window.print();"><i class="bi bi-printer-fill me-2"></i> Print Lineup Card</a>
@@ -202,6 +200,7 @@
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script src="{{ url_for('static', filename='js/lineup_editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
 <script>
@@ -217,6 +216,37 @@
             outfielder_count: {{ current_team.outfielder_count if current_team else 3 }}
         };
         initializeGameManagement(gameData);
+
+        // NEW: Weather fetching logic
+        const fetchWeather = async () => {
+            const location = gameData.game.location;
+            const weatherWidget = document.getElementById('weather-widget-content');
+            if (!location) {
+                weatherWidget.innerHTML = '<p class="text-muted">No location set for this game.</p>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/weather/${encodeURIComponent(location)}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch weather');
+                }
+                const weather = await response.json();
+                weatherWidget.innerHTML = `
+                    <p>
+                        <strong>Current:</strong> ${weather.current_temp || 'N/A'}, ${weather.condition || 'N/A'} <br>
+                        <strong>Wind:</strong> ${weather.wind || 'N/A'} <br>
+                        <strong>High/Low:</strong> ${weather.high_temp || 'N/A'} / ${weather.low_temp || 'N/A'} <br>
+                        <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
+                    </p>
+                `;
+            } catch (error) {
+                weatherWidget.innerHTML = '<p class="text-danger">Could not load weather data.</p>';
+                console.error('Weather fetch error:', error);
+            }
+        };
+
+        fetchWeather();
     });
 </script>
 {% endblock %}
