@@ -58,6 +58,11 @@
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h5 class="mb-0">Current Roster</h5>
                 <div class="d-flex align-items-center gap-2">
+                    <div class="btn-group btn-group-sm me-2">
+                        <button class="btn btn-outline-secondary" id="roster-sort-az" title="Sort A-Z"><i class="bi bi-sort-alpha-down"></i></button>
+                        <button class="btn btn-outline-secondary" id="roster-sort-za" title="Sort Z-A"><i class="bi bi-sort-alpha-up"></i></button>
+                        <button class="btn btn-outline-secondary" id="roster-sort-custom" title="Custom Sort"><i class="bi bi-arrow-down-up"></i></button>
+                    </div>
                     <input type="search" id="rosterSearch" class="form-control form-control-sm" placeholder="Search roster...">
                     <button class="btn btn-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#addPlayerModal">
                         <i class="bi bi-plus-circle"></i> New Player

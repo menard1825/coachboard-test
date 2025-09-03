@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
         player_order: [],
         session: {},
         pitch_count_summary: {},
-        roster_sort: { key: 'name', order: 'asc' },
+        roster_sort: { key: 'custom', order: 'asc' },
         active_player_dev_name: null,
         dev_player_sort: { key: 'custom', order: 'asc' }
     };
@@ -112,20 +112,27 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let rosterToSort = [...(AppState.full_data.roster || [])];
 
-        rosterToSort.sort((a, b) => {
-            const indexA = AppState.player_order.indexOf(a.name);
-            const indexB = AppState.player_order.indexOf(b.name);
-            if (indexA === -1 && indexB === -1) return a.name.localeCompare(b.name);
-            if (indexA === -1) return 1;
-            if (indexB === -1) return -1;
-            return indexA - indexB;
-        });
+        if (AppState.roster_sort.key === 'name') {
+            rosterToSort.sort((a, b) => {
+                if (AppState.roster_sort.order === 'asc') return a.name.localeCompare(b.name);
+                return b.name.localeCompare(a.name);
+            });
+        } else { // Custom sort
+            const customOrderedNames = AppState.player_order.filter(name => rosterToSort.some(p => p.name === name));
+            rosterToSort.sort((a,b) => customOrderedNames.indexOf(a.name) - customOrderedNames.indexOf(b.name));
+        }
         
         const filteredRoster = rosterToSort.filter(p => 
             !searchTerm || p.name.toLowerCase().includes(searchTerm) || (p.number || '').toString().includes(searchTerm)
         );
 
         container.innerHTML = filteredRoster.length > 0 ? filteredRoster.map(playerTemplate).join('') : `<div class="p-3 text-center text-muted">No players found.</div>`;
+
+        document.querySelectorAll('#roster-sort-az, #roster-sort-za, #roster-sort-custom').forEach(btn => btn.classList.remove('active'));
+        if(AppState.roster_sort.key === 'name' && AppState.roster_sort.order === 'asc') document.getElementById('roster-sort-az').classList.add('active');
+        if(AppState.roster_sort.key === 'name' && AppState.roster_sort.order === 'desc') document.getElementById('roster-sort-za').classList.add('active');
+        if(AppState.roster_sort.key === 'custom') document.getElementById('roster-sort-custom').classList.add('active');
+
         attachRosterSaveListeners();
     }
 
@@ -1071,6 +1078,20 @@ document.addEventListener('DOMContentLoaded', () => {
          document.getElementById('dev-sort-custom').addEventListener('click', () => {
             AppState.dev_player_sort = { key: 'custom', order: 'asc' };
             renderPlayerDevelopmentList();
+        });
+
+        // Roster Sort Listeners
+        document.getElementById('roster-sort-az').addEventListener('click', () => {
+            AppState.roster_sort = { key: 'name', order: 'asc' };
+            renderRoster();
+        });
+        document.getElementById('roster-sort-za').addEventListener('click', () => {
+            AppState.roster_sort = { key: 'name', order: 'desc' };
+            renderRoster();
+        });
+        document.getElementById('roster-sort-custom').addEventListener('click', () => {
+            AppState.roster_sort = { key: 'custom', order: 'asc' };
+            renderRoster();
         });
 
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
