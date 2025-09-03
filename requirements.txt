@@ -12,3 +12,4 @@ Flask-Migrate
 Flask-SQLAlchemy
 Flask-WTF==1.1.1
 requests
+python-dotenv

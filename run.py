@@ -1,6 +1,10 @@
 import eventlet
+from dotenv import load_dotenv
+
 print("Starting server...")
 eventlet.monkey_patch()
+
+load_dotenv()
 
 from app import create_app
 from extensions import socketio
