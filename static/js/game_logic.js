@@ -196,10 +196,14 @@ function applyOutOfPositionIndicators() {
         state.lineup.title = document.getElementById('lineupTitle').value;
         state.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => item.dataset.playerName);
         const url = state.lineup.id ? `/edit_lineup/${state.lineup.id}` : '/add_lineup';
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content'); // Added CSRF Token
         try {
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken // Added CSRF Token
+                },
                 body: JSON.stringify({
                     title: state.lineup.title,
                     lineup_data: state.lineup.lineup_positions,

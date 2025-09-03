@@ -295,11 +295,3 @@ function initializeLineupEditor(options) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const lineupModalEl = document.getElementById('lineupEditorModal');
-    if (lineupModalEl) {
-        // Initialize the modal instance and attach the save listener
-        lineupEditorModal = new bootstrap.Modal(lineupModalEl);
-        document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
-    }
-});

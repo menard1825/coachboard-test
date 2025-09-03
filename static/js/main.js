@@ -1013,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupEventListeners() {
+        document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         
         const addScoutedPlayerForm = document.getElementById('addScoutedPlayerForm');
