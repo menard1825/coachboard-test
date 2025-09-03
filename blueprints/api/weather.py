@@ -28,8 +28,6 @@ def get_weather(location):
             parsed_location = default_location
         else:
             return jsonify({"error": "Shorthand location used, but no default practice location is set in Team Settings."}), 400
-    elif "grand park" in parsed_location.lower():
-        parsed_location = "Grand Park Sports Campus"
 
     forecast_date_str = request.args.get('date')
 
