@@ -73,23 +73,58 @@
         <div class="card h-100">
           <div class="card-header"><h5 class="mb-0">Add New Outing</h5></div>
           <div class="card-body">
-            <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
+            <form action="{{ url_for('pitching.pitching_page') }}" method="POST">
+              {{ form.hidden_tag() }}
               <div class="row g-3">
-                <div class="col-6"><label for="pitch_date" class="form-label">Date</label><input type="date" id="pitch_date" name="pitch_date" class="form-control" required></div>
                 <div class="col-6">
-                    <label for="player_id_select" class="form-label">Pitcher</label>
-                    <select name="player_id" id="player_id_select" class="form-select" required>
-                        <option value="">Select Pitcher...</option>
-                        {% for p in pitchers %}
-                        <option value="{{ p.id }}">{{ p.full_name }}</option>
-                        {% endfor %}
-                    </select>
+                  {{ form.pitch_date.label(class="form-label") }}
+                  {{ form.pitch_date(class="form-control") }}
+                  {% for error in form.pitch_date.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                  {% endfor %}
                 </div>
-                <div class="col-12"><label for="opponent" class="form-label">Opponent / Context</label><input type="text" id="opponent" name="opponent" class="form-control" placeholder="e.g., Scrimmage vs. Tigers"></div>
-                <div class="col-6"><label for="pitches" class="form-label">Pitch Count</label><input type="number" id="pitches" name="pitches" class="form-control" required></div>
-                <div class="col-6"><label for="innings" class="form-label">Innings Pitched</label><input type="text" id="innings" name="innings" class="form-control" placeholder="e.g., 2.1" required></div>
-                <div class="col-6"><label for="outing_type" class="form-label">Outing Type</label><select name="outing_type" id="outing_type" class="form-select"><option value="Game">Game</option><option value="External/Lesson">External/Lesson</option><option value="Practice">Practice</option></select></div>
-                <div class="col-6"><label for="pitcher_type" class="form-label">Pitcher Type</label><select name="pitcher_type" id="pitcher_type" class="form-select"><option value="Starter">Starter</option><option value="Reliever">Reliever</option></select></div>
+                <div class="col-6">
+                  {{ form.player_id.label(class="form-label") }}
+                  {{ form.player_id(class="form-select") }}
+                  {% for error in form.player_id.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="col-12">
+                  {{ form.opponent.label(class="form-label") }}
+                  {{ form.opponent(class="form-control", placeholder="e.g., Scrimmage vs. Tigers") }}
+                  {% for error in form.opponent.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="col-6">
+                  {{ form.pitches.label(class="form-label") }}
+                  {{ form.pitches(class="form-control") }}
+                  {% for error in form.pitches.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="col-6">
+                  {{ form.innings.label(class="form-label") }}
+                  {{ form.innings(class="form-control", placeholder="e.g., 2.1") }}
+                  {% for error in form.innings.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="col-6">
+                  {{ form.outing_type.label(class="form-label") }}
+                  {{ form.outing_type(class="form-select") }}
+                  {% for error in form.outing_type.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="col-6">
+                  {{ form.pitcher_type.label(class="form-label") }}
+                  {{ form.pitcher_type(class="form-select") }}
+                  {% for error in form.pitcher_type.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                  {% endfor %}
+                </div>
               </div>
               <button type="submit" class="btn btn-primary w-100 mt-3">Log Outing</button>
             </form>

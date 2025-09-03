@@ -42,6 +42,10 @@
                                             <td>{{ stats.appearances }}</td>
                                         </tr>
                                     {% endif %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">No players on roster.</td>
+                                    </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -86,6 +90,10 @@
                                                 <td>{{ player_positions.get(pos, 0) }}</td>
                                             {% endfor %}
                                         {% endif %}
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="{{ all_positions|length + 1 }}" class="text-center text-muted">No players on roster.</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>

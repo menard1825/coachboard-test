@@ -52,19 +52,25 @@
                             </thead>
                             <tbody>
                                 {# MODIFIED: Dynamic table generation #}
-                                {% set last_threshold = 0 %}
-                                {% for threshold, rest_days in rules.rest_thresholds %}
+                                {% if rules.rest_thresholds %}
+                                    {% set last_threshold = 0 %}
+                                    {% for threshold, rest_days in rules.rest_thresholds %}
+                                        <tr>
+                                            <td>{{ last_threshold + 1 }} - {{ threshold }}</td>
+                                            <td class="text-center">{{ rest_days }}</td>
+                                        </tr>
+                                        {% set last_threshold = threshold %}
+                                    {% endfor %}
+                                    {# Add the final "catch-all" row #}
                                     <tr>
-                                        <td>{{ last_threshold + 1 }} - {{ threshold }}</td>
-                                        <td class="text-center">{{ rest_days }}</td>
+                                        <td>{{ last_threshold + 1 }}+</td>
+                                        <td class="text-center">{{ rules.rest_thresholds[-1][1] + 1 }}</td>
                                     </tr>
-                                    {% set last_threshold = threshold %}
-                                {% endfor %}
-                                {# Add the final "catch-all" row #}
-                                <tr>
-                                    <td>{{ last_threshold + 1 }}+</td>
-                                    <td class="text-center">{{ rules.rest_thresholds[-1][1] + 1 }}</td>
-                                </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="2" class="text-center text-muted">No rest rules defined for this age group.</td>
+                                    </tr>
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>

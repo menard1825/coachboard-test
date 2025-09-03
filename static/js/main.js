@@ -1020,9 +1020,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (addScoutedPlayerForm) {
             addScoutedPlayerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const btn = addScoutedPlayerForm.querySelector('button[type="submit"]');
+                const originalButtonText = btn.innerHTML;
+                const feedbackDiv = document.getElementById('addScoutedPlayerFeedback');
                 const formData = new FormData(addScoutedPlayerForm);
                 const data = Object.fromEntries(formData.entries());
-                const feedbackDiv = document.getElementById('addScoutedPlayerFeedback');
+
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...`;
+                feedbackDiv.style.display = 'none';
+
                 try {
                     const response = await fetch('/add_scouted_player', {
                         method: 'POST',
@@ -1033,16 +1040,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         body: JSON.stringify(data)
                     });
                     const result = await response.json();
-                    if (response.ok) {
-                        feedbackDiv.className = 'alert alert-success';
-                        addScoutedPlayerForm.reset();
-                    } else {
-                        feedbackDiv.className = 'alert alert-danger';
-                    }
-                    feedbackDiv.textContent = result.message;
+                    if (!response.ok) throw new Error(result.message);
+
+                    btn.innerHTML = `Added!`;
+                    addScoutedPlayerForm.reset();
+                    setTimeout(() => {
+                        btn.innerHTML = originalButtonText;
+                        btn.disabled = false;
+                    }, 2000);
+
                 } catch (error) {
-                    feedbackDiv.className = 'alert alert-danger';
-                    feedbackDiv.textContent = 'A network error occurred.';
+                    feedbackDiv.textContent = `Error: ${error.message}`;
+                    feedbackDiv.className = 'save-feedback alert alert-danger';
+                    feedbackDiv.style.display = 'block';
+                    btn.innerHTML = originalButtonText;
+                    btn.disabled = false;
                 }
             });
         }

@@ -91,8 +91,9 @@ function initializeGameManagement(gameData) {
         const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
         const benchDesktop = document.getElementById('bench-list-desktop');
         if(benchDesktop) {
-            // Pass the full player object to the updated createPlayerTag function
-            benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p)).join('');
+            benchDesktop.innerHTML = benchPlayers.length > 0
+                ? benchPlayers.map(p => createPlayerTag(p)).join('')
+                : '<div class="list-group-item text-muted text-center">Bench is empty</div>';
         }
 
         applyOutOfPositionIndicators(); // Add this line at the end
@@ -118,10 +119,14 @@ function initializeGameManagement(gameData) {
         });
         let tableHtml = `<div class="table-responsive"><table class="table table-sm table-striped table-bordered"><thead class="table-light"><tr><th>Player</th><th>Field</th><th>Bench</th><th>Positions</th></tr></thead><tbody>`;
         const sortedPlayerNames = state.roster.map(p => p.name).sort();
-        for (const playerName of sortedPlayerNames) {
-            const data = summary[playerName];
-            if (!data) continue;
-            tableHtml += `<tr><td><strong>${playerName}</strong></td><td>${data.inningsOnField}</td><td>${data.inningsOnBench}</td><td>${Array.from(data.positions).join(', ') || 'N/A'}</td></tr>`;
+        if (sortedPlayerNames.length > 0) {
+            for (const playerName of sortedPlayerNames) {
+                const data = summary[playerName];
+                if (!data) continue;
+                tableHtml += `<tr><td><strong>${playerName}</strong></td><td>${data.inningsOnField}</td><td>${data.inningsOnBench}</td><td>${Array.from(data.positions).join(', ') || 'N/A'}</td></tr>`;
+            }
+        } else {
+            tableHtml += '<tr><td colspan="4" class="text-center text-muted">No players on roster.</td></tr>';
         }
         tableHtml += `</tbody></table></div>`;
         const summaryDesktop = document.getElementById('summary-desktop');

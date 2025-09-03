@@ -84,6 +84,10 @@
                                     <td colspan="2" class="text-center text-muted">No summary data available.</td>
                                 {% endif %}
                             </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">No players on roster.</td>
+                            </tr>
                         {% endfor %}
                         </tbody>
                     </table>

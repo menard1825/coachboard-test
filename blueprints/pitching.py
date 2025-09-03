@@ -7,6 +7,7 @@ from extensions import socketio
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
 from datetime import datetime, date, timedelta
 from functools import wraps
+from .forms import PitchingOutingForm
 
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 
@@ -21,78 +22,7 @@ def parse_date(date_str):
             pass
     return None
 
-@pitching_bp.route('/add_pitching', methods=['POST'])
-def add_pitching():
-    game_id = request.form.get('game_id')
-    game = None
-    if game_id:
-        game = db.session.get(Game, game_id)
-
-    # Validate form fields one by one to provide specific error messages
-    try:
-        pitch_count = int(request.form['pitches'])
-    except (ValueError, KeyError):
-        flash('Pitch count must be a valid number.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
-
-    try:
-        innings_pitched = float(request.form['innings'])
-    except (ValueError, KeyError):
-        flash('Innings pitched must be a valid number.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
-
-    player_id = request.form.get('player_id')
-    if not player_id:
-        flash('A valid pitcher must be selected.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
-    player_id = int(player_id)
-
-
-    if not player_id:
-        flash('A valid pitcher must be selected.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
-
-    pitch_date_str = request.form.get('pitch_date')
-    pitch_date = parse_date(pitch_date_str)
-
-    if not pitch_date:
-        if game:
-            pitch_date = game.date
-        else:
-            flash('A valid date is required.', 'danger')
-            return redirect(request.referrer or url_for('pitching.pitching_page'))
-
-    opponent = request.form.get('opponent')
-    if game:
-        opponent = game.opponent
-    elif not opponent:
-        flash('Opponent is required.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
-
-    player = db.session.get(Player, player_id)
-    if not player:
-        flash('Selected pitcher not found.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
-
-    new_outing = PitchingOuting(
-        date=pitch_date,
-        player_id=player_id,
-        opponent=opponent,
-        pitches=pitch_count, 
-        innings=innings_pitched, 
-        pitcher_type=request.form.get('pitcher_type', 'Starter'),
-        outing_type=request.form.get('outing_type', 'Game'), 
-        team_id=session['team_id'],
-        game_id=game.id if game else None
-    )
-    db.session.add(new_outing)
-    db.session.commit()
-    flash(f'Pitching outing for "{player.full_name}" added successfully!', 'success')
-    socketio.emit('pitching_update', {'message': 'New pitching outing added.'})
-    
-    if game_id:
-        return redirect(url_for('gameday.game_management', game_id=game_id, _anchor='pitching'))
-    return redirect(url_for('pitching.pitching_page'))
+# This route is now handled by pitching_page
 
 @pitching_bp.route('/edit_pitching/<int:outing_id>', methods=['POST'])
 def edit_pitching(outing_id):
@@ -166,30 +96,46 @@ def login_required(f):
     return decorated_function
 
 
-@pitching_bp.route("/pitching", methods=["GET"])
+@pitching_bp.route("/pitching", methods=["GET", "POST"])
 @login_required
 def pitching_page():
     team_id = session['team_id']
     team = db.session.get(Team, team_id)
+    form = PitchingOutingForm()
 
-    all_players = Player.query.filter_by(team_id=team_id).all()
-    all_outings = PitchingOuting.query.filter_by(team_id=team_id).options(joinedload(PitchingOuting.player)).all()
+    # Use a separate query for populating the form choices to keep it sorted
+    form.player_id.choices = [(p.id, p.full_name) for p in Player.query.filter_by(team_id=team_id).order_by(Player.name).all()]
+
+    if form.validate_on_submit():
+        # Handle form submission
+        new_outing = PitchingOuting(
+            date=form.pitch_date.data,
+            player_id=form.player_id.data,
+            opponent=form.opponent.data,
+            pitches=form.pitches.data,
+            innings=form.innings.data,
+            pitcher_type=form.pitcher_type.data,
+            outing_type=form.outing_type.data,
+            team_id=team_id
+        )
+        db.session.add(new_outing)
+        db.session.commit()
+        flash('Pitching outing added successfully!', 'success')
+        socketio.emit('pitching_update', {'message': 'New pitching outing added.'})
+        return redirect(url_for('pitching.pitching_page'))
+
+    # This part is for the GET request or if validation fails
+    all_players = Player.query.filter_by(team_id=team_id).options(joinedload(Player.pitching_outings)).all()
+    all_outings = [outing for player in all_players for outing in player.pitching_outings]
 
     recent_outings = sorted(all_outings, key=lambda o: o.date, reverse=True)[:10]
 
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(all_players, all_outings, rules)
 
-    # Get players designated as pitchers by their role
     designated_pitchers = {p.id: p for p in all_players if p.pitcher_role != 'Not a Pitcher'}
-
-    # Get players who have any pitching outings logged
     players_with_outings = {o.player_id: o.player for o in all_outings if o.player is not None}
-
-    # Combine the two lists (duplicates are handled automatically by using a dictionary)
     combined_pitchers_dict = {**designated_pitchers, **players_with_outings}
-
-    # This is the final list of all players who should be in the summary
     pitchers = list(combined_pitchers_dict.values())
 
     return render_template(
@@ -197,7 +143,8 @@ def pitching_page():
         recent_outings=recent_outings,
         pitch_count_summary=pitch_count_summary,
         current_team=team,
-        pitchers=pitchers
+        pitchers=pitchers,
+        form=form
     )
 
 
