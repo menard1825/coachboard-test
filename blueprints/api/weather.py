@@ -14,32 +14,41 @@ def get_weather(location):
     Fetches weather data for a given location using the Open-Meteo API.
     Now accepts an optional 'date' query parameter.
     """
-    if not location:
+    #
+    # --- START OF CHANGES ---
+    #
+    if not location or not location.strip():
         return jsonify({"error": "Location is required"}), 400
 
     team_id = session.get('team_id')
     team = db.session.get(Team, team_id) if team_id else None
     default_location = team.default_practice_location if team else None
 
-    # Parse the location string
-    parsed_location = location
-    if re.match(r'^[Dd]\d+$', location) and default_location: # Matches "D" followed by digits, case-insensitive
-        parsed_location = default_location
-    elif "grand park" in location.lower():
+    parsed_location = location.strip()
+    # Handle shorthand like "D1", "d2", etc.
+    if re.match(r'^[Dd]\d+$', parsed_location):
+        if default_location:
+            parsed_location = default_location
+        else:
+            # If there's no default location set, we can't resolve the shorthand.
+            return jsonify({"error": "Shorthand location used, but no default practice location is set in Team Settings."}), 400
+    elif "grand park" in parsed_location.lower():
         parsed_location = "Grand Park Sports Campus"
-
+    #
+    # --- END OF CHANGES ---
+    #
 
     forecast_date_str = request.args.get('date')
 
     try:
         # Step 1: Geocode the location to get latitude and longitude
         geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={parsed_location}&count=1"
-        geo_response = requests.get(geocoding_url)
+        geo_response = requests.get(geocoding_url, timeout=10) # Added timeout
         geo_response.raise_for_status()
         geo_data = geo_response.json()
 
         if not geo_data.get("results"):
-            return jsonify({"error": "Location not found"}), 404
+            return jsonify({"error": f"Location '{parsed_location}' not found"}), 404
 
         lat = geo_data["results"][0]["latitude"]
         lon = geo_data["results"][0]["longitude"]
@@ -61,7 +70,7 @@ def get_weather(location):
             params["current_weather"] = "true"
 
         weather_url = f"https://api.open-meteo.com/v1/forecast"
-        weather_response = requests.get(weather_url, params=params)
+        weather_response = requests.get(weather_url, params=params, timeout=10) # Added timeout
         weather_response.raise_for_status()
         weather_data = weather_response.json()
 
