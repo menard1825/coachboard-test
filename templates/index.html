@@ -301,7 +301,7 @@
                 <div class="card h-100">
                     <div class="card-header"><h5 class="mb-0">Add New Outing</h5></div>
                     <div class="card-body">
-                        <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
+                        <form action="{{ url_for('pitching.pitching_page') }}" method="POST">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <div class="row g-3">
                                 <div class="col-6"><label for="pitch_date" class="form-label">Date</label><input type="date" id="pitch_date" name="pitch_date" class="form-control" required></div>
