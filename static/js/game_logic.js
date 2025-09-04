@@ -3,7 +3,6 @@
 // =================================================================================
 
 // This script is now fully self-contained and does not use a global AppState.
-const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
 
 async function fetchWeatherForGame(location, gameDate) {
     const weatherWidget = document.getElementById('weather-widget-content');
