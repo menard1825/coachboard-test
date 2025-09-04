@@ -67,14 +67,31 @@ def create_app():
 
     # --- Custom Jinja Filter for Date/Time Formatting ---
     @app.template_filter('format_datetime')
-    def format_datetime_filter(dt):
-        if not dt or not isinstance(dt, (datetime, date)):
-            return dt
-        if isinstance(dt, datetime):
-            return dt.strftime('%A, %m/%d/%y, %I:%M %p')
-        if isinstance(dt, date):
+    def format_datetime_filter(s):
+        if not s:
+            return s
+
+        dt = None
+        if isinstance(s, (datetime, date)):
+            dt = s
+        elif isinstance(s, str):
+            try:
+                # Handle the ISO format string
+                dt = datetime.fromisoformat(s)
+            except ValueError:
+                # If parsing fails, return the original string
+                return s
+        else:
+            return s
+
+        if not dt:
+            return s
+
+        # If the time is midnight, it was likely just a date entry, so only show the date.
+        if dt.hour == 0 and dt.minute == 0 and dt.second == 0:
             return dt.strftime('%A, %m/%d/%y')
-        return dt
+
+        return dt.strftime('%A, %m/%d/%y, %I:%M %p')
 
     # --- Decorators & Context Processors ---
     def login_required(f):
