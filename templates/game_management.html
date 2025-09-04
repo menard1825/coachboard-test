@@ -44,7 +44,7 @@
 
     <!-- Post-Game Summary -->
     <div class="row">
-        {% if game.date.date() < today %}
+        {% if is_past_game %}
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
                 <div class="card-header bg-dark text-white">

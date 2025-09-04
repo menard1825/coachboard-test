@@ -57,6 +57,7 @@ def game_management(game_id):
     opponent_notes = game.opponent_relationship.notes if game.opponent_relationship else ""
     quick_notes = sorted(game.quick_notes, key=lambda x: x.timestamp, reverse=True)
 
+    is_past_game = game.date.date() < date.today()
 
     return render_template('game_management.html',
                            current_team=team,
@@ -73,7 +74,7 @@ def game_management(game_id):
                            rotation_templates=[model_to_dict(rt) for rt in rotation_templates],
                            opponent_notes=opponent_notes,
                            quick_notes=[model_to_dict(qn) for qn in quick_notes],
-                           today=date.today())
+                           is_past_game=is_past_game)
 
 @gameday_bp.route('/add_game', methods=['POST'])
 def add_game():
