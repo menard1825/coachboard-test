@@ -132,7 +132,13 @@ def edit_game(game_id):
 
     # Update opponent scouting notes if provided
     opponent_notes = request.form.get('opponent_notes')
-    if opponent_notes and game_to_edit.opponent_relationship:
+    if opponent_notes:
+        if not game_to_edit.opponent_relationship:
+            opponent = db.session.query(Opponent).filter_by(name=game_to_edit.opponent, team_id=session['team_id']).first()
+            if not opponent:
+                opponent = Opponent(name=game_to_edit.opponent, team_id=session['team_id'])
+                db.session.add(opponent)
+            game_to_edit.opponent_relationship = opponent
         game_to_edit.opponent_relationship.notes = opponent_notes
 
     db.session.commit()
