@@ -34,6 +34,7 @@ class Team(db.Model):
     player_development_focuses = relationship("PlayerDevelopmentFocus", back_populates="team")
     player_game_absences = relationship("PlayerGameAbsence", back_populates="team")
     player_practice_absences = relationship("PlayerPracticeAbsence", back_populates="team")
+    opponents = relationship("Opponent", back_populates="team", cascade="all, delete-orphan")
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -186,6 +187,9 @@ class Game(db.Model):
     game_notes = Column(Text)
     associated_lineup_title = Column(String)
     associated_rotation_date = Column(String)
+    our_score = Column(Integer)
+    opponent_score = Column(Integer)
+    post_game_summary = Column(Text)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="games")
@@ -193,9 +197,31 @@ class Game(db.Model):
     pitching_outings = relationship("PitchingOuting", back_populates="game", cascade="all, delete-orphan")
     rotations = relationship("Rotation", back_populates="game", cascade="all, delete-orphan")
     
+    opponent_id = Column(Integer, ForeignKey('opponents.id'), nullable=True)
+    opponent_relationship = relationship("Opponent", back_populates="games")
+    quick_notes = relationship("GameQuickNote", back_populates="game", cascade="all, delete-orphan")
+
     def to_dict(self):
         """Return a dictionary representation of the Game object."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+class Opponent(db.Model):
+    __tablename__ = 'opponents'
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    notes = Column(Text)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+    team = relationship("Team", back_populates="opponents")
+    games = relationship("Game", back_populates="opponent_relationship")
+
+class GameQuickNote(db.Model):
+    __tablename__ = 'game_quick_notes'
+    id = Column(Integer, primary_key=True)
+    text = Column(Text, nullable=False)
+    author = Column(String)
+    timestamp = Column(DateTime, nullable=True)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
+    game = relationship("Game", back_populates="quick_notes")
 
 class CollaborationNote(db.Model):
     __tablename__ = 'collaboration_notes'

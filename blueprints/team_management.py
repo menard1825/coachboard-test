@@ -79,34 +79,51 @@ def delete_note(note_type, note_id):
     return redirect(request.referrer or url_for('home', _anchor='collaboration'))
 
 # --- Practice Plan Routes ---
-@team_management_bp.route('/add_practice_plan', methods=['POST'])
+@team_management_bp.route('/add_practice_plan', methods=['GET', 'POST'])
 def add_practice_plan():
-    plan_date_str = request.form.get('plan_date')
-    if not plan_date_str:
-        flash('Practice date is required.', 'danger')
-        return redirect(url_for('home', _anchor='practice_plan'))
-    try:
-        plan_date = datetime.strptime(plan_date_str, '%Y-%m-%d')
-    except ValueError:
-        flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
-        return redirect(url_for('home', _anchor='practice_plan'))
+    if request.method == 'POST':
+        plan_date_str = request.form.get('plan_date')
+        if not plan_date_str:
+            flash('Practice date is required.', 'danger')
+            return redirect(url_for('home', _anchor='practice_plan'))
+        try:
+            plan_date = datetime.strptime(plan_date_str, '%Y-%m-%d')
+        except ValueError:
+            flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+            return redirect(url_for('home', _anchor='practice_plan'))
 
-    new_plan = PracticePlan(
-        date=plan_date,
-        location=request.form.get('location', ''),
-        general_notes=request.form.get('general_notes', ''),
-        emphasis=request.form.get('emphasis', ''),
-        warm_up=request.form.get('warm_up', ''),
-        infield_outfield=request.form.get('infield_outfield', ''),
-        hitting=request.form.get('hitting', ''),
-        pitching_catching=request.form.get('pitching_catching', ''),
-        team_id=session['team_id']
-    )
-    db.session.add(new_plan)
-    db.session.commit()
-    flash('New practice plan created!', 'success')
-    socketio.emit('data_updated', {'message': 'New practice plan created.'})
-    return redirect(url_for('home', _anchor='practice_plan'))
+        new_plan = PracticePlan(
+            date=plan_date,
+            location=request.form.get('location', ''),
+            general_notes=request.form.get('general_notes', ''),
+            emphasis=request.form.get('emphasis', ''),
+            warm_up=request.form.get('warm_up', ''),
+            infield_outfield=request.form.get('infield_outfield', ''),
+            hitting=request.form.get('hitting', ''),
+            pitching_catching=request.form.get('pitching_catching', ''),
+            team_id=session['team_id']
+        )
+        db.session.add(new_plan)
+        db.session.commit()
+        flash('New practice plan created!', 'success')
+        socketio.emit('data_updated', {'message': 'New practice plan created.'})
+        return redirect(url_for('home', _anchor='practice_plan'))
+    else: # GET request
+        emphasis = request.args.get('emphasis')
+        if not emphasis:
+            flash('Emphasis is required to create a practice plan from a game.', 'danger')
+            return redirect(url_for('home', _anchor='games'))
+
+        new_plan = PracticePlan(
+            date=datetime.now(),
+            emphasis=emphasis,
+            team_id=session['team_id']
+        )
+        db.session.add(new_plan)
+        db.session.commit()
+        flash('New practice plan created with emphasis from post-game summary! You can edit the details below.', 'success')
+        socketio.emit('data_updated', {'message': 'New practice plan created.'})
+        return redirect(url_for('home', _anchor=f'plan-{new_plan.id}'))
 
 @team_management_bp.route('/edit_practice_plan/<int:plan_id>', methods=['POST'])
 def edit_practice_plan(plan_id):

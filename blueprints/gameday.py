@@ -1,10 +1,10 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify, render_template
 from models import (
-    Game, Player, Lineup, Rotation, PitchingOuting, Team, PlayerGameAbsence
+    Game, Player, Lineup, Rotation, PitchingOuting, Team, PlayerGameAbsence, Opponent, GameQuickNote
 )
 from db import db
 from extensions import socketio
-from datetime import datetime
+from datetime import datetime, date
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
@@ -26,7 +26,11 @@ def game_management(game_id):
         flash('Team not found.', 'danger')
         return redirect(url_for('home'))
 
-    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
+    game = db.session.query(Game).options(
+        joinedload(Game.opponent_relationship),
+        joinedload(Game.quick_notes)
+    ).filter_by(id=game_id, team_id=team.id).first()
+
     if not game:
         flash('Game not found.', 'danger')
         return redirect(url_for('home', _anchor='games'))
@@ -50,6 +54,10 @@ def game_management(game_id):
 
     game_date_for_input = game.date.strftime('%Y-%m-%d')
 
+    opponent_notes = game.opponent_relationship.notes if game.opponent_relationship else ""
+    quick_notes = sorted(game.quick_notes, key=lambda x: x.timestamp, reverse=True)
+
+
     return render_template('game_management.html',
                            current_team=team,
                            game=model_to_dict(game),
@@ -62,7 +70,10 @@ def game_management(game_id):
                            absent_player_ids=list(absent_player_ids),
                            pitch_count_summary=pitch_count_summary,
                            lineup_templates=[model_to_dict(lt) for lt in lineup_templates],
-                           rotation_templates=[model_to_dict(rt) for rt in rotation_templates])
+                           rotation_templates=[model_to_dict(rt) for rt in rotation_templates],
+                           opponent_notes=opponent_notes,
+                           quick_notes=[model_to_dict(qn) for qn in quick_notes],
+                           today=date.today())
 
 @gameday_bp.route('/add_game', methods=['POST'])
 def add_game():
@@ -73,12 +84,20 @@ def add_game():
         flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
         return redirect(url_for('home', _anchor='games'))
 
+    opponent_name = request.form['game_opponent']
+    opponent = db.session.query(Opponent).filter_by(name=opponent_name, team_id=session['team_id']).first()
+    if not opponent:
+        opponent = Opponent(name=opponent_name, team_id=session['team_id'])
+        db.session.add(opponent)
+        db.session.commit()
+
     new_game = Game(
         date=game_date,
-        opponent=request.form['game_opponent'], 
+        opponent=opponent_name,
         location=request.form.get('game_location', ''),
         game_notes=request.form.get('game_notes', ''),
-        team_id=session['team_id']
+        team_id=session['team_id'],
+        opponent_id=opponent.id
     )
     db.session.add(new_game)
     db.session.commit()
@@ -104,6 +123,17 @@ def edit_game(game_id):
     game_to_edit.opponent = request.form.get('game_opponent', game_to_edit.opponent)
     game_to_edit.location = request.form.get('game_location', game_to_edit.location)
     game_to_edit.game_notes = request.form.get('game_notes', game_to_edit.game_notes)
+
+    # New fields for post-game summary
+    game_to_edit.our_score = request.form.get('our_score')
+    game_to_edit.opponent_score = request.form.get('opponent_score')
+    game_to_edit.post_game_summary = request.form.get('post_game_summary')
+
+    # Update opponent scouting notes if provided
+    opponent_notes = request.form.get('opponent_notes')
+    if opponent_notes and game_to_edit.opponent_relationship:
+        game_to_edit.opponent_relationship.notes = opponent_notes
+
     db.session.commit()
     flash('Game details updated successfully!', 'success')
     socketio.emit('data_updated', {'message': 'Game details updated.'})
@@ -143,6 +173,45 @@ def update_absences(game_id):
     flash('Player availability updated for this game.', 'success')
     socketio.emit('data_updated', {'message': f'Availability updated for game {game_id}.'})
     return redirect(url_for('.game_management', game_id=game_id, _anchor='availability'))
+
+@gameday_bp.route('/game/<int:game_id>/add_quick_note', methods=['POST'])
+def add_quick_note(game_id):
+    note_text = request.form.get('note')
+    if not note_text:
+        return jsonify({'status': 'error', 'message': 'Note cannot be empty.'}), 400
+
+    author_name = session.get('full_name') or session.get('username')
+
+    new_note = GameQuickNote(
+        text=note_text,
+        author=author_name,
+        game_id=game_id,
+        timestamp=datetime.utcnow()
+    )
+    db.session.add(new_note)
+    db.session.commit()
+
+    socketio.emit('data_updated', {'message': 'New quick note added.'})
+
+    return jsonify({
+        'status': 'success',
+        'message': 'Note added successfully!',
+        'note': model_to_dict(new_note)
+    })
+
+@gameday_bp.route('/game/<int:game_id>/create_practice_plan')
+def create_practice_plan_from_game(game_id):
+    game = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
+    if not game:
+        flash('Game not found.', 'danger')
+        return redirect(url_for('home', _anchor='games'))
+
+    if not game.post_game_summary:
+        flash('This game does not have a post-game summary to create a practice plan from.', 'warning')
+        return redirect(url_for('.game_management', game_id=game_id))
+
+    return redirect(url_for('team_management.add_practice_plan', emphasis=game.post_game_summary))
+
 
 # --- Lineup & Rotation API-like routes ---
 @gameday_bp.route('/add_lineup', methods=['POST'])
