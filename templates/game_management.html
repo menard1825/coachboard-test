@@ -214,7 +214,8 @@
             absent_player_ids: {{ absent_player_ids|tojson }},
             lineup_templates: {{ lineup_templates|tojson }},
             rotation_templates: {{ rotation_templates|tojson }},
-            outfielder_count: {{ current_team.outfielder_count if current_team else 3 }}
+            outfielder_count: {{ current_team.outfielder_count if current_team else 3 }},
+            game_date_for_input: '{{ game_date_for_input }}'
         };
         initializeGameManagement(gameData);
 
@@ -224,70 +225,11 @@
             setupAutocomplete(gameLocationInput);
         }
 
-        // NEW: Weather fetching logic
-        const fetchWeather = async () => {
-            const weatherWidget = document.getElementById('weather-widget-content');
-            weatherWidget.innerHTML = '<p><em>Fetching weather...</em></p>'; // Initial state
-
-            const location = gameData.game.location;
-            const gameDate = weatherWidget.dataset.gameDate;
-
-            if (!location) {
-                weatherWidget.innerHTML = '<p class="text-muted">No location set for this game.</p>';
-                return;
-            }
-
-            if (!gameDate) {
-                weatherWidget.innerHTML = '<p class="text-danger">Error: Game date is missing.</p>';
-                return;
-            }
-
-            weatherWidget.innerHTML = `<p><em>Getting data for ${location} on ${gameDate}...</em></p>`;
-
-            const today = new Date().toISOString().split('T')[0];
-            const isToday = gameDate.startsWith(today); // Use startsWith to be safe
-            const url = isToday
-                ? `/api/weather/${encodeURIComponent(location)}`
-                : `/api/weather/${encodeURIComponent(location)}?date=${gameDate}`;
-
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Failed to fetch weather. Status: ${response.status}. Details: ${errorText}`);
-                }
-
-                weatherWidget.innerHTML = '<p><em>Processing weather data...</em></p>';
-                const weather = await response.json();
-
-                if (!weather) {
-                    throw new Error("Received empty weather data.");
-                }
-
-                const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
-
-                weatherWidget.innerHTML = `
-                    <p>
-                        <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay || 'N/A'}, ${weather.condition || 'N/A'} <br>
-                        <strong>Wind:</strong> ${weather.wind || 'N/A'} <br>
-                        <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
-                    </p>
-                `;
-            } catch (error) {
-                weatherWidget.innerHTML = `<p class="text-danger">Could not load weather data.</p><p class="text-muted small">${error.message}</p>`;
-                console.error('Weather fetch error:', error);
-            }
-        };
-
-        fetchWeather();
-
         // Add event listener for when the game date changes in the modal
         const gameDateInput = document.getElementById('game_date');
-        const weatherWidgetContent = document.getElementById('weather-widget-content');
-
         gameDateInput.addEventListener('change', () => {
-            weatherWidgetContent.dataset.gameDate = gameDateInput.value;
-            fetchWeather();
+            const gameLocation = document.getElementById('game_location').value;
+            fetchWeatherForGame(gameLocation, gameDateInput.value);
         });
     });
 </script>

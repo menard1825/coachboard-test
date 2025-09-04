@@ -5,6 +5,55 @@
 // This script is now fully self-contained and does not use a global AppState.
 const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
 
+async function fetchWeatherForGame(location, gameDate) {
+    const weatherWidget = document.getElementById('weather-widget-content');
+    if (!weatherWidget) return;
+
+    weatherWidget.innerHTML = '<p><em>Fetching weather...</em></p>';
+
+    if (!location) {
+        weatherWidget.innerHTML = '<p class="text-muted">No location set for this game.</p>';
+        return;
+    }
+
+    if (!gameDate) {
+        weatherWidget.innerHTML = '<p class="text-danger">Error: Game date is missing.</p>';
+        return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const isToday = gameDate.startsWith(today);
+    const url = isToday
+        ? `/api/weather/${encodeURIComponent(location)}`
+        : `/api/weather/${encodeURIComponent(location)}?date=${gameDate}`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch weather. Status: ${response.status}. Details: ${errorText}`);
+        }
+
+        const weather = await response.json();
+        if (!weather) {
+            throw new Error("Received empty weather data.");
+        }
+
+        const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
+
+        weatherWidget.innerHTML = `
+            <p>
+                <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay || 'N/A'}, ${weather.condition || 'N/A'} <br>
+                <strong>Wind:</strong> ${weather.wind || 'N/A'} <br>
+                <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
+            </p>
+        `;
+    } catch (error) {
+        weatherWidget.innerHTML = `<p class="text-danger">Could not load weather data.</p><p class="text-muted small">${error.message}</p>`;
+        console.error('Weather fetch error:', error);
+    }
+}
+
 function initializeGameManagement(gameData) {
 
     // --- Page-Specific State ---
@@ -505,6 +554,7 @@ function applyOutOfPositionIndicators() {
     if(state.game) {
         renderRotationEditor();
         setupEventListeners();
+        fetchWeatherForGame(state.game.location, gameData.game_date_for_input);
     } else {
         console.error("Game data was not provided to initialize the page.");
         document.getElementById('rotation-board').innerHTML = '<div class="alert alert-danger">Could not load game data. Please go back and try again.</div>';
