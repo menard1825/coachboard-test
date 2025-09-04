@@ -108,7 +108,10 @@ def add_game():
 
 @gameday_bp.route('/edit_game/<int:game_id>', methods=['POST'])
 def edit_game(game_id):
-    game_to_edit = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
+    # Eagerly load pitching outings to avoid extra database queries
+    game_to_edit = db.session.query(Game).options(
+        joinedload(Game.pitching_outings)
+    ).filter_by(id=game_id, team_id=session['team_id']).first()
     if not game_to_edit:
         flash('Game not found.', 'danger')
         return redirect(url_for('home', _anchor='games'))
@@ -116,7 +119,14 @@ def edit_game(game_id):
     game_date_str = request.form.get('game_date')
     if game_date_str:
         try:
-            game_to_edit.date = datetime.strptime(game_date_str, '%Y-%m-%d')
+            new_game_date = datetime.strptime(game_date_str, '%Y-%m-%d')
+            # Check if the date has actually changed
+            if game_to_edit.date.date() != new_game_date.date():
+                game_to_edit.date = new_game_date
+                # Sync the date for all associated pitching outings
+                for outing in game_to_edit.pitching_outings:
+                    outing.date = new_game_date
+                flash('Game date updated. Associated pitching logs were synced automatically.', 'info')
         except ValueError:
             flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
             return redirect(url_for('.game_management', game_id=game_id))

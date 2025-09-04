@@ -1,4 +1,5 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
+from sqlalchemy.orm import joinedload # Add this import if not present
 from models import (
     CollaborationNote, PracticePlan, PracticeTask, Sign, Player, PlayerPracticeAbsence
 )
@@ -127,12 +128,21 @@ def add_practice_plan():
 
 @team_management_bp.route('/edit_practice_plan/<int:plan_id>', methods=['POST'])
 def edit_practice_plan(plan_id):
-    plan_to_edit = db.session.get(PracticePlan, plan_id)
-    if plan_to_edit and plan_to_edit.team_id == session['team_id']:
+    plan_to_edit = db.session.query(PracticePlan).options(
+        joinedload(PracticePlan.pitching_outings)
+    ).filter_by(id=plan_id, team_id=session['team_id']).first()
+
+    if plan_to_edit:
         plan_date_str = request.form.get('plan_date')
         if plan_date_str:
             try:
-                plan_to_edit.date = datetime.strptime(plan_date_str, '%Y-%m-%d')
+                new_plan_date = datetime.strptime(plan_date_str, '%Y-%m-%d')
+                if plan_to_edit.date.date() != new_plan_date.date():
+                    plan_to_edit.date = new_plan_date
+                    # Sync the date for all associated pitching outings
+                    for outing in plan_to_edit.pitching_outings:
+                        outing.date = new_plan_date
+                    flash('Practice date updated. Associated pitching logs were synced automatically.', 'info')
             except ValueError:
                 flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
                 return redirect(url_for('home', _anchor=f'plan-{plan_id}'))

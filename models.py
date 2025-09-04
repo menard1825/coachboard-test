@@ -132,10 +132,12 @@ class PitchingOuting(db.Model):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
     game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
+    practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=True) # ADD THIS LINE
 
     team = relationship("Team", back_populates="pitching_outings")
     player = relationship("Player", back_populates="pitching_outings")
     game = relationship("Game", back_populates="pitching_outings")
+    practice_plan = relationship("PracticePlan", back_populates="pitching_outings") # ADD THIS LINE
 
     def to_dict(self):
         return {
@@ -251,6 +253,7 @@ class PracticePlan(db.Model):
     team = relationship("Team", back_populates="practice_plans")
     tasks = relationship("PracticeTask", back_populates="practice_plan", order_by="PracticeTask.id")
     absences = relationship("PlayerPracticeAbsence", back_populates="practice_plan", cascade="all, delete-orphan")
+    pitching_outings = relationship("PitchingOuting", back_populates="practice_plan", cascade="all, delete-orphan") # ADD THIS LINE
 
 class PracticeTask(db.Model):
     __tablename__ = 'practice_tasks'
