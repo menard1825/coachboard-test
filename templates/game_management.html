@@ -121,7 +121,7 @@
                                 <div class="ms-2 me-auto">
                                     {{ note.text }}
                                 </div>
-                                <span class="badge bg-primary rounded-pill">{{ note.timestamp | format_datetime }}</span>
+                                <span class="badge bg-primary rounded-pill" data-timestamp="{{ note.timestamp }}"></span>
                             </li>
                             {% endfor %}
                         {% else %}
@@ -310,6 +310,14 @@
             game_date_for_input: '{{ game_date_for_input }}'
         };
         initializeGameManagement(gameData);
+
+        document.querySelectorAll('[data-timestamp]').forEach(el => {
+            const timestamp = el.dataset.timestamp;
+            if (timestamp) {
+                const date = new Date(timestamp + 'Z');
+                el.textContent = date.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+            }
+        });
 
         // The setupAutocomplete function is defined in main.js and is globally available.
         const gameLocationInput = document.getElementById('game_location');
