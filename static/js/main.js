@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const setupAutocomplete = (inputElement) => {
         const suggestionsWrapper = document.createElement('div');
         suggestionsWrapper.className = 'list-group position-absolute w-100';
-        suggestionsWrapper.style.zIndex = '1050';
+        suggestionsWrapper.style.zIndex = '1055';
         // Make sure the parent is positioned relatively to contain the absolute suggestions
         if (getComputedStyle(inputElement.parentNode).position === 'static') {
             inputElement.parentNode.style.position = 'relative';
