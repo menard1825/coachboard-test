@@ -2,7 +2,7 @@
 
 let lineupEditorModal;
 
-async function saveLineup() {
+async function saveLineupTemplate() { // RENAMED FROM saveLineup
     const btn = document.getElementById('saveLineupBtn');
     const modal = btn.closest('.modal');
     const lineupId = modal.querySelector('#lineupId').value;

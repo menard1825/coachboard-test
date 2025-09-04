@@ -1176,7 +1176,11 @@ document.addEventListener('DOMContentLoaded', () => {
             setupAutocomplete(addPracticeLocationInput);
         }
 
-        document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
+        // The lineup editor on the main dashboard is for templates.
+        // We check for the existence of the lineups accordion to make sure we're on the right page.
+        if (document.getElementById('lineupsAccordion')) {
+            document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineupTemplate); // UPDATED to saveLineupTemplate
+        }
 
         const rosterSearch = document.getElementById('rosterSearch');
         if (rosterSearch) {
