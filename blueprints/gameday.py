@@ -259,6 +259,43 @@ def create_practice_plan_from_game(game_id):
     return redirect(url_for('team_management.add_practice_plan', emphasis=game.post_game_summary))
 
 
+# ADD THIS NEW ROUTE
+@gameday_bp.route('/game/<int:game_id>/add_pitching_outing', methods=['POST'])
+def add_pitching_outing_for_game(game_id):
+    """Adds a pitching outing from the game management screen."""
+    team_id = session['team_id']
+    game = db.session.get(Game, game_id)
+
+    if not game or game.team_id != team_id:
+        flash('Game not found.', 'danger')
+        return redirect(url_for('home'))
+
+    try:
+        player_id = int(request.form['player_id'])
+        pitches = int(request.form['pitches'])
+        innings = float(request.form['innings'])
+    except (ValueError, KeyError):
+        flash('Invalid form data submitted.', 'danger')
+        return redirect(url_for('.game_management', game_id=game_id))
+
+    new_outing = PitchingOuting(
+        date=game.date,
+        player_id=player_id,
+        opponent=game.opponent,
+        pitches=pitches,
+        innings=innings,
+        pitcher_type=request.form['pitcher_type'],
+        outing_type=request.form['outing_type'],
+        team_id=team_id,
+        game_id=game_id  # Link the outing to the game
+    )
+    db.session.add(new_outing)
+    db.session.commit()
+    flash('Pitching outing for this game logged successfully!', 'success')
+    socketio.emit('pitching_update', {'message': 'New pitching outing added.'})
+    return redirect(url_for('.game_management', game_id=game_id))
+
+
 # --- Lineup & Rotation API-like routes ---
 @gameday_bp.route('/add_lineup', methods=['POST'])
 def add_lineup():
