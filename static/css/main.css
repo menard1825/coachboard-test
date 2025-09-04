@@ -146,6 +146,13 @@ body {
     }
 }
 
+/* ==========================================================================
+   Google Places Autocomplete Fix for Modals
+   ========================================================================== */
+.pac-container {
+    z-index: 1055 !important;
+}
+
 @media print {
     .no-print {
         display: none !important;
