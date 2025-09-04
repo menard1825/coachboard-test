@@ -540,6 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h5>Attendance</h5>
                     <p class="text-muted small">Check the box for any player who is absent.</p>
                     <form action="/update_practice_attendance/${plan.id}" method="POST">
+                        <input type="hidden" name="csrf_token" value="${csrfToken}"/>
                         <div class="mb-3">${attendanceHtml}</div>
                         <button type="submit" class="btn btn-sm btn-primary">Save Attendance</button>
                     </form>
