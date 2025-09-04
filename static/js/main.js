@@ -1,4 +1,8 @@
 // static/js/main.js
+
+// --- UTILITY FUNCTIONS ---
+const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
+
 function fetchPracticeWeather(widget) {
     const location = widget.dataset.location;
     const date = widget.dataset.date;
@@ -117,8 +121,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let sortableInstances = {};
     let confirmDeleteModal;
     
-    // --- UTILITY FUNCTIONS ---
-    const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
     const canEdit = (author) => AppState.session.username === author || ['Head Coach', 'Super Admin'].includes(AppState.session.role);
 
     const formatDateTime = (s) => {
