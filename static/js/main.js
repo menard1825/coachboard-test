@@ -1,38 +1,99 @@
 // static/js/main.js
-    function fetchPracticeWeather(widget) {
-        const location = widget.dataset.location;
-        const date = widget.dataset.date;
+function fetchPracticeWeather(widget) {
+    const location = widget.dataset.location;
+    const date = widget.dataset.date;
 
-        if (!location) {
-            widget.innerHTML = '<p class="text-muted">No location set for this practice.</p>';
+    if (!location) {
+        widget.innerHTML = '<p class="text-muted">No location set for this practice.</p>';
+        return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const isToday = date === today;
+    const url = isToday
+        ? `/api/weather/${encodeURIComponent(location)}`
+        : `/api/weather/${encodeURIComponent(location)}?date=${date}`;
+
+    fetch(url)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(weather => {
+             const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
+             widget.innerHTML = `
+                <p>
+                    <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay}<br>
+                    <strong>Wind:</strong> ${weather.wind || 'N/A'}<br>
+                    <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
+                </p>`;
+        })
+        .catch(error => {
+            widget.innerHTML = '<p class="text-danger">Could not load weather data.</p>';
+            console.error('Weather fetch error:', error);
+        });
+}
+
+const setupAutocomplete = (inputElement) => {
+    const suggestionsWrapper = document.createElement('div');
+    suggestionsWrapper.className = 'list-group position-absolute w-100';
+    suggestionsWrapper.style.zIndex = '1055';
+    // Make sure the parent is positioned relatively to contain the absolute suggestions
+    if (getComputedStyle(inputElement.parentNode).position === 'static') {
+        inputElement.parentNode.style.position = 'relative';
+    }
+    inputElement.parentNode.appendChild(suggestionsWrapper);
+
+    let autocompleteTimeout;
+    inputElement.addEventListener('input', () => {
+        clearTimeout(autocompleteTimeout);
+        const query = inputElement.value;
+
+        if (query.length < 2) { // Start searching after 2 characters
+            suggestionsWrapper.innerHTML = '';
             return;
         }
 
-        const today = new Date().toISOString().split('T')[0];
-        const isToday = date === today;
-        const url = isToday
-            ? `/api/weather/${encodeURIComponent(location)}`
-            : `/api/weather/${encodeURIComponent(location)}?date=${date}`;
+        autocompleteTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error('Autocomplete fetch failed');
 
-        fetch(url)
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.json();
-            })
-            .then(weather => {
-                 const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
-                 widget.innerHTML = `
-                    <p>
-                        <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay}<br>
-                        <strong>Wind:</strong> ${weather.wind || 'N/A'}<br>
-                        <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
-                    </p>`;
-            })
-            .catch(error => {
-                widget.innerHTML = '<p class="text-danger">Could not load weather data.</p>';
-                console.error('Weather fetch error:', error);
-            });
-    }
+                const suggestions = await response.json();
+                if (!suggestions || suggestions.length === 0) {
+                    suggestionsWrapper.innerHTML = '';
+                    return;
+                }
+
+                let suggestionsHtml = suggestions.map(suggestion =>
+                    `<a href="#" class="list-group-item list-group-item-action">${escapeHTML(suggestion)}</a>`
+                ).join('');
+                suggestionsWrapper.innerHTML = suggestionsHtml;
+
+            } catch (error) {
+                console.error('Autocomplete error:', error);
+                suggestionsWrapper.innerHTML = '';
+            }
+        }, 300); // 300ms debounce
+    });
+
+    suggestionsWrapper.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (e.target.classList.contains('list-group-item')) {
+            inputElement.value = e.target.textContent;
+            suggestionsWrapper.innerHTML = '';
+        }
+    });
+
+    // Hide suggestions when clicking away
+    inputElement.addEventListener('blur', () => {
+        // Use a small timeout to allow click event on suggestion to fire
+        setTimeout(() => {
+            suggestionsWrapper.innerHTML = '';
+        }, 150);
+    });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
@@ -55,66 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let sortableInstances = {};
     let confirmDeleteModal;
-
-    const setupAutocomplete = (inputElement) => {
-        const suggestionsWrapper = document.createElement('div');
-        suggestionsWrapper.className = 'list-group position-absolute w-100';
-        suggestionsWrapper.style.zIndex = '1055';
-        // Make sure the parent is positioned relatively to contain the absolute suggestions
-        if (getComputedStyle(inputElement.parentNode).position === 'static') {
-            inputElement.parentNode.style.position = 'relative';
-        }
-        inputElement.parentNode.appendChild(suggestionsWrapper);
-
-        let autocompleteTimeout;
-        inputElement.addEventListener('input', () => {
-            clearTimeout(autocompleteTimeout);
-            const query = inputElement.value;
-
-            if (query.length < 2) { // Start searching after 2 characters
-                suggestionsWrapper.innerHTML = '';
-                return;
-            }
-
-            autocompleteTimeout = setTimeout(async () => {
-                try {
-                    const response = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(query)}`);
-                    if (!response.ok) throw new Error('Autocomplete fetch failed');
-
-                    const suggestions = await response.json();
-                    if (!suggestions || suggestions.length === 0) {
-                        suggestionsWrapper.innerHTML = '';
-                        return;
-                    }
-
-                    let suggestionsHtml = suggestions.map(suggestion =>
-                        `<a href="#" class="list-group-item list-group-item-action">${escapeHTML(suggestion)}</a>`
-                    ).join('');
-                    suggestionsWrapper.innerHTML = suggestionsHtml;
-
-                } catch (error) {
-                    console.error('Autocomplete error:', error);
-                    suggestionsWrapper.innerHTML = '';
-                }
-            }, 300); // 300ms debounce
-        });
-
-        suggestionsWrapper.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (e.target.classList.contains('list-group-item')) {
-                inputElement.value = e.target.textContent;
-                suggestionsWrapper.innerHTML = '';
-            }
-        });
-
-        // Hide suggestions when clicking away
-        inputElement.addEventListener('blur', () => {
-            // Use a small timeout to allow click event on suggestion to fire
-            setTimeout(() => {
-                suggestionsWrapper.innerHTML = '';
-            }, 150);
-        });
-    };
     
     // --- UTILITY FUNCTIONS ---
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
