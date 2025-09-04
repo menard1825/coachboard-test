@@ -63,7 +63,7 @@
                 </ul>
             </div>
              <div class="card-footer">
-                <h6 class="card-title mb-2">Pitcher Availability Status</h6>
+                <h6 class="card-title mb-2">Pitcher Availability for Game</h6>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered">
                         <tbody>
@@ -79,7 +79,7 @@
                                             <span class="badge bg-danger">Resting</span>
                                         {% endif %}
                                     </td>
-                                    <td>Next Available: {{ summary.next_available }}</td>
+                                    <td>Pitches Available: {{ summary.pitches_remaining_today }}</td>
                                 {% else %}
                                     <td colspan="2" class="text-center text-muted">No summary data available.</td>
                                 {% endif %}
