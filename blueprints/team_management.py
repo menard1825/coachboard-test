@@ -25,7 +25,7 @@ def add_note(note_type):
         note_type=note_type, 
         text=note_text, 
         author=author_name, 
-        timestamp=datetime.now(),
+        timestamp=datetime.utcnow(),
         team_id=session['team_id']
     )
 
@@ -115,7 +115,7 @@ def add_practice_plan():
             return redirect(url_for('home', _anchor='games'))
 
         new_plan = PracticePlan(
-            date=datetime.now(),
+            date=datetime.utcnow(),
             emphasis=emphasis,
             team_id=session['team_id']
         )
@@ -205,7 +205,7 @@ def add_task_to_plan(plan_id):
         text=task_text, 
         status="pending", 
         author=author_name, 
-        timestamp=datetime.now(),
+        timestamp=datetime.utcnow(),
         practice_plan_id=plan.id
     )
     db.session.add(new_task)

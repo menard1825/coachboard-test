@@ -34,7 +34,7 @@ def login():
         user = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
 
         if user and check_password_hash(user.password_hash, password):
-            user.last_login = datetime.now()
+            user.last_login = datetime.utcnow()
             db.session.commit()
 
             session['logged_in'] = True

@@ -44,7 +44,7 @@ def add_player():
         pitcher_role=request.form.get('pitcher_role'),
         has_lessons="No",
         notes_author=session['username'],
-        notes_timestamp=datetime.now(),
+        notes_timestamp=datetime.utcnow(),
         team_id=session['team_id']
     )
     db.session.add(new_player)
@@ -86,7 +86,7 @@ def update_player_inline(player_id):
     player_to_edit.notes = request.form.get('notes', player_to_edit.notes)
     player_to_edit.pitcher_role = request.form.get('pitcher_role', player_to_edit.pitcher_role)
     player_to_edit.notes_author = session['username']
-    player_to_edit.notes_timestamp = datetime.now()
+    player_to_edit.notes_timestamp = datetime.utcnow()
 
     db.session.commit()
     socketio.emit('data_updated', {'message': f'Player {new_name} updated.'})

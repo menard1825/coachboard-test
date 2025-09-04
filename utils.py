@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 from sqlalchemy import func
 from models import Player, PitchingOuting
 
@@ -12,10 +12,12 @@ def model_to_dict(obj):
     for column in obj.__table__.columns:
         val = getattr(obj, column.name)
         if isinstance(val, datetime):
-            # Use isoformat() for datetime to preserve time information
+            # If the datetime is naive, make it aware that it's in UTC
+            if val.tzinfo is None:
+                val = val.replace(tzinfo=timezone.utc)
+            # isoformat() on an aware object now includes the timezone
             d[column.name] = val.isoformat()
         elif isinstance(val, date):
-            # Use strftime for date-only objects
             d[column.name] = val.strftime('%Y-%m-%d')
         else:
             d[column.name] = val
