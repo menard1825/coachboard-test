@@ -1179,7 +1179,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
-        document.getElementById('rosterSearch').addEventListener('input', renderRoster);
+
+        const rosterSearch = document.getElementById('rosterSearch');
+        if (rosterSearch) {
+            rosterSearch.addEventListener('input', renderRoster);
+        }
         
         const addScoutedPlayerForm = document.getElementById('addScoutedPlayerForm');
         if (addScoutedPlayerForm) {
@@ -1193,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 btn.disabled = true;
                 btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...`;
-                feedbackDiv.style.display = 'none';
+                if(feedbackDiv) feedbackDiv.style.display = 'none';
 
                 try {
                     const response = await fetch('/add_scouted_player', {
@@ -1215,42 +1219,70 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, 2000);
 
                 } catch (error) {
-                    feedbackDiv.textContent = `Error: ${error.message}`;
-                    feedbackDiv.className = 'save-feedback alert alert-danger';
-                    feedbackDiv.style.display = 'block';
+                    if(feedbackDiv) {
+                        feedbackDiv.textContent = `Error: ${error.message}`;
+                        feedbackDiv.className = 'save-feedback alert alert-danger';
+                        feedbackDiv.style.display = 'block';
+                    }
                     btn.innerHTML = originalButtonText;
                     btn.disabled = false;
                 }
             });
         }
 
-        document.getElementById('devPlayerSearch').addEventListener('input', renderPlayerDevelopmentList);
-        document.getElementById('dev-sort-az').addEventListener('click', () => {
-            AppState.dev_player_sort = { key: 'name', order: 'asc' };
-            renderPlayerDevelopmentList();
-        });
-        document.getElementById('dev-sort-za').addEventListener('click', () => {
-            AppState.dev_player_sort = { key: 'name', order: 'desc' };
-            renderPlayerDevelopmentList();
-        });
-         document.getElementById('dev-sort-custom').addEventListener('click', () => {
-            AppState.dev_player_sort = { key: 'custom', order: 'asc' };
-            renderPlayerDevelopmentList();
-        });
+        const devPlayerSearch = document.getElementById('devPlayerSearch');
+        if(devPlayerSearch) {
+            devPlayerSearch.addEventListener('input', renderPlayerDevelopmentList);
+        }
+
+        const devSortAZ = document.getElementById('dev-sort-az');
+        if(devSortAZ) {
+            devSortAZ.addEventListener('click', () => {
+                AppState.dev_player_sort = { key: 'name', order: 'asc' };
+                renderPlayerDevelopmentList();
+            });
+        }
+
+        const devSortZA = document.getElementById('dev-sort-za');
+        if(devSortZA) {
+            devSortZA.addEventListener('click', () => {
+                AppState.dev_player_sort = { key: 'name', order: 'desc' };
+                renderPlayerDevelopmentList();
+            });
+        }
+
+        const devSortCustom = document.getElementById('dev-sort-custom');
+        if(devSortCustom) {
+            devSortCustom.addEventListener('click', () => {
+                AppState.dev_player_sort = { key: 'custom', order: 'asc' };
+                renderPlayerDevelopmentList();
+            });
+        }
 
         // Roster Sort Listeners
-        document.getElementById('roster-sort-az').addEventListener('click', () => {
-            AppState.roster_sort = { key: 'name', order: 'asc' };
-            renderRoster();
-        });
-        document.getElementById('roster-sort-za').addEventListener('click', () => {
-            AppState.roster_sort = { key: 'name', order: 'desc' };
-            renderRoster();
-        });
-        document.getElementById('roster-sort-custom').addEventListener('click', () => {
-            AppState.roster_sort = { key: 'custom', order: 'asc' };
-            renderRoster();
-        });
+        const rosterSortAZ = document.getElementById('roster-sort-az');
+        if(rosterSortAZ) {
+            rosterSortAZ.addEventListener('click', () => {
+                AppState.roster_sort = { key: 'name', order: 'asc' };
+                renderRoster();
+            });
+        }
+
+        const rosterSortZA = document.getElementById('roster-sort-za');
+        if(rosterSortZA) {
+            rosterSortZA.addEventListener('click', () => {
+                AppState.roster_sort = { key: 'name', order: 'desc' };
+                renderRoster();
+            });
+        }
+
+        const rosterSortCustom = document.getElementById('roster-sort-custom');
+        if(rosterSortCustom) {
+            rosterSortCustom.addEventListener('click', () => {
+                AppState.roster_sort = { key: 'custom', order: 'asc' };
+                renderRoster();
+            });
+        }
 
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
             const deleteButton = document.getElementById('confirmDeleteButton');
