@@ -123,7 +123,7 @@ def add_practice_plan():
         db.session.commit()
         flash('New practice plan created with emphasis from post-game summary! You can edit the details below.', 'success')
         socketio.emit('data_updated', {'message': 'New practice plan created.'})
-        return redirect(url_for('home', _anchor=f'plan-{new_plan.id}'))
+        return redirect(url_for('home', _anchor='practice_plan'))
 
 @team_management_bp.route('/edit_practice_plan/<int:plan_id>', methods=['POST'])
 def edit_practice_plan(plan_id):

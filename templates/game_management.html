@@ -333,15 +333,14 @@
                 const noteText = noteInput.value.trim();
                 if (!noteText) return;
 
-                const csrfToken = document.querySelector('#addQuickNoteForm input[name="csrf_token"]').value;
+                const csrfToken = addQuickNoteForm.querySelector('input[name="csrf_token"]').value;
 
                 const response = await fetch(`/game/${gameData.game.id}/add_quick_note`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
-                        'X-CSRFToken': csrfToken
                     },
-                    body: `note=${encodeURIComponent(noteText)}`
+                    body: `note=${encodeURIComponent(noteText)}&csrf_token=${encodeURIComponent(csrfToken)}`
                 });
 
                 const result = await response.json();
