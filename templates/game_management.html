@@ -41,6 +41,7 @@
              <a href="{{ url_for('gameday.print_lineup', game_id=game.id) }}" class="btn btn-secondary mt-2" target="_blank"><i class="bi bi-printer-fill me-2"></i> Print Lineup Card</a>
         </div>
     </div>
+
     <div class="row">
         {% if is_past_game %}
         <div class="col-lg-6 mb-4">
@@ -140,6 +141,7 @@
             </div>
         </div>
     </div>
+
     <div class="row">
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
@@ -296,7 +298,6 @@
     </div>
   </div>
 </div>
-{% endblock %}
 
 {# NEW: Modal for editing a quick note #}
 <div class="modal fade" id="editQuickNoteModal" tabindex="-1">
@@ -319,10 +320,10 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
 {% block scripts %}
 {{ super() }}
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/lineup_editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
 <script>
@@ -382,8 +383,27 @@
 
                 const result = await response.json();
                 if (result.status === 'success') {
-                    window.location.reload();
+                    noteInput.value = '';
+                    const notesList = document.getElementById('quickNotesList');
+                    const newNoteEl = document.createElement('li');
+                    newNoteEl.className = 'list-group-item d-flex justify-content-between align-items-start';
+
+                    const noteDate = new Date(result.note.timestamp);
+                    const formattedDate = noteDate.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+
+                    newNoteEl.innerHTML = `
+                        <div class="ms-2 me-auto">
+                            ${result.note.text}
+                        </div>
+                        <span class="badge bg-primary rounded-pill">${formattedDate}</span>
+                    `;
+                    const noNotesEl = notesList.querySelector('.text-muted');
+                    if (noNotesEl) {
+                        noNotesEl.parentElement.removeChild(noNotesEl);
+                    }
+                    notesList.prepend(newNoteEl);
                 } else {
+                    // Consider using a more robust notification system
                     alert(result.message || 'An error occurred.');
                 }
             });
