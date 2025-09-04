@@ -34,13 +34,13 @@ PITCHING_RULES = {
         '6U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
         '7U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
         '8U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
-        '9U': {'max_daily': 75, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '10U': {'max_daily': 75, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '11U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '12U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '13U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '14U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        'default': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]}
+        '9U': {'max_daily': 75, 'max_weekly': 100, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '10U': {'max_daily': 75, 'max_weekly': 100, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '11U': {'max_daily': 85, 'max_weekly': 100, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '12U': {'max_daily': 85, 'max_weekly': 100, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '13U': {'max_daily': 95, 'max_weekly': 125, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '14U': {'max_daily': 95, 'max_weekly': 125, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        'default': {'max_daily': 85, 'max_weekly': 100, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]}
     }
     # You could add other rule sets like 'Little League' here in the future
 }
@@ -152,6 +152,7 @@ def calculate_pitch_count_summary(roster, all_outings, rules, context_date=None)
                 'status': status,
                 'next_available': next_available_str,
                 'max_daily': rules.get('max_daily', 85),
+                'max_weekly': rules.get('max_weekly', 100), # Add this line
                 'pitches_remaining_today': max(0, rules.get('max_daily', 85) - daily_pitches)
             }
         except Exception as e:

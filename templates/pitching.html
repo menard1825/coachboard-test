@@ -22,7 +22,7 @@
                       <tr>
                           <th>Pitcher</th>
                           <th>Daily ({{ pitch_count_summary.values() | first | default({'max_daily': 85}) | attr('max_daily') }} max)</th>
-                          <th>Weekly</th>
+                          <th>Weekly ({{ pitch_count_summary.values() | first | default({'max_weekly': 100}) | attr('max_weekly') }} max)</th>
                           <th>Status</th>
                       </tr>
                   </thead>
@@ -41,7 +41,7 @@
                                       <small class="text-muted">{{ summary.pitches_remaining_today }} remaining today</small>
                                   </td>
                                   <td class="align-middle">
-                                      {% set weekly_pct = ([100, (summary.weekly / 100 * 100)] | min) | int %}
+                                      {% set weekly_pct = (summary.weekly / summary.max_weekly * 100) | int if summary.max_weekly > 0 else 0 %}
                                       <div class="progress" style="height: 20px;" title="{{ summary.weekly }} pitches">
                                           <div class="progress-bar" role="progressbar" style="width: {{ weekly_pct }}%;" aria-valuenow="{{ summary.weekly }}">{{ summary.weekly }}</div>
                                       </div>

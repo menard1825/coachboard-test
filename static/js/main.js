@@ -407,14 +407,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return indexA - indexB;
             });
 
-            let summaryHtml = '<div class="table-responsive"><table class="table table-sm table-bordered table-striped"><thead class="table-light"><tr><th>Pitcher</th><th>Daily Max</th><th>Weekly</th><th>Status</th></tr></thead><tbody>';
+            let summaryHtml = '<div class="table-responsive"><table class="table table-sm table-bordered table-striped"><thead class="table-light"><tr><th>Pitcher</th><th>Daily Max</th><th>Weekly Max</th><th>Status</th></tr></thead><tbody>'; // MODIFIED HEADER
             if (sortedPitchers.length > 0) {
                 for (const pitcher of sortedPitchers) {
                     const name = pitcher.name;
                     const counts = summaryData[name];
                     if (counts) {
                         const dailyPct = Math.min((counts.daily / counts.max_daily * 100), 100);
-                        const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
+                        const weeklyPct = counts.max_weekly > 0 ? Math.min((counts.weekly / counts.max_weekly * 100), 100) : 0; // MODIFIED CALCULATION
                         const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
                         const statusBadge = counts.status === 'Available' ? '<span class="badge bg-success">Available</span>' : '<span class="badge bg-danger">Resting</span>';
                         const nextAvailableText = counts.status === 'Resting' ? `<br><small class="text-muted">Next up: ${counts.next_available}</small>` : '';
