@@ -85,6 +85,7 @@ function initializeGameManagement(gameData) {
     let assignPlayerModal;
     let lineupEditorModal;
     let saveTemplateModal;
+    let editQuickNoteModal;
 
     // --- Rotation Editor Functions ---
     function renderRotationEditor() {
@@ -321,13 +322,12 @@ function applyOutOfPositionIndicators() {
     function setupEventListeners() {
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
-        // NEW: Initialize the save template modal
         saveTemplateModal = new bootstrap.Modal(document.getElementById('saveRotationTemplateModal'));
+        editQuickNoteModal = new bootstrap.Modal(document.getElementById('editQuickNoteModal'));
 
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
 
-        // NEW: Populate and handle the rotation template dropdown
         const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');
         if (rotationTemplateSelect) {
             state.rotation_templates.forEach(rt => {
@@ -341,32 +341,25 @@ function applyOutOfPositionIndicators() {
                 if (selectedTemplateId) {
                     const selectedTemplate = state.rotation_templates.find(rt => rt.id == selectedTemplateId);
                     if (selectedTemplate && confirm(`This will overwrite the current rotation with the "${selectedTemplate.title}" template. Are you sure?`)) {
-                        // Deep copy the innings data to avoid reference issues
                         state.rotation.innings = JSON.parse(JSON.stringify(selectedTemplate.innings));
-                        // Ensure at least one inning exists
                         if (Object.keys(state.rotation.innings).length === 0) {
                             state.rotation.innings['1'] = {};
                         }
-                        // Set the current inning to the first available inning from the template
                         state.currentInning = Object.keys(state.rotation.innings).sort((a,b) => parseInt(a) - parseInt(b))[0];
                         renderRotationEditor();
                         alert('Rotation template loaded successfully!');
                     }
-                    // Reset the select so you can re-apply the same template if needed
                     e.target.value = '';
                 }
             });
         }
 
-        // NEW: Add event listener for the "Save as Template" button
         document.getElementById('saveAsTemplateBtn')?.addEventListener('click', () => {
-            // Pre-fill the input with a helpful suggestion
             const suggestedName = `Template from vs ${state.game.opponent}`;
             document.getElementById('rotationTemplateName').value = suggestedName;
             saveTemplateModal.show();
         });
 
-        // NEW: Add event listener for the confirm button inside the modal
         document.getElementById('confirmSaveTemplateBtn')?.addEventListener('click', async () => {
             const templateNameInput = document.getElementById('rotationTemplateName');
             const templateName = templateNameInput.value.trim();
@@ -395,16 +388,14 @@ function applyOutOfPositionIndicators() {
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.message);
 
-                // Add the new template to our dropdown without needing a page refresh
                 const select = document.getElementById('rotationTemplateSelect');
                 if (select && result.new_template) {
                      const newTemplate = result.new_template;
-                     state.rotation_templates.push(newTemplate); // Update state
+                     state.rotation_templates.push(newTemplate);
                      const inningsCount = newTemplate.innings ? Object.keys(newTemplate.innings).length : 0;
                      const option = new Option(`${newTemplate.title} (${inningsCount} innings)`, newTemplate.id);
                      select.add(option);
                 }
-
                 saveTemplateModal.hide();
                 alert('Template saved successfully!');
 
@@ -548,6 +539,55 @@ function applyOutOfPositionIndicators() {
                 alert(`Inning ${previousInningNum} has no data to copy.`);
             }
         });
+
+        const quickNotesList = document.getElementById('quickNotesList');
+        const editQuickNoteForm = document.getElementById('editQuickNoteForm');
+
+        if (quickNotesList) {
+            quickNotesList.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-quick-note-btn');
+                if (editBtn) {
+                    const noteItem = editBtn.closest('.list-group-item');
+                    const noteId = noteItem.dataset.noteId;
+                    const noteText = noteItem.querySelector('.note-text').textContent;
+
+                    editQuickNoteForm.action = `/game/quick_note/${noteId}`;
+                    editQuickNoteForm.querySelector('#editQuickNoteText').value = noteText;
+                }
+            });
+        }
+
+        if (editQuickNoteForm) {
+            editQuickNoteForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const btn = form.querySelector('button[type="submit"]');
+                const originalBtnHtml = btn.innerHTML;
+                const noteId = form.action.split('/').pop();
+
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+
+                const formData = new FormData(form);
+
+                try {
+                    const response = await fetch(form.action, { method: 'POST', body: formData });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.message);
+
+                    const noteItem = quickNotesList.querySelector(`.list-group-item[data-note-id='${noteId}']`);
+                    if (noteItem) {
+                        noteItem.querySelector('.note-text').textContent = result.note.text;
+                    }
+                    editQuickNoteModal.hide();
+                } catch (error) {
+                    alert(`Error: ${error.message}`);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalBtnHtml;
+                }
+            });
+        }
     }
 
     // --- Initial Page Render ---
@@ -556,7 +596,6 @@ function applyOutOfPositionIndicators() {
         setupEventListeners();
         fetchWeatherForGame(state.game.location, gameData.game_date_for_input);
 
-        // Add this block to initialize autocomplete on the Edit Game modal
         const editGameModal = document.getElementById('editGameModal');
         if (editGameModal) {
             const gameLocationInputModal = editGameModal.querySelector('#game_location');

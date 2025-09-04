@@ -11,8 +11,11 @@ def model_to_dict(obj):
     d = {}
     for column in obj.__table__.columns:
         val = getattr(obj, column.name)
-        if isinstance(val, (datetime, date)):
-            # Format dates and datetimes as 'YYYY-MM-DD'
+        if isinstance(val, datetime):
+            # Use isoformat() for datetime to preserve time information
+            d[column.name] = val.isoformat()
+        elif isinstance(val, date):
+            # Use strftime for date-only objects
             d[column.name] = val.strftime('%Y-%m-%d')
         else:
             d[column.name] = val

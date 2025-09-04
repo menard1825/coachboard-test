@@ -206,6 +206,45 @@ def add_quick_note(game_id):
         'note': model_to_dict(new_note)
     })
 
+@gameday_bp.route('/game/quick_note/<int:note_id>', methods=['POST'])
+def edit_quick_note(note_id):
+    note = db.session.get(GameQuickNote, note_id)
+    if not note or note.game.team_id != session['team_id']:
+        return jsonify({'status': 'error', 'message': 'Note not found.'}), 404
+
+    author_name = session.get('full_name') or session.get('username')
+    if note.author != author_name and session.get('role') not in ['Head Coach', 'Super Admin']:
+        return jsonify({'status': 'error', 'message': 'Permission denied.'}), 403
+
+    new_text = request.form.get('text')
+    if not new_text:
+        return jsonify({'status': 'error', 'message': 'Note text cannot be empty.'}), 400
+
+    note.text = new_text
+    db.session.commit()
+    socketio.emit('data_updated', {'message': 'Quick note updated.'})
+
+    return jsonify({'status': 'success', 'note': model_to_dict(note)})
+
+@gameday_bp.route('/game/quick_note/<int:note_id>/delete')
+def delete_quick_note(note_id):
+    note = db.session.get(GameQuickNote, note_id)
+    if not note or note.game.team_id != session['team_id']:
+        flash('Note not found or permission denied.', 'danger')
+        return redirect(request.referrer or url_for('home'))
+
+    author_name = session.get('full_name') or session.get('username')
+    if note.author != author_name and session.get('role') not in ['Head Coach', 'Super Admin']:
+        flash('You do not have permission to delete this note.', 'danger')
+        return redirect(request.referrer or url_for('home'))
+
+    db.session.delete(note)
+    db.session.commit()
+    flash('Note deleted.', 'success')
+    socketio.emit('data_updated', {'message': 'Quick note deleted.'})
+    return redirect(request.referrer or url_for('home'))
+
+
 @gameday_bp.route('/game/<int:game_id>/create_practice_plan')
 def create_practice_plan_from_game(game_id):
     game = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()

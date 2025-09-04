@@ -70,7 +70,7 @@ def delete_note(note_type, note_id):
         if author_name == note_to_delete.author or session.get('role') in ['Head Coach', 'Super Admin']:
             db.session.delete(note_to_delete)
             db.session.commit()
-            flash('Note deleted successfully.', 'success')
+            flash('Note deleted successfully!', 'success')
             socketio.emit('data_updated', {'message': 'Note deleted.'})
         else:
             flash('You do not have permission to delete this note.', 'danger')

@@ -41,8 +41,6 @@
              <a href="{{ url_for('gameday.print_lineup', game_id=game.id) }}" class="btn btn-secondary mt-2" target="_blank"><i class="bi bi-printer-fill me-2"></i> Print Lineup Card</a>
         </div>
     </div>
-
-    <!-- Post-Game Summary -->
     <div class="row">
         {% if is_past_game %}
         <div class="col-lg-6 mb-4">
@@ -79,7 +77,6 @@
         </div>
         {% endif %}
 
-        <!-- Opponent Scouting -->
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
                 <div class="card-header">
@@ -99,7 +96,6 @@
         </div>
     </div>
 
-    <!-- In-Game Quick Notes -->
     <div class="row">
         <div class="col-lg-12 mb-4">
             <div class="card">
@@ -117,11 +113,23 @@
                     <ul class="list-group" id="quickNotesList">
                         {% if quick_notes %}
                             {% for note in quick_notes %}
-                            <li class="list-group-item d-flex justify-content-between align-items-start">
-                                <div class="ms-2 me-auto">
-                                    {{ note.text }}
+                            <li class="list-group-item" data-note-id="{{ note.id }}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto">
+                                        <div class="note-text">{{ note.text }}</div>
+                                        <small class="text-muted">-- {{ note.author }}</small>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-end flex-shrink-0 ms-2">
+                                        <small class="text-muted mb-1 text-nowrap" data-timestamp="{{ note.timestamp }}"></small>
+                                        {% set user_can_edit = (session.full_name == note.author or session.username == note.author) or (session.role in ['Head Coach', 'Super Admin']) %}
+                                        {% if user_can_edit %}
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-secondary btn-sm edit-quick-note-btn" data-bs-toggle="modal" data-bs-target="#editQuickNoteModal"><i class="bi bi-pencil"></i></button>
+                                            <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="{{ url_for('gameday.delete_quick_note', note_id=note.id) }}" data-delete-name="this note"><i class="bi bi-trash"></i></button>
+                                        </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                <span class="badge bg-primary rounded-pill" data-timestamp="{{ note.timestamp }}"></span>
                             </li>
                             {% endfor %}
                         {% else %}
@@ -132,7 +140,6 @@
             </div>
         </div>
     </div>
-
     <div class="row">
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
@@ -291,6 +298,28 @@
 </div>
 {% endblock %}
 
+{# NEW: Modal for editing a quick note #}
+<div class="modal fade" id="editQuickNoteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Quick Note</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="editQuickNoteForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="modal-body">
+            <textarea class="form-control" name="text" id="editQuickNoteText" rows="4" required></textarea>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% block scripts %}
 {{ super() }}
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
@@ -314,7 +343,7 @@
         document.querySelectorAll('[data-timestamp]').forEach(el => {
             const timestamp = el.dataset.timestamp;
             if (timestamp) {
-                const date = new Date(timestamp + 'Z');
+                const date = new Date(timestamp);
                 el.textContent = date.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
             }
         });
@@ -353,25 +382,8 @@
 
                 const result = await response.json();
                 if (result.status === 'success') {
-                    noteInput.value = '';
-                    const notesList = document.getElementById('quickNotesList');
-                    const newNoteEl = document.createElement('li');
-                    newNoteEl.className = 'list-group-item d-flex justify-content-between align-items-start';
-
-                    const noteDate = new Date(result.note.timestamp + 'Z');
-                    const formattedDate = noteDate.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
-
-                    newNoteEl.innerHTML = `
-                        <div class="ms-2 me-auto">${result.note.text}</div>
-                        <span class="badge bg-primary rounded-pill">${formattedDate}</span>
-                    `;
-                    const noNotesEl = notesList.querySelector('.text-muted');
-                    if (noNotesEl) {
-                        noNotesEl.parentElement.removeChild(noNotesEl);
-                    }
-                    notesList.prepend(newNoteEl);
+                    window.location.reload();
                 } else {
-                    // Consider using a more robust notification system
                     alert(result.message || 'An error occurred.');
                 }
             });
