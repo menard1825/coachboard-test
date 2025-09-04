@@ -1027,12 +1027,6 @@ document.addEventListener('DOMContentLoaded', () => {
             AppState.full_data.games = AppState.full_data.games.filter(g => g.id !== data.game_id);
             renderGames();
         });
-        socket.on('lineup_add', (data) => {
-            console.log('lineup_add received', data);
-            AppState.full_data.lineups.push(data.lineup);
-            renderLineups();
-            renderGames();
-        });
         socket.on('lineup_update', (data) => {
             console.log('lineup_update received', data);
             const index = AppState.full_data.lineups.findIndex(l => l.id === data.lineup.id);

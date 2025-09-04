@@ -268,7 +268,6 @@ function applyOutOfPositionIndicators() {
             if(!response.ok) throw new Error(result.message);
             if (result.new_id) state.lineup.id = result.new_id;
             lineupEditorModal.hide();
-            window.location.reload();
         } catch (error) {
             alert('Error saving lineup: ' + error.message);
             btn.disabled = false;

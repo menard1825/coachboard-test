@@ -280,7 +280,7 @@ def add_lineup():
 
         lineup_dict = model_to_dict(new_lineup)
         # Emit a simple message instead of the full dict to avoid serialization errors
-        socketio.emit('data_updated', {'message': f'Lineup {new_lineup.id} created/updated'})
+        socketio.emit('lineup_update', {'lineup': lineup_dict})
 
         return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id, 'lineup': lineup_dict})
     except Exception as e:
@@ -307,7 +307,7 @@ def edit_lineup(lineup_id):
 
         lineup_dict = model_to_dict(lineup_to_edit)
         # Emit a simple message instead of the full dict to avoid serialization errors
-        socketio.emit('data_updated', {'message': f'Lineup {lineup_id} created/updated'})
+        socketio.emit('lineup_update', {'lineup': lineup_dict})
 
         return jsonify({'status': 'success', 'message': f'Lineup "{lineup_to_edit.title}" updated successfully!', 'lineup': lineup_dict})
     except Exception as e:
@@ -318,10 +318,11 @@ def edit_lineup(lineup_id):
 def delete_lineup(lineup_id):
     lineup_to_delete = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
     if lineup_to_delete:
+        lineup_id = lineup_to_delete.id
         db.session.delete(lineup_to_delete)
         db.session.commit()
         flash(f'Lineup "{lineup_to_delete.title}" deleted successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Lineup deleted.'})
+        socketio.emit('lineup_delete', {'lineup_id': lineup_id})
     else:
         flash('Lineup not found.', 'danger')
     redirect_url = request.referrer or url_for('home', _anchor='lineups')
