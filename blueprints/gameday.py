@@ -4,7 +4,7 @@ from models import (
 )
 from db import db
 from extensions import socketio
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
@@ -266,7 +266,13 @@ def create_practice_plan_from_game(game_id):
         flash('This game does not have a post-game summary to create a practice plan from.', 'warning')
         return redirect(url_for('.game_management', game_id=game_id))
 
-    return redirect(url_for('team_management.add_practice_plan', emphasis=game.post_game_summary))
+    # Calculate the day after the game for the new practice plan
+    next_practice_date = game.date + timedelta(days=1)
+
+    # Redirect with both the summary and the calculated date
+    return redirect(url_for('team_management.add_practice_plan',
+                            emphasis=game.post_game_summary,
+                            plan_date=next_practice_date.strftime('%Y-%m-%d')))
 
 
 # ADD THIS NEW ROUTE

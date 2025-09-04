@@ -109,14 +109,24 @@ def add_practice_plan():
         flash('New practice plan created!', 'success')
         socketio.emit('data_updated', {'message': 'New practice plan created.'})
         return redirect(url_for('home', _anchor='practice_plan'))
-    else: # GET request
+    else: # GET request (This is used by the "Create from game" feature)
         emphasis = request.args.get('emphasis')
+        plan_date_str = request.args.get('plan_date') # Get the new date parameter from the redirect
+
         if not emphasis:
             flash('Emphasis is required to create a practice plan from a game.', 'danger')
             return redirect(url_for('home', _anchor='games'))
 
+        try:
+            # Use the passed date string, or default to today if it's not provided
+            plan_date = datetime.strptime(plan_date_str, '%Y-%m-%d') if plan_date_str else datetime.utcnow()
+        except (ValueError, TypeError):
+            plan_date = datetime.utcnow() # Fallback if the date format is somehow wrong
+            flash('Invalid date format passed, defaulting to today.', 'warning')
+
+
         new_plan = PracticePlan(
-            date=datetime.utcnow(),
+            date=plan_date, # Use the intelligent date
             emphasis=emphasis,
             team_id=session['team_id']
         )
@@ -124,7 +134,9 @@ def add_practice_plan():
         db.session.commit()
         flash('New practice plan created with emphasis from post-game summary! You can edit the details below.', 'success')
         socketio.emit('data_updated', {'message': 'New practice plan created.'})
-        return redirect(url_for('home', _anchor='practice_plan'))
+
+        # Redirect the user directly to the newly created plan's accordion item
+        return redirect(url_for('home', _anchor=f'plan-{new_plan.id}'))
 
 @team_management_bp.route('/edit_practice_plan/<int:plan_id>', methods=['POST'])
 def edit_practice_plan(plan_id):
