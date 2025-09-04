@@ -226,39 +226,55 @@
 
         // NEW: Weather fetching logic
         const fetchWeather = async () => {
-            const location = gameData.game.location;
             const weatherWidget = document.getElementById('weather-widget-content');
-            const gameDate = weatherWidget.dataset.gameDate.split('T')[0];
+            weatherWidget.innerHTML = '<p><em>Fetching weather...</em></p>'; // Initial state
+
+            const location = gameData.game.location;
+            const gameDate = weatherWidget.dataset.gameDate;
+
             if (!location) {
                 weatherWidget.innerHTML = '<p class="text-muted">No location set for this game.</p>';
                 return;
             }
 
+            if (!gameDate) {
+                weatherWidget.innerHTML = '<p class="text-danger">Error: Game date is missing.</p>';
+                return;
+            }
+
+            weatherWidget.innerHTML = `<p><em>Getting data for ${location} on ${gameDate}...</em></p>`;
+
             const today = new Date().toISOString().split('T')[0];
-            const isToday = gameDate === today;
+            const isToday = gameDate.startsWith(today); // Use startsWith to be safe
             const url = isToday
                 ? `/api/weather/${encodeURIComponent(location)}`
                 : `/api/weather/${encodeURIComponent(location)}?date=${gameDate}`;
 
-
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
-                    throw new Error('Failed to fetch weather');
+                    const errorText = await response.text();
+                    throw new Error(`Failed to fetch weather. Status: ${response.status}. Details: ${errorText}`);
                 }
+
+                weatherWidget.innerHTML = '<p><em>Processing weather data...</em></p>';
                 const weather = await response.json();
+
+                if (!weather) {
+                    throw new Error("Received empty weather data.");
+                }
 
                 const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
 
                 weatherWidget.innerHTML = `
                     <p>
-                        <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay}, ${weather.condition || 'N/A'} <br>
+                        <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay || 'N/A'}, ${weather.condition || 'N/A'} <br>
                         <strong>Wind:</strong> ${weather.wind || 'N/A'} <br>
                         <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
                     </p>
                 `;
             } catch (error) {
-                weatherWidget.innerHTML = '<p class="text-danger">Could not load weather data.</p>';
+                weatherWidget.innerHTML = `<p class="text-danger">Could not load weather data.</p><p class="text-muted small">${error.message}</p>`;
                 console.error('Weather fetch error:', error);
             }
         };
