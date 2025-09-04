@@ -555,6 +555,18 @@ function applyOutOfPositionIndicators() {
         renderRotationEditor();
         setupEventListeners();
         fetchWeatherForGame(state.game.location, gameData.game_date_for_input);
+
+        // Add this block to initialize autocomplete on the Edit Game modal
+        const editGameModal = document.getElementById('editGameModal');
+        if (editGameModal) {
+            const gameLocationInputModal = editGameModal.querySelector('#game_location');
+            if (gameLocationInputModal) {
+                editGameModal.addEventListener('shown.bs.modal', () => {
+                    setupAutocomplete(gameLocationInputModal);
+                });
+            }
+        }
+
     } else {
         console.error("Game data was not provided to initialize the page.");
         document.getElementById('rotation-board').innerHTML = '<div class="alert alert-danger">Could not load game data. Please go back and try again.</div>';
