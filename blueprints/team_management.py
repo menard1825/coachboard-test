@@ -173,7 +173,7 @@ def edit_practice_plan(plan_id):
         flash('Practice plan not found.', 'danger')
     return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
-@team_management_bp.route('/delete_practice_plan/<int:plan_id>')
+@team_management_bp.route('/delete_practice_plan/<int:plan_id>', methods=['GET', 'POST'])
 def delete_practice_plan(plan_id):
     plan_to_delete = db.session.get(PracticePlan, plan_id)
     if plan_to_delete and plan_to_delete.team_id == session['team_id']:
