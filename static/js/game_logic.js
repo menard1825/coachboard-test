@@ -4,7 +4,7 @@
 
 // This script is now fully self-contained and does not use a global AppState.
 
-async function fetchWeatherForGame(location, gameDate) {
+window.fetchWeatherForGame = async function(location, gameDate) {
     const weatherWidget = document.getElementById('weather-widget-content');
     if (!weatherWidget) return;
 
@@ -53,7 +53,7 @@ async function fetchWeatherForGame(location, gameDate) {
     }
 }
 
-function initializeGameManagement(gameData) {
+window.initializeGameManagement = function(gameData) {
 
     // --- Page-Specific State ---
     // All data for this page is stored in a local 'state' object.
