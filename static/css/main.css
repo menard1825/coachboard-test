@@ -215,71 +215,72 @@ body {
     background-position: center;
     aspect-ratio: 1 / 1;
     display: grid;
-    /* Create a 5x5 grid for precise positioning */
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(5, 1fr);
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    grid-template-rows: 1.2fr 1.5fr 1fr 1fr 1.5fr;
+    grid-template-areas:
+        "lf lcf . rcf rf"
+        ". ss . 2b ."
+        "3b . p . 1b"
+        ". . . . ."
+        ". . c . .";
     align-items: center;
     justify-items: center;
 }
 
+/* Position mapping using grid-area */
+.pos-P  { grid-area: p; }
+.pos-C  { grid-area: c; }
+.pos-1B { grid-area: 1b; }
+.pos-2B { grid-area: 2b; }
+.pos-3B { grid-area: 3b; }
+.pos-SS { grid-area: ss; }
+.pos-LF { grid-area: lf; }
+.pos-CF { grid-area: cf; } /* This is for a 3-outfielder team, needs to be placed separately */
+.pos-RF { grid-area: rf; }
+
+/* Re-position CF for 3-man teams */
+.pos-CF-3-man { grid-area: 1 / 3 / span 1 / span 1; }
+
+/* Position coordinates for the 4-outfielder diamond */
+.pos-4-LF  { grid-area: lf; }
+.pos-4-LCF { grid-area: lcf; }
+.pos-4-RCF { grid-area: rcf; }
+.pos-4-RF  { grid-area: rf; }
+
 .position-dropzone {
-    /* Reset absolute positioning for the new grid layout */
     position: relative;
     background-color: rgba(255, 255, 255, 0.7);
     border: 2px dashed var(--primary-color);
     color: var(--primary-color);
-    padding: 5px;
+    padding: 3px; /* Reduced padding */
     border-radius: 8px;
     font-weight: bold;
     text-align: center;
     width: 90%;
-    min-height: 60px;
+    min-height: 40px; /* Reduced min-height */
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     align-items: center;
     transition: background-color 0.2s;
-}
-
-/* Map positions to grid areas */
-.pos-P  { grid-area: 3 / 3 / span 1 / span 1; }
-.pos-C  { grid-area: 5 / 3 / span 1 / span 1; }
-.pos-1B { grid-area: 3 / 5 / span 1 / span 1; }
-.pos-2B { grid-area: 2 / 4 / span 1 / span 1; }
-.pos-3B { grid-area: 3 / 1 / span 1 / span 1; }
-.pos-SS { grid-area: 2 / 2 / span 1 / span 1; }
-.pos-LF { grid-area: 1 / 1 / span 1 / span 1; }
-.pos-CF { grid-area: 1 / 3 / span 1 / span 1; }
-.pos-RF { grid-area: 1 / 5 / span 1 / span 1; }
-
-/* Position coordinates for the 4-outfielder diamond */
-.pos-4-LF  { grid-area: 1 / 1 / span 1 / span 1; }
-.pos-4-LCF { grid-area: 1 / 2 / span 1 / span 1; }
-.pos-4-RCF { grid-area: 1 / 4 / span 1 / span 1; }
-.pos-4-RF  { grid-area: 1 / 5 / span 1 / span 1; }
-
-/* Ensure mobile layout uses the same grid for consistency */
-.d-lg-none .diamond-container-interactive {
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(5, 1fr);
-}
-
-.d-lg-none .position-dropzone {
-    width: 100%;
+    font-size: 0.85rem; /* Smaller font for position label */
 }
 
 .player-tag {
     background-color: var(--primary-color);
     color: white;
-    padding: 3px 8px;
+    padding: 2px 5px; /* Reduced padding for player name */
     border-radius: 4px;
-    font-size: 0.9rem;
+    font-size: 0.8rem; /* Smaller font for player name */
     cursor: grab;
     width: 100%;
     text-align: center;
     border: 1px solid var(--primary-color-hover);
     margin-top: 2px;
     display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Prevent long names from breaking layout */
 }
 
 /* Lineup Editor styles */
