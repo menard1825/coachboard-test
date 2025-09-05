@@ -332,28 +332,6 @@ window.initializeGameManagement = function(gameData) {
             }
             renderRotationEditor();
         });
-        document.getElementById('copyInningBtn')?.addEventListener('click', () => {
-            if (!state.rotation || !state.currentInning) return;
-            state.copiedInningData = { ...state.rotation.innings[state.currentInning] };
-            document.getElementById('inning-paste-controls').classList.remove('d-none');
-            document.getElementById('rotation-board').classList.add('copy-mode');
-            const pasteCheckboxes = document.getElementById('inning-paste-checkboxes');
-            pasteCheckboxes.innerHTML = Object.keys(state.rotation.innings)
-                .filter(inn => inn != state.currentInning)
-                .map(inn => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" value="${inn}" id="paste-check-${inn}"><label class="form-check-label" for="paste-check-${inn}">${inn}</label></div>`).join('');
-        });
-        document.getElementById('pasteToSelectedBtn')?.addEventListener('click', () => {
-            if (!state.copiedInningData) return;
-            const selectedInnings = Array.from(document.querySelectorAll('#inning-paste-checkboxes input:checked')).map(cb => cb.value);
-            if (selectedInnings.length === 0) return alert('Please select at least one inning to paste to.');
-            selectedInnings.forEach(inn => {
-                state.rotation.innings[inn] = { ...state.copiedInningData };
-            });
-            exitCopyMode();
-            updatePlayingTimeSummary();
-        });
-        document.getElementById('cancelPasteBtn')?.addEventListener('click', exitCopyMode);
-
         document.getElementById('clearInningBtn')?.addEventListener('click', () => {
             if (!state.rotation || !state.currentInning) return;
             if (confirm(`Are you sure you want to clear all positions for inning ${state.currentInning}?`)) {
