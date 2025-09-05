@@ -177,4 +177,6 @@ function initializeRotationEditor(state, escapeHTML) {
     document.getElementById('cancelPasteBtn')?.addEventListener('click', exitCopyMode);
 
     renderRotationEditor();
+    // NEW: Return the main function so game_logic.js can call it later
+    return renderRotationEditor;
 }

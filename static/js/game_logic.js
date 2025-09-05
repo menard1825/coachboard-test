@@ -85,6 +85,7 @@ window.initializeGameManagement = function(gameData) {
     let lineupEditorModal;
     let saveTemplateModal;
     let editQuickNoteModal;
+    let renderRotationEditor; // ADD THIS LINE TO DECLARE THE FUNCTION
 
     async function saveLineup() {
         const btn = document.getElementById('saveLineupBtn');
@@ -411,7 +412,8 @@ window.initializeGameManagement = function(gameData) {
 
     // --- Initial Page Render ---
     if(state.game) {
-        initializeRotationEditor(state, escapeHTML);
+        // MODIFIED: Capture the function returned by initializeRotationEditor
+        renderRotationEditor = initializeRotationEditor(state, escapeHTML);
         setupEventListeners();
         fetchWeatherForGame(state.game.location, gameData.game_date_for_input);
 
