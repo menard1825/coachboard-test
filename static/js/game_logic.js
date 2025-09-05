@@ -65,11 +65,11 @@ window.initializeGameManagement = function(gameData) {
         lineup_templates: gameData.lineup_templates || [],
         // NEW: Add rotation_templates to the state
         rotation_templates: gameData.rotation_templates || [],
+        pitch_count_summary: gameData.pitch_count_summary,
         outfielder_count: gameData.outfielder_count || 3,
         currentInning: '1',
         copiedInningData: null,
-        sortableInstances: {},
-        pitch_count_summary: gameData.pitch_count_summary
+        sortableInstances: {}
     };
 
     // ADD THIS BLOCK TO FIX THE INNINGS BUG

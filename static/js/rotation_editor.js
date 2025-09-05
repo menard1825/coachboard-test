@@ -30,61 +30,63 @@ function initializeRotationEditor(state, escapeHTML) {
         });
     }
 
-function renderRotationDiamondAndBench() {
-    const currentInningData = state.rotation.innings[state.currentInning] || {};
+    function renderRotationDiamondAndBench() {
+        const currentInningData = state.rotation.innings[state.currentInning] || {};
 
-    const createPlayerTag = (player) => {
-        const primaryPos = player.position1 ? ` (${escapeHTML(player.position1)})` : '';
-        // MODIFIED: Add a check for pitcher status
-        const pitchingSummary = (state.pitch_count_summary || {})[player.name];
-        const isPitcherOnRest = (pitchingSummary && pitchingSummary.status === 'Resting');
-        const pitcherClass = isPitcherOnRest ? 'pitcher-on-rest' : '';
-        return `<div class="player-tag ${pitcherClass}" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
-    };
+        const createPlayerTag = (player) => {
+            const primaryPos = player.position1 ? ` (${escapeHTML(player.position1)})` : '';
+            // MODIFIED: Add a check for pitcher status
+            const pitchingSummary = Array.isArray(state.pitch_count_summary)
+                ? state.pitch_count_summary.find(p => p.player_name === player.name)
+                : (state.pitch_count_summary || {})[player.name];
+            const isPitcherOnRest = (pitchingSummary && pitchingSummary.status === 'Resting');
+            const pitcherClass = isPitcherOnRest ? 'pitcher-on-rest' : '';
+            return `<div class="player-tag ${pitcherClass}" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
+        };
 
-    document.querySelectorAll('.position-dropzone').forEach(dz => {
-        const desktopId = `pos-desktop-${dz.dataset.position}`;
-        const mobileId = `pos-mobile-${dz.dataset.position}`;
-        const desktopDz = document.getElementById(desktopId);
-        const mobileDz = document.getElementById(mobileId);
+        document.querySelectorAll('.position-dropzone').forEach(dz => {
+            const desktopId = `pos-desktop-${dz.dataset.position}`;
+            const mobileId = `pos-mobile-${dz.dataset.position}`;
+            const desktopDz = document.getElementById(desktopId);
+            const mobileDz = document.getElementById(mobileId);
 
-        if (currentInningData[dz.dataset.position]) {
-            // Player is assigned, add the player tag and 'has-player' class
-            const player = state.roster.find(p => p.name === currentInningData[dz.dataset.position]);
-            if (player) {
+            if (currentInningData[dz.dataset.position]) {
+                // Player is assigned, add the player tag and 'has-player' class
+                const player = state.roster.find(p => p.name === currentInningData[dz.dataset.position]);
+                if (player) {
+                    if (desktopDz) {
+                        desktopDz.innerHTML = `<span class="pos-abbr d-none">${dz.dataset.position}</span>${createPlayerTag(player)}`;
+                        desktopDz.classList.add('has-player');
+                    }
+                    if (mobileDz) {
+                        mobileDz.innerHTML = `<span class="pos-abbr d-none">${dz.dataset.position}</span>${createPlayerTag(player)}`;
+                        mobileDz.classList.add('has-player');
+                    }
+                }
+            } else {
+                // No player assigned, show the abbreviation and remove the class
                 if (desktopDz) {
-                    desktopDz.innerHTML = `<span class="pos-abbr d-none">${dz.dataset.position}</span>${createPlayerTag(player)}`;
-                    desktopDz.classList.add('has-player');
+                    desktopDz.innerHTML = `<span class="pos-abbr">${dz.dataset.position}</span>`;
+                    desktopDz.classList.remove('has-player');
                 }
                 if (mobileDz) {
-                    mobileDz.innerHTML = `<span class="pos-abbr d-none">${dz.dataset.position}</span>${createPlayerTag(player)}`;
-                    mobileDz.classList.add('has-player');
+                    mobileDz.innerHTML = `<span class="pos-abbr">${dz.dataset.position}</span>`;
+                    mobileDz.classList.remove('has-player');
                 }
             }
-        } else {
-            // No player assigned, show the abbreviation and remove the class
-            if (desktopDz) {
-                desktopDz.innerHTML = `<span class="pos-abbr">${dz.dataset.position}</span>`;
-                desktopDz.classList.remove('has-player');
-            }
-            if (mobileDz) {
-                mobileDz.innerHTML = `<span class="pos-abbr">${dz.dataset.position}</span>`;
-                mobileDz.classList.remove('has-player');
-            }
+        });
+
+        const assignedPlayers = new Set(Object.values(currentInningData));
+        const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
+        const benchDesktop = document.getElementById('bench-list-desktop');
+        if(benchDesktop) {
+            benchDesktop.innerHTML = benchPlayers.length > 0
+                ? benchPlayers.map(p => createPlayerTag(p)).join('')
+                : '<div class="list-group-item text-muted text-center">Bench is empty</div>';
         }
-    });
 
-    const assignedPlayers = new Set(Object.values(currentInningData));
-    const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
-    const benchDesktop = document.getElementById('bench-list-desktop');
-    if(benchDesktop) {
-        benchDesktop.innerHTML = benchPlayers.length > 0
-            ? benchPlayers.map(p => createPlayerTag(p)).join('')
-            : '<div class="list-group-item text-muted text-center">Bench is empty</div>';
+        applyOutOfPositionIndicators();
     }
-
-    applyOutOfPositionIndicators();
-}
 
     function updatePlayingTimeSummary() {
         const summary = {};
