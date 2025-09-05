@@ -214,10 +214,17 @@ body {
     background-repeat: no-repeat;
     background-position: center;
     aspect-ratio: 1 / 1;
+    display: grid;
+    /* Create a 5x5 grid for precise positioning */
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+    align-items: center;
+    justify-items: center;
 }
 
 .position-dropzone {
-    position: absolute;
+    /* Reset absolute positioning for the new grid layout */
+    position: relative;
     background-color: rgba(255, 255, 255, 0.7);
     border: 2px dashed var(--primary-color);
     color: var(--primary-color);
@@ -225,9 +232,8 @@ body {
     border-radius: 8px;
     font-weight: bold;
     text-align: center;
-    width: 120px;
+    width: 90%;
     min-height: 60px;
-    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -235,9 +241,32 @@ body {
     transition: background-color 0.2s;
 }
 
-.d-lg-none .position-dropzone { cursor: pointer; }
-.position-dropzone.sortable-ghost { background-color: #fcebeb; }
-.position-dropzone .pos-abbr { font-size: 0.75rem; display: block; margin-bottom: 3px; }
+/* Map positions to grid areas */
+.pos-P  { grid-area: 3 / 3 / span 1 / span 1; }
+.pos-C  { grid-area: 5 / 3 / span 1 / span 1; }
+.pos-1B { grid-area: 3 / 5 / span 1 / span 1; }
+.pos-2B { grid-area: 2 / 4 / span 1 / span 1; }
+.pos-3B { grid-area: 3 / 1 / span 1 / span 1; }
+.pos-SS { grid-area: 2 / 2 / span 1 / span 1; }
+.pos-LF { grid-area: 1 / 1 / span 1 / span 1; }
+.pos-CF { grid-area: 1 / 3 / span 1 / span 1; }
+.pos-RF { grid-area: 1 / 5 / span 1 / span 1; }
+
+/* Position coordinates for the 4-outfielder diamond */
+.pos-4-LF  { grid-area: 1 / 1 / span 1 / span 1; }
+.pos-4-LCF { grid-area: 1 / 2 / span 1 / span 1; }
+.pos-4-RCF { grid-area: 1 / 4 / span 1 / span 1; }
+.pos-4-RF  { grid-area: 1 / 5 / span 1 / span 1; }
+
+/* Ensure mobile layout uses the same grid for consistency */
+.d-lg-none .diamond-container-interactive {
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+}
+
+.d-lg-none .position-dropzone {
+    width: 100%;
+}
 
 .player-tag {
     background-color: var(--primary-color);
@@ -250,51 +279,7 @@ body {
     text-align: center;
     border: 1px solid var(--primary-color-hover);
     margin-top: 2px;
-}
-
-.d-lg-none .player-tag { cursor: pointer; }
-.bench-list .player-tag { background-color: var(--text-muted); border-color: #5c636a; }
-
-.player-tag.natural-position {
-    background-color: #198754; /* A nice green */
-    color: white;
-    border-color: #157347;
-}
-
-.player-tag.secondary-position {
-    background-color: #ffc107; /* A warning yellow */
-    color: #000;
-    border-color: #e6ac00;
-}
-
-/* Position coordinates for the diamond */
-.pos-P  { top: 52%; left: 50%; }
-.pos-C  { top: 83%; left: 50%; }
-.pos-1B { top: 52%; left: 78%; }
-.pos-2B { top: 33%; left: 65%; }
-.pos-3B { top: 52%; left: 22%; }
-.pos-SS { top: 33%; left: 35%; }
-.pos-LF { top: 15%; left: 15%; }
-.pos-CF { top: 8%;  left: 50%; }
-.pos-RF { top: 15%; left: 85%; }
-
-/* Position coordinates for the 4-outfielder diamond */
-.pos-4-LF { top: 18%; left: 15%; }
-.pos-4-LCF { top: 10%; left: 35%; }
-.pos-4-RCF { top: 10%; left: 65%; }
-.pos-4-RF { top: 18%; left: 85%; }
-
-/* Inning selector styles */
-#inning-btn-group .btn-check:checked+.btn-outline-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-    color: white;
-}
-.copy-mode #inning-btn-group,
-.copy-mode #copyInningBtn,
-.copy-mode .d-flex.gap-2 {
-    opacity: 0.6;
-    pointer-events: none;
+    display: block;
 }
 
 /* Lineup Editor styles */
