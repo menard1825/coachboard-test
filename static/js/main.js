@@ -1445,5 +1445,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    init(); // Start the app
+    // Only run the main dashboard initialization if the main container exists
+    if (document.getElementById('mainTabContent')) {
+        init(); // Start the app
+    }
 });
