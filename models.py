@@ -90,7 +90,7 @@ class Lineup(db.Model):
     title = Column(String, nullable=False)
     # Use a private attribute to map to the 'lineup_positions' column in the DB
     _lineup_positions_db = Column('lineup_positions', JSON)
-    associated_game_id = Column(Integer)
+    associated_game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="lineups")
@@ -199,6 +199,8 @@ class Game(db.Model):
     pitching_outings = relationship("PitchingOuting", back_populates="game", cascade="all, delete-orphan")
     rotations = relationship("Rotation", back_populates="game", cascade="all, delete-orphan")
     
+    lineups = relationship("Lineup", backref="game", cascade="all, delete-orphan")
+
     opponent_id = Column(Integer, ForeignKey('opponents.id'), nullable=True)
     opponent_relationship = relationship("Opponent", back_populates="games")
     quick_notes = relationship("GameQuickNote", back_populates="game", cascade="all, delete-orphan")
