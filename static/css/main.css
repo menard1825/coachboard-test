@@ -242,23 +242,23 @@ body {
 }
 
 /* Positioning for Infielders and Pitcher/Catcher */
-.pos-P  { top: 52%; left: 50%; }
-.pos-C  { top: 83%; left: 50%; }
-.pos-1B { top: 52%; left: 78%; }
-.pos-2B { top: 33%; left: 65%; }
-.pos-3B { top: 52%; left: 22%; }
-.pos-SS { top: 33%; left: 35%; }
+.pos-P  { top: 55%; left: 50%; }
+.pos-C  { top: 88%; left: 50%; }
+.pos-1B { top: 65%; left: 78%; }
+.pos-2B { top: 45%; left: 65%; }
+.pos-3B { top: 65%; left: 22%; }
+.pos-SS { top: 45%; left: 35%; }
 
 /* Default 3 Outfielder Layout */
-.pos-LF { top: 15%; left: 15%; }
-.pos-CF { top:  8%; left: 50%; }
-.pos-RF { top: 15%; left: 85%; }
+.pos-LF { top: 20%; left: 15%; }
+.pos-CF { top: 12%; left: 50%; }
+.pos-RF { top: 20%; left: 85%; }
 
 /* 4 Outfielder Layout - Overrides the default 3-outfielder positions */
-.four-outfielders .pos-LF  { top: 15%; left: 10%; }
-.four-outfielders .pos-LCF { top:  8%; left: 35%; }
-.four-outfielders .pos-RCF { top:  8%; left: 65%; }
-.four-outfielders .pos-RF  { top: 15%; left: 90%; }
+.four-outfielders .pos-LF  { top: 20%; left: 10%; }
+.four-outfielders .pos-LCF { top: 12%; left: 35%; }
+.four-outfielders .pos-RCF { top: 12%; left: 65%; }
+.four-outfielders .pos-RF  { top: 20%; left: 90%; }
 
 .position-dropzone.pos-P .player-tag.pitcher-on-rest {
     border: 2px solid #dc3545; /* Red border */
