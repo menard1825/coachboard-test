@@ -230,7 +230,7 @@ body {
 }
 
 /* Positioning for Infielders and Pitcher/Catcher */
-.pos-P  { top: 25%; left: 50%; transform: translate(-50%, -50%); }
+.pos-P  { top: 40%; left: 50%; transform: translate(-50%, -50%); }
 .pos-C  { top: 80%; left: 50%; transform: translate(-50%, -50%); }
 .pos-1B { top: 60%; left: 80%; transform: translate(-50%, -50%); }
 .pos-2B { top: 45%; left: 68%; transform: translate(-50%, -50%); }
@@ -248,16 +248,44 @@ body {
 .four-outfielders .pos-RCF { top: 10%; left: 65%; transform: translate(-50%, -50%); }
 .four-outfielders .pos-RF  { top: 15%; left: 90%; transform: translate(-50%, -50%); }
 
-.player-tag {
-    /* ... (existing code) ... */
-    position: absolute;
-    bottom: 5px; /* Adjust as needed */
-    left: 50%;
-    transform: translateX(-50%);
+/* Add a bold font weight and slightly larger font size to the position abbreviation */
+.position-dropzone .pos-abbr {
+    font-weight: bold;
+    font-size: 1rem;
 }
 
-.pos-P .player-tag {
-    bottom: -15px; /* Position pitcher name below the circle */
+.player-tag {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.8rem; /* Keep this small for mobile to prevent overflow */
+    cursor: grab;
+    width: 100%;
+    text-align: center;
+    border: 1px solid var(--primary-color-hover);
+    margin-top: 2px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600; /* Make player names bolder */
+}
+
+/* Ensure the background is solid when a player is assigned */
+.position-dropzone.has-player {
+    background-color: transparent; /* A cleaner look when a player is assigned */
+    border: 2px solid transparent; /* Hide the dashed border */
+}
+
+.position-dropzone.has-player .pos-abbr {
+    display: none; /* Hide the position abbreviation when a player is present */
+}
+
+.position-dropzone.pos-P .player-tag.pitcher-on-rest {
+    border: 2px solid #dc3545; /* Red border */
+    background-color: #dc3545; /* Red background */
+    color: white;
 }
 
 /* Inning selector styles */
