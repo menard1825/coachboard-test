@@ -213,7 +213,7 @@ body {
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    /* Updated aspect ratio to be wider than it is tall, like a real field */
+    /* This makes the field wider, fitting the image better */
     aspect-ratio: 4 / 3;
     display: grid;
     /* Redesigned grid for better spacing and realistic alignment */
