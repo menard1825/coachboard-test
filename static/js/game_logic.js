@@ -68,7 +68,8 @@ window.initializeGameManagement = function(gameData) {
         outfielder_count: gameData.outfielder_count || 3,
         currentInning: '1',
         copiedInningData: null,
-        sortableInstances: {}
+        sortableInstances: {},
+        pitch_count_summary: gameData.pitch_count_summary
     };
 
     // ADD THIS BLOCK TO FIX THE INNINGS BUG

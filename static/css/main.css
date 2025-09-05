@@ -146,6 +146,13 @@ body {
     }
 }
 
+/* --- Pitching Rest Indicator --- */
+.position-dropzone.pos-P .player-tag.pitcher-on-rest {
+    border: 2px solid #dc3545; /* Red border */
+    background-color: #dc3545; /* Red background */
+    color: white;
+}
+
 /* ==========================================================================
    Google Places Autocomplete Fix for Modals
    ========================================================================== */

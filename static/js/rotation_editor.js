@@ -35,7 +35,11 @@ function initializeRotationEditor(state, escapeHTML) {
 
         const createPlayerTag = (player) => {
             const primaryPos = player.position1 ? ` (${escapeHTML(player.position1)})` : '';
-            return `<div class="player-tag" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
+            // MODIFIED: Add a check for pitcher status
+            const pitchingSummary = state.pitch_count_summary[player.name];
+            const isPitcherOnRest = (pitchingSummary && pitchingSummary.status === 'Resting');
+            const pitcherClass = isPitcherOnRest ? 'pitcher-on-rest' : '';
+            return `<div class="player-tag ${pitcherClass}" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
         };
 
         document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => tag.remove());
