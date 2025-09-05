@@ -54,74 +54,76 @@
                 <button id="cancelPasteBtn" class="btn btn-sm btn-secondary">Cancel</button>
             </div>
         </div>
-<div class="row d-none d-lg-flex">
-    <div class="col-lg-3">
-        <h5>Bench</h5>
-        <div id="bench-list-desktop" class="list-group bench-list" style="min-height: 200px; max-height: 500px; overflow-y: auto;" data-position="bench"></div>
-    </div>
-    <div class="col-lg-6">
-        <div class="diamond-container-interactive" id="diamond-parent-desktop">
-            <div id="pos-desktop-P" class="position-dropzone pos-P" data-position="P"><span class="pos-abbr">P</span></div>
-            <div id="pos-desktop-C" class="position-dropzone pos-C" data-position="C"><span class="pos-abbr">C</span></div>
-            <div id="pos-desktop-1B" class="position-dropzone pos-1B" data-position="1B"><span class="pos-abbr">1B</span></div>
-            <div id="pos-desktop-2B" class="position-dropzone pos-2B" data-position="2B"><span class="pos-abbr">2B</span></div>
-            <div id="pos-desktop-3B" class="position-dropzone pos-3B" data-position="3B"><span class="pos-abbr">3B</span></div>
-            <div id="pos-desktop-SS" class="position-dropzone pos-SS" data-position="SS"><span class="pos-abbr">SS</span></div>
-            {% if current_team and current_team.outfielder_count == 4 %}
-                <div id="pos-desktop-LF" class="position-dropzone pos-4-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
-                <div id="pos-desktop-LCF" class="position-dropzone pos-4-LCF" data-position="LCF"><span class="pos-abbr">LCF</span></div>
-                <div id="pos-desktop-RCF" class="position-dropzone pos-4-RCF" data-position="RCF"><span class="pos-abbr">RCF</span></div>
-                <div id="pos-desktop-RF" class="position-dropzone pos-4-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
-            {% else %}
-                <div id="pos-desktop-LF" class="position-dropzone pos-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
-                <div id="pos-desktop-CF" class="position-dropzone pos-CF-3-man" data-position="CF"><span class="pos-abbr">CF</span></div>
-                <div id="pos-desktop-RF" class="position-dropzone pos-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
-            {% endif %}
+        <div class="row d-none d-lg-flex">
+            <div class="col-lg-3">
+                <h5>Bench</h5>
+                <div id="bench-list-desktop" class="list-group bench-list" style="min-height: 200px; max-height: 500px; overflow-y: auto;" data-position="bench"></div>
+            </div>
+            <div class="col-lg-6">
+                {# Add a class to the container based on the outfielder count #}
+                <div class="diamond-container-interactive {% if current_team and current_team.outfielder_count == 4 %}four-outfielders{% endif %}" id="diamond-parent-desktop">
+                    <div id="pos-desktop-P" class="position-dropzone pos-P" data-position="P">P</div>
+                    <div id="pos-desktop-C" class="position-dropzone pos-C" data-position="C">C</div>
+                    <div id="pos-desktop-1B" class="position-dropzone pos-1B" data-position="1B">1B</div>
+                    <div id="pos-desktop-2B" class="position-dropzone pos-2B" data-position="2B">2B</div>
+                    <div id="pos-desktop-3B" class="position-dropzone pos-3B" data-position="3B">3B</div>
+                    <div id="pos-desktop-SS" class="position-dropzone pos-SS" data-position="SS">SS</div>
+
+                    {% if current_team and current_team.outfielder_count == 4 %}
+                        <div id="pos-desktop-LF" class="position-dropzone pos-LF" data-position="LF">LF</div>
+                        <div id="pos-desktop-LCF" class="position-dropzone pos-LCF" data-position="LCF">LCF</div>
+                        <div id="pos-desktop-RCF" class="position-dropzone pos-RCF" data-position="RCF">RCF</div>
+                        <div id="pos-desktop-RF" class="position-dropzone pos-RF" data-position="RF">RF</div>
+                    {% else %}
+                        <div id="pos-desktop-LF" class="position-dropzone pos-LF" data-position="LF">LF</div>
+                        <div id="pos-desktop-CF" class="position-dropzone pos-CF" data-position="CF">CF</div>
+                        <div id="pos-desktop-RF" class="position-dropzone pos-RF" data-position="RF">RF</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-3">
+                <h5 class="mt-4">Legend</h5>
+                <ul class="list-unstyled">
+                    <li><span class="badge bg-success me-2">&nbsp;</span> Natural Position</li>
+                    <li><span class="badge bg-warning text-dark me-2">&nbsp;</span> Secondary Position</li>
+                    <li><span class="badge me-2" style="background-color: var(--primary-color);">&nbsp;</span> Unlisted Position</li>
+                </ul>
+                <h5>Playing Time Summary</h5>
+                <div id="summary-desktop"></div>
+            </div>
         </div>
-    </div>
-    <div class="col-lg-3">
-        <h5 class="mt-4">Legend</h5>
-        <ul class="list-unstyled">
-            <li><span class="badge bg-success me-2">&nbsp;</span> Natural Position</li>
-            <li><span class="badge bg-warning text-dark me-2">&nbsp;</span> Secondary Position</li>
-            <li><span class="badge me-2" style="background-color: var(--primary-color);">&nbsp;</span> Unlisted Position</li>
-        </ul>
-        <h5>Playing Time Summary</h5>
-        <div id="summary-desktop"></div>
-    </div>
-</div>
-<div class="d-lg-none">
-    <div class="alert alert-info d-flex align-items-center" role="alert">
-        <i class="bi bi-info-circle-fill me-2"></i>
-        <div>Tap a position to assign a player. Tap a player on the field to send them to the bench.</div>
-    </div>
-    <div class="diamond-container-interactive" id="diamond-parent-mobile">
-         <div id="pos-mobile-P" class="position-dropzone pos-P" data-position="P"><span class="pos-abbr">P</span></div>
-         <div id="pos-mobile-C" class="position-dropzone pos-C" data-position="C"><span class="pos-abbr">C</span></div>
-         <div id="pos-mobile-1B" class="position-dropzone pos-1B" data-position="1B"><span class="pos-abbr">1B</span></div>
-         <div id="pos-mobile-2B" class="position-dropzone pos-2B" data-position="2B"><span class="pos-abbr">2B</span></div>
-         <div id="pos-mobile-3B" class="position-dropzone pos-3B" data-position="3B"><span class="pos-abbr">3B</span></div>
-         <div id="pos-mobile-SS" class="position-dropzone pos-SS" data-position="SS"><span class="pos-abbr">SS</span></div>
-         {% if current_team and current_team.outfielder_count == 4 %}
-             <div id="pos-mobile-LF" class="position-dropzone pos-4-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
-             <div id="pos-mobile-LCF" class="position-dropzone pos-4-LCF" data-position="LCF"><span class="pos-abbr">LCF</span></div>
-             <div id="pos-mobile-RCF" class="position-dropzone pos-4-RCF" data-position="RCF"><span class="pos-abbr">RCF</span></div>
-             <div id="pos-mobile-RF" class="position-dropzone pos-4-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
-         {% else %}
-             <div id="pos-mobile-LF" class="position-dropzone pos-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
-             <div id="pos-mobile-CF" class="position-dropzone pos-CF-3-man" data-position="CF"><span class="pos-abbr">CF</span></div>
-             <div id="pos-mobile-RF" class="position-dropzone pos-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
-         {% endif %}
-    </div>
-    <h5 class="mt-4">Legend</h5>
-    <ul class="list-unstyled">
-        <li><span class="badge bg-success me-2">&nbsp;</span> Natural Position</li>
-        <li><span class="badge bg-warning text-dark me-2">&nbsp;</span> Secondary Position</li>
-        <li><span class="badge me-2" style="background-color: var(--primary-color);">&nbsp;</span> Unlisted Position</li>
-    </ul>
-    <hr>
-    <h5>Playing Time Summary</h5>
-    <div id="summary-mobile"></div>
-</div>
+        <div class="d-lg-none">
+            <div class="alert alert-info d-flex align-items-center" role="alert">
+                <i class="bi bi-info-circle-fill me-2"></i>
+                <div>Tap a position to assign a player. Tap a player on the field to send them to the bench.</div>
+            </div>
+            <div class="diamond-container-interactive {% if current_team and current_team.outfielder_count == 4 %}four-outfielders{% endif %}" id="diamond-parent-mobile">
+                 <div id="pos-mobile-P" class="position-dropzone pos-P" data-position="P">P</div>
+                 <div id="pos-mobile-C" class="position-dropzone pos-C" data-position="C">C</div>
+                 <div id="pos-mobile-1B" class="position-dropzone pos-1B" data-position="1B">1B</div>
+                 <div id="pos-mobile-2B" class="position-dropzone pos-2B" data-position="2B">2B</div>
+                 <div id="pos-mobile-3B" class="position-dropzone pos-3B" data-position="3B">3B</div>
+                 <div id="pos-mobile-SS" class="position-dropzone pos-SS" data-position="SS">SS</div>
+                 {% if current_team and current_team.outfielder_count == 4 %}
+                     <div id="pos-mobile-LF" class="position-dropzone pos-LF" data-position="LF">LF</div>
+                     <div id="pos-mobile-LCF" class="position-dropzone pos-LCF" data-position="LCF">LCF</div>
+                     <div id="pos-mobile-RCF" class="position-dropzone pos-RCF" data-position="RCF">RCF</div>
+                     <div id="pos-mobile-RF" class="position-dropzone pos-RF" data-position="RF">RF</div>
+                 {% else %}
+                     <div id="pos-mobile-LF" class="position-dropzone pos-LF" data-position="LF">LF</div>
+                     <div id="pos-mobile-CF" class="position-dropzone pos-CF" data-position="CF">CF</div>
+                     <div id="pos-mobile-RF" class="position-dropzone pos-RF" data-position="RF">RF</div>
+                 {% endif %}
+            </div>
+            <h5 class="mt-4">Legend</h5>
+            <ul class="list-unstyled">
+                <li><span class="badge bg-success me-2">&nbsp;</span> Natural Position</li>
+                <li><span class="badge bg-warning text-dark me-2">&nbsp;</span> Secondary Position</li>
+                <li><span class="badge me-2" style="background-color: var(--primary-color);">&nbsp;</span> Unlisted Position</li>
+            </ul>
+            <hr>
+            <h5>Playing Time Summary</h5>
+            <div id="summary-mobile"></div>
+        </div>
     </div>
 </div>
