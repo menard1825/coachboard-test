@@ -89,9 +89,6 @@ function initializeLineupEditor(options) {
         lineup.lineup_positions = [];
     }
 
-    // --- Utility Functions ---
-    const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
-
     function createBenchPlayerItem(player) {
         const item = document.createElement('div');
         item.className = 'list-group-item';

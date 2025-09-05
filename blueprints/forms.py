@@ -4,6 +4,7 @@ from wtforms.validators import DataRequired, Optional
 
 class PitchingOutingForm(FlaskForm):
     player_id = SelectField('Pitcher', validators=[DataRequired()], coerce=int)
+    game_id = SelectField('Associated Game (Optional)', coerce=int, validators=[Optional()])
     pitch_date = DateField('Date', format='%Y-%m-%d', validators=[Optional()])
     opponent = StringField('Opponent', validators=[Optional()])
     pitches = IntegerField('Pitches', validators=[DataRequired()])

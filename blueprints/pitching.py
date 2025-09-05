@@ -69,7 +69,7 @@ def edit_pitching(outing_id):
     return redirect(url_for('pitching.pitching_page'))
 
 
-@pitching_bp.route('/delete_pitching/<int:outing_id>')
+@pitching_bp.route('/delete_pitching/<int:outing_id>', methods=['POST'])
 def delete_pitching(outing_id):
     outing_to_delete = db.session.query(PitchingOuting).filter_by(id=outing_id, team_id=session['team_id']).first()
     if outing_to_delete:
@@ -103,20 +103,39 @@ def pitching_page():
     team = db.session.get(Team, team_id)
     form = PitchingOutingForm()
 
-    # Use a separate query for populating the form choices to keep it sorted
+    # Populate form choices
     form.player_id.choices = [(p.id, p.full_name) for p in Player.query.filter_by(team_id=team_id).order_by(Player.name).all()]
+    games = Game.query.filter_by(team_id=team_id).order_by(Game.date.desc()).all()
+    form.game_id.choices = [(g.id, f'{g.date.strftime("%m/%d/%y")} vs {g.opponent}') for g in games]
+    form.game_id.choices.insert(0, (0, 'Non-Game Outing (Bullpen/Practice)')) # Use 0 or another non-existent ID
 
     if form.validate_on_submit():
-        # Handle form submission
+        game_id = form.game_id.data
+        game = None
+        if game_id and game_id != 0:
+            game = db.session.get(Game, game_id)
+
+        if game:
+            # If a game is selected, use its data
+            pitch_date = game.date
+            opponent = game.opponent
+            outing_type = 'Game'
+        else:
+            # Otherwise, use the data from the form
+            pitch_date = form.pitch_date.data
+            opponent = form.opponent.data
+            outing_type = form.outing_type.data
+
         new_outing = PitchingOuting(
-            date=form.pitch_date.data,
+            date=pitch_date,
             player_id=form.player_id.data,
-            opponent=form.opponent.data,
+            opponent=opponent,
             pitches=form.pitches.data,
             innings=form.innings.data,
             pitcher_type=form.pitcher_type.data,
-            outing_type=form.outing_type.data,
-            team_id=team_id
+            outing_type=outing_type,
+            team_id=team_id,
+            game_id=game.id if game else None
         )
         db.session.add(new_outing)
         db.session.commit()
@@ -138,13 +157,17 @@ def pitching_page():
     combined_pitchers_dict = {**designated_pitchers, **players_with_outings}
     pitchers = list(combined_pitchers_dict.values())
 
+    # Pass games to the template for the new JS functionality
+    games_json = {g.id: {'date': g.date.strftime('%Y-%m-%d'), 'opponent': g.opponent} for g in games}
+
     return render_template(
         "pitching.html",
         recent_outings=recent_outings,
         pitch_count_summary=pitch_count_summary,
         current_team=team,
         pitchers=pitchers,
-        form=form
+        form=form,
+        games_json=games_json
     )
 
 

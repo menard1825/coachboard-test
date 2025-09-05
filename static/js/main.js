@@ -1,8 +1,5 @@
 // static/js/main.js
 
-// --- UTILITY FUNCTIONS ---
-const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
-
 function fetchPracticeWeather(widget) {
     const location = widget.dataset.location;
     const date = widget.dataset.date;
@@ -1091,6 +1088,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        socket.on('dev_lesson_update', (data) => {
+            console.log('dev_lesson_update received', data);
+            const { player } = data;
+            const playerIndex = AppState.full_data.roster.findIndex(p => p.id === player.id);
+            if (playerIndex > -1) {
+                AppState.full_data.roster[playerIndex].has_lessons = player.has_lessons;
+                AppState.full_data.roster[playerIndex].lesson_focus = player.lesson_focus;
+            }
+            if (AppState.active_player_dev_name === player.name) {
+                renderPlayerDevelopmentDetails();
+            }
+        });
+
         // --- Other Data Sockets ---
         socket.on('pitching_update', async () => {
             console.log('pitching_update received');
@@ -1287,16 +1297,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
-            const deleteButton = document.getElementById('confirmDeleteButton');
+            const deleteForm = document.getElementById('confirmDeleteForm');
             const modalBody = e.target.querySelector('.modal-body');
             const url = e.relatedTarget.dataset.deleteUrl;
             const name = e.relatedTarget.dataset.deleteName;
 
-            if (url) {
-                deleteButton.href = url;
+            if (url && deleteForm) {
+                deleteForm.action = url;
                 modalBody.innerHTML = `Are you sure you want to delete <strong>${name || 'this item'}</strong>? This action cannot be undone.`;
             } else {
-                console.error("Delete modal opened without a data-delete-url attribute on the trigger.");
+                console.error("Delete modal opened without a data-delete-url attribute on the trigger or the form was not found.");
                 e.preventDefault();
             }
         });

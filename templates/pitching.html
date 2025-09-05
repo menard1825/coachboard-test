@@ -91,6 +91,13 @@
                   {% endfor %}
                 </div>
                 <div class="col-12">
+                    {{ form.game_id.label(class="form-label") }}
+                    {{ form.game_id(class="form-select") }}
+                    {% for error in form.game_id.errors %}
+                      <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-12">
                   {{ form.opponent.label(class="form-label") }}
                   {{ form.opponent(class="form-control", placeholder="e.g., Scrimmage vs. Tigers") }}
                   {% for error in form.opponent.errors %}
@@ -154,7 +161,10 @@
                                 data-pitcher-type="{{ o.pitcher_type }}">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-outline-danger" onclick="return confirm('Are you sure?')"><i class="bi bi-trash"></i></a>
+                            <form action="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Are you sure?')"><i class="bi bi-trash"></i></button>
+                            </form>
                         </div>
                     </li>
                 {% else %}
@@ -238,6 +248,33 @@ document.addEventListener('DOMContentLoaded', function () {
     if (pitchDateInput && !pitchDateInput.value) {
         pitchDateInput.value = new Date().toISOString().split('T')[0];
     }
+
+    // --- New functionality for game selection ---
+    const gamesData = {{ games_json | tojson | safe }};
+    const gameSelect = document.getElementById('game_id');
+    const opponentInput = document.getElementById('opponent');
+    const outingTypeSelect = document.getElementById('outing_type');
+
+    if (gameSelect) {
+        gameSelect.addEventListener('change', function() {
+            const selectedGameId = this.value;
+            if (selectedGameId && gamesData[selectedGameId]) {
+                const game = gamesData[selectedGameId];
+                if(pitchDateInput) pitchDateInput.value = game.date;
+                if(opponentInput) opponentInput.value = game.opponent;
+                if(outingTypeSelect) outingTypeSelect.value = 'Game';
+
+                // Optional: disable fields that are auto-filled
+                // pitchDateInput.disabled = true;
+                // opponentInput.disabled = true;
+            } else {
+                // Optional: re-enable fields if "Non-Game" is selected
+                // pitchDateInput.disabled = false;
+                // opponentInput.disabled = false;
+            }
+        });
+    }
+
 
     const editModal = document.getElementById('editPitchingOutingModal');
     if (editModal) {

@@ -156,7 +156,7 @@ def edit_game(game_id):
     socketio.emit('data_updated', {'message': 'Game details updated.'})
     return redirect(url_for('.game_management', game_id=game_id))
 
-@gameday_bp.route('/delete_game/<int:game_id>')
+@gameday_bp.route('/delete_game/<int:game_id>', methods=['POST'])
 def delete_game(game_id):
     game_to_delete = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
     if game_to_delete:
@@ -236,7 +236,7 @@ def edit_quick_note(note_id):
 
     return jsonify({'status': 'success', 'note': model_to_dict(note)})
 
-@gameday_bp.route('/game/quick_note/<int:note_id>/delete')
+@gameday_bp.route('/game/quick_note/<int:note_id>/delete', methods=['POST'])
 def delete_quick_note(note_id):
     note = db.session.get(GameQuickNote, note_id)
     if not note or note.game.team_id != session['team_id']:
@@ -367,7 +367,7 @@ def edit_lineup(lineup_id):
         db.session.rollback()
         return jsonify({'status': 'error', 'message': 'An unexpected error occurred while editing the lineup.'}), 500
 
-@gameday_bp.route('/delete_lineup/<int:lineup_id>')
+@gameday_bp.route('/delete_lineup/<int:lineup_id>', methods=['POST'])
 def delete_lineup(lineup_id):
     lineup_to_delete = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
     if lineup_to_delete:
@@ -420,7 +420,7 @@ def save_rotation():
     socketio.emit('data_updated', {'message': 'Rotation saved/updated.'})
     return jsonify({'status': 'success', 'message': message, 'new_id': new_rotation_id})
 
-@gameday_bp.route('/delete_rotation/<int:rotation_id>')
+@gameday_bp.route('/delete_rotation/<int:rotation_id>', methods=['POST'])
 def delete_rotation(rotation_id):
     rotation_to_delete = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
     if rotation_to_delete:
