@@ -93,9 +93,10 @@
             </div>
         </div>
         <div class="d-lg-none">
-            <div class="alert alert-info d-flex align-items-center" role="alert">
+            <div class="alert alert-info alert-dismissible fade show d-flex align-items-center" role="alert">
                 <i class="bi bi-info-circle-fill me-2"></i>
                 <div>Tap a position to assign a player. Tap a player on the field to send them to the bench.</div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             <div class="diamond-container-interactive {% if current_team and current_team.outfielder_count == 4 %}four-outfielders{% endif %}" id="diamond-parent-mobile">
                  <div id="pos-mobile-P" class="position-dropzone pos-P" data-position="P"><span class="pos-abbr">P</span></div>
