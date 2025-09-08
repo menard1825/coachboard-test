@@ -273,6 +273,10 @@ window.initializeGameManagement = function(gameData) {
                     const selectedTemplate = state.lineup_templates.find(lt => lt.id == selectedTemplateId);
                     if (selectedTemplate) {
                         state.lineup.lineup_positions = [...selectedTemplate.lineup_positions];
+                        // When a template is loaded, we are creating a *new* lineup for this game,
+                        // not editing the template itself. Setting the id to null ensures that
+                        // the `saveLineup` function will use the '/add_lineup' route.
+                        state.lineup.id = null;
                         renderLineup();
                     }
                 }
