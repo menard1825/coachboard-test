@@ -161,6 +161,7 @@ def edit_game(game_id):
 def delete_game(game_id):
     game_to_delete = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
     if game_to_delete:
+        game_id_for_emit = game_to_delete.id
         game_date_str = game_to_delete.date.strftime('%m/%d/%Y')
         # --- MODIFICATION START ---
         # Explicitly delete associated lineups just in case the cascade doesn't cover all edge cases
@@ -169,7 +170,8 @@ def delete_game(game_id):
         db.session.delete(game_to_delete)
         db.session.commit()
         flash(f'Game vs "{game_to_delete.opponent}" on {game_date_str} and its associated lineup/rotation data have been removed successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Game deleted.'})
+        socketio.emit('game_delete', {'game_id': game_id_for_emit})
+        socketio.emit('stats_update', {'message': 'Game deleted.'})
     else:
         flash('Game not found.', 'danger')
     return redirect(url_for('home', _anchor='games'))
@@ -431,10 +433,12 @@ def save_rotation():
 def delete_rotation(rotation_id):
     rotation_to_delete = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
     if rotation_to_delete:
+        rotation_id_for_emit = rotation_to_delete.id
         db.session.delete(rotation_to_delete)
         db.session.commit()
         flash('Rotation deleted successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Rotation deleted.'})
+        socketio.emit('rotation_delete', {'rotation_id': rotation_id_for_emit})
+        socketio.emit('stats_update', {'message': 'Rotation deleted.'})
     else:
         flash('Rotation not found.', 'danger')
     redirect_url = request.referrer or url_for('home', _anchor='rotations')
