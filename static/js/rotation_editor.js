@@ -6,19 +6,19 @@ function initializeRotationEditor(state, escapeHTML) {
         // Infield
         'P':  { x: 50, y: 50 },  // Center of the mound
         'C':  { x: 50, y: 92 },  // Behind home plate
-        '1B': { x: 78, y: 55 },  // Moved slightly back
-        '2B': { x: 65, y: 35 },  // Moved back
-        'SS': { x: 35, y: 35 },  // Moved back
-        '3B': { x: 22, y: 55 },  // Moved slightly back
+        '1B': { x: 78, y: 55 },
+        '2B': { x: 62, y: 40 },  // Adjusted slightly
+        'SS': { x: 38, y: 40 },  // Adjusted slightly
+        '3B': { x: 22, y: 55 },
 
-        // 3-Outfielder Setup (Deeper Outfield)
-        'LF': { x: 15, y: 15 },  // Deeper Left Field
-        'CF': { x: 50, y: 18 },   // Deeper Center Field
-        'RF': { x: 85, y: 15 },  // Deeper Right Field
+        // 3-Outfielder Setup (Recommended Adjustment)
+        'LF': { x: 15, y: 12 },  // Deeper
+        'CF': { x: 50, y: 10 },  // Deeper
+        'RF': { x: 85, y: 12 },  // Deeper
 
         // 4-Outfielder Setup (Deeper Outfield)
-        'LCF':{ x: 35, y: 10 },  // Deeper Left-Center Field
-        'RCF':{ x: 65, y: 10 }   // Deeper Right-Center Field
+        'LCF':{ x: 35, y: 10 },
+        'RCF':{ x: 65, y: 10 }
     };
 
     function renderRotationEditor() {
