@@ -160,6 +160,11 @@ def create_app():
         response.headers['Expires'] = '0'
         return response
 
+    @app.route('/favicon.ico')
+    def favicon():
+        return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
     @app.route('/manifest.json')
     def serve_manifest():
         return send_from_directory('static', 'manifest.json')

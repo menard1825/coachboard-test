@@ -601,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return notes.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map(note => {
                 const canUserEdit = canEdit(note.author);
                 const editButton = canUserEdit ? `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${note.id}" data-note-type="${noteType}" data-note-text="${escapeHTML(note.text)}">Edit</button>` : '';
-                const deleteButton = canUserEdit ? `<button class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_note/${noteType}/${note.id}" data-delete-name="this note">Delete</button>` : '';
+                const deleteButton = canUserEdit ? `<form action="/delete_note/${noteType}/${note.id}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this note?');"><input type="hidden" name="csrf_token" value="${csrfToken}"/><button type="submit" class="btn btn-sm btn-link text-danger py-0">Delete</button></form>` : '';
                 const playerTitle = noteType === 'player_notes' && note.player_name ? `<strong>${escapeHTML(note.player_name)}:</strong> ` : '';
                 
                 return `<div class="card mb-2">

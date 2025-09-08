@@ -63,7 +63,7 @@ def edit_note():
         flash('You do not have permission to edit this note.', 'danger')
     return redirect(url_for('home', _anchor='collaboration'))
 
-@team_management_bp.route('/delete_note/<note_type>/<int:note_id>')
+@team_management_bp.route('/delete_note/<note_type>/<int:note_id>', methods=['GET', 'POST'])
 def delete_note(note_type, note_id):
     note_to_delete = db.session.query(CollaborationNote).filter_by(id=note_id, team_id=session['team_id']).first()
     if note_to_delete and note_to_delete.note_type == note_type:
