@@ -164,8 +164,9 @@ def delete_game(game_id):
         game_id_for_emit = game_to_delete.id
         game_date_str = game_to_delete.date.strftime('%m/%d/%Y')
         # --- MODIFICATION START ---
-        # Explicitly delete associated lineups just in case the cascade doesn't cover all edge cases
+        # Explicitly delete associated lineups and rotations to prevent orphaned data
         db.session.query(Lineup).filter_by(associated_game_id=game_id, team_id=session['team_id']).delete()
+        db.session.query(Rotation).filter_by(associated_game_id=game_id, team_id=session['team_id']).delete()
         # --- MODIFICATION END ---
         db.session.delete(game_to_delete)
         db.session.commit()
