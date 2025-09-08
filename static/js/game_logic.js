@@ -321,7 +321,7 @@ window.initializeGameManagement = function(gameData) {
             const innings = Object.keys(state.rotation.innings);
             const nextInningNum = innings.length > 0 ? Math.max(...innings.map(Number)) + 1 : 1;
             state.rotation.innings[nextInningNum] = {};
-            renderInningSelector();
+            renderRotationEditor();
         });
         document.getElementById('removeInningBtn')?.addEventListener('click', () => {
             if(!state.rotation) return;
