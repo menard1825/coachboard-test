@@ -6,10 +6,10 @@ function initializeRotationEditor(state, escapeHTML) {
         // Infield
         'P':  { x: 50, y: 61 },  // Pitcher's Mound
         'C':  { x: 50, y: 85 },  // Catcher
-        '1B': { x: 77, y: 69 },  // First Base
-        '2B': { x: 50, y: 48 },  // Second Base
-        '3B': { x: 23, y: 69 },  // Third Base
-        'SS': { x: 32, y: 55 },  // Shortstop
+        '1B': { x: 69, y: 65 },  // First Base
+        '2B': { x: 50, y: 50 },  // Second Base
+        '3B': { x: 30, y: 65 },  // Third Base
+        'SS': { x: 38, y: 53 },  // Shortstop
 
         // 3-Outfielder Setup
         'LF': { x: 18, y: 30 },  // Left Field
