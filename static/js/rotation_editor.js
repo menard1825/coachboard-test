@@ -7,13 +7,13 @@ function initializeRotationEditor(state, escapeHTML) {
         'P':  { x: 50, y: 60 },  // Pitcher's Mound
         'C':  { x: 50, y: 85 },  // Catcher
         '1B': { x: 72, y: 65 },  // First Base
-        '2B': { x: 62, y: 50 },  // Second Baseman
-        'SS': { x: 38, y: 50 },  // Shortstop
+        '2B': { x: 65, y: 55 },  // Second Baseman - MODIFIED
+        'SS': { x: 35, y: 55 },  // Shortstop - MODIFIED
         '3B': { x: 28, y: 65 },  // Third Base
 
         // 3-Outfielder Setup
         'LF': { x: 20, y: 25 },  // Left Field
-        'CF': { x: 50, y: 15 },  // Center Field
+        'CF': { x: 50, y: 20 },  // Center Field - MODIFIED
         'RF': { x: 80, y: 25 },  // Right Field
 
         // 4-Outfielder Setup
