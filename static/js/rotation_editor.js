@@ -3,17 +3,22 @@
 function initializeRotationEditor(state, escapeHTML) {
 
     const POS_COORDS = {
-        'P':  { x: 50, y: 62 },
-        'C':  { x: 50, y: 92 },
-        '1B': { x: 75, y: 70 },
-        '2B': { x: 68, y: 48 },
-        '3B': { x: 25, y: 70 },
-        'SS': { x: 32, y: 48 },
-        'LF': { x: 20, y: 25 },
-        'CF': { x: 50, y: 15 },
-        'RF': { x: 80, y: 25 },
-        'LCF':{ x: 35, y: 20 },
-        'RCF':{ x: 65, y: 20 }
+        // Infield
+        'P':  { x: 50, y: 50 },  // Center of the mound
+        'C':  { x: 50, y: 92 },  // Behind home plate
+        '1B': { x: 78, y: 58 },  // Near first base bag
+        '2B': { x: 65, y: 38 },  // Standard 2B position
+        'SS': { x: 35, y: 38 },  // Standard SS position
+        '3B': { x: 22, y: 58 },  // Near third base bag
+
+        // 3-Outfielder Setup
+        'LF': { x: 20, y: 20 },  // Left Field
+        'CF': { x: 50, y: 12 },  // Center Field
+        'RF': { x: 80, y: 20 },  // Right Field
+
+        // 4-Outfielder Setup (overrides LF/CF/RF when active)
+        'LCF':{ x: 35, y: 15 },  // Left-Center Field
+        'RCF':{ x: 65, y: 15 }   // Right-Center Field
     };
 
     function renderRotationEditor() {
