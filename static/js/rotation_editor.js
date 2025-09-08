@@ -13,7 +13,7 @@ function initializeRotationEditor(state, escapeHTML) {
 
         // 3-Outfielder Setup (Deeper Outfield)
         'LF': { x: 15, y: 15 },  // Deeper Left Field
-        'CF': { x: 50, y: 8 },   // Deeper Center Field
+        'CF': { x: 50, y: 18 },   // Deeper Center Field
         'RF': { x: 85, y: 15 },  // Deeper Right Field
 
         // 4-Outfielder Setup (Deeper Outfield)
