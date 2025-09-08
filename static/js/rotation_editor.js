@@ -5,20 +5,20 @@ function initializeRotationEditor(state, escapeHTML) {
     const POS_COORDS = {
         // Infield
         'P':  { x: 50, y: 61 },  // Pitcher's Mound
-        'C':  { x: 50, y: 90 },  // Catcher
-        '1B': { x: 76, y: 66 },  // First Base
-        '2B': { x: 60, y: 48 },  // Second Baseman
-        'SS': { x: 40, y: 48 },  // Shortstop
-        '3B': { x: 24, y: 66 },  // Third Base
+        'C':  { x: 50, y: 88 },  // Catcher
+        '1B': { x: 78, y: 68 },  // First Base
+        '2B': { x: 50, y: 48 },  // Second Base
+        'SS': { x: 35, y: 53 },  // Shortstop
+        '3B': { x: 22, y: 68 },  // Third Base
 
         // 3-Outfielder Setup
-        'LF': { x: 20, y: 20 },  // Left Field
-        'CF': { x: 50, y: 12 },  // Center Field
-        'RF': { x: 80, y: 20 },  // Right Field
+        'LF': { x: 20, y: 35 },  // Left Field
+        'CF': { x: 50, y: 25 },  // Center Field
+        'RF': { x: 80, y: 35 },  // Right Field
 
         // 4-Outfielder Setup
-        'LCF':{ x: 35, y: 15 },  // Left-Center Field
-        'RCF':{ x: 65, y: 15 }   // Right-Center Field
+        'LCF':{ x: 35, y: 30 },  // Left-Center Field
+        'RCF':{ x: 65, y: 30 }   // Right-Center Field
     };
 
     function renderRotationEditor() {
