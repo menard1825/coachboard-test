@@ -287,7 +287,19 @@ window.initializeGameManagement = function(gameData) {
 
         document.getElementById('deleteRotationBtn')?.addEventListener('click', () => {
             if (state.rotation?.id && confirm(`Are you sure you want to delete this rotation?`)) {
-                window.location.href = `/delete_rotation/${state.rotation.id}`;
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/delete_rotation/${state.rotation.id}`;
+
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = csrfToken;
+                form.appendChild(csrfInput);
+
+                document.body.appendChild(form);
+                form.submit();
             }
         });
         document.body.addEventListener('click', function(event){
