@@ -19,8 +19,8 @@ def get_stats():
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
 
     # --- MODIFICATION START ---
-    # Query for rotations for position stats
-    rotations_db = db.session.query(Rotation).filter_by(team_id=team_id).all()
+    # Query for rotations for position stats, but only those associated with a game.
+    rotations_db = db.session.query(Rotation).filter(Rotation.team_id == team_id, Rotation.associated_game_id != None).all()
     # --- MODIFICATION END ---
 
     # Get players designated as pitchers
