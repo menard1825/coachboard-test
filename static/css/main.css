@@ -145,6 +145,17 @@ body {
         background-color: transparent;
     }
 }
+
+/* Hide SVG drawing when using a background image */
+.diamond-container-interactive svg .grass,
+.diamond-container-interactive svg .outfield-grass,
+.diamond-container-interactive svg .dirt {
+    fill: transparent;
+}
+
+.diamond-container-interactive svg .basepath {
+    stroke: transparent;
+}
 /* ==========================================================================
    New Rotation Editor Styles
    ========================================================================== */
