@@ -8,7 +8,7 @@ function initializeRotationEditor(state, escapeHTML) {
         'P':  { x: 50, y: 62 },  // Pitcher's Mound
         'C':  { x: 50, y: 98 },  // Catcher
         '1B': { x: 73, y: 68 },  // First Base
-        '2B': { x: 62, y: 56 },  // Second Baseman
+        '2B': { x: 0, y: 0 },  // Second Baseman
         'SS': { x: 38, y: 56 },  // Shortstop
         '3B': { x: 27, y: 68 },  // Third Base
 
