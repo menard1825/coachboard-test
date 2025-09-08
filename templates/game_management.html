@@ -20,202 +20,218 @@
 </nav>
 
 <div class="container-fluid">
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">Game Day Conditions</h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <h6><i class="bi bi-geo-alt-fill me-2"></i>Location & Notes</h6>
-                    <p><strong>Location:</strong> {{ game['location'] or 'Not specified' }}</p>
-                    <p><strong>Notes:</strong> {{ game['game_notes'] or 'No notes for this game.' }}</p>
-                </div>
-                <div class="col-md-6">
-                <h6><i class="bi bi-thermometer-sun me-2"></i>Weather</h6>
-                <div id="weather-widget-content" data-game-date="{{ game_date_for_input }}">
-                    <p><em>Loading weather...</em></p>
-                </div>
-                </div>
-            </div>
-             <a href="{{ url_for('gameday.print_lineup', game_id=game.id) }}" class="btn btn-secondary mt-2" target="_blank"><i class="bi bi-printer-fill me-2"></i> Print Lineup Card</a>
-        </div>
-    </div>
-
-    <div class="row">
+    <ul class="nav nav-tabs" id="gameTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="pregame-tab" data-bs-toggle="tab" data-bs-target="#pregame" type="button" role="tab" aria-controls="pregame" aria-selected="true">Pre-Game</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="ingame-tab" data-bs-toggle="tab" data-bs-target="#ingame" type="button" role="tab" aria-controls="ingame" aria-selected="false">In-Game</button>
+        </li>
         {% if is_past_game %}
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Post-Game Summary</h5>
-                </div>
-                <div class="card-body">
-                    <form action="{{ url_for('gameday.edit_game', game_id=game.id) }}" method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <div class="row mb-3">
-                            <div class="col">
-                                <label for="our_score" class="form-label">Our Score</label>
-                                <input type="number" class="form-control" id="our_score" name="our_score" value="{{ game.our_score or '' }}">
-                            </div>
-                            <div class="col">
-                                <label for="opponent_score" class="form-label">Opponent Score</label>
-                                <input type="number" class="form-control" id="opponent_score" name="opponent_score" value="{{ game.opponent_score or '' }}">
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="post_game_summary" class="form-label">Takeaways & Summary</label>
-                            <textarea class="form-control" id="post_game_summary" name="post_game_summary" rows="4">{{ game.post_game_summary or '' }}</textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Save Summary</button>
-                    </form>
-                    {% if game.post_game_summary %}
-                    <a href="{{ url_for('gameday.create_practice_plan_from_game', game_id=game.id) }}" class="btn btn-success w-100 mt-2">
-                        <i class="bi bi-cone-striped me-2"></i> Create Practice Plan from Takeaways
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="postgame-tab" data-bs-toggle="tab" data-bs-target="#postgame" type="button" role="tab" aria-controls="postgame" aria-selected="false">Post-Game</button>
+        </li>
         {% endif %}
-
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Opponent Scouting</h5>
+    </ul>
+    <div class="tab-content pt-3" id="gameTabsContent">
+        <div class="tab-pane fade show active" id="pregame" role="tabpanel" aria-labelledby="pregame-tab">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Game Day Conditions</h5>
                 </div>
                 <div class="card-body">
-                    <form action="{{ url_for('gameday.edit_game', game_id=game.id) }}" method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <div class="mb-3">
-                            <label for="opponent_notes" class="form-label">Scouting Notes for {{ game.opponent }}</label>
-                            <textarea class="form-control" id="opponent_notes" name="opponent_notes" rows="5">{{ opponent_notes or '' }}</textarea>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-geo-alt-fill me-2"></i>Location & Notes</h6>
+                            <p><strong>Location:</strong> {{ game['location'] or 'Not specified' }}</p>
+                            <p><strong>Notes:</strong> {{ game['game_notes'] or 'No notes for this game.' }}</p>
                         </div>
-                        <button type="submit" class="btn btn-secondary w-100">Save Scouting Notes</button>
-                    </form>
+                        <div class="col-md-6">
+                        <h6><i class="bi bi-thermometer-sun me-2"></i>Weather</h6>
+                        <div id="weather-widget-content" data-game-date="{{ game_date_for_input }}">
+                            <p><em>Loading weather...</em></p>
+                        </div>
+                        </div>
+                    </div>
+                     <a href="{{ url_for('gameday.print_lineup', game_id=game.id) }}" class="btn btn-secondary mt-2" target="_blank"><i class="bi bi-printer-fill me-2"></i> Print Lineup Card</a>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-lg-12 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-lightning-fill me-2"></i>In-Game Quick Notes</h5>
-                </div>
-                <div class="card-body">
-                    <form id="addQuickNoteForm">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <div class="input-group mb-3">
-                            <input type="text" id="quickNoteInput" class="form-control" placeholder="Log a quick thought...">
-                            <button class="btn btn-outline-secondary" type="submit">Add Note</button>
+            <div class="row">
+                <div class="col-lg-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-check2-circle me-2"></i>Player Availability</h5>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#availabilityCollapse">
+                                Edit
+                            </button>
                         </div>
-                    </form>
-                    <ul class="list-group" id="quickNotesList">
-                        {% if quick_notes %}
-                            {% for note in quick_notes %}
-                            <li class="list-group-item" data-note-id="{{ note.id }}">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div class="ms-2 me-auto">
-                                        <div class="note-text">{{ note.text }}</div>
-                                        <small class="text-muted">-- {{ note.author }}</small>
-                                    </div>
-                                    <div class="d-flex flex-column align-items-end flex-shrink-0 ms-2">
-                                        <small class="text-muted mb-1 text-nowrap" data-timestamp="{{ note.timestamp }}"></small>
-                                        {% set user_can_edit = (session.full_name == note.author or session.username == note.author) or (session.role in ['Head Coach', 'Super Admin']) %}
-                                        {% if user_can_edit %}
-                                        <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-secondary btn-sm edit-quick-note-btn" data-bs-toggle="modal" data-bs-target="#editQuickNoteModal"><i class="bi bi-pencil"></i></button>
-                                            <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="{{ url_for('gameday.delete_quick_note', note_id=note.id) }}" data-delete-name="this note"><i class="bi bi-trash"></i></button>
-                                        </div>
-                                        {% endif %}
-                                    </div>
+                        <div class="card-body">
+                            {% set absent_count = absent_player_ids | length %}
+                            {% set present_count = roster | length - absent_count %}
+                            <p><strong>{{ present_count }}</strong> players present, <strong>{{ absent_count }}</strong> absent.</p>
+                            <div class="collapse" id="availabilityCollapse">
+                                <form action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <ul class="list-group mb-3">
+                                        {% for player in roster %}
+                                        <li class="list-group-item">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player['id'] }}" id="player-{{ player['id'] }}" {% if player['id'] in absent_player_ids %}checked{% endif %}>
+                                                <label class="form-check-label" for="player-{{ player['id'] }}">
+                                                    {{ player['name'] }}
+                                                </label>
+                                            </div>
+                                        </li>
+                                        {% else %}
+                                        <li class="list-group-item text-muted">No players on the roster.</li>
+                                        {% endfor %}
+                                    </ul>
+                                    <button type="submit" class="btn btn-primary w-100">Save Availability</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Batting Lineup</h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">
+                                <i class="bi bi-pencil-square"></i> Edit Lineup
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            {% if lineup and lineup.lineup_positions %}
+                                <ol class="list-group list-group-numbered">
+                                    {% for player_name in lineup.lineup_positions %}
+                                        <li class="list-group-item">{{ player_name }}</li>
+                                    {% endfor %}
+                                </ol>
+                            {% else %}
+                                <div class="text-center p-3 text-muted">
+                                    <p class="mb-1">No lineup has been set.</p>
                                 </div>
-                            </li>
-                            {% endfor %}
-                        {% else %}
-                            <li class="list-group-item text-muted text-center">No quick notes yet.</li>
-                        {% endif %}
-                    </ul>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-check2-circle me-2"></i>Player Availability</h5>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#availabilityCollapse">
-                        Edit
-                    </button>
-                </div>
-                <div class="card-body">
-                    {% set absent_count = absent_player_ids | length %}
-                    {% set present_count = roster | length - absent_count %}
-                    <p><strong>{{ present_count }}</strong> players present, <strong>{{ absent_count }}</strong> absent.</p>
-                    <div class="collapse" id="availabilityCollapse">
-                        <form action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                            <ul class="list-group mb-3">
-                                {% for player in roster %}
-                                <li class="list-group-item">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player['id'] }}" id="player-{{ player['id'] }}" {% if player['id'] in absent_player_ids %}checked{% endif %}>
-                                        <label class="form-check-label" for="player-{{ player['id'] }}">
-                                            {{ player['name'] }}
-                                        </label>
-                                    </div>
-                                </li>
-                                {% else %}
-                                <li class="list-group-item text-muted">No players on the roster.</li>
-                                {% endfor %}
-                            </ul>
-                            <button type="submit" class="btn btn-primary w-100">Save Availability</button>
-                        </form>
+            <div class="row">
+                <div class="col-lg-12 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Opponent Scouting</h5>
+                        </div>
+                        <div class="card-body">
+                            <form action="{{ url_for('gameday.edit_game', game_id=game.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="mb-3">
+                                    <label for="opponent_notes" class="form-label">Scouting Notes for {{ game.opponent }}</label>
+                                    <textarea class="form-control" id="opponent_notes" name="opponent_notes" rows="5">{{ opponent_notes or '' }}</textarea>
+                                </div>
+                                <button type="submit" class="btn btn-secondary w-100">Save Scouting Notes</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Batting Lineup</h5>
-                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">
-                        <i class="bi bi-pencil-square"></i> Edit Lineup
-                    </button>
+        <div class="tab-pane fade" id="ingame" role="tabpanel" aria-labelledby="ingame-tab">
+            <div class="row">
+                <div class="col-lg-12 mb-4">
+                    {% include '_rotation_editor.html' %}
                 </div>
-                <div class="card-body">
-                    {% if lineup and lineup.lineup_positions %}
-                        <ol class="list-group list-group-numbered">
-                            {% for player_name in lineup.lineup_positions %}
-                                <li class="list-group-item">{{ player_name }}</li>
-                            {% endfor %}
-                        </ol>
-                    {% else %}
-                        <div class="text-center p-3 text-muted">
-                            <p class="mb-1">No lineup has been set.</p>
+                <div class="col-lg-12 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-lightning-fill me-2"></i>In-Game Quick Notes</h5>
                         </div>
-                    {% endif %}
+                        <div class="card-body">
+                            <form id="addQuickNoteForm">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="input-group mb-3">
+                                    <input type="text" id="quickNoteInput" class="form-control" placeholder="Log a quick thought...">
+                                    <button class="btn btn-outline-secondary" type="submit">Add Note</button>
+                                </div>
+                            </form>
+                            <ul class="list-group" id="quickNotesList">
+                                {% if quick_notes %}
+                                    {% for note in quick_notes %}
+                                    <li class="list-group-item" data-note-id="{{ note.id }}">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="ms-2 me-auto">
+                                                <div class="note-text">{{ note.text }}</div>
+                                                <small class="text-muted">-- {{ note.author }}</small>
+                                            </div>
+                                            <div class="d-flex flex-column align-items-end flex-shrink-0 ms-2">
+                                                <small class="text-muted mb-1 text-nowrap" data-timestamp="{{ note.timestamp }}"></small>
+                                                {% set user_can_edit = (session.full_name == note.author or session.username == note.author) or (session.role in ['Head Coach', 'Super Admin']) %}
+                                                {% if user_can_edit %}
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-secondary btn-sm edit-quick-note-btn" data-bs-toggle="modal" data-bs-target="#editQuickNoteModal"><i class="bi bi-pencil"></i></button>
+                                                    <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="{{ url_for('gameday.delete_quick_note', note_id=note.id) }}" data-delete-name="this note"><i class="bi bi-trash"></i></button>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                {% else %}
+                                    <li class="list-group-item text-muted text-center">No quick notes yet.</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-12 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitching Log</h5>
+                        </div>
+                        <div class="card-body">
+                          {% include '_pitching_log.html' %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="col-lg-12 mb-4">
-            {% include '_rotation_editor.html' %}
-        </div>
-
-        <div class="col-lg-12 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitching Log</h5>
-                </div>
-                <div class="card-body">
-                  {% include '_pitching_log.html' %}
+        <div class="tab-pane fade" id="postgame" role="tabpanel" aria-labelledby="postgame-tab">
+            {% if is_past_game %}
+            <div class="row">
+                <div class="col-lg-8 offset-lg-2 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-dark text-white">
+                            <h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Post-Game Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <form action="{{ url_for('gameday.edit_game', game_id=game.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="row mb-3">
+                                    <div class="col">
+                                        <label for="our_score" class="form-label">Our Score</label>
+                                        <input type="number" class="form-control" id="our_score" name="our_score" value="{{ game.our_score or '' }}">
+                                    </div>
+                                    <div class="col">
+                                        <label for="opponent_score" class="form-label">Opponent Score</label>
+                                        <input type="number" class="form-control" id="opponent_score" name="opponent_score" value="{{ game.opponent_score or '' }}">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="post_game_summary" class="form-label">Takeaways & Summary</label>
+                                    <textarea class="form-control" id="post_game_summary" name="post_game_summary" rows="4">{{ game.post_game_summary or '' }}</textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Save Summary</button>
+                            </form>
+                            {% if game.post_game_summary %}
+                            <a href="{{ url_for('gameday.create_practice_plan_from_game', game_id=game.id) }}" class="btn btn-success w-100 mt-2">
+                                <i class="bi bi-cone-striped me-2"></i> Create Practice Plan from Takeaways
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>
