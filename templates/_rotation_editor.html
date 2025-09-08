@@ -2,25 +2,24 @@
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="mb-0" id="rotation-editor-title">Defensive Rotation</h5>
         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-            <div class="btn-group">
-                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-list"></i> Menu
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="#" id="saveRotationBtn"><i class="bi bi-save me-1"></i> Save Rotation</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li class="px-2">
-                        <label for="rotationTemplateSelect" class="form-label small visually-hidden">Load Template</label>
-                        <select id="rotationTemplateSelect" class="form-select form-select-sm">
-                            <option value="">-- Load Template --</option>
-                        </select>
-                    </li>
-                    <li><a class="dropdown-item" href="#" id="saveAsTemplateBtn"><i class="bi bi-journal-plus me-1"></i> Save as New Template</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="#" id="deleteRotationBtn" {% if not rotation or not rotation.id %}disabled{% endif %}><i class="bi bi-trash me-1"></i> Delete Rotation</a></li>
-                </ul>
-            </div>
-        </div>
+    <button type="button" class="btn btn-primary btn-sm" id="saveRotationBtn"><i class="bi bi-save me-1"></i> Save Rotation</button>
+    <div class="btn-group">
+        <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-list"></i> More
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li class="px-2">
+                <label for="rotationTemplateSelect" class="form-label small visually-hidden">Load Template</label>
+                <select id="rotationTemplateSelect" class="form-select form-select-sm">
+                    <option value="">-- Load Template --</option>
+                </select>
+            </li>
+            <li><a class="dropdown-item" href="#" id="saveAsTemplateBtn"><i class="bi bi-journal-plus me-1"></i> Save as New Template</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" href="#" id="deleteRotationBtn" {% if not rotation or not rotation.id %}disabled{% endif %}><i class="bi bi-trash me-1"></i> Delete Rotation</a></li>
+        </ul>
+    </div>
+</div>
     </div>
     <div class="card-body" id="rotation-board">
         <div class="mb-3">
@@ -78,6 +77,13 @@
 
                         </svg>
                 </div>
+
+<div class="d-flex justify-content-center align-items-center gap-3 mb-3 small text-muted">
+    <strong>Legend:</strong>
+    <span class="d-flex align-items-center"><span class="d-inline-block rounded-circle me-1" style="width: 12px; height: 12px; background-color: #198754;"></span> Natural</span>
+    <span class="d-flex align-items-center"><span class="d-inline-block rounded-circle me-1" style="width: 12px; height: 12px; background-color: #ffc107;"></span> Secondary</span>
+    <span class="d-flex align-items-center"><span class="d-inline-block rounded-circle me-1" style="width: 12px; height: 12px; background-color: var(--primary-color);"></span> Other</span>
+</div>
 
                 <ul class="nav nav-tabs">
                     <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#bench-tab">Bench</a></li>
