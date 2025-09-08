@@ -5,11 +5,11 @@ function initializeRotationEditor(state, escapeHTML) {
     const POS_COORDS = {
         // Infield
         'P':  { x: 50, y: 61 },  // Pitcher's Mound
-        'C':  { x: 50, y: 100 }, // Catcher
+        'C':  { x: 50, y: 85 },  // Catcher
         '1B': { x: 77, y: 69 },  // First Base
         '2B': { x: 50, y: 48 },  // Second Base
-        'SS': { x: 32, y: 55 },  // Shortstop
         '3B': { x: 23, y: 69 },  // Third Base
+        'SS': { x: 32, y: 55 },  // Shortstop
 
         // 3-Outfielder Setup
         'LF': { x: 18, y: 30 },  // Left Field
