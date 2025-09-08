@@ -154,7 +154,8 @@ def edit_game(game_id):
     db.session.commit()
     flash('Game details updated successfully!', 'success')
     socketio.emit('data_updated', {'message': 'Game details updated.'})
-    return redirect(url_for('.game_management', game_id=game_id))
+    active_tab = request.form.get('active_tab', 'pregame')
+    return redirect(url_for('.game_management', game_id=game_id, _anchor=active_tab))
 
 @gameday_bp.route('/delete_game/<int:game_id>', methods=['POST'])
 def delete_game(game_id):
@@ -193,7 +194,8 @@ def update_absences(game_id):
     db.session.commit()
     flash('Player availability updated for this game.', 'success')
     socketio.emit('data_updated', {'message': f'Availability updated for game {game_id}.'})
-    return redirect(url_for('.game_management', game_id=game_id, _anchor='availability'))
+    active_tab = request.form.get('active_tab', 'pregame')
+    return redirect(url_for('.game_management', game_id=game_id, _anchor=active_tab))
 
 @gameday_bp.route('/game/<int:game_id>/add_quick_note', methods=['POST'])
 def add_quick_note(game_id):
@@ -313,7 +315,8 @@ def add_pitching_outing_for_game(game_id):
     db.session.commit()
     flash('Pitching outing for this game logged successfully!', 'success')
     socketio.emit('pitching_update', {'message': 'New pitching outing added.'})
-    return redirect(url_for('.game_management', game_id=game_id))
+    active_tab = request.form.get('active_tab', 'ingame')
+    return redirect(url_for('.game_management', game_id=game_id, _anchor=active_tab))
 
 
 # --- Lineup & Rotation API-like routes ---

@@ -428,5 +428,45 @@
             });
         }
     });
+
+    // --- Tab State Management ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const gameTabs = document.getElementById('gameTabs');
+        const allForms = document.querySelectorAll('form[action*="/edit_game/"], form[action*="/update_absences"], form[action*="/add_pitching_outing"]');
+
+        // Function to update hidden form fields with the current active tab
+        const updateActiveTabInForms = (activeTabId) => {
+            allForms.forEach(form => {
+                let hiddenInput = form.querySelector('input[name="active_tab"]');
+                if (!hiddenInput) {
+                    hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'active_tab';
+                    form.appendChild(hiddenInput);
+                }
+                hiddenInput.value = activeTabId;
+            });
+        };
+
+        // On page load, check for a hash and activate the corresponding tab
+        if (window.location.hash) {
+            const tabId = window.location.hash.substring(1); // e.g., "ingame"
+            const tabButton = document.querySelector(`button[data-bs-target="#${tabId}"]`);
+            if (tabButton) {
+                const tab = new bootstrap.Tab(tabButton);
+                tab.show();
+                updateActiveTabInForms(tabId); // Update forms on initial load
+            }
+        } else {
+            // If no hash, ensure the default active tab ("pregame") is set in forms
+            updateActiveTabInForms('pregame');
+        }
+
+        // When a new tab is shown, update its ID in all relevant forms
+        gameTabs.addEventListener('shown.bs.tab', (event) => {
+            const activeTabId = event.target.getAttribute('data-bs-target').substring(1);
+            updateActiveTabInForms(activeTabId);
+        });
+    });
 </script>
 {% endblock %}
