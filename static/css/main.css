@@ -254,7 +254,7 @@ body {
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    aspect-ratio: 2 / 3; /* This is the corrected line */
+    aspect-ratio: 1 / 1; /* MODIFIED: Was 2 / 3. This makes the container square. */
 }
 
 .position-dropzone {

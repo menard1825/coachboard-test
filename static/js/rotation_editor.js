@@ -12,13 +12,13 @@ function initializeRotationEditor(state, escapeHTML) {
         '3B': { x: 22, y: 68 },  // Third Base
 
         // 3-Outfielder Setup
-        'LF': { x: 20, y: 35 },  // Left Field
-        'CF': { x: 50, y: 25 },  // Center Field
-        'RF': { x: 80, y: 35 },  // Right Field
+        'LF': { x: 18, y: 30 },  // Left Field
+        'CF': { x: 50, y: 20 },  // Center Field
+        'RF': { x: 82, y: 30 },  // Right Field
 
         // 4-Outfielder Setup
-        'LCF':{ x: 35, y: 30 },  // Left-Center Field
-        'RCF':{ x: 65, y: 30 }   // Right-Center Field
+        'LCF':{ x: 35, y: 25 },  // Left-Center Field
+        'RCF':{ x: 65, y: 25 }   // Right-Center Field
     };
 
     function renderRotationEditor() {
