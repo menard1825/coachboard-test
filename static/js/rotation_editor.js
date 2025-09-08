@@ -2,26 +2,48 @@
 
 function initializeRotationEditor(state, escapeHTML) {
 
-    // --- Rotation Editor Functions ---
+    const POS_COORDS = {
+        'P':  { x: 50, y: 62 },
+        'C':  { x: 50, y: 92 },
+        '1B': { x: 75, y: 70 },
+        '2B': { x: 68, y: 48 },
+        '3B': { x: 25, y: 70 },
+        'SS': { x: 32, y: 48 },
+        'LF': { x: 20, y: 25 },
+        'CF': { x: 50, y: 15 },
+        'RF': { x: 80, y: 25 },
+        'LCF':{ x: 35, y: 20 },
+        'RCF':{ x: 65, y: 20 }
+    };
+
     function renderRotationEditor() {
         if (!state.rotation) return;
         renderInningSelector();
-        renderRotationDiamondAndBench();
+        renderPositionList();
+        renderDiamond();
+        renderBenchAndSummary();
         updatePlayingTimeSummary();
-        initializeRotationSortables();
     }
 
     function renderInningSelector() {
         const container = document.getElementById('inning-btn-group');
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const display = document.getElementById('current-inning-display');
+        const innings = Object.keys(state.rotation.innings || {}).map(Number).sort((a, b) => a - b);
         if (innings.length === 0) {
             state.rotation.innings['1'] = {};
-            innings.push('1');
+            innings.push(1);
         }
+        if (!state.currentInning || !state.rotation.innings[state.currentInning]) {
+             state.currentInning = innings[0];
+        }
+
         container.innerHTML = innings.map(inn => `
             <input type="radio" class="btn-check" name="inning-radio" id="inning-${inn}" value="${inn}" ${state.currentInning == inn ? 'checked' : ''}>
             <label class="btn btn-outline-primary" for="inning-${inn}">${inn}</label>
         `).join('');
+
+        if (display) display.textContent = state.currentInning;
+
         container.querySelectorAll('input[name="inning-radio"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
                 state.currentInning = e.target.value;
@@ -30,121 +52,152 @@ function initializeRotationEditor(state, escapeHTML) {
         });
     }
 
-    function renderRotationDiamondAndBench() {
+    function renderPositionList() {
+        const container = document.getElementById('position-assignment-list');
+        const currentInningData = state.rotation.innings[state.currentInning] || {};
+        const assignedPlayerNames = new Set(Object.values(currentInningData));
+
+        let positions = ['P', 'C', '1B', '2B', '3B', 'SS'];
+        if (state.outfielder_count === 4) {
+            positions.push('LF', 'LCF', 'RCF', 'RF');
+        } else {
+            positions.push('LF', 'CF', 'RF');
+        }
+
+        container.innerHTML = positions.map(pos => {
+            const assignedPlayerName = currentInningData[pos];
+            const availablePlayers = state.roster.filter(p => !assignedPlayerNames.has(p.name) || p.name === assignedPlayerName);
+
+            let options = availablePlayers.map(p =>
+                `<option value="${escapeHTML(p.name)}" ${assignedPlayerName === p.name ? 'selected' : ''}>${escapeHTML(p.name)}</option>`
+            ).join('');
+
+            return `
+                <div class="list-group-item d-flex justify-content-between align-items-center ps-2">
+                    <span class="fw-bold me-3">${pos}</span>
+                    <select class="form-select form-select-sm position-select" data-position="${pos}">
+                        <option value="">-- Empty --</option>
+                        ${options}
+                    </select>
+                </div>
+            `;
+        }).join('');
+
+        container.querySelectorAll('.position-select').forEach(select => {
+            select.addEventListener('change', handlePositionChange);
+        });
+    }
+
+    function handlePositionChange(e) {
+        const position = e.target.dataset.position;
+        const newPlayerName = e.target.value;
         const currentInningData = state.rotation.innings[state.currentInning] || {};
 
-        const createPlayerTag = (player) => {
-            const primaryPos = player.position1 ? ` (${escapeHTML(player.position1)})` : '';
-            const pitchingSummary = (state.pitch_count_summary || {})[player.name];
-            const isPitcherOnRest = (pitchingSummary && pitchingSummary.status === 'Resting');
-            const pitcherClass = isPitcherOnRest ? 'pitcher-on-rest' : '';
-            return `<div class="player-tag ${pitcherClass}" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
-        };
+        const oldPlayerAtPos = currentInningData[position];
 
-        document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => tag.remove());
-        for (const [pos, playerName] of Object.entries(currentInningData)) {
-            const player = state.roster.find(p => p.name === playerName);
-            if (player) {
-                const dropzoneDesktop = document.getElementById(`pos-desktop-${pos}`);
-                const dropzoneMobile = document.getElementById(`pos-mobile-${pos}`);
-                if (dropzoneDesktop) dropzoneDesktop.insertAdjacentHTML('beforeend', createPlayerTag(player));
-                if (dropzoneMobile) dropzoneMobile.insertAdjacentHTML('beforeend', createPlayerTag(player));
+        // Find if the new player was assigned elsewhere and clear that spot
+        for (const [pos, name] of Object.entries(currentInningData)) {
+            if (name === newPlayerName) {
+                delete currentInningData[pos];
             }
         }
 
-        const assignedPlayers = new Set(Object.values(currentInningData));
-        const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
-        const benchDesktop = document.getElementById('bench-list-desktop');
-        if(benchDesktop) {
-            benchDesktop.innerHTML = benchPlayers.length > 0
-                ? benchPlayers.map(p => createPlayerTag(p)).join('')
-                : '<div class="list-group-item text-muted text-center">Bench is empty</div>';
+        if (newPlayerName) {
+            currentInningData[position] = newPlayerName;
+        } else {
+            delete currentInningData[position];
         }
 
-        applyOutOfPositionIndicators();
+        renderRotationEditor();
+    }
+
+    function renderDiamond() {
+        const svg = document.getElementById('baseball-diamond-svg');
+        if (!svg) return;
+
+        // Clear existing player tokens
+        svg.querySelectorAll('.player-token').forEach(el => el.remove());
+
+        const currentInningData = state.rotation.innings[state.currentInning] || {};
+
+        for (const [pos, playerName] of Object.entries(currentInningData)) {
+            const player = state.roster.find(p => p.name === playerName);
+            if (!player || !POS_COORDS[pos]) continue;
+
+            let posClass = 'other-pos';
+            if (player.position1 === pos) posClass = 'natural-pos';
+            else if (player.position2 === pos || player.position3 === pos) posClass = 'secondary-pos';
+
+            const tokenGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            tokenGroup.setAttribute('class', `player-token ${posClass}`);
+            tokenGroup.setAttribute('transform', `translate(${POS_COORDS[pos].x}, ${POS_COORDS[pos].y})`);
+
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('r', '5');
+            circle.setAttribute('class', 'player-token-circle');
+
+            const numText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            numText.setAttribute('class', 'player-token-text-num');
+            numText.setAttribute('y', '0.5');
+            numText.textContent = `#${player.number || ''}`;
+
+            const nameText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            nameText.setAttribute('class', 'player-token-text-name');
+            nameText.setAttribute('y', '3');
+            nameText.textContent = player.name.split(' ')[0]; // First name
+
+            tokenGroup.appendChild(circle);
+            tokenGroup.appendChild(numText);
+            tokenGroup.appendChild(nameText);
+            svg.appendChild(tokenGroup);
+        }
+    }
+
+    function renderBenchAndSummary() {
+        const benchContainer = document.getElementById('bench-list-visual');
+        const currentInningData = state.rotation.innings[state.currentInning] || {};
+        const assignedPlayers = new Set(Object.values(currentInningData));
+        const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
+
+        if (benchPlayers.length > 0) {
+            benchContainer.innerHTML = benchPlayers.map(p =>
+                `<span class="badge bg-secondary me-1 mb-1">${escapeHTML(p.name)}</span>`
+            ).join('');
+        } else {
+            benchContainer.innerHTML = `<p class="text-muted small">All players are on the field.</p>`;
+        }
     }
 
     function updatePlayingTimeSummary() {
+        const summaryContainer = document.getElementById('summary-visual');
         const summary = {};
         state.roster.forEach(player => {
-            summary[player.name] = { name: player.name, inningsOnField: 0, inningsOnBench: 0, positions: new Set() };
+            summary[player.name] = { name: player.name, inningsOnField: 0, positions: new Set() };
         });
-        const innings = Object.keys(state.rotation.innings || {});
-        innings.forEach(inningNum => {
-            const inningPositions = state.rotation.innings[inningNum] || {};
-            const playersOnFieldThisInning = new Set(Object.values(inningPositions));
-            state.roster.forEach(player => {
-                if (summary[player.name]) {
-                    playersOnFieldThisInning.has(player.name) ? summary[player.name].inningsOnField++ : summary[player.name].inningsOnBench++;
+
+        Object.values(state.rotation.innings || {}).forEach(inningData => {
+            for (const [pos, playerName] of Object.entries(inningData)) {
+                if (summary[playerName]) {
+                    summary[playerName].inningsOnField++;
+                    summary[playerName].positions.add(pos);
                 }
-            });
-            for (const [position, playerName] of Object.entries(inningPositions)) {
-                if (playerName && summary[playerName]) summary[playerName].positions.add(position);
             }
         });
-        let tableHtml = `<div class="table-responsive"><table class="table table-sm table-striped table-bordered"><thead class="table-light"><tr><th>Player</th><th>Field</th><th>Bench</th><th>Positions</th></tr></thead><tbody>`;
+
         const sortedPlayerNames = state.roster.map(p => p.name).sort();
+        let tableHtml = `<div class="table-responsive"><table class="table table-sm table-striped" style="font-size: 0.8rem;"><thead><tr><th>Player</th><th>Innings</th><th>Positions</th></tr></thead><tbody>`;
+
         if (sortedPlayerNames.length > 0) {
             for (const playerName of sortedPlayerNames) {
                 const data = summary[playerName];
                 if (!data) continue;
-                tableHtml += `<tr><td><strong>${playerName}</strong></td><td>${data.inningsOnField}</td><td>${data.inningsOnBench}</td><td>${Array.from(data.positions).join(', ') || 'N/A'}</td></tr>`;
+                tableHtml += `<tr><td><strong>${playerName}</strong></td><td>${data.inningsOnField}</td><td>${Array.from(data.positions).join(', ') || 'N/A'}</td></tr>`;
             }
         } else {
-            tableHtml += '<tr><td colspan="4" class="text-center text-muted">No players on roster.</td></tr>';
+            tableHtml += '<tr><td colspan="3" class="text-center text-muted">No players.</td></tr>';
         }
         tableHtml += `</tbody></table></div>`;
-        const summaryDesktop = document.getElementById('summary-desktop');
-        const summaryMobile = document.getElementById('summary-mobile');
-        if (summaryDesktop) summaryDesktop.innerHTML = tableHtml;
-        if (summaryMobile) summaryMobile.innerHTML = tableHtml;
-    }
-
-    function initializeRotationSortables() {
-        Object.values(state.sortableInstances).forEach(s => { if (s.destroy) s.destroy(); });
-        state.sortableInstances = {};
-        const onEndHandler = () => {
-            const inningData = state.rotation.innings[state.currentInning] = {};
-            document.querySelectorAll('#diamond-parent-desktop .position-dropzone').forEach(dz => {
-                const playerTag = dz.querySelector('.player-tag');
-                if (playerTag) {
-                    inningData[dz.dataset.position] = playerTag.dataset.playerName;
-                }
-            });
-            renderRotationEditor();
-        };
-        const allContainers = [...document.querySelectorAll('#bench-list-desktop, #diamond-parent-desktop .position-dropzone')];
-        allContainers.forEach(container => {
-            state.sortableInstances[container.id] = new Sortable(container, {
-                group: 'rotation', animation: 150, onEnd: onEndHandler,
-                onMove: (evt) => {
-                    if (evt.to.classList.contains('position-dropzone') && evt.to.children.length > 1 && evt.to !== evt.from) {
-                        evt.from.appendChild(evt.to.querySelector('.player-tag'));
-                    }
-                }
-            });
-        });
-    }
-
-    function applyOutOfPositionIndicators() {
-        document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => {
-            const playerName = tag.dataset.playerName;
-            const position = tag.closest('.position-dropzone').dataset.position;
-            const player = state.roster.find(p => p.name === playerName);
-
-            tag.classList.remove('natural-position', 'secondary-position');
-
-            if (player && position) {
-                const primaryPos = player.position1;
-                const secondaryPositions = [player.position2, player.position3];
-
-                if (position === primaryPos) {
-                    tag.classList.add('natural-position');
-                } else if (secondaryPositions.includes(position)) {
-                    tag.classList.add('secondary-position');
-                }
-            }
-        });
+        summaryContainer.innerHTML = tableHtml;
     }
 
     function exitCopyMode() {
@@ -167,6 +220,7 @@ function initializeRotationEditor(state, escapeHTML) {
             .filter(inn => inn != state.currentInning)
             .map(inn => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" value="${inn}" id="paste-check-${inn}"><label class="form-check-label" for="paste-check-${inn}">${inn}</label></div>`).join('');
     });
+
     document.getElementById('pasteToSelectedBtn')?.addEventListener('click', () => {
         if (!state.copiedInningData) return;
         const selectedInnings = Array.from(document.querySelectorAll('#inning-paste-checkboxes input:checked')).map(cb => cb.value);
@@ -175,11 +229,11 @@ function initializeRotationEditor(state, escapeHTML) {
             state.rotation.innings[inn] = { ...state.copiedInningData };
         });
         exitCopyMode();
-        updatePlayingTimeSummary();
+        renderRotationEditor();
     });
+
     document.getElementById('cancelPasteBtn')?.addEventListener('click', exitCopyMode);
 
     renderRotationEditor();
-    // NEW: Return the main function so game_logic.js can call it later
     return renderRotationEditor;
 }

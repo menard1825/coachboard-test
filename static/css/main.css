@@ -145,6 +145,43 @@ body {
         background-color: transparent;
     }
 }
+/* ==========================================================================
+   New Rotation Editor Styles
+   ========================================================================== */
+
+/* Remove old interactive diamond styles */
+.diamond-container-interactive {
+    background-image: none;
+}
+.position-dropzone {
+    display: none;
+}
+
+/* Player Token Styles */
+.player-token {
+    transition: all 0.2s ease-in-out;
+    cursor: default;
+}
+
+.player-token-circle {
+    stroke-width: 0.5;
+    stroke: rgba(0,0,0,0.5);
+}
+
+.player-token.natural-pos .player-token-circle {
+    fill: #198754; /* Bootstrap Success Green */
+}
+.player-token.secondary-pos .player-token-circle {
+    fill: #ffc107; /* Bootstrap Warning Yellow */
+}
+.player-token.other-pos .player-token-circle {
+    fill: var(--primary-color);
+}
+
+.player-token.secondary-pos .player-token-text-name,
+.player-token.secondary-pos .player-token-text-num {
+    fill: #000;
+}
 
 /* ==========================================================================
    Google Places Autocomplete Fix for Modals
