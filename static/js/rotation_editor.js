@@ -3,22 +3,22 @@
 function initializeRotationEditor(state, escapeHTML) {
 
     const POS_COORDS = {
-        // Infield
-        'P':  { x: 50, y: 50 },  // Center of the mound
-        'C':  { x: 50, y: 92 },  // Behind home plate
+        // Infield (can remain as is or fine-tuned if needed)
+        'P':  { x: 50, y: 50 },
+        'C':  { x: 50, y: 92 },
         '1B': { x: 78, y: 55 },
-        '2B': { x: 62, y: 40 },  // Adjusted slightly
-        'SS': { x: 38, y: 40 },  // Adjusted slightly
+        '2B': { x: 62, y: 40 },
+        'SS': { x: 38, y: 40 },
         '3B': { x: 22, y: 55 },
 
-        // 3-Outfielder Setup (Recommended Adjustment)
-        'LF': { x: 15, y: 12 },  // Deeper
-        'CF': { x: 50, y: 10 },  // Deeper
-        'RF': { x: 85, y: 12 },  // Deeper
+        // 3-Outfielder Setup (Adjusted for the new, deeper image)
+        'LF': { x: 15, y: 8 },  // Even deeper left field
+        'CF': { x: 50, y: 5 },  // Much deeper center field
+        'RF': { x: 85, y: 8 },  // Even deeper right field
 
-        // 4-Outfielder Setup (Deeper Outfield)
-        'LCF':{ x: 35, y: 10 },
-        'RCF':{ x: 65, y: 10 }
+        // 4-Outfielder Setup (Adjusted for the new, deeper image)
+        'LCF':{ x: 35, y: 6 },  // Deeper Left-Center Field
+        'RCF':{ x: 65, y: 6 }   // Deeper Right-Center Field
     };
 
     function renderRotationEditor() {
