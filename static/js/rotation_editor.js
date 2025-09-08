@@ -3,22 +3,23 @@
 function initializeRotationEditor(state, escapeHTML) {
 
     const POS_COORDS = {
-        // Infield (can remain as is or fine-tuned if needed)
-        'P':  { x: 50, y: 50 },
-        'C':  { x: 50, y: 92 },
-        '1B': { x: 78, y: 55 },
-        '2B': { x: 62, y: 40 },
-        'SS': { x: 38, y: 40 },
-        '3B': { x: 22, y: 55 },
+        // Coordinates recalibrated for the new background image
+        // Infield
+        'P':  { x: 50, y: 62 },  // Pitcher's Mound
+        'C':  { x: 50, y: 98 },  // Catcher
+        '1B': { x: 73, y: 68 },  // First Base
+        '2B': { x: 62, y: 56 },  // Second Baseman
+        'SS': { x: 38, y: 56 },  // Shortstop
+        '3B': { x: 27, y: 68 },  // Third Base
 
-        // 3-Outfielder Setup (Adjusted for the new, deeper image)
-        'LF': { x: 15, y: 8 },  // Even deeper left field
-        'CF': { x: 50, y: 5 },  // Much deeper center field
-        'RF': { x: 85, y: 8 },  // Even deeper right field
+        // 3-Outfielder Setup
+        'LF': { x: 20, y: 30 },  // Left Field
+        'CF': { x: 50, y: 20 },  // Center Field
+        'RF': { x: 80, y: 30 },  // Right Field
 
-        // 4-Outfielder Setup (Adjusted for the new, deeper image)
-        'LCF':{ x: 35, y: 6 },  // Deeper Left-Center Field
-        'RCF':{ x: 65, y: 6 }   // Deeper Right-Center Field
+        // 4-Outfielder Setup
+        'LCF':{ x: 35, y: 25 },  // Left-Center Field
+        'RCF':{ x: 65, y: 25 }   // Right-Center Field
     };
 
     function renderRotationEditor() {
