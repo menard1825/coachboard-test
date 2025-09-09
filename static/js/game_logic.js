@@ -457,6 +457,7 @@ window.initializeGameManagement = function(gameData) {
         renderRotationEditor = initializeRotationEditor(state, escapeHTML);
         renderLineupDisplay(); // Initial render of the lineup
         setupEventListeners();
+        initializeRotationEditor(state, escapeHTML);
         fetchWeatherForGame(state.game.location, gameData.game_date_for_input);
 
         const editGameModal = document.getElementById('editGameModal');

@@ -146,6 +146,18 @@ body {
     }
 }
 
+/* ==========================================================================
+   Login & Registration Page Styles
+   ========================================================================== */
+.login-logo-container {
+    background-color: #ffffff;
+    border-radius: 50%;
+    padding: 20px;
+    display: inline-block;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem !important;
+}
+
 /* Hide SVG drawing when using a background image */
 .diamond-container-interactive svg .grass,
 .diamond-container-interactive svg .outfield-grass,
