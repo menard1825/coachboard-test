@@ -60,7 +60,7 @@ window.initializeGameManagement = function(gameData) {
     const state = {
         roster: (gameData.roster || []).filter(p => !(gameData.absent_player_ids || []).includes(p.id)),
         lineup: gameData.lineup || { id: null, title: `Lineup for vs ${gameData.game.opponent}`, lineup_positions: [], associated_game_id: gameData.game.id },
-        rotation: gameData.rotation || { id: null, title: `Rotation for vs ${state.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
+        rotation: gameData.rotation || { id: null, title: `Rotation for vs ${gameData.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
         game: gameData.game,
         lineup_templates: gameData.lineup_templates || [],
         rotation_templates: gameData.rotation_templates || [],
