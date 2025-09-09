@@ -115,7 +115,7 @@ def delete_player(player_id):
         socketio.emit('data_updated', {'message': f'Player {player_name} deleted.'})
     else:
         flash('Player not found.', 'danger')
-    return redirect(request.referrer or url_for('home', _anchor='roster'))
+    return redirect(url_for('home', _anchor=request.args.get('anchor', 'roster')))
         
 @roster_bp.route('/save_player_order', methods=['POST'])
 def save_player_order():

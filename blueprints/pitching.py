@@ -39,7 +39,7 @@ def edit_pitching(outing_id):
                 outing_to_edit.date = parsed_date
             else:
                 flash('Invalid date format.', 'danger')
-                return redirect(request.referrer or url_for('pitching.pitching_page'))
+                return redirect(url_for('pitching.pitching_page'))
 
         player_id = request.form.get('player_id')
         if player_id:

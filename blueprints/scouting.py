@@ -59,7 +59,7 @@ def delete_scouted_player(list_type, player_id):
         socketio.emit('scouting_update', {'message': f'Scouted player {player_name} removed.'})
     else:
         flash(f'Could not find the player to remove.', 'warning')
-    return redirect(request.referrer or url_for('home', _anchor='scouting_list'))
+    return redirect(url_for('home', _anchor=request.args.get('anchor', 'scouting_list')))
 
 @scouting_bp.route('/move_scouted_player/<from_type>/<to_type>/<int:player_id>', methods=['POST'])
 def move_scouted_player(from_type, to_type, player_id):
@@ -71,17 +71,17 @@ def move_scouted_player(from_type, to_type, player_id):
         socketio.emit('scouting_update', {'message': f'Scouted player {player_to_move.name} moved.'})
     else:
         flash('Could not move player.', 'danger')
-    return redirect(request.referrer or url_for('home', _anchor='scouting_list'))
+    return redirect(url_for('home', _anchor=request.args.get('anchor', 'scouting_list')))
 
 @scouting_bp.route('/move_scouted_player_to_roster/<int:player_id>', methods=['POST'])
 def move_scouted_player_to_roster(player_id):
     scouted_player = db.session.query(ScoutedPlayer).filter_by(id=player_id, list_type='committed', team_id=session['team_id']).first()
     if not scouted_player:
         flash('Committed player not found.', 'danger')
-        return redirect(request.referrer or url_for('home', _anchor='scouting_list'))
+        return redirect(url_for('home', _anchor=request.args.get('anchor', 'scouting_list')))
     if db.session.query(Player).filter_by(name=scouted_player.name, team_id=session['team_id']).first():
         flash(f'Cannot move "{scouted_player.name}" to roster because a player with that name already exists.', 'danger')
-        return redirect(request.referrer or url_for('home', _anchor='scouting_list'))
+        return redirect(url_for('home', _anchor=request.args.get('anchor', 'scouting_list')))
         
     new_roster_player = Player(
         name=scouted_player.name, number="", position1=scouted_player.position1, position2=scouted_player.position2,
@@ -108,4 +108,4 @@ def move_scouted_player_to_roster(player_id):
     db.session.commit()
     flash(f'Player "{new_roster_player.name}" moved to Roster. Please assign a number.', 'success')
     socketio.emit('scouting_update', {'message': f'Scouted player {new_roster_player.name} moved to roster.'})
-    return redirect(request.referrer or url_for('home', _anchor='scouting_list'))
+    return redirect(url_for('home', _anchor=request.args.get('anchor', 'scouting_list')))
