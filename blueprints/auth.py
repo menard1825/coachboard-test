@@ -43,7 +43,10 @@ def login():
             session['role'] = user.role
             session['team_id'] = user.team_id
             session['player_order'] = get_player_order_as_list(user.player_order)
-            session.permanent = True
+            if request.form.get('remember'):
+                session.permanent = True
+            else:
+                session.permanent = False
             flash('You were successfully logged in.', 'success')
             return redirect(url_for('home'))
         else:
