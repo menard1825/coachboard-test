@@ -163,17 +163,17 @@ def delete_game(game_id):
     if game_to_delete:
         game_id_for_emit = game_to_delete.id
         game_date_str = game_to_delete.date.strftime('%m/%d/%Y')
-        # --- MODIFICATION START ---
-        # Explicitly delete associated lineups and rotations to prevent orphaned data
+
+        # Explicitly delete all associated data to prevent orphans
         db.session.query(Lineup).filter_by(associated_game_id=game_id, team_id=session['team_id']).delete()
         db.session.query(Rotation).filter_by(associated_game_id=game_id, team_id=session['team_id']).delete()
         db.session.query(PitchingOuting).filter_by(game_id=game_id, team_id=session['team_id']).delete()
         db.session.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=session['team_id']).delete()
         db.session.query(GameQuickNote).filter_by(game_id=game_id).delete()
-        # --- MODIFICATION END ---
+
         db.session.delete(game_to_delete)
         db.session.commit()
-        flash(f'Game vs "{game_to_delete.opponent}" on {game_date_str} and its associated lineup/rotation data have been removed successfully!', 'success')
+        flash(f'Game vs "{game_to_delete.opponent}" on {game_date_str} and all its associated data have been removed successfully!', 'success')
         socketio.emit('game_delete', {'game_id': game_id_for_emit})
         socketio.emit('stats_update', {'message': 'Game deleted.'})
     else:
@@ -253,18 +253,20 @@ def delete_quick_note(note_id):
     note = db.session.get(GameQuickNote, note_id)
     if not note or note.game.team_id != session['team_id']:
         flash('Note not found or permission denied.', 'danger')
-        return redirect(request.referrer or url_for('home'))
+        return redirect(url_for('home')) # Fallback to home if note is not found
 
+    game_id = note.game_id # Get game_id before deleting
     author_name = session.get('full_name') or session.get('username')
     if note.author != author_name and session.get('role') not in ['Head Coach', 'Super Admin']:
         flash('You do not have permission to delete this note.', 'danger')
-        return redirect(request.referrer or url_for('home'))
+        return redirect(url_for('.game_management', game_id=game_id, _anchor='postgame'))
 
     db.session.delete(note)
     db.session.commit()
     flash('Note deleted.', 'success')
     socketio.emit('data_updated', {'message': 'Quick note deleted.'})
-    return redirect(request.referrer or url_for('home'))
+    # Redirect back to the postgame tab of the game management page
+    return redirect(url_for('.game_management', game_id=game_id, _anchor='postgame'))
 
 
 @gameday_bp.route('/game/<int:game_id>/create_practice_plan')
@@ -391,8 +393,8 @@ def delete_lineup(lineup_id):
         socketio.emit('lineup_delete', {'lineup_id': lineup_id})
     else:
         flash('Lineup not found.', 'danger')
-    redirect_url = request.referrer or url_for('home', _anchor='lineups')
-    return redirect(redirect_url)
+    anchor = request.args.get('anchor', 'lineups')
+    return redirect(url_for('home', _anchor=anchor))
 
 @gameday_bp.route('/save_rotation', methods=['POST'])
 def save_rotation():
@@ -445,8 +447,8 @@ def delete_rotation(rotation_id):
         socketio.emit('stats_update', {'message': 'Rotation deleted.'})
     else:
         flash('Rotation not found.', 'danger')
-    redirect_url = request.referrer or url_for('home', _anchor='rotations')
-    return redirect(redirect_url)
+    anchor = request.args.get('anchor', 'rotations')
+    return redirect(url_for('home', _anchor=anchor))
 
 @gameday_bp.route('/save_rotation_as_template', methods=['POST'])
 def save_rotation_as_template():

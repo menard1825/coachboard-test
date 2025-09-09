@@ -39,7 +39,7 @@ def edit_pitching(outing_id):
                 outing_to_edit.date = parsed_date
             else:
                 flash('Invalid date format.', 'danger')
-                return redirect(url_for('pitching.pitching_page'))
+                return redirect(request.referrer or url_for('pitching.pitching_page'))
 
         player_id = request.form.get('player_id')
         if player_id:
@@ -81,8 +81,7 @@ def delete_pitching(outing_id):
     else:
         flash('Pitching outing not found.', 'danger')
     
-    redirect_url = request.referrer or url_for('pitching.pitching_page')
-    return redirect(redirect_url)
+    return redirect(url_for('pitching.pitching_page'))
 
 def login_required(f):
     @wraps(f)

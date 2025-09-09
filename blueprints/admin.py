@@ -309,7 +309,7 @@ def create_team():
     flash(f'Team "{new_team.team_name}" created successfully!', 'success')
     return redirect(url_for('.team_management'))
 
-@admin_bp.route('/delete_team/<int:team_id>')
+@admin_bp.route('/delete_team/<int:team_id>', methods=['POST'])
 @super_admin_required
 def delete_team(team_id):
     team_to_delete = db.session.get(Team, team_id)

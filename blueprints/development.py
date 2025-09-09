@@ -71,7 +71,7 @@ def complete_focus(focus_id):
     socketio.emit('dev_focus_update', {'player_name': focus_item.player.name, 'focus': model_to_dict(focus_item)})
     return redirect(url_for('home', _anchor='player_development'))
 
-@development_bp.route('/delete_focus/<int:focus_id>')
+@development_bp.route('/delete_focus/<int:focus_id>', methods=['POST'])
 def delete_focus(focus_id):
     focus_item = find_focus_by_id(focus_id)
     if focus_item and focus_item.team_id == session['team_id']:
@@ -82,7 +82,8 @@ def delete_focus(focus_id):
         socketio.emit('dev_focus_delete', {'player_name': player_name, 'focus_id': focus_id})
     else:
         flash('Could not find the focus item to delete or you do not have permission.', 'danger')
-    return redirect(url_for('home', _anchor='player_development'))
+    anchor = request.args.get('anchor', 'player_development')
+    return redirect(url_for('home', _anchor=anchor))
 
 @development_bp.route('/update_lesson_info/<int:player_id>', methods=['POST'])
 def update_lesson_info(player_id):
@@ -99,7 +100,7 @@ def update_lesson_info(player_id):
     socketio.emit('dev_lesson_update', {'player': player.to_dict()})
     return redirect(url_for('home', _anchor='player_development'))
 
-@development_bp.route('/delete_lesson_info/<int:player_id>')
+@development_bp.route('/delete_lesson_info/<int:player_id>', methods=['POST'])
 def delete_lesson_info(player_id):
     player = db.session.get(Player, player_id)
     if not player or player.team_id != session['team_id']:
@@ -111,4 +112,5 @@ def delete_lesson_info(player_id):
     db.session.commit()
     flash(f'Lesson info for {player.name} has been deleted.', 'success')
     socketio.emit('dev_lesson_update', {'player': player.to_dict()})
-    return redirect(url_for('home', _anchor='player_development'))
+    anchor = request.args.get('anchor', 'player_development')
+    return redirect(url_for('home', _anchor=anchor))

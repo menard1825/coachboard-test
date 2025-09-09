@@ -3,7 +3,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 
 from db import db
-from models import Player, PitchingOuting, Rotation, PlayerGameAbsence, PlayerPracticeAbsence, Game
+from models import Player, PitchingOuting, Rotation, PlayerGameAbsence, PlayerPracticeAbsence
 from utils import calculate_cumulative_pitching_stats, calculate_cumulative_position_stats
 from . import api_bp
 from .decorators import login_required
@@ -20,7 +20,7 @@ def get_stats():
 
     # --- MODIFICATION START ---
     # Query for rotations for position stats, but only those associated with a game.
-    rotations_db = db.session.query(Rotation).join(Game, Rotation.associated_game_id == Game.id).filter(Rotation.team_id == team_id).all()
+    rotations_db = db.session.query(Rotation).filter(Rotation.team_id == team_id, Rotation.associated_game_id != None).all()
     # --- MODIFICATION END ---
 
     # Get players designated as pitchers

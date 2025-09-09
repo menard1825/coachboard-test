@@ -63,7 +63,7 @@ def edit_note():
         flash('You do not have permission to edit this note.', 'danger')
     return redirect(url_for('home', _anchor='collaboration'))
 
-@team_management_bp.route('/delete_note/<note_type>/<int:note_id>', methods=['GET', 'POST'])
+@team_management_bp.route('/delete_note/<note_type>/<int:note_id>', methods=['POST'])
 def delete_note(note_type, note_id):
     note_to_delete = db.session.query(CollaborationNote).filter_by(id=note_id, team_id=session['team_id']).first()
     if note_to_delete and note_to_delete.note_type == note_type:
@@ -77,7 +77,8 @@ def delete_note(note_type, note_id):
             flash('You do not have permission to delete this note.', 'danger')
     else:
         flash('Note not found or invalid note type.', 'danger')
-    return redirect(request.referrer or url_for('home', _anchor='collaboration'))
+    anchor = request.args.get('anchor', 'collaboration')
+    return redirect(url_for('home', _anchor=anchor))
 
 # --- Practice Plan Routes ---
 @team_management_bp.route('/add_practice_plan', methods=['GET', 'POST'])
@@ -173,7 +174,7 @@ def edit_practice_plan(plan_id):
         flash('Practice plan not found.', 'danger')
     return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
-@team_management_bp.route('/delete_practice_plan/<int:plan_id>', methods=['GET', 'POST'])
+@team_management_bp.route('/delete_practice_plan/<int:plan_id>', methods=['POST'])
 def delete_practice_plan(plan_id):
     plan_to_delete = db.session.get(PracticePlan, plan_id)
     if plan_to_delete and plan_to_delete.team_id == session['team_id']:
@@ -184,7 +185,8 @@ def delete_practice_plan(plan_id):
         socketio.emit('data_updated', {'message': 'Practice plan deleted.'})
     else:
         flash('Practice plan not found.', 'danger')
-    return redirect(url_for('home', _anchor='practice_plan'))
+    anchor = request.args.get('anchor', 'practice_plan')
+    return redirect(url_for('home', _anchor=anchor))
 
 @team_management_bp.route('/update_practice_attendance/<int:plan_id>', methods=['POST'])
 def update_practice_attendance(plan_id):
@@ -237,7 +239,7 @@ def add_task_to_plan(plan_id):
     socketio.emit('data_updated', {'message': 'Task added to plan.'})
     return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
-@team_management_bp.route('/delete_task/<int:plan_id>/<int:task_id>')
+@team_management_bp.route('/delete_task/<int:plan_id>/<int:task_id>', methods=['POST'])
 def delete_task(plan_id, task_id):
     plan = db.session.query(PracticePlan).filter_by(id=plan_id, team_id=session['team_id']).first()
     if not plan:
@@ -251,7 +253,8 @@ def delete_task(plan_id, task_id):
         socketio.emit('data_updated', {'message': 'Task deleted from plan.'})
     else: 
         flash('Task not found.', 'danger')
-    return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
+    anchor = request.args.get('anchor', f'plan-{plan_id}')
+    return redirect(url_for('home', _anchor=anchor))
 
 @team_management_bp.route('/update_task_status/<int:plan_id>/<int:task_id>', methods=['POST'])
 def update_task_status(plan_id, task_id):
@@ -305,7 +308,7 @@ def update_sign(sign_id):
         flash('Sign Name and Indicator are required.', 'danger')
     return redirect(url_for('home', _anchor='signs'))
 
-@team_management_bp.route('/delete_sign/<int:sign_id>')
+@team_management_bp.route('/delete_sign/<int:sign_id>', methods=['POST'])
 def delete_sign(sign_id):
     sign_to_delete = db.session.query(Sign).filter_by(id=sign_id, team_id=session['team_id']).first()
     if sign_to_delete:
@@ -315,4 +318,5 @@ def delete_sign(sign_id):
         socketio.emit('data_updated', {'message': 'Sign deleted.'})
     else:
         flash('Sign not found.', 'danger')
-    return redirect(url_for('home', _anchor='signs'))
+    anchor = request.args.get('anchor', 'signs')
+    return redirect(url_for('home', _anchor=anchor))

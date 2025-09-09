@@ -60,10 +60,9 @@ window.initializeGameManagement = function(gameData) {
     const state = {
         roster: (gameData.roster || []).filter(p => !(gameData.absent_player_ids || []).includes(p.id)),
         lineup: gameData.lineup || { id: null, title: `Lineup for vs ${gameData.game.opponent}`, lineup_positions: [], associated_game_id: gameData.game.id },
-        rotation: gameData.rotation || { id: null, title: `Rotation for vs ${gameData.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
+        rotation: gameData.rotation || { id: null, title: `Rotation for vs ${state.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
         game: gameData.game,
         lineup_templates: gameData.lineup_templates || [],
-        // NEW: Add rotation_templates to the state
         rotation_templates: gameData.rotation_templates || [],
         pitch_count_summary: gameData.pitch_count_summary,
         outfielder_count: gameData.outfielder_count || 3,
@@ -72,7 +71,6 @@ window.initializeGameManagement = function(gameData) {
         sortableInstances: {}
     };
 
-    // ADD THIS BLOCK TO FIX THE INNINGS BUG
     if (state.rotation && typeof state.rotation.innings === 'string') {
         try {
             state.rotation.innings = JSON.parse(state.rotation.innings);
@@ -86,40 +84,46 @@ window.initializeGameManagement = function(gameData) {
     let lineupEditorModal;
     let saveTemplateModal;
     let editQuickNoteModal;
-    let renderRotationEditor; // ADD THIS LINE TO DECLARE THE FUNCTION
+    let renderRotationEditor;
 
+    // --- UI RENDER FUNCTIONS ---
     function renderLineupDisplay() {
-        const container = document.getElementById('lineup-display-container');
-        if (!container) return;
+        const lineupCardBody = document.getElementById('lineup-card-body');
+        if (!lineupCardBody) return;
 
-        if (state.lineup && state.lineup.lineup_positions && state.lineup.lineup_positions.length > 0) {
-            const lineupHtml = `
-                <ol class="list-group list-group-numbered">
-                    ${state.lineup.lineup_positions.map(playerName => `<li class="list-group-item">${escapeHTML(playerName)}</li>`).join('')}
-                </ol>`;
-            container.innerHTML = lineupHtml;
+        const lineup = state.lineup;
+        let content = '';
+
+        if (lineup && lineup.lineup_positions && lineup.lineup_positions.length > 0) {
+            content = '<ol class="list-group list-group-numbered">';
+            lineup.lineup_positions.forEach(playerName => {
+                content += `<li class="list-group-item">${escapeHTML(playerName)}</li>`;
+            });
+            content += '</ol>';
         } else {
-            container.innerHTML = `
-                <div class="text-center p-3 text-muted">
-                    <p class="mb-1">No lineup has been set.</p>
-                </div>`;
+            content = '<p class="text-muted">No lineup has been set for this game.</p>';
         }
+        lineupCardBody.innerHTML = content;
     }
 
+    // --- DATA SAVE FUNCTIONS ---
     async function saveLineup() {
         const btn = document.getElementById('saveLineupBtn');
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+
         state.lineup.title = document.getElementById('lineupTitle').value;
         state.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => item.dataset.playerName);
+
         const url = state.lineup.id ? `/edit_lineup/${state.lineup.id}` : '/add_lineup';
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content'); // Added CSRF Token
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken // Added CSRF Token
+                    'X-CSRF-Token': csrfToken
                 },
                 body: JSON.stringify({
                     title: state.lineup.title,
@@ -129,11 +133,20 @@ window.initializeGameManagement = function(gameData) {
             });
             const result = await response.json();
             if(!response.ok) throw new Error(result.message);
-            if (result.new_id) state.lineup.id = result.new_id;
-            renderLineupDisplay();
+
+            if (result.lineup) {
+                state.lineup = result.lineup;
+            }
+            if (result.new_id) {
+                 state.lineup.id = result.new_id;
+            }
+
+            renderLineupDisplay(); // Re-render the display on the main page
             lineupEditorModal.hide();
+
         } catch (error) {
             alert('Error saving lineup: ' + error.message);
+        } finally {
             btn.disabled = false;
             btn.innerHTML = 'Save Lineup';
         }
@@ -145,11 +158,7 @@ window.initializeGameManagement = function(gameData) {
         btn.disabled = true;
         btn.textContent = 'Saving...';
 
-    // *** MODIFICATION START ***
-    // Retrieve the CSRF token from the meta tag in the page's <head>
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    // *** MODIFICATION END ***
-
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const payload = {
             id: state.rotation.id,
             title: state.rotation.title || `Rotation for vs ${state.game.opponent}`,
@@ -292,9 +301,6 @@ window.initializeGameManagement = function(gameData) {
                     const selectedTemplate = state.lineup_templates.find(lt => lt.id == selectedTemplateId);
                     if (selectedTemplate) {
                         state.lineup.lineup_positions = [...selectedTemplate.lineup_positions];
-                        // When a template is loaded, we are creating a *new* lineup for this game,
-                        // not editing the template itself. Setting the id to null ensures that
-                        // the `saveLineup` function will use the '/add_lineup' route.
                         state.lineup.id = null;
                         renderLineup();
                     }
@@ -448,10 +454,9 @@ window.initializeGameManagement = function(gameData) {
 
     // --- Initial Page Render ---
     if(state.game) {
-        // MODIFIED: Capture the function returned by initializeRotationEditor
         renderRotationEditor = initializeRotationEditor(state, escapeHTML);
+        renderLineupDisplay(); // Initial render of the lineup
         setupEventListeners();
-        renderLineupDisplay();
         fetchWeatherForGame(state.game.location, gameData.game_date_for_input);
 
         const editGameModal = document.getElementById('editGameModal');
