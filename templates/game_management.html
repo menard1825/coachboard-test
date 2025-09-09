@@ -100,7 +100,7 @@
                                 <i class="bi bi-pencil-square"></i> Edit Lineup
                             </button>
                         </div>
-                        <div class="card-body">
+                        <div class="card-body" id="lineup-display-container">
                             {% if lineup and lineup.lineup_positions %}
                                 <ol class="list-group list-group-numbered">
                                     {% for player_name in lineup.lineup_positions %}

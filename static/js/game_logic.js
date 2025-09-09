@@ -88,6 +88,24 @@ window.initializeGameManagement = function(gameData) {
     let editQuickNoteModal;
     let renderRotationEditor; // ADD THIS LINE TO DECLARE THE FUNCTION
 
+    function renderLineupDisplay() {
+        const container = document.getElementById('lineup-display-container');
+        if (!container) return;
+
+        if (state.lineup && state.lineup.lineup_positions && state.lineup.lineup_positions.length > 0) {
+            const lineupHtml = `
+                <ol class="list-group list-group-numbered">
+                    ${state.lineup.lineup_positions.map(playerName => `<li class="list-group-item">${escapeHTML(playerName)}</li>`).join('')}
+                </ol>`;
+            container.innerHTML = lineupHtml;
+        } else {
+            container.innerHTML = `
+                <div class="text-center p-3 text-muted">
+                    <p class="mb-1">No lineup has been set.</p>
+                </div>`;
+        }
+    }
+
     async function saveLineup() {
         const btn = document.getElementById('saveLineupBtn');
         btn.disabled = true;
@@ -112,6 +130,7 @@ window.initializeGameManagement = function(gameData) {
             const result = await response.json();
             if(!response.ok) throw new Error(result.message);
             if (result.new_id) state.lineup.id = result.new_id;
+            renderLineupDisplay();
             lineupEditorModal.hide();
         } catch (error) {
             alert('Error saving lineup: ' + error.message);
@@ -432,6 +451,7 @@ window.initializeGameManagement = function(gameData) {
         // MODIFIED: Capture the function returned by initializeRotationEditor
         renderRotationEditor = initializeRotationEditor(state, escapeHTML);
         setupEventListeners();
+        renderLineupDisplay();
         fetchWeatherForGame(state.game.location, gameData.game_date_for_input);
 
         const editGameModal = document.getElementById('editGameModal');
