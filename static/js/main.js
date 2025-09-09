@@ -488,9 +488,9 @@ document.addEventListener('DOMContentLoaded', () => {
             let playerHtml = players.length > 0 ? players.map(p => {
                 let moveOptions = '';
                 if (key === 'targets') {
-                    moveOptions = `<li><form action="/move_scouted_player/targets/committed/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Committed</button></form></li><li><form action="/move_scouted_player/targets/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
+                    moveOptions = `<li><form action="/move_scouted_player/targets/committed/${p.id}" method="POST" class="d-inline"><input type="hidden" name="csrf_token" value="${csrfToken}"/><button type="submit" class="dropdown-item">To Committed</button></form></li><li><form action="/move_scouted_player/targets/not_interested/${p.id}" method="POST" class="d-inline"><input type="hidden" name="csrf_token" value="${csrfToken}"/><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
                 } else if (key === 'committed') {
-                    moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item fw-bold">To Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
+                    moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><input type="hidden" name="csrf_token" value="${csrfToken}"/><button type="submit" class="dropdown-item fw-bold">To Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><input type="hidden" name="csrf_token" value="${csrfToken}"/><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
                 }
                 const positions = [p.position1, p.position2].filter(Boolean).join(' / ') || 'N/A';
                 const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_scouted_player/${key}/${p.id}" data-delete-name="${escapeHTML(p.name)}"><i class="bi bi-trash"></i></button>`;
@@ -556,6 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="col-lg-12">
                     <h5>Tasks / To-Do</h5>
                     <form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form">
+                        <input type="hidden" name="csrf_token" value="${csrfToken}"/>
                         <div class="input-group">
                             <input type="text" name="task_text" class="form-control" placeholder="Add task..." required>
                             <button type="submit" class="btn btn-primary">Add</button>
