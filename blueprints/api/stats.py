@@ -3,7 +3,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 
 from db import db
-from models import Player, PitchingOuting, Rotation, PlayerGameAbsence, PlayerPracticeAbsence
+from models import Player, PitchingOuting, Rotation, PlayerGameAbsence, PlayerPracticeAbsence, Game, PracticePlan
 from utils import calculate_cumulative_pitching_stats, calculate_cumulative_position_stats
 from . import api_bp
 from .decorators import login_required
@@ -20,7 +20,7 @@ def get_stats():
 
     # --- MODIFICATION START ---
     # Query for rotations for position stats, but only those associated with a game.
-    rotations_db = db.session.query(Rotation).filter(Rotation.team_id == team_id, Rotation.associated_game_id != None).all()
+    rotations_db = db.session.query(Rotation).join(Game).filter(Game.team_id == team_id, Rotation.associated_game_id != None).all()
     # --- MODIFICATION END ---
 
     # Get players designated as pitchers
@@ -41,8 +41,8 @@ def get_stats():
     cumulative_position_data = calculate_cumulative_position_stats(roster_db, rotations_db)
     # --- MODIFICATION END ---
 
-    game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=team_id).group_by(PlayerGameAbsence.player_id).all()
-    practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=team_id).group_by(PlayerPracticeAbsence.player_id).all()
+    game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).join(Game, PlayerGameAbsence.game_id == Game.id).filter(Game.team_id == team_id).group_by(PlayerGameAbsence.player_id).all()
+    practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).join(PracticePlan, PlayerPracticeAbsence.practice_plan_id == PracticePlan.id).filter(PracticePlan.team_id == team_id).group_by(PlayerPracticeAbsence.player_id).all()
 
     attendance_stats = {p.id: {'name': p.name, 'games_missed': 0, 'practices_missed': 0} for p in roster_db}
     for player_id, count in game_absences:

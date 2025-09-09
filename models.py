@@ -32,8 +32,6 @@ class Team(db.Model):
     practice_plans = relationship("PracticePlan", back_populates="team")
     signs = relationship("Sign", back_populates="team")
     player_development_focuses = relationship("PlayerDevelopmentFocus", back_populates="team")
-    player_game_absences = relationship("PlayerGameAbsence", back_populates="team")
-    player_practice_absences = relationship("PlayerPracticeAbsence", back_populates="team")
     opponents = relationship("Opponent", back_populates="team", cascade="all, delete-orphan")
 
 class User(db.Model):
@@ -90,7 +88,7 @@ class Lineup(db.Model):
     title = Column(String, nullable=False)
     # Use a private attribute to map to the 'lineup_positions' column in the DB
     _lineup_positions_db = Column('lineup_positions', JSON)
-    associated_game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
+    associated_game_id = Column(Integer, ForeignKey('games.id', ondelete='CASCADE'), nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="lineups")
@@ -174,7 +172,7 @@ class Rotation(db.Model):
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     innings = Column(JSON) # Changed to JSON
-    associated_game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
+    associated_game_id = Column(Integer, ForeignKey('games.id', ondelete='CASCADE'), nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
@@ -197,9 +195,9 @@ class Game(db.Model):
     team = relationship("Team", back_populates="games")
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
     pitching_outings = relationship("PitchingOuting", back_populates="game", cascade="all, delete-orphan")
-    rotations = relationship("Rotation", back_populates="game", cascade="all, delete-orphan")
+    rotations = relationship("Rotation", back_populates="game", cascade="all, delete-orphan", passive_deletes=True)
     
-    lineups = relationship("Lineup", backref="game", cascade="all, delete-orphan")
+    lineups = relationship("Lineup", backref="game", cascade="all, delete-orphan", passive_deletes=True)
 
     opponent_id = Column(Integer, ForeignKey('opponents.id'), nullable=True)
     opponent_relationship = relationship("Opponent", back_populates="games")
@@ -303,11 +301,9 @@ class PlayerGameAbsence(db.Model):
 
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
     game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
-    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
 
     player = relationship("Player", back_populates="game_absences")
     game = relationship("Game", back_populates="absences")
-    team = relationship("Team", back_populates="player_game_absences")
 
 class PlayerPracticeAbsence(db.Model):
     __tablename__ = 'player_practice_absences'
@@ -315,8 +311,6 @@ class PlayerPracticeAbsence(db.Model):
 
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
     practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
-    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
 
     player = relationship("Player", back_populates="practice_absences")
     practice_plan = relationship("PracticePlan", back_populates="absences")
-    team = relationship("Team", back_populates="player_practice_absences")

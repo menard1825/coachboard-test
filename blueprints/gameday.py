@@ -37,13 +37,13 @@ def game_management(game_id):
     
     roster_objects = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
     
-    lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
-    rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
+    lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id).first()
+    rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id).first()
     
     all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all()
     game_pitching_log = [o for o in all_pitching_outings if o.game_id == game.id]
 
-    absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
+    absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id).all()
     absent_player_ids = {absence.player_id for absence in absences}
 
     rules = get_pitching_rules_for_team(team)
@@ -165,10 +165,10 @@ def delete_game(game_id):
         game_date_str = game_to_delete.date.strftime('%m/%d/%Y')
 
         # Explicitly delete all associated data to prevent orphans
-        db.session.query(Lineup).filter_by(associated_game_id=game_id, team_id=session['team_id']).delete()
-        db.session.query(Rotation).filter_by(associated_game_id=game_id, team_id=session['team_id']).delete()
+        db.session.query(Lineup).filter_by(associated_game_id=game_id).delete()
+        db.session.query(Rotation).filter_by(associated_game_id=game_id).delete()
         db.session.query(PitchingOuting).filter_by(game_id=game_id, team_id=session['team_id']).delete()
-        db.session.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=session['team_id']).delete()
+        db.session.query(PlayerGameAbsence).filter_by(game_id=game_id).delete()
         db.session.query(GameQuickNote).filter_by(game_id=game_id).delete()
 
         db.session.delete(game_to_delete)
@@ -189,12 +189,12 @@ def update_absences(game_id):
         return redirect(url_for('home', _anchor='games'))
 
     absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
-    db.session.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=team_id).delete()
+    db.session.query(PlayerGameAbsence).filter_by(game_id=game_id).delete()
 
     for player_id in absent_player_ids:
         player = db.session.query(Player).filter_by(id=player_id, team_id=team_id).first()
         if player:
-            new_absence = PlayerGameAbsence(player_id=player.id, game_id=game.id, team_id=team_id)
+            new_absence = PlayerGameAbsence(player_id=player.id, game_id=game.id)
             db.session.add(new_absence)
 
     db.session.commit()
@@ -337,11 +337,19 @@ def add_lineup():
         if not payload or 'title' not in payload or 'lineup_data' not in payload:
             return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
 
+        associated_game_id = int(payload['associated_game_id']) if payload.get('associated_game_id') else None
+        team_id = session['team_id']
+
+        if associated_game_id:
+            game = db.session.get(Game, associated_game_id)
+            if game:
+                team_id = game.team_id
+
         new_lineup = Lineup(
             title=payload['title'],
             lineup_positions=payload['lineup_data'],
-            associated_game_id=int(payload['associated_game_id']) if payload.get('associated_game_id') else None,
-            team_id=session['team_id']
+            associated_game_id=associated_game_id,
+            team_id=team_id
         )
         db.session.add(new_lineup)
         db.session.commit()
@@ -370,7 +378,15 @@ def edit_lineup(lineup_id):
 
         lineup_to_edit.title = payload['title']
         lineup_to_edit.lineup_positions = payload['lineup_data']
-        lineup_to_edit.associated_game_id = int(payload.get('associated_game_id')) if payload.get('associated_game_id') else None
+
+        associated_game_id = int(payload.get('associated_game_id')) if payload.get('associated_game_id') else None
+        lineup_to_edit.associated_game_id = associated_game_id
+
+        if associated_game_id:
+            game = db.session.get(Game, associated_game_id)
+            if game:
+                lineup_to_edit.team_id = game.team_id
+
         db.session.commit()
 
         lineup_dict = model_to_dict(lineup_to_edit)
@@ -407,12 +423,19 @@ def save_rotation():
     if not title or not isinstance(innings_data, dict):
         return jsonify({'status': 'error', 'message': 'Invalid data provided.'}), 400
 
+    team_id = session['team_id']
+    if associated_game_id:
+        game = db.session.get(Game, associated_game_id)
+        if game:
+            team_id = game.team_id
+
     if rotation_id:
         rotation_to_update = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
         if rotation_to_update:
             rotation_to_update.title = title
             rotation_to_update.innings = innings_data
             rotation_to_update.associated_game_id = associated_game_id
+            rotation_to_update.team_id = team_id
             message = 'Rotation updated successfully!'
             new_rotation_id = rotation_id
         else: 
@@ -423,7 +446,7 @@ def save_rotation():
             title=title, 
             innings=innings_data,
             associated_game_id=associated_game_id, 
-            team_id=session['team_id']
+            team_id=team_id
         )
         db.session.add(new_rotation)
         db.session.commit()
@@ -491,7 +514,7 @@ def save_rotation_as_template():
 def print_lineup(game_id):
     team = db.session.get(Team, session['team_id'])
     game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
-    lineup = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
+    lineup = db.session.query(Lineup).filter_by(associated_game_id=game.id).first()
     roster = db.session.query(Player).filter_by(team_id=team.id).all()
 
     if not game:
