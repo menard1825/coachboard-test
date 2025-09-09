@@ -92,7 +92,7 @@ def update_player_inline(player_id):
     socketio.emit('data_updated', {'message': f'Player {new_name} updated.'})
     return jsonify({'status': 'success', 'message': f'Player "{new_name}" updated successfully!'})
 
-@roster_bp.route('/delete_player/<int:player_id>')
+@roster_bp.route('/delete_player/<int:player_id>', methods=['POST'])
 def delete_player(player_id):
     player_to_delete = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
     if player_to_delete:

@@ -48,7 +48,7 @@ def add_scouted_player():
         print(f"Error adding scouted player: {e}")
         return jsonify({'status': 'error', 'message': 'An internal server error occurred.'}), 500
 
-@scouting_bp.route('/delete_scouted_player/<list_type>/<int:player_id>')
+@scouting_bp.route('/delete_scouted_player/<list_type>/<int:player_id>', methods=['POST'])
 def delete_scouted_player(list_type, player_id):
     player_to_delete = db.session.query(ScoutedPlayer).filter_by(id=player_id, list_type=list_type, team_id=session['team_id']).first()
     if player_to_delete:

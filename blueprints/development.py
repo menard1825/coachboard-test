@@ -71,7 +71,7 @@ def complete_focus(focus_id):
     socketio.emit('dev_focus_update', {'player_name': focus_item.player.name, 'focus': model_to_dict(focus_item)})
     return redirect(url_for('home', _anchor='player_development'))
 
-@development_bp.route('/delete_focus/<int:focus_id>')
+@development_bp.route('/delete_focus/<int:focus_id>', methods=['POST'])
 def delete_focus(focus_id):
     focus_item = find_focus_by_id(focus_id)
     if focus_item and focus_item.team_id == session['team_id']:
