@@ -167,6 +167,9 @@ def delete_game(game_id):
         # Explicitly delete associated lineups and rotations to prevent orphaned data
         db.session.query(Lineup).filter_by(associated_game_id=game_id, team_id=session['team_id']).delete()
         db.session.query(Rotation).filter_by(associated_game_id=game_id, team_id=session['team_id']).delete()
+        db.session.query(PitchingOuting).filter_by(game_id=game_id, team_id=session['team_id']).delete()
+        db.session.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=session['team_id']).delete()
+        db.session.query(GameQuickNote).filter_by(game_id=game_id).delete()
         # --- MODIFICATION END ---
         db.session.delete(game_to_delete)
         db.session.commit()
