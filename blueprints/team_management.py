@@ -113,6 +113,7 @@ def add_practice_plan():
     else: # GET request (This is used by the "Create from game" feature)
         emphasis = request.args.get('emphasis')
         plan_date_str = request.args.get('plan_date') # Get the new date parameter from the redirect
+        source_game_id = request.args.get('source_game_id', type=int)
 
         if not emphasis:
             flash('Emphasis is required to create a practice plan from a game.', 'danger')
@@ -129,7 +130,8 @@ def add_practice_plan():
         new_plan = PracticePlan(
             date=plan_date, # Use the intelligent date
             emphasis=emphasis,
-            team_id=session['team_id']
+            team_id=session['team_id'],
+            source_game_id=source_game_id
         )
         db.session.add(new_plan)
         db.session.commit()

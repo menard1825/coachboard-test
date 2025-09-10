@@ -307,7 +307,8 @@ def create_practice_plan_from_game(game_id):
     # Redirect with both the summary and the calculated date
     return redirect(url_for('team_management.add_practice_plan',
                             emphasis=game.post_game_summary,
-                            plan_date=next_practice_date.strftime('%Y-%m-%d')))
+                            plan_date=next_practice_date.strftime('%Y-%m-%d'),
+                            source_game_id=game.id))
 
 
 # ADD THIS NEW ROUTE

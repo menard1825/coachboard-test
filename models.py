@@ -201,6 +201,7 @@ class Game(db.Model):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="games")
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
+    derived_practice_plans = relationship("PracticePlan", back_populates="source_game")
     pitching_outings = relationship("PitchingOuting", back_populates="game", cascade="all, delete-orphan")
     rotations = relationship("Rotation", back_populates="game", cascade="all, delete-orphan", passive_deletes=True)
     
@@ -261,6 +262,9 @@ class PracticePlan(db.Model):
     tasks = relationship("PracticeTask", back_populates="practice_plan", order_by="PracticeTask.id")
     absences = relationship("PlayerPracticeAbsence", back_populates="practice_plan", cascade="all, delete-orphan")
     pitching_outings = relationship("PitchingOuting", back_populates="practice_plan", cascade="all, delete-orphan") # ADD THIS LINE
+    
+    source_game_id = Column(Integer, ForeignKey('games.id', ondelete='SET NULL'), nullable=True)
+    source_game = relationship("Game", back_populates="derived_practice_plans")
 
 class PracticeTask(db.Model):
     __tablename__ = 'practice_tasks'
