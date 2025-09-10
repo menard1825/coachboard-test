@@ -400,6 +400,7 @@ def edit_lineup(lineup_id):
 
 @gameday_bp.route('/delete_lineup/<int:lineup_id>', methods=['POST'])
 def delete_lineup(lineup_id):
+    game_id = request.args.get('game_id', type=int)
     lineup_to_delete = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
     if lineup_to_delete:
         lineup_id = lineup_to_delete.id
@@ -409,8 +410,11 @@ def delete_lineup(lineup_id):
         socketio.emit('lineup_delete', {'lineup_id': lineup_id})
     else:
         flash('Lineup not found.', 'danger')
-    anchor = request.args.get('anchor', 'lineups')
-    return redirect(url_for('home', _anchor=anchor))
+
+    if game_id:
+        return redirect(url_for('.game_management', game_id=game_id, _anchor='pregame'))
+    else:
+        return redirect(url_for('home', _anchor='lineups'))
 
 @gameday_bp.route('/save_rotation', methods=['POST'])
 def save_rotation():
@@ -460,6 +464,7 @@ def save_rotation():
 
 @gameday_bp.route('/delete_rotation/<int:rotation_id>', methods=['POST'])
 def delete_rotation(rotation_id):
+    game_id = request.args.get('game_id', type=int)
     rotation_to_delete = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
     if rotation_to_delete:
         rotation_id_for_emit = rotation_to_delete.id
@@ -470,8 +475,11 @@ def delete_rotation(rotation_id):
         socketio.emit('stats_update', {'message': 'Rotation deleted.'})
     else:
         flash('Rotation not found.', 'danger')
-    anchor = request.args.get('anchor', 'rotations')
-    return redirect(url_for('home', _anchor=anchor))
+
+    if game_id:
+        return redirect(url_for('.game_management', game_id=game_id, _anchor='ingame'))
+    else:
+        return redirect(url_for('home', _anchor='rotations'))
 
 @gameday_bp.route('/save_rotation_as_template', methods=['POST'])
 def save_rotation_as_template():

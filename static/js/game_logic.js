@@ -3,56 +3,7 @@
 // =================================================================================
 
 // This script is now fully self-contained and does not use a global AppState.
-
-window.fetchWeatherForGame = async function(location, gameDate) {
-    const weatherWidget = document.getElementById('weather-widget-content');
-    if (!weatherWidget) return;
-
-    weatherWidget.innerHTML = '<p><em>Fetching weather...</em></p>';
-
-    if (!location) {
-        weatherWidget.innerHTML = '<p class="text-muted">No location set for this game.</p>';
-        return;
-    }
-
-    if (!gameDate) {
-        weatherWidget.innerHTML = '<p class="text-danger">Error: Game date is missing.</p>';
-        return;
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-    const isToday = gameDate.startsWith(today);
-    const url = isToday
-        ? `/api/weather/${encodeURIComponent(location)}`
-        : `/api/weather/${encodeURIComponent(location)}?date=${gameDate}`;
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to fetch weather. Status: ${response.status}. Details: ${errorText}`);
-        }
-
-        const weather = await response.json();
-        if (!weather) {
-            throw new Error("Received empty weather data.");
-        }
-
-        const tempDisplay = isToday ? weather.current_temp : `${weather.high_temp} / ${weather.low_temp}`;
-        const conditionDisplay = isToday ? weather.condition : 'Forecast';
-
-        weatherWidget.innerHTML = `
-            <p>
-                <strong>${isToday ? 'Current' : 'High/Low'}:</strong> ${tempDisplay || 'N/A'} <br>
-                <strong>Wind:</strong> ${weather.wind || 'N/A'} <br>
-                <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
-            </p>
-        `;
-    } catch (error) {
-        weatherWidget.innerHTML = `<p class="text-danger">Could not load weather data.</p><p class="text-muted small">${error.message}</p>`;
-        console.error('Weather fetch error:', error);
-    }
-}
+// The fetchWeather function is now in utils.js
 
 window.initializeGameManagement = function(gameData) {
 
@@ -459,7 +410,11 @@ window.initializeGameManagement = function(gameData) {
         renderLineupDisplay(); // Initial render of the lineup
         setupEventListeners();
         initializeRotationEditor(state, escapeHTML);
-        fetchWeatherForGame(state.game.location, gameData.game_date_for_input);
+
+        const weatherWidget = document.getElementById('weather-widget-content');
+        if (weatherWidget) {
+            fetchWeather(weatherWidget);
+        }
 
         const editGameModal = document.getElementById('editGameModal');
         if (editGameModal) {

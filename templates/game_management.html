@@ -95,10 +95,14 @@
                 <div class="col-lg-6 mb-4">
                     <div class="card h-100">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Batting Lineup</h5>
-                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">
-                                <i class="bi bi-pencil-square"></i> Edit Lineup
-                            </button>
+                            <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Batting Lineup</h5>                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">
+                                    <i class="bi bi-pencil-square"></i> Edit
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal"
+                                    data-delete-url="{{ url_for('gameday.delete_lineup', lineup_id=lineup.id, game_id=game.id) }}"
+                                    data-delete-name="this lineup" {% if not lineup or not lineup.id %}disabled{% endif %}>Delete</button>
+                            </div>
                         </div>
                         <div class="card-body">
                             {% if lineup and lineup.lineup_positions %}
