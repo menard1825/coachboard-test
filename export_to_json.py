@@ -92,7 +92,7 @@ def export_db_to_json(db_path, json_path):
     # Player Development Focuses
     player_dev_data = {}
     player_id_to_name = {p['id']: p['name'] for p in all_data.get('roster', [])}
-    for focus in all_data.get('player_development_focuses_raw', []):
+    for focus in all_data.get('player_development_focuses_raw') or []:
         player_name = player_id_to_name.get(focus.get('player_id'))
         skill_type = focus.get('skill_type')
         if player_name and skill_type:

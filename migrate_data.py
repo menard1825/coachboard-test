@@ -191,12 +191,13 @@ try:
                 pitcher_type=po_data.get('pitcher_type', 'Starter'), outing_type=po_data.get('outing_type', 'Game'),
                 team_id=new_team_id
             )
-            # The 'pitcher' text column is no longer in the model, but we need to find the player_id
-            player_id = player_name_to_id_map.get(po_data['pitcher'])
+            # The old 'pitcher' text column is gone. Use the player_id directly from the backup.
+            player_id = po_data.get('player_id')
             if player_id:
                 outing.player_id = player_id
             else:
-                print(f"Warning: Could not find player ID for pitcher '{po_data['pitcher']}'. Skipping outing.")
+                # Fallback for very old data that might still have the name
+                print(f"Warning: Could not find player_id for outing on {po_data.get('date')}. Skipping.")
                 continue
             session.add(outing)
     except Exception as e:
