@@ -149,13 +149,18 @@ body {
 /* ==========================================================================
    Login & Registration Page Styles
    ========================================================================== */
-.login-logo-container {
+.login-logo-container { /* MODIFIED */
+    width: 150px;
+    height: 150px;
     background-color: #ffffff;
     border-radius: 50%;
-    padding: 20px;
-    display: inline-block;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    margin-bottom: 1.5rem !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    margin-bottom: 2rem !important;
+    padding: 1rem; /* Add some padding for smaller logos */
+    transition: transform 0.3s ease-in-out;
 }
 
 /* Hide SVG drawing when using a background image */
