@@ -48,7 +48,7 @@
                         </div>
                         <div class="col-md-6">
                         <h6><i class="bi bi-thermometer-sun me-2"></i>Weather</h6>
-                        <div id="weather-widget-content" data-game-date="{{ game_date_for_input }}">
+                        <div id="weather-widget-content" data-location="{{ game.location or '' }}" data-date="{{ game_date_for_input }}">
                             <p><em>Loading weather...</em></p>
                         </div>
                         </div>
