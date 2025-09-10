@@ -90,7 +90,7 @@ def add_game():
     if not opponent:
         opponent = Opponent(name=opponent_name, team_id=session['team_id'])
         db.session.add(opponent)
-        db.session.commit()
+        db.session.flush()  # Flush to get the new opponent's ID before creating the game
 
     new_game = Game(
         date=game_date,
