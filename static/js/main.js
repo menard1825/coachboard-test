@@ -1102,6 +1102,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (AppState.active_player_dev_name === player.name) {
                 renderPlayerDevelopmentDetails();
             }
+            // Also need to update the main roster object for consistency
+            const rosterIndex = AppState.full_data.roster.findIndex(p => p.id === player.id);
+            if (rosterIndex > -1) {
+                AppState.full_data.roster[rosterIndex] = player;
+            }
         });
 
         // --- Other Data Sockets ---

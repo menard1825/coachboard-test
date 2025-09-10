@@ -157,8 +157,13 @@ try:
             new_team_id = team_map.get(old_team_id)
             if not new_team_id: continue
             lineup_data = l_data.get('lineup_positions', [])
-            # Extract just the names to match the application's expected format
-            player_names = [p['name'] for p in lineup_data if isinstance(p, dict) and 'name' in p]
+            player_names = []
+            if lineup_data and isinstance(lineup_data[0], dict):
+                # Handle old format: list of dicts
+                player_names = [p['name'] for p in lineup_data if isinstance(p, dict) and 'name' in p]
+            elif lineup_data and isinstance(lineup_data[0], str):
+                # Handle new format: list of strings
+                player_names = lineup_data
 
             lineup = Lineup(
                 title=l_data['title'], lineup_positions=player_names,
