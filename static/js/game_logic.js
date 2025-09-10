@@ -38,11 +38,12 @@ window.fetchWeatherForGame = async function(location, gameDate) {
             throw new Error("Received empty weather data.");
         }
 
-        const tempDisplay = isToday ? weather.current_temp : `High/Low: ${weather.high_temp} / ${weather.low_temp}`;
+        const tempDisplay = isToday ? weather.current_temp : `${weather.high_temp} / ${weather.low_temp}`;
+        const conditionDisplay = isToday ? weather.condition : 'Forecast';
 
         weatherWidget.innerHTML = `
             <p>
-                <strong>${isToday ? 'Current' : 'Forecast'}:</strong> ${tempDisplay || 'N/A'}, ${weather.condition || 'N/A'} <br>
+                <strong>${isToday ? 'Current' : 'High/Low'}:</strong> ${tempDisplay || 'N/A'} <br>
                 <strong>Wind:</strong> ${weather.wind || 'N/A'} <br>
                 <strong>Precipitation:</strong> ${weather.precipitation || 'N/A'}
             </p>

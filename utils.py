@@ -134,7 +134,9 @@ def calculate_pitch_count_summary(roster, all_outings, rules, context_date=None)
                     if rules.get('rest_thresholds'):
                         required_rest = rules['rest_thresholds'][-1][1] + 1
 
-                next_available_date = last_outing_date + timedelta(days=required_rest)
+                # A pitcher is available the day AFTER their rest period is over.
+                # e.g., 1 day of rest means they can't pitch the next day, but can the day after.
+                next_available_date = last_outing_date + timedelta(days=required_rest + 1)
 
                 if today < next_available_date:
                     status = 'Resting'

@@ -1468,6 +1468,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const pitcherIdToSelect = AppState.full_data.roster.find(p => p.name === btn.dataset.pitcher)?.id;
             if (pitcherIdToSelect) {
                 pitcherSelect.value = pitcherIdToSelect;
+                pitcherSelect.value = pitcherIdToSelect;
             }
 
             modal.querySelector('#edit_pitch_date').value = btn.dataset.date;
