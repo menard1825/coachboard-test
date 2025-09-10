@@ -54,7 +54,11 @@ def initialize_database():
                     role='Super Admin',
                     team_id=team.id,
                     tab_order=json.dumps(default_tab_keys),
-                    player_order=[]
+                    player_order=[],
+                    email=None,
+                    email_verified=False,
+                    email_verified_at=None,
+                    last_password_change_at=None
                 )
                 db.session.add(new_user)
 

@@ -50,6 +50,7 @@ class User(db.Model):
     email_verified = Column(Boolean, nullable=False, default=False)
     email_verified_at = Column(DateTime, nullable=True)
     last_password_change_at = Column(DateTime, nullable=True)
+    reset_token_version = Column(Integer, nullable=False, default=0)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="users")
