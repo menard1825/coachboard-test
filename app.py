@@ -104,7 +104,7 @@ def create_app():
 
     @app.context_processor
     def inject_current_year():
-        return {'current_year': datetime.now().year}
+        return {'current_year': datetime.utcnow().year}
 
     @app.context_processor
     def inject_team_info():
@@ -116,13 +116,13 @@ def create_app():
 
     @app.context_processor
     def inject_css_version():
-        return {'css_version': datetime.now().strftime('%Y%m%d%H%M%S')}
+        return {'css_version': datetime.utcnow().strftime('%Y%m%d%H%M%S')}
 
     @app.context_processor
     def inject_current_year_and_timestamp():
         return {
-            'current_year': datetime.now().year,
-            'current_year_timestamp': datetime.now().timestamp()
+            'current_year': datetime.utcnow().year,
+            'current_year_timestamp': datetime.utcnow().timestamp()
         }
 
     # --- CORE APP ROUTES ---

@@ -72,7 +72,8 @@ def move_scouted_player(from_type, to_type, player_id):
         socketio.emit('scouting_update', {'message': f'Scouted player {player_to_move.name} moved.'})
     else:
         flash('Could not move player.', 'danger')
-    return redirect(request.referrer or url_for('home', _anchor='scouting_list'))
+    anchor = request.args.get('anchor', 'scouting_list')
+    return redirect(url_for('home', _anchor=anchor))
 
 @scouting_bp.route('/move_scouted_player_to_roster/<int:player_id>', methods=['POST'])
 def move_scouted_player_to_roster(player_id):
@@ -87,7 +88,7 @@ def move_scouted_player_to_roster(player_id):
     new_roster_player = Player(
         name=scouted_player.name, number="", position1=scouted_player.position1, position2=scouted_player.position2,
         throws=scouted_player.throws, bats=scouted_player.bats, notes="", pitcher_role="Not a Pitcher", has_lessons="No",
-        lesson_focus="", notes_author=session['username'], notes_timestamp=datetime.now(), team_id=session['team_id']
+        lesson_focus="", notes_author=session['username'], notes_timestamp=datetime.utcnow(), team_id=session['team_id']
     )
     db.session.add(new_roster_player)
     db.session.flush() # to get the new player's ID
