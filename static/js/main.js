@@ -421,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="mb-0">${pNameSafe} - Development Log</h4>
                 <div class="btn-group">
-                    <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body">Add New</button>
+                    <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" data-bs-strategy="fixed">Add New</button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">Hitting Focus</a></li>
                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">Pitching Focus</a></li>
