@@ -178,7 +178,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const playerName = AppState.active_roster_player_name;
         if (!playerName) {
-            container.innerHTML = `<div class="text-center p-5 text-muted border rounded bg-light"><i class="bi bi-arrow-left-circle-fill" style="font-size: 3rem;"></i><h4 class="mt-3">Select a Player</h4><p>Select a player from the list to view or edit their details.</p></div>`;
+            // On mobile, hide the container. On desktop, show a helpful placeholder.
+            if (window.innerWidth < 992) {
+                container.innerHTML = '';
+            } else {
+                container.innerHTML = `<div class="text-center p-5 text-muted border rounded bg-light"><i class="bi bi-people" style="font-size: 3rem;"></i><h4 class="mt-3">Select a Player</h4><p>Select a player from the list to view or edit their details.</p></div>`;
+            }
             return;
         }
 
@@ -357,7 +362,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const playerName = AppState.active_player_dev_name;
         if (!playerName) {
-            container.innerHTML = `<div class="text-center p-5 text-muted"><i class="bi bi-arrow-left-circle-fill" style="font-size: 3rem;"></i><h4 class="mt-3">Select a player</h4><p>Select a player from the list to view their development log.</p></div>`;
+            // On mobile, hide the container. On desktop, show a helpful placeholder.
+            if (window.innerWidth < 992) {
+                container.innerHTML = '';
+            } else {
+                container.innerHTML = `<div class="text-center p-5 text-muted border rounded bg-light"><i class="bi bi-graph-up" style="font-size: 3rem;"></i><h4 class="mt-3">Select a Player</h4><p>Select a player from the list to view their development log.</p></div>`;
+            }
             return;
         }
 
