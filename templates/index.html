@@ -54,29 +54,30 @@
     </div>
     {# Roster is the default active tab #}
     <div class="tab-pane fade" id="roster" role="tabpanel">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h5 class="mb-0">Current Roster</h5>
-                <div class="d-flex align-items-center gap-2">
-                    <div class="btn-group btn-group-sm me-2">
-                        <button class="btn btn-outline-secondary" id="roster-sort-az" title="Sort A-Z"><i class="bi bi-sort-alpha-down"></i></button>
-                        <button class="btn btn-outline-secondary" id="roster-sort-za" title="Sort Z-A"><i class="bi bi-sort-alpha-up"></i></button>
-                        <button class="btn btn-outline-secondary" id="roster-sort-custom" title="Custom Sort"><i class="bi bi-arrow-down-up"></i></button>
-                    </div>
-                    <input type="search" id="rosterSearch" class="form-control form-control-sm" placeholder="Search roster...">
-                    <button class="btn btn-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#addPlayerModal">
-                        <i class="bi bi-plus-circle"></i> New Player
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="roster-cards-container" class="row g-3">
-                    <div class="d-flex justify-content-center p-5">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading Roster...</span>
+        <div class="row">
+            <div class="col-lg-4 mb-3 mb-lg-0">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="mb-0">Players</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" id="roster-sort-az" title="Sort A-Z"><i class="bi bi-sort-alpha-down"></i></button>
+                                <button class="btn btn-outline-secondary" id="roster-sort-za" title="Sort Z-A"><i class="bi bi-sort-alpha-up"></i></button>
+                                <button class="btn btn-outline-secondary active" id="roster-sort-custom" title="Custom Sort"><i class="bi bi-arrow-down-up"></i></button>
+                            </div>
+                            <button class="btn btn-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#addPlayerModal">
+                                <i class="bi bi-plus-circle"></i> New
+                            </button>
                         </div>
                     </div>
+                    <div class="card-body">
+                        <input type="search" id="rosterSearch" class="form-control mb-3" placeholder="Search players...">
+                        <div class="list-group" id="roster-player-list"></div>
+                    </div>
                 </div>
+            </div>
+            <div class="col-lg-8">
+                <div id="roster-player-details"></div>
             </div>
         </div>
     </div>
@@ -90,7 +91,7 @@
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-outline-secondary" id="dev-sort-az" title="Sort A-Z"><i class="bi bi-sort-alpha-down"></i></button>
                             <button class="btn btn-outline-secondary" id="dev-sort-za" title="Sort Z-A"><i class="bi bi-sort-alpha-up"></i></button>
-                            <button class="btn btn-outline-secondary" id="dev-sort-custom" title="Custom Sort"><i class="bi bi-arrow-down-up"></i></button>
+                            <button class="btn btn-outline-secondary active" id="dev-sort-custom" title="Custom Sort"><i class="bi bi-arrow-down-up"></i></button>
                         </div>
                     </div>
                     <div class="card-body">

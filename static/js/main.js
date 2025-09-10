@@ -111,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         session: {},
         pitch_count_summary: {},
         roster_sort: { key: 'custom', order: 'asc' },
+        active_roster_player_name: null,
         active_player_dev_name: null,
         dev_player_sort: { key: 'custom', order: 'asc' }
     };
@@ -152,58 +153,80 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- RENDER FUNCTIONS ---
-    function playerTemplate(p) {
+    function rosterPlayerListTemplate(p) {
+        const pNameSafe = escapeHTML(p.name);
+        const positions = [p.position1, p.position2, p.position3].filter(Boolean).map(pos => `<span class="badge bg-secondary me-1">${pos}</span>`).join('') || '<span class="text-muted small">N/A</span>';
+
+        return `
+            <a href="#" class="list-group-item list-group-item-action" data-player-name="${pNameSafe}">
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-grip-vertical me-2 drag-handle" style="cursor: move;" title="Drag to reorder"></i>
+                        <span class="fw-bold">${pNameSafe}</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <div class="me-3 d-none d-sm-block">${positions}</div>
+                        <span class="badge bg-primary rounded-pill">#${p.number || 'N/A'}</span>
+                    </div>
+                </div>
+            </a>`;
+    }
+
+    function renderRosterDetails() {
+        const container = document.getElementById('roster-player-details');
+        if (!container) return;
+
+        const playerName = AppState.active_roster_player_name;
+        if (!playerName) {
+            container.innerHTML = `<div class="text-center p-5 text-muted border rounded bg-light"><i class="bi bi-arrow-left-circle-fill" style="font-size: 3rem;"></i><h4 class="mt-3">Select a Player</h4><p>Select a player from the list to view or edit their details.</p></div>`;
+            return;
+        }
+
+        const p = AppState.full_data.roster.find(player => player.name === playerName);
+        if (!p) {
+            container.innerHTML = `<div class="alert alert-danger">Could not find details for player: ${escapeHTML(playerName)}</div>`;
+            return;
+        }
+
         const pNameSafe = escapeHTML(p.name);
         const pNotesSafe = escapeHTML(p.notes || '');
         const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
         const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}" data-delete-name="${pNameSafe}">Delete</button>`;
 
-        const positions = [p.position1, p.position2, p.position3].filter(Boolean).map(pos => `<span class="badge bg-secondary me-1">${pos}</span>`).join('') || '<span class="text-muted small">N/A</span>';
-        const batsThrows = `B/T: ${p.bats?.[0] || 'N'}/${p.throws?.[0] || 'N'}`;
+        container.innerHTML = `
+            <div class="card">
+                <div class="card-header bg-primary bg-opacity-10">
+                    <h5 class="mb-0"><i class="bi bi-person-vcard me-2"></i>Player Details: <strong>${pNameSafe}</strong></h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12"><h5>Player Notes</h5></div>
+                        <div class="col-12"><textarea class="form-control" name="notes" rows="2" placeholder="Notes">${pNotesSafe}</textarea></div>
+                        ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${formattedTimestamp}</small></div>` : ''}
+                        <hr class="my-3">
+                        <div class="col-12 col-md-4"><label class="form-label">Name</label><input type="text" class="form-control" name="name" value="${pNameSafe}"></div>
+                        <div class="col-6 col-md-2"><label class="form-label">J#</label><input type="number" class="form-control" name="number" value="${p.number || ''}"></div>
+                        <div class="col-6 col-md-3"><label class="form-label">Pos 1</label>${renderPositionSelect('position1', `position1_${p.id}`, p.position1, '', 'form-select')}</div>
+                        <div class="col-6 col-md-3"><label class="form-label">Pos 2</label>${renderPositionSelect('position2', `position2_${p.id}`, p.position2, '', 'form-select')}</div>
+                        <div class="col-6 col-md-3"><label class="form-label">Pos 3</label>${renderPositionSelect('position3', `position3_${p.id}`, p.position3, '', 'form-select')}</div>
+                        <div class="col-6 col-md-3"><label class="form-label">Throws</label><select name="throws" class="form-select"><option value="Right" ${p.throws === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.throws === 'Left' ? 'selected' : ''}>Left</option></select></div>
+                        <div class="col-6 col-md-3"><label class="form-label">Bats</label><select name="bats" class="form-select"><option value="Right" ${p.bats === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.bats === 'Left' ? 'selected' : ''}>Left</option></select></div>
+                        <div class="col-6 col-md-3"><label class="form-label">Pitcher Role</label><select name="pitcher_role" class="form-select"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Not a Pitcher</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starter</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Reliever</option></select></div>
+                        <div class="col-12 d-flex justify-content-end mt-3"><button type="button" class="btn btn-sm btn-primary me-2 save-player-btn" data-player-id="${p.id}">Save</button>${deleteButtonHtml}</div>
+                        <div class="col-12 mt-2"><div class="save-feedback" style="display: none;"></div></div>
+                    </div>
+                </div>
+            </div>`;
 
-        return `
-        <div class="col-12" data-player-name="${pNameSafe}">
-            <div class="card player-card">
-                <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#collapse-roster-${p.id}" style="cursor: pointer;">
-                    <h6 class="mb-0">
-                        <i class="bi bi-grip-vertical text-muted drag-handle" style="cursor: move;" title="Drag to reorder"></i>
-                        <strong class="ms-2">${pNameSafe}</strong>
-                    </h6>
-                    <div class="d-flex align-items-center">
-                        <div class="me-3 d-none d-sm-block">${positions}</div>
-                        <span class="badge bg-primary rounded-pill">#${p.number || 'N/A'}</span>
-                    </div>
-                </div>
-                <div id="collapse-roster-${p.id}" class="collapse">
-                    <div class="card-body bg-light">
-                        <div class="row g-3 align-items-end">
-                            <div class="col-12"><h5>Player Notes</h5></div>
-                            <div class="col-12"><textarea class="form-control" name="notes" rows="2" placeholder="Notes">${pNotesSafe}</textarea></div>
-                            ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${formattedTimestamp}</small></div>` : ''}
-                            <hr class="my-3">
-                            <div class="col-12 col-md-4"><label class="form-label">Name</label><input type="text" class="form-control" name="name" value="${pNameSafe}"></div>
-                            <div class="col-6 col-md-2"><label class="form-label">J#</label><input type="number" class="form-control" name="number" value="${p.number || ''}"></div>
-                            <div class="col-6 col-md-3"><label class="form-label">Pos 1</label>${renderPositionSelect('position1', `position1_${p.id}`, p.position1, '', 'form-select')}</div>
-                            <div class="col-6 col-md-3"><label class="form-label">Pos 2</label>${renderPositionSelect('position2', `position2_${p.id}`, p.position2, '', 'form-select')}</div>
-                            <div class="col-6 col-md-3"><label class="form-label">Pos 3</label>${renderPositionSelect('position3', `position3_${p.id}`, p.position3, '', 'form-select')}</div>
-                            <div class="col-6 col-md-3"><label class="form-label">Throws</label><select name="throws" class="form-select"><option value="Right" ${p.throws === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.throws === 'Left' ? 'selected' : ''}>Left</option></select></div>
-                            <div class="col-6 col-md-3"><label class="form-label">Bats</label><select name="bats" class="form-select"><option value="Right" ${p.bats === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.bats === 'Left' ? 'selected' : ''}>Left</option></select></div>
-                            <div class="col-6 col-md-3"><label class="form-label">Pitcher Role</label><select name="pitcher_role" class="form-select"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Not a Pitcher</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starter</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Reliever</option></select></div>
-                            <div class="col-12 d-flex justify-content-end mt-3"><button type="button" class="btn btn-sm btn-primary me-2 save-player-btn" data-player-id="${p.id}">Save</button>${deleteButtonHtml}</div>
-                            <div class="col-12 mt-2"><div class="save-feedback" style="display: none;"></div></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>`;
+        attachRosterSaveListeners();
     }
 
-    function renderRoster() {
-        const container = document.getElementById('roster-cards-container');
+    function renderRosterList() {
+        const container = document.getElementById('roster-player-list');
         if (!container) return;
         const searchTerm = document.getElementById('rosterSearch').value.toLowerCase();
-        
+
         let rosterToSort = [...(AppState.full_data.roster || [])];
 
         if (AppState.roster_sort.key === 'name') {
@@ -213,21 +236,51 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } else { // Custom sort
             const customOrderedNames = AppState.player_order.filter(name => rosterToSort.some(p => p.name === name));
-            rosterToSort.sort((a,b) => customOrderedNames.indexOf(a.name) - customOrderedNames.indexOf(b.name));
+            rosterToSort.sort((a, b) => customOrderedNames.indexOf(a.name) - customOrderedNames.indexOf(b.name));
         }
-        
-        const filteredRoster = rosterToSort.filter(p => 
+
+        const filteredRoster = rosterToSort.filter(p =>
             !searchTerm || p.name.toLowerCase().includes(searchTerm) || (p.number || '').toString().includes(searchTerm)
         );
 
-        container.innerHTML = filteredRoster.length > 0 ? filteredRoster.map(playerTemplate).join('') : `<div class="p-3 text-center text-muted">No players found.</div>`;
+        container.innerHTML = filteredRoster.length > 0 ? filteredRoster.map(rosterPlayerListTemplate).join('') : `<div class="p-3 text-center text-muted">No players found.</div>`;
+
+        container.querySelectorAll('.list-group-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.classList.contains('drag-handle')) return;
+                e.preventDefault();
+                AppState.active_roster_player_name = item.dataset.playerName;
+                renderRosterDetails();
+                container.querySelector('.active')?.classList.remove('active');
+                item.classList.add('active');
+
+                // On mobile, scroll down to the details view automatically
+                if (window.innerWidth < 992) {
+                    const detailsContainer = document.getElementById('roster-player-details');
+                    if (detailsContainer) {
+                        detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
+            });
+        });
 
         document.querySelectorAll('#roster-sort-az, #roster-sort-za, #roster-sort-custom').forEach(btn => btn.classList.remove('active'));
-        if(AppState.roster_sort.key === 'name' && AppState.roster_sort.order === 'asc') document.getElementById('roster-sort-az').classList.add('active');
-        if(AppState.roster_sort.key === 'name' && AppState.roster_sort.order === 'desc') document.getElementById('roster-sort-za').classList.add('active');
-        if(AppState.roster_sort.key === 'custom') document.getElementById('roster-sort-custom').classList.add('active');
+        if (AppState.roster_sort.key === 'name' && AppState.roster_sort.order === 'asc') document.getElementById('roster-sort-az').classList.add('active');
+        if (AppState.roster_sort.key === 'name' && AppState.roster_sort.order === 'desc') document.getElementById('roster-sort-za').classList.add('active');
+        if (AppState.roster_sort.key === 'custom') document.getElementById('roster-sort-custom').classList.add('active');
 
-        attachRosterSaveListeners();
+        // Highlight the active player in the list
+        if (AppState.active_roster_player_name) {
+            const activeItem = container.querySelector(`[data-player-name="${AppState.active_roster_player_name}"]`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+            }
+        }
+    }
+
+    function renderRoster() {
+        renderRosterList();
+        renderRosterDetails();
     }
 
     function renderPlayerDevelopmentList() {
@@ -276,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.classList.add('active');
 
                 // On mobile, scroll down to the details view automatically
-                if (window.innerWidth < 992) { // Corresponds to Bootstrap's 'lg' breakpoint
+                if (window.innerWidth < 992) {
                     const detailsContainer = document.getElementById('player-dev-content');
                     if (detailsContainer) {
                         detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -285,10 +338,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        // Highlight the active player in the list
+        if (AppState.active_player_dev_name) {
+            const activeItem = container.querySelector(`[data-player-name="${AppState.active_player_dev_name}"]`);
+            if (activeItem) activeItem.classList.add('active');
+        }
+
         document.querySelectorAll('#dev-sort-az, #dev-sort-za, #dev-sort-custom').forEach(btn => btn.classList.remove('active'));
         if(AppState.dev_player_sort.key === 'name' && AppState.dev_player_sort.order === 'asc') document.getElementById('dev-sort-az').classList.add('active');
         if(AppState.dev_player_sort.key === 'name' && AppState.dev_player_sort.order === 'desc') document.getElementById('dev-sort-za').classList.add('active');
         if(AppState.dev_player_sort.key === 'custom') document.getElementById('dev-sort-custom').classList.add('active');
+
     }
 
     function renderPlayerDevelopmentDetails() {
@@ -978,27 +1038,42 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('roster_add', (data) => {
             console.log('roster_add received', data);
             AppState.full_data.roster.push(data.player);
-            if (!AppState.player_order.includes(data.player.name)) {
-                AppState.player_order.push(data.player.name);
-            }
-            renderRoster();
+            AppState.player_order.push(data.player.name); // Add to end of custom order
+            AppState.active_roster_player_name = data.player.name; // Select the new player
+            renderRoster(); // Re-render list and details
             renderPlayerDevelopmentList();
         });
         socket.on('roster_update', (data) => {
             console.log('roster_update received', data);
             const index = AppState.full_data.roster.findIndex(p => p.id === data.player.id);
             if (index > -1) {
+                const oldName = AppState.full_data.roster[index].name;
+                const newName = data.player.name;
+
+                // Update player order if name changed
+                if (oldName !== newName) {
+                    const orderIndex = AppState.player_order.indexOf(oldName);
+                    if (orderIndex > -1) AppState.player_order[orderIndex] = newName;
+                }
+
                 AppState.full_data.roster[index] = data.player;
+
+                // If the updated player was the active one, update the active name
+                if (AppState.active_roster_player_name === oldName) {
+                    AppState.active_roster_player_name = newName;
+                }
+
                 renderRoster();
                 renderPlayerDevelopmentList();
             }
         });
         socket.on('roster_delete', (data) => {
             console.log('roster_delete received', data);
-            const playerToDelete = AppState.full_data.roster.find(p => p.id === data.player_id);
-            if(playerToDelete) {
-                AppState.player_order = AppState.player_order.filter(name => name !== playerToDelete.name);
+            const deletedPlayer = AppState.full_data.roster.find(p => p.id === data.player_id);
+            if (deletedPlayer && AppState.active_roster_player_name === deletedPlayer.name) {
+                AppState.active_roster_player_name = null; // Deselect if deleted
             }
+            if (deletedPlayer) AppState.player_order = AppState.player_order.filter(name => name !== deletedPlayer.name);
             AppState.full_data.roster = AppState.full_data.roster.filter(p => p.id !== data.player_id);
             renderRoster();
             renderPlayerDevelopmentList();
@@ -1151,10 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
             AppState.player_order = newOrder;
             fetch('/save_player_order', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': csrfToken
-                },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                 body: JSON.stringify({ player_order: newOrder })
             });
             AppState.dev_player_sort.key = 'custom';
@@ -1162,10 +1234,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         ['roster-cards-container', 'dev-player-list'].forEach(id => {
             const el = document.getElementById(id);
-            if(el) sortableInstances[id] = new Sortable(el, { handle: '.drag-handle', animation: 150, onEnd: savePlayerOrder });
+            if (el) sortableInstances[id] = new Sortable(el, { handle: '.drag-handle', animation: 150, onEnd: savePlayerOrder });
         });
         const desktopTabEl = document.getElementById('mainTabsDesktop');
-        if (desktopTabEl) {
+        if (desktopTabEl && (AppState.session.role === 'Head Coach' || AppState.session.role === 'Super Admin')) {
             sortableInstances.desktopTabs = new Sortable(desktopTabEl, {
                 handle: '.drag-handle', animation: 150,
                 onEnd: () => {
@@ -1179,6 +1251,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         body: JSON.stringify({ order: newOrder })
                     });
                 }
+            });
+        } else if (desktopTabEl) {
+            // If user is not a coach, remove drag handles
+            desktopTabEl.querySelectorAll('.drag-handle').forEach(handle => {
+                handle.style.display = 'none';
             });
         }
     }
