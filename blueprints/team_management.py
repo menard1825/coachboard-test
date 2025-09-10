@@ -131,7 +131,8 @@ def add_practice_plan():
             date=plan_date, # Use the intelligent date
             emphasis=emphasis,
             team_id=session['team_id'],
-            source_game_id=source_game_id
+            source_game_id=source_game_id,
+            source_game_summary=emphasis # Also save the original summary
         )
         db.session.add(new_plan)
         db.session.commit()

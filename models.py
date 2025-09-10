@@ -265,6 +265,7 @@ class PracticePlan(db.Model):
     
     source_game_id = Column(Integer, ForeignKey('games.id', ondelete='SET NULL'), nullable=True)
     source_game = relationship("Game", back_populates="derived_practice_plans")
+    source_game_summary = Column(Text, nullable=True)
 
 class PracticeTask(db.Model):
     __tablename__ = 'practice_tasks'

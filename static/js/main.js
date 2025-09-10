@@ -603,9 +603,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         container.innerHTML = plans.map(plan => {
-            const sourceGameHtml = plan.source_game_info
-                ? `<div class="mb-2"><small class="text-muted fst-italic"><i class="bi bi-link-45deg"></i> Derived from game vs <a href="/game/${plan.source_game_info.id}">${escapeHTML(plan.source_game_info.opponent)}</a></small></div>`
-                : '';
+            let sourceGameHtml = '';
+            if (plan.source_game_info) {
+                sourceGameHtml = `
+                    <div class="alert alert-info" role="alert">
+                        <h6 class="alert-heading"><i class="bi bi-info-circle-fill"></i> Post-Game Takeaways</h6>
+                        <p class="mb-1">This plan was created from the game vs <strong><a href="/game/${plan.source_game_info.id}" class="alert-link">${escapeHTML(plan.source_game_info.opponent)}</a></strong>. The original summary is below for reference.</p>
+                        <hr>
+                        <blockquote class="blockquote mb-0 small fst-italic">"${escapeHTML(plan.source_game_summary || 'No summary was provided.')}"</blockquote>
+                    </div>`;
+            }
 
             const absentPlayerIds = new Set(plan.absent_player_ids || []);
             const attendanceHtml = roster.map(player => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="absent_players" value="${player.id}" id="attendance-${plan.id}-${player.id}" ${absentPlayerIds.has(player.id) ? 'checked' : ''}><label class="form-check-label" for="attendance-${plan.id}-${player.id}">${escapeHTML(player.name)}</label></div>`).join('');
