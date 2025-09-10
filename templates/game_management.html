@@ -403,15 +403,22 @@
                     const notesList = document.getElementById('quickNotesList');
                     const newNoteEl = document.createElement('li');
                     newNoteEl.className = 'list-group-item d-flex justify-content-between align-items-start';
+                    newNoteEl.dataset.noteId = result.note.id;
 
                     const noteDate = new Date(result.note.timestamp);
                     const formattedDate = noteDate.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
 
                     newNoteEl.innerHTML = `
-                        <div class="ms-2 me-auto">
-                            ${result.note.text}
+                        <div class="d-flex justify-content-between align-items-start w-100">
+                            <div class="ms-2 me-auto">
+                                <div class="note-text">${result.note.text}</div>
+                                <small class="text-muted">-- ${result.note.author}</small>
+                            </div>
+                            <div class="d-flex flex-column align-items-end flex-shrink-0 ms-2">
+                                <small class="text-muted mb-1 text-nowrap">${formattedDate}</small>
+                                <div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary btn-sm edit-quick-note-btn" data-bs-toggle="modal" data-bs-target="#editQuickNoteModal"><i class="bi bi-pencil"></i></button><button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/game/quick_note/${result.note.id}/delete" data-delete-name="this note"><i class="bi bi-trash"></i></button></div>
+                            </div>
                         </div>
-                        <span class="badge bg-primary rounded-pill">${formattedDate}</span>
                     `;
                     const noNotesEl = notesList.querySelector('.text-muted');
                     if (noNotesEl) {
