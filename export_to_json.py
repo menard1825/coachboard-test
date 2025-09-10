@@ -31,22 +31,24 @@ def export_db_to_json(db_path, json_path):
 
     all_data = {}
 
-    # List of tables to export. The key is the JSON key, the value is the DB table name.
-    tables_to_export = {
-        "teams": "teams",
-        "users": "users",
-        "roster": "players",
-        "lineups": "lineups",
-        "pitching": "pitching_outings",
-        "rotations": "rotations",
-        "games": "games",
-        "practice_plans": "practice_plans",
-        "signs": "signs",
-    }
+    # Dynamically get all table names from the database
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+    tables = cursor.fetchall()
+    table_names = [table['name'] for table in tables]
 
     print("Exporting data...")
 
-    for json_key, table_name in tables_to_export.items():
+    # Map DB table names to the keys expected in the JSON file
+    table_to_json_key_map = {
+        "players": "roster",
+        "pitching_outings": "pitching",
+        "player_development_focuses": "player_development_focuses_raw", # Temp key
+        # Add other mappings if table name differs from json key
+    }
+
+    for table_name in table_names:
+        json_key = table_to_json_key_map.get(table_name, table_name)
+
         try:
             cursor.execute(f"SELECT * FROM {table_name}")
             rows = cursor.fetchall()
@@ -55,48 +57,50 @@ def export_db_to_json(db_path, json_path):
         except sqlite3.OperationalError:
             print(f"  - Warning: Table '{table_name}' not found in the old database. Skipping.")
             all_data[json_key] = []
+    
+    # --- Restructure data to match migrate_data.py's expected format ---
 
     # Handle special structured data
     # Scouted Players
-    try:
-        cursor.execute("SELECT * FROM scouted_players")
-        rows = cursor.fetchall()
-        scouting_list = {}
-        for row in rows:
-            list_type = row['list_type']
-            if list_type not in scouting_list:
-                scouting_list[list_type] = []
-            scouting_list[list_type].append(dict(row))
-        all_data["scouting_list"] = scouting_list
-        print(f"  - Exported {len(rows)} rows from 'scouted_players'")
-    except sqlite3.OperationalError:
-        print("  - Warning: Table 'scouted_players' not found. Skipping.")
+    scouting_list = {"committed": [], "targets": [], "not_interested": []}
+    for player_data in all_data.get("scouted_players", []):
+        list_type = player_data.get('list_type')
+        if list_type in scouting_list:
+            scouting_list[list_type].append(player_data)
+    all_data["scouting_list"] = scouting_list
 
     # Collaboration Notes
-    try:
-        cursor.execute("SELECT * FROM collaboration_notes")
-        rows = cursor.fetchall()
-        collab_notes = {}
-        for row in rows:
-            note_type = row['note_type']
-            if note_type not in collab_notes:
-                collab_notes[note_type] = []
-            collab_notes[note_type].append(dict(row))
-        all_data["collaboration_notes"] = collab_notes
-        print(f"  - Exported {len(rows)} rows from 'collaboration_notes'")
-    except sqlite3.OperationalError:
-        print("  - Warning: Table 'collaboration_notes' not found. Skipping.")
+    collab_notes = {"player_notes": [], "team_notes": []}
+    for note_data in all_data.get("collaboration_notes", []):
+        note_type = note_data.get('note_type')
+        if note_type in collab_notes:
+            collab_notes[note_type].append(note_data)
+    all_data["collaboration_notes"] = collab_notes
 
-    # Player Development Focuses (This one is complex, adjust if needed)
-    # This part is simplified; migrate_data.py handles the complex structure.
-    # We just need to dump the raw data.
-    try:
-        cursor.execute("SELECT * FROM player_development_focuses")
-        rows = cursor.fetchall()
-        all_data["player_development_focuses"] = [dict(row) for row in rows]
-        print(f"  - Exported {len(rows)} rows from 'player_development_focuses'")
-    except sqlite3.OperationalError:
-        print("  - Warning: Table 'player_development_focuses' not found. Skipping.")
+    # Practice Plans and Tasks
+    tasks_by_plan_id = {}
+    for task in all_data.get("practice_tasks", []):
+        plan_id = task.get('practice_plan_id')
+        if plan_id:
+            if plan_id not in tasks_by_plan_id:
+                tasks_by_plan_id[plan_id] = []
+            tasks_by_plan_id[plan_id].append(task)
+    
+    for plan in all_data.get("practice_plans", []):
+        plan['tasks'] = tasks_by_plan_id.get(plan['id'], [])
+
+    # Player Development Focuses
+    player_dev_data = {}
+    player_id_to_name = {p['id']: p['name'] for p in all_data.get('roster', [])}
+    for focus in all_data.get('player_development_focuses_raw', []):
+        player_name = player_id_to_name.get(focus.get('player_id'))
+        skill_type = focus.get('skill_type')
+        if player_name and skill_type:
+            if player_name not in player_dev_data:
+                player_dev_data[player_name] = {"hitting": [], "pitching": [], "fielding": [], "baserunning": []}
+            if skill_type in player_dev_data[player_name]:
+                 player_dev_data[player_name][skill_type].append(focus)
+    all_data["player_development"] = player_dev_data
 
     with open(json_path, 'w') as f:
         json.dump(all_data, f, indent=4, default=str) # Use default=str for any types json doesn't know
@@ -105,6 +109,6 @@ def export_db_to_json(db_path, json_path):
     conn.close()
 
 if __name__ == "__main__":
-    old_db_file = 'app_old.db' # The name of your old database backup file
+    old_db_file = 'app_old.db'  # The name of your old database backup file
     json_backup_file = 'data_backup.json'
     export_db_to_json(old_db_file, json_backup_file)

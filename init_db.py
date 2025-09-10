@@ -58,7 +58,8 @@ def initialize_database():
                     email=None,
                     email_verified=False,
                     email_verified_at=None,
-                    last_password_change_at=None
+                    last_password_change_at=None,
+                    reset_token_version=0
                 )
                 db.session.add(new_user)
 
