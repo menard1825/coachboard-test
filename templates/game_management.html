@@ -378,13 +378,6 @@
             setupAutocomplete(gameLocationInput);
         }
 
-        // Add event listener for when the game date changes in the modal
-        const gameDateInput = document.getElementById('game_date');
-        gameDateInput.addEventListener('change', () => {
-            const gameLocation = document.getElementById('game_location').value;
-            fetchWeatherForGame(gameLocation, gameDateInput.value);
-        });
-
         // Quick Note Submission
         const addQuickNoteForm = document.getElementById('addQuickNoteForm');
         if(addQuickNoteForm) {

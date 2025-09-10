@@ -6,10 +6,22 @@ from db import db
 from extensions import socketio
 from datetime import datetime, date, timedelta
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
+from functools import wraps
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 
 gameday_bp = Blueprint('gameday', __name__, template_folder='templates')
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('auth.login'))
+        if 'team_id' not in session:
+            flash('Please select a team first.', 'warning')
+            return redirect(url_for('auth.login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 def pitching_outing_to_dict(outing):
     if not outing:
@@ -20,6 +32,7 @@ def pitching_outing_to_dict(outing):
 
 # --- Game Management ---
 @gameday_bp.route('/game/<int:game_id>')
+@login_required
 def game_management(game_id):
     team = db.session.get(Team, session['team_id'])
     if not team:
@@ -77,6 +90,7 @@ def game_management(game_id):
                            is_past_game=is_past_game)
 
 @gameday_bp.route('/add_game', methods=['POST'])
+@login_required
 def add_game():
     game_date_str = request.form['game_date']
     try:
@@ -107,6 +121,7 @@ def add_game():
     return redirect(url_for('gameday.game_management', game_id=new_game.id))
 
 @gameday_bp.route('/edit_game/<int:game_id>', methods=['POST'])
+@login_required
 def edit_game(game_id):
     # Eagerly load pitching outings to avoid extra database queries
     game_to_edit = db.session.query(Game).options(
@@ -158,6 +173,7 @@ def edit_game(game_id):
     return redirect(url_for('.game_management', game_id=game_id, _anchor=active_tab))
 
 @gameday_bp.route('/delete_game/<int:game_id>', methods=['POST'])
+@login_required
 def delete_game(game_id):
     game_to_delete = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
     if game_to_delete:
@@ -181,6 +197,7 @@ def delete_game(game_id):
     return redirect(url_for('home', _anchor='games'))
 
 @gameday_bp.route('/game/<int:game_id>/update_absences', methods=['POST'])
+@login_required
 def update_absences(game_id):
     team_id = session['team_id']
     game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
@@ -204,6 +221,7 @@ def update_absences(game_id):
     return redirect(url_for('.game_management', game_id=game_id, _anchor=active_tab))
 
 @gameday_bp.route('/game/<int:game_id>/add_quick_note', methods=['POST'])
+@login_required
 def add_quick_note(game_id):
     note_text = request.form.get('note')
     if not note_text:
@@ -229,6 +247,7 @@ def add_quick_note(game_id):
     })
 
 @gameday_bp.route('/game/quick_note/<int:note_id>', methods=['POST'])
+@login_required
 def edit_quick_note(note_id):
     note = db.session.get(GameQuickNote, note_id)
     if not note or note.game.team_id != session['team_id']:
@@ -249,6 +268,7 @@ def edit_quick_note(note_id):
     return jsonify({'status': 'success', 'note': model_to_dict(note)})
 
 @gameday_bp.route('/game/quick_note/<int:note_id>/delete', methods=['POST'])
+@login_required
 def delete_quick_note(note_id):
     note = db.session.get(GameQuickNote, note_id)
     if not note or note.game.team_id != session['team_id']:
@@ -270,6 +290,7 @@ def delete_quick_note(note_id):
 
 
 @gameday_bp.route('/game/<int:game_id>/create_practice_plan')
+@login_required
 def create_practice_plan_from_game(game_id):
     game = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
     if not game:
@@ -291,6 +312,7 @@ def create_practice_plan_from_game(game_id):
 
 # ADD THIS NEW ROUTE
 @gameday_bp.route('/game/<int:game_id>/add_pitching_outing', methods=['POST'])
+@login_required
 def add_pitching_outing_for_game(game_id):
     """Adds a pitching outing from the game management screen."""
     team_id = session['team_id']
@@ -329,6 +351,7 @@ def add_pitching_outing_for_game(game_id):
 
 # --- Lineup & Rotation API-like routes ---
 @gameday_bp.route('/add_lineup', methods=['POST'])
+@login_required
 def add_lineup():
     if 'logged_in' not in session:
         return jsonify({'status': 'error', 'message': 'Authentication required.'}), 401
@@ -364,6 +387,7 @@ def add_lineup():
         return jsonify({'status': 'error', 'message': 'An unexpected error occurred while adding the lineup.'}), 500
 
 @gameday_bp.route('/edit_lineup/<int:lineup_id>', methods=['POST'])
+@login_required
 def edit_lineup(lineup_id):
     if 'logged_in' not in session:
         return jsonify({'status': 'error', 'message': 'Authentication required.'}), 401
@@ -399,6 +423,7 @@ def edit_lineup(lineup_id):
         return jsonify({'status': 'error', 'message': 'An unexpected error occurred while editing the lineup.'}), 500
 
 @gameday_bp.route('/delete_lineup/<int:lineup_id>', methods=['POST'])
+@login_required
 def delete_lineup(lineup_id):
     game_id = request.args.get('game_id', type=int)
     lineup_to_delete = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
@@ -417,6 +442,7 @@ def delete_lineup(lineup_id):
         return redirect(url_for('home', _anchor='lineups'))
 
 @gameday_bp.route('/save_rotation', methods=['POST'])
+@login_required
 def save_rotation():
     rotation_data = request.get_json()
     rotation_id = rotation_data.get('id')
@@ -463,6 +489,7 @@ def save_rotation():
     return jsonify({'status': 'success', 'message': message, 'new_id': new_rotation_id})
 
 @gameday_bp.route('/delete_rotation/<int:rotation_id>', methods=['POST'])
+@login_required
 def delete_rotation(rotation_id):
     game_id = request.args.get('game_id', type=int)
     rotation_to_delete = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
@@ -482,6 +509,7 @@ def delete_rotation(rotation_id):
         return redirect(url_for('home', _anchor='rotations'))
 
 @gameday_bp.route('/save_rotation_as_template', methods=['POST'])
+@login_required
 def save_rotation_as_template():
     payload = request.get_json()
     title = payload.get('title')
@@ -519,6 +547,7 @@ def save_rotation_as_template():
     })
 
 @gameday_bp.route('/game/<int:game_id>/print_lineup')
+@login_required
 def print_lineup(game_id):
     team = db.session.get(Team, session['team_id'])
     game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
