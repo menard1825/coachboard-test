@@ -7,7 +7,7 @@ import uuid
 import os
 import random
 import string
-import json
+import json, datetime
 from functools import wraps
 
 from db import db
@@ -73,6 +73,7 @@ def add_user():
     username = request.form.get('username')
     password = request.form.get('password')
     full_name = request.form.get('full_name')
+    email = request.form.get('email')
     role = request.form.get('role', 'Assistant Coach')
     
     team_id_for_new_user = None
@@ -91,6 +92,9 @@ def add_user():
     if db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first():
         flash('Username already exists.', 'danger')
         return redirect(url_for('.user_management'))
+    if email and db.session.query(User).filter(func.lower(User.email) == func.lower(email)).first():
+        flash('Email address is already in use.', 'danger')
+        return redirect(url_for('.user_management'))
 
     if role == SUPER_ADMIN and session.get('role') != SUPER_ADMIN:
         flash('Only a Super Admin can create another Super Admin.', 'danger')
@@ -103,6 +107,7 @@ def add_user():
         username=username,
         full_name=full_name,
         password_hash=hashed_password,
+        email=email.lower() if email else None,
         role=role,
         tab_order=json.dumps(default_tab_keys),
         last_login=None,
@@ -159,6 +164,7 @@ def reset_password(username):
         
     temp_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
     user_to_reset.password_hash = generate_password_hash(temp_password)
+    user_to_reset.last_password_change_at = datetime.datetime.utcnow()
     db.session.commit()
     flash(f"Password for {username} has been reset. The temporary password is: {temp_password}", 'success')
     socketio.emit('data_updated', {'message': f"Password for {username} reset."})
@@ -180,6 +186,7 @@ def edit_user(username):
 
     new_full_name = request.form.get('full_name')
     new_role = request.form.get('role')
+    new_email = request.form.get('email')
 
     # Update Full Name
     user_to_edit.full_name = new_full_name
@@ -207,6 +214,15 @@ def edit_user(username):
             flash('Invalid role selected.', 'danger')
             db.session.rollback() # Rollback name change
             return redirect(url_for('.user_management'))
+
+    # Update Email
+    if new_email and new_email.lower() != (user_to_edit.email or '').lower():
+        # Check if the new email is already taken by another user
+        if db.session.query(User).filter(User.id != user_to_edit.id, func.lower(User.email) == func.lower(new_email)).first():
+            flash('That email address is already in use by another account.', 'danger')
+            db.session.rollback()
+            return redirect(url_for('.user_management'))
+        user_to_edit.email = new_email.lower()
 
     db.session.commit()
     flash(f"Successfully updated user {username}.", 'success')

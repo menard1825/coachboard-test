@@ -99,6 +99,10 @@ try:
                     tab_order=json.dumps(u_data.get('tab_order', [])),
                     player_order=u_data.get('player_order', []),
                     team_id=new_team_id
+                    # Set defaults for new email-related fields
+                    email=u_data.get('email'), # Will be None if not in backup
+                    email_verified=False,
+                    last_password_change_at=None
                 )
                 session.add(user)
                 existing_usernames.add(u_data['username'].lower())

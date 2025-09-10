@@ -46,6 +46,10 @@ class User(db.Model):
     last_login = Column(DateTime)
     tab_order = Column(Text) # Keeping as text for simplicity
     player_order = Column(JSON) # Changed to JSON
+    email = Column(String(255), unique=True, nullable=True)
+    email_verified = Column(Boolean, nullable=False, default=False)
+    email_verified_at = Column(DateTime, nullable=True)
+    last_password_change_at = Column(DateTime, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="users")

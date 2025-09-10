@@ -65,6 +65,7 @@ def register():
         username = request.form.get('username')
         full_name = request.form.get('full_name')
         password = request.form.get('password')
+        email = request.form.get('email')
         reg_code = request.form.get('registration_code')
 
         if not all([username, full_name, password, reg_code]):
@@ -76,6 +77,7 @@ def register():
         if db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first():
             flash('That username is already taken. Please choose another.', 'danger')
             return redirect(url_for('auth.register'))
+        
 
         team = db.session.query(Team).filter_by(registration_code=reg_code).first()
         if not team:
@@ -92,6 +94,7 @@ def register():
             username=username,
             full_name=full_name,
             password_hash=hashed_password,
+            email=email.lower() if email else None,
             role=user_role,
             team_id=team.id,
             tab_order=json.dumps(default_tab_keys),
@@ -133,6 +136,7 @@ def change_password():
             flash('New password must be at least 4 characters long.', 'danger')
             return redirect(url_for('auth.change_password'))
 
+        user.last_password_change_at = datetime.utcnow()
         user.password_hash = generate_password_hash(new_password)
         db.session.commit()
 
