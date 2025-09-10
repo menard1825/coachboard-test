@@ -201,8 +201,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         container.innerHTML = `
             <div class="card">
-                <div class="card-header bg-primary bg-opacity-10">
-                    <h5 class="mb-0"><i class="bi bi-person-vcard me-2"></i>Player Details: <strong>${pNameSafe}</strong></h5>
+                <div class="card-header bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-person-vcard me-2"></i>Player Details: <strong>${pNameSafe}</strong>
+                    </h5>
+                    <button type="button" class="btn-close" id="close-roster-details" aria-label="Close"></button>
                 </div>
                 <div class="card-body">
                     <div class="row g-3 align-items-end">
@@ -225,6 +228,14 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
 
         attachRosterSaveListeners();
+
+        // Add event listener for the new close button
+        const closeBtn = document.getElementById('close-roster-details');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                closeRosterDetails();
+            });
+        }
     }
 
     function renderRosterList() {
@@ -285,6 +296,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderRoster() {
         renderRosterList();
+        renderRosterDetails();
+    }
+
+    function closeRosterDetails() {
+        AppState.active_roster_player_name = null;
+        // Deselect the active item in the list
+        const activeItem = document.querySelector('#roster-player-list .list-group-item.active');
+        if (activeItem) {
+            activeItem.classList.remove('active');
+        }
         renderRosterDetails();
     }
 
