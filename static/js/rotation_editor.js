@@ -162,7 +162,7 @@ function initializeRotationEditor(state, escapeHTML) {
         const benchContainer = document.getElementById('bench-list-visual');
         const currentInningData = state.rotation.innings[state.currentInning] || {};
         const assignedPlayers = new Set(Object.values(currentInningData));
-        const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
+        const benchPlayers = state.available_roster.filter(p => !assignedPlayers.has(p.name));
 
         if (benchPlayers.length > 0) {
             benchContainer.innerHTML = benchPlayers.map(p =>
