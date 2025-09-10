@@ -16,8 +16,8 @@
             </li>
             <li><a class="dropdown-item" href="#" id="saveAsTemplateBtn"><i class="bi bi-journal-plus me-1"></i> Save as New Template</a></li>
             <li><hr class="dropdown-divider"></li>
-            <li><button class="dropdown-item text-danger" type="button" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal"
-                data-delete-url="{{ url_for('gameday.delete_rotation', rotation_id=rotation.id, game_id=game.id) }}"
+            <li><button class="dropdown-item text-danger" type="button" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" 
+                data-delete-url="{% if rotation and rotation.id %}{{ url_for('gameday.delete_rotation', rotation_id=rotation.id, game_id=game.id) }}{% endif %}"
                 data-delete-name="this rotation" {% if not rotation or not rotation.id %}disabled{% endif %}><i class="bi bi-trash me-1"></i> Delete Rotation</button></li>
         </ul>
     </div>
