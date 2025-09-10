@@ -1,4 +1,5 @@
 import eventlet
+import os
 from dotenv import load_dotenv
 
 print("Starting server...")
@@ -12,5 +13,6 @@ from extensions import socketio
 app = create_app()
 
 if __name__ == '__main__':
-    # Use socketio.run() to start the development server
-    socketio.run(app, host='0.0.0.0', port=5005, debug=True)
+    # Debug mode is now controlled by the FLASK_DEBUG environment variable
+    debug_mode = os.environ.get('FLASK_DEBUG') == '1'
+    socketio.run(app, host='0.0.0.0', port=5005, debug=debug_mode)

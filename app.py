@@ -1,5 +1,7 @@
 import os
 import json
+import logging
+from logging.handlers import RotatingFileHandler
 from flask import Flask, render_template, session, jsonify, send_from_directory, redirect, url_for, flash, make_response
 from datetime import datetime, timedelta, date
 from functools import wraps
@@ -40,7 +42,15 @@ HEAD_COACH = 'Head Coach'
 def create_app():
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
-    app.secret_key = os.environ.get('SECRET_KEY', 'a-fallback-secret-key-for-development')
+
+    # Securely configure the secret key
+    secret_key = os.environ.get('SECRET_KEY')
+    is_production = os.environ.get('FLASK_ENV') == 'production'
+
+    if is_production and not secret_key:
+        raise ValueError("No SECRET_KEY set for production application")
+
+    app.secret_key = secret_key or 'a-fallback-secret-key-for-development'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
     app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
@@ -169,5 +179,18 @@ def create_app():
     def serve_manifest():
         return send_from_directory('static', 'manifest.json')
 
+
+    # --- Production Logging ---
+    if not app.debug:
+        if not os.path.exists('logs'):
+            os.mkdir('logs')
+        file_handler = RotatingFileHandler('logs/app.log', maxBytes=10240, backupCount=10)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
+        app.logger.setLevel(logging.INFO)
+        app.logger.info('CoachBoard startup')
 
     return app
