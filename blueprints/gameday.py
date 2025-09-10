@@ -189,12 +189,12 @@ def update_absences(game_id):
         return redirect(url_for('home', _anchor='games'))
 
     absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
-    db.session.query(PlayerGameAbsence).filter_by(game_id=game_id).delete()
+    db.session.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=team_id).delete()
 
     for player_id in absent_player_ids:
         player = db.session.query(Player).filter_by(id=player_id, team_id=team_id).first()
         if player:
-            new_absence = PlayerGameAbsence(player_id=player.id, game_id=game.id)
+            new_absence = PlayerGameAbsence(player_id=player.id, game_id=game.id, team_id=team_id)
             db.session.add(new_absence)
 
     db.session.commit()

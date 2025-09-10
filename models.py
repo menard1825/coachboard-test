@@ -33,6 +33,8 @@ class Team(db.Model):
     signs = relationship("Sign", back_populates="team")
     player_development_focuses = relationship("PlayerDevelopmentFocus", back_populates="team")
     opponents = relationship("Opponent", back_populates="team", cascade="all, delete-orphan")
+    game_absences = relationship("PlayerGameAbsence", back_populates="team")
+    practice_absences = relationship("PlayerPracticeAbsence", back_populates="team")
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -298,19 +300,23 @@ class Sign(db.Model):
 class PlayerGameAbsence(db.Model):
     __tablename__ = 'player_game_absences'
     id = Column(Integer, primary_key=True)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
 
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
     game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
 
     player = relationship("Player", back_populates="game_absences")
     game = relationship("Game", back_populates="absences")
+    team = relationship("Team", back_populates="game_absences")
 
 class PlayerPracticeAbsence(db.Model):
     __tablename__ = 'player_practice_absences'
     id = Column(Integer, primary_key=True)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
 
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
     practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
 
     player = relationship("Player", back_populates="practice_absences")
     practice_plan = relationship("PracticePlan", back_populates="absences")
+    team = relationship("Team", back_populates="practice_absences")
