@@ -206,6 +206,24 @@ body {
     fill: var(--primary-color);
 }
 
+.player-token-text-num {
+    font-size: 2.5px;
+    fill: white;
+    text-anchor: middle;
+    font-weight: bold;
+}
+
+.player-token-text-name {
+    font-size: 2px;
+    fill: white;
+    text-anchor: middle;
+    dominant-baseline: hanging;
+}
+
+.player-token.secondary-pos .player-token-circle {
+    fill: #ffc107; /* Bootstrap Warning Yellow */
+}
+
 .player-token.secondary-pos .player-token-text-name,
 .player-token.secondary-pos .player-token-text-num {
     fill: #000;
@@ -266,12 +284,12 @@ body {
 .diamond-container-interactive {
     position: relative;
     max-width: 500px;
-    margin: 20px auto;
-    background-image: url('/static/diamond.jpg');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    aspect-ratio: 1 / 1; /* MODIFIED: Was 2 / 3. This makes the container square. */
+    margin: 0 auto; /* Centered */
+}
+
+.diamond-container-interactive svg {
+    width: 100%;
+    height: auto;
 }
 
 .position-dropzone {

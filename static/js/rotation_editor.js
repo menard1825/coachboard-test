@@ -27,6 +27,7 @@ function initializeRotationEditor(state, escapeHTML) {
         renderPositionList();
         renderDiamond();
         renderBenchAndSummary();
+        // The drag-drop listeners are now added once, so we don't need to call it on every render.
         addDragDropListeners();
         updatePlayingTimeSummary();
     }
