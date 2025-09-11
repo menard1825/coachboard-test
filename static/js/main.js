@@ -105,7 +105,8 @@ const setupAmPmDisplay = (timeInput, displayElement) => {
 
     const showAmPm = (value) => {
         if (!value) {
-            displayElement.textContent = '';
+            // If there's no value, revert to default text or clear it.
+            displayElement.textContent = displayElement.dataset.defaultText || '';
             return;
         }
         const [h, m] = value.split(':').map(Number);
@@ -114,6 +115,9 @@ const setupAmPmDisplay = (timeInput, displayElement) => {
         if (hh === 0) hh = 12; // 0 or 12 should be 12
         displayElement.textContent = `${hh}:${String(m).padStart(2, '0')} ${ampm}`;
     };
+
+    // Store the initial text content as the default
+    displayElement.dataset.defaultText = displayElement.textContent;
 
     // Initial update
     showAmPm(timeInput.value);

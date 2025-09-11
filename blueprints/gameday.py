@@ -67,6 +67,12 @@ def game_management(game_id):
 
     game_date_for_input = game.date.strftime('%Y-%m-%d')
 
+    # NEW: Create a 24-hour formatted time string for the input value
+    game_time_for_input = ''
+    if game.time:
+        # The game.time is already a 'HH:MM' string, so we can use it directly.
+        game_time_for_input = game.time
+
     opponent_notes = game.opponent_relationship.notes if game.opponent_relationship else ""
     quick_notes = sorted(game.quick_notes, key=lambda x: x.timestamp, reverse=True)
 
@@ -76,6 +82,7 @@ def game_management(game_id):
                            current_team=team,
                            game=model_to_dict(game),
                            game_date_for_input=game_date_for_input,
+                           game_time_for_input=game_time_for_input,
                            roster=[model_to_dict(p) for p in roster_objects],
                            lineup=model_to_dict(lineup_obj),
                            rotation=model_to_dict(rotation_obj),
