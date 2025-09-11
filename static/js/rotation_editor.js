@@ -1,10 +1,10 @@
 // static/js/rotation_editor.js
 
 function initializeRotationEditor(state, escapeHTML) {
-
+ 
     const POS_COORDS = {
         // Infield
-        'P':  { x: 50, y: 61 },  // Pitcher's Mound
+        'P': { x: 50, y: 61 }, // Pitcher's Mound
         'C':  { x: 50, y: 85 },  // Catcher
         '1B': { x: 69, y: 65 },  // First Base
         '2B': { x: 50, y: 50 },  // Second Base
@@ -19,11 +19,6 @@ function initializeRotationEditor(state, escapeHTML) {
         // 4-Outfielder Setup
         'LCF':{ x: 35, y: 25 },  // Left-Center Field
         'RCF':{ x: 65, y: 25 }   // Right-Center Field
-    };
-
-    // Ensure the state object has a place to store sortable instances
-    if (!state.sortableInstances) {
-        state.sortableInstances = {};
     }
 
     function renderRotationEditor() {
@@ -32,6 +27,7 @@ function initializeRotationEditor(state, escapeHTML) {
         renderPositionList();
         renderDiamond();
         renderBenchAndSummary();
+        addDragDropListeners();
         updatePlayingTimeSummary();
     }
 
@@ -65,7 +61,6 @@ function initializeRotationEditor(state, escapeHTML) {
     function renderPositionList() {
         const container = document.getElementById('position-assignment-list');
         const currentInningData = state.rotation.innings[state.currentInning] || {};
-        const assignedPlayerNames = new Set(Object.values(currentInningData));
 
         let positions = ['P', 'C', '1B', '2B', '3B', 'SS'];
         if (state.outfielder_count === 4) {
@@ -76,49 +71,17 @@ function initializeRotationEditor(state, escapeHTML) {
 
         container.innerHTML = positions.map(pos => {
             const assignedPlayerName = currentInningData[pos];
-            const availablePlayers = state.roster.filter(p => !assignedPlayerNames.has(p.name) || p.name === assignedPlayerName);
-
-            let options = availablePlayers.map(p =>
-                `<option value="${escapeHTML(p.name)}" ${assignedPlayerName === p.name ? 'selected' : ''}>${escapeHTML(p.name)}</option>`
-            ).join('');
+            const playerTagHtml = assignedPlayerName
+                ? `<div class="player-tag" data-player-name="${escapeHTML(assignedPlayerName)}" draggable="true">${escapeHTML(assignedPlayerName)}</div>`
+                : '';
 
             return `
-                <div class="list-group-item d-flex justify-content-between align-items-center ps-2">
+                <div class="list-group-item d-flex justify-content-between align-items-center ps-2 position-drop-item" data-position="${pos}">
                     <span class="fw-bold me-3">${pos}</span>
-                    <select class="form-select form-select-sm position-select" data-position="${pos}">
-                        <option value="">-- Empty --</option>
-                        ${options}
-                    </select>
+                    <div class="player-slot flex-grow-1">${playerTagHtml}</div>
                 </div>
             `;
         }).join('');
-
-        container.querySelectorAll('.position-select').forEach(select => {
-            select.addEventListener('change', handlePositionChange);
-        });
-    }
-
-    function handlePositionChange(e) {
-        const position = e.target.dataset.position;
-        const newPlayerName = e.target.value;
-        const currentInningData = state.rotation.innings[state.currentInning] || {};
-
-        const oldPlayerAtPos = currentInningData[position];
-
-        // Find if the new player was assigned elsewhere and clear that spot
-        for (const [pos, name] of Object.entries(currentInningData)) {
-            if (name === newPlayerName) {
-                delete currentInningData[pos];
-            }
-        }
-
-        if (newPlayerName) {
-            currentInningData[position] = newPlayerName;
-        } else {
-            delete currentInningData[position];
-        }
-
-        renderRotationEditor();
     }
 
     function renderDiamond() {
@@ -170,13 +133,13 @@ function initializeRotationEditor(state, escapeHTML) {
         const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
 
         if (benchPlayers.length > 0) {
-            benchContainer.innerHTML = benchPlayers.map(p => `
-                <span class="badge bg-secondary me-1 mb-1" data-player-name="${escapeHTML(p.name)}">${escapeHTML(p.name)}</span>
-            `
+            benchContainer.innerHTML = benchPlayers.map(p =>
+                `<div class="player-tag" data-player-name="${escapeHTML(p.name)}" draggable="true">${escapeHTML(p.name)}</div>`
             ).join('');
         } else {
-            benchContainer.innerHTML = `<p class="text-muted small">All players are on the field.</p>`;
+            benchContainer.innerHTML = `<p class="text-muted small p-2">All players are on the field.</p>`;
         }
+        updatePlayingTimeSummary();
     }
 
     function updatePlayingTimeSummary() {
@@ -245,58 +208,79 @@ function initializeRotationEditor(state, escapeHTML) {
 
     document.getElementById('cancelPasteBtn')?.addEventListener('click', exitCopyMode);
 
-    // Destroy existing sortable instances before creating new ones
-    if (state.sortableInstances.bench) state.sortableInstances.bench.destroy();
-    if (state.sortableInstances.positions) state.sortableInstances.positions.destroy();
+    function addDragDropListeners() {
+        const rotationBoard = document.getElementById('rotation-board');
+        if (!rotationBoard || rotationBoard.dataset.listenersAttached) return;
+        rotationBoard.dataset.listenersAttached = 'true';
+        
+        let draggedPlayerName = null;
 
-    const benchEl = document.getElementById('bench-list-visual');
-    const positionsEl = document.getElementById('position-assignment-list');
-
-    const commonSortableOptions = {
-        group: 'rotation-players',
-        animation: 150,
-        ghostClass: 'bg-info'
-    };
-
-    // Initialize Sortable for the bench
-    state.sortableInstances.bench = new Sortable(benchEl, {
-        ...commonSortableOptions,
-        onEnd: function (evt) {
-            // A player was dropped back onto the bench
-            const playerName = evt.item.dataset.playerName;
-            const currentInningData = state.rotation.innings[state.currentInning] || {};
-
-            // Find and remove the player from any position they were in
-            for (const pos in currentInningData) {
-                if (currentInningData[pos] === playerName) {
-                    delete currentInningData[pos];
-                    break;
-                }
+        rotationBoard.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('player-tag')) {
+                draggedPlayerName = e.target.dataset.playerName;
+                e.dataTransfer.setData('text/plain', draggedPlayerName);
+                setTimeout(() => e.target.classList.add('dragging'), 0);
             }
-            renderRotationEditor(); // Re-render to update everything
-        }
-    });
+        });
 
-    // Initialize Sortable for the positions list
-    state.sortableInstances.positions = new Sortable(positionsEl, {
-        ...commonSortableOptions,
-        onAdd: function (evt) {
-            // A player was dropped onto the positions list
-            const playerName = evt.item.dataset.playerName;
-            const toPositionItem = evt.to.children[evt.newIndex];
-            const position = toPositionItem.querySelector('.position-select').dataset.position;
-            const currentInningData = state.rotation.innings[state.currentInning] || {};
-
-            // Remove the new player from their old position (if they had one)
-            for (const pos in currentInningData) {
-                if (pos !== position && currentInningData[pos] === playerName) {
-                    delete currentInningData[pos];
-                }
+        rotationBoard.addEventListener('dragend', (e) => {
+            if (e.target.classList.contains('player-tag')) {
+                e.target.classList.remove('dragging');
             }
-            currentInningData[position] = playerName;
-            renderRotationEditor(); // Re-render to reflect the change
-        }
-    });
+            draggedPlayerName = null;
+        });
+
+        rotationBoard.addEventListener('dragover', (e) => {
+            const dropZone = e.target.closest('.position-drop-item, #bench-list-visual');
+            if (dropZone) {
+                e.preventDefault();
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                dropZone.classList.add('drag-over');
+            }
+        });
+
+        rotationBoard.addEventListener('dragleave', (e) => {
+            const dropZone = e.target.closest('.position-drop-item, #bench-list-visual');
+            if (dropZone) {
+                dropZone.classList.remove('drag-over');
+            }
+        });
+
+        rotationBoard.addEventListener('drop', (e) => {
+            e.preventDefault();
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            const dropZone = e.target.closest('.position-drop-item, #bench-list-visual');
+            
+            if (dropZone && draggedPlayerName) {
+                const currentInningData = state.rotation.innings[state.currentInning] || {};
+
+                let oldPosition = null;
+                for (const pos in currentInningData) {
+                    if (currentInningData[pos] === draggedPlayerName) {
+                        oldPosition = pos;
+                        break;
+                    }
+                }
+                if (oldPosition) {
+                    delete currentInningData[oldPosition];
+                }
+
+                if (dropZone.id === 'bench-list-visual') {
+                    // Player was dropped on the bench, we're done.
+                } else {
+                    const targetPosition = dropZone.dataset.position;
+                    const displacedPlayer = currentInningData[targetPosition];
+                    
+                    currentInningData[targetPosition] = draggedPlayerName;
+                    
+                    if (displacedPlayer && oldPosition) {
+                        currentInningData[oldPosition] = displacedPlayer;
+                    }
+                }
+                renderRotationEditor();
+            }
+        });
+    }
 
     renderRotationEditor();
     return renderRotationEditor;

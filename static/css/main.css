@@ -515,20 +515,47 @@ input[type="time"]:placeholder-shown::before {
     display: block;
 }
 
-/* Make draggable items look grabbable */
-#bench-list-visual .badge, #position-assignment-list .player-tag {
-    cursor: grab;
+/* Styling for new drag-and-drop rotation editor */
+.position-drop-item .player-slot {
+    min-height: 38px;
+    border: 2px dashed #dee2e6;
+    border-radius: .375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, border-color 0.2s;
 }
 
-/* Style for the placeholder element while dragging */
-.bg-info.sortable-ghost {
-    opacity: 0.5;
-    border: 2px dashed #0dcaf0;
+#bench-list-visual {
+    min-height: 50px;
+    border: 2px dashed transparent;
+    border-radius: .375rem;
+    padding: 0.25rem;
+    transition: background-color 0.2s, border-color 0.2s;
 }
 
-/* Highlight drop zones when dragging over them */
-.sortable-drag #position-assignment-list,
-.sortable-drag #bench-list-visual {
-    background-color: #eefbff; /* A light blue to indicate a valid drop target */
+.player-tag {
+    background-color: #6c757d;
+    color: white;
+    padding: 5px 10px;
     border-radius: 5px;
+    cursor: grab;
+    text-align: center;
+    border: 1px solid rgba(0,0,0,0.2);
+}
+
+.player-slot .player-tag {
+    background-color: var(--primary-color);
+}
+
+/* Highlight potential drop zones on hover */
+.position-drop-item.drag-over .player-slot,
+#bench-list-visual.drag-over {
+    background-color: #e0f7ff;
+    border-color: #0d6efd;
+}
+
+/* Make the original dragged item semi-transparent */
+.player-tag.dragging {
+    opacity: 0.4;
 }
