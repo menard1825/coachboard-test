@@ -261,8 +261,8 @@
               <div class="mb-3">
                   <label for="game_time" class="form-label">Time</label>
                   <div class="input-group">
-                      <span class="input-group-text"><i class="bi bi-clock"></i></span>
-                      <input type="time" class="form-control" id="game_time" name="game_time" value="{{ game.time or '' }}" placeholder="Time">
+                      <input type="time" class="form-control" id="game_time" name="game_time" value="{{ game.time or '' }}" step="900">
+                      <span class="input-group-text" id="edit_game_time_display" style="min-width: 5rem;"></span>
                   </div>
               </div>
               <div class="mb-3">

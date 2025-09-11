@@ -95,6 +95,32 @@ const setupAutocomplete = (inputElement) => {
     });
 };
 
+/**
+ * Sets up a time input to display a 12-hour AM/PM format in a separate element.
+ * @param {HTMLInputElement} timeInput The <input type="time"> element.
+ * @param {HTMLElement} displayElement The element to show the formatted time in.
+ */
+const setupAmPmDisplay = (timeInput, displayElement) => {
+    if (!timeInput || !displayElement) return;
+
+    const showAmPm = (value) => {
+        if (!value) {
+            displayElement.textContent = '';
+            return;
+        }
+        const [h, m] = value.split(':').map(Number);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        let hh = h % 12;
+        if (hh === 0) hh = 12; // 0 or 12 should be 12
+        displayElement.textContent = `${hh}:${String(m).padStart(2, '0')} ${ampm}`;
+    };
+
+    // Initial update
+    showAmPm(timeInput.value);
+    // Update on change
+    timeInput.addEventListener('input', () => showAmPm(timeInput.value));
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
@@ -1312,6 +1338,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (addPracticeLocationInput) {
             setupAutocomplete(addPracticeLocationInput);
         }
+
+        // Setup AM/PM display for time inputs
+        const addGameTimeInput = document.getElementById('add_game_time');
+        const addGameTimeDisplay = document.getElementById('add_game_time_display');
+        setupAmPmDisplay(addGameTimeInput, addGameTimeDisplay);
+
+        const editGameTimeInput = document.getElementById('game_time'); // In edit modal
+        const editGameTimeDisplay = document.getElementById('edit_game_time_display');
+        setupAmPmDisplay(editGameTimeInput, editGameTimeDisplay);
 
         // The lineup editor on the main dashboard is for templates.
         // We check for the existence of the lineups accordion to make sure we're on the right page.
