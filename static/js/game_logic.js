@@ -279,25 +279,45 @@ window.initializeGameManagement = function(gameData) {
                 form.submit();
             }
         });
-        document.body.addEventListener('click', function(event){
-            const mobileDropzone = event.target.closest('.d-lg-none .position-dropzone');
-            if (mobileDropzone) {
-                const position = mobileDropzone.dataset.position;
-                if (mobileDropzone.querySelector('.player-tag')) { 
-                    delete state.rotation.innings[state.currentInning][position];
-                    renderRotationEditor();
-                } else { 
+        // --- START OF FIX: Mobile Tap-to-Assign/Remove Logic ---
+        document.getElementById('rotation-board').addEventListener('click', function(event) {
+            // This handler is for mobile tap interactions on the position list.
+            // It will only run on screens smaller than large (where the SVG diamond is hidden).
+            if (window.innerWidth >= 992) {
+                return;
+            }
+
+            const positionItem = event.target.closest('.position-drop-item');
+            if (positionItem) {
+                const position = positionItem.dataset.position;
+                const playerTag = positionItem.querySelector('.player-tag');
+
+                if (playerTag) {
+                    // A player is already in this slot. Confirm removal.
+                    const playerName = playerTag.dataset.playerName;
+                    if (confirm(`Remove ${playerName} from ${position}?`)) {
+                        delete state.rotation.innings[state.currentInning][position];
+                        renderRotationEditor();
+                    }
+                } else {
+                    // The slot is empty. Open the assignment modal.
                     const assignedPlayers = new Set(Object.values(state.rotation.innings[state.currentInning] || {}));
                     const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
-                    document.getElementById('assignPlayerModalTitle').textContent = `Assign to ${position}`;
+                    
+                    document.getElementById('assignPlayerModalTitle').textContent = `Assign Player to ${position}`;
                     document.getElementById('assignPlayerModal').dataset.targetPosition = position;
-                    document.getElementById('assignPlayerModalBenchList').innerHTML = benchPlayers.length > 0 ? 
+                    const benchList = document.getElementById('assignPlayerModalBenchList');
+                    benchList.innerHTML = benchPlayers.length > 0 ? 
                         benchPlayers.map(p => `<a href="#" class="list-group-item list-group-item-action" data-player-name="${escapeHTML(p.name)}">${escapeHTML(p.name)}</a>`).join('') :
-                        `<div class="list-group-item">No players on the bench.</div>`;
+                        `<div class="list-group-item text-muted">No players on the bench.</div>`;
                     assignPlayerModal.show();
                 }
             }
-            const modalPlayerLink = event.target.closest('#assignPlayerModalBenchList a');
+        });
+
+        // This handles the click on a player within the assignment modal.
+        document.getElementById('assignPlayerModalBenchList').addEventListener('click', function(event) {
+            const modalPlayerLink = event.target.closest('a.list-group-item-action');
             if (modalPlayerLink) {
                 event.preventDefault();
                 const playerName = modalPlayerLink.dataset.playerName;
@@ -309,6 +329,7 @@ window.initializeGameManagement = function(gameData) {
                 }
             }
         });
+        // --- END OF FIX ---
         document.getElementById('addInningBtn')?.addEventListener('click', () => {
             if(!state.rotation) return;
             const innings = Object.keys(state.rotation.innings);
