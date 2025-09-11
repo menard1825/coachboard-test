@@ -494,3 +494,23 @@ body {
     /* 100dvh accounts for dynamic browser UI on mobile */
     max-height: calc(100dvh - 2rem);
 }
+
+/* Fix for blank time inputs on certain mobile browsers */
+input[type="time"] {
+    position: relative;
+}
+
+input[type="time"]::before {
+    content: attr(placeholder);
+    position: absolute;
+    top: 50%;
+    left: 0.75rem; 
+    transform: translateY(-50%);
+    color: #6c757d;
+    pointer-events: none;
+    display: none;
+}
+
+input[type="time"]:placeholder-shown::before {
+    display: block;
+}
