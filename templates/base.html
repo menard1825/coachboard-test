@@ -155,5 +155,22 @@
     
     {% block scripts %}{% endblock %}
 
+    {# MODAL MOVED HERE: Placed outside of any relatively positioned containers to prevent clipping issues. #}
+    <div class="modal fade" id="editFocusModal" tabindex="-1">
+      <div class="modal-dialog"><div class="modal-content">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="modal-header"><h5 class="modal-title">Development Focus</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body">
+            <div class="mb-3"><label class="form-label">Skill</label><select name="skill" id="focusSkill" class="form-select" required><option value="hitting">Hitting</option><option value="pitching">Pitching</option><option value="fielding">Fielding</option><option value="baserunning">Baserunning</option></select></div>
+            <div class="mb-3"><label class="form-label">Focus / Goal</label><input type="text" class="form-control" name="focus_text" id="focusText" required></div>
+            <div class="mb-3"><label class="form-label">Notes</label><textarea class="form-control" name="notes" id="focusNotes" rows="3"></textarea></div>
+            <div class="mb-3"><label class="form-label">Progress Notes</label><textarea class="form-control" name="progress_notes" id="focusProgressNotes" rows="3"></textarea></div>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
+        </form>
+      </div></div>
+    </div>
+
 </body>
 </html>
