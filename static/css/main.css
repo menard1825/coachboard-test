@@ -487,3 +487,10 @@ body {
         background-color: transparent;
     }
 }
+
+/* Prevent the editFocusModal from exceeding the viewport height. This keeps
+   the modal fully visible on all devices even when players have active focuses. */
+.modal-dialog.modal-dialog-scrollable {
+    /* 100dvh accounts for dynamic browser UI on mobile */
+    max-height: calc(100dvh - 2rem);
+}
