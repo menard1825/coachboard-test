@@ -2,28 +2,30 @@
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="mb-0" id="rotation-editor-title">Defensive Rotation</h5>
         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-    <button type="button" class="btn btn-primary btn-sm" id="saveRotationBtn"><i class="bi bi-save me-1"></i> Save Rotation</button>
-    <div class="btn-group">
-        <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-list"></i> More
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end">
-            <li class="px-2">
-                <label for="rotationTemplateSelect" class="form-label small visually-hidden">Load Template</label>
-                <select id="rotationTemplateSelect" class="form-select form-select-sm">
-                    <option value="">-- Load Template --</option>
-                </select>
-            </li>
-            <li><a class="dropdown-item" href="#" id="saveAsTemplateBtn"><i class="bi bi-journal-plus me-1"></i> Save as New Template</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><button class="dropdown-item text-danger" type="button" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" 
-                data-delete-url="{% if rotation and rotation.id %}{{ url_for('gameday.delete_rotation', rotation_id=rotation.id, game_id=game.id) }}{% endif %}"
-                data-delete-name="this rotation" {% if not rotation or not rotation.id %}disabled{% endif %}><i class="bi bi-trash me-1"></i> Delete Rotation</button></li>
-        </ul>
-    </div>
-</div>
+            <button type="button" class="btn btn-primary btn-sm" id="saveRotationBtn"><i class="bi bi-save me-1"></i> Save This Game's Rotation</button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-list"></i> Rotation Options
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li class="px-2">
+                        <label for="rotationTemplateSelect" class="form-label small">Load Template</label>
+                        <select id="rotationTemplateSelect" class="form-select form-select-sm">
+                            <option value="">-- Load Template --</option>
+                        </select>
+                    </li>
+                    <li><a class="dropdown-item" href="#" id="saveAsTemplateBtn"><i class="bi bi-journal-plus me-1"></i> Save as New Template</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><button class="dropdown-item text-danger" type="button" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" 
+                        data-delete-url="{% if rotation and rotation.id %}{{ url_for('gameday.delete_rotation', rotation_id=rotation.id, game_id=game.id) }}{% endif %}"
+                        data-delete-name="this rotation" {% if not rotation or not rotation.id %}disabled{% endif %}><i class="bi bi-trash me-1"></i> Delete Rotation</button></li>
+                </ul>
+            </div>
+        </div>
     </div>
     <div class="card-body" id="rotation-board">
+        <div class="alert alert-info d-flex align-items-center"><i class="bi bi-info-circle-fill me-2"></i><div>Assign players to positions using the dropdowns below. Add or remove innings as needed. You can also drag players from the "Bench" to the diamond.
+        </div></div>
         <div class="mb-3">
             <div class="d-flex align-items-center border rounded p-1 mb-2">
                 <div id="inning-btn-group" class="btn-group flex-wrap" role="group">

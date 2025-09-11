@@ -11,7 +11,7 @@ const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;',
  * Fetches and displays weather for a given location and date.
  * @param {HTMLElement} widget The container element to display the weather in.
  */
-async function fetchWeather(widget) {
+async function fetchWeather(widget, time = null) { // Add time parameter
     if (!widget) return;
 
     const location = widget.dataset.location;
@@ -30,7 +30,10 @@ async function fetchWeather(widget) {
 
     const today = new Date().toISOString().split('T')[0];
     const isToday = date.startsWith(today);
-    const url = isToday ? `/api/weather/${encodeURIComponent(location)}` : `/api/weather/${encodeURIComponent(location)}?date=${date}`;
+    let url = isToday ? `/api/weather/${encodeURIComponent(location)}` : `/api/weather/${encodeURIComponent(location)}?date=${date}`;
+    if (time) { // Add time to the URL if it exists
+        url += `&time=${time}`;
+    }
 
     try {
         const response = await fetch(url);

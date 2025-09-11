@@ -413,7 +413,8 @@ window.initializeGameManagement = function(gameData) {
 
         const weatherWidget = document.getElementById('weather-widget-content');
         if (weatherWidget) {
-            fetchWeather(weatherWidget);
+            // Pass the game time to the fetchWeather function
+            fetchWeather(weatherWidget, state.game.time); 
         }
 
         const editGameModal = document.getElementById('editGameModal');

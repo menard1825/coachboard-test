@@ -93,12 +93,14 @@ def game_management(game_id):
 @login_required
 def add_game():
     game_date_str = request.form['game_date']
+    game_time_str = request.form.get('game_time', '') # Add this line
     try:
-        game_date = datetime.strptime(game_date_str, '%Y-%m-%d')
+        game_datetime_str = f"{game_date_str} {game_time_str if game_time_str else '00:00'}"
+        game_date = datetime.strptime(game_datetime_str.strip(), '%Y-%m-%d %H:%M')
     except ValueError:
-        flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+        flash('Invalid date or time format. Please use YYYY-MM-DD and HH:MM.', 'danger')
         return redirect(url_for('home', _anchor='games'))
-
+ 
     opponent_name = request.form['game_opponent']
     opponent = db.session.query(Opponent).filter_by(name=opponent_name, team_id=session['team_id']).first()
     if not opponent:
@@ -108,6 +110,7 @@ def add_game():
 
     new_game = Game(
         date=game_date,
+        time=game_time_str, # Add this line
         opponent=opponent_name,
         location=request.form.get('game_location', ''),
         game_notes=request.form.get('game_notes', ''),
@@ -132,20 +135,23 @@ def edit_game(game_id):
         return redirect(url_for('home', _anchor='games'))
 
     game_date_str = request.form.get('game_date')
+    game_time_str = request.form.get('game_time', '') # Add this line
     if game_date_str:
         try:
-            new_game_date = datetime.strptime(game_date_str, '%Y-%m-%d')
+            game_datetime_str = f"{game_date_str} {game_time_str if game_time_str else '00:00'}"
+            new_game_date = datetime.strptime(game_datetime_str.strip(), '%Y-%m-%d %H:%M')
             # Check if the date has actually changed
-            if game_to_edit.date.date() != new_game_date.date():
+            if game_to_edit.date != new_game_date:
                 game_to_edit.date = new_game_date
                 # Sync the date for all associated pitching outings
                 for outing in game_to_edit.pitching_outings:
                     outing.date = new_game_date
-                flash('Game date updated. Associated pitching logs were synced automatically.', 'info')
+                flash('Game date/time updated. Associated pitching logs were synced automatically.', 'info')
         except ValueError:
-            flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+            flash('Invalid date or time format. Please use YYYY-MM-DD and HH:MM.', 'danger')
             return redirect(url_for('.game_management', game_id=game_id))
-
+    
+    game_to_edit.time = game_time_str # Add this line
     game_to_edit.opponent = request.form.get('game_opponent', game_to_edit.opponent)
     game_to_edit.location = request.form.get('game_location', game_to_edit.location)
     game_to_edit.game_notes = request.form.get('game_notes', game_to_edit.game_notes)
