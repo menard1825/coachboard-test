@@ -419,7 +419,6 @@ body {
     /* --- Full Height, Scrollable Layout --- */
     html, body {
         height: 100%;
-        overflow: hidden;
         position: relative;
         width: 100%;
         display: flex;
