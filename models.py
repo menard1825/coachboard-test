@@ -189,6 +189,7 @@ class Game(db.Model):
     __tablename__ = 'games'
     id = Column(Integer, primary_key=True)
     date = Column(DateTime, nullable=False) # Changed to DateTime
+    time = Column(String)
     opponent = Column(String, nullable=False)
     location = Column(String)
     game_notes = Column(Text)
