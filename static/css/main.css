@@ -514,3 +514,21 @@ input[type="time"]::before {
 input[type="time"]:placeholder-shown::before {
     display: block;
 }
+
+/* Make draggable items look grabbable */
+#bench-list-visual .badge, #position-assignment-list .player-tag {
+    cursor: grab;
+}
+
+/* Style for the placeholder element while dragging */
+.bg-info.sortable-ghost {
+    opacity: 0.5;
+    border: 2px dashed #0dcaf0;
+}
+
+/* Highlight drop zones when dragging over them */
+.sortable-drag #position-assignment-list,
+.sortable-drag #bench-list-visual {
+    background-color: #eefbff; /* A light blue to indicate a valid drop target */
+    border-radius: 5px;
+}

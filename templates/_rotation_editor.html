@@ -60,42 +60,18 @@
         <div class="row">
             <div class="col-lg-5 mb-4 mb-lg-0">
                 <h5 class="mb-3">Inning <span id="current-inning-display">1</span> Assignments</h5>
-                <div id="position-assignment-list" class="list-group">
+                <div id="position-assignment-list" class="list-group" data-drop-zone="positions">
                     </div>
             </div>
 
             <div class="col-lg-7">
-                <div id="svg-diamond-container" class="mb-3 diamond-container-interactive">
-                    <svg viewBox="0 0 100 100" id="baseball-diamond-svg" style="width: 100%; height: auto; max-width: 500px; display: block; margin: 0 auto;">
-                        <style>
-                            .grass { fill: #6b8e23; }
-                            .outfield-grass { fill: #719a2e; }
-                            .dirt { fill: #cdaa7d; }
-                            .base { fill: #fff; stroke: #333; stroke-width: 0.2; }
-                            .basepath { fill: none; stroke: #d3b48c; stroke-width: 1; }
-                            .position-node { fill: rgba(255,255,255,0.7); stroke: #555; stroke-width: 0.3; }
-                            .position-label { font-size: 3px; font-weight: bold; font-family: sans-serif; text-anchor: middle; pointer-events: none; fill: #333; }
-                            .player-token-text-name { font-size: 1.8px; text-anchor: middle; fill: white; font-weight: bold; }
-                            .player-token-text-num { font-size: 2.5px; text-anchor: middle; fill: white; font-weight: bold; }
-                        </style>
-
-                        </svg>
-                </div>
-
-<div class="d-flex justify-content-center align-items-center gap-3 mb-3 small text-muted">
-    <strong>Legend:</strong>
-    <span class="d-flex align-items-center"><span class="d-inline-block rounded-circle me-1" style="width: 12px; height: 12px; background-color: #198754;"></span> Natural</span>
-    <span class="d-flex align-items-center"><span class="d-inline-block rounded-circle me-1" style="width: 12px; height: 12px; background-color: #ffc107;"></span> Secondary</span>
-    <span class="d-flex align-items-center"><span class="d-inline-block rounded-circle me-1" style="width: 12px; height: 12px; background-color: var(--primary-color);"></span> Other</span>
-</div>
-
                 <ul class="nav nav-tabs">
                     <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#bench-tab">Bench</a></li>
                     <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#summary-tab">Playing Time</a></li>
                 </ul>
                 <div class="tab-content border border-top-0 rounded-bottom p-2">
                     <div class="tab-pane fade show active" id="bench-tab">
-                        <div id="bench-list-visual"></div>
+                        <div id="bench-list-visual" class="d-flex flex-wrap gap-2" data-drop-zone="bench"></div>
                     </div>
                     <div class="tab-pane fade" id="summary-tab">
                         <div id="summary-visual"></div>

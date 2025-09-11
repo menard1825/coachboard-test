@@ -21,6 +21,11 @@ function initializeRotationEditor(state, escapeHTML) {
         'RCF':{ x: 65, y: 25 }   // Right-Center Field
     };
 
+    // Ensure the state object has a place to store sortable instances
+    if (!state.sortableInstances) {
+        state.sortableInstances = {};
+    }
+
     function renderRotationEditor() {
         if (!state.rotation) return;
         renderInningSelector();
@@ -165,8 +170,9 @@ function initializeRotationEditor(state, escapeHTML) {
         const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
 
         if (benchPlayers.length > 0) {
-            benchContainer.innerHTML = benchPlayers.map(p =>
-                `<span class="badge bg-secondary me-1 mb-1">${escapeHTML(p.name)}</span>`
+            benchContainer.innerHTML = benchPlayers.map(p => `
+                <span class="badge bg-secondary me-1 mb-1" data-player-name="${escapeHTML(p.name)}">${escapeHTML(p.name)}</span>
+            `
             ).join('');
         } else {
             benchContainer.innerHTML = `<p class="text-muted small">All players are on the field.</p>`;
@@ -238,6 +244,59 @@ function initializeRotationEditor(state, escapeHTML) {
     });
 
     document.getElementById('cancelPasteBtn')?.addEventListener('click', exitCopyMode);
+
+    // Destroy existing sortable instances before creating new ones
+    if (state.sortableInstances.bench) state.sortableInstances.bench.destroy();
+    if (state.sortableInstances.positions) state.sortableInstances.positions.destroy();
+
+    const benchEl = document.getElementById('bench-list-visual');
+    const positionsEl = document.getElementById('position-assignment-list');
+
+    const commonSortableOptions = {
+        group: 'rotation-players',
+        animation: 150,
+        ghostClass: 'bg-info'
+    };
+
+    // Initialize Sortable for the bench
+    state.sortableInstances.bench = new Sortable(benchEl, {
+        ...commonSortableOptions,
+        onEnd: function (evt) {
+            // A player was dropped back onto the bench
+            const playerName = evt.item.dataset.playerName;
+            const currentInningData = state.rotation.innings[state.currentInning] || {};
+
+            // Find and remove the player from any position they were in
+            for (const pos in currentInningData) {
+                if (currentInningData[pos] === playerName) {
+                    delete currentInningData[pos];
+                    break;
+                }
+            }
+            renderRotationEditor(); // Re-render to update everything
+        }
+    });
+
+    // Initialize Sortable for the positions list
+    state.sortableInstances.positions = new Sortable(positionsEl, {
+        ...commonSortableOptions,
+        onAdd: function (evt) {
+            // A player was dropped onto the positions list
+            const playerName = evt.item.dataset.playerName;
+            const toPositionItem = evt.to.children[evt.newIndex];
+            const position = toPositionItem.querySelector('.position-select').dataset.position;
+            const currentInningData = state.rotation.innings[state.currentInning] || {};
+
+            // Remove the new player from their old position (if they had one)
+            for (const pos in currentInningData) {
+                if (pos !== position && currentInningData[pos] === playerName) {
+                    delete currentInningData[pos];
+                }
+            }
+            currentInningData[position] = playerName;
+            renderRotationEditor(); // Re-render to reflect the change
+        }
+    });
 
     renderRotationEditor();
     return renderRotationEditor;
