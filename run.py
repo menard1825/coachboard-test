@@ -2,7 +2,6 @@ import eventlet
 import os
 from dotenv import load_dotenv
 
-print("Starting server...")
 eventlet.monkey_patch()
 
 load_dotenv()

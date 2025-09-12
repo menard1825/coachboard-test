@@ -5,6 +5,9 @@ from db import db
 from sqlalchemy import func
 from datetime import datetime
 import json
+import uuid
+
+from utils import get_player_order_as_list
 
 # Define role constants for clarity
 HEAD_COACH = 'Head Coach'
@@ -12,19 +15,6 @@ ASSISTANT_COACH = 'Assistant Coach'
 SUPER_ADMIN = 'Super Admin'
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
-
-def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list, decoding from JSON if necessary."""
-    if not player_order_data:
-        return []
-    if isinstance(player_order_data, list):
-        return player_order_data
-    if isinstance(player_order_data, str):
-        try:
-            return json.loads(player_order_data)
-        except (json.JSONDecodeError, TypeError):
-            return []
-    return [] # default to empty list
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -69,7 +59,7 @@ def register():
         reg_code = request.form.get('registration_code')
 
         if not all([username, full_name, password, reg_code]):
-            flash('All fields are required.', 'danger')
+            flash('A registration code is required to join a team.', 'danger')
             return redirect(url_for('auth.register'))
         if len(password) < 4:
             flash('Password must be at least 4 characters long.', 'danger')
@@ -78,36 +68,28 @@ def register():
             flash('That username is already taken. Please choose another.', 'danger')
             return redirect(url_for('auth.register'))
         
+        team = db.session.query(Team).filter_by(registration_code=reg_code).first()
+        if not team:
+            flash('Invalid Registration Code.', 'danger')
+            return redirect(url_for('auth.register'))
 
-        team = None
-        if reg_code:
-            team = db.session.query(Team).filter_by(registration_code=reg_code).first()
-            if not team:
-                flash('Invalid Registration Code.', 'danger')
-                return redirect(url_for('auth.register'))
-
-        is_first_user = False
-        if team:
-            is_first_user = db.session.query(User).filter_by(team_id=team.id).count() == 0
-
-        user_role = HEAD_COACH if is_first_user or not team else ASSISTANT_COACH
+        is_first_user = db.session.query(User).filter_by(team_id=team.id).count() == 0
+        user_role = HEAD_COACH if is_first_user else ASSISTANT_COACH
 
         hashed_password = generate_password_hash(password)
         default_tab_keys = ['roster', 'player_development', 'games', 'pitching', 'practice_plan', 'collaboration']
-
         new_user = User(
             username=username,
             full_name=full_name,
             password_hash=hashed_password,
             email=email.lower() if email else None,
             role=user_role,
-            team_id=team.id if team else None,
+            team_id=team.id,
             tab_order=json.dumps(default_tab_keys),
             player_order=[]
         )
         db.session.add(new_user)
         db.session.commit()
-
         session['logged_in'] = True
         session['username'] = new_user.username
         session['full_name'] = new_user.full_name
@@ -116,15 +98,83 @@ def register():
         session['player_order'] = []
         session.permanent = True
 
-        if not team:
-            flash('Registration successful! Now, let\'s create your team.', 'success')
-            return redirect(url_for('auth.create_team'))
-        else:
-            flash(f'Registration successful! You have joined team "{team.team_name}". Welcome.', 'success')
-            return redirect(url_for('home'))
+        flash(f'Registration successful! You have joined team "{team.team_name}". Welcome.', 'success')
+        return redirect(url_for('home'))
 
     registration_code = request.args.get('code', '')
     return render_template('register.html', registration_code=registration_code)
+
+@auth_bp.route('/register-team', methods=['GET', 'POST'])
+def register_team():
+    if request.method == 'POST':
+        # Form fields from register_team.html
+        username = request.form.get('username')
+        full_name = request.form.get('full_name')
+        password = request.form.get('password')
+        email = request.form.get('email')
+        team_name = request.form.get('team_name')
+
+        # --- Validation ---
+        if not all([username, full_name, password, email, team_name]):
+            flash('All fields are required.', 'danger')
+            return redirect(url_for('auth.register_team'))
+        if len(password) < 4:
+            flash('Password must be at least 4 characters long.', 'danger')
+            return redirect(url_for('auth.register_team'))
+        if db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first():
+            flash('That username is already taken. Please choose another.', 'danger')
+            return redirect(url_for('auth.register_team'))
+        if db.session.query(Team).filter(func.lower(Team.team_name) == func.lower(team_name)).first():
+            flash('A team with that name already exists. Please choose another.', 'danger')
+            return redirect(url_for('auth.register_team'))
+
+        # --- Transactional Creation ---
+        try:
+            # 1. Create Team
+            new_team = Team(
+                team_name=team_name,
+                registration_code=str(uuid.uuid4()).split('-')[-1] # Generate a unique code
+            )
+            db.session.add(new_team)
+            db.session.flush()  # Flush to get the new_team.id
+
+            # 2. Create User (as Head Coach of the new team)
+            hashed_password = generate_password_hash(password)
+            default_tab_keys = ['roster', 'player_development', 'games', 'pitching', 'practice_plan', 'collaboration']
+            new_user = User(
+                username=username,
+                full_name=full_name,
+                password_hash=hashed_password,
+                email=email.lower() if email else None,
+                role=HEAD_COACH, # First user of a new team is always the Head Coach
+                team_id=new_team.id,
+                tab_order=json.dumps(default_tab_keys),
+                player_order=[]
+            )
+            db.session.add(new_user)
+            db.session.commit()
+
+            # 3. Log the new user in
+            session['logged_in'] = True
+            session['username'] = new_user.username
+            session['full_name'] = new_user.full_name
+            session['role'] = new_user.role
+            session['team_id'] = new_user.team_id
+            session['player_order'] = []
+            session.permanent = True
+
+            flash('Account and team created successfully! Welcome to CoachBoard.', 'success')
+            return redirect(url_for('home'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash('An error occurred during registration. Please try again.', 'danger')
+            print(f"Error in /register-team: {e}") # for debugging
+            return redirect(url_for('auth.register_team'))
+
+    # GET request
+    return render_template('register_team.html')
+
 
 @auth_bp.route('/change_password', methods=['GET', 'POST'])
 def change_password():
@@ -152,7 +202,3 @@ def change_password():
         flash('Your password has been updated successfully!', 'success')
         return redirect(url_for('home'))
     return render_template('change_password.html')
-
-@auth_bp.route('/create_team', methods=['GET'])
-def create_team():
-    return render_template('create_initial_team.html')

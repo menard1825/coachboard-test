@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Register - Coach Planner</title>
+  <title>Create Team - Coach Planner</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
@@ -17,8 +17,8 @@
       <div class="text-center mb-4 login-logo-container">
         <img src="{{ url_for('static', filename='logo.png') }}" alt="CoachBoard Logo" width="72">
       </div>
-      <h2 class="text-center mb-4">Join an Existing Team</h2>
-      <p class="text-center text-muted">Enter your details and the registration code provided by your team administrator to join your team.</p>
+      <h2 class="text-center mb-4">Create Your Account & Team</h2>
+      <p class="text-center text-muted">Fill out the details below to create your new team and your Head Coach account.</p>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for category, message in messages %}
@@ -26,8 +26,10 @@
           {% endfor %}
         {% endif %}
       {% endwith %}
-      <form method="POST" action="{{ url_for('auth.register') }}">
+      <form method="POST" action="{{ url_for('auth.register_team') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+        <h5 class="text-muted mt-4 mb-3">Your Account Details</h5>
         <div class="form-floating mb-3">
           <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
           <label for="username">Username</label>
@@ -44,17 +46,16 @@
             <input type="email" class="form-control" id="email" name="email" placeholder="Email Address" required>
             <label for="email">Email Address</label>
         </div>
-        <hr>
+
+        <h5 class="text-muted mt-4 mb-3">Your New Team's Details</h5>
         <div class="form-floating mb-3">
-            <input type="text" class="form-control" id="registration_code" name="registration_code" placeholder="Registration Code" value="{{ registration_code }}" required>
-            <label for="registration_code">Team Registration Code</label>
+            <input type="text" class="form-control" id="team_name" name="team_name" placeholder="Team Name" required>
+            <label for="team_name">Team Name</label>
         </div>
 
-        <button type="submit" class="btn btn-primary w-100">Register</button>
+        <button type="submit" class="btn btn-primary w-100 mt-3">Create Account and Team</button>
         <div class="text-center mt-3">
-            <p><a href="{{ url_for('auth.login') }}">Already have an account? Login</a></p>
-            <p class="text-muted">-- OR --</p>
-            <a href="{{ url_for('auth.register_team') }}" class="btn btn-outline-secondary">Create a New Team and Account</a>
+            <a href="{{ url_for('auth.login') }}">Already have an account? Login</a>
         </div>
       </form>
     </div>

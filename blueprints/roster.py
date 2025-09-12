@@ -4,21 +4,9 @@ from db import db
 from extensions import socketio
 import json
 from datetime import datetime
+from utils import get_player_order_as_list # Correctly imported from utils
 
 roster_bp = Blueprint('roster', __name__, template_folder='templates')
-
-def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list, decoding from JSON if necessary."""
-    if not player_order_data:
-        return []
-    if isinstance(player_order_data, list):
-        return player_order_data
-    if isinstance(player_order_data, str):
-        try:
-            return json.loads(player_order_data)
-        except (json.JSONDecodeError, TypeError):
-            return []
-    return [] # default to empty list
 
 @roster_bp.route('/add_player', methods=['POST'])
 def add_player():
@@ -50,6 +38,7 @@ def add_player():
     db.session.add(new_player)
     db.session.flush() # Flush to get the new player's ID
 
+    # Add the new player's ID to every user's personal player_order list for the team
     for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
         current_order = get_player_order_as_list(user_obj.player_order)
         if new_player.id not in current_order:
@@ -97,19 +86,23 @@ def delete_player(player_id):
     player_to_delete = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
     if player_to_delete:
         player_name = player_to_delete.name
-        player_id_to_delete = player_to_delete.id
-        db.session.delete(player_to_delete)
 
+        # Remove the player's ID from all users' player_order on the team
         for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
             current_order = get_player_order_as_list(user_obj.player_order)
-            updated_order = [pid for pid in current_order if pid != player_id_to_delete]
-            user_obj.player_order = updated_order
+            if player_id in current_order:
+                current_order.remove(player_id)
+                user_obj.player_order = current_order
         
+        # Also update the current user's session
         if 'player_order' in session:
             session_order = get_player_order_as_list(session['player_order'])
-            session['player_order'] = [pid for pid in session_order if pid != player_id_to_delete]
-            session.modified = True
+            if player_id in session_order:
+                session_order.remove(player_id)
+                session['player_order'] = session_order
+                session.modified = True
 
+        db.session.delete(player_to_delete)
         db.session.commit()
         flash(f'Player "{player_name}" removed successfully!', 'success')
         socketio.emit('data_updated', {'message': f'Player {player_name} deleted.'})
@@ -123,6 +116,7 @@ def save_player_order():
     user = db.session.query(User).filter_by(username=session['username']).first()
     if not user: return jsonify({'status': 'error', 'message': 'User not found'}), 404
     
+    # The frontend now sends a list of player IDs (integers)
     new_order = request.json.get('player_order')
     if not isinstance(new_order, list): 
         return jsonify({'status': 'error', 'message': 'Invalid order format'}), 400

@@ -3,6 +3,19 @@ from datetime import date, timedelta, datetime, timezone
 from sqlalchemy import func
 from models import Player, PitchingOuting
 
+def get_player_order_as_list(player_order_data):
+    """Safely returns player_order as a list, decoding from JSON if necessary."""
+    if not player_order_data:
+        return []
+    if isinstance(player_order_data, list):
+        return player_order_data
+    if isinstance(player_order_data, str):
+        try:
+            return json.loads(player_order_data)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return [] # default to empty list
+
 def model_to_dict(obj):
     """Converts a SQLAlchemy model instance into a dictionary."""
     if obj is None:
