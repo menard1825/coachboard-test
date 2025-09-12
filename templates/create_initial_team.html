@@ -10,6 +10,7 @@
             <div class="card-body">
                 <p class="text-center">Welcome to CoachBoard! To get started, please enter the name of your team.</p>
                 <form method="POST" action="{{ url_for('team_management.create_team_initial') }}" class="mt-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="form-group">
                         <label for="team_name" class="font-weight-bold">Team Name</label>
                         <input type="text" class="form-control" id="team_name" name="team_name" placeholder="e.g., Westfield Shamrocks 12U" required>

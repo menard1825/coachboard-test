@@ -79,13 +79,18 @@ def register():
             return redirect(url_for('auth.register'))
         
 
-        team = db.session.query(Team).filter_by(registration_code=reg_code).first()
-        if not team:
-            flash('Invalid Registration Code.', 'danger')
-            return redirect(url_for('auth.register'))
+        team = None
+        if reg_code:
+            team = db.session.query(Team).filter_by(registration_code=reg_code).first()
+            if not team:
+                flash('Invalid Registration Code.', 'danger')
+                return redirect(url_for('auth.register'))
 
-        is_first_user = db.session.query(User).filter_by(team_id=team.id).count() == 0
-        user_role = HEAD_COACH if is_first_user else ASSISTANT_COACH
+        is_first_user = False
+        if team:
+            is_first_user = db.session.query(User).filter_by(team_id=team.id).count() == 0
+
+        user_role = HEAD_COACH if is_first_user or not team else ASSISTANT_COACH
 
         hashed_password = generate_password_hash(password)
         default_tab_keys = ['roster', 'player_development', 'games', 'pitching', 'practice_plan', 'collaboration']
@@ -96,7 +101,7 @@ def register():
             password_hash=hashed_password,
             email=email.lower() if email else None,
             role=user_role,
-            team_id=team.id,
+            team_id=team.id if team else None,
             tab_order=json.dumps(default_tab_keys),
             player_order=[]
         )
@@ -111,8 +116,12 @@ def register():
         session['player_order'] = []
         session.permanent = True
 
-        flash(f'Registration successful! You have joined team "{team.team_name}". Welcome.', 'success')
-        return redirect(url_for('home'))
+        if not team:
+            flash('Registration successful! Now, let\'s create your team.', 'success')
+            return redirect(url_for('auth.create_team'))
+        else:
+            flash(f'Registration successful! You have joined team "{team.team_name}". Welcome.', 'success')
+            return redirect(url_for('home'))
 
     registration_code = request.args.get('code', '')
     return render_template('register.html', registration_code=registration_code)
@@ -143,3 +152,7 @@ def change_password():
         flash('Your password has been updated successfully!', 'success')
         return redirect(url_for('home'))
     return render_template('change_password.html')
+
+@auth_bp.route('/create_team', methods=['GET'])
+def create_team():
+    return render_template('create_initial_team.html')

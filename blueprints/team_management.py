@@ -6,8 +6,33 @@ from models import (
 from db import db
 from extensions import socketio
 from datetime import datetime
+from models import User, Team
+from werkzeug.utils import secure_filename
+import os
 
 team_management_bp = Blueprint('team_management', __name__, template_folder='templates')
+
+@team_management_bp.route('/create_team_initial', methods=['POST'])
+def create_team_initial():
+    team_name = request.form.get('team_name')
+    if not team_name:
+        flash('Team name is required.', 'danger')
+        return redirect(url_for('auth.create_team'))
+
+    # Create new team
+    new_team = Team(team_name=team_name)
+    db.session.add(new_team)
+    db.session.commit()
+
+    # Update user with new team
+    user = db.session.query(User).filter_by(username=session['username']).first()
+    if user:
+        user.team_id = new_team.id
+        session['team_id'] = new_team.id
+        db.session.commit()
+
+    flash('Team created successfully!', 'success')
+    return redirect(url_for('home'))
 
 # --- Collaboration Notes Routes ---
 @team_management_bp.route('/add_note/<note_type>', methods=['POST'])
