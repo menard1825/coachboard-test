@@ -1,3 +1,4 @@
+# migrate_data.py
 import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -9,12 +10,13 @@ import os
 
 def parse_date(date_str):
     """
-    More robustly parses date strings from the old database, handling multiple formats.
+    More robustly parses date strings from the old database, handling multiple formats,
+    including those with microseconds.
     """
     if not date_str or date_str == 'Never':
         return None
-    # Handles formats like '2025-07-23' and '2025-07-24 23:55'
-    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
+    # Handles formats like '2025-07-23', '2025-07-24 23:55', and '2025-09-03 16:50:38.194614'
+    for fmt in ('%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
         try:
             return datetime.strptime(date_str, fmt)
         except (ValueError, TypeError):
@@ -83,13 +85,13 @@ try:
                 role=u_data.get('role', 'Coach'),
                 last_login=parse_date(u_data.get('last_login')),
                 tab_order=json.dumps(u_data.get('tab_order', [])),
-                player_order=json.dumps(u_data.get('player_order', [])), # Ensure player_order is stored as JSON string
+                player_order=json.dumps(u_data.get('player_order', [])),
                 team_id=new_team_id
             )
             session.add(user)
             existing_usernames.add(u_data['username'].lower())
 
-    session.flush() # Ensure users are flushed to get IDs if needed later
+    session.flush()
 
     player_name_to_id_map = {}
     # Add players (roster)
@@ -135,21 +137,18 @@ try:
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
 
-        # *** DATA TRANSFORMATION LOGIC ***
         lineup_data = l_data.get('lineup_positions', [])
         player_names = []
-        if lineup_data and isinstance(lineup_data[0], dict):
-            # Handle old format: list of dicts
+        if lineup_data and isinstance(lineup_data, list) and len(lineup_data) > 0 and isinstance(lineup_data[0], dict):
             player_names = [p['name'] for p in lineup_data if isinstance(p, dict) and 'name' in p]
-        elif lineup_data and isinstance(lineup_data[0], str):
-            # Handle new format: list of strings (for safety)
+        elif lineup_data and isinstance(lineup_data, list):
             player_names = lineup_data
 
         new_game_id = game_id_map.get(l_data.get('associated_game_id'))
 
         lineup = Lineup(
             title=l_data['title'],
-            lineup_positions=player_names, # Use the transformed list of names
+            lineup_positions=player_names,
             associated_game_id=new_game_id,
             team_id=new_team_id
         )
@@ -177,7 +176,6 @@ try:
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
 
-        # Find the new player_id
         player_id = player_name_to_id_map.get((po_data['pitcher'], new_team_id))
         if not player_id:
             print(f"Warning: Could not find player '{po_data['pitcher']}' for a pitching outing. Skipping.")
@@ -195,8 +193,6 @@ try:
             game_id=game_id_map.get(po_data.get('game_id'))
         )
         session.add(outing)
-
-    # ... (Add other data models here in a similar fashion) ...
 
     session.commit()
     print("\nData migration complete.")
