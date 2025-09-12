@@ -1,4 +1,4 @@
-# migrate_data.py
+# menard1825/coachboard-test/coachboard-test-production-readiness-and-bug-fixes/migrate_data.py
 import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -137,12 +137,19 @@ try:
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
 
+        # This handles both the old list-of-dicts and new list-of-strings format
         lineup_data = l_data.get('lineup_positions', [])
         player_names = []
+        if isinstance(lineup_data, str):
+             try:
+                 lineup_data = json.loads(lineup_data)
+             except json.JSONDecodeError:
+                 lineup_data = [] # Treat as empty if it's a non-JSON string
+
         if lineup_data and isinstance(lineup_data, list) and len(lineup_data) > 0 and isinstance(lineup_data[0], dict):
             player_names = [p['name'] for p in lineup_data if isinstance(p, dict) and 'name' in p]
         elif lineup_data and isinstance(lineup_data, list):
-            player_names = lineup_data
+            player_names = lineup_data # It's already in the correct list-of-strings format
 
         new_game_id = game_id_map.get(l_data.get('associated_game_id'))
 
@@ -162,9 +169,17 @@ try:
 
         new_game_id = game_id_map.get(r_data.get('associated_game_id'))
 
+        innings_data = r_data.get('innings', {})
+        if isinstance(innings_data, str):
+            try:
+                innings_data = json.loads(innings_data)
+            except json.JSONDecodeError:
+                innings_data = {}
+
+
         rotation = Rotation(
             title=r_data['title'],
-            innings=r_data.get('innings', {}),
+            innings=innings_data,
             associated_game_id=new_game_id,
             team_id=new_team_id
         )
@@ -176,9 +191,15 @@ try:
         new_team_id = team_map.get(old_team_id)
         if not new_team_id: continue
 
-        player_id = player_name_to_id_map.get((po_data['pitcher'], new_team_id))
+        # The old data might have 'pitcher' as the player's name
+        pitcher_name = po_data.get('pitcher') or po_data.get('player_name')
+        if not pitcher_name:
+            print(f"Warning: Pitching outing found without a pitcher name. Skipping. Data: {po_data}")
+            continue
+
+        player_id = player_name_to_id_map.get((pitcher_name, new_team_id))
         if not player_id:
-            print(f"Warning: Could not find player '{po_data['pitcher']}' for a pitching outing. Skipping.")
+            print(f"Warning: Could not find player '{pitcher_name}' for a pitching outing. Skipping.")
             continue
 
         outing = PitchingOuting(
@@ -193,6 +214,7 @@ try:
             game_id=game_id_map.get(po_data.get('game_id'))
         )
         session.add(outing)
+
 
     session.commit()
     print("\nData migration complete.")

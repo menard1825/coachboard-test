@@ -30,10 +30,6 @@
             "outfielder_count": 4
         }
     ],
-    "collaboration_notes": {
-        "player_notes": [],
-        "team_notes": []
-    },
     "games": [
         {
             "id": 3,
@@ -496,7 +492,6 @@
             "team_id": 2
         }
     ],
-    "scouted_players": [],
     "signs": [],
     "users": [
         {
@@ -578,7 +573,6 @@
         }
     ],
     "pitching": [],
-    "player_development_focuses_raw": [],
     "player_game_absences": [
         {
             "id": 1,
@@ -588,7 +582,6 @@
         }
     ],
     "player_practice_absences": [],
-    "practice_tasks": [],
     "scouting_list": {
         "committed": [],
         "targets": [],

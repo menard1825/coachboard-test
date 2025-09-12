@@ -1,3 +1,4 @@
+# menard1825/coachboard-test/coachboard-test-production-readiness-and-bug-fixes/export_to_json.py
 import sqlite3
 import json
 import os
@@ -15,7 +16,7 @@ def convert_datetime(s):
 sqlite3.register_adapter(datetime, adapt_datetime)
 sqlite3.register_converter("DATETIME", convert_datetime)
 
-def export_db_to_json(db_path, json_path):
+def export_db_to_json(db_path='app_old.db', json_path='data_backup.json'):
     """
     Reads data from a SQLite database and exports it to a JSON file
     in the format expected by migrate_data.py.
@@ -43,7 +44,6 @@ def export_db_to_json(db_path, json_path):
         "players": "roster",
         "pitching_outings": "pitching",
         "player_development_focuses": "player_development_focuses_raw", # Temp key
-        # Add other mappings if table name differs from json key
     }
 
     for table_name in table_names:
@@ -57,7 +57,7 @@ def export_db_to_json(db_path, json_path):
         except sqlite3.OperationalError:
             print(f"  - Warning: Table '{table_name}' not found in the old database. Skipping.")
             all_data[json_key] = []
-    
+
     # --- Restructure data to match migrate_data.py's expected format ---
 
     # Handle special structured data
@@ -85,14 +85,14 @@ def export_db_to_json(db_path, json_path):
             if plan_id not in tasks_by_plan_id:
                 tasks_by_plan_id[plan_id] = []
             tasks_by_plan_id[plan_id].append(task)
-    
+
     for plan in all_data.get("practice_plans", []):
         plan['tasks'] = tasks_by_plan_id.get(plan['id'], [])
 
     # Player Development Focuses
     player_dev_data = {}
     player_id_to_name = {p['id']: p['name'] for p in all_data.get('roster', [])}
-    for focus in all_data.get('player_development_focuses_raw') or []:
+    for focus in all_data.get('player_development_focuses_raw', []):
         player_name = player_id_to_name.get(focus.get('player_id'))
         skill_type = focus.get('skill_type')
         if player_name and skill_type:
@@ -102,6 +102,12 @@ def export_db_to_json(db_path, json_path):
                  player_dev_data[player_name][skill_type].append(focus)
     all_data["player_development"] = player_dev_data
 
+    # Clean up raw data to keep the final JSON clean
+    for key in ['scouted_players', 'collaboration_notes', 'practice_tasks', 'player_development_focuses_raw']:
+        if key in all_data:
+            del all_data[key]
+
+
     with open(json_path, 'w') as f:
         json.dump(all_data, f, indent=4, default=str) # Use default=str for any types json doesn't know
 
@@ -109,6 +115,4 @@ def export_db_to_json(db_path, json_path):
     conn.close()
 
 if __name__ == "__main__":
-    old_db_file = 'app_old.db'  # The name of your old database backup file
-    json_backup_file = 'data_backup.json'
-    export_db_to_json(old_db_file, json_backup_file)
+    export_db_to_json()
