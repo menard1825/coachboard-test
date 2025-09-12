@@ -142,23 +142,23 @@ def edit_game(game_id):
         return redirect(url_for('home', _anchor='games'))
 
     game_date_str = request.form.get('game_date')
-    game_time_str = request.form.get('game_time', '') # Add this line
+    game_time_str = request.form.get('game_time', '') # Get the time
     if game_date_str:
         try:
+            # Combine date and time for accurate parsing
             game_datetime_str = f"{game_date_str} {game_time_str if game_time_str else '00:00'}"
             new_game_date = datetime.strptime(game_datetime_str.strip(), '%Y-%m-%d %H:%M')
-            # Check if the date has actually changed
             if game_to_edit.date != new_game_date:
                 game_to_edit.date = new_game_date
-                # Sync the date for all associated pitching outings
+                # Sync date for associated pitching outings
                 for outing in game_to_edit.pitching_outings:
                     outing.date = new_game_date
                 flash('Game date/time updated. Associated pitching logs were synced automatically.', 'info')
         except ValueError:
             flash('Invalid date or time format. Please use YYYY-MM-DD and HH:MM.', 'danger')
             return redirect(url_for('.game_management', game_id=game_id))
-    
-    game_to_edit.time = game_time_str # Add this line
+
+    game_to_edit.time = game_time_str # Save the time string
     game_to_edit.opponent = request.form.get('game_opponent', game_to_edit.opponent)
     game_to_edit.location = request.form.get('game_location', game_to_edit.location)
     game_to_edit.game_notes = request.form.get('game_notes', game_to_edit.game_notes)
