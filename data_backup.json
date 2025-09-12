@@ -1,124 +1,91 @@
 {
+    "alembic_version": [
+        {
+            "version_num": "61099c75ca7e"
+        }
+    ],
     "teams": [
         {
             "id": 1,
-            "team_name": "Marucci Prospects Midwest 11u Select",
+            "team_name": "Marucci Prospects Midwest 11u",
             "registration_code": "Westfield",
-            "logo_path": "1_3b96740847284d639c6fa5bbdb9217a4.png",
+            "logo_path": "1_a2e2656e7f0644649f7ff520456d1bd3.jpg",
             "display_coach_names": 1,
-            "primary_color": "#1F2937",
-            "secondary_color": "#E5E7EB"
+            "primary_color": "#041c62",
+            "secondary_color": "#e9c61c",
+            "age_group": "11U",
+            "pitching_rule_set": "USSSA",
+            "outfielder_count": 3
         },
         {
             "id": 2,
             "team_name": "USA Prime Indiana Orange 8u",
-            "registration_code": "ec3887e0e941",
-            "logo_path": "2_f3256420681040d9858849f5dd8b6917.jpg",
-            "display_coach_names": 1,
+            "registration_code": "65930207e30e",
+            "logo_path": null,
+            "display_coach_names": 0,
             "primary_color": "#1F2937",
-            "secondary_color": "#E5E7EB"
+            "secondary_color": "#E5E7EB",
+            "age_group": "8U",
+            "pitching_rule_set": "USSSA",
+            "outfielder_count": 4
         }
     ],
-    "users": [
+    "collaboration_notes": {
+        "player_notes": [],
+        "team_notes": []
+    },
+    "games": [
+        {
+            "id": 3,
+            "date": "2025-08-28 00:00:00",
+            "opponent": "Zionsville",
+            "location": "",
+            "game_notes": "",
+            "associated_lineup_title": null,
+            "associated_rotation_date": null,
+            "team_id": 2
+        },
+        {
+            "id": 4,
+            "date": "2025-09-13 00:00:00",
+            "opponent": "ZBC Black",
+            "location": "Whitestown",
+            "game_notes": "",
+            "associated_lineup_title": null,
+            "associated_rotation_date": null,
+            "team_id": 2
+        },
+        {
+            "id": 5,
+            "date": "2025-09-10 00:00:00",
+            "opponent": "Westfield",
+            "location": "Grand park",
+            "game_notes": "",
+            "associated_lineup_title": null,
+            "associated_rotation_date": null,
+            "team_id": 1
+        }
+    ],
+    "lineups": [
         {
             "id": 1,
-            "username": "Mike1825",
-            "full_name": "Mike Menard",
-            "password_hash": "pbkdf2:sha256:600000$2I13PTeSyZds17YG$3f34709d586faf65c2407d2280220eb799ee50127abb4f6b32b3671629a5ed38",
-            "role": "Super Admin",
-            "last_login": "2025-07-24 23:55",
-            "tab_order": [
-                "player_development",
-                "roster",
-                "lineups",
-                "pitching",
-                "scouting_list",
-                "rotations",
-                "games",
-                "collaboration",
-                "practice_plan",
-                "signs",
-                "stats"
-            ],
-            "player_order": [
-                "Calvin Hinton",
-                "Declan Smith",
-                "Graham Menard",
-                "Griffin Barnes",
-                "Jack Fordice",
-                "Leo Christofaro",
-                "Lincoln Rochester ",
-                "Luke Charles",
-                "Reed Evans",
-                "Riggins Robinson",
-                "Rylan Wright"
-            ],
+            "title": "Lineup for vs Westfield Gold",
+            "lineup_positions": "[\"Lincoln Rochester\", \"Leo Christofaro\", \"Calvin Hinton\", \"Jack Fordice\", \"Griffin Barnes\", \"Reed Evans\", \"Rylan Wright\", \"Graham Menard\", \"Riggins Robinson\", \"Declan Smith\", \"Luke Charles\"]",
+            "associated_game_id": 1,
+            "team_id": 1
+        },
+        {
+            "id": 2,
+            "title": "Lineup for vs Test game",
+            "lineup_positions": "[\"Luke Charles\", \"Jack Fordice\", \"Griffin Barnes\", \"Graham Menard\", \"Lincoln Rochester\", \"Declan Smith\", \"Reed Evans\", \"Rylan Wright\", \"Calvin Hinton\", \"Riggins Robinson\", \"Leo Christofaro\"]",
+            "associated_game_id": 2,
             "team_id": 1
         },
         {
             "id": 3,
-            "username": "jwright",
-            "full_name": "James Wright",
-            "password_hash": "pbkdf2:sha256:600000$yCYKKEFE2abfqgJC$229f99ab7e7c19faa3ecbd39940c8488a7b52efed37b53314a41082f766829e4",
-            "role": "Head Coach",
-            "last_login": "Never",
-            "tab_order": [
-                "roster",
-                "lineups",
-                "pitching",
-                "scouting_list",
-                "rotations",
-                "games",
-                "collaboration",
-                "practice_plan"
-            ],
-            "player_order": [
-                "Lincoln Rochester "
-            ],
-            "team_id": 1
-        },
-        {
-            "id": 4,
-            "username": "jevans",
-            "full_name": "Jeff Evans",
-            "password_hash": "pbkdf2:sha256:600000$ysjunUkLYetjKHfx$5a17ff1070898ea17f7e2a58fbeb6ee289fb4307977862638b425c4f617bdad7",
-            "role": "Assistant Coach",
-            "last_login": "Never",
-            "tab_order": [
-                "roster",
-                "lineups",
-                "pitching",
-                "scouting_list",
-                "rotations",
-                "games",
-                "collaboration",
-                "practice_plan"
-            ],
-            "player_order": [
-                "Lincoln Rochester "
-            ],
-            "team_id": 1
-        },
-        {
-            "id": 5,
-            "username": "bhuckstep",
-            "full_name": "Ben Huckstep",
-            "password_hash": "pbkdf2:sha256:600000$yZ6iQ3lras9wdZET$1df090a487895a2210ec85f5ecb9610471defb71849ddeac264b43e8c2fd66cb",
-            "role": "Head Coach",
-            "last_login": "2025-07-22 03:38",
-            "tab_order": [
-                "roster",
-                "lineups",
-                "pitching",
-                "scouting_list",
-                "rotations",
-                "games",
-                "collaboration",
-                "practice_plan"
-            ],
-            "player_order": [
-                "Owen Huckstep"
-            ],
+            "title": "",
+            "lineup_positions": "[\"Conor Clinkenbeard\", \"Rhett Wanninger \", \"Owen Huckstep\", \"Jack Arnold\", \"RJ Buchanan\", \"Alex Cox\", \"Abram Hemmerly\", \"Tyson Sutton\", \"Ryne Vorhees\", \"Jackson Arnold\"]",
+            "associated_game_id": 4,
             "team_id": 2
         }
     ],
@@ -128,54 +95,37 @@
             "name": "Graham Menard",
             "number": "3",
             "position1": "1B",
-            "position2": "LF",
-            "position3": "P",
+            "position2": "P",
+            "position3": "",
             "throws": "Left",
             "bats": "Right",
             "notes": "",
-            "pitcher_role": "Reliever",
+            "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": "",
+            "lesson_focus": null,
             "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-22 13:54",
+            "notes_timestamp": "2025-08-27 16:11:42.713899",
             "team_id": 1
         },
         {
             "id": 2,
-            "name": "Leo Christofaro",
-            "number": "30",
-            "position1": "CF",
-            "position2": "SS",
+            "name": "Rylan Wright",
+            "number": "1",
+            "position1": "3B",
+            "position2": "P",
             "position3": "",
             "throws": "Right",
             "bats": "Right",
             "notes": "",
             "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": "",
+            "lesson_focus": null,
             "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-14 14:46",
+            "notes_timestamp": "2025-08-27 16:14:22.673423",
             "team_id": 1
         },
         {
             "id": 3,
-            "name": "Rylan Wright",
-            "number": "1",
-            "position1": "3B",
-            "position2": "DH",
-            "position3": "P",
-            "throws": "Right",
-            "bats": "Right",
-            "notes": "",
-            "pitcher_role": "Starter",
-            "has_lessons": "No",
-            "lesson_focus": "",
-            "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-24 20:14",
-            "team_id": 1
-        },
-        {
-            "id": 4,
             "name": "Reed Evans",
             "number": "5",
             "position1": "SS",
@@ -184,11 +134,28 @@
             "throws": "Right",
             "bats": "Right",
             "notes": "",
-            "pitcher_role": "Starter",
+            "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": "",
+            "lesson_focus": null,
             "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-14 14:46",
+            "notes_timestamp": "2025-08-27 16:14:46.805475",
+            "team_id": 1
+        },
+        {
+            "id": 4,
+            "name": "Griffin Barnes",
+            "number": "6",
+            "position1": "",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Mike1825",
+            "notes_timestamp": "2025-08-27 16:15:00.975208",
             "team_id": 1
         },
         {
@@ -203,9 +170,9 @@
             "notes": "",
             "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": "",
+            "lesson_focus": null,
             "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-15 20:10",
+            "notes_timestamp": "2025-08-27 16:15:39.843877",
             "team_id": 1
         },
         {
@@ -220,82 +187,82 @@
             "notes": "",
             "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": "",
+            "lesson_focus": null,
             "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-19 14:21",
+            "notes_timestamp": "2025-08-27 16:15:55.694795",
             "team_id": 1
         },
         {
             "id": 7,
-            "name": "Riggins Robinson",
-            "number": "27",
-            "position1": "RF",
-            "position2": "2B",
+            "name": "Calvin Hinton",
+            "number": "15",
+            "position1": "",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "\r\n",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Mike1825",
+            "notes_timestamp": "2025-08-28 20:56:38.666227",
+            "team_id": 1
+        },
+        {
+            "id": 8,
+            "name": "Declan Smith",
+            "number": "22",
+            "position1": "",
+            "position2": "",
             "position3": "",
             "throws": "Right",
             "bats": "Right",
             "notes": "",
             "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": "",
+            "lesson_focus": null,
             "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-19 14:21",
-            "team_id": 1
-        },
-        {
-            "id": 8,
-            "name": "Calvin Hinton",
-            "number": "15",
-            "position1": "1B",
-            "position2": "LF",
-            "position3": "P",
-            "throws": "Left",
-            "bats": "Left",
-            "notes": "",
-            "pitcher_role": "Starter",
-            "has_lessons": "No",
-            "lesson_focus": "",
-            "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-24 20:13",
+            "notes_timestamp": "2025-08-27 16:16:17.056174",
             "team_id": 1
         },
         {
             "id": 9,
-            "name": "Declan Smith",
-            "number": "22",
-            "position1": "C",
-            "position2": "2B",
-            "position3": "",
-            "throws": "Right",
-            "bats": "Right",
-            "notes": "Eric's email address.\r\nEsmith14@alumni.nd.edu\r\n",
-            "pitcher_role": "Reliever",
-            "has_lessons": "No",
-            "lesson_focus": "",
-            "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-19 14:19",
-            "team_id": 1
-        },
-        {
-            "id": 10,
-            "name": "Griffin Barnes",
-            "number": "6",
-            "position1": "RF",
-            "position2": "P",
+            "name": "Riggins Robinson",
+            "number": "27",
+            "position1": "",
+            "position2": "",
             "position3": "",
             "throws": "Right",
             "bats": "Right",
             "notes": "",
-            "pitcher_role": "Starter",
+            "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": "",
+            "lesson_focus": null,
             "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-19 14:28",
+            "notes_timestamp": "2025-08-27 16:16:29.785860",
+            "team_id": 1
+        },
+        {
+            "id": 10,
+            "name": "Leo Christofaro",
+            "number": "30",
+            "position1": "",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Mike1825",
+            "notes_timestamp": "2025-08-27 16:16:38.692035",
             "team_id": 1
         },
         {
             "id": 11,
-            "name": "Lincoln Rochester ",
+            "name": "Lincoln Rochester",
             "number": "99",
             "position1": "",
             "position2": "",
@@ -305,17 +272,34 @@
             "notes": "",
             "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
-            "lesson_focus": "",
+            "lesson_focus": null,
             "notes_author": "Mike1825",
-            "notes_timestamp": "2025-07-19 14:27",
+            "notes_timestamp": "2025-08-27 16:16:48.715688",
             "team_id": 1
         },
         {
             "id": 12,
-            "name": "Owen Huckstep",
-            "number": "3",
-            "position1": "2B",
-            "position2": "CF",
+            "name": "Tyson Sutton",
+            "number": "0",
+            "position1": "1B",
+            "position2": "",
+            "position3": "",
+            "throws": "Left",
+            "bats": "Left",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:56:49.929508",
+            "team_id": 2
+        },
+        {
+            "id": 13,
+            "name": "Alex Cox",
+            "number": "1",
+            "position1": "",
+            "position2": "",
             "position3": "",
             "throws": "Right",
             "bats": "Right",
@@ -323,640 +307,292 @@
             "pitcher_role": "Not a Pitcher",
             "has_lessons": "No",
             "lesson_focus": null,
-            "notes_author": "bhuckstep",
-            "notes_timestamp": "2025-07-22 02:52",
-            "team_id": 2
-        }
-    ],
-    "lineups": [
-        {
-            "id": 1,
-            "title": "Lineup for vs Westfield Gold",
-            "lineup_positions": [
-                {
-                    "name": "Rylan Wright",
-                    "position": "3B"
-                },
-                {
-                    "name": "Reed Evans",
-                    "position": "SS"
-                },
-                {
-                    "name": "Leo Christofaro",
-                    "position": "CF"
-                },
-                {
-                    "name": "Riggins Robinson",
-                    "position": "RF"
-                },
-                {
-                    "name": "Graham Menard",
-                    "position": "1B"
-                },
-                {
-                    "name": "Luke Charles",
-                    "position": "C"
-                },
-                {
-                    "name": "Jack Fordice",
-                    "position": "2B"
-                }
-            ],
-            "associated_game_id": 1,
-            "team_id": 1
-        },
-        {
-            "id": 2,
-            "title": "Lineup for vs Test",
-            "lineup_positions": [
-                {
-                    "name": "Owen Huckstep",
-                    "position": "2B"
-                }
-            ],
-            "associated_game_id": 1,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:57:06.941223",
             "team_id": 2
         },
         {
-            "id": 3,
-            "title": "Lineup for vs Westfield Gold",
-            "lineup_positions": [
-                {
-                    "name": "Reed Evans",
-                    "position": ""
-                },
-                {
-                    "name": "Graham Menard",
-                    "position": ""
-                },
-                {
-                    "name": "Calvin Hinton",
-                    "position": ""
-                },
-                {
-                    "name": "Griffin Barnes",
-                    "position": ""
-                },
-                {
-                    "name": "Lincoln Rochester ",
-                    "position": ""
-                },
-                {
-                    "name": "Jack Fordice",
-                    "position": ""
-                },
-                {
-                    "name": "Leo Christofaro",
-                    "position": ""
-                },
-                {
-                    "name": "Luke Charles",
-                    "position": ""
-                },
-                {
-                    "name": "Rylan Wright",
-                    "position": ""
-                },
-                {
-                    "name": "Declan Smith",
-                    "position": ""
-                },
-                {
-                    "name": "Riggins Robinson",
-                    "position": ""
-                }
-            ],
-            "associated_game_id": 2,
-            "team_id": 1
+            "id": 14,
+            "name": "Owen Huckstep",
+            "number": "4",
+            "position1": "2B",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:57:32.198825",
+            "team_id": 2
         },
         {
-            "id": 4,
-            "title": "Lineup for vs Westfield Green",
-            "lineup_positions": [
-                {
-                    "name": "Reed Evans",
-                    "position": ""
-                },
-                {
-                    "name": "Leo Christofaro",
-                    "position": ""
-                },
-                {
-                    "name": "Rylan Wright",
-                    "position": ""
-                },
-                {
-                    "name": "Graham Menard",
-                    "position": ""
-                },
-                {
-                    "name": "Luke Charles",
-                    "position": ""
-                },
-                {
-                    "name": "Declan Smith",
-                    "position": ""
-                },
-                {
-                    "name": "Griffin Barnes",
-                    "position": ""
-                },
-                {
-                    "name": "Riggins Robinson",
-                    "position": ""
-                },
-                {
-                    "name": "Jack Fordice",
-                    "position": ""
-                },
-                {
-                    "name": "Lincoln Rochester ",
-                    "position": ""
-                },
-                {
-                    "name": "Calvin Hinton",
-                    "position": ""
-                }
-            ],
-            "associated_game_id": 3,
-            "team_id": 1
+            "id": 15,
+            "name": "Jackson Arnold",
+            "number": "9",
+            "position1": "",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:57:51.242379",
+            "team_id": 2
+        },
+        {
+            "id": 16,
+            "name": "Conor Clinkenbeard",
+            "number": "11",
+            "position1": "SS",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:58:14.038812",
+            "team_id": 2
+        },
+        {
+            "id": 17,
+            "name": "Abram Hemmerly",
+            "number": "17",
+            "position1": "P",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:58:35.833188",
+            "team_id": 2
+        },
+        {
+            "id": 18,
+            "name": "Kingston Slade",
+            "number": "18",
+            "position1": "1B",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:58:58.850543",
+            "team_id": 2
+        },
+        {
+            "id": 19,
+            "name": "RJ Buchanan",
+            "number": "20",
+            "position1": "",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:59:20.824954",
+            "team_id": 2
+        },
+        {
+            "id": 20,
+            "name": "Ryne Vorhees",
+            "number": "23",
+            "position1": "2B",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:59:39.375475",
+            "team_id": 2
+        },
+        {
+            "id": 21,
+            "name": "Rhett Wanninger ",
+            "number": "44",
+            "position1": "3B",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 13:59:59.003032",
+            "team_id": 2
+        },
+        {
+            "id": 22,
+            "name": "Jack Arnold",
+            "number": "99",
+            "position1": "SS",
+            "position2": "",
+            "position3": "",
+            "throws": "Right",
+            "bats": "Right",
+            "notes": "",
+            "pitcher_role": "Not a Pitcher",
+            "has_lessons": "No",
+            "lesson_focus": null,
+            "notes_author": "Bhuckstep88",
+            "notes_timestamp": "2025-08-28 14:00:14.154157",
+            "team_id": 2
         }
     ],
-    "pitching": [
-        {
-            "id": 1,
-            "date": "2025-07-23",
-            "pitcher": "Graham Menard",
-            "opponent": "Westfield Green",
-            "pitches": 65,
-            "innings": 2.0,
-            "pitcher_type": "Starter",
-            "outing_type": "Game",
-            "team_id": 1
-        },
-        {
-            "id": 2,
-            "date": "2025-07-23",
-            "pitcher": "Leo Christofaro",
-            "opponent": "Westfield Green",
-            "pitches": 35,
-            "innings": 1.0,
-            "pitcher_type": "Reliever",
-            "outing_type": "Game",
-            "team_id": 1
-        },
-        {
-            "id": 3,
-            "date": "2025-07-22",
-            "pitcher": "Reed Evans",
-            "opponent": "Westfield Gold",
-            "pitches": 88,
-            "innings": 4.0,
-            "pitcher_type": "Starter",
-            "outing_type": "Game",
-            "team_id": 1
-        },
-        {
-            "id": 4,
-            "date": "2025-07-22",
-            "pitcher": "Rylan Wright",
-            "opponent": "Westfield Gold",
-            "pitches": 65,
-            "innings": 2.0,
-            "pitcher_type": "Reliever",
-            "outing_type": "Game",
-            "team_id": 1
-        },
-        {
-            "id": 5,
-            "date": "2025-07-21",
-            "pitcher": "Riggins Robinson",
-            "opponent": "Nitro",
-            "pitches": 100,
-            "innings": 6.0,
-            "pitcher_type": "Starter",
-            "outing_type": "Game",
-            "team_id": 1
-        }
-    ],
-    "scouting_list": {
-        "committed": [],
-        "targets": [
-            {
-                "id": 9,
-                "name": "Test player",
-                "position1": "SS",
-                "position2": "2B",
-                "throws": "Right",
-                "bats": "Right",
-                "list_type": "targets",
-                "team_id": 2
-            }
-        ],
-        "not_interested": [
-            {
-                "id": 1,
-                "name": "Cayden Deyoung",
-                "position1": "C",
-                "position2": "3B",
-                "throws": "Right",
-                "bats": "Right",
-                "list_type": "not_interested",
-                "team_id": 1
-            },
-            {
-                "id": 5,
-                "name": "Clay Cottle",
-                "position1": "",
-                "position2": "",
-                "throws": "",
-                "bats": "",
-                "list_type": "not_interested",
-                "team_id": 1
-            },
-            {
-                "id": 6,
-                "name": "Jacob Alber",
-                "position1": "",
-                "position2": "",
-                "throws": "",
-                "bats": "",
-                "list_type": "not_interested",
-                "team_id": 1
-            }
-        ]
-    },
+    "practice_plans": [],
     "rotations": [
         {
             "id": 1,
-            "title": "vs Nitro Gold (2025-07-16)",
-            "innings": {
-                "1": {
-                    "3B": "Rylan Wright",
-                    "SS": "Reed Evans",
-                    "CF": "Leo Christofaro",
-                    "RF": "Riggins Robinson",
-                    "1B": "Graham Menard",
-                    "C": "Luke Charles",
-                    "2B": "Jack Fordice"
-                }
-            },
+            "title": "Rotation for vs Westfield Gold",
+            "innings": "{\"1\": {\"1B\": \"Graham Menard\", \"2B\": \"Leo Christofaro\", \"3B\": \"Rylan Wright\", \"C\": \"Jack Fordice\", \"CF\": \"Luke Charles\", \"LF\": \"Lincoln Rochester\", \"P\": \"Declan Smith\", \"RF\": \"Griffin Barnes\", \"SS\": \"Reed Evans\"}, \"2\": {\"1B\": \"Leo Christofaro\", \"2B\": \"Graham Menard\", \"3B\": \"Lincoln Rochester\", \"C\": \"Luke Charles\", \"CF\": \"Riggins Robinson\", \"LF\": \"Calvin Hinton\", \"P\": \"Jack Fordice\", \"RF\": \"Rylan Wright\", \"SS\": \"Declan Smith\"}, \"3\": {\"1B\": \"Graham Menard\", \"2B\": \"Leo Christofaro\", \"3B\": \"Rylan Wright\", \"C\": \"Jack Fordice\", \"CF\": \"Luke Charles\", \"LF\": \"Lincoln Rochester\", \"P\": \"Declan Smith\", \"RF\": \"Griffin Barnes\", \"SS\": \"Reed Evans\"}, \"4\": {\"1B\": \"Leo Christofaro\", \"2B\": \"Graham Menard\", \"3B\": \"Lincoln Rochester\", \"C\": \"Luke Charles\", \"CF\": \"Riggins Robinson\", \"LF\": \"Calvin Hinton\", \"P\": \"Jack Fordice\", \"RF\": \"Rylan Wright\", \"SS\": \"Declan Smith\"}}",
             "associated_game_id": 1,
             "team_id": 1
-        },
-        {
-            "id": 2,
-            "title": "vs Test (2025-07-22)",
-            "innings": {
-                "1": {
-                    "2B": "Owen Huckstep"
-                },
-                "2": {
-                    "3B": "Owen Huckstep"
-                },
-                "3": {
-                    "RF": "Owen Huckstep"
-                }
-            },
-            "associated_game_id": 1,
-            "team_id": 2
         },
         {
             "id": 3,
-            "title": "Rotation for vs Westfield Gold",
-            "innings": {
-                "1": {
-                    "1B": "Graham Menard",
-                    "2B": "Riggins Robinson",
-                    "3B": "Rylan Wright",
-                    "C": "Luke Charles",
-                    "LF": "Jack Fordice",
-                    "P": "Declan Smith",
-                    "RF": "Lincoln Rochester ",
-                    "SS": "Reed Evans",
-                    "CF": "Griffin Barnes"
-                },
-                "2": {
-                    "1B": "Luke Charles",
-                    "2B": "Griffin Barnes",
-                    "3B": "Reed Evans",
-                    "C": "Calvin Hinton",
-                    "CF": "Leo Christofaro",
-                    "LF": "Jack Fordice",
-                    "P": "Rylan Wright",
-                    "RF": "Lincoln Rochester ",
-                    "SS": "Declan Smith"
-                },
-                "3": {
-                    "1B": "Graham Menard",
-                    "2B": "Riggins Robinson",
-                    "3B": "Rylan Wright",
-                    "C": "Luke Charles",
-                    "CF": "Leo Christofaro",
-                    "LF": "Jack Fordice",
-                    "P": "Declan Smith",
-                    "RF": "Lincoln Rochester ",
-                    "SS": "Reed Evans"
-                },
-                "4": {
-                    "1B": "Luke Charles",
-                    "2B": "Griffin Barnes",
-                    "3B": "Reed Evans",
-                    "C": "Calvin Hinton",
-                    "CF": "Leo Christofaro",
-                    "LF": "Jack Fordice",
-                    "P": "Rylan Wright",
-                    "RF": "Lincoln Rochester ",
-                    "SS": "Declan Smith"
-                },
-                "5": {
-                    "1B": "Graham Menard",
-                    "2B": "Riggins Robinson",
-                    "3B": "Rylan Wright",
-                    "C": "Luke Charles",
-                    "CF": "Leo Christofaro",
-                    "LF": "Jack Fordice",
-                    "P": "Declan Smith",
-                    "RF": "Lincoln Rochester ",
-                    "SS": "Reed Evans"
-                },
-                "6": {
-                    "1B": "Luke Charles",
-                    "2B": "Griffin Barnes",
-                    "3B": "Reed Evans",
-                    "C": "Calvin Hinton",
-                    "CF": "Leo Christofaro",
-                    "LF": "Jack Fordice",
-                    "P": "Rylan Wright",
-                    "RF": "Lincoln Rochester ",
-                    "SS": "Declan Smith"
-                },
-                "7": {}
-            },
-            "associated_game_id": 2,
-            "team_id": 1
+            "title": "Rotation for vs Zionsville",
+            "innings": "{\"1\": {\"1B\": \"Kingston Slade\", \"2B\": \"Owen Huckstep\", \"3B\": \"Rhett Wanninger \", \"C\": \"Tyson Sutton\", \"P\": \"Abram Hemmerly\", \"SS\": \"Conor Clinkenbeard\", \"RF\": \"Jackson Arnold\", \"LCF\": \"Jack Arnold\", \"RCF\": \"RJ Buchanan\", \"LF\": \"Ryne Vorhees\"}}",
+            "associated_game_id": 3,
+            "team_id": 2
         },
         {
             "id": 4,
-            "title": "Rotation for vs Westfield Green",
-            "innings": {
-                "1": {
-                    "1B": "Graham Menard",
-                    "P": "Luke Charles",
-                    "3B": "Rylan Wright",
-                    "C": "Jack Fordice",
-                    "2B": "Calvin Hinton",
-                    "SS": "Reed Evans",
-                    "LF": "Riggins Robinson",
-                    "CF": "Leo Christofaro",
-                    "RF": "Lincoln Rochester "
-                },
-                "2": {
-                    "1B": "Graham Menard",
-                    "P": "Luke Charles",
-                    "3B": "Rylan Wright",
-                    "C": "Jack Fordice",
-                    "2B": "Calvin Hinton",
-                    "SS": "Reed Evans",
-                    "LF": "Riggins Robinson",
-                    "CF": "Leo Christofaro",
-                    "RF": "Lincoln Rochester "
-                },
-                "3": {
-                    "1B": "Graham Menard",
-                    "P": "Luke Charles",
-                    "3B": "Rylan Wright",
-                    "C": "Jack Fordice",
-                    "2B": "Calvin Hinton",
-                    "SS": "Reed Evans",
-                    "LF": "Riggins Robinson",
-                    "CF": "Leo Christofaro",
-                    "RF": "Lincoln Rochester "
-                },
-                "4": {
-                    "1B": "Graham Menard",
-                    "P": "Luke Charles",
-                    "3B": "Rylan Wright",
-                    "C": "Jack Fordice",
-                    "2B": "Calvin Hinton",
-                    "SS": "Reed Evans",
-                    "LF": "Riggins Robinson",
-                    "CF": "Leo Christofaro",
-                    "RF": "Lincoln Rochester "
-                },
-                "5": {
-                    "1B": "Graham Menard",
-                    "P": "Luke Charles",
-                    "3B": "Rylan Wright",
-                    "C": "Jack Fordice",
-                    "2B": "Calvin Hinton",
-                    "SS": "Reed Evans",
-                    "LF": "Riggins Robinson",
-                    "CF": "Leo Christofaro",
-                    "RF": "Lincoln Rochester "
-                },
-                "6": {
-                    "1B": "Graham Menard",
-                    "P": "Luke Charles",
-                    "3B": "Rylan Wright",
-                    "C": "Jack Fordice",
-                    "2B": "Calvin Hinton",
-                    "SS": "Reed Evans",
-                    "LF": "Riggins Robinson",
-                    "CF": "Leo Christofaro",
-                    "RF": "Lincoln Rochester "
-                }
-            },
-            "associated_game_id": 3,
+            "title": "Rotation for vs Test",
+            "innings": "{\"1\": {\"1B\": \"Graham Menard\", \"C\": \"Luke Charles\", \"3B\": \"Rylan Wright\", \"SS\": \"Reed Evans\", \"LF\": \"Griffin Barnes\", \"CF\": \"Leo Christofaro\", \"RF\": \"Calvin Hinton\", \"2B\": \"Lincoln Rochester\", \"P\": \"Riggins Robinson\"}}",
+            "associated_game_id": 4,
             "team_id": 1
         },
         {
             "id": 5,
-            "title": "Rotation for vs Nitro",
-            "innings": {
-                "1": {
-                    "RF": "Riggins Robinson",
-                    "CF": "Reed Evans",
-                    "SS": "Griffin Barnes",
-                    "LF": "Jack Fordice",
-                    "3B": "Lincoln Rochester ",
-                    "P": "Luke Charles",
-                    "2B": "Leo Christofaro",
-                    "1B": "Calvin Hinton",
-                    "C": "Declan Smith"
-                },
-                "2": {
-                    "RF": "Riggins Robinson",
-                    "CF": "Reed Evans",
-                    "SS": "Griffin Barnes",
-                    "LF": "Jack Fordice",
-                    "3B": "Lincoln Rochester ",
-                    "P": "Luke Charles",
-                    "2B": "Leo Christofaro",
-                    "1B": "Calvin Hinton",
-                    "C": "Declan Smith"
-                },
-                "3": {
-                    "RF": "Riggins Robinson",
-                    "CF": "Reed Evans",
-                    "SS": "Griffin Barnes",
-                    "LF": "Jack Fordice",
-                    "3B": "Lincoln Rochester ",
-                    "P": "Luke Charles",
-                    "2B": "Leo Christofaro",
-                    "1B": "Calvin Hinton",
-                    "C": "Declan Smith"
-                },
-                "4": {
-                    "RF": "Riggins Robinson",
-                    "CF": "Reed Evans",
-                    "SS": "Griffin Barnes",
-                    "LF": "Jack Fordice",
-                    "3B": "Lincoln Rochester ",
-                    "P": "Luke Charles",
-                    "2B": "Leo Christofaro",
-                    "1B": "Calvin Hinton",
-                    "C": "Declan Smith"
-                },
-                "5": {
-                    "RF": "Riggins Robinson",
-                    "CF": "Reed Evans",
-                    "SS": "Griffin Barnes",
-                    "LF": "Jack Fordice",
-                    "3B": "Lincoln Rochester ",
-                    "P": "Luke Charles",
-                    "2B": "Leo Christofaro",
-                    "1B": "Calvin Hinton",
-                    "C": "Declan Smith"
-                },
-                "6": {
-                    "RF": "Riggins Robinson",
-                    "CF": "Reed Evans",
-                    "SS": "Griffin Barnes",
-                    "LF": "Jack Fordice",
-                    "3B": "Lincoln Rochester ",
-                    "P": "Luke Charles",
-                    "2B": "Leo Christofaro",
-                    "1B": "Calvin Hinton",
-                    "C": "Declan Smith"
-                }
-            },
+            "title": "Rotation for vs ZBC Black",
+            "innings": "{\"1\": {\"1B\": \"Tyson Sutton\", \"C\": \"Alex Cox\", \"2B\": \"Owen Huckstep\", \"3B\": \"Rhett Wanninger \", \"SS\": \"Conor Clinkenbeard\", \"P\": \"Abram Hemmerly\", \"LF\": \"Jack Arnold\", \"LCF\": \"Jackson Arnold\", \"RCF\": \"RJ Buchanan\", \"RF\": \"Ryne Vorhees\"}, \"2\": {\"1B\": \"Tyson Sutton\", \"C\": \"Alex Cox\", \"2B\": \"Owen Huckstep\", \"3B\": \"Rhett Wanninger \", \"SS\": \"Conor Clinkenbeard\", \"P\": \"Abram Hemmerly\", \"LF\": \"Jack Arnold\", \"LCF\": \"Jackson Arnold\", \"RCF\": \"RJ Buchanan\", \"RF\": \"Ryne Vorhees\"}, \"3\": {\"1B\": \"Tyson Sutton\", \"C\": \"Alex Cox\", \"2B\": \"Owen Huckstep\", \"3B\": \"Rhett Wanninger \", \"SS\": \"Conor Clinkenbeard\", \"P\": \"Abram Hemmerly\", \"LF\": \"Jack Arnold\", \"LCF\": \"Jackson Arnold\", \"RCF\": \"RJ Buchanan\", \"RF\": \"Ryne Vorhees\"}, \"4\": {\"C\": \"Tyson Sutton\", \"SS\": \"Jack Arnold\", \"3B\": \"Jackson Arnold\", \"2B\": \"Ryne Vorhees\", \"1B\": \"RJ Buchanan\", \"P\": \"Alex Cox\", \"LF\": \"Rhett Wanninger \", \"RF\": \"Abram Hemmerly\", \"LCF\": \"Owen Huckstep\", \"RCF\": \"Conor Clinkenbeard\"}}",
             "associated_game_id": 4,
-            "team_id": 1
+            "team_id": 2
         }
     ],
-    "games": [
+    "scouted_players": [],
+    "signs": [],
+    "users": [
         {
             "id": 1,
-            "date": "2025-07-22",
-            "opponent": "Test",
-            "location": "Grand park",
-            "game_notes": "",
-            "associated_lineup_title": "",
-            "associated_rotation_date": "",
-            "team_id": 2
-        },
-        {
-            "id": 2,
-            "date": "2025-07-22",
-            "opponent": "Westfield Gold",
-            "location": "Grand Park",
-            "game_notes": "",
-            "associated_lineup_title": "",
-            "associated_rotation_date": "",
+            "username": "Mike1825",
+            "full_name": "Mike Menard",
+            "password_hash": "pbkdf2:sha256:600000$O5xasSIClaWAXkxi$fe08b2b62bb41e37902d93730eea69cf151b849383535244028ff046778f061f",
+            "role": "Super Admin",
+            "last_login": "2025-09-03 16:50:38.194614",
+            "tab_order": "[\"roster\", \"player_development\", \"lineups\", \"pitching\", \"scouting_list\", \"rotations\", \"games\", \"collaboration\", \"practice_plan\", \"signs\"]",
+            "player_order": "[\"Calvin Hinton\", \"Declan Smith\", \"Graham Menard\", \"Griffin Barnes\", \"Jack Fordice\", \"Riggins Robinson\", \"Lincoln Rochester\", \"Luke Charles\", \"Leo Christofaro\", \"Reed Evans\", \"Rylan Wright\"]",
             "team_id": 1
         },
         {
             "id": 3,
-            "date": "2025-07-23",
-            "opponent": "Westfield Green",
-            "location": "Grand Park",
-            "game_notes": "",
-            "associated_lineup_title": "",
-            "associated_rotation_date": "",
-            "team_id": 1
+            "username": "Bhuckstep88",
+            "full_name": "Ben Huckstep",
+            "password_hash": "pbkdf2:sha256:600000$k70pJDGRCF4ncbN6$6ec50020f2aa0dad74cdfe449a79f5aa9c86b5670d18662bb33ce9fde4001a25",
+            "role": "Head Coach",
+            "last_login": null,
+            "tab_order": "[\"roster\", \"player_development\", \"games\", \"pitching\", \"practice_plan\", \"collaboration\"]",
+            "player_order": "[\"Abram Hemmerly\", \"Alex Cox\", \"Conor Clinkenbeard\", \"Jackson Arnold\", \"Jack Arnold\", \"Kingston Slade\", \"Owen Huckstep\", \"Rhett Wanninger \", \"RJ Buchanan\", \"Ryne Vorhees\", \"Tyson Sutton\"]",
+            "team_id": 2
         },
         {
             "id": 4,
-            "date": "2025-07-21",
-            "opponent": "Nitro",
-            "location": "",
-            "game_notes": "",
-            "associated_lineup_title": "",
-            "associated_rotation_date": "",
-            "team_id": 1
-        }
-    ],
-    "collaboration_notes": {
-        "player_notes": [],
-        "team_notes": [
-            {
-                "id": 1,
-                "note_type": "team_notes",
-                "text": "Test Note",
-                "author": "Mike1825",
-                "timestamp": "2025-07-24 19:23",
-                "player_name": null,
-                "team_id": 1
-            }
-        ]
-    },
-    "practice_plans": [
-        {
-            "id": 1,
-            "date": "2025-07-24",
-            "general_notes": "",
-            "team_id": 2,
-            "tasks": [
-                {
-                    "id": 1,
-                    "text": "Pop flys",
-                    "status": "pending",
-                    "author": "bhuckstep",
-                    "timestamp": "2025-07-22 03:41",
-                    "practice_plan_id": 1
-                }
-            ]
+            "username": "mike",
+            "full_name": "Mike",
+            "password_hash": "pbkdf2:sha256:600000$OGKUjJCzkzJJTXZC$ce5259b72cc18731c8f31b6e75b48ecdb09b298b5728067c3832bb4a9a89443f",
+            "role": "Head Coach",
+            "last_login": "2025-08-29 14:40:12.777998",
+            "tab_order": "[\"roster\", \"lineups\", \"pitching\", \"scouting_list\", \"rotations\", \"games\", \"collaboration\", \"practice_plan\"]",
+            "player_order": "[]",
+            "team_id": 2
         },
         {
-            "id": 2,
-            "date": "2025-07-29",
-            "general_notes": "",
-            "team_id": 1,
-            "tasks": [
-                {
-                    "id": 2,
-                    "text": "Very coachable",
-                    "status": "pending",
-                    "author": "Mike1825",
-                    "timestamp": "2025-07-24 19:24",
-                    "practice_plan_id": 2
-                }
-            ]
+            "id": 5,
+            "username": "jevans",
+            "full_name": "Jeff Evans",
+            "password_hash": "pbkdf2:sha256:600000$NauntYnf7JJBGTcv$142ead1b42f70a71725f25b431520da2451233bf895c69c7245d1d132592d4e7",
+            "role": "Assistant Coach",
+            "last_login": null,
+            "tab_order": "[\"roster\", \"lineups\", \"pitching\", \"scouting_list\", \"rotations\", \"games\", \"collaboration\", \"practice_plan\"]",
+            "player_order": "[]",
+            "team_id": 1
+        },
+        {
+            "id": 6,
+            "username": "jwright",
+            "full_name": "James Wright",
+            "password_hash": "pbkdf2:sha256:600000$6WhyIP7z5Y5fhl9t$a828cd059621fa84f3d1438a3cce48747b4f9b588effaf06442ce3f094233b9d",
+            "role": "Head Coach",
+            "last_login": null,
+            "tab_order": "[\"roster\", \"lineups\", \"pitching\", \"scouting_list\", \"rotations\", \"games\", \"collaboration\", \"practice_plan\"]",
+            "player_order": "[]",
+            "team_id": 1
+        },
+        {
+            "id": 7,
+            "username": "ben",
+            "full_name": "Ben",
+            "password_hash": "pbkdf2:sha256:600000$2OcQmuM5HtOEC68L$849e784d40c6a1d181f923f7fa88c654ae4f58ac8fcfb38798674e90c760e84e",
+            "role": "Head Coach",
+            "last_login": "2025-08-29 23:01:32.991337",
+            "tab_order": "[\"roster\", \"lineups\", \"pitching\", \"scouting_list\", \"rotations\", \"games\", \"collaboration\", \"practice_plan\"]",
+            "player_order": "[]",
+            "team_id": 2
+        },
+        {
+            "id": 8,
+            "username": "cslade",
+            "full_name": "Cory Slade",
+            "password_hash": "pbkdf2:sha256:600000$9N0YenCiQKupOKLR$f731862cb6c7b171a47ae944d77e8bb3c1e69643e9daf11f7cfd92c89a7f2524",
+            "role": "Head Coach",
+            "last_login": "2025-09-11 00:52:40.939933",
+            "tab_order": "[\"roster\", \"lineups\", \"pitching\", \"scouting_list\", \"rotations\", \"games\", \"collaboration\", \"practice_plan\"]",
+            "player_order": "[]",
+            "team_id": 2
         }
     ],
-    "player_development": {
-        "Griffin Barnes": {
-            "hitting": [],
-            "pitching": [],
-            "fielding": [
-                {
-                    "id": 1,
-                    "focus": "Ground balls",
-                    "status": "active",
-                    "notes": "Get a feel for his attitude. ",
-                    "created_date": "2025-07-22",
-                    "completed_date": null,
-                    "author": "Mike1825",
-                    "last_edited_by": "Mike1825",
-                    "last_edited_date": "2025-07-24 20:14",
-                    "player_id": 10,
-                    "skill_type": "fielding",
-                    "team_id": 1
-                }
-            ],
-            "baserunning": []
+    "pitching": [],
+    "player_development_focuses_raw": [],
+    "player_game_absences": [
+        {
+            "id": 1,
+            "player_id": 18,
+            "game_id": 4,
+            "team_id": 2
         }
+    ],
+    "player_practice_absences": [],
+    "practice_tasks": [],
+    "scouting_list": {
+        "committed": [],
+        "targets": [],
+        "not_interested": []
     },
-    "signs": []
+    "player_development": {}
 }
