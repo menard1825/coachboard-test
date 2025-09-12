@@ -54,7 +54,14 @@ def create_app():
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
     app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
+
+    # *** PRODUCTION FIX FOR SQLITE AND EVENTLET ***
+    db_uri = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
+    # When running with eventlet, disable the thread check
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true': # Heuristic to detect if running under `python run.py`
+        db_uri += '?check_same_thread=False'
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['WTF_CSRF_ENABLED'] = True
 
