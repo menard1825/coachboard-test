@@ -198,6 +198,7 @@ class Game(db.Model):
     our_score = Column(Integer)
     opponent_score = Column(Integer)
     post_game_summary = Column(Text)
+    status = db.Column(db.String, default='scheduled')
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="games")

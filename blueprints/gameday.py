@@ -302,6 +302,20 @@ def delete_quick_note(note_id):
     return redirect(url_for('.game_management', game_id=game_id, _anchor='postgame'))
 
 
+@gameday_bp.route('/game/<int:game_id>/complete', methods=['POST'])
+@login_required
+def mark_game_complete(game_id):
+    game = db.session.get(Game, game_id)
+    if game and game.team_id == session['team_id']:
+        game.status = 'complete'
+        db.session.commit()
+        flash('Game marked as complete!', 'success')
+        socketio.emit('data_updated', {'message': 'Game status updated.'})
+    else:
+        flash('Game not found.', 'danger')
+    return redirect(url_for('.game_management', game_id=game_id))
+
+
 @gameday_bp.route('/game/<int:game_id>/create_practice_plan')
 @login_required
 def create_practice_plan_from_game(game_id):
