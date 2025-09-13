@@ -31,7 +31,7 @@ def add_scouted_player():
         )
         db.session.add(new_player)
         db.session.commit()
-        socketio.emit('scouting_update', {'message': 'New scouted player added.'})
+        socketio.emit('data_updated', {'message': 'New scouted player added.'})
         return jsonify({'status': 'success', 'message': f'Player "{new_player.name}" added to {scouted_player_type.replace("_", " ").title()} list.'})
     except Exception as e:
         print(f"Error adding scouted player: {e}")

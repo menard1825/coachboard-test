@@ -59,8 +59,15 @@ PITCHING_RULES = {
         '13U': {'max_daily': 95, 'max_weekly': 125, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
         '14U': {'max_daily': 95, 'max_weekly': 125, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
         'default': {'max_daily': 85, 'max_weekly': 100, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]}
+    },
+    'Little League': {
+        '8U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
+        '10U': {'max_daily': 75, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3), (75, 4)]},
+        '12U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3), (85, 4)]},
+        '14U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3), (95, 4)]},
+        '16U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3), (95, 4)]},
+        'default': {'max_daily': 75, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3), (75, 4)]}
     }
-    # You could add other rule sets like 'Little League' here in the future
 }
 
 

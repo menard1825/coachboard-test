@@ -392,8 +392,7 @@ def add_lineup():
         db.session.commit()
 
         lineup_dict = model_to_dict(new_lineup)
-        # Emit a simple message instead of the full dict to avoid serialization errors
-        socketio.emit('lineup_update', {'lineup': lineup_dict})
+        socketio.emit('data_updated', {'message': 'New lineup added.'})
 
         return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id, 'lineup': lineup_dict})
     except Exception as e:

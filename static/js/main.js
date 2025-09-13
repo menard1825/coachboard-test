@@ -1071,8 +1071,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.on('data_updated', async (data) => {
             console.log('Generic data_updated received:', data.message);
-            // This is a catch-all. We can make it smarter later.
-            // For now, let's just refetch everything.
             await fetchData();
             renderAll();
         });

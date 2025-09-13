@@ -275,6 +275,23 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    const inningsInput = document.getElementById('innings');
+    if (outingTypeSelect && inningsInput) {
+        const inningsContainer = inningsInput.closest('.col-6');
+
+        const toggleInningsVisibility = () => {
+            if (outingTypeSelect.value === 'Game') {
+                inningsContainer.style.display = 'block';
+            } else {
+                inningsContainer.style.display = 'none';
+            }
+        };
+
+        outingTypeSelect.addEventListener('change', toggleInningsVisibility);
+        // Initial check in case the page loads with a non-game type selected
+        toggleInningsVisibility();
+    }
+
 
     const editModal = document.getElementById('editPitchingOutingModal');
     if (editModal) {
