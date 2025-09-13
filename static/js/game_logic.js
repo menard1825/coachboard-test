@@ -32,6 +32,9 @@ window.initializeGameManagement = function(gameData) {
         }
     }
 
+    // Store the initial state of the rotation to check for unsaved changes.
+    let initialRotationInnings = JSON.parse(JSON.stringify(state.rotation.innings || { '1': {} }));
+
     let assignPlayerModal;
     let lineupEditorModal;
     let saveTemplateModal;
@@ -130,6 +133,8 @@ window.initializeGameManagement = function(gameData) {
             const result = await response.json();
             if (result.status === 'success') {
                 if (result.new_id) state.rotation.id = result.new_id;
+                // Update the clean state after a successful save
+                initialRotationInnings = JSON.parse(JSON.stringify(state.rotation.innings));
                 btn.textContent = 'Saved!';
                 renderRotationEditor();
             } else { throw new Error(result.message); }
@@ -423,6 +428,18 @@ window.initializeGameManagement = function(gameData) {
                 }
             });
         }
+
+        // Warn user about unsaved rotation changes before leaving the page
+        window.addEventListener('beforeunload', function (e) {
+            const currentInningsState = JSON.stringify(state.rotation.innings);
+            const savedInningsState = JSON.stringify(initialRotationInnings);
+
+            if (currentInningsState !== savedInningsState) {
+                const confirmationMessage = 'You have unsaved changes to the rotation. Are you sure you want to leave?';
+                e.returnValue = confirmationMessage; // For most browsers
+                return confirmationMessage;          // For old browsers
+            }
+        });
     }
 
     // --- Initial Page Render ---
