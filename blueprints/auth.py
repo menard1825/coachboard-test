@@ -61,11 +61,11 @@ def register():
         if not all([username, full_name, password, reg_code]):
             flash('A registration code is required to join a team.', 'danger')
             return redirect(url_for('auth.register'))
-        if len(password) < 4:
-            flash('Password must be at least 4 characters long.', 'danger')
+        if len(password) < 8:
+            flash('Password must be at least 8 characters long.', 'danger')
             return redirect(url_for('auth.register'))
         if db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first():
-            flash('That username is already taken. Please choose another.', 'danger')
+            flash('Registration failed. Please check your information and try again.', 'danger')
             return redirect(url_for('auth.register'))
         
         team = db.session.query(Team).filter_by(registration_code=reg_code).first()
@@ -118,11 +118,11 @@ def register_team():
         if not all([username, full_name, password, email, team_name]):
             flash('All fields are required.', 'danger')
             return redirect(url_for('auth.register_team'))
-        if len(password) < 4:
-            flash('Password must be at least 4 characters long.', 'danger')
+        if len(password) < 8:
+            flash('Password must be at least 8 characters long.', 'danger')
             return redirect(url_for('auth.register_team'))
         if db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first():
-            flash('That username is already taken. Please choose another.', 'danger')
+            flash('Registration failed. Please check your information and try again.', 'danger')
             return redirect(url_for('auth.register_team'))
         if db.session.query(Team).filter(func.lower(Team.team_name) == func.lower(team_name)).first():
             flash('A team with that name already exists. Please choose another.', 'danger')
@@ -191,8 +191,8 @@ def change_password():
         if new_password != confirm_new_password:
             flash('New passwords do not match.', 'danger')
             return redirect(url_for('auth.change_password'))
-        if len(new_password) < 4:
-            flash('New password must be at least 4 characters long.', 'danger')
+        if len(new_password) < 8:
+            flash('New password must be at least 8 characters long.', 'danger')
             return redirect(url_for('auth.change_password'))
 
         user.last_password_change_at = datetime.utcnow()

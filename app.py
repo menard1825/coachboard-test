@@ -53,7 +53,8 @@ def create_app():
     app.secret_key = secret_key or 'a-fallback-secret-key-for-development'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
-    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
+    app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2 MB
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['WTF_CSRF_ENABLED'] = True
@@ -179,6 +180,12 @@ def create_app():
     def serve_manifest():
         return send_from_directory('static', 'manifest.json')
 
+
+    @app.errorhandler(413)
+    def request_entity_too_large(error):
+        flash('The uploaded file is too large. Please upload a file smaller than 2MB.', 'danger')
+        # Redirect to the admin settings page, as that's where the upload happens
+        return redirect(url_for('admin.admin_settings'))
 
     # --- Production Logging ---
     if not app.debug:

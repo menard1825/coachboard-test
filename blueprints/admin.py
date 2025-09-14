@@ -5,10 +5,12 @@ from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 import uuid
 import os
+import io
 import random
 import string
 import json, datetime
 from functools import wraps
+from PIL import Image
 
 from db import db
 from models import User, Team
@@ -281,6 +283,18 @@ def upload_logo():
         return redirect(url_for('.admin_settings'))
 
     if file and allowed_file(file.filename):
+        try:
+            # Read the file stream and "rewind" it
+            file_stream = file.read()
+            file.seek(0)
+
+            # Try to open it with Pillow
+            img = Image.open(io.BytesIO(file_stream))
+            img.verify() # Verify that it is, in fact, an image
+        except Exception as e:
+            flash('Invalid or corrupt image file.', 'danger')
+            return redirect(url_for('.admin_settings'))
+
         filename = secure_filename(file.filename)
         unique_id = uuid.uuid4().hex
         file_ext = filename.rsplit('.', 1)[1].lower()
@@ -302,7 +316,7 @@ def upload_logo():
         flash('Team logo uploaded successfully!', 'success')
         socketio.emit('data_updated', {'message': 'Team logo updated.'})
     else:
-        flash('Invalid file type. Allowed types are: png, jpg, jpeg, gif, svg.', 'danger')
+        flash('Invalid file type. Allowed types are: png, jpg, jpeg, gif.', 'danger')
 
     return redirect(url_for('.admin_settings'))
 
