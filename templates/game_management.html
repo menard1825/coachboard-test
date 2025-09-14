@@ -104,7 +104,7 @@
                                     data-delete-name="this lineup" {% if not lineup or not lineup.id %}disabled{% endif %}>Delete</button>
                             </div>
                         </div>
-                        <div class="card-body">
+                        <div class="card-body" id="lineup-card-body">
                             {% if lineup and lineup.lineup_positions %}
                                 <ol class="list-group list-group-numbered">
                                     {% for player_name in lineup.lineup_positions %}
