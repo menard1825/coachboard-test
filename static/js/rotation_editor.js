@@ -72,8 +72,10 @@ function initializeRotationEditor(state, escapeHTML) {
 
         container.innerHTML = positions.map(pos => {
             const assignedPlayerName = currentInningData[pos];
+            const player = state.roster.find(p => p.name === assignedPlayerName);
+            const isAbsent = player && state.absent_player_ids.includes(player.id);
             const playerTagHtml = assignedPlayerName
-                ? `<div class="player-tag" data-player-name="${escapeHTML(assignedPlayerName)}" draggable="true">${escapeHTML(assignedPlayerName)}</div>`
+                ? `<div class="player-tag ${isAbsent ? 'is-absent' : ''}" data-player-name="${escapeHTML(assignedPlayerName)}" draggable="true">${escapeHTML(assignedPlayerName)}</div>`
                 : '';
 
             return `
@@ -98,12 +100,13 @@ function initializeRotationEditor(state, escapeHTML) {
             const player = state.roster.find(p => p.name === playerName);
             if (!player || !POS_COORDS[pos]) continue;
 
+            const isAbsent = state.absent_player_ids.includes(player.id);
             let posClass = 'other-pos';
             if (player.position1 === pos) posClass = 'natural-pos';
             else if (player.position2 === pos || player.position3 === pos) posClass = 'secondary-pos';
 
             const tokenGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            tokenGroup.setAttribute('class', `player-token ${posClass}`);
+            tokenGroup.setAttribute('class', `player-token ${posClass} ${isAbsent ? 'is-absent' : ''}`);
             tokenGroup.setAttribute('transform', `translate(${POS_COORDS[pos].x}, ${POS_COORDS[pos].y})`);
 
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -134,9 +137,10 @@ function initializeRotationEditor(state, escapeHTML) {
         const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
 
         if (benchPlayers.length > 0) {
-            benchContainer.innerHTML = benchPlayers.map(p =>
-                `<div class="player-tag" data-player-name="${escapeHTML(p.name)}" draggable="true">${escapeHTML(p.name)}</div>`
-            ).join('');
+            benchContainer.innerHTML = benchPlayers.map(p => {
+                const isAbsent = state.absent_player_ids.includes(p.id);
+                return `<div class="player-tag ${isAbsent ? 'is-absent' : ''}" data-player-name="${escapeHTML(p.name)}" draggable="true">${escapeHTML(p.name)}</div>`;
+            }).join('');
         } else {
             benchContainer.innerHTML = `<p class="text-muted small p-2">All players are on the field.</p>`;
         }

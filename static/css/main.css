@@ -577,3 +577,21 @@ input[type="time"]:placeholder-shown::before {
 .player-tag.dragging {
     opacity: 0.4;
 }
+
+/* Style for absent players in editors */
+.is-absent {
+    text-decoration: line-through;
+    background-color: #f8f9fa; /* A light gray background */
+    color: #6c757d; /* Muted text color */
+    pointer-events: none; /* Make them un-clickable/un-draggable */
+}
+
+.player-token.is-absent .player-token-circle {
+    fill: #6c757d; /* Muted gray */
+    stroke: #343a40;
+}
+.player-token.is-absent .player-token-text-num,
+.player-token.is-absent .player-token-text-name {
+    text-decoration: line-through;
+    fill: #f8f9fa;
+}

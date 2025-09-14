@@ -10,7 +10,8 @@ window.initializeGameManagement = function(gameData) {
     // --- Page-Specific State ---
     // All data for this page is stored in a local 'state' object.
     const state = {
-        roster: (gameData.roster || []).filter(p => !(gameData.absent_player_ids || []).includes(p.id)),
+        roster: gameData.roster || [],
+        absent_player_ids: gameData.absent_player_ids || [],
         lineup: gameData.lineup || { id: null, title: `Lineup for vs ${gameData.game.opponent}`, lineup_positions: [], associated_game_id: gameData.game.id },
         rotation: gameData.rotation || { id: null, title: `Rotation for vs ${gameData.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
         game: gameData.game,
@@ -274,7 +275,8 @@ window.initializeGameManagement = function(gameData) {
                     roster: state.roster,
                     lineup: state.lineup,
                     benchEl: document.getElementById('lineup-bench'),
-                    orderEl: document.getElementById('lineup-order')
+                    orderEl: document.getElementById('lineup-order'),
+                    absent_player_ids: state.absent_player_ids
                 });
             };
 

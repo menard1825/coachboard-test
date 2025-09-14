@@ -67,7 +67,8 @@ function initializeLineupEditor(options) {
         roster,
         lineup,
         benchEl,
-        orderEl
+        orderEl,
+        absent_player_ids
     } = options;
 
     // FIX: Ensure lineup_positions is always a valid array, parsing from JSON if necessary.
@@ -91,7 +92,8 @@ function initializeLineupEditor(options) {
 
     function createBenchPlayerItem(player) {
         const item = document.createElement('div');
-        item.className = 'list-group-item';
+        const isAbsent = absent_player_ids.includes(player.id);
+        item.className = `list-group-item ${isAbsent ? 'is-absent' : ''}`;
         item.dataset.playerName = player.name;
         item.innerHTML = `
             <div class="d-flex align-items-center">
@@ -104,7 +106,8 @@ function initializeLineupEditor(options) {
 
     function createBattingOrderItem(player) {
         const item = document.createElement('div');
-        item.className = 'list-group-item';
+        const isAbsent = absent_player_ids.includes(player.id);
+        item.className = `list-group-item ${isAbsent ? 'is-absent' : ''}`;
         item.dataset.playerName = player.name;
         item.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
