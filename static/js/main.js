@@ -1231,7 +1231,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const modalBody = e.target.querySelector('.modal-body');
         const url = e.relatedTarget.dataset.deleteUrl;
         const name = e.relatedTarget.dataset.deleteName;
-        if (url && deleteForm) {
+        if (url && url !== '#' && deleteForm) {
             deleteForm.action = url;
             modalBody.innerHTML = `Are you sure you want to delete <strong>${name || 'this item'}</strong>? This action cannot be undone.`;
         } else {
