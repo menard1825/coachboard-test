@@ -61,6 +61,30 @@ window.initializeGameManagement = function(gameData) {
         lineupCardBody.innerHTML = content;
     }
 
+    function updateDeleteButtonState() {
+        const lineupDeleteBtn = document.querySelector('button[data-delete-name="this lineup"]');
+        if (lineupDeleteBtn) {
+            if (state.lineup && state.lineup.id) {
+                lineupDeleteBtn.dataset.deleteUrl = `/delete_lineup/${state.lineup.id}?game_id=${state.game.id}`;
+                lineupDeleteBtn.disabled = false;
+            } else {
+                lineupDeleteBtn.dataset.deleteUrl = '#';
+                lineupDeleteBtn.disabled = true;
+            }
+        }
+
+        const rotationDeleteBtn = document.querySelector('button[data-delete-name="this rotation"]');
+        if (rotationDeleteBtn) {
+            if (state.rotation && state.rotation.id) {
+                rotationDeleteBtn.dataset.deleteUrl = `/delete_rotation/${state.rotation.id}?game_id=${state.game.id}`;
+                rotationDeleteBtn.disabled = false;
+            } else {
+                rotationDeleteBtn.dataset.deleteUrl = '#';
+                rotationDeleteBtn.disabled = true;
+            }
+        }
+    }
+
     // --- DATA SAVE FUNCTIONS ---
     async function saveLineup() {
         const btn = document.getElementById('saveLineupBtn');
@@ -97,6 +121,7 @@ window.initializeGameManagement = function(gameData) {
             }
 
             renderLineupDisplay(); // Re-render the display on the main page
+            updateDeleteButtonState();
             lineupEditorModal.hide();
 
         } catch (error) {
@@ -137,6 +162,7 @@ window.initializeGameManagement = function(gameData) {
                 initialRotationInnings = JSON.parse(JSON.stringify(state.rotation.innings));
                 btn.textContent = 'Saved!';
                 renderRotationEditor();
+                updateDeleteButtonState();
             } else { throw new Error(result.message); }
         } catch (error) {
             alert('Error saving rotation: ' + error.message);
