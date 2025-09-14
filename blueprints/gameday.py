@@ -438,7 +438,7 @@ def edit_lineup(lineup_id):
 @gameday_bp.route('/delete_lineup/<int:lineup_id>', methods=['POST'])
 @login_required
 def delete_lineup(lineup_id):
-    game_id = request.args.get('game_id', type=int)
+    game_id = request.values.get('game_id', type=int)
     lineup_to_delete = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
     if lineup_to_delete:
         lineup_id = lineup_to_delete.id
@@ -504,7 +504,7 @@ def save_rotation():
 @gameday_bp.route('/delete_rotation/<int:rotation_id>', methods=['POST'])
 @login_required
 def delete_rotation(rotation_id):
-    game_id = request.args.get('game_id', type=int)
+    game_id = request.values.get('game_id', type=int)
     rotation_to_delete = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
     if rotation_to_delete:
         rotation_id_for_emit = rotation_to_delete.id
