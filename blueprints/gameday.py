@@ -41,7 +41,7 @@ def game_management(game_id):
     game_pitching_log = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(
         team_id=team.id,
         opponent=game.opponent
-    ).filter(db.func.date(PitchingOuting.date) == game.date.date()).all()
+    ).filter(db.func.date(PitchingOuting.date) == game.date).all()
 
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
     absent_player_ids = [absence.player_id for absence in absences]
@@ -75,7 +75,7 @@ def game_management(game_id):
 def add_game():
     game_date_str = request.form['game_date']
     try:
-        game_date = datetime.strptime(game_date_str, '%Y-%m-%d')
+        game_date = datetime.strptime(game_date_str, '%Y-%m-%d').date()
     except ValueError:
         flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
         return redirect(url_for('home', _anchor='games'))
@@ -103,7 +103,7 @@ def edit_game(game_id):
     game_date_str = request.form.get('game_date')
     if game_date_str:
         try:
-            game_to_edit.date = datetime.strptime(game_date_str, '%Y-%m-%d')
+            game_to_edit.date = datetime.strptime(game_date_str, '%Y-%m-%d').date()
         except ValueError:
             flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
             return redirect(url_for('.game_management', game_id=game_id))

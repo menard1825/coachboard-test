@@ -1,12 +1,8 @@
-# menard1825/coachboard-test/coachboard-test-structure-overhaul/models.py
-# models.py
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float, DateTime, JSON
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float, DateTime, JSON, Date
 from sqlalchemy.orm import relationship
 from db import db
-import json
 from datetime import datetime
 
-# All models now inherit from db.Model
 class Team(db.Model):
     __tablename__ = 'teams'
     id = Column(Integer, primary_key=True)
@@ -42,8 +38,8 @@ class User(db.Model):
     password_hash = Column(String, nullable=False)
     role = Column(String, default='Coach')
     last_login = Column(DateTime)
-    tab_order = Column(Text) # Keeping as text for simplicity
-    player_order = Column(JSON) # Changed to JSON
+    tab_order = Column(Text)
+    player_order = Column(JSON)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="users")
@@ -63,7 +59,7 @@ class Player(db.Model):
     has_lessons = Column(String)
     lesson_focus = Column(Text)
     notes_author = Column(String)
-    notes_timestamp = Column(DateTime) # Changed to DateTime
+    notes_timestamp = Column(DateTime)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="players")
@@ -78,15 +74,13 @@ class Player(db.Model):
         return self.name.strip() if self.name else None
 
     def to_dict(self):
-        """Return a dictionary representation of the Player object."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-
 
 class Lineup(db.Model):
     __tablename__ = 'lineups'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
-    lineup_positions = Column(JSON) # Changed to JSON
+    lineup_positions = Column(JSON)
     associated_game_id = Column(Integer)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
@@ -135,14 +129,13 @@ class ScoutedPlayer(db.Model):
     team = relationship("Team", back_populates="scouted_players")
     
     def to_dict(self):
-        """Return a dictionary representation of the ScoutedPlayer object."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class Rotation(db.Model):
     __tablename__ = 'rotations'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
-    innings = Column(JSON) # Changed to JSON
+    innings = Column(JSON)
     associated_game_id = Column(Integer, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
@@ -151,7 +144,7 @@ class Rotation(db.Model):
 class Game(db.Model):
     __tablename__ = 'games'
     id = Column(Integer, primary_key=True)
-    date = Column(DateTime, nullable=False) # Changed to DateTime
+    date = Column(Date, nullable=False)
     opponent = Column(String, nullable=False)
     location = Column(String)
     game_notes = Column(Text)
@@ -163,7 +156,6 @@ class Game(db.Model):
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
     
     def to_dict(self):
-        """Return a dictionary representation of the Game object."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class CollaborationNote(db.Model):
@@ -172,7 +164,7 @@ class CollaborationNote(db.Model):
     note_type = Column(String, nullable=False)
     text = Column(Text, nullable=False)
     author = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
+    timestamp = Column(DateTime, default=datetime.utcnow)
     player_name = Column(String, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
@@ -181,7 +173,7 @@ class CollaborationNote(db.Model):
 class PracticePlan(db.Model):
     __tablename__ = 'practice_plans'
     id = Column(Integer, primary_key=True)
-    date = Column(DateTime, nullable=False) # Changed to DateTime
+    date = Column(DateTime, nullable=False)
     general_notes = Column(Text)
     emphasis = Column(Text)
     warm_up = Column(Text)
@@ -200,7 +192,7 @@ class PracticeTask(db.Model):
     text = Column(Text, nullable=False)
     status = Column(String, default="pending")
     author = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
+    timestamp = Column(DateTime, default=datetime.utcnow)
 
     practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
     practice_plan = relationship("PracticePlan", back_populates="tasks")
@@ -211,12 +203,12 @@ class PlayerDevelopmentFocus(db.Model):
     focus = Column(Text, nullable=False)
     status = Column(String, default="active")
     notes = Column(Text)
-    progress_notes = Column(Text, nullable=True) # New field
-    created_date = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
-    completed_date = Column(DateTime, nullable=True) # Changed to DateTime
+    progress_notes = Column(Text, nullable=True)
+    created_date = Column(DateTime, default=datetime.utcnow)
+    completed_date = Column(DateTime, nullable=True)
     author = Column(String)
     last_edited_by = Column(String)
-    last_edited_date = Column(DateTime) # Changed to DateTime
+    last_edited_date = Column(DateTime)
 
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
     player = relationship("Player", back_populates="development_focuses")

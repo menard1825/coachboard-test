@@ -62,30 +62,18 @@ def pitching_outing_to_dict(outing):
     d['player_name'] = outing.player.name if outing.player else "Unknown"
     return d
 
-# This dictionary was originally in app.py
-# MODIFIED: Expanded to include a full range of age groups for USSSA rules.
-PITCHING_RULES = {
-    'USSSA': {
-        '4U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
-        '5U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
-        '6U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
-        '7U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
-        '8U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
-        '9U': {'max_daily': 75, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '10U': {'max_daily': 75, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '11U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '12U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '13U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        '14U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
-        'default': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]}
-    }
-    # You could add other rule sets like 'Little League' here in the future
-}
-
+def parse_date(date_str):
+    if not date_str or date_str == 'Never':
+        return None
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d', '%A, %m/%d/%y, %I:%M %p', '%A, %m/%d/%y'):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except (ValueError, TypeError):
+            continue
+    return None
 
 def allowed_file(filename):
     """Checks if the filename has an allowed extension."""
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -114,16 +102,11 @@ def calculate_cumulative_position_stats(roster_players, rotations):
     """Calculates the number of games a player appeared at each position in a rotation."""
     stats = {player.name: {} for player in roster_players}
 
-    # Create a set to track which players have already been counted for a specific game
-    # to prevent counting them multiple times for the same game rotation.
     game_rotations_counted = set()
 
     for rotation in rotations:
-        # A rotation is tied to a single game, so we use its ID to track.
-        # If no associated game, we can use the rotation's own ID as a unique identifier.
         rotation_key = rotation.associated_game_id or rotation.id
 
-        # Skip if we've already processed this game/rotation
         if rotation_key in game_rotations_counted:
             continue
 
@@ -133,30 +116,24 @@ def calculate_cumulative_position_stats(roster_players, rotations):
                 continue
 
             players_in_this_rotation = set()
-            # Iterate through each inning in the rotation
             for inning, positions in innings_data.items():
-                # Iterate through each position assignment in the inning
                 for position, player_name in positions.items():
-                    # Add the player to a set for this rotation.
-                    # We only count a player once per position per game rotation.
                     player_position_tuple = (player_name, position)
 
                     if player_name in stats and player_position_tuple not in players_in_this_rotation:
                         stats[player_name][position] = stats[player_name].get(position, 0) + 1
                         players_in_this_rotation.add(player_position_tuple)
 
-            # Mark this game/rotation as counted
             game_rotations_counted.add(rotation_key)
 
         except Exception:
-            # Safely skip any rotation that has malformed data
             continue
     return stats
 
 def calculate_pitch_count_summary(roster, all_outings, rules):
     """Calculates the daily/weekly pitch counts and availability for all pitchers."""
     summary = {}
-    today = date.today()
+    today = datetime.utcnow().date()
     for player in roster:
         try:
             player_outings = sorted([o for o in all_outings if o.player_id == player.id and isinstance(o.date, (datetime, date))], key=lambda x: x.date, reverse=True)
@@ -171,15 +148,13 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                 last_outing = player_outings[0]
                 last_outing_date = last_outing.date.date()
 
-                # Sum pitches on the last day the pitcher threw
                 pitches_on_last_day = sum(o.pitches or 0 for o in player_outings if o.date.date() == last_outing_date)
 
-                # Determine rest days based on the total pitches on that day
                 for threshold, rest_days in rules.get('rest_thresholds', []):
                     if pitches_on_last_day <= threshold:
                         required_rest = rest_days
                         break
-                else: # If pitch count is over the highest threshold
+                else:
                     if rules.get('rest_thresholds'):
                         required_rest = rules['rest_thresholds'][-1][1] + 1
 
@@ -189,14 +164,11 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                     status = 'Resting'
                     next_available_str = next_available_date.strftime('%a, %b %d')
 
-                # New logic: If the last outing was today, check if they can still pitch.
                 if last_outing_date == today:
                     if daily_pitches < rules.get('max_daily', 85):
                         status = 'Available'
                         next_available_str = 'Today'
                     else:
-                        # They've hit their daily max, so they are resting.
-                        # The next_available_date calculated earlier is correct.
                         status = 'Resting'
                         next_available_str = next_available_date.strftime('%a, %b %d')
 

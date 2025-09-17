@@ -5,10 +5,10 @@ from models import (
 from db import db
 from extensions import socketio
 from datetime import datetime
+from utils import parse_date
 
 team_management_bp = Blueprint('team_management', __name__, template_folder='templates')
 
-# --- Collaboration Notes Routes ---
 @team_management_bp.route('/add_note/<note_type>', methods=['POST'])
 def add_note(note_type):
     if note_type not in ['player_notes', 'team_notes']:
@@ -25,7 +25,7 @@ def add_note(note_type):
         note_type=note_type, 
         text=note_text, 
         author=author_name, 
-        timestamp=datetime.now(),
+        timestamp=datetime.utcnow(),
         team_id=session['team_id']
     )
 
@@ -78,17 +78,15 @@ def delete_note(note_type, note_id):
         flash('Note not found or invalid note type.', 'danger')
     return redirect(url_for('home', _anchor='collaboration'))
 
-# --- Practice Plan Routes ---
 @team_management_bp.route('/add_practice_plan', methods=['POST'])
 def add_practice_plan():
     plan_date_str = request.form.get('plan_date')
     if not plan_date_str:
         flash('Practice date is required.', 'danger')
         return redirect(url_for('home', _anchor='practice_plan'))
-    try:
-        plan_date = datetime.strptime(plan_date_str, '%Y-%m-%d')
-    except ValueError:
-        flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+    plan_date = parse_date(plan_date_str)
+    if not plan_date:
+        flash('Invalid date format.', 'danger')
         return redirect(url_for('home', _anchor='practice_plan'))
 
     new_plan = PracticePlan(
@@ -113,10 +111,11 @@ def edit_practice_plan(plan_id):
     if plan_to_edit and plan_to_edit.team_id == session['team_id']:
         plan_date_str = request.form.get('plan_date')
         if plan_date_str:
-            try:
-                plan_to_edit.date = datetime.strptime(plan_date_str, '%Y-%m-%d')
-            except ValueError:
-                flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
+            plan_date = parse_date(plan_date_str)
+            if plan_date:
+                plan_to_edit.date = plan_date
+            else:
+                flash('Invalid date format.', 'danger')
                 return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
         plan_to_edit.general_notes = request.form.get('general_notes', plan_to_edit.general_notes)
@@ -167,7 +166,6 @@ def update_practice_attendance(plan_id):
     socketio.emit('data_updated', {'message': f'Attendance updated for plan {plan_id}.'})
     return redirect(url_for('home', _anchor=f'plan-{plan_id}'))
 
-# --- Practice Task Routes ---
 @team_management_bp.route('/add_task_to_plan/<int:plan_id>', methods=['POST'])
 def add_task_to_plan(plan_id):
     task_text = request.form.get('task_text')
@@ -186,7 +184,7 @@ def add_task_to_plan(plan_id):
         text=task_text, 
         status="pending", 
         author=author_name, 
-        timestamp=datetime.now(),
+        timestamp=datetime.utcnow(),
         practice_plan_id=plan.id
     )
     db.session.add(new_task)
@@ -231,7 +229,6 @@ def update_task_status(plan_id, task_id):
     socketio.emit('data_updated', {'message': 'Task status updated.'})
     return jsonify({'status': 'success', 'message': 'Task status updated.'})
 
-# --- Signs Routes ---
 @team_management_bp.route('/add_sign', methods=['POST'])
 def add_sign():
     sign_name = request.form.get('sign_name')
