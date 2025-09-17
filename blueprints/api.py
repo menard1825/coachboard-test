@@ -98,9 +98,6 @@ def get_rotations():
     rotations_db = db.session.query(Rotation).filter_by(team_id=team_id).all()
     return jsonify([model_to_dict(r) for r in rotations_db])
 
-from sqlalchemy import text
-from datetime import date
-
 @api_bp.route('/games')
 @login_required
 def get_games():
@@ -108,33 +105,8 @@ def get_games():
     if not team_id:
         return jsonify({"error": "Team not found"}), 404
 
-    try:
-        with db.engine.connect() as connection:
-            result = connection.execute(text(f"SELECT * FROM games WHERE team_id = :team_id"), {'team_id': team_id})
-            games = []
-            for row in result:
-                game_dict = dict(row._mapping)
-
-                # Handle date which might be a string or a date object
-                game_date = game_dict.get('date')
-                if isinstance(game_date, str):
-                    # If it's a string, parse it to a date object, then to ISO format
-                    game_dict['date'] = datetime.strptime(game_date.split(' ')[0], '%Y-%m-%d').date().isoformat()
-                elif isinstance(game_date, date):
-                    game_dict['date'] = game_date.isoformat()
-
-                games.append(game_dict)
-        return jsonify(games)
-    except Exception as e:
-        # Fallback to the original query if the raw query fails,
-        # but with an error handler to prevent a crash.
-        print(f"Raw SQL query failed, falling back to ORM. Error: {e}")
-        try:
-            games_db = db.session.query(Game).filter_by(team_id=team_id).all()
-            return jsonify([model_to_dict(g) for g in games_db])
-        except Exception as inner_e:
-            print(f"ORM query also failed. Error: {inner_e}")
-            return jsonify({"error": "Failed to retrieve games from the database.", "details": str(inner_e)}), 500
+    games_db = db.session.query(Game).filter_by(team_id=team_id).all()
+    return jsonify([model_to_dict(g) for g in games_db])
 
 @api_bp.route('/collaboration_notes')
 @login_required
