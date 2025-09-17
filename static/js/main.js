@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderGames() {
         const container = document.getElementById('games-list-container');
         if (!container) return;
-        const games = (AppState.full_data.games || []).sort((a,b) => b.date.localeCompare(a.date));
+        const games = (AppState.full_data.games || []).sort((a,b) => (b.date || '').localeCompare(a.date || ''));
         if (games.length === 0) { container.innerHTML = `<li class="list-group-item text-center text-muted">No games scheduled.</li>`; return; }
         container.innerHTML = games.map(game => {
             const lineup = AppState.full_data.lineups.find(l => l.associated_game_id === game.id);
