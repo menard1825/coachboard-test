@@ -8,7 +8,6 @@ from datetime import datetime
 roster_bp = Blueprint('roster', __name__, template_folder='templates')
 
 def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list, decoding from JSON if necessary."""
     if not player_order_data:
         return []
     if isinstance(player_order_data, list):
@@ -18,7 +17,7 @@ def get_player_order_as_list(player_order_data):
             return json.loads(player_order_data)
         except (json.JSONDecodeError, TypeError):
             return []
-    return [] # default to empty list
+    return []
 
 @roster_bp.route('/add_player', methods=['POST'])
 def add_player():
@@ -44,11 +43,11 @@ def add_player():
         pitcher_role=request.form.get('pitcher_role'),
         has_lessons="No",
         notes_author=session['username'],
-        notes_timestamp=datetime.now(),
+        notes_timestamp=datetime.utcnow(),
         team_id=session['team_id']
     )
     db.session.add(new_player)
-    db.session.flush() # Flush to get the new player's ID
+    db.session.flush()
 
     for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
         current_order = get_player_order_as_list(user_obj.player_order)
@@ -86,7 +85,7 @@ def update_player_inline(player_id):
     player_to_edit.notes = request.form.get('notes', player_to_edit.notes)
     player_to_edit.pitcher_role = request.form.get('pitcher_role', player_to_edit.pitcher_role)
     player_to_edit.notes_author = session['username']
-    player_to_edit.notes_timestamp = datetime.now()
+    player_to_edit.notes_timestamp = datetime.utcnow()
 
     db.session.commit()
     socketio.emit('data_updated', {'message': f'Player {new_name} updated.'})

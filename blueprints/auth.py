@@ -5,9 +5,8 @@ from db import db
 from sqlalchemy import func
 from datetime import datetime
 import json
-from utils import DEFAULT_TAB_ORDER
+from utils import DEFAULT_TAB_ORDER, parse_date
 
-# Define role constants for clarity
 HEAD_COACH = 'Head Coach'
 ASSISTANT_COACH = 'Assistant Coach'
 SUPER_ADMIN = 'Super Admin'
@@ -15,7 +14,6 @@ SUPER_ADMIN = 'Super Admin'
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
 
 def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list, decoding from JSON if necessary."""
     if not player_order_data:
         return []
     if isinstance(player_order_data, list):
@@ -25,7 +23,7 @@ def get_player_order_as_list(player_order_data):
             return json.loads(player_order_data)
         except (json.JSONDecodeError, TypeError):
             return []
-    return [] # default to empty list
+    return []
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -35,7 +33,7 @@ def login():
         user = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
 
         if user and check_password_hash(user.password_hash, password):
-            user.last_login = datetime.now()
+            user.last_login = datetime.utcnow()
             db.session.commit()
 
             session['logged_in'] = True

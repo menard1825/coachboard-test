@@ -4,22 +4,11 @@ from db import db
 from sqlalchemy import func, case, cast, Date
 from sqlalchemy.orm import joinedload
 from extensions import socketio
-from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
+from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, parse_date
 from datetime import datetime, date, timedelta
 from functools import wraps
 
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
-
-def parse_date(date_str):
-    """Tries to parse a date string with multiple formats."""
-    if not date_str:
-        return None
-    for fmt in ('%Y-%m-%d', '%A, %m/%d/%y, %I:%M %p', '%A, %m/%d/%y'):
-        try:
-            return datetime.strptime(date_str, fmt)
-        except ValueError:
-            pass
-    return None
 
 @pitching_bp.route('/add_pitching', methods=['POST'])
 def add_pitching():
@@ -28,7 +17,6 @@ def add_pitching():
     if game_id:
         game = db.session.get(Game, game_id)
 
-    # Validate form fields one by one to provide specific error messages
     try:
         pitch_count = int(request.form['pitches'])
     except (ValueError, KeyError):
@@ -46,11 +34,6 @@ def add_pitching():
         flash('A valid pitcher must be selected.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
     player_id = int(player_id)
-
-
-    if not player_id:
-        flash('A valid pitcher must be selected.', 'danger')
-        return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     pitch_date_str = request.form.get('pitch_date')
     pitch_date = parse_date(pitch_date_str)
@@ -137,7 +120,6 @@ def edit_pitching(outing_id):
         
     return redirect(url_for('pitching.pitching_page'))
 
-
 @pitching_bp.route('/delete_pitching/<int:outing_id>')
 def delete_pitching(outing_id):
     outing_to_delete = db.session.query(PitchingOuting).filter_by(id=outing_id, team_id=session['team_id']).first()
@@ -164,7 +146,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-
 @pitching_bp.route("/pitching", methods=["GET"])
 @login_required
 def pitching_page():
@@ -179,16 +160,9 @@ def pitching_page():
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(all_players, all_outings, rules)
 
-    # Get players designated as pitchers by their role
     designated_pitchers = {p.id: p for p in all_players if p.pitcher_role != 'Not a Pitcher'}
-
-    # Get players who have any pitching outings logged
     players_with_outings = {o.player_id: o.player for o in all_outings if o.player is not None}
-
-    # Combine the two lists (duplicates are handled automatically by using a dictionary)
     combined_pitchers_dict = {**designated_pitchers, **players_with_outings}
-
-    # This is the final list of all players who should be in the summary
     pitchers = list(combined_pitchers_dict.values())
 
     return render_template(
@@ -198,7 +172,6 @@ def pitching_page():
         current_team=team,
         pitchers=pitchers
     )
-
 
 @pitching_bp.route('/rules')
 def pitching_rules():
