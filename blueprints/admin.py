@@ -122,11 +122,12 @@ def add_user():
 def delete_user(username):
     user_to_delete = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
     if user_to_delete:
-        # MODIFIED: Check against the user's role instead of hardcoded username
+        # Prevent deletion of the last Super Admin
         if user_to_delete.role == SUPER_ADMIN:
-            flash("A Super Admin cannot be deleted.", "danger")
-            return redirect(url_for('.user_management'))
-            
+            if db.session.query(User).filter_by(role=SUPER_ADMIN).count() <= 1:
+                flash("You cannot delete the last Super Admin.", "danger")
+                return redirect(url_for('.user_management'))
+
         if session.get('role') == HEAD_COACH and user_to_delete.team_id != session.get('team_id'):
             flash('You do not have permission to delete this user.', 'danger')
             return redirect(url_for('.user_management'))

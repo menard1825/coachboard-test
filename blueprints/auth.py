@@ -5,6 +5,7 @@ from db import db
 from sqlalchemy import func
 from datetime import datetime
 import json
+from utils import DEFAULT_TAB_ORDER
 
 # Define role constants for clarity
 HEAD_COACH = 'Head Coach'
@@ -83,7 +84,6 @@ def register():
         user_role = HEAD_COACH if is_first_user else ASSISTANT_COACH
 
         hashed_password = generate_password_hash(password)
-        default_tab_keys = ['roster', 'player_development', 'games', 'pitching', 'practice_plan', 'collaboration']
 
         new_user = User(
             username=username,
@@ -91,7 +91,7 @@ def register():
             password_hash=hashed_password,
             role=user_role,
             team_id=team.id,
-            tab_order=json.dumps(default_tab_keys),
+            tab_order=json.dumps(DEFAULT_TAB_ORDER),
             player_order=[]
         )
         db.session.add(new_user)

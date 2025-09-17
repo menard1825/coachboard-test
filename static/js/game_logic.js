@@ -23,15 +23,7 @@ function initializeGameManagement(gameData) {
         sortableInstances: {}
     };
 
-    // ADD THIS BLOCK TO FIX THE INNINGS BUG
-    if (state.rotation && typeof state.rotation.innings === 'string') {
-        try {
-            state.rotation.innings = JSON.parse(state.rotation.innings);
-        } catch (e) {
-            console.error("Error parsing rotation.innings JSON:", e);
-            state.rotation.innings = { '1': {} }; // Default to a valid object on failure
-        }
-    }
+    // This block is no longer needed as the backend now correctly sends a JSON object.
 
     let assignPlayerModal;
     let lineupEditorModal;

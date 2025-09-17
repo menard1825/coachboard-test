@@ -3,6 +3,7 @@ from db import db
 from models import Team, User
 from werkzeug.security import generate_password_hash
 import json
+from utils import DEFAULT_TAB_ORDER
 
 # Create an application instance to work with
 app = create_app()
@@ -45,7 +46,6 @@ def initialize_database():
             if not admin_user:
                 print(f"Creating Super Admin user: {SUPER_ADMIN_USERNAME}")
                 hashed_password = generate_password_hash(SUPER_ADMIN_PASSWORD)
-                default_tab_keys = ['roster', 'player_development', 'lineups', 'pitching', 'scouting_list', 'rotations', 'games', 'collaboration', 'practice_plan', 'signs']
                 
                 new_user = User(
                     username=SUPER_ADMIN_USERNAME,
@@ -53,7 +53,7 @@ def initialize_database():
                     password_hash=hashed_password,
                     role='Super Admin',
                     team_id=team.id,
-                    tab_order=json.dumps(default_tab_keys),
+                    tab_order=json.dumps(DEFAULT_TAB_ORDER),
                     player_order=[]
                 )
                 db.session.add(new_user)

@@ -3,17 +3,54 @@ from datetime import date, timedelta, datetime
 from sqlalchemy import func
 from models import Player, PitchingOuting
 
+# --- Constants ---
+DEFAULT_TAB_ORDER = ['roster', 'player_development', 'lineups', 'pitching', 'scouting_list', 'rotations', 'games', 'collaboration', 'practice_plan', 'signs']
+PITCHING_RULES = {
+    'USSSA': {
+        '4U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
+        '5U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
+        '6U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
+        '7U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
+        '8U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
+        '9U': {'max_daily': 75, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '10U': {'max_daily': 75, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '11U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '12U': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '13U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        '14U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
+        'default': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]}
+    }
+    # You could add other rule sets like 'Little League' here in the future
+}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+
+
+# --- Helper Functions ---
 def model_to_dict(obj):
-    """Converts a SQLAlchemy model instance into a dictionary."""
+    """
+    Converts a SQLAlchemy model instance into a dictionary,
+    correctly handling date/datetime objects and JSON strings.
+    """
     if obj is None:
         return None
 
     d = {}
     for column in obj.__table__.columns:
         val = getattr(obj, column.name)
+
+        # Format dates and datetimes
         if isinstance(val, (datetime, date)):
-            # Format dates and datetimes as 'YYYY-MM-DD'
-            d[column.name] = val.strftime('%Y-%m-%d')
+            d[column.name] = val.isoformat()
+        # Parse JSON strings into objects/arrays
+        elif isinstance(val, str) and column.name in ['innings', 'lineup_positions', 'tab_order', 'player_order', 'tasks', 'absences']:
+            try:
+                d[column.name] = json.loads(val)
+            except (json.JSONDecodeError, TypeError):
+                # If parsing fails, default to a sensible empty type
+                if 'positions' in column.name or 'order' in column.name or 'tasks' in column.name or 'absences' in column.name:
+                    d[column.name] = []
+                else:
+                    d[column.name] = {}
         else:
             d[column.name] = val
     return d
