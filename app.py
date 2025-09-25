@@ -117,17 +117,21 @@ def create_app():
         all_tabs = {'overview': 'Overview', 'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineup Templates', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotation Templates', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
         default_tab_order = list(all_tabs.keys())
 
-        final_tab_order = []
         try:
             user_tab_order = json.loads(user.tab_order or '[]')
             if not isinstance(user_tab_order, list) or not user_tab_order:
+                # If loaded order is invalid or empty, use the default.
                 final_tab_order = default_tab_order
             else:
+                # Use the user's saved order.
                 final_tab_order = user_tab_order
+                # Add any tabs from the default list that might be missing from the user's saved list
+                # (e.g., if new features were added).
                 for tab in default_tab_order:
                     if tab not in final_tab_order:
                         final_tab_order.append(tab)
         except (json.JSONDecodeError, TypeError):
+            # If JSON is malformed or not a string, fall back to the default order.
             final_tab_order = default_tab_order
 
         response = make_response(render_template('index.html',

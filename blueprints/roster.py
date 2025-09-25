@@ -2,7 +2,6 @@ from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
 from models import Player, User
 from db import db
 from extensions import socketio
-import json
 from datetime import datetime
 
 roster_bp = Blueprint('roster', __name__, template_folder='templates')
@@ -22,10 +21,25 @@ def get_player_order_as_list(player_order_data):
 
 @roster_bp.route('/add_player', methods=['POST'])
 def add_player():
-    name = request.form.get('name')
+    name = request.form.get('name', '').strip()
+    number_str = request.form.get('number')
+
+    # --- VALIDATION START ---
     if not name:
         flash('Player name is required.', 'danger')
         return redirect(url_for('home', _anchor='roster'))
+
+    if len(name) > 50:
+        flash('Player name cannot exceed 50 characters.', 'danger')
+        return redirect(url_for('home', _anchor='roster'))
+
+    if number_str:
+        try:
+            int(number_str)
+        except ValueError:
+            flash('Jersey number must be a valid number.', 'danger')
+            return redirect(url_for('home', _anchor='roster'))
+    # --- VALIDATION END ---
 
     existing_player = db.session.query(Player).filter_by(name=name, team_id=session['team_id']).first()
     if existing_player:
@@ -34,7 +48,7 @@ def add_player():
 
     new_player = Player(
         name=name,
-        number=request.form.get('number'),
+        number=number_str,
         position1=request.form.get('position1'),
         position2=request.form.get('position2'),
         position3=request.form.get('position3'),
@@ -48,18 +62,29 @@ def add_player():
         team_id=session['team_id']
     )
     db.session.add(new_player)
-    db.session.flush() # Flush to get the new player's ID
+    db.session.flush()
 
+    # Add the new player's name to the player_order for all users on the team
     for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
         current_order = get_player_order_as_list(user_obj.player_order)
-        if new_player.id not in current_order:
-            current_order.append(new_player.id)
+        if new_player.name not in current_order:
+            current_order.append(new_player.name)
             user_obj.player_order = current_order
+
+    # --- CORRECTED FIX: Update the current user's session with the player's name ---
+    if 'player_order' in session:
+        session_order = get_player_order_as_list(session['player_order'])
+        if new_player.name not in session_order:
+            session_order.append(new_player.name)
+            session['player_order'] = session_order
+            session.modified = True
+    # --- END FIX ---
 
     db.session.commit()
     flash(f'Player "{name}" added successfully!', 'success')
-    socketio.emit('data_updated', {'message': f'Player {name} added.'})
-    
+    # MODIFICATION: Changed to emit a specific event for adding a player
+    socketio.emit('roster_add', {'player': new_player.to_dict()})
+
     if 'X-Requested-With' in request.headers and request.headers['X-Requested-With'] == 'XMLHttpRequest':
          return jsonify({'status': 'success'})
 
@@ -107,7 +132,7 @@ def delete_player(player_id):
         
         if 'player_order' in session:
             session_order = get_player_order_as_list(session['player_order'])
-            session['player_order'] = [pid for pid in session_order if pid != player_id_to_delete]
+            session['player_order'] = [name for name in session_order if name != player_name]
             session.modified = True
 
         db.session.commit()

@@ -1,25 +1,14 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, render_template
 from models import PitchingOuting, Team, Game, Player
 from db import db
-from sqlalchemy import func, case, cast, Date
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from extensions import socketio
-from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
+from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, parse_date
 from datetime import datetime, date, timedelta
 from functools import wraps
 
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
-
-def parse_date(date_str):
-    """Tries to parse a date string with multiple formats."""
-    if not date_str:
-        return None
-    for fmt in ('%Y-%m-%d', '%A, %m/%d/%y, %I:%M %p', '%A, %m/%d/%y'):
-        try:
-            return datetime.strptime(date_str, fmt)
-        except ValueError:
-            pass
-    return None
 
 @pitching_bp.route('/add_pitching', methods=['POST'])
 def add_pitching():
@@ -86,7 +75,7 @@ def add_pitching():
     )
     db.session.add(new_outing)
     db.session.commit()
-    flash(f'Pitching outing for "{player.full_name}" added successfully!', 'success')
+    flash(f'Pitching outing for "{player.name}" added successfully!', 'success')
     socketio.emit('pitching_update', {'message': 'New pitching outing added.'})
     
     if game_id:
@@ -114,9 +103,10 @@ def edit_pitching(outing_id):
         if player_id:
             outing_to_edit.player_id = int(player_id)
         else:
-            pitcher_name = request.form.get('pitcher')
-            if pitcher_name:
-                player = db.session.query(Player).filter(func.lower(Player.name) == func.lower(pitcher_name), Player.team_id == session['team_id']).first()
+            # Standardize to 'player_name' for consistency, though this is a fallback
+            player_name = request.form.get('player_name')
+            if player_name:
+                player = db.session.query(Player).filter(func.lower(Player.name) == func.lower(player_name), Player.team_id == session['team_id']).first()
                 if player:
                     outing_to_edit.player_id = player.id
 
@@ -127,7 +117,7 @@ def edit_pitching(outing_id):
         outing_to_edit.outing_type = request.form.get('outing_type', outing_to_edit.outing_type)
         
         db.session.commit()
-        flash(f'Successfully updated outing for {outing_to_edit.player.full_name}.', 'success')
+        flash(f'Successfully updated outing for {outing_to_edit.player.name}.', 'success')
         socketio.emit('pitching_update', {'message': 'Pitching outing updated.'})
     except ValueError:
         flash('Invalid number format for pitches or innings.', 'danger')
@@ -142,7 +132,7 @@ def edit_pitching(outing_id):
 def delete_pitching(outing_id):
     outing_to_delete = db.session.query(PitchingOuting).filter_by(id=outing_id, team_id=session['team_id']).first()
     if outing_to_delete:
-        player_name = outing_to_delete.player.full_name if outing_to_delete.player else "An unknown player"
+        player_name = outing_to_delete.player.name if outing_to_delete.player else "An unknown player"
         db.session.delete(outing_to_delete)
         db.session.commit()
         flash(f'Pitching outing for "{player_name}" removed successfully!', 'success')

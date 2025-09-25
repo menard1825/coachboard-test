@@ -5,7 +5,7 @@ from models import (
 from db import db
 from extensions import socketio
 from datetime import datetime
-from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
+from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict, parse_date
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 
@@ -36,12 +36,14 @@ def game_management(game_id):
     lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
     rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
     
-    # MODIFIED: Optimized query to filter in the database
-    all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all() # Keep for summary stats
-    game_pitching_log = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(
-        team_id=team.id,
-        opponent=game.opponent
-    ).filter(db.func.date(PitchingOuting.date) == game.date.date()).all()
+    # Fetch all pitching outings for the team once to be used for both summary stats and the game log.
+    all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all()
+
+    # Filter the outings in Python to get the game-specific log, reducing database queries.
+    game_pitching_log = [
+        o for o in all_pitching_outings
+        if o.opponent == game.opponent and o.date.date() == game.date.date()
+    ]
 
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
     absent_player_ids = [absence.player_id for absence in absences]
@@ -73,24 +75,41 @@ def game_management(game_id):
 
 @gameday_bp.route('/add_game', methods=['POST'])
 def add_game():
-    game_date_str = request.form['game_date']
-    try:
-        game_date = datetime.strptime(game_date_str, '%Y-%m-%d')
-    except ValueError:
+    game_date_str = request.form.get('game_date')
+    opponent = request.form.get('game_opponent', '').strip()
+    location = request.form.get('game_location', '').strip()
+    game_notes = request.form.get('game_notes', '').strip()
+
+    # --- VALIDATION START ---
+    game_date = parse_date(game_date_str)
+    if not game_date:
         flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
         return redirect(url_for('home', _anchor='games'))
 
+    if not opponent:
+        flash('Opponent name is required.', 'danger')
+        return redirect(url_for('home', _anchor='games'))
+
+    if len(opponent) > 100:
+        flash('Opponent name cannot exceed 100 characters.', 'danger')
+        return redirect(url_for('home', _anchor='games'))
+
+    if len(location) > 100:
+        flash('Location cannot exceed 100 characters.', 'danger')
+        return redirect(url_for('home', _anchor='games'))
+    # --- VALIDATION END ---
+
     new_game = Game(
         date=game_date,
-        opponent=request.form['game_opponent'], 
-        location=request.form.get('game_location', ''),
-        game_notes=request.form.get('game_notes', ''),
+        opponent=opponent,
+        location=location,
+        game_notes=game_notes,
         team_id=session['team_id']
     )
     db.session.add(new_game)
     db.session.commit()
     flash(f'Game vs "{new_game.opponent}" on {new_game.date.strftime("%m/%d/%Y")} added successfully!', 'success')
-    socketio.emit('data_updated', {'message': 'New game added.'})
+    socketio.emit('game_add', {'game': new_game.to_dict()})
     return redirect(url_for('gameday.game_management', game_id=new_game.id))
 
 @gameday_bp.route('/edit_game/<int:game_id>', methods=['POST'])
@@ -102,18 +121,32 @@ def edit_game(game_id):
 
     game_date_str = request.form.get('game_date')
     if game_date_str:
-        try:
-            game_to_edit.date = datetime.strptime(game_date_str, '%Y-%m-%d')
-        except ValueError:
+        parsed_date = parse_date(game_date_str)
+        if parsed_date:
+            game_to_edit.date = parsed_date
+        else:
             flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
             return redirect(url_for('.game_management', game_id=game_id))
 
-    game_to_edit.opponent = request.form.get('game_opponent', game_to_edit.opponent)
-    game_to_edit.location = request.form.get('game_location', game_to_edit.location)
-    game_to_edit.game_notes = request.form.get('game_notes', game_to_edit.game_notes)
+    opponent = request.form.get('game_opponent', '').strip()
+    location = request.form.get('game_location', '').strip()
+
+    if not opponent:
+        flash('Opponent name is required.', 'danger')
+        return redirect(url_for('.game_management', game_id=game_id))
+    if len(opponent) > 100:
+        flash('Opponent name cannot exceed 100 characters.', 'danger')
+        return redirect(url_for('.game_management', game_id=game_id))
+    if len(location) > 100:
+        flash('Location cannot exceed 100 characters.', 'danger')
+        return redirect(url_for('.game_management', game_id=game_id))
+
+    game_to_edit.opponent = opponent
+    game_to_edit.location = location
+    game_to_edit.game_notes = request.form.get('game_notes', '').strip()
     db.session.commit()
     flash('Game details updated successfully!', 'success')
-    socketio.emit('data_updated', {'message': 'Game details updated.'})
+    socketio.emit('game_update', {'game': game_to_edit.to_dict()})
     return redirect(url_for('.game_management', game_id=game_id))
 
 @gameday_bp.route('/delete_game/<int:game_id>')

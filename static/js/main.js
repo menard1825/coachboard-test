@@ -347,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
                             data-outing-id="${o.id}"
                             data-date="${o.date}"
-                            data-pitcher="${escapeHTML(o.player_name)}"
+                            data-player-name="${escapeHTML(o.player_name)}"
                             data-opponent="${escapeHTML(o.opponent)}"
                             data-pitches="${o.pitches}"
                             data-innings="${o.innings}"
@@ -1134,7 +1134,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 .map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`)
                 .join('');
             
-            const pitcherIdToSelect = AppState.full_data.roster.find(p => p.name === btn.dataset.pitcher)?.id;
+            const pitcherIdToSelect = AppState.full_data.roster.find(p => p.name === btn.dataset.playerName)?.id;
             if (pitcherIdToSelect) {
                 pitcherSelect.value = pitcherIdToSelect;
             }

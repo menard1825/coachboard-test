@@ -3,6 +3,24 @@ from datetime import date, timedelta, datetime
 from sqlalchemy import func
 from models import Player, PitchingOuting
 
+def parse_date(date_str):
+    """Tries to parse a date string with multiple formats, returning a datetime object."""
+    if not date_str:
+        return None
+    # Add more formats here as needed throughout the app
+    for fmt in (
+        '%Y-%m-%d',                 # Used in gameday forms
+        '%A, %m/%d/%y, %I:%M %p',   # Used in pitching forms (full datetime)
+        '%A, %m/%d/%y',             # Used in pitching forms (date only)
+        '%Y-%m-%d %H:%M:%S',        # Used in data migration
+        '%Y-%m-%d %H:%M'            # Used in data migration
+    ):
+        try:
+            return datetime.strptime(date_str, fmt)
+        except (ValueError, TypeError):
+            pass
+    return None
+
 def model_to_dict(obj):
     """Converts a SQLAlchemy model instance into a dictionary."""
     if obj is None:

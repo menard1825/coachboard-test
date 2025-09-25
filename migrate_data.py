@@ -1,5 +1,5 @@
 import json
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from models import Team, User, Player, Lineup, PitchingOuting, ScoutedPlayer, \
                    Rotation, Game, CollaborationNote, PracticePlan, PracticeTask, \
@@ -131,9 +131,13 @@ try:
         else:
             print(f"Player {p_data['name']} already exists for this team, skipping.")
             # Ensure the player_name_to_id_map is up to date even for existing players
-            existing_player_obj = session.query(Player).filter_by(name=p_data['name'], team_id=new_team_id).first()
+            existing_player_obj = session.query(Player).filter(
+                func.lower(Player.name) == p_data['name'].lower(),
+                Player.team_id == new_team_id
+            ).first()
             if existing_player_obj:
-                player_name_to_id_map[existing_player_obj.name] = existing_player_obj.id
+                # Use the name from the JSON data as the key, as this is what will be used for lookups later.
+                player_name_to_id_map[p_data['name']] = existing_player_obj.id
 
 
     # --- FULL SCRIPT RESUMES HERE ---
