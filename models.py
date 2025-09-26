@@ -87,10 +87,15 @@ class Lineup(db.Model):
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     lineup_positions = Column(JSON) # Changed to JSON
-    associated_game_id = Column(Integer)
+
+    # UPDATED: associated_game_id is now a ForeignKey
+    associated_game_id = Column(Integer, ForeignKey('games.id'))
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="lineups")
+
+    # ADDED: Relationship back to the Game model
+    game = relationship("Game", back_populates="lineups")
 
 class PitchingOuting(db.Model):
     __tablename__ = 'pitching_outings'
@@ -143,10 +148,15 @@ class Rotation(db.Model):
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     innings = Column(JSON) # Changed to JSON
-    associated_game_id = Column(Integer, nullable=True)
+
+    # UPDATED: associated_game_id is now a ForeignKey
+    associated_game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
+
+    # ADDED: Relationship back to the Game model
+    game = relationship("Game", back_populates="rotations")
 
 class Game(db.Model):
     __tablename__ = 'games'
@@ -162,6 +172,10 @@ class Game(db.Model):
     team = relationship("Team", back_populates="games")
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
     
+    # ADDED RELATIONSHIPS WITH CASCADE DELETE
+    lineups = relationship("Lineup", back_populates="game", cascade="all, delete-orphan")
+    rotations = relationship("Rotation", back_populates="game", cascade="all, delete-orphan")
+
     def to_dict(self):
         """Return a dictionary representation of the Game object."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
