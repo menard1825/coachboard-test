@@ -94,8 +94,8 @@ def calculate_cumulative_pitching_stats(player_id, all_outings):
 def calculate_cumulative_position_stats(roster_players, rotations):
     """Calculates the number of innings a player appeared at each position in a rotation."""
     stats = {player.name: {} for player in roster_players}
+    print("--- Starting Position Stat Calculation ---")
 
-    # Create a set to track which game rotations have been processed to avoid double-counting.
     game_rotations_counted = set()
 
     for rotation in rotations:
@@ -107,22 +107,25 @@ def calculate_cumulative_position_stats(roster_players, rotations):
         try:
             innings_data = rotation.innings or {}
             if not isinstance(innings_data, dict):
+                print(f"Skipping rotation ID {rotation.id} due to invalid innings data.")
                 continue
 
-            # Iterate through each inning in the rotation
+            print(f"\nProcessing Rotation ID: {rotation.id}, Title: {rotation.title}, Game ID: {rotation.associated_game_id}")
+
             for inning, positions in innings_data.items():
-                # Iterate through each position assignment in the inning
+                print(f"  Inning {inning}:")
                 for position, player_name in positions.items():
+                    print(f"    - {player_name} at {position}")
                     if player_name in stats:
-                        # Increment the count for the position for each inning they played it.
                         stats[player_name][position] = stats[player_name].get(position, 0) + 1
 
-            # Mark this game/rotation as counted
             game_rotations_counted.add(rotation_key)
 
-        except Exception:
-            # Safely skip any rotation that has malformed data
+        except Exception as e:
+            print(f"Error processing rotation ID {rotation.id}: {e}")
             continue
+
+    print("\n--- Finished Position Stat Calculation ---")
     return stats
 
 def calculate_pitch_count_summary(roster, all_outings, rules):
