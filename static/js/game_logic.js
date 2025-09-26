@@ -68,13 +68,20 @@ function initializeGameManagement(gameData) {
     function renderRotationDiamondAndBench() {
         const currentInningData = state.rotation.innings[state.currentInning] || {};
 
-        // Note: The original createPlayerTag is now modified to accept a player object
         const createPlayerTag = (player) => {
             const primaryPos = player.position1 ? ` (${escapeHTML(player.position1)})` : '';
             return `<div class="player-tag" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
         };
 
-        // Modify the rendering of player tags on the diamond to pass the full player object
+        const createMobileBenchPlayerItem = (player) => {
+            const primaryPos = player.position1 || 'N/A';
+            const secondaryPos = player.position2 || 'N/A';
+            return `<div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${escapeHTML(player.name)}</span>
+                    <small class="text-muted">Pos: ${escapeHTML(primaryPos)} / ${escapeHTML(secondaryPos)}</small>
+                </div>`;
+        };
+
         document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => tag.remove());
         for (const [pos, playerName] of Object.entries(currentInningData)) {
             const player = state.roster.find(p => p.name === playerName);
@@ -86,16 +93,24 @@ function initializeGameManagement(gameData) {
             }
         }
 
-        // Update the bench rendering logic
         const assignedPlayers = new Set(Object.values(currentInningData));
         const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
+
         const benchDesktop = document.getElementById('bench-list-desktop');
         if(benchDesktop) {
-            // Pass the full player object to the updated createPlayerTag function
             benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p)).join('');
         }
 
-        applyOutOfPositionIndicators(); // Add this line at the end
+        const benchMobile = document.getElementById('bench-list-mobile');
+        if (benchMobile) {
+            benchMobile.innerHTML = benchPlayers.length > 0 ? benchPlayers.map(p => createMobileBenchPlayerItem(p)).join('') : '<div class="list-group-item text-muted">All players are on the field.</div>';
+        }
+        const mobileInningNumber = document.getElementById('mobile-bench-inning-number');
+        if(mobileInningNumber){
+            mobileInningNumber.textContent = state.currentInning;
+        }
+
+        applyOutOfPositionIndicators();
     }
 
     function updatePlayingTimeSummary() {
