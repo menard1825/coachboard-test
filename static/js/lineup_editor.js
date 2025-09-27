@@ -1,7 +1,23 @@
 // static/js/lineup_editor.js
 
-// Using a global function for now, assuming this file is loaded via a script tag.
-// A more robust solution might use ES6 modules.
+/**
+ * NEW: A debounce function to delay execution.
+ * This prevents the save function from being called on every single change,
+ * instead waiting for a pause in user activity.
+ * @param {Function} func The function to debounce.
+ * @param {number} delay The delay in milliseconds.
+ * @returns {Function} The debounced function.
+ */
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+}
+
+
 function initializeLineupEditor(options) {
     const {
         roster,
@@ -10,23 +26,24 @@ function initializeLineupEditor(options) {
         orderEl
     } = options;
 
-    // FIX: Ensure lineup_positions is always a valid array, parsing from JSON if necessary.
-    if (typeof lineup.lineup_positions === 'string') {
+    // NEW: State object to manage lineup data and save status
+    const state = {
+        lineupData: lineup,
+        hasUnsavedChanges: false
+    };
+
+    if (typeof state.lineupData.lineup_positions === 'string') {
         try {
-            // Attempt to parse the string as JSON.
-            lineup.lineup_positions = JSON.parse(lineup.lineup_positions);
-            // Further check if the parsed result is actually an array.
-            if (!Array.isArray(lineup.lineup_positions)) {
-                lineup.lineup_positions = [];
+            state.lineupData.lineup_positions = JSON.parse(state.lineupData.lineup_positions);
+            if (!Array.isArray(state.lineupData.lineup_positions)) {
+                state.lineupData.lineup_positions = [];
             }
         } catch (e) {
             console.error("Error parsing lineup_positions JSON:", e);
-            // If parsing fails, default to an empty array.
-            lineup.lineup_positions = [];
+            state.lineupData.lineup_positions = [];
         }
-    } else if (!Array.isArray(lineup.lineup_positions)) {
-        // If it's not a string and not an array (e.g., null, undefined), default to an empty array.
-        lineup.lineup_positions = [];
+    } else if (!Array.isArray(state.lineupData.lineup_positions)) {
+        state.lineupData.lineup_positions = [];
     }
 
     // --- Utility Functions ---
@@ -66,11 +83,78 @@ function initializeLineupEditor(options) {
         return item;
     }
 
+    // NEW: Auto-saving logic
+    const saveLineup = async (isManualSave = false) => {
+        const btn = document.getElementById('saveLineupBtn');
+        if (!btn) return;
+
+        // If this is a manual save from a "Save Failed" state, allow it. Otherwise, if there are no changes, do nothing.
+        if (!state.hasUnsavedChanges && !btn.classList.contains('btn-danger')) return;
+
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Saving...`;
+        btn.classList.remove('btn-success', 'btn-danger');
+
+        const lineupId = document.getElementById('lineupId').value;
+        const title = document.getElementById('lineupTitle').value;
+        const lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
+
+        state.lineupData.title = title;
+        state.lineupData.lineup_positions = lineup_positions;
+
+        const url = lineupId ? `/edit_lineup/${lineupId}` : '/add_lineup';
+        const payload = {
+            title: title,
+            lineup_data: lineup_positions,
+            // Determine if it's for a game or a template
+            associated_game_id: new URL(window.location.href).pathname.startsWith('/game/') ? state.lineupData.associated_game_id : null
+        };
+
+        try {
+            const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message);
+
+            if (result.new_id) {
+                state.lineupData.id = result.new_id;
+                document.getElementById('lineupId').value = result.new_id;
+            }
+
+            state.hasUnsavedChanges = false;
+            btn.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> Saved`;
+            btn.classList.add('btn-success');
+
+            // If it was a manual save, close the modal after success
+            if(isManualSave) {
+                setTimeout(() => bootstrap.Modal.getInstance(document.getElementById('lineupEditorModal')).hide(), 1000);
+            }
+
+        } catch (error) {
+            state.hasUnsavedChanges = true;
+            btn.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i> Save Failed`;
+            btn.classList.add('btn-danger');
+            alert(`Error saving lineup: ${error.message}. Your changes are still here. Please try saving again.`);
+        } finally {
+            btn.disabled = false;
+        }
+    };
+
+    const debouncedSave = debounce(() => saveLineup(false), 2000);
+
+    // NEW: Function to trigger a change
+    function handleContentChange() {
+        state.hasUnsavedChanges = true;
+        const saveBtn = document.getElementById('saveLineupBtn');
+        saveBtn.innerHTML = 'Save Lineup';
+        saveBtn.classList.remove('btn-success', 'btn-danger');
+        debouncedSave();
+    }
+
     function renderLineup() {
         benchEl.innerHTML = '';
         orderEl.innerHTML = '';
 
-        const lineupPlayerNames = new Set(lineup.lineup_positions || []);
+        const lineupPlayerNames = new Set(state.lineupData.lineup_positions || []);
 
         roster.forEach(player => {
             if (!lineupPlayerNames.has(player.name)) {
@@ -78,7 +162,7 @@ function initializeLineupEditor(options) {
             }
         });
 
-        (lineup.lineup_positions || []).forEach(playerName => {
+        (state.lineupData.lineup_positions || []).forEach(playerName => {
             const player = roster.find(p => p.name === playerName);
             if (player) {
                 orderEl.appendChild(createBattingOrderItem(player));
@@ -88,131 +172,71 @@ function initializeLineupEditor(options) {
     }
 
     function updatePlaceholders() {
-        // Remove existing placeholders
         benchEl.querySelector('.placeholder-text')?.remove();
         orderEl.querySelector('.placeholder-text')?.remove();
 
-        // Add placeholder to order list if empty
         if (orderEl.children.length === 0) {
             orderEl.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text"><i class="bi bi-people" style="font-size: 2rem;"></i><p class="mt-2 mb-0">Drag players from the bench to build the batting order.</p></div>`;
         }
 
-        // Add placeholder to bench list if empty
         if (benchEl.children.length === 0) {
             benchEl.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text"><i class="bi bi-check-circle" style="font-size: 2rem;"></i><p class="mt-2 mb-0">All available players are in the lineup.</p></div>`;
         }
     }
 
     function setupEventListeners() {
-        orderEl.addEventListener('click', (event) => {
-            const moveUpButton = event.target.closest('.move-up-btn');
-            const moveDownButton = event.target.closest('.move-down-btn');
-            const removeButton = event.target.closest('.remove-player-btn');
-            const playerItem = event.target.closest('.list-group-item');
+        // Listen for changes on the title input
+        document.getElementById('lineupTitle').addEventListener('input', handleContentChange);
 
+        orderEl.addEventListener('click', (event) => {
+            const playerItem = event.target.closest('.list-group-item');
             if (!playerItem) return;
 
             const index = Array.from(orderEl.children).indexOf(playerItem);
 
-            if (moveUpButton) {
+            if (event.target.closest('.move-up-btn')) {
                 if (index > 0) {
-                    [lineup.lineup_positions[index], lineup.lineup_positions[index - 1]] = [lineup.lineup_positions[index - 1], lineup.lineup_positions[index]];
-                    renderLineup();
+                    [state.lineupData.lineup_positions[index], state.lineupData.lineup_positions[index - 1]] = [state.lineupData.lineup_positions[index - 1], state.lineupData.lineup_positions[index]];
                 }
-            } else if (moveDownButton) {
-                if (index < lineup.lineup_positions.length - 1) {
-                    [lineup.lineup_positions[index], lineup.lineup_positions[index + 1]] = [lineup.lineup_positions[index + 1], lineup.lineup_positions[index]];
-                    renderLineup();
+            } else if (event.target.closest('.move-down-btn')) {
+                if (index < state.lineupData.lineup_positions.length - 1) {
+                    [state.lineupData.lineup_positions[index], state.lineupData.lineup_positions[index + 1]] = [state.lineupData.lineup_positions[index + 1], state.lineupData.lineup_positions[index]];
                 }
-            } else if (removeButton) {
-                const playerName = playerItem.dataset.playerName;
-                const player = roster.find(p => p.name === playerName);
+            } else if (event.target.closest('.remove-player-btn')) {
+                state.lineupData.lineup_positions.splice(index, 1);
+            } else {
+                return; // No relevant button was clicked
+            }
 
-                if (player) {
-                    // Update state
-                    lineup.lineup_positions = lineup.lineup_positions.filter(p => p !== playerName);
+            handleContentChange();
+            renderLineup();
+        });
 
-                    // Manipulate DOM directly
-                    const newBenchItem = createBenchPlayerItem(player);
-                    benchEl.appendChild(newBenchItem);
-                    playerItem.remove();
+        // Manual save button
+        document.getElementById('saveLineupBtn').addEventListener('click', () => saveLineup(true));
 
-                    updatePlaceholders();
+        // Safeguard for leaving the page
+        const modal = document.getElementById('lineupEditorModal');
+        modal.addEventListener('hide.bs.modal', (event) => {
+            if (state.hasUnsavedChanges) {
+                if (!confirm('You have unsaved changes. Are you sure you want to close?')) {
+                    event.preventDefault();
                 }
             }
         });
     }
 
-    // Initial render
     renderLineup();
     setupEventListeners();
 
-    // Destroy existing sortable instances if they exist to prevent memory leaks
     if (benchEl.sortable) benchEl.sortable.destroy();
     if (orderEl.sortable) orderEl.sortable.destroy();
 
     let ghostPositionEl = null;
 
-    const onDragStart = (evt) => {
-        document.body.classList.add('dragging-lineup-player');
-    };
-
-    const onDragMove = (evt) => {
-        const ghostEl = document.querySelector('.lineup-ghost');
-        if (!ghostEl) return;
-
-        // Check if we've already modified this ghost to add our number element
-        if (!ghostEl.dataset.ghostModified) {
-            ghostEl.dataset.ghostModified = 'true';
-
-            // Find the main text span to insert our number before it
-            const mainContainer = ghostEl.querySelector('.d-flex.align-items-center');
-            if (mainContainer) {
-                ghostPositionEl = document.createElement('span');
-                ghostPositionEl.className = 'ghost-position-number';
-
-                // Insert the position number as the first element in the container
-                mainContainer.insertBefore(ghostPositionEl, mainContainer.firstChild);
-
-                // Add a class to the ghost itself to hide the default CSS counter
-                ghostEl.classList.add('sortable-ghost-custom');
-            }
-        }
-
-        if (ghostPositionEl) {
-            if (evt.to === orderEl) {
-                const newIndex = evt.newIndex;
-                if (typeof newIndex === 'number') {
-                    const pos = newIndex + 1;
-                    ghostPositionEl.textContent = `${pos}.\u00A0`;
-                } else {
-                    // This case handles dragging over an empty lineup list that has a placeholder.
-                    const isOrderEmpty = orderEl.children.length === 0 || orderEl.querySelector('.placeholder-text');
-                    if (isOrderEmpty) {
-                        ghostPositionEl.textContent = '1.\u00A0';
-                    } else {
-                        // If the index is invalid for any other reason, hide the number.
-                        ghostPositionEl.textContent = '';
-                    }
-                }
-            } else {
-                // We are over the bench or somewhere else, so hide the position.
-                ghostPositionEl.textContent = '';
-            }
-        }
-    };
-
     const onSortEnd = (evt) => {
-        document.body.classList.remove('dragging-lineup-player');
-        ghostPositionEl = null; // Clear reference
-
-        // Update the lineup from the DOM
-        lineup.lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
-
-        // Full re-render to ensure consistency
+        handleContentChange();
         renderLineup();
-
-        // Reset scroll positions
         benchEl.scrollTop = 0;
         orderEl.scrollTop = 0;
     };
@@ -220,17 +244,10 @@ function initializeLineupEditor(options) {
     const sortableOptions = {
         group: 'lineup',
         animation: 150,
-        ghostClass: 'lineup-ghost', // Custom ghost class
-        onStart: onDragStart,
-        onMove: onDragMove,
+        ghostClass: 'lineup-ghost',
         onEnd: onSortEnd,
     };
 
-    // Initialize SortableJS
     benchEl.sortable = new Sortable(benchEl, sortableOptions);
-
-    orderEl.sortable = new Sortable(orderEl, {
-        ...sortableOptions,
-        handle: '.lineup-drag-handle',
-    });
+    orderEl.sortable = new Sortable(orderEl, { ...sortableOptions, handle: '.lineup-drag-handle' });
 }
