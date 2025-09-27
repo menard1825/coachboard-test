@@ -1,9 +1,28 @@
+// static/js/game_logic.js
 // =================================================================================
 // Coach Planner - Game Management Client-Side Logic (REFACTORED)
 // =================================================================================
 
 // This script is now fully self-contained and does not use a global AppState.
 const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
+
+/**
+ * NEW: A debounce function to delay execution.
+ * This prevents the save function from being called on every single little change,
+ * instead waiting for a pause in user activity.
+ * @param {Function} func The function to debounce.
+ * @param {number} delay The delay in milliseconds.
+ * @returns {Function} The debounced function.
+ */
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+}
+
 
 function initializeGameManagement(gameData) {
 
@@ -15,21 +34,20 @@ function initializeGameManagement(gameData) {
         rotation: gameData.rotation || { id: null, title: `Rotation for vs ${gameData.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
         game: gameData.game,
         lineup_templates: gameData.lineup_templates || [],
-        // NEW: Add rotation_templates to the state
         rotation_templates: gameData.rotation_templates || [],
         outfielder_count: gameData.outfielder_count || 3,
         currentInning: '1',
         copiedInningData: null,
-        sortableInstances: {}
+        sortableInstances: {},
+        hasUnsavedChanges: false // NEW: Track unsaved changes for the rotation
     };
 
-    // ADD THIS BLOCK TO FIX THE INNINGS BUG
     if (state.rotation && typeof state.rotation.innings === 'string') {
         try {
             state.rotation.innings = JSON.parse(state.rotation.innings);
         } catch (e) {
             console.error("Error parsing rotation.innings JSON:", e);
-            state.rotation.innings = { '1': {} }; // Default to a valid object on failure
+            state.rotation.innings = { '1': {} };
         }
     }
 
@@ -49,7 +67,7 @@ function initializeGameManagement(gameData) {
     function renderInningSelector() {
         const container = document.getElementById('inning-btn-group');
         const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
-        if (innings.length === 0) { 
+        if (innings.length === 0) {
             state.rotation.innings['1'] = {};
             innings.push('1');
         }
@@ -69,7 +87,6 @@ function initializeGameManagement(gameData) {
         const currentInningData = state.rotation.innings[state.currentInning] || {};
 
         const createPlayerTag = (player) => {
-            // The primary position has been removed to avoid confusion.
             return `<div class="player-tag" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}</div>`;
         };
 
@@ -145,9 +162,14 @@ function initializeGameManagement(gameData) {
         if (summaryMobile) summaryMobile.innerHTML = tableHtml;
     }
 
+    // MODIFIED: Create a debounced save function that will be called after 2 seconds of inactivity
+    const debouncedSave = debounce(() => saveRotation(), 2000);
+
     function initializeRotationSortables() {
         Object.values(state.sortableInstances).forEach(s => { if (s.destroy) s.destroy(); });
         state.sortableInstances = {};
+
+        // MODIFIED: This handler now updates state and triggers the auto-save
         const onEndHandler = () => {
             const inningData = state.rotation.innings[state.currentInning] = {};
             document.querySelectorAll('#diamond-parent-desktop .position-dropzone').forEach(dz => {
@@ -156,7 +178,17 @@ function initializeGameManagement(gameData) {
                     inningData[dz.dataset.position] = playerTag.dataset.playerName;
                 }
             });
-            renderRotationEditor();
+
+            // Mark that we have changes and trigger the debounced save
+            state.hasUnsavedChanges = true;
+            const saveBtn = document.getElementById('saveRotationBtn');
+            if (saveBtn) {
+                saveBtn.innerHTML = '<i class="bi bi-save me-1"></i> Save Rotation'; // Reset button text on new change
+                saveBtn.classList.remove('btn-success');
+            }
+            debouncedSave();
+
+            renderRotationEditor(); // Re-render immediately for UI responsiveness
         };
         const allContainers = [...document.querySelectorAll('#bench-list-desktop, #diamond-parent-desktop .position-dropzone')];
         allContainers.forEach(container => {
@@ -171,28 +203,25 @@ function initializeGameManagement(gameData) {
         });
     }
 
-function applyOutOfPositionIndicators() {
-    document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => {
-        const playerName = tag.dataset.playerName;
-        const position = tag.closest('.position-dropzone').dataset.position;
-        const player = state.roster.find(p => p.name === playerName);
+    function applyOutOfPositionIndicators() {
+        document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => {
+            const playerName = tag.dataset.playerName;
+            const position = tag.closest('.position-dropzone').dataset.position;
+            const player = state.roster.find(p => p.name === playerName);
+            tag.classList.remove('natural-position', 'secondary-position');
 
-        // First, remove any existing position classes to reset the state
-        tag.classList.remove('natural-position', 'secondary-position');
+            if (player && position) {
+                const primaryPos = player.position1;
+                const secondaryPositions = [player.position2, player.position3];
 
-        if (player && position) {
-            const primaryPos = player.position1;
-            const secondaryPositions = [player.position2, player.position3];
-
-            if (position === primaryPos) {
-                tag.classList.add('natural-position');
-            } else if (secondaryPositions.includes(position)) {
-                tag.classList.add('secondary-position');
+                if (position === primaryPos) {
+                    tag.classList.add('natural-position');
+                } else if (secondaryPositions.includes(position)) {
+                    tag.classList.add('secondary-position');
+                }
             }
-            // If it's not in any of the three, it will just have the default color
-        }
-    });
-}
+        });
+    }
 
     function exitCopyMode() {
         state.copiedInningData = null;
@@ -233,11 +262,15 @@ function applyOutOfPositionIndicators() {
         }
     }
     
+    // MODIFIED: This function now provides visual feedback
     async function saveRotation() {
         const btn = document.getElementById('saveRotationBtn');
-        const originalText = btn.textContent;
+        if (!btn) return;
+
         btn.disabled = true;
-        btn.textContent = 'Saving...';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Saving...';
+        btn.classList.remove('btn-success');
+
         const payload = {
             id: state.rotation.id,
             title: state.rotation.title || `Rotation for vs ${state.game.opponent}`,
@@ -250,14 +283,23 @@ function applyOutOfPositionIndicators() {
             const result = await response.json();
             if (result.status === 'success') {
                 if (result.new_id) state.rotation.id = result.new_id;
-                btn.textContent = 'Saved!';
-                renderRotationEditor();
+
+                // Success feedback
+                btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Saved';
+                btn.classList.add('btn-success');
+                state.hasUnsavedChanges = false;
+
+                // Re-enable the delete button if a rotation was just created
+                document.getElementById('deleteRotationBtn')?.removeAttribute('disabled');
+
             } else { throw new Error(result.message); }
         } catch (error) {
+            // Error feedback
+            btn.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> Save Failed';
             alert('Error saving rotation: ' + error.message);
-            btn.textContent = 'Save Failed';
         } finally {
-            setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 2000);
+            btn.disabled = false;
+            // The button text will be reset to normal when a new change is made.
         }
     }
 
@@ -265,13 +307,11 @@ function applyOutOfPositionIndicators() {
     function setupEventListeners() {
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
-        // NEW: Initialize the save template modal
         saveTemplateModal = new bootstrap.Modal(document.getElementById('saveRotationTemplateModal'));
 
-        document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
+        // The manual save button still works if a user wants to save immediately
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
 
-        // NEW: Populate and handle the rotation template dropdown
         const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');
         if (rotationTemplateSelect) {
             state.rotation_templates.forEach(rt => {
@@ -285,32 +325,29 @@ function applyOutOfPositionIndicators() {
                 if (selectedTemplateId) {
                     const selectedTemplate = state.rotation_templates.find(rt => rt.id == selectedTemplateId);
                     if (selectedTemplate && confirm(`This will overwrite the current rotation with the "${selectedTemplate.title}" template. Are you sure?`)) {
-                        // Deep copy the innings data to avoid reference issues
                         state.rotation.innings = JSON.parse(JSON.stringify(selectedTemplate.innings));
-                        // Ensure at least one inning exists
                         if (Object.keys(state.rotation.innings).length === 0) {
                             state.rotation.innings['1'] = {};
                         }
-                        // Set the current inning to the first available inning from the template
                         state.currentInning = Object.keys(state.rotation.innings).sort((a,b) => parseInt(a) - parseInt(b))[0];
+
+                        state.hasUnsavedChanges = true; // Mark as changed and save
+                        debouncedSave();
+
                         renderRotationEditor();
                         alert('Rotation template loaded successfully!');
                     }
-                    // Reset the select so you can re-apply the same template if needed
                     e.target.value = '';
                 }
             });
         }
 
-        // NEW: Add event listener for the "Save as Template" button
         document.getElementById('saveAsTemplateBtn')?.addEventListener('click', () => {
-            // Pre-fill the input with a helpful suggestion
             const suggestedName = `Template from vs ${state.game.opponent}`;
             document.getElementById('rotationTemplateName').value = suggestedName;
             saveTemplateModal.show();
         });
 
-        // NEW: Add event listener for the confirm button inside the modal
         document.getElementById('confirmSaveTemplateBtn')?.addEventListener('click', async () => {
             const templateNameInput = document.getElementById('rotationTemplateName');
             const templateName = templateNameInput.value.trim();
@@ -339,11 +376,10 @@ function applyOutOfPositionIndicators() {
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.message);
 
-                // Add the new template to our dropdown without needing a page refresh
                 const select = document.getElementById('rotationTemplateSelect');
                 if (select && result.new_template) {
                      const newTemplate = result.new_template;
-                     state.rotation_templates.push(newTemplate); // Update state
+                     state.rotation_templates.push(newTemplate);
                      const inningsCount = newTemplate.innings ? Object.keys(newTemplate.innings).length : 0;
                      const option = new Option(`${newTemplate.title} (${inningsCount} innings)`, newTemplate.id);
                      select.add(option);
@@ -402,7 +438,6 @@ function applyOutOfPositionIndicators() {
                 const position = mobileDropzone.dataset.position;
                 if (mobileDropzone.querySelector('.player-tag')) { 
                     delete state.rotation.innings[state.currentInning][position];
-                    renderRotationEditor();
                 } else { 
                     const assignedPlayers = new Set(Object.values(state.rotation.innings[state.currentInning] || {}));
                     const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
@@ -413,6 +448,10 @@ function applyOutOfPositionIndicators() {
                         `<div class="list-group-item">No players on the bench.</div>`;
                     assignPlayerModal.show();
                 }
+
+                state.hasUnsavedChanges = true;
+                debouncedSave();
+                renderRotationEditor();
             }
             const modalPlayerLink = event.target.closest('#assignPlayerModalBenchList a');
             if (modalPlayerLink) {
@@ -421,29 +460,39 @@ function applyOutOfPositionIndicators() {
                 const position = document.getElementById('assignPlayerModal').dataset.targetPosition;
                 if (playerName && position) {
                     state.rotation.innings[state.currentInning][position] = playerName;
+                    state.hasUnsavedChanges = true;
+                    debouncedSave();
                     renderRotationEditor();
                     assignPlayerModal.hide();
                 }
             }
         });
-        document.getElementById('addInningBtn')?.addEventListener('click', () => {
-            if(!state.rotation) return;
+
+        const changeInningCount = (amount) => {
+            if (!state.rotation) return;
             const innings = Object.keys(state.rotation.innings);
-            const nextInningNum = innings.length > 0 ? Math.max(...innings.map(Number)) + 1 : 1;
-            state.rotation.innings[nextInningNum] = {};
-            renderInningSelector();
-        });
-        document.getElementById('removeInningBtn')?.addEventListener('click', () => {
-            if(!state.rotation) return;
-            const innings = Object.keys(state.rotation.innings);
-            if(innings.length <= 1) return alert("Cannot remove the last inning.");
-            const lastInningNum = Math.max(...innings.map(Number));
-            delete state.rotation.innings[lastInningNum];
-            if(state.currentInning == lastInningNum) {
-                state.currentInning = Math.max(...Object.keys(state.rotation.innings).map(Number));
+            if (amount < 0 && innings.length <= 1) {
+                alert("Cannot remove the last inning.");
+                return;
             }
-            renderRotationEditor();
-        });
+            const nextInningNum = innings.length > 0 ? Math.max(...innings.map(Number)) + 1 : 1;
+            if (amount > 0) {
+                 state.rotation.innings[nextInningNum] = {};
+            } else {
+                 const lastInningNum = Math.max(...innings.map(Number));
+                 delete state.rotation.innings[lastInningNum];
+                 if (state.currentInning == lastInningNum) {
+                     state.currentInning = Math.max(...Object.keys(state.rotation.innings).map(Number));
+                 }
+            }
+             state.hasUnsavedChanges = true;
+             debouncedSave();
+             renderRotationEditor();
+        };
+
+        document.getElementById('addInningBtn')?.addEventListener('click', () => changeInningCount(1));
+        document.getElementById('removeInningBtn')?.addEventListener('click', () => changeInningCount(-1));
+
         document.getElementById('copyInningBtn')?.addEventListener('click', () => {
             if (!state.rotation || !state.currentInning) return;
             state.copiedInningData = { ...state.rotation.innings[state.currentInning] };
@@ -461,6 +510,8 @@ function applyOutOfPositionIndicators() {
             selectedInnings.forEach(inn => {
                 state.rotation.innings[inn] = { ...state.copiedInningData };
             });
+            state.hasUnsavedChanges = true;
+            debouncedSave();
             exitCopyMode();
             updatePlayingTimeSummary();
         });
@@ -470,6 +521,8 @@ function applyOutOfPositionIndicators() {
             if (!state.rotation || !state.currentInning) return;
             if (confirm(`Are you sure you want to clear all positions for inning ${state.currentInning}?`)) {
                 state.rotation.innings[state.currentInning] = {};
+                state.hasUnsavedChanges = true;
+                debouncedSave();
                 renderRotationEditor();
             }
         });
@@ -486,10 +539,21 @@ function applyOutOfPositionIndicators() {
             if (previousInningData) {
                  if (confirm(`This will overwrite inning ${currentInningNum} with the positions from inning ${previousInningNum}. Continue?`)) {
                     state.rotation.innings[currentInningNum] = { ...previousInningData };
+                    state.hasUnsavedChanges = true;
+                    debouncedSave();
                     renderRotationEditor();
                 }
             } else {
                 alert(`Inning ${previousInningNum} has no data to copy.`);
+            }
+        });
+
+        // NEW: Add beforeunload event listener as a safeguard
+        window.addEventListener('beforeunload', (event) => {
+            if (state.hasUnsavedChanges) {
+                // Standard way to trigger the browser's confirmation dialog
+                event.preventDefault();
+                event.returnValue = ''; // This is required for older browsers
             }
         });
     }
