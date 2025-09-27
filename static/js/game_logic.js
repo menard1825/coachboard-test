@@ -267,6 +267,9 @@ function initializeGameManagement(gameData) {
         const btn = document.getElementById('saveRotationBtn');
         if (!btn) return;
 
+        const timestampEl = document.getElementById('rotation-save-timestamp');
+        if(timestampEl) timestampEl.textContent = ''; // Clear timestamp on new save attempt
+
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Saving...';
         btn.classList.remove('btn-success');
@@ -288,6 +291,10 @@ function initializeGameManagement(gameData) {
                 btn.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Saved';
                 btn.classList.add('btn-success');
                 state.hasUnsavedChanges = false;
+
+                if (timestampEl && result.last_updated) {
+                    timestampEl.textContent = `Last saved: ${result.last_updated}`;
+                }
 
                 // Re-enable the delete button if a rotation was just created
                 document.getElementById('deleteRotationBtn')?.removeAttribute('disabled');

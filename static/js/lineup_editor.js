@@ -88,6 +88,9 @@ function initializeLineupEditor(options) {
         const btn = document.getElementById('saveLineupBtn');
         if (!btn) return;
 
+        const timestampEl = document.getElementById('lineup-save-timestamp');
+        if (timestampEl) timestampEl.textContent = ''; // Clear timestamp on new save attempt
+
         // If this is a manual save from a "Save Failed" state, allow it. Otherwise, if there are no changes, do nothing.
         if (!state.hasUnsavedChanges && !btn.classList.contains('btn-danger')) return;
 
@@ -123,6 +126,10 @@ function initializeLineupEditor(options) {
             state.hasUnsavedChanges = false;
             btn.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> Saved`;
             btn.classList.add('btn-success');
+
+            if (timestampEl && result.last_updated) {
+                timestampEl.textContent = `Last saved: ${result.last_updated}`;
+            }
 
             // If it was a manual save, close the modal after success
             if(isManualSave) {

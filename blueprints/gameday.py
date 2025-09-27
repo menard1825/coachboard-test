@@ -203,7 +203,13 @@ def add_lineup():
     lineup_dict = model_to_dict(new_lineup)
     socketio.emit('lineup_add', {'lineup': lineup_dict})
 
-    return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id, 'lineup': lineup_dict})
+    return jsonify({
+        'status': 'success',
+        'message': f'Lineup "{new_lineup.title}" created successfully!',
+        'new_id': new_lineup.id,
+        'lineup': lineup_dict,
+        'last_updated': datetime.now().strftime('%-I:%M:%S %p')
+    })
 
 @gameday_bp.route('/edit_lineup/<int:lineup_id>', methods=['POST'])
 def edit_lineup(lineup_id):
@@ -223,7 +229,12 @@ def edit_lineup(lineup_id):
     lineup_dict = model_to_dict(lineup_to_edit)
     socketio.emit('lineup_update', {'lineup': lineup_dict})
 
-    return jsonify({'status': 'success', 'message': f'Lineup "{lineup_to_edit.title}" updated successfully!', 'lineup': lineup_dict})
+    return jsonify({
+        'status': 'success',
+        'message': f'Lineup "{lineup_to_edit.title}" updated successfully!',
+        'lineup': lineup_dict,
+        'last_updated': datetime.now().strftime('%-I:%M:%S %p')
+    })
 
 @gameday_bp.route('/delete_lineup/<int:lineup_id>')
 def delete_lineup(lineup_id):
@@ -275,7 +286,12 @@ def save_rotation():
          db.session.commit()
 
     socketio.emit('data_updated', {'message': 'Rotation saved/updated.'})
-    return jsonify({'status': 'success', 'message': message, 'new_id': new_rotation_id})
+    return jsonify({
+        'status': 'success',
+        'message': message,
+        'new_id': new_rotation_id,
+        'last_updated': datetime.now().strftime('%-I:%M:%S %p')
+    })
 
 @gameday_bp.route('/delete_rotation/<int:rotation_id>')
 def delete_rotation(rotation_id):
