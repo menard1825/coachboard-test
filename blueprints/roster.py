@@ -4,36 +4,9 @@ from db import db
 from extensions import socketio
 from datetime import datetime
 import json
+from utils import get_player_order_as_list
 
 roster_bp = Blueprint('roster', __name__, template_folder='templates')
-
-def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list of integers, decoding from JSON if necessary."""
-    if not player_order_data:
-        return []
-
-    order_list = []
-    if isinstance(player_order_data, list):
-        order_list = player_order_data
-    elif isinstance(player_order_data, str):
-        try:
-            loaded = json.loads(player_order_data)
-            if isinstance(loaded, list):
-                order_list = loaded
-        except (json.JSONDecodeError, TypeError):
-            return []
-
-    if not isinstance(order_list, list):
-        return []
-
-    # Safely convert all elements to integers.
-    result = []
-    for item in order_list:
-        try:
-            result.append(int(item))
-        except (ValueError, TypeError):
-            continue
-    return result
 
 @roster_bp.route('/add_player', methods=['POST'])
 def add_player():

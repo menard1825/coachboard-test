@@ -5,6 +5,7 @@ from db import db
 from sqlalchemy import func
 from datetime import datetime
 import json
+from utils import get_player_order_as_list
 
 # Define role constants for clarity
 HEAD_COACH = 'Head Coach'
@@ -12,19 +13,6 @@ ASSISTANT_COACH = 'Assistant Coach'
 SUPER_ADMIN = 'Super Admin'
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
-
-def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list, decoding from JSON if necessary."""
-    if not player_order_data:
-        return []
-    if isinstance(player_order_data, list):
-        return player_order_data
-    if isinstance(player_order_data, str):
-        try:
-            return json.loads(player_order_data)
-        except (json.JSONDecodeError, TypeError):
-            return []
-    return [] # default to empty list
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
