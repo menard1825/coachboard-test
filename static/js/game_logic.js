@@ -69,8 +69,8 @@ function initializeGameManagement(gameData) {
         const currentInningData = state.rotation.innings[state.currentInning] || {};
 
         const createPlayerTag = (player) => {
-            const primaryPos = player.position1 ? ` (${escapeHTML(player.position1)})` : '';
-            return `<div class="player-tag" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
+            // The primary position has been removed to avoid confusion.
+            return `<div class="player-tag" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}</div>`;
         };
 
         const createMobileBenchPlayerItem = (player) => {

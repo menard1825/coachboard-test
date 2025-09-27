@@ -116,13 +116,11 @@ def delete_player(player_id):
 
         for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
             current_order = get_player_order_as_list(user_obj.player_order)
-            # MODIFIED: Use the player's ID directly for removal.
-            updated_order = [pid for pid in current_order if pid != player_to_delete.id]
+            updated_order = [pid for pid in current_order if pid != player_id_to_delete]
             user_obj.player_order = updated_order
         
         if 'player_order' in session:
             session_order = get_player_order_as_list(session['player_order'])
-            # MODIFIED: Use the player's ID for removal from the session as well.
             session['player_order'] = [pid for pid in session_order if pid != player_id_to_delete]
             session.modified = True
 
