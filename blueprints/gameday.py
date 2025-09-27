@@ -39,11 +39,11 @@ def game_management(game_id):
     # Fetch all pitching outings for the team once to be used for both summary stats and the game log.
     all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all()
 
-    # Filter the outings in Python to get the game-specific log, reducing database queries.
-    game_pitching_log = [
-        o for o in all_pitching_outings
-        if o.opponent == game.opponent and o.date.date() == game.date.date()
-    ]
+    game_pitching_log = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter(
+        PitchingOuting.team_id == team.id,
+        PitchingOuting.opponent == game.opponent,
+        func.date(PitchingOuting.date) == game.date.date()
+    ).all()
 
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
     absent_player_ids = [absence.player_id for absence in absences]

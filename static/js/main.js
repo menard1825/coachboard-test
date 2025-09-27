@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const batsThrows = `B/T: ${p.bats?.[0] || 'N'}/${p.throws?.[0] || 'N'}`;
 
         return `
-        <div class="col-12" data-player-name="${pNameSafe}">
+        <div class="col-12" data-player-id="${p.id}" data-player-name="${pNameSafe}">
             <div class="card player-card">
                 <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#collapse-roster-${p.id}" style="cursor: pointer;">
                     <h6 class="mb-0">
@@ -113,8 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let rosterToSort = [...(AppState.full_data.roster || [])];
 
         rosterToSort.sort((a, b) => {
-            const indexA = AppState.player_order.indexOf(a.name);
-            const indexB = AppState.player_order.indexOf(b.name);
+            const indexA = AppState.player_order.indexOf(a.id);
+            const indexB = AppState.player_order.indexOf(b.id);
             if (indexA === -1 && indexB === -1) return a.name.localeCompare(b.name);
             if (indexA === -1) return 1;
             if (indexB === -1) return -1;
@@ -145,8 +145,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return b.name.localeCompare(a.name);
             });
         } else {
-             const customOrderedNames = AppState.player_order.filter(name => filteredRoster.some(p => p.name === name));
-             filteredRoster.sort((a,b) => customOrderedNames.indexOf(a.name) - customOrderedNames.indexOf(b.name));
+             const customOrderedIds = AppState.player_order.filter(id => filteredRoster.some(p => p.id === id));
+             filteredRoster.sort((a,b) => customOrderedIds.indexOf(a.id) - customOrderedIds.indexOf(b.id));
         }
 
         container.innerHTML = filteredRoster.map(p => {
@@ -298,8 +298,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const sortedPitchers = pitchers.sort((a, b) => {
-                const indexA = AppState.player_order.indexOf(a.name);
-                const indexB = AppState.player_order.indexOf(b.name);
+                const indexA = AppState.player_order.indexOf(a.id);
+                const indexB = AppState.player_order.indexOf(b.id);
                 if (indexA === -1 && indexB === -1) return a.name.localeCompare(b.name);
                 if (indexA === -1) return 1;
                 if (indexB === -1) return -1;
@@ -798,8 +798,8 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('roster_add', (data) => {
             console.log('roster_add received', data);
             AppState.full_data.roster.push(data.player);
-            if (!AppState.player_order.includes(data.player.name)) {
-                AppState.player_order.push(data.player.name);
+            if (!AppState.player_order.includes(data.player.id)) {
+                AppState.player_order.push(data.player.id);
             }
             renderRoster();
             renderPlayerDevelopmentList();
@@ -817,7 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('roster_delete received', data);
             const playerToDelete = AppState.full_data.roster.find(p => p.id === data.player_id);
             if(playerToDelete) {
-                AppState.player_order = AppState.player_order.filter(name => name !== playerToDelete.name);
+                AppState.player_order = AppState.player_order.filter(id => id !== playerToDelete.id);
             }
             AppState.full_data.roster = AppState.full_data.roster.filter(p => p.id !== data.player_id);
             renderRoster();
@@ -955,7 +955,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.values(sortableInstances).forEach(s => s.destroy());
         sortableInstances = {};
         const savePlayerOrder = (evt) => {
-            const newOrder = Array.from(evt.from.children).map(item => item.dataset.playerName);
+            const newOrder = Array.from(evt.from.children).map(item => parseInt(item.dataset.playerId));
             AppState.player_order = newOrder;
             fetch('/save_player_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_order: newOrder }) });
             AppState.dev_player_sort.key = 'custom';

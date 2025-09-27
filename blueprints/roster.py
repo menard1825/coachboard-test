@@ -3,21 +3,37 @@ from models import Player, User
 from db import db
 from extensions import socketio
 from datetime import datetime
+import json
 
 roster_bp = Blueprint('roster', __name__, template_folder='templates')
 
 def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list, decoding from JSON if necessary."""
+    """Safely returns player_order as a list of integers, decoding from JSON if necessary."""
     if not player_order_data:
         return []
+
+    order_list = []
     if isinstance(player_order_data, list):
-        return player_order_data
-    if isinstance(player_order_data, str):
+        order_list = player_order_data
+    elif isinstance(player_order_data, str):
         try:
-            return json.loads(player_order_data)
+            loaded = json.loads(player_order_data)
+            if isinstance(loaded, list):
+                order_list = loaded
         except (json.JSONDecodeError, TypeError):
             return []
-    return [] # default to empty list
+
+    if not isinstance(order_list, list):
+        return []
+
+    # Safely convert all elements to integers.
+    result = []
+    for item in order_list:
+        try:
+            result.append(int(item))
+        except (ValueError, TypeError):
+            continue
+    return result
 
 @roster_bp.route('/add_player', methods=['POST'])
 def add_player():
@@ -67,15 +83,15 @@ def add_player():
     # Add the new player's name to the player_order for all users on the team
     for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
         current_order = get_player_order_as_list(user_obj.player_order)
-        if new_player.name not in current_order:
-            current_order.append(new_player.name)
+        if new_player.id not in current_order:
+            current_order.append(new_player.id)
             user_obj.player_order = current_order
 
-    # --- CORRECTED FIX: Update the current user's session with the player's name ---
+    # --- CORRECTED FIX: Update the current user's session with the player's ID ---
     if 'player_order' in session:
         session_order = get_player_order_as_list(session['player_order'])
-        if new_player.name not in session_order:
-            session_order.append(new_player.name)
+        if new_player.id not in session_order:
+            session_order.append(new_player.id)
             session['player_order'] = session_order
             session.modified = True
     # --- END FIX ---
@@ -127,12 +143,14 @@ def delete_player(player_id):
 
         for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
             current_order = get_player_order_as_list(user_obj.player_order)
-            updated_order = [pid for pid in current_order if pid != player_id_to_delete]
+            # MODIFIED: Use the player's ID directly for removal.
+            updated_order = [pid for pid in current_order if pid != player_to_delete.id]
             user_obj.player_order = updated_order
         
         if 'player_order' in session:
             session_order = get_player_order_as_list(session['player_order'])
-            session['player_order'] = [name for name in session_order if name != player_name]
+            # MODIFIED: Use the player's ID for removal from the session as well.
+            session['player_order'] = [pid for pid in session_order if pid != player_id_to_delete]
             session.modified = True
 
         db.session.commit()

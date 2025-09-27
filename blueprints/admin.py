@@ -301,7 +301,7 @@ def create_team():
         flash(f'A team with the name "{team_name}" already exists.', 'danger')
         return redirect(url_for('.team_management'))
 
-    new_team = Team(team_name=team_name, registration_code=str(uuid.uuid4()).split('-')[-1])
+    new_team = Team(team_name=team_name, outfielder_count=3, registration_code=str(uuid.uuid4()).split('-')[-1])
     db.session.add(new_team)
     db.session.commit()
 
