@@ -7,13 +7,12 @@ def parse_date(date_str):
     """Tries to parse a date string with multiple formats, returning a datetime object."""
     if not date_str:
         return None
-    # Add more formats here as needed throughout the app
     for fmt in (
-        '%Y-%m-%d',                 # Used in gameday forms
-        '%A, %m/%d/%y, %I:%M %p',   # Used in pitching forms (full datetime)
-        '%A, %m/%d/%y',             # Used in pitching forms (date only)
-        '%Y-%m-%d %H:%M:%S',        # Used in data migration
-        '%Y-%m-%d %H:%M'            # Used in data migration
+        '%Y-%m-%d',
+        '%A, %m/%d/%y, %I:%M %p',
+        '%A, %m/%d/%y',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y-%m-%d %H:%M'
     ):
         try:
             return datetime.strptime(date_str, fmt)
@@ -25,12 +24,10 @@ def model_to_dict(obj):
     """Converts a SQLAlchemy model instance into a dictionary."""
     if obj is None:
         return None
-
     d = {}
     for column in obj.__table__.columns:
         val = getattr(obj, column.name)
         if isinstance(val, (datetime, date)):
-            # Format dates and datetimes as 'YYYY-MM-DD'
             d[column.name] = val.strftime('%Y-%m-%d')
         else:
             d[column.name] = val
@@ -43,8 +40,6 @@ def pitching_outing_to_dict(outing):
     d['player_name'] = outing.player.name if outing.player else "Unknown"
     return d
 
-# This dictionary was originally in app.py
-# MODIFIED: Expanded to include a full range of age groups for USSSA rules.
 PITCHING_RULES = {
     'USSSA': {
         '4U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
@@ -60,25 +55,19 @@ PITCHING_RULES = {
         '14U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]},
         'default': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3)]}
     }
-    # You could add other rule sets like 'Little League' here in the future
 }
 
-
 def allowed_file(filename):
-    """Checks if the filename has an allowed extension."""
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_pitching_rules_for_team(team):
-    """Gets the appropriate pitching rule set for a given team."""
     rule_set_name = getattr(team, 'pitching_rule_set', 'USSSA') or 'USSSA'
     age_group = getattr(team, 'age_group', 'default') or 'default'
     rule_set = PITCHING_RULES.get(rule_set_name, PITCHING_RULES['USSSA'])
     return rule_set.get(age_group, rule_set.get('default'))
 
 def calculate_cumulative_pitching_stats(player_id, all_outings):
-    """Calculates total innings, pitches, and appearances for a pitcher."""
     stats = {'total_innings_pitched': 0.0, 'total_pitches_thrown': 0, 'appearances': 0}
     for outing in all_outings:
         if outing.player_id == player_id:
@@ -91,45 +80,39 @@ def calculate_cumulative_pitching_stats(player_id, all_outings):
     stats['total_innings_pitched'] = round(stats['total_innings_pitched'], 1)
     return stats
 
-def calculate_cumulative_position_stats(roster_players, rotations):
-    """Calculates the number of innings a player appeared at each position in a rotation."""
+def calculate_cumulative_position_stats(roster_players, rotations, games):
     stats = {player.name: {} for player in roster_players}
-    print("--- Starting Position Stat Calculation ---")
+    today = datetime.now().date()
 
-    game_rotations_counted = set()
+    past_game_ids = {game.id for game in games if game.date.date() < today}
 
     for rotation in rotations:
-        rotation_key = rotation.associated_game_id or rotation.id
-
-        if rotation_key in game_rotations_counted:
+        if rotation.associated_game_id not in past_game_ids:
             continue
 
         try:
             innings_data = rotation.innings or {}
             if not isinstance(innings_data, dict):
-                print(f"Skipping rotation ID {rotation.id} due to invalid innings data.")
                 continue
 
-            print(f"\nProcessing Rotation ID: {rotation.id}, Title: {rotation.title}, Game ID: {rotation.associated_game_id}")
-
             for inning, positions in innings_data.items():
-                print(f"  Inning {inning}:")
                 for position, player_name in positions.items():
-                    print(f"    - {player_name} at {position}")
-                    if player_name in stats:
+                    if player_name in stats and not position.startswith('_'):
                         stats[player_name][position] = stats[player_name].get(position, 0) + 1
 
-            game_rotations_counted.add(rotation_key)
+                substitutions = positions.get('_substitutions', {})
+                for position, subbed_players in substitutions.items():
+                    for player_name in subbed_players:
+                        if player_name in stats:
+                            stats[player_name][position] = stats[player_name].get(position, 0) + 1
 
         except Exception as e:
             print(f"Error processing rotation ID {rotation.id}: {e}")
             continue
 
-    print("\n--- Finished Position Stat Calculation ---")
     return stats
 
 def calculate_pitch_count_summary(roster, all_outings, rules):
-    """Calculates the daily/weekly pitch counts and availability for all pitchers."""
     summary = {}
     today = date.today()
     for player in roster:
@@ -146,15 +129,13 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                 last_outing = player_outings[0]
                 last_outing_date = last_outing.date.date()
 
-                # Sum pitches on the last day the pitcher threw
                 pitches_on_last_day = sum(o.pitches or 0 for o in player_outings if o.date.date() == last_outing_date)
 
-                # Determine rest days based on the total pitches on that day
                 for threshold, rest_days in rules.get('rest_thresholds', []):
                     if pitches_on_last_day <= threshold:
                         required_rest = rest_days
                         break
-                else: # If pitch count is over the highest threshold
+                else:
                     if rules.get('rest_thresholds'):
                         required_rest = rules['rest_thresholds'][-1][1] + 1
 
@@ -164,14 +145,11 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                     status = 'Resting'
                     next_available_str = next_available_date.strftime('%a, %b %d')
 
-                # New logic: If the last outing was today, check if they can still pitch.
                 if last_outing_date == today:
                     if daily_pitches < rules.get('max_daily', 85):
                         status = 'Available'
                         next_available_str = 'Today'
                     else:
-                        # They've hit their daily max, so they are resting.
-                        # The next_available_date calculated earlier is correct.
                         status = 'Resting'
                         next_available_str = next_available_date.strftime('%a, %b %d')
 
@@ -189,7 +167,6 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
     return summary
 
 def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list of integers, decoding from JSON if necessary."""
     if not player_order_data:
         return []
 
@@ -207,7 +184,6 @@ def get_player_order_as_list(player_order_data):
     if not isinstance(order_list, list):
         return []
 
-    # Safely convert all elements to integers.
     result = []
     for item in order_list:
         try:
