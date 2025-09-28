@@ -67,16 +67,21 @@ def get_pitching_rules_for_team(team):
     rule_set = PITCHING_RULES.get(rule_set_name, PITCHING_RULES['USSSA'])
     return rule_set.get(age_group, rule_set.get('default'))
 
-def calculate_cumulative_pitching_stats(player_id, all_outings):
+def calculate_cumulative_pitching_stats(player_id, all_outings, games):
     stats = {'total_innings_pitched': 0.0, 'total_pitches_thrown': 0, 'appearances': 0}
+    today = datetime.now().date()
+    past_game_ids = {game.id for game in games if game.date.date() <= today}
+
     for outing in all_outings:
         if outing.player_id == player_id:
-            try:
-                stats['total_innings_pitched'] += float(outing.innings or 0.0)
-                stats['total_pitches_thrown'] += int(outing.pitches or 0)
-                stats['appearances'] += 1
-            except (ValueError, TypeError):
-                continue
+            game_id = getattr(outing, 'associated_game_id', None)
+            if game_id and game_id in past_game_ids:
+                try:
+                    stats['total_innings_pitched'] += float(outing.innings or 0.0)
+                    stats['total_pitches_thrown'] += int(outing.pitches or 0)
+                    stats['appearances'] += 1
+                except (ValueError, TypeError):
+                    continue
     stats['total_innings_pitched'] = round(stats['total_innings_pitched'], 1)
     return stats
 
@@ -84,7 +89,7 @@ def calculate_cumulative_position_stats(roster_players, rotations, games):
     stats = {player.name: {} for player in roster_players}
     today = datetime.now().date()
 
-    past_game_ids = {game.id for game in games if game.date.date() < today}
+    past_game_ids = {game.id for game in games if game.date.date() <= today}
 
     for rotation in rotations:
         if rotation.associated_game_id not in past_game_ids:
