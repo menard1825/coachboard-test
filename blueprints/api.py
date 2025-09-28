@@ -218,6 +218,10 @@ def get_stats():
 
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
+
+    # --- DEBUGGING LINE ADDED HERE ---
+    print(f"DEBUG: Found {len(pitching_outings_db)} pitching outings for team_id {team_id}.")
+
     rotations_db = db.session.query(Rotation).filter_by(team_id=team_id).all()
     games_db = db.session.query(Game).filter_by(team_id=team_id).all()
 
