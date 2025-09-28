@@ -37,7 +37,7 @@ def get_session_data():
 @api_bp.route('/roster')
 @login_required
 def get_roster():
-    team__id = session.get('team_id')
+    team_id = session.get('team_id')
     if not team_id:
         return jsonify({"error": "Team not found"}), 404
 
