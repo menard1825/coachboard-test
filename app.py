@@ -68,7 +68,13 @@ def create_app():
         if not dt or not isinstance(dt, (datetime, date)):
             return dt
         if isinstance(dt, datetime):
-            return dt.strftime('%A, %m/%d/%y, %I:%M %p')
+            # MODIFIED: Add a check for midnight
+            if dt.hour == 0 and dt.minute == 0 and dt.second == 0:
+                # If the time is midnight, format as date only
+                return dt.strftime('%A, %m/%d/%y')
+            else:
+                # Otherwise, format with the time
+                return dt.strftime('%A, %m/%d/%y, %I:%M %p')
         if isinstance(dt, date):
             return dt.strftime('%A, %m/%d/%y')
         return dt
