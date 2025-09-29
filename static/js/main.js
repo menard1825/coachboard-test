@@ -29,7 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatDateTime = (s) => {
         if (!s || s === 'Never') return s;
         try {
-            const dt = new Date(s.replace(' ', 'T'));
+            // By replacing hyphens with slashes, we instruct the Date constructor
+            // to parse the date in the local timezone rather than UTC, fixing the display error.
+            const dt = new Date(s.replace(/-/g, '/').replace(' ', 'T'));
             if (isNaN(dt)) throw new Error('Invalid date');
             
             if (s.length <= 10) {
