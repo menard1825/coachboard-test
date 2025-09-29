@@ -239,6 +239,22 @@ class PlayerDevelopmentFocus(db.Model):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="player_development_focuses")
 
+    def to_dict(self):
+        """Return a dictionary representation of the PlayerDevelopmentFocus object."""
+        return {
+            'id': self.id,
+            'type': 'Development',
+            'subtype': self.skill_type,
+            'text': self.focus,
+            'focus': self.focus,
+            'status': self.status,
+            'notes': self.notes,
+            'progress_notes': self.progress_notes,
+            'date': self.created_date.isoformat() if self.created_date else None,
+            'completed_date': self.completed_date.isoformat() if self.completed_date else None,
+            'author': self.author
+        }
+
 class Sign(db.Model):
     __tablename__ = 'signs'
     id = Column(Integer, primary_key=True)

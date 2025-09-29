@@ -34,7 +34,7 @@ def add_focus(player_name):
     db.session.add(new_focus)
     db.session.commit()
     flash(f'New {skill} focus added for {player_name}.', 'success')
-    socketio.emit('data_updated', {'message': f'New focus added for {player_name}.'})
+    socketio.emit('dev_focus_add', {'player_name': player_name, 'focus': new_focus.to_dict()})
     return redirect(url_for('home', _anchor='player_development'))
 
 @development_bp.route('/update_focus/<int:focus_id>', methods=['POST'])
@@ -53,7 +53,7 @@ def update_focus(focus_id):
     focus_item.last_edited_date = datetime.now()
     db.session.commit()
     flash('Focus item updated successfully.', 'success')
-    socketio.emit('data_updated', {'message': 'Focus item updated.'})
+    socketio.emit('dev_focus_update', {'player_name': focus_item.player.name, 'focus': focus_item.to_dict()})
     return redirect(url_for('home', _anchor='player_development'))
 
 @development_bp.route('/complete_focus/<int:focus_id>')
@@ -67,17 +67,18 @@ def complete_focus(focus_id):
     focus_item.completed_date = date.today()
     db.session.commit()
     flash('Focus marked as complete!', 'success')
-    socketio.emit('data_updated', {'message': 'Focus marked complete.'})
+    socketio.emit('dev_focus_update', {'player_name': focus_item.player.name, 'focus': focus_item.to_dict()})
     return redirect(url_for('home', _anchor='player_development'))
 
 @development_bp.route('/delete_focus/<int:focus_id>')
 def delete_focus(focus_id):
     focus_item = find_focus_by_id(focus_id)
     if focus_item and focus_item.team_id == session['team_id']:
+        player_name = focus_item.player.name # Get name before deleting
         db.session.delete(focus_item)
         db.session.commit()
         flash('Focus deleted successfully.', 'success')
-        socketio.emit('data_updated', {'message': 'Focus deleted.'})
+        socketio.emit('dev_focus_delete', {'player_name': player_name, 'focus_id': focus_id})
     else:
         flash('Could not find the focus item to delete or you do not have permission.', 'danger')
     return redirect(url_for('home', _anchor='player_development'))
