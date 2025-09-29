@@ -67,22 +67,22 @@ def get_pitching_rules_for_team(team):
     rule_set = PITCHING_RULES.get(rule_set_name, PITCHING_RULES['USSSA'])
     return rule_set.get(age_group, rule_set.get('default'))
 
-def calculate_cumulative_pitching_stats(player_id, all_outings, games):
+def calculate_cumulative_pitching_stats(player_id, all_outings):
+    """Calculates total innings, pitches, and appearances for a pitcher."""
     stats = {'total_innings_pitched': 0.0, 'total_pitches_thrown': 0, 'appearances': 0}
-    today = datetime.now().date()
-    past_game_ids = {game.id for game in games if game.date.date() <= today}
-
+    print(f"--- Calculating for player_id: {player_id} ---")
     for outing in all_outings:
+        print(f"  - Comparing with outing for player_id: {outing.player_id} (type: {type(outing.player_id)}) vs {player_id} (type: {type(player_id)})")
         if outing.player_id == player_id:
-            game_id = getattr(outing, 'associated_game_id', None)
-            if game_id and game_id in past_game_ids:
-                try:
-                    stats['total_innings_pitched'] += float(outing.innings or 0.0)
-                    stats['total_pitches_thrown'] += int(outing.pitches or 0)
-                    stats['appearances'] += 1
-                except (ValueError, TypeError):
-                    continue
+            print(f"    - MATCH FOUND!")
+            try:
+                stats['total_innings_pitched'] += float(outing.innings or 0.0)
+                stats['total_pitches_thrown'] += int(outing.pitches or 0)
+                stats['appearances'] += 1
+            except (ValueError, TypeError):
+                continue
     stats['total_innings_pitched'] = round(stats['total_innings_pitched'], 1)
+    print(f"--- Final stats for player_id {player_id}: {stats} ---")
     return stats
 
 def calculate_cumulative_position_stats(roster_players, rotations, games):
