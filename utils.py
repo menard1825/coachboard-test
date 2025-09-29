@@ -27,8 +27,9 @@ def model_to_dict(obj):
     d = {}
     for column in obj.__table__.columns:
         val = getattr(obj, column.name)
+        # MODIFIED: Output dates in ISO 8601 format for unambiguous parsing in JavaScript.
         if isinstance(val, (datetime, date)):
-            d[column.name] = val.strftime('%Y-%m-%d')
+            d[column.name] = val.isoformat()
         else:
             d[column.name] = val
     return d

@@ -29,18 +29,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatDateTime = (s) => {
         if (!s || s === 'Never') return s;
         try {
-            // By replacing hyphens with slashes, we instruct the Date constructor
-            // to parse the date in the local timezone rather than UTC, fixing the display error.
-            const dt = new Date(s.replace(/-/g, '/').replace(' ', 'T'));
+            // SIMPLIFIED: The new Date() constructor handles ISO 8601 format directly.
+            const dt = new Date(s);
             if (isNaN(dt)) throw new Error('Invalid date');
-            
-            if (s.length <= 10) {
-                 return dt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' });
+
+            // Check if the time part is midnight (or not present)
+            if (dt.getUTCHours() === 0 && dt.getUTCMinutes() === 0 && dt.getUTCSeconds() === 0) {
+                // If it's just a date, format it without the time
+                 return dt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit', timeZone: 'UTC' });
             }
+            // Otherwise, format with the time
             return dt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' }) + ', ' + 
                    dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
         } catch (e) {
-            return s;
+            console.error("Error formatting date:", s, e);
+            return s; // Return original string if formatting fails
         }
     };
 
