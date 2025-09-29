@@ -70,11 +70,8 @@ def get_pitching_rules_for_team(team):
 def calculate_cumulative_pitching_stats(player_id, all_outings):
     """Calculates total innings, pitches, and appearances for a pitcher."""
     stats = {'total_innings_pitched': 0.0, 'total_pitches_thrown': 0, 'appearances': 0}
-    print(f"--- Calculating for player_id: {player_id} ---")
     for outing in all_outings:
-        print(f"  - Comparing with outing for player_id: {outing.player_id} (type: {type(outing.player_id)}) vs {player_id} (type: {type(player_id)})")
         if outing.player_id == player_id:
-            print(f"    - MATCH FOUND!")
             try:
                 stats['total_innings_pitched'] += float(outing.innings or 0.0)
                 stats['total_pitches_thrown'] += int(outing.pitches or 0)
@@ -82,7 +79,6 @@ def calculate_cumulative_pitching_stats(player_id, all_outings):
             except (ValueError, TypeError):
                 continue
     stats['total_innings_pitched'] = round(stats['total_innings_pitched'], 1)
-    print(f"--- Final stats for player_id {player_id}: {stats} ---")
     return stats
 
 def calculate_cumulative_position_stats(roster_players, rotations, games):

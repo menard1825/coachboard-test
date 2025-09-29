@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from functools import wraps
 from datetime import datetime
+import json
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -227,6 +228,10 @@ def get_stats():
 
     pitchers = list(combined_pitchers_dict.values())
     cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings_db) for p in pitchers}
+
+    # --- DEBUGGING LINE ADDED HERE ---
+    print(f"DEBUG: Final pitching data being sent: {json.dumps(cumulative_pitching_data, indent=2)}")
+
     cumulative_position_data = calculate_cumulative_position_stats(roster_db, rotations_db, games_db)
 
     game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=team_id).group_by(PlayerGameAbsence.player_id).all()
