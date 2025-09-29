@@ -64,16 +64,24 @@ def create_app():
 
     # --- Custom Jinja Filter for Date/Time Formatting ---
     @app.template_filter('format_datetime')
-    def format_datetime_filter(dt):
+    def format_datetime_filter(val):
+        dt = val
+        if isinstance(val, str):
+            try:
+                if 'T' in val:
+                    dt = datetime.fromisoformat(val)
+                else:
+                    dt = date.fromisoformat(val)
+            except (ValueError, TypeError):
+                return val  # Return original string if parsing fails
+
         if not dt or not isinstance(dt, (datetime, date)):
             return dt
+
         if isinstance(dt, datetime):
-            # MODIFIED: Add a check for midnight
             if dt.hour == 0 and dt.minute == 0 and dt.second == 0:
-                # If the time is midnight, format as date only
                 return dt.strftime('%A, %m/%d/%y')
             else:
-                # Otherwise, format with the time
                 return dt.strftime('%A, %m/%d/%y, %I:%M %p')
         if isinstance(dt, date):
             return dt.strftime('%A, %m/%d/%y')

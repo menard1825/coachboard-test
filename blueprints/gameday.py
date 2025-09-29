@@ -99,6 +99,9 @@ def add_game():
         return redirect(url_for('home', _anchor='games'))
     # --- VALIDATION END ---
 
+    # Ensure the time is set to midnight, not the current time
+    game_date = game_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
     new_game = Game(
         date=game_date,
         opponent=opponent,
@@ -123,7 +126,8 @@ def edit_game(game_id):
     if game_date_str:
         parsed_date = parse_date(game_date_str)
         if parsed_date:
-            game_to_edit.date = parsed_date
+            # Ensure the time is set to midnight, not the current time
+            game_to_edit.date = parsed_date.replace(hour=0, minute=0, second=0, microsecond=0)
         else:
             flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
             return redirect(url_for('.game_management', game_id=game_id))
