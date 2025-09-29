@@ -1,10 +1,9 @@
-# menard1825/coachboard-test/coachboard-test-structure-overhaul/models.py
 # models.py
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float, DateTime, JSON
 from sqlalchemy.orm import relationship
 from db import db
 import json
-from datetime import datetime
+from datetime import datetime, date
 
 # All models now inherit from db.Model
 class Team(db.Model):
@@ -79,7 +78,14 @@ class Player(db.Model):
 
     def to_dict(self):
         """Return a dictionary representation of the Player object."""
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        d = {}
+        for column in self.__table__.columns:
+            val = getattr(self, column.name)
+            if isinstance(val, (datetime, date)):
+                d[column.name] = val.isoformat()
+            else:
+                d[column.name] = val
+        return d
 
 
 class Lineup(db.Model):
@@ -178,7 +184,14 @@ class Game(db.Model):
 
     def to_dict(self):
         """Return a dictionary representation of the Game object."""
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        d = {}
+        for column in self.__table__.columns:
+            val = getattr(self, column.name)
+            if isinstance(val, (datetime, date)):
+                d[column.name] = val.isoformat()
+            else:
+                d[column.name] = val
+        return d
 
 class CollaborationNote(db.Model):
     __tablename__ = 'collaboration_notes'
