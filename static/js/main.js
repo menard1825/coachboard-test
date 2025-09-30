@@ -29,18 +29,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatDateTime = (s) => {
         if (!s || s === 'Never') return s;
         try {
-            // SIMPLIFIED: The new Date() constructor handles ISO 8601 format directly.
             const dt = new Date(s);
             if (isNaN(dt)) throw new Error('Invalid date');
 
-            // Check if the time part is midnight (or not present)
-            if (dt.getUTCHours() === 0 && dt.getUTCMinutes() === 0 && dt.getUTCSeconds() === 0) {
-                // If it's just a date, format it without the time
-                 return dt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit', timeZone: 'UTC' });
-            }
-            // Otherwise, format with the time
-            return dt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' }) + ', ' + 
-                   dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            // MODIFIED: Always format without the time. Using timeZone: 'UTC' prevents
+            // the date from accidentally shifting by a day due to the user's local timezone.
+            return dt.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: '2-digit',
+                month: '2-digit',
+                day: '2-digit',
+                timeZone: 'UTC'
+            });
         } catch (e) {
             console.error("Error formatting date:", s, e);
             return s; // Return original string if formatting fails

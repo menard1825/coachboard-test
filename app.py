@@ -78,14 +78,8 @@ def create_app():
         if not dt or not isinstance(dt, (datetime, date)):
             return dt
 
-        if isinstance(dt, datetime):
-            if dt.hour == 0 and dt.minute == 0 and dt.second == 0:
-                return dt.strftime('%A, %m/%d/%y')
-            else:
-                return dt.strftime('%A, %m/%d/%y, %I:%M %p')
-        if isinstance(dt, date):
-            return dt.strftime('%A, %m/%d/%y')
-        return dt
+        # MODIFIED: Always format dates without the time part for a cleaner UI.
+        return dt.strftime('%A, %m/%d/%y')
 
     # --- Decorators & Context Processors ---
     def login_required(f):
