@@ -178,14 +178,7 @@ class Game(db.Model):
 
     def to_dict(self):
         """Return a dictionary representation of the Game object."""
-        d = {}
-        for column in self.__table__.columns:
-            val = getattr(self, column.name)
-            if isinstance(val, datetime):
-                d[column.name] = val.isoformat()
-            else:
-                d[column.name] = val
-        return d
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class CollaborationNote(db.Model):
     __tablename__ = 'collaboration_notes'
