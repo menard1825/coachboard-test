@@ -175,6 +175,8 @@ class Game(db.Model):
     team = relationship("Team", back_populates="games")
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
     
+    game_status = Column(String, default='pre-game', nullable=False) # New field
+
     # ADDED RELATIONSHIPS WITH CASCADE DELETE
     lineups = relationship("Lineup", back_populates="game", cascade="all, delete-orphan")
     rotations = relationship("Rotation", back_populates="game", cascade="all, delete-orphan")

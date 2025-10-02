@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Live Game vs {{ game.opponent }}{% endblock %}
+
+{% block bottom_nav %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+        <h4 class="mb-0 text-danger"><i class="bi bi-broadcast"></i> Live Game vs {{ game.opponent }}</h4>
+        <div class="btn-group">
+            <a href="{{ url_for('gameday.update_game_status', game_id=game.id, status='pre-game') }}" class="btn btn-sm btn-outline-secondary">Return to Planning</a>
+            <a href="{{ url_for('gameday.update_game_status', game_id=game.id, status='final') }}" class="btn btn-sm btn-danger">Mark as Final</a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header"><h5 class="mb-0">Batting Lineup</h5></div>
+                <div class="card-body">
+                    {% if lineup and lineup.lineup_positions %}
+                        <ol class="list-group list-group-numbered">
+                            {% for player_name in lineup.lineup_positions %}
+                                <li class="list-group-item">{{ player_name }}</li>
+                            {% endfor %}
+                        </ol>
+                    {% else %}
+                        <p class="text-muted">No lineup set.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Defensive Rotation</h5>
+                        <div class="d-flex align-items-center">
+                            <button id="prev-inning" class="btn btn-sm btn-secondary"><i class="bi bi-arrow-left"></i></button>
+                            <span id="inning-display" class="mx-3 fw-bold">Inning 1</span>
+                            <button id="next-inning" class="btn btn-sm btn-secondary"><i class="bi bi-arrow-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body position-relative p-2" style="min-height: 400px;">
+                    <div id="rotation-display" class="diamond-container-interactive">
+                        </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                 <div class="card-header"><h5 class="mb-0">Quick Pitch Log</h5></div>
+                 <div class="card-body">
+                    {% include '_pitching_log.html' %}
+                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const rotation = {{ rotation|tojson }};
+    const innings = rotation ? Object.keys(rotation.innings).sort((a, b) => parseInt(a) - parseInt(b)) : ['1'];
+    let currentIndex = 0;
+
+    const inningDisplay = document.getElementById('inning-display');
+    const rotationDisplay = document.getElementById('rotation-display');
+
+    function renderInning(index) {
+        const inningNum = innings[index];
+        const inningData = rotation.innings[inningNum] || {};
+        inningDisplay.textContent = `Inning ${inningNum}`;
+
+        let positionHTML = '';
+        const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
+        positions.forEach(pos => {
+            const playerName = inningData[pos] || '';
+            const playerTag = playerName ? `<div class="player-tag">${playerName}</div>` : '';
+            positionHTML += `<div class="position-dropzone pos-${pos}" data-position="${pos}"><span class="pos-abbr">${pos}</span>${playerTag}</div>`;
+        });
+        rotationDisplay.innerHTML = positionHTML;
+    }
+
+    document.getElementById('next-inning').addEventListener('click', () => {
+        if (currentIndex < innings.length - 1) {
+            currentIndex++;
+            renderInning(currentIndex);
+        }
+    });
+
+    document.getElementById('prev-inning').addEventListener('click', () => {
+        if (currentIndex > 0) {
+            currentIndex--;
+            renderInning(currentIndex);
+        }
+    });
+
+    // Initial render
+    if (innings.length > 0) {
+        renderInning(0);
+    }
+});
+</script>
+{% endblock %}
