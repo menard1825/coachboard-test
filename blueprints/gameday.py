@@ -1,4 +1,6 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify, render_template
+from flask_socketio import join_room, leave_room
+from sqlalchemy.orm.attributes import flag_modified
 from models import (
     Game, Player, Lineup, Rotation, PitchingOuting, Team, PlayerGameAbsence
 )
@@ -202,21 +204,15 @@ def update_game_status(game_id):
     status = request.args.get('status')
     game = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
     if not game:
-        flash('Game not found.', 'danger')
-        return redirect(url_for('home'))
+        return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
 
     if status in ['pre-game', 'live', 'final']:
         game.game_status = status
         db.session.commit()
-        flash(f'Game status updated to {status.replace("-", " ").title()}.', 'success')
-        socketio.emit('data_updated', {'message': 'Game status updated.'})
+        socketio.emit('status_changed', {'game_id': game_id, 'status': status}, room=str(game_id))
+        return jsonify({'status': 'success', 'message': f'Game status updated to {status}.'})
     else:
-        flash('Invalid game status.', 'danger')
-
-    if status == 'live':
-        return redirect(url_for('gameday.live_game', game_id=game.id))
-    else:
-        return redirect(url_for('gameday.game_management', game_id=game.id))
+        return jsonify({'status': 'error', 'message': 'Invalid game status.'}), 400
 
 
 @gameday_bp.route('/game/<int:game_id>/update_absences', methods=['POST'])
@@ -399,3 +395,73 @@ def save_rotation_as_template():
         'message': 'Template saved successfully!',
         'new_template': model_to_dict(new_template)
     })
+
+# --- Socket.IO Event Handlers for Real-Time Gameday ---
+
+@socketio.on('join_game')
+def on_join(data):
+    """Client joins a room for a specific game."""
+    game_id = data.get('game_id')
+    if game_id:
+        room = str(game_id)
+        join_room(room)
+        print(f"Client joined room: {room}")
+
+@socketio.on('leave_game')
+def on_leave(data):
+    """Client leaves a room for a specific game."""
+    game_id = data.get('game_id')
+    if game_id:
+        room = str(game_id)
+        leave_room(room)
+        print(f"Client left room: {room}")
+
+@socketio.on('game_update')
+def handle_game_update(data):
+    """Handles live updates to the game state (score, inning, outs)."""
+    game_id = data.get('game_id')
+    game = db.session.get(Game, game_id)
+    if not game:
+        return
+
+    # Update score, inning, and outs from the received data
+    score_data = data.get('score', {})
+    game.our_score = score_data.get('our_score', game.our_score)
+    game.opponent_score = score_data.get('opponent_score', game.opponent_score)
+    game.inning = data.get('inning', game.inning)
+    game.outs = data.get('outs', game.outs)
+
+    db.session.commit()
+
+    # Broadcast the updated state to all clients in the same game room
+    emit_data = {
+        'game_id': game_id,
+        'score': {'our_score': game.our_score, 'opponent_score': game.opponent_score},
+        'inning': game.inning,
+        'outs': game.outs
+    }
+    socketio.emit('game_state_updated', emit_data, room=str(game_id))
+
+@socketio.on('substitution')
+def handle_substitution(data):
+    """Handles a player substitution and updates the rotation."""
+    game_id = data.get('game_id')
+    inning = str(data.get('inning'))
+    position = data.get('position')
+    new_player_name = data.get('player_name')
+
+    rotation = db.session.query(Rotation).filter_by(associated_game_id=game_id).first()
+    if not rotation or not rotation.innings:
+        return
+
+    # Update the specific position for the specific inning
+    if inning in rotation.innings and position:
+        rotation.innings[inning][position] = new_player_name
+        flag_modified(rotation, "innings") # Mark the JSONB field as modified
+        db.session.commit()
+
+        # Broadcast the entire updated rotation to all clients
+        socketio.emit('defensive_rotation_updated', {
+            'game_id': game_id,
+            'rotation': model_to_dict(rotation)
+        }, room=str(game_id))

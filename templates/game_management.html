@@ -20,105 +20,169 @@
 </nav>
 
 <div class="container-fluid">
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center flex-wrap">
-                <div class="mb-2 mb-md-0">
-                    <h5 class="card-title mb-1">Game Status</h5>
-                    <span class="badge fs-6
-                        {% if game['game_status'] == 'live' %}
-                            bg-danger
-                        {% elif game['game_status'] == 'final' %}
-                            bg-secondary
-                        {% else %}
-                            bg-primary
-                        {% endif %}">
-                        {{ game['game_status'].replace('-', ' ')|title }}
-                    </span>
+    <!-- Live Mode Toggle -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap">
+            <div class="d-flex align-items-center">
+                <h5 class="card-title mb-0 me-3">Game Mode</h5>
+                <div class="form-check form-switch fs-5">
+                    <input class="form-check-input" type="checkbox" id="live-mode-toggle" {% if game['game_status'] == 'live' %}checked{% endif %}>
+                    <label class="form-check-label" for="live-mode-toggle">Live</label>
                 </div>
-                <div class="btn-group">
-                    {% if game['game_status'] == 'pre-game' %}
-                        <a href="{{ url_for('gameday.update_game_status', game_id=game['id'], status='live') }}" class="btn btn-danger"><i class="bi bi-broadcast"></i> Go Live!</a>
-                    {% elif game['game_status'] == 'live' %}
-                        <a href="{{ url_for('gameday.update_game_status', game_id=game['id'], status='final') }}" class="btn btn-secondary">Mark as Final</a>
-                        <a href="{{ url_for('gameday.update_game_status', game_id=game['id'], status='pre-game') }}" class="btn btn-outline-secondary">Revert to Pre-Game</a>
-                    {% elif game['game_status'] == 'final' %}
-                        <a href="{{ url_for('gameday.update_game_status', game_id=game['id'], status='pre-game') }}" class="btn btn-outline-secondary">Revert to Pre-Game</a>
-                    {% endif %}
+            </div>
+            <span id="game-status-badge" class="badge fs-6
+                {% if game['game_status'] == 'live' %} bg-danger
+                {% elif game['game_status'] == 'final' %} bg-secondary
+                {% else %} bg-primary
+                {% endif %}">
+                {{ game['game_status'].replace('-', ' ')|title }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Planning Mode Container -->
+    <div id="planning-mode-container" class="{{ 'd-none' if game['game_status'] == 'live' else '' }}">
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-check2-circle me-2"></i>Player Availability</h5>
+                        <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#availabilityCollapse">
+                            Edit
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        {% set absent_count = absent_player_ids | length %}
+                        {% set present_count = roster | length - absent_count %}
+                        <p><strong>{{ present_count }}</strong> players present, <strong>{{ absent_count }}</strong> absent.</p>
+                        <div class="collapse" id="availabilityCollapse">
+                            <form action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
+                                <ul class="list-group mb-3">
+                                    {% for player in roster %}
+                                    <li class="list-group-item">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player['id'] }}" id="player-{{ player['id'] }}" {% if player['id'] in absent_player_ids %}checked{% endif %}>
+                                            <label class="form-check-label" for="player-{{ player['id'] }}">
+                                                {{ player['name'] }}
+                                            </label>
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                <button type="submit" class="btn btn-primary w-100">Save Availability</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Batting Lineup</h5>
+                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">
+                            <i class="bi bi-pencil-square"></i> Edit Lineup
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        {% if lineup and lineup.lineup_positions %}
+                            <ol class="list-group list-group-numbered">
+                                {% for player_name in lineup.lineup_positions %}
+                                    <li class="list-group-item">{{ player_name }}</li>
+                                {% endfor %}
+                            </ol>
+                        {% else %}
+                            <div class="text-center p-3 text-muted">
+                                <p class="mb-1">No lineup has been set.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-12 mb-4">
+                {% include '_rotation_editor.html' %}
+            </div>
+            <div class="col-lg-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitching Log</h5>
+                    </div>
+                    <div class="card-body">
+                      {% include '_pitching_log.html' %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-check2-circle me-2"></i>Player Availability</h5>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#availabilityCollapse">
-                        Edit
-                    </button>
-                </div>
-                <div class="card-body">
-                    {% set absent_count = absent_player_ids | length %}
-                    {% set present_count = roster | length - absent_count %}
-                    <p><strong>{{ present_count }}</strong> players present, <strong>{{ absent_count }}</strong> absent.</p>
-                    <div class="collapse" id="availabilityCollapse">
-                        <form action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
-                            <ul class="list-group mb-3">
-                                {% for player in roster %}
-                                <li class="list-group-item">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player['id'] }}" id="player-{{ player['id'] }}" {% if player['id'] in absent_player_ids %}checked{% endif %}>
-                                        <label class="form-check-label" for="player-{{ player['id'] }}">
-                                            {{ player['name'] }}
-                                        </label>
-                                    </div>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                            <button type="submit" class="btn btn-primary w-100">Save Availability</button>
-                        </form>
+    <!-- Live Mode Container -->
+    <div id="live-mode-container" class="{{ 'd-none' if game['game_status'] != 'live' }}">
+        <div class="row">
+            <!-- Live Scoreboard -->
+            <div class="col-12 mb-4">
+                <div class="card text-center">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Live Scoreboard</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <h4>{{ current_team.name }}</h4>
+                                <span id="live-our-score" class="display-4">{{ game.our_score or 0 }}</span>
+                                <div>
+                                    <button id="our-score-plus" class="btn btn-success btn-sm"><i class="bi bi-plus"></i></button>
+                                    <button id="our-score-minus" class="btn btn-danger btn-sm"><i class="bi bi-dash"></i></button>
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <h3 class="display-3">VS</h3>
+                            </div>
+                            <div class="col">
+                                <h4>{{ game.opponent }}</h4>
+                                <span id="live-opponent-score" class="display-4">{{ game.opponent_score or 0 }}</span>
+                                <div>
+                                    <button id="opponent-score-plus" class="btn btn-success btn-sm"><i class="bi bi-plus"></i></button>
+                                    <button id="opponent-score-minus" class="btn btn-danger btn-sm"><i class="bi bi-dash"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row mt-3">
+                            <div class="col">
+                                <h5 id="live-inning">Inning: {{ game.inning or 1 }}</h5>
+                                <button id="inning-minus" class="btn btn-secondary btn-sm"><i class="bi bi-arrow-down"></i></button>
+                                <button id="inning-plus" class="btn btn-secondary btn-sm"><i class="bi bi-arrow-up"></i></button>
+                            </div>
+                            <div class="col">
+                                <h5 id="live-outs">Outs: {{ game.outs or 0 }}</h5>
+                                <button id="outs-plus" class="btn btn-secondary btn-sm"><i class="bi bi-plus"></i></button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Batting Lineup</h5>
-                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">
-                        <i class="bi bi-pencil-square"></i> Edit Lineup
-                    </button>
-                </div>
-                <div class="card-body">
-                    {% if lineup and lineup.lineup_positions %}
-                        <ol class="list-group list-group-numbered">
-                            {% for player_name in lineup.lineup_positions %}
-                                <li class="list-group-item">{{ player_name }}</li>
-                            {% endfor %}
-                        </ol>
-                    {% else %}
-                        <div class="text-center p-3 text-muted">
-                            <p class="mb-1">No lineup has been set.</p>
-                        </div>
-                    {% endif %}
+            <!-- Defensive Rotation View -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Current Defensive Rotation</h5>
+                    </div>
+                    <div class="card-body" id="live-defensive-view">
+                        <!-- Content generated by game_dashboard.js -->
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-lg-12 mb-4">
-            {% include '_rotation_editor.html' %}
-        </div>
-
-        <div class="col-lg-12 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitching Log</h5>
-                </div>
-                <div class="card-body">
-                  {% include '_pitching_log.html' %}
+            <!-- Substitution Panel -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Make Substitution</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Substitution UI will go here -->
+                        <p class="text-muted">Substitution functionality coming soon.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -204,6 +268,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/lineup_editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
+<script src="{{ url_for('static', filename='js/game_dashboard.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const gameData = {
@@ -216,7 +281,11 @@
             rotation_templates: {{ rotation_templates|tojson }},
             outfielder_count: {{ current_team.outfielder_count if current_team else 3 }}
         };
+        // Initialize the planning mode logic
         initializeGameManagement(gameData);
+
+        // Initialize the new live dashboard logic
+        initializeLiveDashboard(gameData);
     });
 </script>
 {% endblock %}
