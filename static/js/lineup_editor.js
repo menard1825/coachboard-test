@@ -242,10 +242,9 @@ function initializeLineupEditor(options) {
     let ghostPositionEl = null;
 
     const onSortEnd = (evt) => {
+        state.lineupData.lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
         handleContentChange();
         renderLineup();
-        benchEl.scrollTop = 0;
-        orderEl.scrollTop = 0;
     };
 
     const sortableOptions = {
