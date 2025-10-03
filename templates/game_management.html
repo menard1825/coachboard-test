@@ -179,9 +179,23 @@
                     <div class="card-header">
                         <h5 class="mb-0">Make Substitution</h5>
                     </div>
-                    <div class="card-body">
-                        <!-- Substitution UI will go here -->
-                        <p class="text-muted">Substitution functionality coming soon.</p>
+                    <div class="card-body" id="substitution-panel">
+                        <form id="substitution-form">
+                            <div class="row g-3">
+                                <div class="col-sm-6">
+                                    <label for="sub-position-select" class="form-label">Position to Change</label>
+                                    <select id="sub-position-select" class="form-select" required></select>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label for="sub-player-in-select" class="form-label">New Player</label>
+                                    <select id="sub-player-in-select" class="form-select" required></select>
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-primary w-100">Make Change</button>
+                                </div>
+                            </div>
+                            <div id="sub-player-out-info" class="text-muted small mt-2"></div>
+                        </form>
                     </div>
                 </div>
             </div>
