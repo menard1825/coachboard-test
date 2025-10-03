@@ -123,7 +123,9 @@ def create_app():
             return redirect(url_for('auth.login'))
 
         all_tabs = {'overview': 'Overview', 'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineup Templates', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotation Templates', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
-        default_tab_order = list(all_tabs.keys())
+
+        # MODIFIED: Changed default_tab_order to start with 'overview'
+        default_tab_order = ['overview', 'roster', 'player_development', 'lineups', 'pitching', 'scouting_list', 'rotations', 'games', 'collaboration', 'practice_plan', 'signs', 'stats']
 
         try:
             user_tab_order = json.loads(user.tab_order or '[]')

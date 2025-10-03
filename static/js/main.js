@@ -1163,7 +1163,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     
         // On initial page load, check the URL hash and activate the correct tab.
-        let hash = window.location.hash || '#roster';
+        // MODIFIED: Changed the default hash from '#roster' to '#overview'
+        let hash = window.location.hash || '#overview';
         let tabToActivate = document.querySelector(`a[data-bs-toggle="tab"][href="${hash}"]`);
     
         // If the hash points to something inside a tab (like an accordion), find its parent tab.
@@ -1177,9 +1178,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // If still no tab is found, default to the roster.
+        // If still no tab is found, default to the overview.
         if (!tabToActivate) {
-            tabToActivate = document.querySelector('a[data-bs-toggle="tab"][href="#roster"]');
+            tabToActivate = document.querySelector('a[data-bs-toggle="tab"][href="#overview"]');
         }
 
         // Activate the initial tab
