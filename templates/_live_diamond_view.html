@@ -1,0 +1,18 @@
+<div class="diamond-container-interactive">
+    <div id="pos-live-P" class="position-dropzone pos-P" data-position="P"><span class="pos-abbr">P</span></div>
+    <div id="pos-live-C" class="position-dropzone pos-C" data-position="C"><span class="pos-abbr">C</span></div>
+    <div id="pos-live-1B" class="position-dropzone pos-1B" data-position="1B"><span class="pos-abbr">1B</span></div>
+    <div id="pos-live-2B" class="position-dropzone pos-2B" data-position="2B"><span class="pos-abbr">2B</span></div>
+    <div id="pos-live-3B" class="position-dropzone pos-3B" data-position="3B"><span class="pos-abbr">3B</span></div>
+    <div id="pos-live-SS" class="position-dropzone pos-SS" data-position="SS"><span class="pos-abbr">SS</span></div>
+    {% if current_team and current_team.outfielder_count == 4 %}
+        <div id="pos-live-LF" class="position-dropzone pos-4-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
+        <div id="pos-live-LCF" class="position-dropzone pos-4-LCF" data-position="LCF"><span class="pos-abbr">LCF</span></div>
+        <div id="pos-live-RCF" class="position-dropzone pos-4-RCF" data-position="RCF"><span class="pos-abbr">RCF</span></div>
+        <div id="pos-live-RF" class="position-dropzone pos-4-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+    {% else %}
+        <div id="pos-live-LF" class="position-dropzone pos-LF" data-position="LF"><span class="pos-abbr">LF</span></div>
+        <div id="pos-live-CF" class="position-dropzone pos-CF" data-position="CF"><span class="pos-abbr">CF</span></div>
+        <div id="pos-live-RF" class="position-dropzone pos-RF" data-position="RF"><span class="pos-abbr">RF</span></div>
+    {% endif %}
+</div>

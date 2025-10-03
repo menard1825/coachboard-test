@@ -10,17 +10,7 @@ function initializeLiveDashboard(gameData) {
     // --- STATE ---
     const state = {
         isLive: gameData.game.game_status === 'live',
-        score: {
-            our_score: gameData.game.our_score || 0,
-            opponent_score: gameData.game.opponent_score || 0
-        },
         inning: gameData.game.inning || 1,
-        outs: gameData.game.outs || 0,
-        base_runners: {
-            first: false,
-            second: false,
-            third: false
-        },
         rotation: gameData.rotation || {},
         roster: gameData.roster || []
     };
@@ -34,11 +24,11 @@ function initializeLiveDashboard(gameData) {
     const subPositionSelect = document.getElementById('sub-position-select');
     const subPlayerInSelect = document.getElementById('sub-player-in-select');
     const subPlayerOutInfo = document.getElementById('sub-player-out-info');
+    const inningDisplay = document.getElementById('live-inning-display');
 
 
     // --- RENDER FUNCTIONS ---
     function render() {
-        // Show/hide containers based on live status
         if (state.isLive) {
             planningContainer.classList.add('d-none');
             liveContainer.classList.remove('d-none');
@@ -54,35 +44,29 @@ function initializeLiveDashboard(gameData) {
             statusBadge.classList.remove('bg-danger', 'bg-secondary');
             statusBadge.classList.add('bg-primary');
         }
-        renderScoreboard();
         renderDefensiveView();
     }
 
-    function renderScoreboard() {
-        document.getElementById('live-our-score').textContent = state.score.our_score;
-        document.getElementById('live-opponent-score').textContent = state.score.opponent_score;
-        document.getElementById('live-inning').textContent = `Inning: ${state.inning}`;
-        document.getElementById('live-outs').textContent = `Outs: ${state.outs}`;
-        // Add logic for base runners if UI elements exist
-    }
-
     function renderDefensiveView() {
-        const defensiveViewContainer = document.getElementById('live-defensive-view');
-        if (!defensiveViewContainer) return;
-
         const currentInningData = state.rotation.innings ? state.rotation.innings[state.inning] || {} : {};
-        let html = '<ul class="list-group">';
-        // Sort positions for consistent order
-        const sortedPositions = Object.keys(currentInningData).sort();
 
-        for (const pos of sortedPositions) {
-            const playerName = currentInningData[pos];
-            html += `<li class="list-group-item"><strong>${pos}:</strong> ${playerName}</li>`;
+        // Update inning display
+        if(inningDisplay) inningDisplay.textContent = state.inning;
+
+        // Clear existing player tags
+        document.querySelectorAll('.diamond-container-interactive .player-tag').forEach(tag => tag.remove());
+
+        // Add new player tags
+        for (const [pos, playerName] of Object.entries(currentInningData)) {
+            const dropzone = document.getElementById(`pos-live-${pos}`);
+            if (dropzone) {
+                const playerTag = document.createElement('div');
+                playerTag.className = 'player-tag';
+                playerTag.textContent = playerName;
+                dropzone.appendChild(playerTag);
+            }
         }
-        html += '</ul>';
-        defensiveViewContainer.innerHTML = html;
 
-        // Render the substitution panel after the defensive view is updated
         renderSubstitutionPanel();
     }
 
@@ -95,11 +79,9 @@ function initializeLiveDashboard(gameData) {
         const fieldPlayers = state.roster.filter(p => playersOnField.has(p.name));
         const positions = Object.keys(currentInningData).sort();
 
-        // Populate positions dropdown
         subPositionSelect.innerHTML = '<option value="">Select Position...</option>' +
             positions.map(pos => `<option value="${pos}">${pos}</option>`).join('');
 
-        // Populate players-in dropdown with groups
         const benchOptions = benchPlayers.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
         const fieldOptions = fieldPlayers.map(p => {
             const currentPos = Object.keys(currentInningData).find(pos => currentInningData[pos] === p.name);
@@ -112,12 +94,10 @@ function initializeLiveDashboard(gameData) {
             ${fieldOptions.length > 0 ? `<optgroup label="On the Field">${fieldOptions}</optgroup>` : ''}
         `;
 
-        // Update player-out info when a position is selected
         subPositionSelect.onchange = () => {
             const selectedPos = subPositionSelect.value;
             if (selectedPos && currentInningData[selectedPos]) {
                 subPlayerOutInfo.textContent = `Player out: ${currentInningData[selectedPos]}`;
-                 // Don't allow selecting the same player you're subbing out
                 for (const opt of subPlayerInSelect.options) {
                     opt.disabled = (opt.value === currentInningData[selectedPos]);
                 }
@@ -128,7 +108,6 @@ function initializeLiveDashboard(gameData) {
                 }
             }
         };
-        // Reset the player-out info initially
         subPlayerOutInfo.textContent = '';
     }
 
@@ -148,26 +127,6 @@ function initializeLiveDashboard(gameData) {
             });
     }
 
-    function handleScoreUpdate(field, delta) {
-        if (field === 'our_score') {
-            state.score.our_score = Math.max(0, state.score.our_score + delta);
-        } else if (field === 'opponent_score') {
-            state.score.opponent_score = Math.max(0, state.score.opponent_score + delta);
-        } else if (field === 'inning') {
-            state.inning = Math.max(1, state.inning + delta);
-        } else if (field === 'outs') {
-            state.outs += delta;
-            if (state.outs > 2) {
-                state.outs = 0;
-                state.inning += 1;
-            } else if (state.outs < 0) {
-                state.outs = 0;
-            }
-        }
-        renderScoreboard();
-        socket.emit('game_update', { game_id: gameId, ...state });
-    }
-
     function handleSubstitutionSubmit(event) {
         event.preventDefault();
         const posToChange = subPositionSelect.value;
@@ -183,7 +142,6 @@ function initializeLiveDashboard(gameData) {
         const playerInCurrentPos = selectedPlayerInOption.dataset.currentPos;
 
         if (playerInCurrentPos) {
-            // This is a SWAP between two players on the field
             socket.emit('swap_positions', {
                 game_id: gameId,
                 inning: state.inning,
@@ -193,7 +151,6 @@ function initializeLiveDashboard(gameData) {
                 player2_name: playerInName
             });
         } else {
-            // This is a standard SUBSTITUTION from the bench
             socket.emit('substitution', {
                 game_id: gameId,
                 inning: state.inning,
@@ -201,8 +158,6 @@ function initializeLiveDashboard(gameData) {
                 player_name: playerInName
             });
         }
-
-        // Reset the form
         subForm.reset();
         subPlayerOutInfo.textContent = '';
     }
@@ -220,18 +175,11 @@ function initializeLiveDashboard(gameData) {
         }
     });
 
-    socket.on('game_state_updated', (data) => {
-        if (data.game_id === gameId) {
-            state.score = data.score;
-            state.inning = data.inning;
-            state.outs = data.outs;
-            renderScoreboard();
-        }
-    });
-
     socket.on('defensive_rotation_updated', (data) => {
         if (data.game_id === gameId) {
             state.rotation = data.rotation;
+            // A swap or sub might change the current inning if not handled carefully
+            // For now, we assume the inning stays the same unless a game_state_updated event says otherwise.
             renderDefensiveView();
         }
     });
@@ -239,22 +187,11 @@ function initializeLiveDashboard(gameData) {
     // --- INITIALIZATION ---
     function setupEventListeners() {
         liveModeToggle.addEventListener('change', handleToggleChange);
-
-        // Scoreboard controls
-        document.getElementById('our-score-plus').addEventListener('click', () => handleScoreUpdate('our_score', 1));
-        document.getElementById('our-score-minus').addEventListener('click', () => handleScoreUpdate('our_score', -1));
-        document.getElementById('opponent-score-plus').addEventListener('click', () => handleScoreUpdate('opponent_score', 1));
-        document.getElementById('opponent-score-minus').addEventListener('click', () => handleScoreUpdate('opponent_score', -1));
-        document.getElementById('inning-plus').addEventListener('click', () => handleScoreUpdate('inning', 1));
-        document.getElementById('inning-minus').addEventListener('click', () => handleScoreUpdate('inning', -1));
-        document.getElementById('outs-plus').addEventListener('click', () => handleScoreUpdate('outs', 1));
-
-        // Add listener for the substitution form
         if (subForm) {
             subForm.addEventListener('submit', handleSubstitutionSubmit);
         }
     }
 
-    render(); // Initial render
-    setupEventListeners(); // Set up event listeners
+    render();
+    setupEventListeners();
 }
