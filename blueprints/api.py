@@ -186,12 +186,23 @@ def get_overview_data():
         return jsonify({"error": "Team not found"}), 404
 
     team = db.session.get(Team, team_id)
+    today = datetime.utcnow().date()
 
-    # 1. Next upcoming game
-    next_game = db.session.query(Game).filter(
+    # MODIFIED: Find a live game first
+    live_game = db.session.query(Game).filter(
         Game.team_id == team_id,
-        Game.date >= datetime.utcnow()
-    ).order_by(Game.date.asc()).first()
+        Game.game_status == 'live'
+    ).first()
+
+    # MODIFIED: Find all upcoming (or not yet final) games for today
+    upcoming_games_today = db.session.query(Game).filter(
+        Game.team_id == team_id,
+        func.date(Game.date) == today,
+        Game.game_status != 'final',
+        # Exclude the live game from this list
+        Game.id != (live_game.id if live_game else -1)
+    ).order_by(Game.date.asc()).all()
+
 
     # 2. Pitchers on mandatory rest
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
@@ -203,8 +214,10 @@ def get_overview_data():
     # 3. 3-5 most recent collaboration notes
     recent_notes = db.session.query(CollaborationNote).filter_by(team_id=team_id).order_by(CollaborationNote.timestamp.desc()).limit(5).all()
 
+    # MODIFIED: Return the new data structure
     return jsonify({
-        'next_game': model_to_dict(next_game) if next_game else None,
+        'live_game': model_to_dict(live_game) if live_game else None,
+        'upcoming_games': [model_to_dict(g) for g in upcoming_games_today],
         'pitchers_on_rest': pitchers_on_rest,
         'recent_notes': [model_to_dict(n) for n in recent_notes]
     })

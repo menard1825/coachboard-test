@@ -576,24 +576,65 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('overview-content-container');
         if (!container) return;
 
-        // Since the data is already fetched in init(), we can access it from AppState
-        const { next_game, pitchers_on_rest, recent_notes } = AppState.full_data.overview || {};
+        // MODIFIED: Destructure the new properties from the overview data
+        const { live_game, upcoming_games, pitchers_on_rest, recent_notes } = AppState.full_data.overview || {};
 
-        if (!next_game && !pitchers_on_rest && !recent_notes) {
+        if (!live_game && !upcoming_games && !pitchers_on_rest && !recent_notes) {
             container.innerHTML = `<div class="p-3 text-center text-muted">Loading overview data...</div>`;
             return;
         }
 
-        let nextGameHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Next Game</h5></div><div class="card-body">';
-        if (next_game) {
-            nextGameHtml += `<h5 class="card-title">vs ${escapeHTML(next_game.opponent)}</h5>
-                             <p class="card-text">${formatDateTime(next_game.date)} at ${escapeHTML(next_game.location || 'TBD')}</p>
-                             <a href="/game/${next_game.id}" class="btn btn-primary">Manage Game</a>`;
-        } else {
-            nextGameHtml += '<p class="text-muted">No upcoming games scheduled.</p>';
+        // --- Live Game Card ---
+        let liveGameHtml = '';
+        if (live_game) {
+            liveGameHtml = `
+            <div class="card mb-4 border-danger shadow">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-broadcast-pin me-2"></i>Live Game in Progress</h5>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">vs ${escapeHTML(live_game.opponent)}</h5>
+                    <p class="card-text">${formatDateTime(live_game.date)} at ${escapeHTML(live_game.location || 'TBD')}</p>
+                    <a href="/game/${live_game.id}" class="btn btn-danger">
+                        <i class="bi bi-arrow-right-circle-fill me-1"></i> Return to Game
+                    </a>
+                </div>
+            </div>`;
         }
-        nextGameHtml += '</div></div>';
 
+        // --- Upcoming Games Card ---
+        let upcomingGamesHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Upcoming Today</h5></div><div class="list-group list-group-flush">';
+        if (upcoming_games && upcoming_games.length > 0) {
+            upcomingGamesHtml += upcoming_games.map(game => `
+                <a href="/game/${game.id}" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">vs ${escapeHTML(game.opponent)}</h6>
+                        <small>${escapeHTML(game.location || 'TBD')}</small>
+                    </div>
+                    <small class="text-muted">${formatDateTime(game.date)}</small>
+                </a>
+            `).join('');
+        } else {
+            upcomingGamesHtml += '<li class="list-group-item text-muted">No other games scheduled for today.</li>';
+        }
+        upcomingGamesHtml += '</div></div>';
+
+        // If there's no live game and no upcoming games, show the old "Next Game" logic as a fallback
+        if (!live_game && (!upcoming_games || upcoming_games.length === 0)) {
+            const next_game = AppState.full_data.overview.next_game; // Fallback to original next_game property
+             upcomingGamesHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Next Game</h5></div><div class="card-body">';
+            if (next_game) {
+                upcomingGamesHtml += `<h5 class="card-title">vs ${escapeHTML(next_game.opponent)}</h5>
+                                 <p class="card-text">${formatDateTime(next_game.date)} at ${escapeHTML(next_game.location || 'TBD')}</p>
+                                 <a href="/game/${next_game.id}" class="btn btn-primary">Manage Game</a>`;
+            } else {
+                upcomingGamesHtml += '<p class="text-muted">No upcoming games scheduled.</p>';
+            }
+            upcomingGamesHtml += '</div></div>';
+        }
+
+
+        // --- Pitchers on Rest Card ---
         let pitchersOnRestHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Pitchers on Rest</h5></div><ul class="list-group list-group-flush">';
         if (pitchers_on_rest && Object.keys(pitchers_on_rest).length > 0) {
             for (const [name, data] of Object.entries(pitchers_on_rest)) {
@@ -604,6 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         pitchersOnRestHtml += '</ul></div>';
 
+        // --- Recent Notes Card ---
         let recentNotesHtml = '<div class="card"><div class="card-header"><h5 class="mb-0">Recent Coaches Log</h5></div><div class="card-body">';
         if (recent_notes && recent_notes.length > 0) {
             recentNotesHtml += recent_notes.map(note => `
@@ -617,7 +659,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         recentNotesHtml += '</div></div>';
 
-        container.innerHTML = `<div class="row"><div class="col-md-6">${nextGameHtml}${pitchersOnRestHtml}</div><div class="col-md-6">${recentNotesHtml}</div></div>`;
+        // --- Assemble Final HTML ---
+        container.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    ${liveGameHtml}
+                    ${upcomingGamesHtml}
+                    ${pitchersOnRestHtml}
+                </div>
+                <div class="col-md-6">
+                    ${recentNotesHtml}
+                </div>
+            </div>`;
     }
 
     function renderAll() {
