@@ -435,3 +435,31 @@ def handle_substitution(data):
             'game_id': game_id,
             'rotation': model_to_dict(rotation)
         }, room=str(game_id))
+
+@socketio.on('swap_positions')
+def handle_position_swap(data):
+    """Handles a two-player position swap on the field."""
+    game_id = data.get('game_id')
+    inning = str(data.get('inning'))
+    pos1 = data.get('pos1')
+    player1_name = data.get('player1_name')
+    pos2 = data.get('pos2')
+    player2_name = data.get('player2_name')
+
+    rotation = db.session.query(Rotation).filter_by(associated_game_id=game_id).first()
+    if not rotation or not rotation.innings:
+        return
+
+    if inning in rotation.innings and pos1 and pos2:
+        # Perform the swap
+        rotation.innings[inning][pos1] = player2_name
+        rotation.innings[inning][pos2] = player1_name
+
+        flag_modified(rotation, "innings") # Mark the JSONB field as modified
+        db.session.commit()
+
+        # Broadcast the updated rotation
+        socketio.emit('defensive_rotation_updated', {
+            'game_id': game_id,
+            'rotation': model_to_dict(rotation)
+        }, room=str(game_id))
