@@ -33,10 +33,6 @@ def game_management(game_id):
         flash('Game not found.', 'danger')
         return redirect(url_for('home', _anchor='games'))
 
-    # Redirect to live view if game is live
-    if game.game_status == 'live':
-        return redirect(url_for('gameday.live_game', game_id=game.id))
-    
     roster_objects = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
     
     lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
@@ -171,32 +167,6 @@ def delete_game(game_id):
     else:
         flash('Game not found.', 'danger')
     return redirect(url_for('home', _anchor='games'))
-
-
-@gameday_bp.route('/game/<int:game_id>/live')
-def live_game(game_id):
-    team_id = session.get('team_id')
-    team = db.session.get(Team, team_id)
-    game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first_or_404()
-    lineup = db.session.query(Lineup).filter_by(associated_game_id=game.id).first()
-    rotation = db.session.query(Rotation).filter_by(associated_game_id=game.id).first()
-
-    all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
-
-    game_pitching_log = [o for o in all_pitching_outings if o.opponent == game.opponent and o.date.date() == game.date.date()]
-
-    roster_objects = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
-
-    rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules)
-
-    return render_template('live_game.html',
-                           game=game,
-                           lineup=lineup,
-                           rotation=model_to_dict(rotation) if rotation else None,
-                           game_pitching_log=[pitching_outing_to_dict(o) for o in game_pitching_log],
-                           roster=[model_to_dict(p) for p in roster_objects],
-                           pitch_count_summary=pitch_count_summary)
 
 
 @gameday_bp.route('/game/<int:game_id>/status')
