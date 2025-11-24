@@ -316,8 +316,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
                         const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
                         const statusBadge = counts.status === 'Available' ? '<span class="badge bg-success">Available</span>' : '<span class="badge bg-danger">Resting</span>';
-                        const nextAvailableText = counts.status === 'Resting' ? `<br><small class="text-muted">Next up: ${counts.next_available}</small>` : '';
-                        summaryHtml += `<tr><td class="align-middle"><strong>${escapeHTML(name)}</strong></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div><small class="text-muted">${counts.pitches_remaining_today} remaining</small></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div></div></td><td class="text-center align-middle">${statusBadge}${nextAvailableText}</td></tr>`;
+                        let nextAvailableText = '';
+                        if (counts.status === 'Resting') {
+                            nextAvailableText = `<br><small class="text-muted">Next up: ${counts.next_available}</small>`;
+                            if (counts.last_outing_display && counts.last_outing_display !== 'N/A') {
+                                nextAvailableText += `<br><small class="text-muted fst-italic">(Pitched ${counts.last_outing_display})</small>`;
+                            }
+                        }
+                        // Modified: Weekly count is now just text, no progress bar, to avoid implying a 100-pitch limit.
+                        summaryHtml += `<tr><td class="align-middle"><strong>${escapeHTML(name)}</strong></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div><small class="text-muted">${counts.pitches_remaining_today} remaining</small></td><td class="align-middle text-center"><span class="fw-bold">${counts.weekly}</span></td><td class="text-center align-middle">${statusBadge}${nextAvailableText}</td></tr>`;
                     }
                 }
             } else { summaryHtml += '<tr><td colspan="4" class="text-center text-muted">No pitching data.</td></tr>'; }
@@ -332,7 +339,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const pitchDateInput = document.getElementById('pitch_date');
         if (pitchDateInput && !pitchDateInput.value) {
-            pitchDateInput.value = new Date().toISOString().split('T')[0];
+            // FIX: Use local time instead of UTC to prevent default date being tomorrow in evening hours
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            pitchDateInput.value = `${year}-${month}-${day}`;
         }
 
         const outingsList = document.getElementById('recorded-outings-list');
@@ -589,13 +601,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         nextGameHtml += '</div></div>';
 
-        let pitchersOnRestHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Pitchers on Rest</h5></div><ul class="list-group list-group-flush">';
-        if (pitchers_on_rest && Object.keys(pitchers_on_rest).length > 0) {
-            for (const [name, data] of Object.entries(pitchers_on_rest)) {
-                pitchersOnRestHtml += `<li class="list-group-item">${escapeHTML(name)} - Available on ${data.next_available}</li>`;
-            }
+        let pitchersOnRestHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Pitcher Availability</h5></div><ul class="list-group list-group-flush">';
+
+        // Use full pitch count summary if available for better data
+        const summaryData = AppState.pitch_count_summary;
+        if (summaryData && Object.keys(summaryData).length > 0) {
+             const sortedNames = Object.keys(summaryData).sort();
+             // Filter for only players who are actually pitchers or have pitched
+             const relevantNames = sortedNames.filter(name => {
+                const p = AppState.full_data.roster.find(rp => rp.name === name);
+                return p && (p.pitcher_role !== 'Not a Pitcher' || summaryData[name].daily > 0 || summaryData[name].weekly > 0);
+             });
+
+             if (relevantNames.length > 0) {
+                 relevantNames.forEach(name => {
+                     const data = summaryData[name];
+                     const badge = data.status === 'Available'
+                        ? '<span class="badge bg-success">Available</span>'
+                        : `<span class="badge bg-danger">Resting</span>`;
+                     const detail = data.status === 'Resting'
+                        ? `<small class="text-muted ms-2">Returns: ${data.next_available}</small>`
+                        : `<small class="text-muted ms-2">${data.daily} pitches today</small>`;
+
+                     pitchersOnRestHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>${escapeHTML(name)} ${detail}</span>
+                        ${badge}
+                     </li>`;
+                 });
+             } else {
+                 pitchersOnRestHtml += '<li class="list-group-item text-muted">No pitchers found.</li>';
+             }
         } else {
-            pitchersOnRestHtml += '<li class="list-group-item text-muted">All pitchers are available.</li>';
+            // Fallback to the overview specific data
+            if (pitchers_on_rest && Object.keys(pitchers_on_rest).length > 0) {
+                for (const [name, data] of Object.entries(pitchers_on_rest)) {
+                    pitchersOnRestHtml += `<li class="list-group-item d-flex justify-content-between align-items-center"><span>${escapeHTML(name)}</span> <span class="badge bg-danger">Resting (Returns ${data.next_available})</span></li>`;
+                }
+                 pitchersOnRestHtml += '<li class="list-group-item text-muted small">Other pitchers are available (full data loading...)</li>';
+            } else {
+                pitchersOnRestHtml += '<li class="list-group-item text-success"><i class="bi bi-check-circle-fill me-2"></i>All pitchers available</li>';
+            }
         }
         pitchersOnRestHtml += '</ul></div>';
 

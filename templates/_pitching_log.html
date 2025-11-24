@@ -67,23 +67,32 @@
              <div class="card-footer">
                 <h6 class="card-title mb-2">Pitcher Availability Status</h6>
                 <div class="table-responsive">
-                    <table class="table table-sm table-bordered">
+                    <table class="table table-sm table-bordered table-striped">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Pitcher</th>
+                                <th>Status</th>
+                                <th>Next Available</th>
+                            </tr>
+                        </thead>
                         <tbody>
                         {% for p in roster %}
-                            <tr>
+                            {% set summary = pitch_count_summary.get(p['name']) %}
+                            <tr class="{% if summary and summary.status != 'Available' %}table-danger{% endif %}">
                                 <td><strong>{{ p['name'] }}</strong></td>
-                                {% set summary = pitch_count_summary.get(p['name']) %}
                                 {% if summary %}
                                     <td>
                                         {% if summary.status == 'Available' %}
-                                            <span class="badge bg-success">Available</span>
+                                            <span class="badge bg-success rounded-pill px-3">Available</span>
                                         {% else %}
-                                            <span class="badge bg-danger">Resting</span>
+                                            <span class="badge bg-danger rounded-pill px-3">Resting</span>
                                         {% endif %}
                                     </td>
-                                    <td>Next Available: {{ summary.next_available }}</td>
+                                    <td class="{% if summary.status != 'Available' %}text-danger fw-bold{% endif %}">
+                                        {{ summary.next_available }}
+                                    </td>
                                 {% else %}
-                                    <td colspan="2" class="text-center text-muted">No summary data available.</td>
+                                    <td colspan="2" class="text-center text-muted fst-italic">No data</td>
                                 {% endif %}
                             </tr>
                         {% endfor %}

@@ -58,7 +58,7 @@
                           {% endif %}
                       {% else %}
                           <tr>
-                              <td colspan="4" class="text-center text-muted">No pitching data for pitchers.</td>
+                              <td colspan="4" class="text-center text-muted fst-italic py-3">No pitching data for pitchers found.</td>
                           </tr>
                       {% endfor %}
                   </tbody>
@@ -200,7 +200,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // Set default date for new pitching outings to today
     const pitchDateInput = document.getElementById('pitch_date');
     if (pitchDateInput && !pitchDateInput.value) {
-        pitchDateInput.value = new Date().toISOString().split('T')[0];
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        pitchDateInput.value = `${year}-${month}-${day}`;
     }
 
     const editModal = document.getElementById('editPitchingOutingModal');

@@ -43,6 +43,10 @@ function initializeGameManagement(gameData) {
         renderInningSelector();
         renderRotationDiamondAndBench();
         updatePlayingTimeSummary();
+        renderRotationMatrix(); // NEW: Render the matrix view
+        renderBenchReportMobile(); // NEW: Render the mobile bench report
+        renderBenchReportDesktop(); // NEW: Render the desktop bench report
+        renderRotationSummaryMobile(); // NEW: Render mobile summary
         initializeRotationSortables();
     }
 
@@ -69,8 +73,16 @@ function initializeGameManagement(gameData) {
         const currentInningData = state.rotation.innings[state.currentInning] || {};
 
         // Note: The original createPlayerTag is now modified to accept a player object
-        const createPlayerTag = (player) => {
-            const primaryPos = player.position1 ? ` (${escapeHTML(player.position1)})` : '';
+        // MODIFIED: Only show position if on bench (or general list). If on field, the position is implied by the dropzone.
+        // We will pass an optional 'isOnField' flag.
+        const createPlayerTag = (player, isOnField = false) => {
+            let primaryPos = '';
+            // Only show the primary position label if they are NOT on the field (i.e. on the bench or being dragged from bench)
+            // Or if we just want to be explicit. The user request is to NOT show it when they are playing a different position.
+            // Simplest logic: If isOnField is true, don't show the suffix.
+            if (!isOnField && player.position1) {
+                primaryPos = ` (${escapeHTML(player.position1)})`;
+            }
             return `<div class="player-tag" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
         };
 
@@ -81,8 +93,9 @@ function initializeGameManagement(gameData) {
             if (player) {
                 const dropzoneDesktop = document.getElementById(`pos-desktop-${pos}`);
                 const dropzoneMobile = document.getElementById(`pos-mobile-${pos}`);
-                if (dropzoneDesktop) dropzoneDesktop.insertAdjacentHTML('beforeend', createPlayerTag(player));
-                if (dropzoneMobile) dropzoneMobile.insertAdjacentHTML('beforeend', createPlayerTag(player));
+                // Pass true for isOnField
+                if (dropzoneDesktop) dropzoneDesktop.insertAdjacentHTML('beforeend', createPlayerTag(player, true));
+                if (dropzoneMobile) dropzoneMobile.insertAdjacentHTML('beforeend', createPlayerTag(player, true));
             }
         }
 
@@ -92,10 +105,172 @@ function initializeGameManagement(gameData) {
         const benchDesktop = document.getElementById('bench-list-desktop');
         if(benchDesktop) {
             // Pass the full player object to the updated createPlayerTag function
-            benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p)).join('');
+            // Pass false for isOnField (default)
+            benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p, false)).join('');
+        }
+
+        // NEW: Update Mobile Bench View
+        const benchMobile = document.getElementById('bench-list-mobile');
+        if (benchMobile) {
+            document.querySelectorAll('.current-inning-display').forEach(el => el.textContent = state.currentInning);
+
+            if (benchPlayers.length > 0) {
+                 benchMobile.innerHTML = benchPlayers.map(p =>
+                    `<span class="badge bg-secondary fw-normal p-2 border">${escapeHTML(p.name)}</span>`
+                 ).join('');
+            } else {
+                benchMobile.innerHTML = '<span class="text-muted fst-italic">No one on bench.</span>';
+            }
         }
 
         applyOutOfPositionIndicators(); // Add this line at the end
+    }
+
+    // NEW: Function to render the Rotation Matrix
+    function renderRotationMatrix() {
+        const matrixContainer = document.getElementById('rotation-matrix-container');
+        if (!matrixContainer) return;
+
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        if (innings.length === 0) {
+             matrixContainer.innerHTML = '<p class="text-muted p-2">No innings added yet.</p>';
+             return;
+        }
+
+        let html = '<table class="table table-bordered table-sm text-center mb-0" style="table-layout: fixed; min-width: 800px;">';
+
+        // Header Row
+        html += '<thead class="table-light"><tr><th style="width: 150px; text-align: left;">Player</th>';
+        innings.forEach(inn => {
+            const isCurrent = inn === state.currentInning;
+            html += `<th class="${isCurrent ? 'table-primary border-primary' : ''}">Inning ${inn}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+
+        // Player Rows
+        // Sort players alphabetically
+        const sortedRoster = [...state.roster].sort((a, b) => a.name.localeCompare(b.name));
+
+        sortedRoster.forEach(player => {
+            html += `<tr><td style="text-align: left; font-weight: 500;">${escapeHTML(player.name)}</td>`;
+
+            innings.forEach(inn => {
+                const inningData = state.rotation.innings[inn] || {};
+                // Find position for this player in this inning
+                // inningData format: { "P": "Player Name", "C": "Player Name", ... }
+                let position = null;
+                for (const [pos, name] of Object.entries(inningData)) {
+                    if (name === player.name) {
+                        position = pos;
+                        break;
+                    }
+                }
+
+                if (position) {
+                    html += `<td><span class="badge bg-success bg-opacity-10 text-success border border-success w-100">${position}</span></td>`;
+                } else {
+                    html += `<td class="bg-light"><span class="text-muted small">BENCH</span></td>`;
+                }
+            });
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        matrixContainer.innerHTML = html;
+    }
+
+    // NEW: Function to render the Bench Report for Mobile
+    function renderBenchReportMobile() {
+        const container = document.getElementById('bench-report-mobile-container');
+        if (!container) return;
+        renderBenchReportGeneric(container);
+    }
+
+    // NEW: Function to render the Bench Report for Desktop
+    function renderBenchReportDesktop() {
+        const container = document.getElementById('bench-report-desktop-container');
+        if (!container) return;
+        renderBenchReportGeneric(container);
+    }
+
+    // Shared logic for rendering bench reports
+    function renderBenchReportGeneric(container) {
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        if (innings.length === 0) {
+            container.innerHTML = '<div class="p-3 text-muted">No innings data available.</div>';
+            return;
+        }
+
+        let html = '<div class="list-group list-group-flush">';
+
+        innings.forEach(inn => {
+            const inningData = state.rotation.innings[inn] || {};
+            const assignedPlayers = new Set(Object.values(inningData));
+            const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
+
+            html += `<div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-bold">Inning ${inn}</span>
+                    <span class="badge bg-secondary rounded-pill">${benchPlayers.length} Sitting</span>
+                </div>
+                <div class="d-flex flex-wrap gap-1">`;
+
+            if (benchPlayers.length > 0) {
+                benchPlayers.forEach(p => {
+                    html += `<span class="badge bg-light text-dark border">${escapeHTML(p.name)}</span>`;
+                });
+            } else {
+                html += `<span class="text-muted small fst-italic">All players on field</span>`;
+            }
+
+            html += `</div></div>`;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    // NEW: Function to render the Player Rotation Summary for Mobile
+    function renderRotationSummaryMobile() {
+        const container = document.getElementById('rotation-summary-mobile-container');
+        if (!container) return;
+
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const sortedRoster = [...state.roster].sort((a, b) => a.name.localeCompare(b.name));
+
+        if (innings.length === 0) {
+             container.innerHTML = '<div class="p-3 text-muted">No innings data available.</div>';
+             return;
+        }
+
+        let html = '<div class="list-group list-group-flush">';
+
+        sortedRoster.forEach(player => {
+            html += `<div class="list-group-item">
+                <div class="fw-bold mb-1">${escapeHTML(player.name)}</div>
+                <div class="d-flex flex-wrap gap-1">`;
+
+            innings.forEach(inn => {
+                const inningData = state.rotation.innings[inn] || {};
+                let position = null;
+                for (const [pos, name] of Object.entries(inningData)) {
+                    if (name === player.name) {
+                        position = pos;
+                        break;
+                    }
+                }
+
+                if (position) {
+                    html += `<span class="badge bg-success bg-opacity-10 text-success border border-success" title="Inning ${inn}: ${position}">${inn}: ${position}</span>`;
+                } else {
+                     html += `<span class="badge bg-light text-muted border" title="Inning ${inn}: Bench">${inn}: BN</span>`;
+                }
+            });
+
+            html += `</div></div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
     }
 
     function updatePlayingTimeSummary() {
@@ -142,6 +317,7 @@ function initializeGameManagement(gameData) {
                 }
             });
             renderRotationEditor();
+            triggerAutosave();
         };
         const allContainers = [...document.querySelectorAll('#bench-list-desktop, #diamond-parent-desktop .position-dropzone')];
         allContainers.forEach(container => {
@@ -189,6 +365,79 @@ function applyOutOfPositionIndicators() {
         document.getElementById('rotation-board')?.classList.remove('copy-mode');
     }
 
+    function printLineupCard() {
+        const printWindow = window.open('', '_blank');
+        const lineupRows = (state.lineup.lineup_positions || []).map((p, i) => `<tr><td>${i+1}</td><td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td></tr>`).join('');
+
+        // Rotation Grid
+        const innings = Object.keys(state.rotation.innings || {}).sort((a,b) => parseInt(a)-parseInt(b));
+        const header = innings.map(inn => `<th>${inn}</th>`).join('');
+
+        const sortedRoster = [...state.roster].sort((a,b) => a.name.localeCompare(b.name));
+        const rotationRows = sortedRoster.map(p => {
+            const cells = innings.map(inn => {
+                const innData = state.rotation.innings[inn] || {};
+                let position = '';
+                for(const [pos, name] of Object.entries(innData)) {
+                    if(name === p.name) { position = pos; break; }
+                }
+                return position ? `<td><strong>${position}</strong></td>` : `<td style="color: #ccc;">-</td>`;
+            }).join('');
+            return `<tr><td style="text-align: left; padding-left: 10px;">${escapeHTML(p.name)}</td>${cells}</tr>`;
+        }).join('');
+
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Lineup Card - vs ${escapeHTML(state.game.opponent)}</title>
+                <style>
+                    body { font-family: sans-serif; padding: 20px; }
+                    h1 { text-align: center; margin-bottom: 5px; }
+                    p { text-align: center; margin-top: 0; color: #555; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+                    th, td { border: 1px solid #000; padding: 4px; text-align: center; }
+                    th { background: #f0f0f0; }
+                    .container { display: flex; gap: 20px; }
+                    .lineup-col { width: 35%; }
+                    .rotation-col { width: 65%; }
+                    @media print {
+                        .no-print { display: none; }
+                        body { padding: 0; }
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>vs ${escapeHTML(state.game.opponent)}</h1>
+                <p>${new Date(state.game.date).toLocaleDateString()}</p>
+
+                <div class="container">
+                    <div class="lineup-col">
+                        <h3>Batting Order</h3>
+                        <table>
+                            <thead><tr><th style="width: 30px;">#</th><th>Player</th></tr></thead>
+                            <tbody>${lineupRows || '<tr><td colspan="2">No lineup set</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                    <div class="rotation-col">
+                        <h3>Defense Rotation</h3>
+                        <table>
+                            <thead><tr><th>Player</th>${header}</tr></thead>
+                            <tbody>${rotationRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="no-print" style="text-align: center; margin-top: 20px;">
+                    <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">Print Now</button>
+                    <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px;">Close</button>
+                </div>
+            </body>
+            </html>
+        `;
+        printWindow.document.write(html);
+        printWindow.document.close();
+    }
+
     async function saveLineup() {
         const btn = document.getElementById('saveLineupBtn');
         btn.disabled = true;
@@ -218,11 +467,30 @@ function applyOutOfPositionIndicators() {
         }
     }
     
-    async function saveRotation() {
-        const btn = document.getElementById('saveRotationBtn');
-        const originalText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = 'Saving...';
+    let autosaveTimer = null;
+    function triggerAutosave() {
+        if (autosaveTimer) clearTimeout(autosaveTimer);
+        const btnDesktop = document.getElementById('saveRotationBtn');
+        const btnMobile = document.getElementById('saveRotationBtnMobile');
+
+        const indicatingHtml = '<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>';
+        if (btnDesktop && !btnDesktop.disabled) btnDesktop.innerHTML = indicatingHtml + ' Saving...';
+        if (btnMobile && !btnMobile.disabled) btnMobile.innerHTML = indicatingHtml;
+
+        autosaveTimer = setTimeout(() => {
+            saveRotation(true);
+        }, 2000);
+    }
+
+    async function saveRotation(isAutosave = false) {
+        const btnDesktop = document.getElementById('saveRotationBtn');
+        const btnMobile = document.getElementById('saveRotationBtnMobile');
+
+        if (!isAutosave) {
+            if (btnDesktop) { btnDesktop.disabled = true; btnDesktop.textContent = 'Saving...'; }
+            if (btnMobile) { btnMobile.disabled = true; btnMobile.textContent = 'Saving...'; }
+        }
+
         const payload = {
             id: state.rotation.id,
             title: state.rotation.title || `Rotation for vs ${state.game.opponent}`,
@@ -235,14 +503,23 @@ function applyOutOfPositionIndicators() {
             const result = await response.json();
             if (result.status === 'success') {
                 if (result.new_id) state.rotation.id = result.new_id;
-                btn.textContent = 'Saved!';
-                renderRotationEditor();
+
+                if (btnDesktop) btnDesktop.innerHTML = '<i class="bi bi-check"></i> Saved!';
+                if (btnMobile) btnMobile.innerHTML = '<i class="bi bi-check"></i>';
+
+                if (!isAutosave || !state.rotation.id) {
+                     renderRotationEditor();
+                }
             } else { throw new Error(result.message); }
         } catch (error) {
-            alert('Error saving rotation: ' + error.message);
-            btn.textContent = 'Save Failed';
+            if (!isAutosave) alert('Error saving rotation: ' + error.message);
+            if (btnDesktop) btnDesktop.textContent = 'Save Failed';
+            if (btnMobile) btnMobile.textContent = 'Error';
         } finally {
-            setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 2000);
+            setTimeout(() => {
+                if (btnDesktop) { btnDesktop.disabled = false; btnDesktop.innerHTML = '<i class="bi bi-save me-1"></i> Save Rotation'; }
+                if (btnMobile) { btnMobile.disabled = false; btnMobile.innerHTML = '<i class="bi bi-save"></i> Save'; }
+            }, 2000);
         }
     }
 
@@ -255,6 +532,8 @@ function applyOutOfPositionIndicators() {
 
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
+        document.getElementById('saveRotationBtnMobile')?.addEventListener('click', saveRotation); // Add mobile listener
+        document.getElementById('printCardBtn')?.addEventListener('click', printLineupCard);
 
         // NEW: Populate and handle the rotation template dropdown
         const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');
@@ -280,6 +559,7 @@ function applyOutOfPositionIndicators() {
                         state.currentInning = Object.keys(state.rotation.innings).sort((a,b) => parseInt(a) - parseInt(b))[0];
                         renderRotationEditor();
                         alert('Rotation template loaded successfully!');
+                        triggerAutosave();
                     }
                     // Reset the select so you can re-apply the same template if needed
                     e.target.value = '';
@@ -388,6 +668,7 @@ function applyOutOfPositionIndicators() {
                 if (mobileDropzone.querySelector('.player-tag')) { 
                     delete state.rotation.innings[state.currentInning][position];
                     renderRotationEditor();
+                    triggerAutosave();
                 } else { 
                     const assignedPlayers = new Set(Object.values(state.rotation.innings[state.currentInning] || {}));
                     const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
@@ -408,6 +689,7 @@ function applyOutOfPositionIndicators() {
                     state.rotation.innings[state.currentInning][position] = playerName;
                     renderRotationEditor();
                     assignPlayerModal.hide();
+                    triggerAutosave();
                 }
             }
         });
@@ -415,8 +697,20 @@ function applyOutOfPositionIndicators() {
             if(!state.rotation) return;
             const innings = Object.keys(state.rotation.innings);
             const nextInningNum = innings.length > 0 ? Math.max(...innings.map(Number)) + 1 : 1;
-            state.rotation.innings[nextInningNum] = {};
+
+            if (innings.length > 0) {
+                // Auto-copy the previous inning's data
+                const lastInningNum = Math.max(...innings.map(Number));
+                state.rotation.innings[nextInningNum] = { ...state.rotation.innings[lastInningNum] };
+            } else {
+                state.rotation.innings[nextInningNum] = {};
+            }
+
             renderInningSelector();
+            // Optional: Switch to the new inning to let the user edit immediately
+            state.currentInning = String(nextInningNum);
+            renderRotationEditor();
+            triggerAutosave();
         });
         document.getElementById('removeInningBtn')?.addEventListener('click', () => {
             if(!state.rotation) return;
@@ -428,6 +722,7 @@ function applyOutOfPositionIndicators() {
                 state.currentInning = Math.max(...Object.keys(state.rotation.innings).map(Number));
             }
             renderRotationEditor();
+            triggerAutosave();
         });
         document.getElementById('copyInningBtn')?.addEventListener('click', () => {
             if (!state.rotation || !state.currentInning) return;
@@ -448,6 +743,7 @@ function applyOutOfPositionIndicators() {
             });
             exitCopyMode();
             updatePlayingTimeSummary();
+            triggerAutosave();
         });
         document.getElementById('cancelPasteBtn')?.addEventListener('click', exitCopyMode);
 
@@ -456,6 +752,7 @@ function applyOutOfPositionIndicators() {
             if (confirm(`Are you sure you want to clear all positions for inning ${state.currentInning}?`)) {
                 state.rotation.innings[state.currentInning] = {};
                 renderRotationEditor();
+                triggerAutosave();
             }
         });
 
@@ -472,6 +769,7 @@ function applyOutOfPositionIndicators() {
                  if (confirm(`This will overwrite inning ${currentInningNum} with the positions from inning ${previousInningNum}. Continue?`)) {
                     state.rotation.innings[currentInningNum] = { ...previousInningData };
                     renderRotationEditor();
+                    triggerAutosave();
                 }
             } else {
                 alert(`Inning ${previousInningNum} has no data to copy.`);
