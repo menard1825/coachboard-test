@@ -261,6 +261,7 @@ function initializeGameManagement(gameData) {
                 }
             });
             renderRotationEditor();
+            triggerAutosave();
         };
         const allContainers = [...document.querySelectorAll('#bench-list-desktop, #diamond-parent-desktop .position-dropzone')];
         allContainers.forEach(container => {
@@ -337,11 +338,30 @@ function applyOutOfPositionIndicators() {
         }
     }
     
-    async function saveRotation() {
-        const btn = document.getElementById('saveRotationBtn');
-        const originalText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = 'Saving...';
+    let autosaveTimer = null;
+    function triggerAutosave() {
+        if (autosaveTimer) clearTimeout(autosaveTimer);
+        const btnDesktop = document.getElementById('saveRotationBtn');
+        const btnMobile = document.getElementById('saveRotationBtnMobile');
+
+        const indicatingHtml = '<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>';
+        if (btnDesktop && !btnDesktop.disabled) btnDesktop.innerHTML = indicatingHtml + ' Saving...';
+        if (btnMobile && !btnMobile.disabled) btnMobile.innerHTML = indicatingHtml;
+
+        autosaveTimer = setTimeout(() => {
+            saveRotation(true);
+        }, 2000);
+    }
+
+    async function saveRotation(isAutosave = false) {
+        const btnDesktop = document.getElementById('saveRotationBtn');
+        const btnMobile = document.getElementById('saveRotationBtnMobile');
+
+        if (!isAutosave) {
+            if (btnDesktop) { btnDesktop.disabled = true; btnDesktop.textContent = 'Saving...'; }
+            if (btnMobile) { btnMobile.disabled = true; btnMobile.textContent = 'Saving...'; }
+        }
+
         const payload = {
             id: state.rotation.id,
             title: state.rotation.title || `Rotation for vs ${state.game.opponent}`,
@@ -354,14 +374,23 @@ function applyOutOfPositionIndicators() {
             const result = await response.json();
             if (result.status === 'success') {
                 if (result.new_id) state.rotation.id = result.new_id;
-                btn.textContent = 'Saved!';
-                renderRotationEditor();
+
+                if (btnDesktop) btnDesktop.innerHTML = '<i class="bi bi-check"></i> Saved!';
+                if (btnMobile) btnMobile.innerHTML = '<i class="bi bi-check"></i>';
+
+                if (!isAutosave || !state.rotation.id) {
+                     renderRotationEditor();
+                }
             } else { throw new Error(result.message); }
         } catch (error) {
-            alert('Error saving rotation: ' + error.message);
-            btn.textContent = 'Save Failed';
+            if (!isAutosave) alert('Error saving rotation: ' + error.message);
+            if (btnDesktop) btnDesktop.textContent = 'Save Failed';
+            if (btnMobile) btnMobile.textContent = 'Error';
         } finally {
-            setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 2000);
+            setTimeout(() => {
+                if (btnDesktop) { btnDesktop.disabled = false; btnDesktop.innerHTML = '<i class="bi bi-save me-1"></i> Save Rotation'; }
+                if (btnMobile) { btnMobile.disabled = false; btnMobile.innerHTML = '<i class="bi bi-save"></i> Save'; }
+            }, 2000);
         }
     }
 
@@ -400,6 +429,7 @@ function applyOutOfPositionIndicators() {
                         state.currentInning = Object.keys(state.rotation.innings).sort((a,b) => parseInt(a) - parseInt(b))[0];
                         renderRotationEditor();
                         alert('Rotation template loaded successfully!');
+                        triggerAutosave();
                     }
                     // Reset the select so you can re-apply the same template if needed
                     e.target.value = '';
@@ -508,6 +538,7 @@ function applyOutOfPositionIndicators() {
                 if (mobileDropzone.querySelector('.player-tag')) { 
                     delete state.rotation.innings[state.currentInning][position];
                     renderRotationEditor();
+                    triggerAutosave();
                 } else { 
                     const assignedPlayers = new Set(Object.values(state.rotation.innings[state.currentInning] || {}));
                     const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
@@ -528,6 +559,7 @@ function applyOutOfPositionIndicators() {
                     state.rotation.innings[state.currentInning][position] = playerName;
                     renderRotationEditor();
                     assignPlayerModal.hide();
+                    triggerAutosave();
                 }
             }
         });
@@ -548,6 +580,7 @@ function applyOutOfPositionIndicators() {
             // Optional: Switch to the new inning to let the user edit immediately
             state.currentInning = String(nextInningNum);
             renderRotationEditor();
+            triggerAutosave();
         });
         document.getElementById('removeInningBtn')?.addEventListener('click', () => {
             if(!state.rotation) return;
@@ -559,6 +592,7 @@ function applyOutOfPositionIndicators() {
                 state.currentInning = Math.max(...Object.keys(state.rotation.innings).map(Number));
             }
             renderRotationEditor();
+            triggerAutosave();
         });
         document.getElementById('copyInningBtn')?.addEventListener('click', () => {
             if (!state.rotation || !state.currentInning) return;
@@ -579,6 +613,7 @@ function applyOutOfPositionIndicators() {
             });
             exitCopyMode();
             updatePlayingTimeSummary();
+            triggerAutosave();
         });
         document.getElementById('cancelPasteBtn')?.addEventListener('click', exitCopyMode);
 
@@ -587,6 +622,7 @@ function applyOutOfPositionIndicators() {
             if (confirm(`Are you sure you want to clear all positions for inning ${state.currentInning}?`)) {
                 state.rotation.innings[state.currentInning] = {};
                 renderRotationEditor();
+                triggerAutosave();
             }
         });
 
@@ -603,6 +639,7 @@ function applyOutOfPositionIndicators() {
                  if (confirm(`This will overwrite inning ${currentInningNum} with the positions from inning ${previousInningNum}. Continue?`)) {
                     state.rotation.innings[currentInningNum] = { ...previousInningData };
                     renderRotationEditor();
+                    triggerAutosave();
                 }
             } else {
                 alert(`Inning ${previousInningNum} has no data to copy.`);
