@@ -44,6 +44,7 @@ function initializeGameManagement(gameData) {
         renderRotationDiamondAndBench();
         updatePlayingTimeSummary();
         renderRotationMatrix(); // NEW: Render the matrix view
+        renderBenchReportMobile(); // NEW: Render the mobile bench report
         initializeRotationSortables();
     }
 
@@ -70,8 +71,16 @@ function initializeGameManagement(gameData) {
         const currentInningData = state.rotation.innings[state.currentInning] || {};
 
         // Note: The original createPlayerTag is now modified to accept a player object
-        const createPlayerTag = (player) => {
-            const primaryPos = player.position1 ? ` (${escapeHTML(player.position1)})` : '';
+        // MODIFIED: Only show position if on bench (or general list). If on field, the position is implied by the dropzone.
+        // We will pass an optional 'isOnField' flag.
+        const createPlayerTag = (player, isOnField = false) => {
+            let primaryPos = '';
+            // Only show the primary position label if they are NOT on the field (i.e. on the bench or being dragged from bench)
+            // Or if we just want to be explicit. The user request is to NOT show it when they are playing a different position.
+            // Simplest logic: If isOnField is true, don't show the suffix.
+            if (!isOnField && player.position1) {
+                primaryPos = ` (${escapeHTML(player.position1)})`;
+            }
             return `<div class="player-tag" data-player-name="${escapeHTML(player.name)}">${escapeHTML(player.name)}${primaryPos}</div>`;
         };
 
@@ -82,8 +91,9 @@ function initializeGameManagement(gameData) {
             if (player) {
                 const dropzoneDesktop = document.getElementById(`pos-desktop-${pos}`);
                 const dropzoneMobile = document.getElementById(`pos-mobile-${pos}`);
-                if (dropzoneDesktop) dropzoneDesktop.insertAdjacentHTML('beforeend', createPlayerTag(player));
-                if (dropzoneMobile) dropzoneMobile.insertAdjacentHTML('beforeend', createPlayerTag(player));
+                // Pass true for isOnField
+                if (dropzoneDesktop) dropzoneDesktop.insertAdjacentHTML('beforeend', createPlayerTag(player, true));
+                if (dropzoneMobile) dropzoneMobile.insertAdjacentHTML('beforeend', createPlayerTag(player, true));
             }
         }
 
@@ -93,7 +103,8 @@ function initializeGameManagement(gameData) {
         const benchDesktop = document.getElementById('bench-list-desktop');
         if(benchDesktop) {
             // Pass the full player object to the updated createPlayerTag function
-            benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p)).join('');
+            // Pass false for isOnField (default)
+            benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p, false)).join('');
         }
 
         // NEW: Update Mobile Bench View
@@ -164,6 +175,46 @@ function initializeGameManagement(gameData) {
 
         html += '</tbody></table>';
         matrixContainer.innerHTML = html;
+    }
+
+    // NEW: Function to render the Bench Report for Mobile
+    function renderBenchReportMobile() {
+        const container = document.getElementById('bench-report-mobile-container');
+        if (!container) return;
+
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        if (innings.length === 0) {
+            container.innerHTML = '<div class="p-3 text-muted">No innings data available.</div>';
+            return;
+        }
+
+        let html = '<div class="list-group list-group-flush">';
+
+        innings.forEach(inn => {
+            const inningData = state.rotation.innings[inn] || {};
+            const assignedPlayers = new Set(Object.values(inningData));
+            const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
+
+            html += `<div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-bold">Inning ${inn}</span>
+                    <span class="badge bg-secondary rounded-pill">${benchPlayers.length} Sitting</span>
+                </div>
+                <div class="d-flex flex-wrap gap-1">`;
+
+            if (benchPlayers.length > 0) {
+                benchPlayers.forEach(p => {
+                    html += `<span class="badge bg-light text-dark border">${escapeHTML(p.name)}</span>`;
+                });
+            } else {
+                html += `<span class="text-muted small fst-italic">All players on field</span>`;
+            }
+
+            html += `</div></div>`;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
     }
 
     function updatePlayingTimeSummary() {
@@ -323,6 +374,7 @@ function applyOutOfPositionIndicators() {
 
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
+        document.getElementById('saveRotationBtnMobile')?.addEventListener('click', saveRotation); // Add mobile listener
 
         // NEW: Populate and handle the rotation template dropdown
         const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');

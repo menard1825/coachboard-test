@@ -2,12 +2,17 @@
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="mb-0" id="rotation-editor-title">Defensive Rotation</h5>
         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+             <!-- Mobile Friendly Save Button -->
+            <button type="button" class="btn btn-primary btn-sm d-lg-none" id="saveRotationBtnMobile">
+                <i class="bi bi-save"></i> Save
+            </button>
             <div class="btn-group">
                 <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-list"></i> Menu
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="#" id="saveRotationBtn"><i class="bi bi-save me-1"></i> Save Rotation</a></li>
+                    <!-- Keep desktop save button in menu or move it out if desired, keeping it for now -->
+                    <li class="d-none d-lg-block"><a class="dropdown-item" href="#" id="saveRotationBtn"><i class="bi bi-save me-1"></i> Save Rotation</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li class="px-2">
                         <label for="rotationTemplateSelect" class="form-label small visually-hidden">Load Template</label>
@@ -93,8 +98,8 @@
             </div>
         </div>
 
-        <!-- NEW: Rotation Matrix View (Collapsible) -->
-        <div class="mt-4 mb-4">
+        <!-- NEW: Rotation Matrix View (Collapsible) - Hidden on Mobile, Replaced by Bench Report -->
+        <div class="mt-4 mb-4 d-none d-lg-block">
             <div class="card">
                 <div class="card-header bg-light">
                     <h6 class="mb-0 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#rotationMatrixCollapse" style="cursor: pointer;">
@@ -108,6 +113,20 @@
                             <!-- Matrix table rendered by JS -->
                          </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Bench Report -->
+        <div class="mt-4 mb-4 d-lg-none">
+            <div class="card">
+                <div class="card-header bg-light">
+                     <h6 class="mb-0"><i class="bi bi-clipboard-x me-2"></i>Bench Report (All Innings)</h6>
+                </div>
+                <div class="card-body p-0">
+                     <div id="bench-report-mobile-container">
+                        <!-- Bench report rendered by JS -->
+                     </div>
                 </div>
             </div>
         </div>
