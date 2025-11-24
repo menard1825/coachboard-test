@@ -165,13 +165,18 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                         status = 'Resting'
                         next_available_str = next_available_date.strftime('%a, %b %d')
 
+            # Logic fix: If resting, they have 0 pitches remaining today regardless of daily count
+            pitches_remaining = max(0, rules.get('max_daily', 85) - daily_pitches)
+            if status == 'Resting':
+                pitches_remaining = 0
+
             summary[player.name] = {
                 'daily': daily_pitches,
                 'weekly': weekly_pitches,
                 'status': status,
                 'next_available': next_available_str,
                 'max_daily': rules.get('max_daily', 85),
-                'pitches_remaining_today': max(0, rules.get('max_daily', 85) - daily_pitches),
+                'pitches_remaining_today': pitches_remaining,
                 'last_outing_display': last_outing_display
             }
         except Exception as e:
