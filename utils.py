@@ -154,16 +154,22 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                     status = 'Resting'
                     next_available_str = next_available_date.strftime('%a, %b %d')
 
-                # New logic: If the last outing was today, check if they can still pitch.
-                if last_outing_date == today:
-                    if daily_pitches < rules.get('max_daily', 85):
+                # --- CORRECTION FOR SAME-DAY OR PRE-LOGGED GAMES ---
+                # If the last outing is Today OR in the Future (pre-logging),
+                # check if they have room left in the daily limit.
+                if last_outing_date >= today:
+                    # Recalculate daily_pitches to be based on the ACTIVE game day, not just 'today'
+                    # This handles the case where you pre-log a game for tomorrow.
+                    active_day_pitches = pitches_on_last_day
+
+                    if active_day_pitches < rules.get('max_daily', 85):
                         status = 'Available'
-                        next_available_str = 'Today'
+                        next_available_str = 'Today' # Or "Game Day"
+                        # Update the displayed remaining count to match the active day
+                        daily_pitches = active_day_pitches
                     else:
-                        # They've hit their daily max, so they are resting.
-                        # The next_available_date calculated earlier is correct.
                         status = 'Resting'
-                        next_available_str = next_available_date.strftime('%a, %b %d')
+                        # next_available_str is already correct from the calculation above
 
             # Logic fix: If resting, they have 0 pitches remaining today regardless of daily count
             pitches_remaining = max(0, rules.get('max_daily', 85) - daily_pitches)
