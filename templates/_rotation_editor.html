@@ -92,12 +92,44 @@
                 <div id="summary-desktop"></div>
             </div>
         </div>
+
+        <!-- NEW: Rotation Matrix View (Collapsible) -->
+        <div class="mt-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#rotationMatrixCollapse" style="cursor: pointer;">
+                        <span><i class="bi bi-grid-3x3 me-2"></i>Rotation Matrix (Full View)</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </h6>
+                </div>
+                <div id="rotationMatrixCollapse" class="collapse show">
+                    <div class="card-body p-0">
+                         <div id="rotation-matrix-container" class="table-responsive">
+                            <!-- Matrix table rendered by JS -->
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="d-lg-none">
             <div class="alert alert-info d-flex align-items-center" role="alert">
                 <i class="bi bi-info-circle-fill me-2"></i>
                 <div>Tap a position to assign a player. Tap a player on the field to send them to the bench.</div>
             </div>
             <div id="diamond-parent-mobile">
+                 <!-- Bench View for Mobile -->
+                 <div class="mb-3">
+                    <div class="card bg-light border-0">
+                        <div class="card-body p-2">
+                             <h6 class="card-title text-muted small text-uppercase mb-2">On Bench (Inning <span class="current-inning-display"></span>)</h6>
+                             <div id="bench-list-mobile" class="d-flex flex-wrap gap-1">
+                                 <!-- Bench players rendered by JS -->
+                             </div>
+                        </div>
+                    </div>
+                 </div>
+
                  <div class="diamond-container-interactive">
                     <div id="pos-mobile-P" class="position-dropzone pos-P" data-position="P"><span class="pos-abbr">P</span></div>
                     <div id="pos-mobile-C" class="position-dropzone pos-C" data-position="C"><span class="pos-abbr">C</span></div>

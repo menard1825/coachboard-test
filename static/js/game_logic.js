@@ -43,6 +43,7 @@ function initializeGameManagement(gameData) {
         renderInningSelector();
         renderRotationDiamondAndBench();
         updatePlayingTimeSummary();
+        renderRotationMatrix(); // NEW: Render the matrix view
         initializeRotationSortables();
     }
 
@@ -95,7 +96,74 @@ function initializeGameManagement(gameData) {
             benchDesktop.innerHTML = benchPlayers.map(p => createPlayerTag(p)).join('');
         }
 
+        // NEW: Update Mobile Bench View
+        const benchMobile = document.getElementById('bench-list-mobile');
+        if (benchMobile) {
+            document.querySelectorAll('.current-inning-display').forEach(el => el.textContent = state.currentInning);
+
+            if (benchPlayers.length > 0) {
+                 benchMobile.innerHTML = benchPlayers.map(p =>
+                    `<span class="badge bg-secondary fw-normal p-2 border">${escapeHTML(p.name)}</span>`
+                 ).join('');
+            } else {
+                benchMobile.innerHTML = '<span class="text-muted fst-italic">No one on bench.</span>';
+            }
+        }
+
         applyOutOfPositionIndicators(); // Add this line at the end
+    }
+
+    // NEW: Function to render the Rotation Matrix
+    function renderRotationMatrix() {
+        const matrixContainer = document.getElementById('rotation-matrix-container');
+        if (!matrixContainer) return;
+
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        if (innings.length === 0) {
+             matrixContainer.innerHTML = '<p class="text-muted p-2">No innings added yet.</p>';
+             return;
+        }
+
+        let html = '<table class="table table-bordered table-sm text-center mb-0" style="table-layout: fixed; min-width: 800px;">';
+
+        // Header Row
+        html += '<thead class="table-light"><tr><th style="width: 150px; text-align: left;">Player</th>';
+        innings.forEach(inn => {
+            const isCurrent = inn === state.currentInning;
+            html += `<th class="${isCurrent ? 'table-primary border-primary' : ''}">Inning ${inn}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+
+        // Player Rows
+        // Sort players alphabetically
+        const sortedRoster = [...state.roster].sort((a, b) => a.name.localeCompare(b.name));
+
+        sortedRoster.forEach(player => {
+            html += `<tr><td style="text-align: left; font-weight: 500;">${escapeHTML(player.name)}</td>`;
+
+            innings.forEach(inn => {
+                const inningData = state.rotation.innings[inn] || {};
+                // Find position for this player in this inning
+                // inningData format: { "P": "Player Name", "C": "Player Name", ... }
+                let position = null;
+                for (const [pos, name] of Object.entries(inningData)) {
+                    if (name === player.name) {
+                        position = pos;
+                        break;
+                    }
+                }
+
+                if (position) {
+                    html += `<td><span class="badge bg-success bg-opacity-10 text-success border border-success w-100">${position}</span></td>`;
+                } else {
+                    html += `<td class="bg-light"><span class="text-muted small">BENCH</span></td>`;
+                }
+            });
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        matrixContainer.innerHTML = html;
     }
 
     function updatePlayingTimeSummary() {
