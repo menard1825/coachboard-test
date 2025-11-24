@@ -13,6 +13,7 @@
                 <ul class="dropdown-menu dropdown-menu-end">
                     <!-- Keep desktop save button in menu or move it out if desired, keeping it for now -->
                     <li class="d-none d-lg-block"><a class="dropdown-item" href="#" id="saveRotationBtn"><i class="bi bi-save me-1"></i> Save Rotation</a></li>
+                    <li><a class="dropdown-item" href="#" id="printCardBtn"><i class="bi bi-printer me-1"></i> Print Lineup Card</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li class="px-2">
                         <label for="rotationTemplateSelect" class="form-label small visually-hidden">Load Template</label>
@@ -111,6 +112,25 @@
                     <div class="card-body p-0">
                          <div id="rotation-matrix-container" class="table-responsive">
                             <!-- Matrix table rendered by JS -->
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: Desktop Bench Report (Collapsible) -->
+        <div class="mt-4 mb-4 d-none d-lg-block">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#benchReportDesktopCollapse" style="cursor: pointer;">
+                        <span><i class="bi bi-clipboard-x me-2"></i>Bench Report (Full View)</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </h6>
+                </div>
+                <div id="benchReportDesktopCollapse" class="collapse">
+                    <div class="card-body p-0">
+                         <div id="bench-report-desktop-container">
+                            <!-- Rendered by JS -->
                          </div>
                     </div>
                 </div>

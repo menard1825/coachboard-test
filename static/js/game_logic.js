@@ -45,6 +45,7 @@ function initializeGameManagement(gameData) {
         updatePlayingTimeSummary();
         renderRotationMatrix(); // NEW: Render the matrix view
         renderBenchReportMobile(); // NEW: Render the mobile bench report
+        renderBenchReportDesktop(); // NEW: Render the desktop bench report
         renderRotationSummaryMobile(); // NEW: Render mobile summary
         initializeRotationSortables();
     }
@@ -182,7 +183,18 @@ function initializeGameManagement(gameData) {
     function renderBenchReportMobile() {
         const container = document.getElementById('bench-report-mobile-container');
         if (!container) return;
+        renderBenchReportGeneric(container);
+    }
 
+    // NEW: Function to render the Bench Report for Desktop
+    function renderBenchReportDesktop() {
+        const container = document.getElementById('bench-report-desktop-container');
+        if (!container) return;
+        renderBenchReportGeneric(container);
+    }
+
+    // Shared logic for rendering bench reports
+    function renderBenchReportGeneric(container) {
         const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
         if (innings.length === 0) {
             container.innerHTML = '<div class="p-3 text-muted">No innings data available.</div>';
@@ -353,6 +365,79 @@ function applyOutOfPositionIndicators() {
         document.getElementById('rotation-board')?.classList.remove('copy-mode');
     }
 
+    function printLineupCard() {
+        const printWindow = window.open('', '_blank');
+        const lineupRows = (state.lineup.lineup_positions || []).map((p, i) => `<tr><td>${i+1}</td><td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td></tr>`).join('');
+
+        // Rotation Grid
+        const innings = Object.keys(state.rotation.innings || {}).sort((a,b) => parseInt(a)-parseInt(b));
+        const header = innings.map(inn => `<th>${inn}</th>`).join('');
+
+        const sortedRoster = [...state.roster].sort((a,b) => a.name.localeCompare(b.name));
+        const rotationRows = sortedRoster.map(p => {
+            const cells = innings.map(inn => {
+                const innData = state.rotation.innings[inn] || {};
+                let position = '';
+                for(const [pos, name] of Object.entries(innData)) {
+                    if(name === p.name) { position = pos; break; }
+                }
+                return position ? `<td><strong>${position}</strong></td>` : `<td style="color: #ccc;">-</td>`;
+            }).join('');
+            return `<tr><td style="text-align: left; padding-left: 10px;">${escapeHTML(p.name)}</td>${cells}</tr>`;
+        }).join('');
+
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Lineup Card - vs ${escapeHTML(state.game.opponent)}</title>
+                <style>
+                    body { font-family: sans-serif; padding: 20px; }
+                    h1 { text-align: center; margin-bottom: 5px; }
+                    p { text-align: center; margin-top: 0; color: #555; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+                    th, td { border: 1px solid #000; padding: 4px; text-align: center; }
+                    th { background: #f0f0f0; }
+                    .container { display: flex; gap: 20px; }
+                    .lineup-col { width: 35%; }
+                    .rotation-col { width: 65%; }
+                    @media print {
+                        .no-print { display: none; }
+                        body { padding: 0; }
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>vs ${escapeHTML(state.game.opponent)}</h1>
+                <p>${new Date(state.game.date).toLocaleDateString()}</p>
+
+                <div class="container">
+                    <div class="lineup-col">
+                        <h3>Batting Order</h3>
+                        <table>
+                            <thead><tr><th style="width: 30px;">#</th><th>Player</th></tr></thead>
+                            <tbody>${lineupRows || '<tr><td colspan="2">No lineup set</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                    <div class="rotation-col">
+                        <h3>Defense Rotation</h3>
+                        <table>
+                            <thead><tr><th>Player</th>${header}</tr></thead>
+                            <tbody>${rotationRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="no-print" style="text-align: center; margin-top: 20px;">
+                    <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">Print Now</button>
+                    <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; cursor: pointer; margin-left: 10px;">Close</button>
+                </div>
+            </body>
+            </html>
+        `;
+        printWindow.document.write(html);
+        printWindow.document.close();
+    }
+
     async function saveLineup() {
         const btn = document.getElementById('saveLineupBtn');
         btn.disabled = true;
@@ -448,6 +533,7 @@ function applyOutOfPositionIndicators() {
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
         document.getElementById('saveRotationBtnMobile')?.addEventListener('click', saveRotation); // Add mobile listener
+        document.getElementById('printCardBtn')?.addEventListener('click', printLineupCard);
 
         // NEW: Populate and handle the rotation template dropdown
         const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');

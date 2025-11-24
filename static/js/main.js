@@ -589,13 +589,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         nextGameHtml += '</div></div>';
 
-        let pitchersOnRestHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Pitchers on Rest</h5></div><ul class="list-group list-group-flush">';
-        if (pitchers_on_rest && Object.keys(pitchers_on_rest).length > 0) {
-            for (const [name, data] of Object.entries(pitchers_on_rest)) {
-                pitchersOnRestHtml += `<li class="list-group-item">${escapeHTML(name)} - Available on ${data.next_available}</li>`;
-            }
+        let pitchersOnRestHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Pitcher Availability</h5></div><ul class="list-group list-group-flush">';
+
+        // Use full pitch count summary if available for better data
+        const summaryData = AppState.pitch_count_summary;
+        if (summaryData && Object.keys(summaryData).length > 0) {
+             const sortedNames = Object.keys(summaryData).sort();
+             // Filter for only players who are actually pitchers or have pitched
+             const relevantNames = sortedNames.filter(name => {
+                const p = AppState.full_data.roster.find(rp => rp.name === name);
+                return p && (p.pitcher_role !== 'Not a Pitcher' || summaryData[name].daily > 0 || summaryData[name].weekly > 0);
+             });
+
+             if (relevantNames.length > 0) {
+                 relevantNames.forEach(name => {
+                     const data = summaryData[name];
+                     const badge = data.status === 'Available'
+                        ? '<span class="badge bg-success">Available</span>'
+                        : `<span class="badge bg-danger">Resting</span>`;
+                     const detail = data.status === 'Resting'
+                        ? `<small class="text-muted ms-2">Returns: ${data.next_available}</small>`
+                        : `<small class="text-muted ms-2">${data.daily} pitches today</small>`;
+
+                     pitchersOnRestHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>${escapeHTML(name)} ${detail}</span>
+                        ${badge}
+                     </li>`;
+                 });
+             } else {
+                 pitchersOnRestHtml += '<li class="list-group-item text-muted">No pitchers found.</li>';
+             }
         } else {
-            pitchersOnRestHtml += '<li class="list-group-item text-muted">All pitchers are available.</li>';
+            // Fallback to the overview specific data
+            if (pitchers_on_rest && Object.keys(pitchers_on_rest).length > 0) {
+                for (const [name, data] of Object.entries(pitchers_on_rest)) {
+                    pitchersOnRestHtml += `<li class="list-group-item d-flex justify-content-between align-items-center"><span>${escapeHTML(name)}</span> <span class="badge bg-danger">Resting (Returns ${data.next_available})</span></li>`;
+                }
+                 pitchersOnRestHtml += '<li class="list-group-item text-muted small">Other pitchers are available (full data loading...)</li>';
+            } else {
+                pitchersOnRestHtml += '<li class="list-group-item text-success"><i class="bi bi-check-circle-fill me-2"></i>All pitchers available</li>';
+            }
         }
         pitchersOnRestHtml += '</ul></div>';
 
