@@ -45,6 +45,7 @@ function initializeGameManagement(gameData) {
         updatePlayingTimeSummary();
         renderRotationMatrix(); // NEW: Render the matrix view
         renderBenchReportMobile(); // NEW: Render the mobile bench report
+        renderRotationSummaryMobile(); // NEW: Render mobile summary
         initializeRotationSortables();
     }
 
@@ -213,6 +214,49 @@ function initializeGameManagement(gameData) {
             html += `</div></div>`;
         });
 
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    // NEW: Function to render the Player Rotation Summary for Mobile
+    function renderRotationSummaryMobile() {
+        const container = document.getElementById('rotation-summary-mobile-container');
+        if (!container) return;
+
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const sortedRoster = [...state.roster].sort((a, b) => a.name.localeCompare(b.name));
+
+        if (innings.length === 0) {
+             container.innerHTML = '<div class="p-3 text-muted">No innings data available.</div>';
+             return;
+        }
+
+        let html = '<div class="list-group list-group-flush">';
+
+        sortedRoster.forEach(player => {
+            html += `<div class="list-group-item">
+                <div class="fw-bold mb-1">${escapeHTML(player.name)}</div>
+                <div class="d-flex flex-wrap gap-1">`;
+
+            innings.forEach(inn => {
+                const inningData = state.rotation.innings[inn] || {};
+                let position = null;
+                for (const [pos, name] of Object.entries(inningData)) {
+                    if (name === player.name) {
+                        position = pos;
+                        break;
+                    }
+                }
+
+                if (position) {
+                    html += `<span class="badge bg-success bg-opacity-10 text-success border border-success" title="Inning ${inn}: ${position}">${inn}: ${position}</span>`;
+                } else {
+                     html += `<span class="badge bg-light text-muted border" title="Inning ${inn}: Bench">${inn}: BN</span>`;
+                }
+            });
+
+            html += `</div></div>`;
+        });
         html += '</div>';
         container.innerHTML = html;
     }
