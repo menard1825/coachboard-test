@@ -535,8 +535,19 @@ function applyOutOfPositionIndicators() {
             if(!state.rotation) return;
             const innings = Object.keys(state.rotation.innings);
             const nextInningNum = innings.length > 0 ? Math.max(...innings.map(Number)) + 1 : 1;
-            state.rotation.innings[nextInningNum] = {};
+
+            if (innings.length > 0) {
+                // Auto-copy the previous inning's data
+                const lastInningNum = Math.max(...innings.map(Number));
+                state.rotation.innings[nextInningNum] = { ...state.rotation.innings[lastInningNum] };
+            } else {
+                state.rotation.innings[nextInningNum] = {};
+            }
+
             renderInningSelector();
+            // Optional: Switch to the new inning to let the user edit immediately
+            state.currentInning = String(nextInningNum);
+            renderRotationEditor();
         });
         document.getElementById('removeInningBtn')?.addEventListener('click', () => {
             if(!state.rotation) return;
