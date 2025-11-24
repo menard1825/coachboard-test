@@ -316,8 +316,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         const weeklyPct = Math.min((counts.weekly / 100 * 100), 100);
                         const dailyBg = dailyPct > 80 ? 'bg-danger' : dailyPct > 60 ? 'bg-warning' : 'bg-success';
                         const statusBadge = counts.status === 'Available' ? '<span class="badge bg-success">Available</span>' : '<span class="badge bg-danger">Resting</span>';
-                        const nextAvailableText = counts.status === 'Resting' ? `<br><small class="text-muted">Next up: ${counts.next_available}</small>` : '';
-                        summaryHtml += `<tr><td class="align-middle"><strong>${escapeHTML(name)}</strong></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div><small class="text-muted">${counts.pitches_remaining_today} remaining</small></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar" role="progressbar" style="width: ${weeklyPct}%;" aria-valuenow="${counts.weekly}">${counts.weekly}</div></div></td><td class="text-center align-middle">${statusBadge}${nextAvailableText}</td></tr>`;
+                        let nextAvailableText = '';
+                        if (counts.status === 'Resting') {
+                            nextAvailableText = `<br><small class="text-muted">Next up: ${counts.next_available}</small>`;
+                            if (counts.last_outing_display && counts.last_outing_display !== 'N/A') {
+                                nextAvailableText += `<br><small class="text-muted fst-italic">(Pitched ${counts.last_outing_display})</small>`;
+                            }
+                        }
+                        // Modified: Weekly count is now just text, no progress bar, to avoid implying a 100-pitch limit.
+                        summaryHtml += `<tr><td class="align-middle"><strong>${escapeHTML(name)}</strong></td><td class="align-middle"><div class="progress" style="height: 20px;"><div class="progress-bar ${dailyBg}" role="progressbar" style="width: ${dailyPct}%;" aria-valuenow="${counts.daily}">${counts.daily}</div></div><small class="text-muted">${counts.pitches_remaining_today} remaining</small></td><td class="align-middle text-center"><span class="fw-bold">${counts.weekly}</span></td><td class="text-center align-middle">${statusBadge}${nextAvailableText}</td></tr>`;
                     }
                 }
             } else { summaryHtml += '<tr><td colspan="4" class="text-center text-muted">No pitching data.</td></tr>'; }
@@ -332,7 +339,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const pitchDateInput = document.getElementById('pitch_date');
         if (pitchDateInput && !pitchDateInput.value) {
-            pitchDateInput.value = new Date().toISOString().split('T')[0];
+            // FIX: Use local time instead of UTC to prevent default date being tomorrow in evening hours
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            pitchDateInput.value = `${year}-${month}-${day}`;
         }
 
         const outingsList = document.getElementById('recorded-outings-list');

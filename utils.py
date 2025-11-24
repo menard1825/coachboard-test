@@ -130,9 +130,11 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
             status, next_available_str = 'Available', 'Today'
             required_rest = 0
             
+            last_outing_display = 'N/A'
             if player_outings:
                 last_outing = player_outings[0]
                 last_outing_date = last_outing.date.date()
+                last_outing_display = last_outing_date.strftime('%a, %b %d')
 
                 # Sum pitches on the last day the pitcher threw
                 pitches_on_last_day = sum(o.pitches or 0 for o in player_outings if o.date.date() == last_outing_date)
@@ -169,7 +171,8 @@ def calculate_pitch_count_summary(roster, all_outings, rules):
                 'status': status,
                 'next_available': next_available_str,
                 'max_daily': rules.get('max_daily', 85),
-                'pitches_remaining_today': max(0, rules.get('max_daily', 85) - daily_pitches)
+                'pitches_remaining_today': max(0, rules.get('max_daily', 85) - daily_pitches),
+                'last_outing_display': last_outing_display
             }
         except Exception as e:
             print(f"Error calculating pitch count summary for player {player.name} (ID: {player.id}): {e}")
