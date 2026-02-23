@@ -1,0 +1,109 @@
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 528-207-680
+(4954) wsgi starting up on http://0.0.0.0:5002
+(4954) accepted ('127.0.0.1', 39048)
+127.0.0.1 - - [23/Feb/2026 14:06:18] "GET /login HTTP/1.1" 200 1478 0.009828
+(4954) accepted ('127.0.0.1', 38112)
+127.0.0.1 - - [23/Feb/2026 14:07:31] "GET /login HTTP/1.1" 200 1478 0.001250
+127.0.0.1 - - [23/Feb/2026 14:07:32] "POST /login HTTP/1.1" 302 679 0.607234
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET / HTTP/1.1" 200 44750 0.074549
+(4954) accepted ('127.0.0.1', 38126)
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /static/css/main.css?v=20260223140732 HTTP/1.1" 200 13545 0.006813
+(4954) accepted ('127.0.0.1', 38128)
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /static/js/main.js HTTP/1.1" 200 78909 0.001652
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /static/js/lineup_editor.js HTTP/1.1" 200 10315 0.001466
+(3509) accepted ('127.0.0.1', 38146)
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/session_data HTTP/1.1" 200 548 0.004570
+(4954) accepted ('127.0.0.1', 38130)
+(4954) accepted ('127.0.0.1', 38144)
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/roster HTTP/1.1" 200 4371 0.005610
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/lineups HTTP/1.1" 200 414 0.003461
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/rotations HTTP/1.1" 200 1680 0.003408
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/pitching_data HTTP/1.1" 200 2933 0.011251
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/games HTTP/1.1" 200 1052 0.005006
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/player_development HTTP/1.1" 200 672 0.003784
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/scouting_list HTTP/1.1" 200 475 0.004618
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/collaboration_notes HTTP/1.1" 200 457 0.004092
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/overview_data HTTP/1.1" 200 484 0.005540
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/stats HTTP/1.1" 200 3436 0.012536
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/practice_plans HTTP/1.1" 200 414 0.009119
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /api/signs HTTP/1.1" 200 414 0.003299
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /socket.io/?EIO=4&transport=polling&t=PoAqwSF HTTP/1.1" 200 300 0.000580
+127.0.0.1 - - [23/Feb/2026 14:07:32] "POST /socket.io/?EIO=4&transport=polling&t=PoAqwSg&sid=oLOqq_mOxICwCrSaAAAA HTTP/1.1" 200 219 0.000920
+(3509) accepted ('127.0.0.1', 38162)
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /socket.io/?EIO=4&transport=polling&t=PoAqwSh&sid=oLOqq_mOxICwCrSaAAAA HTTP/1.1" 200 213 0.000194
+Invalid session oLOqq_mOxICwCrSaAAAA (further occurrences of this error will be logged with level INFO)
+127.0.0.1 - - [23/Feb/2026 14:07:32] "GET /socket.io/?EIO=4&transport=websocket&sid=oLOqq_mOxICwCrSaAAAA HTTP/1.1" 400 241 0.000440
+127.0.0.1 - - [23/Feb/2026 14:07:57] "GET /socket.io/?EIO=4&transport=polling&t=PoAqwSm&sid=oLOqq_mOxICwCrSaAAAA HTTP/1.1" 200 181 24.970795
+127.0.0.1 - - [23/Feb/2026 14:07:57] "POST /socket.io/?EIO=4&transport=polling&t=PoAr0Z0&sid=oLOqq_mOxICwCrSaAAAA HTTP/1.1" 200 219 0.000283
+127.0.0.1 - - [23/Feb/2026 14:08:22] "GET /socket.io/?EIO=4&transport=polling&t=PoAr0Z1&sid=oLOqq_mOxICwCrSaAAAA HTTP/1.1" 200 181 25.000788
+(4954) accepted ('127.0.0.1', 38184)
+127.0.0.1 - - [23/Feb/2026 14:08:34] "GET /login HTTP/1.1" 200 1478 0.001013
+127.0.0.1 - - [23/Feb/2026 14:08:35] "POST /login HTTP/1.1" 302 679 0.507943
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET / HTTP/1.1" 200 44750 0.004988
+(4954) accepted ('127.0.0.1', 38188)
+(4954) accepted ('127.0.0.1', 38190)
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /static/css/main.css?v=20260223140835 HTTP/1.1" 200 13545 0.001561
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /static/js/main.js HTTP/1.1" 200 78909 0.001866
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /static/js/lineup_editor.js HTTP/1.1" 200 10315 0.001314
+(3509) accepted ('127.0.0.1', 38198)
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/session_data HTTP/1.1" 200 548 0.004169
+(4954) accepted ('127.0.0.1', 38192)
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/roster HTTP/1.1" 200 4371 0.003007
+(4954) accepted ('127.0.0.1', 38208)
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/lineups HTTP/1.1" 200 414 0.001938
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/scouting_list HTTP/1.1" 200 475 0.002717
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/pitching_data HTTP/1.1" 200 2933 0.004024
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/player_development HTTP/1.1" 200 672 0.002710
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/rotations HTTP/1.1" 200 1680 0.001876
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/collaboration_notes HTTP/1.1" 200 457 0.001927
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/games HTTP/1.1" 200 1052 0.001938
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/stats HTTP/1.1" 200 3436 0.005047
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/practice_plans HTTP/1.1" 200 414 0.002027
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/overview_data HTTP/1.1" 200 484 0.006952
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /api/signs HTTP/1.1" 200 414 0.001574
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /socket.io/?EIO=4&transport=polling&t=PoAr9sh HTTP/1.1" 200 300 0.000324
+127.0.0.1 - - [23/Feb/2026 14:08:35] "POST /socket.io/?EIO=4&transport=polling&t=PoAr9so&sid=Fdl80OvkEi12TgNTAAAC HTTP/1.1" 200 219 0.000609
+(4954) accepted ('127.0.0.1', 38214)
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /socket.io/?EIO=4&transport=polling&t=PoAr9sq&sid=Fdl80OvkEi12TgNTAAAC HTTP/1.1" 200 213 0.000267
+127.0.0.1 - - [23/Feb/2026 14:08:35] "GET /socket.io/?EIO=4&transport=polling&t=PoAr9sw&sid=Fdl80OvkEi12TgNTAAAC HTTP/1.1" 200 181 0.000175
+127.0.0.1 - - [23/Feb/2026 14:09:05] "GET /socket.io/?EIO=4&transport=websocket&sid=Fdl80OvkEi12TgNTAAAC HTTP/1.1" 200 0 30.087719
+(3509) accepted ('127.0.0.1', 42330)
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /login HTTP/1.1" 200 1478 0.001085
+127.0.0.1 - - [23/Feb/2026 14:09:34] "POST /login HTTP/1.1" 302 679 0.507458
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET / HTTP/1.1" 200 44750 0.005826
+(4954) accepted ('127.0.0.1', 45550)
+(4954) accepted ('127.0.0.1', 45566)
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /static/css/main.css?v=20260223140934 HTTP/1.1" 200 13545 0.001567
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /static/js/lineup_editor.js HTTP/1.1" 200 10315 0.001713
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /static/js/main.js HTTP/1.1" 200 78909 0.001564
+(3509) accepted ('127.0.0.1', 45570)
+(4954) accepted ('127.0.0.1', 45578)
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/session_data HTTP/1.1" 200 548 0.003155
+(3509) accepted ('127.0.0.1', 45592)
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/roster HTTP/1.1" 200 4371 0.003226
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/rotations HTTP/1.1" 200 1680 0.002186
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/lineups HTTP/1.1" 200 414 0.001880
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/scouting_list HTTP/1.1" 200 475 0.001821
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/pitching_data HTTP/1.1" 200 2933 0.006941
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/player_development HTTP/1.1" 200 672 0.005116
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/games HTTP/1.1" 200 1052 0.003400
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/collaboration_notes HTTP/1.1" 200 457 0.001487
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/signs HTTP/1.1" 200 414 0.001502
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/practice_plans HTTP/1.1" 200 414 0.002107
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/overview_data HTTP/1.1" 200 484 0.004431
+127.0.0.1 - - [23/Feb/2026 14:09:34] "GET /api/stats HTTP/1.1" 200 3436 0.004906
+127.0.0.1 - - [23/Feb/2026 14:09:35] "GET /socket.io/?EIO=4&transport=polling&t=PoArOKO HTTP/1.1" 200 300 0.000547
+127.0.0.1 - - [23/Feb/2026 14:09:35] "POST /socket.io/?EIO=4&transport=polling&t=PoArOKd&sid=GEVaEVXKcdgFTkB2AAAE HTTP/1.1" 200 219 0.000620
+Invalid session GEVaEVXKcdgFTkB2AAAE (further occurrences of this error will be logged with level INFO)
+127.0.0.1 - - [23/Feb/2026 14:09:35] "GET /socket.io/?EIO=4&transport=polling&t=PoArOKf&sid=GEVaEVXKcdgFTkB2AAAE HTTP/1.1" 400 213 0.000492
+(3509) accepted ('127.0.0.1', 45602)
+127.0.0.1 - - [23/Feb/2026 14:09:35] "POST /socket.io/?EIO=4&transport=polling&t=PoArOKy&sid=GEVaEVXKcdgFTkB2AAAE HTTP/1.1" 400 265 0.000282
+127.0.0.1 - - [23/Feb/2026 14:09:35] "GET /socket.io/?EIO=4&transport=websocket&sid=GEVaEVXKcdgFTkB2AAAE HTTP/1.1" 200 0 0.017821
+127.0.0.1 - - [23/Feb/2026 14:09:35] "POST /add_game HTTP/1.1" 302 737 0.011384
+127.0.0.1 - - [23/Feb/2026 14:09:35] "GET /game/4 HTTP/1.1" 200 51548 0.059488
+127.0.0.1 - - [23/Feb/2026 14:09:35] "GET /static/css/main.css?v=20260223140935 HTTP/1.1" 200 13545 0.001449
+127.0.0.1 - - [23/Feb/2026 14:09:35] "GET /static/js/lineup_editor.js HTTP/1.1" 304 528 0.001568
+127.0.0.1 - - [23/Feb/2026 14:09:35] "GET /static/js/game_logic.js HTTP/1.1" 200 39861 0.001222
+127.0.0.1 - - [23/Feb/2026 14:09:35] "GET /static/diamond.jpg HTTP/1.1" 200 88253 0.001828
