@@ -415,3 +415,52 @@ body {
         background-color: transparent;
     }
 }
+/* ==========================================================================
+   Mobile Optimization for Diamond
+   ========================================================================== */
+@media (max-width: 767.98px) {
+    .diamond-container-interactive {
+        /* Ensure the container doesn't overflow horizontally on very small screens */
+        max-width: 100%;
+        margin: 10px auto;
+    }
+
+    .position-dropzone {
+        width: 80px; /* Significantly reduced from 120px, but slightly wider than 74px for better wrapping */
+        min-height: 40px;
+        padding: 2px;
+        border-width: 1px; /* Thinner border */
+    }
+
+    .position-dropzone .pos-abbr {
+        font-size: 0.65rem;
+        margin-bottom: 1px;
+        /* Make label less obtrusive */
+        opacity: 0.8;
+    }
+
+    .player-tag {
+        font-size: 0.65rem; /* Slightly smaller to fit names */
+        padding: 2px 4px;
+        white-space: normal; /* Allow wrapping */
+        line-height: 1.1;
+        margin-top: 1px;
+    }
+
+    /* Adjust coordinates to prevent overlap on small screens */
+    /* Spread middle infielders out */
+    .pos-SS { left: 27%; top: 32%; }
+    .pos-2B { left: 73%; top: 32%; }
+
+    /* Move Pitcher down slightly */
+    .pos-P  { top: 54%; }
+
+    /* Move Corner Infielders slightly out to be safe */
+    .pos-3B { left: 20%; }
+    .pos-1B { left: 80%; }
+
+    /* Move Outfielders to use more width */
+    .pos-LF { left: 14%; top: 14%; }
+    .pos-RF { left: 86%; top: 14%; }
+    .pos-CF { top: 6%; }
+}
