@@ -184,6 +184,7 @@
             absent_player_ids: {{ absent_player_ids|tojson }},
             lineup_templates: {{ lineup_templates|tojson }},
             rotation_templates: {{ rotation_templates|tojson }},
+            pitch_count_summary: {{ pitch_count_summary|tojson }},
             outfielder_count: {{ current_team.outfielder_count if current_team else 3 }}
         };
         initializeGameManagement(gameData);
