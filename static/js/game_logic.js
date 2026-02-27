@@ -678,6 +678,7 @@ function applyOutOfPositionIndicators() {
                         benchPlayers.map(p => {
                             const positions = [p.position1, p.position2, p.position3].filter(pos => pos).join(', ');
                             const posString = positions ? ` (${positions})` : '';
+
                             return `<a href="#" class="list-group-item list-group-item-action" data-player-name="${escapeHTML(p.name)}">${escapeHTML(p.name)}${escapeHTML(posString)}</a>`;
                         }).join('') :
                         `<div class="list-group-item">No players on the bench.</div>`;
