@@ -20,3 +20,4 @@ team-coach-app-test/
 app.db
 app.log
 nohup.out
+server.log
