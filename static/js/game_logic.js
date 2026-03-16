@@ -523,8 +523,86 @@ function applyOutOfPositionIndicators() {
         }
     }
 
+    async function fetchLatestGameData() {
+        if (!state.game || !state.game.id) return;
+        try {
+            const res = await fetch(`/api/game_data/${state.game.id}`);
+            if (!res.ok) throw new Error("Failed to fetch game data.");
+            const newData = await res.json();
+
+            // Update state
+            state.game = newData.game;
+            state.roster = (newData.roster || []).filter(p => !(newData.absent_player_ids || []).includes(p.id));
+            state.lineup = newData.lineup || { id: null, title: `Lineup for vs ${newData.game.opponent}`, lineup_positions: [], associated_game_id: newData.game.id };
+
+            // Ensure rotation innings is an object
+            let parsedRotation = newData.rotation || { id: null, title: `Rotation for vs ${newData.game.opponent}`, innings: { '1': {} }, associated_game_id: newData.game.id };
+            if (typeof parsedRotation.innings === 'string') {
+                try {
+                    parsedRotation.innings = JSON.parse(parsedRotation.innings);
+                } catch (e) {
+                    parsedRotation.innings = { '1': {} };
+                }
+            }
+            state.rotation = parsedRotation;
+
+            state.lineup_templates = newData.lineup_templates || [];
+            state.rotation_templates = newData.rotation_templates || [];
+
+            // Re-render
+            renderRotationEditor();
+
+            // If lineup modal is open, re-render it
+            if (document.getElementById('lineupEditorModal')?.classList.contains('show')) {
+                 initializeLineupEditor({
+                    roster: state.roster,
+                    lineup: state.lineup,
+                    benchEl: document.getElementById('lineup-bench'),
+                    orderEl: document.getElementById('lineup-order')
+                });
+            }
+
+            // Check if we need to update the availability list UI
+            const presentCount = newData.roster.length - newData.absent_player_ids.length;
+            const absentCount = newData.absent_player_ids.length;
+            const cardBody = document.querySelector('#availabilityCollapse').closest('.card-body');
+            if(cardBody) {
+                 const pTag = cardBody.querySelector('p');
+                 if(pTag) pTag.innerHTML = `<strong>${presentCount}</strong> players present, <strong>${absentCount}</strong> absent.`;
+
+                 // Update checkboxes
+                 newData.roster.forEach(player => {
+                     const cb = document.getElementById(`player-${player.id}`);
+                     if (cb) {
+                         cb.checked = newData.absent_player_ids.includes(player.id);
+                     }
+                 });
+            }
+
+            // Update lineup text list on the main page
+            const lineupCardBody = document.querySelector('.card:has(#lineupEditorModal) .card-body') || document.querySelector('.card:nth-child(2) .card-body');
+            if (lineupCardBody && !lineupCardBody.closest('.modal')) {
+                 if (state.lineup && state.lineup.lineup_positions && state.lineup.lineup_positions.length > 0) {
+                      lineupCardBody.innerHTML = `<ol class="list-group list-group-numbered">${state.lineup.lineup_positions.map(p => `<li class="list-group-item">${escapeHTML(p)}</li>`).join('')}</ol>`;
+                 } else {
+                      lineupCardBody.innerHTML = `<div class="text-center p-3 text-muted"><p class="mb-1">No lineup has been set.</p></div>`;
+                 }
+            }
+
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
     // --- Event Listeners ---
     function setupEventListeners() {
+        const socket = io();
+        socket.on('data_updated', fetchLatestGameData);
+        socket.on('lineup_add', fetchLatestGameData);
+        socket.on('lineup_update', fetchLatestGameData);
+        socket.on('rotation_save', fetchLatestGameData);
+        socket.on('roster_update', fetchLatestGameData);
+
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
         // NEW: Initialize the save template modal

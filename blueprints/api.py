@@ -209,6 +209,51 @@ def get_overview_data():
     })
 
 
+@api_bp.route('/game_data/<int:game_id>')
+@login_required
+def get_game_data(game_id):
+    team_id = session.get('team_id')
+    if not team_id:
+        return jsonify({"error": "Team not found"}), 404
+
+    team = db.session.get(Team, team_id)
+    if not team:
+        return jsonify({"error": "Team not found"}), 404
+
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
+    if not game:
+        return jsonify({"error": "Game not found"}), 404
+
+    roster_objects = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
+    lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team_id).first()
+    rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team_id).first()
+
+    all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
+    game_pitching_log = [o for o in all_pitching_outings if o.opponent == game.opponent and o.date.date() == game.date.date()]
+
+    absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
+    absent_player_ids = [absence.player_id for absence in absences]
+
+    rules = get_pitching_rules_for_team(team)
+    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules)
+
+    lineup_templates = db.session.query(Lineup).filter_by(team_id=team_id, associated_game_id=None).all()
+    rotation_templates = db.session.query(Rotation).filter_by(team_id=team_id, associated_game_id=None).all()
+
+    return jsonify({
+        'game': model_to_dict(game),
+        'roster': [model_to_dict(p) for p in roster_objects],
+        'lineup': model_to_dict(lineup_obj) if lineup_obj else None,
+        'rotation': model_to_dict(rotation_obj) if rotation_obj else None,
+        'game_pitching_log': [pitching_outing_to_dict(o) for o in game_pitching_log],
+        'absent_player_ids': absent_player_ids,
+        'pitch_count_summary': pitch_count_summary,
+        'lineup_templates': [model_to_dict(lt) for lt in lineup_templates],
+        'rotation_templates': [model_to_dict(rt) for rt in rotation_templates],
+        'outfielder_count': team.outfielder_count
+    })
+
+
 @api_bp.route('/stats')
 @login_required
 def get_stats():
