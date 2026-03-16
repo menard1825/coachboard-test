@@ -1,0 +1,27 @@
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 118-483-853
+(7432) wsgi starting up on http://0.0.0.0:5002
+(7432) accepted ('127.0.0.1', 57996)
+127.0.0.1 - - [16/Mar/2026 19:30:23] "POST /login HTTP/1.1" 302 679 0.734931
+127.0.0.1 - - [16/Mar/2026 19:30:23] "GET / HTTP/1.1" 200 44750 0.064114
+127.0.0.1 - - [16/Mar/2026 19:30:23] "GET /api/game_data/1 HTTP/1.1" 200 1657 0.024911
+127.0.0.1 - - [16/Mar/2026 19:30:23] "POST /save_rotation HTTP/1.1" 200 498 0.009365
+ * Detected change in '/app/blueprints/api.py', reloading
+Starting server...
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 118-483-853
+(8973) wsgi starting up on http://0.0.0.0:5002
+ * Detected change in '/app/blueprints/gameday.py', reloading
+Starting server...
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 118-483-853
+(9493) wsgi starting up on http://0.0.0.0:5002
+(9493) accepted ('127.0.0.1', 38016)
+127.0.0.1 - - [16/Mar/2026 19:34:44] "POST /login HTTP/1.1" 302 679 0.596816
+127.0.0.1 - - [16/Mar/2026 19:34:44] "GET / HTTP/1.1" 200 44750 0.067455
+127.0.0.1 - - [16/Mar/2026 19:34:44] "GET /api/game_data/1 HTTP/1.1" 200 1657 0.024084
+127.0.0.1 - - [16/Mar/2026 19:34:44] "POST /save_rotation HTTP/1.1" 200 498 0.008925
+Starting server...

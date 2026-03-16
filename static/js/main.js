@@ -912,12 +912,9 @@ document.addEventListener('DOMContentLoaded', () => {
             renderLineups();
             renderGames();
         });
-        socket.on('rotation_save', (data) => {
+        socket.on('rotation_save', async (data) => {
             console.log('rotation_save received', data);
-            const index = AppState.full_data.rotations.findIndex(r => r.id === data.rotation.id);
-            if (index > -1) AppState.full_data.rotations[index] = data.rotation;
-            else AppState.full_data.rotations.push(data.rotation);
-            renderRotations();
+            await fetchData();
             renderGames();
         });
         socket.on('rotation_delete', (data) => {
@@ -960,6 +957,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderPlayerDevelopmentList();
                 if (AppState.active_player_dev_name === player_name) renderPlayerDevelopmentDetails();
             }
+        });
+
+        socket.on('data_updated', async () => {
+            console.log('data_updated received');
+            await fetchData();
+            renderAll();
         });
 
         // --- Other Data Sockets ---

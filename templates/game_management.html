@@ -176,7 +176,7 @@
 <script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const gameData = {
+        const initialGameData = {
             game: {{ game|tojson }},
             roster: {{ roster|tojson }},
             lineup: {{ lineup|tojson }},
@@ -187,7 +187,7 @@
             pitch_count_summary: {{ pitch_count_summary|tojson }},
             outfielder_count: {{ current_team.outfielder_count if current_team else 3 }}
         };
-        initializeGameManagement(gameData);
+        initializeGameManagement(initialGameData);
     });
 </script>
 {% endblock %}

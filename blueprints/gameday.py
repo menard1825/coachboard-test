@@ -241,7 +241,12 @@ def save_rotation():
     else:
          db.session.commit()
 
-    socketio.emit('data_updated', {'message': 'Rotation saved/updated.'})
+    # Re-fetch the rotation to send back a complete object
+    saved_rotation = db.session.query(Rotation).get(new_rotation_id)
+    if saved_rotation:
+        socketio.emit('rotation_save', {'rotation': model_to_dict(saved_rotation)})
+
+
     return jsonify({'status': 'success', 'message': message, 'new_id': new_rotation_id})
 
 @gameday_bp.route('/delete_rotation/<int:rotation_id>')
