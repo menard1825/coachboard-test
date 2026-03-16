@@ -26,9 +26,8 @@ def pitching_outing_to_dict(outing):
     return d
 
 # This dictionary was originally in app.py
-# MODIFIED: Expanded to include a full range of age groups for USSSA rules.
 PITCHING_RULES = {
-    'USSSA': {
+    'MLB Pitch Smart': {
         # Using MLB Pitch Smart Guidelines for all age groups
         '4U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
         '5U': {'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
@@ -43,8 +42,12 @@ PITCHING_RULES = {
         '14U': {'max_daily': 95, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3), (95, 4)]},
         '15U': {'max_daily': 95, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (75, 3), (95, 4)]},
         '16U': {'max_daily': 95, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (75, 3), (95, 4)]},
-        '17U': {'max_daily': 105, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (75, 3), (105, 4)]},
-        '18U': {'max_daily': 105, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (75, 3), (105, 4)]},
+        '17U': {'max_daily': 105, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (80, 3), (105, 4)]},
+        '18U': {'max_daily': 105, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (80, 3), (105, 4)]},
+        '19U': {'max_daily': 120, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (80, 3), (105, 4), (120, 5)]},
+        '20U': {'max_daily': 120, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (80, 3), (105, 4), (120, 5)]},
+        '21U': {'max_daily': 120, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (80, 3), (105, 4), (120, 5)]},
+        '22U': {'max_daily': 120, 'rest_thresholds': [(30, 0), (45, 1), (60, 2), (80, 3), (105, 4), (120, 5)]},
         'default': {'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3), (85, 4)]}
     }
 }
@@ -58,9 +61,11 @@ def allowed_file(filename):
 
 def get_pitching_rules_for_team(team):
     """Gets the appropriate pitching rule set for a given team."""
-    rule_set_name = getattr(team, 'pitching_rule_set', 'USSSA') or 'USSSA'
+    rule_set_name = getattr(team, 'pitching_rule_set', 'MLB Pitch Smart') or 'MLB Pitch Smart'
+    if rule_set_name == 'USSSA':
+        rule_set_name = 'MLB Pitch Smart' # Fallback for old data
     age_group = getattr(team, 'age_group', 'default') or 'default'
-    rule_set = PITCHING_RULES.get(rule_set_name, PITCHING_RULES['USSSA'])
+    rule_set = PITCHING_RULES.get(rule_set_name, PITCHING_RULES['MLB Pitch Smart'])
     return rule_set.get(age_group, rule_set.get('default'))
 
 def calculate_cumulative_pitching_stats(player_id, all_outings):

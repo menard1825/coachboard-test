@@ -1,27 +1,91 @@
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 118-483-853
-(7432) wsgi starting up on http://0.0.0.0:5002
-(7432) accepted ('127.0.0.1', 57996)
-127.0.0.1 - - [16/Mar/2026 19:30:23] "POST /login HTTP/1.1" 302 679 0.734931
-127.0.0.1 - - [16/Mar/2026 19:30:23] "GET / HTTP/1.1" 200 44750 0.064114
-127.0.0.1 - - [16/Mar/2026 19:30:23] "GET /api/game_data/1 HTTP/1.1" 200 1657 0.024911
-127.0.0.1 - - [16/Mar/2026 19:30:23] "POST /save_rotation HTTP/1.1" 200 498 0.009365
- * Detected change in '/app/blueprints/api.py', reloading
+(3445) wsgi starting up on http://0.0.0.0:5002
+(3445) accepted ('127.0.0.1', 37700)
+127.0.0.1 - - [16/Mar/2026 20:50:01] "HEAD / HTTP/1.1" 302 138 0.001374
+ * Detected change in '/app/verify_frontend.py', reloading
 Starting server...
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 118-483-853
-(8973) wsgi starting up on http://0.0.0.0:5002
- * Detected change in '/app/blueprints/gameday.py', reloading
+(3678) wsgi starting up on http://0.0.0.0:5002
+(3678) accepted ('127.0.0.1', 51122)
+127.0.0.1 - - [16/Mar/2026 20:50:35] "GET /login HTTP/1.1" 200 1478 0.038687
+127.0.0.1 - - [16/Mar/2026 20:50:38] "POST /login HTTP/1.1" 302 678 0.964845
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET / HTTP/1.1" 200 44749 0.113976
+(3678) accepted ('127.0.0.1', 51136)
+(3678) accepted ('127.0.0.1', 51142)
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /static/css/main.css?v=20260316205038 HTTP/1.1" 200 13532 0.008336
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /static/js/main.js HTTP/1.1" 200 78835 0.002052
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /static/js/lineup_editor.js HTTP/1.1" 200 10314 0.001467
+(3678) accepted ('127.0.0.1', 51152)
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/session_data HTTP/1.1" 200 538 0.004704
+(3678) accepted ('127.0.0.1', 51164)
+(3678) accepted ('127.0.0.1', 51176)
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/roster HTTP/1.1" 200 413 0.006635
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/lineups HTTP/1.1" 200 413 0.004390
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/pitching_data HTTP/1.1" 200 461 0.012077
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/rotations HTTP/1.1" 200 413 0.003470
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/collaboration_notes HTTP/1.1" 200 456 0.005401
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/scouting_list HTTP/1.1" 200 474 0.004137
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/games HTTP/1.1" 200 413 0.003568
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/stats HTTP/1.1" 200 508 0.009665
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/practice_plans HTTP/1.1" 200 413 0.009748
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/signs HTTP/1.1" 200 413 0.003046
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/overview_data HTTP/1.1" 200 483 0.008586
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /api/player_development HTTP/1.1" 200 413 0.005105
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /socket.io/?EIO=4&transport=polling&t=PpuQa2K HTTP/1.1" 200 300 0.000506
+127.0.0.1 - - [16/Mar/2026 20:50:38] "POST /socket.io/?EIO=4&transport=polling&t=PpuQa2Y&sid=o4RzMGXbEeWGnvxDAAAA HTTP/1.1" 200 219 0.001014
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /socket.io/?EIO=4&transport=polling&t=PpuQa2u&sid=o4RzMGXbEeWGnvxDAAAA HTTP/1.1" 200 213 0.000282
+(3678) accepted ('127.0.0.1', 51190)
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /socket.io/?EIO=4&transport=polling&t=PpuQa3B&sid=o4RzMGXbEeWGnvxDAAAA HTTP/1.1" 200 181 0.000246
+127.0.0.1 - - [16/Mar/2026 20:50:38] "GET /socket.io/?EIO=4&transport=polling&t=PpuQa3S&sid=o4RzMGXbEeWGnvxDAAAA HTTP/1.1" 200 181 0.000228
+127.0.0.1 - - [16/Mar/2026 20:50:39] "GET /admin/settings HTTP/1.1" 200 19724 0.019166
+127.0.0.1 - - [16/Mar/2026 20:50:39] "GET /socket.io/?EIO=4&transport=websocket&sid=o4RzMGXbEeWGnvxDAAAA HTTP/1.1" 200 0 0.586261
+127.0.0.1 - - [16/Mar/2026 20:50:39] "GET /static/css/main.css?v=20260316205039 HTTP/1.1" 200 13532 0.001625
+ * Detected change in '/app/verify_frontend.py', reloading
 Starting server...
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 118-483-853
-(9493) wsgi starting up on http://0.0.0.0:5002
-(9493) accepted ('127.0.0.1', 38016)
-127.0.0.1 - - [16/Mar/2026 19:34:44] "POST /login HTTP/1.1" 302 679 0.596816
-127.0.0.1 - - [16/Mar/2026 19:34:44] "GET / HTTP/1.1" 200 44750 0.067455
-127.0.0.1 - - [16/Mar/2026 19:34:44] "GET /api/game_data/1 HTTP/1.1" 200 1657 0.024084
-127.0.0.1 - - [16/Mar/2026 19:34:44] "POST /save_rotation HTTP/1.1" 200 498 0.008925
-Starting server...
+(4032) wsgi starting up on http://0.0.0.0:5002
+(4032) accepted ('127.0.0.1', 49418)
+127.0.0.1 - - [16/Mar/2026 20:51:29] "GET /login HTTP/1.1" 200 1478 0.007399
+127.0.0.1 - - [16/Mar/2026 20:51:30] "POST /login HTTP/1.1" 302 678 0.617194
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET / HTTP/1.1" 200 44749 0.062954
+(4032) accepted ('127.0.0.1', 49430)
+(4032) accepted ('127.0.0.1', 49432)
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /static/css/main.css?v=20260316205130 HTTP/1.1" 200 13532 0.007421
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /static/js/main.js HTTP/1.1" 200 78835 0.001985
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /static/js/lineup_editor.js HTTP/1.1" 200 10314 0.002069
+(4032) accepted ('127.0.0.1', 49444)
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/session_data HTTP/1.1" 200 538 0.004056
+(4032) accepted ('127.0.0.1', 49458)
+(4032) accepted ('127.0.0.1', 49468)
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/roster HTTP/1.1" 200 413 0.004897
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/games HTTP/1.1" 200 413 0.003517
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/scouting_list HTTP/1.1" 200 474 0.003373
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/lineups HTTP/1.1" 200 413 0.002954
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/pitching_data HTTP/1.1" 200 461 0.008206
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/rotations HTTP/1.1" 200 413 0.002920
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/collaboration_notes HTTP/1.1" 200 456 0.002965
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/signs HTTP/1.1" 200 413 0.004210
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/practice_plans HTTP/1.1" 200 413 0.007556
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/player_development HTTP/1.1" 200 413 0.004239
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/stats HTTP/1.1" 200 508 0.006851
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /api/overview_data HTTP/1.1" 200 483 0.006451
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /socket.io/?EIO=4&transport=polling&t=PpuQmbR HTTP/1.1" 200 300 0.000389
+127.0.0.1 - - [16/Mar/2026 20:51:30] "POST /socket.io/?EIO=4&transport=polling&t=PpuQmbW&sid=BsCXfIxez9PBtDSEAAAA HTTP/1.1" 200 219 0.001808
+(4032) accepted ('127.0.0.1', 49476)
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /socket.io/?EIO=4&transport=polling&t=PpuQmbY&sid=BsCXfIxez9PBtDSEAAAA HTTP/1.1" 200 213 0.000178
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /socket.io/?EIO=4&transport=polling&t=PpuQmbn&sid=BsCXfIxez9PBtDSEAAAA HTTP/1.1" 200 181 0.000211
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /socket.io/?EIO=4&transport=polling&t=PpuQmbq&sid=BsCXfIxez9PBtDSEAAAA HTTP/1.1" 200 181 0.000152
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /admin/settings HTTP/1.1" 200 19724 0.019828
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /socket.io/?EIO=4&transport=websocket&sid=BsCXfIxez9PBtDSEAAAA HTTP/1.1" 200 0 0.550522
+127.0.0.1 - - [16/Mar/2026 20:51:30] "GET /static/css/main.css?v=20260316205130 HTTP/1.1" 304 520 0.001496
+127.0.0.1 - - [16/Mar/2026 20:51:31] "POST /admin/settings/update HTTP/1.1" 302 725 0.004118
+127.0.0.1 - - [16/Mar/2026 20:51:31] "GET /admin/settings HTTP/1.1" 200 20054 0.003374
+127.0.0.1 - - [16/Mar/2026 20:51:31] "GET /static/css/main.css?v=20260316205131 HTTP/1.1" 200 13532 0.001278
+127.0.0.1 - - [16/Mar/2026 20:51:31] "GET /rules HTTP/1.1" 200 5404 0.010768
+127.0.0.1 - - [16/Mar/2026 20:51:31] "GET /static/css/main.css HTTP/1.1" 200 13532 0.001587
