@@ -30,6 +30,9 @@
                         <li class="nav-item">
                             <a class="nav-link" data-bs-toggle="tab" href="#pitching-rules-settings">Pitching Rules</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-danger" data-bs-toggle="tab" href="#season-management"><i class="bi bi-calendar-x"></i> Season Management</a>
+                        </li>
                     </ul>
                 </div>
                 <div class="card-body">
@@ -101,6 +104,15 @@
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                             </form>
                         </div>
+                        <div class="tab-pane fade" id="season-management">
+                            <h6 class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Start New Season</h6>
+                            <p class="text-muted small">Starting a new season will permanently delete your current schedule, games, practice plans, lineups, rotations, and pitching outings.</p>
+                            <p class="text-muted small"><strong>A backup ZIP file containing all your current data as CSV spreadsheets will be downloaded automatically before the reset occurs.</strong></p>
+
+                            <button type="button" class="btn btn-danger w-100 mt-2" data-bs-toggle="modal" data-bs-target="#startNewSeasonModal">
+                                Configure New Season
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -131,6 +143,164 @@
         </div>
     </div>
 </div>
+    <!-- Start New Season Modal -->
+    <div class="modal fade" id="startNewSeasonModal" tabindex="-1" aria-labelledby="startNewSeasonModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form id="startNewSeasonForm" action="{{ url_for('admin.start_new_season') }}" method="POST">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="startNewSeasonModalLabel">Start New Season</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle-fill"></i> <strong>Warning:</strong> This action cannot be undone. All games, practice plans, pitching logs, and lineups will be deleted. A ZIP file of your old data will be downloaded automatically.
+                        </div>
+
+                        <h6 class="mt-4 border-bottom pb-2">New Season Information</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="new_team_name" class="form-label">New Team Name</label>
+                                <input type="text" class="form-control" id="new_team_name" name="new_team_name" value="{{ settings.team_name }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="new_age_group" class="form-label">New Age Group</label>
+                                <select class="form-select" id="new_age_group" name="new_age_group" required>
+                                    {% set sample_rule_set = all_rules['MLB Pitch Smart'] %}
+                                    {% for age_group_key in sample_rule_set.keys() %}
+                                        {% if age_group_key != 'default' %}
+                                            <option value="{{ age_group_key }}" {% if settings.age_group == age_group_key %}selected{% endif %}>
+                                                {{ age_group_key }}
+                                            </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <h6 class="mt-4 border-bottom pb-2">What do you want to carry over?</h6>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="keep_players" name="keep_players" checked>
+                            <label class="form-check-label" for="keep_players">Keep Current Roster (Players)</label>
+                        </div>
+                        <div class="form-check form-switch mb-2 ms-4" id="devNotesContainer">
+                            <input class="form-check-input" type="checkbox" id="keep_dev_notes" name="keep_dev_notes" checked>
+                            <label class="form-check-label" for="keep_dev_notes">Keep Player Development Notes</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="keep_scouted_players" name="keep_scouted_players" checked>
+                            <label class="form-check-label" for="keep_scouted_players">Keep Scouted Players List</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="keep_collab_notes" name="keep_collab_notes" checked>
+                            <label class="form-check-label" for="keep_collab_notes">Keep Collaboration Notes</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="keep_signs" name="keep_signs" checked>
+                            <label class="form-check-label" for="keep_signs">Keep Signs/Indicators</label>
+                        </div>
+
+                        <h6 class="mt-4 border-bottom pb-2 text-danger">Final Confirmation</h6>
+                        <p class="small mb-2">To confirm that you understand your schedule and historical data will be deleted, please type <strong>START NEW SEASON</strong> below.</p>
+                        <input type="text" class="form-control mb-3" id="confirmText" placeholder="Type START NEW SEASON here">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger" id="confirmResetBtn" disabled>
+                            Download Backup & Start Season
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const keepPlayersCheckbox = document.getElementById('keep_players');
+        const keepDevNotesCheckbox = document.getElementById('keep_dev_notes');
+        const confirmTextInput = document.getElementById('confirmText');
+        const confirmBtn = document.getElementById('confirmResetBtn');
+        const form = document.getElementById('startNewSeasonForm');
+
+        // Toggle dev notes availability based on roster
+        keepPlayersCheckbox.addEventListener('change', function() {
+            if (!this.checked) {
+                keepDevNotesCheckbox.checked = false;
+                keepDevNotesCheckbox.disabled = true;
+            } else {
+                keepDevNotesCheckbox.disabled = false;
+            }
+        });
+
+        // Enable confirm button only when text matches
+        confirmTextInput.addEventListener('input', function() {
+            if (this.value.trim().toUpperCase() === 'START NEW SEASON') {
+                confirmBtn.disabled = false;
+            } else {
+                confirmBtn.disabled = true;
+            }
+        });
+
+        // Handle form submission to download backup before redirecting
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault(); // Prevent immediate submission
+
+            // Disable the button and show spinner
+            confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing Backup...';
+            confirmBtn.disabled = true;
+
+            try {
+                // 1. Fetch the backup ZIP asynchronously
+                const response = await fetch("{{ url_for('admin.backup_season_data') }}");
+                if (!response.ok) throw new Error('Backup failed');
+
+                // 2. Create a blob from the response
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+
+                // Get filename from Content-Disposition header if possible, otherwise use a default
+                const disposition = response.headers.get('Content-Disposition');
+                let filename = 'Season_Backup.zip';
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                    const matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[1]) {
+                        filename = matches[1].replace(/['"]/g, '');
+                    }
+                }
+
+                // 3. Trigger the browser download
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                // 4. Update button text and submit the actual form to perform the database reset
+                confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Resetting Season...';
+
+                // Short delay to ensure download dialog has appeared
+                setTimeout(() => {
+                    form.submit();
+                }, 1000);
+
+            } catch (error) {
+                console.error("Failed to download backup:", error);
+                alert("Failed to create the season backup. The season reset has been aborted to prevent data loss. Please try again or contact support.");
+                confirmBtn.innerHTML = 'Download Backup & Start Season';
+                confirmBtn.disabled = false;
+            }
+        });
+    });
+</script>
+
 {% endblock %}
 {% block scripts %}
 <script>

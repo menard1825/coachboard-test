@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from werkzeug.security import generate_password_hash
@@ -8,10 +8,13 @@ import os
 import random
 import string
 import json
+import csv
+import io
+import zipfile
 from functools import wraps
 
 from db import db
-from models import User, Team
+from models import User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer, Rotation, Game, CollaborationNote, PracticePlan, PracticeTask, PlayerDevelopmentFocus, Sign, PlayerGameAbsence, PlayerPracticeAbsence
 from extensions import socketio
 from utils import PITCHING_RULES, allowed_file
 
@@ -220,6 +223,150 @@ def edit_user(username):
 def admin_settings():
     team_settings = db.session.get(Team, session['team_id'])
     return render_template('admin_settings.html', session=session, settings=team_settings, all_rules=PITCHING_RULES)
+
+
+@admin_bp.route('/settings/backup_season_data', methods=['GET'])
+@admin_required
+def backup_season_data():
+    team_id = session.get('team_id')
+    team = db.session.get(Team, team_id)
+    if not team:
+        return "Team not found", 404
+
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Helper to convert model to dict and write to CSV
+        def add_model_to_zip(model_class, filename):
+            # Special case for PracticeTask since it doesn't have a team_id column
+            if model_class == PracticeTask:
+                practice_plan_ids = [p.id for p in db.session.query(PracticePlan.id).filter_by(team_id=team_id).all()]
+                if not practice_plan_ids:
+                    return
+                records = db.session.query(PracticeTask).filter(PracticeTask.practice_plan_id.in_(practice_plan_ids)).all()
+            else:
+                records = db.session.query(model_class).filter_by(team_id=team_id).all()
+
+            if not records:
+                return
+
+            # Use the first record to get column names, fallback to model columns
+            if hasattr(records[0], 'to_dict'):
+                fieldnames = records[0].to_dict().keys()
+                rows = [r.to_dict() for r in records]
+            else:
+                fieldnames = [c.name for c in model_class.__table__.columns if c.name != 'team_id']
+                rows = [{c.name: getattr(r, c.name) for c in model_class.__table__.columns if c.name != 'team_id'} for r in records]
+
+            # Convert dicts with nested structures (like JSON) to strings for CSV
+            for row in rows:
+                for k, v in row.items():
+                    if isinstance(v, (dict, list)):
+                        row[k] = json.dumps(v)
+
+            string_io = io.StringIO()
+            writer = csv.DictWriter(string_io, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+            zf.writestr(filename, string_io.getvalue())
+
+        # Add all relevant data to the ZIP
+        add_model_to_zip(Player, 'Roster.csv')
+        add_model_to_zip(Game, 'Games.csv')
+        add_model_to_zip(Lineup, 'Lineups.csv')
+        add_model_to_zip(Rotation, 'Rotations.csv')
+        add_model_to_zip(PitchingOuting, 'PitchingOutings.csv')
+        add_model_to_zip(PracticePlan, 'PracticePlans.csv')
+        add_model_to_zip(PracticeTask, 'PracticeTasks.csv')
+        add_model_to_zip(ScoutedPlayer, 'ScoutedPlayers.csv')
+        add_model_to_zip(CollaborationNote, 'CollaborationNotes.csv')
+        add_model_to_zip(PlayerDevelopmentFocus, 'PlayerDevelopment.csv')
+        add_model_to_zip(Sign, 'Signs.csv')
+
+    memory_file.seek(0)
+
+    # Format filename safely
+    safe_team_name = "".join([c for c in team.team_name if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+    zip_filename = f"{safe_team_name.replace(' ', '_')}_Season_Backup.zip"
+
+    return send_file(
+        memory_file,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=zip_filename
+    )
+
+@admin_bp.route('/settings/start_new_season', methods=['POST'])
+@admin_required
+def start_new_season():
+    team_id = session.get('team_id')
+    team = db.session.get(Team, team_id)
+    if not team:
+        flash('Team not found.', 'danger')
+        return redirect(url_for('admin.admin_settings'))
+
+    # Update Team Settings
+    new_team_name = request.form.get('new_team_name')
+    new_age_group = request.form.get('new_age_group')
+    if new_team_name:
+        team.team_name = new_team_name
+    if new_age_group:
+        team.age_group = new_age_group
+
+    # Get checkboxes
+    keep_players = request.form.get('keep_players') == 'on'
+    keep_dev_notes = request.form.get('keep_dev_notes') == 'on'
+    keep_scouted_players = request.form.get('keep_scouted_players') == 'on'
+    keep_collab_notes = request.form.get('keep_collab_notes') == 'on'
+    keep_signs = request.form.get('keep_signs') == 'on'
+
+    try:
+        # 1. DELETE CHILD RECORDS FIRST (to satisfy Foreign Key constraints)
+
+        # PitchingOuting, Lineup, Rotation, Absences
+        db.session.query(PitchingOuting).filter_by(team_id=team_id).delete()
+        db.session.query(Lineup).filter_by(team_id=team_id).delete()
+        db.session.query(Rotation).filter_by(team_id=team_id).delete()
+        db.session.query(PlayerGameAbsence).filter_by(team_id=team_id).delete()
+        db.session.query(PlayerPracticeAbsence).filter_by(team_id=team_id).delete()
+
+        # Manually clear tasks linked to the plans we are deleting (no team_id on PracticeTask)
+        practice_plan_ids = [p.id for p in db.session.query(PracticePlan.id).filter_by(team_id=team_id).all()]
+        if practice_plan_ids:
+            db.session.query(PracticeTask).filter(PracticeTask.practice_plan_id.in_(practice_plan_ids)).delete(synchronize_session=False)
+
+        # 2. DELETE PARENT RECORDS
+        db.session.query(Game).filter_by(team_id=team_id).delete()
+        db.session.query(PracticePlan).filter_by(team_id=team_id).delete()
+
+        # 3. CONDITIONALLY DELETE (based on user choice)
+        if not keep_players:
+            # Delete players. This should cascade to dev notes, absences, pitching outings.
+            db.session.query(Player).filter_by(team_id=team_id).delete()
+        elif not keep_dev_notes:
+            # Kept players, but want to wipe dev notes
+            db.session.query(PlayerDevelopmentFocus).filter_by(team_id=team_id).delete()
+
+        if not keep_scouted_players:
+            db.session.query(ScoutedPlayer).filter_by(team_id=team_id).delete()
+
+        if not keep_collab_notes:
+            db.session.query(CollaborationNote).filter_by(team_id=team_id).delete()
+
+        if not keep_signs:
+            db.session.query(Sign).filter_by(team_id=team_id).delete()
+
+        db.session.commit()
+
+        # Broadcast team settings update to clients
+        socketio.emit('team_settings_updated', {'team_id': team_id}, namespace='/')
+
+        flash(f'Successfully started new season for {team.team_name}!', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'An error occurred while resetting the season: {str(e)}', 'danger')
+
+    return redirect(url_for('admin.admin_settings'))
 
 
 @admin_bp.route('/settings/update', methods=['POST'])
