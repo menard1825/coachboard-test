@@ -172,10 +172,10 @@
                   <hr>
                   <h6>Management Actions</h6>
                   <div class="d-flex flex-wrap gap-2">
-                      <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resetPasswordModal-{{ user.username }}">
+                      <button type="button" class="btn btn-sm btn-outline-warning" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#resetPasswordModal-{{ user.username }}">
                           <i class="bi bi-key-fill"></i> Reset Password
                       </button>
-                      <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteUserModal-{{ user.username }}">
+                      <button type="button" class="btn btn-sm btn-outline-danger" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#deleteUserModal-{{ user.username }}">
                           <i class="bi bi-trash"></i> Delete User
                       </button>
                   </div>
