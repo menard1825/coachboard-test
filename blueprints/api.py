@@ -235,7 +235,7 @@ def get_game_data(game_id):
     absent_player_ids = [absence.player_id for absence in absences]
 
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules)
+    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date)
 
     lineup_templates = db.session.query(Lineup).filter_by(team_id=team_id, associated_game_id=None).all()
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team_id, associated_game_id=None).all()
