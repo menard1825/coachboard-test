@@ -675,7 +675,12 @@ function applyOutOfPositionIndicators() {
                     document.getElementById('assignPlayerModalTitle').textContent = `Assign to ${position}`;
                     document.getElementById('assignPlayerModal').dataset.targetPosition = position;
                     document.getElementById('assignPlayerModalBenchList').innerHTML = benchPlayers.length > 0 ? 
-                        benchPlayers.map(p => `<a href="#" class="list-group-item list-group-item-action" data-player-name="${escapeHTML(p.name)}">${escapeHTML(p.name)}</a>`).join('') :
+                        benchPlayers.map(p => {
+                            const positions = [p.position1, p.position2, p.position3].filter(pos => pos).join(', ');
+                            const posString = positions ? ` (${positions})` : '';
+
+                            return `<a href="#" class="list-group-item list-group-item-action" data-player-name="${escapeHTML(p.name)}">${escapeHTML(p.name)}${escapeHTML(posString)}</a>`;
+                        }).join('') :
                         `<div class="list-group-item">No players on the bench.</div>`;
                     assignPlayerModal.show();
                 }
