@@ -125,10 +125,19 @@ def calculate_cumulative_position_stats(roster_players, rotations):
             continue
     return stats
 
-def calculate_pitch_count_summary(roster, all_outings, rules):
+def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None):
     """Calculates the daily/weekly pitch counts and availability for all pitchers."""
     summary = {}
-    today = date.today()
+
+    if target_date is None:
+        today = date.today()
+    elif isinstance(target_date, datetime):
+        today = target_date.date()
+    elif isinstance(target_date, str):
+        today = datetime.strptime(target_date, '%Y-%m-%d').date()
+    else:
+        today = target_date
+
     for player in roster:
         try:
             player_outings = sorted([o for o in all_outings if o.player_id == player.id and isinstance(o.date, (datetime, date))], key=lambda x: x.date, reverse=True)
