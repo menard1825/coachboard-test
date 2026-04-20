@@ -5,5 +5,5 @@ from flask_migrate import Migrate
 from db import db
 
 # Create the instances here, but don't attach them to an app yet.
-socketio = SocketIO()
+socketio = SocketIO(cors_allowed_origins="*")
 migrate = Migrate()
