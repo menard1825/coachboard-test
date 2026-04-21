@@ -20,7 +20,13 @@ function initializeGameManagement(gameData) {
         outfielder_count: gameData.outfielder_count || 3,
         currentInning: '1',
         copiedInningData: null,
-        sortableInstances: {}
+        sortableInstances: {},
+        getActiveInnings: function() {
+            if (this.rotation.innings && this.rotation.innings.format === 'v2') {
+                return this.rotation.innings.is_live ? this.rotation.innings.actual : this.rotation.innings.planned;
+            }
+            return this.rotation.innings;
+        }
     };
 
     // ADD THIS BLOCK TO FIX THE INNINGS BUG
@@ -115,9 +121,31 @@ function initializeGameManagement(gameData) {
             document.querySelectorAll('.current-inning-display').forEach(el => el.textContent = state.currentInning);
 
             if (benchPlayers.length > 0) {
-                 benchMobile.innerHTML = benchPlayers.map(p =>
-                    `<span class="badge bg-secondary fw-normal p-2 border">${escapeHTML(p.name)}</span>`
-                 ).join('');
+                 // Calculate summary for highlighting
+                 const summary = {};
+                 state.roster.forEach(player => summary[player.name] = { inningsOnBench: 0 });
+                 const inningsByBase = {};
+                 Object.keys(state.getActiveInnings() || {}).forEach(inn => {
+                     const base = Math.floor(parseFloat(inn));
+                     if (!inningsByBase[base]) inningsByBase[base] = [];
+                     inningsByBase[base].push(inn);
+                 });
+                 for (const base in inningsByBase) {
+                     state.roster.forEach(player => {
+                         let playedInBase = false;
+                         inningsByBase[base].forEach(subInn => {
+                             const inningPositions = state.getActiveInnings()[subInn] || {};
+                             if (Object.values(inningPositions).includes(player.name)) playedInBase = true;
+                         });
+                         if (summary[player.name] && !playedInBase) summary[player.name].inningsOnBench++;
+                     });
+                 }
+
+                 benchMobile.innerHTML = benchPlayers.map(p => {
+                    const sat = summary[p.name] ? summary[p.name].inningsOnBench : 0;
+                    const alertClass = sat > 2 ? 'bg-danger text-white' : 'bg-secondary';
+                    return `<span class="badge ${alertClass} fw-normal p-2 border">${escapeHTML(p.name)}</span>`;
+                 }).join('');
             } else {
                 benchMobile.innerHTML = '<span class="text-muted fst-italic">No one on bench.</span>';
             }
@@ -195,7 +223,33 @@ function initializeGameManagement(gameData) {
 
     // Shared logic for rendering bench reports
     function renderBenchReportGeneric(container) {
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const innings = Object.keys(state.getActiveInnings() || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
+
+        const summary = {};
+        state.roster.forEach(player => {
+            summary[player.name] = { inningsOnField: 0, inningsOnBench: 0 };
+        });
+        const inningsByBase = {};
+        innings.forEach(inn => {
+            const base = Math.floor(parseFloat(inn));
+            if (!inningsByBase[base]) inningsByBase[base] = [];
+            inningsByBase[base].push(inn);
+        });
+        for (const base in inningsByBase) {
+            const subInnings = inningsByBase[base];
+            state.roster.forEach(player => {
+                let playedInBase = false;
+                subInnings.forEach(subInn => {
+                    const inningPositions = state.getActiveInnings()[subInn] || {};
+                    if (Object.values(inningPositions).includes(player.name)) {
+                        playedInBase = true;
+                    }
+                });
+                if (summary[player.name]) {
+                    playedInBase ? summary[player.name].inningsOnField++ : summary[player.name].inningsOnBench++;
+                }
+            });
+        }
         if (innings.length === 0) {
             container.innerHTML = '<div class="p-3 text-muted">No innings data available.</div>';
             return;
@@ -217,7 +271,10 @@ function initializeGameManagement(gameData) {
 
             if (benchPlayers.length > 0) {
                 benchPlayers.forEach(p => {
-                    html += `<span class="badge bg-light text-dark border">${escapeHTML(p.name)}</span>`;
+                    const data = summary[p.name] || {inningsOnField: 0, inningsOnBench: 0};
+                    const isAtRisk = data.inningsOnBench > 2;
+                    const alertClass = isAtRisk ? 'bg-danger text-white' : 'bg-light text-dark';
+                    html += `<span class="badge border ${alertClass}" title="Total Played: ${data.inningsOnField} | Total Sat: ${data.inningsOnBench}">${escapeHTML(p.name)} (P:${data.inningsOnField} S:${data.inningsOnBench})</span>`;
                 });
             } else {
                 html += `<span class="text-muted small fst-italic">All players on field</span>`;
@@ -235,7 +292,7 @@ function initializeGameManagement(gameData) {
         const container = document.getElementById('rotation-summary-mobile-container');
         if (!container) return;
 
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const innings = Object.keys(state.getActiveInnings() || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
         const sortedRoster = [...state.roster].sort((a, b) => a.name.localeCompare(b.name));
 
         if (innings.length === 0) {
@@ -251,7 +308,7 @@ function initializeGameManagement(gameData) {
                 <div class="d-flex flex-wrap gap-1">`;
 
             innings.forEach(inn => {
-                const inningData = state.rotation.innings[inn] || {};
+                const inningData = state.getActiveInnings()[inn] || {};
                 let position = null;
                 for (const [pos, name] of Object.entries(inningData)) {
                     if (name === player.name) {
@@ -267,7 +324,24 @@ function initializeGameManagement(gameData) {
                 }
             });
 
-            html += `</div></div>`;
+            let played = 0; let sat = 0;
+            const inningsByBase = {};
+            innings.forEach(i => {
+                const b = Math.floor(parseFloat(i));
+                if (!inningsByBase[b]) inningsByBase[b] = [];
+                inningsByBase[b].push(i);
+            });
+            for (const b in inningsByBase) {
+                let pBase = false;
+                inningsByBase[b].forEach(si => {
+                    if (Object.values(state.getActiveInnings()[si] || {}).includes(player.name)) pBase = true;
+                });
+                pBase ? played++ : sat++;
+            }
+            const isAtRisk = sat > 2;
+            const alertClass = isAtRisk ? 'bg-danger text-white' : 'bg-secondary text-white';
+
+            html += `</div><div class="mt-2"><span class="badge ${alertClass}">Played: ${played} | Sat: ${sat}</span></div></div>`;
         });
         html += '</div>';
         container.innerHTML = html;
@@ -278,25 +352,51 @@ function initializeGameManagement(gameData) {
         state.roster.forEach(player => {
             summary[player.name] = { name: player.name, inningsOnField: 0, inningsOnBench: 0, positions: new Set() };
         });
-        const innings = Object.keys(state.rotation.innings || {});
-        innings.forEach(inningNum => {
-            const inningPositions = state.rotation.innings[inningNum] || {};
-            const playersOnFieldThisInning = new Set(Object.values(inningPositions));
-            state.roster.forEach(player => {
-                if (summary[player.name]) {
-                    playersOnFieldThisInning.has(player.name) ? summary[player.name].inningsOnField++ : summary[player.name].inningsOnBench++;
-                }
-            });
+
+        const innings = Object.keys(state.getActiveInnings() || {});
+
+        // Group by base inning for accurate played/sat counts
+        const inningsByBase = {};
+        innings.forEach(inn => {
+            const base = Math.floor(parseFloat(inn));
+            if (!inningsByBase[base]) inningsByBase[base] = [];
+            inningsByBase[base].push(inn);
+
+            // Still track positions played across all sub-innings
+            const inningPositions = state.getActiveInnings()[inn] || {};
             for (const [position, playerName] of Object.entries(inningPositions)) {
                 if (playerName && summary[playerName]) summary[playerName].positions.add(position);
             }
         });
+
+        for (const base in inningsByBase) {
+            const subInnings = inningsByBase[base];
+            state.roster.forEach(player => {
+                let playedInBase = false;
+                subInnings.forEach(subInn => {
+                    const inningPositions = state.getActiveInnings()[subInn] || {};
+                    if (Object.values(inningPositions).includes(player.name)) {
+                        playedInBase = true;
+                    }
+                });
+
+                if (summary[player.name]) {
+                    if (playedInBase) {
+                        summary[player.name].inningsOnField++;
+                    } else {
+                        summary[player.name].inningsOnBench++;
+                    }
+                }
+            });
+        }
         let tableHtml = `<div class="table-responsive"><table class="table table-sm table-striped table-bordered"><thead class="table-light"><tr><th>Player</th><th>Field</th><th>Bench</th><th>Positions</th></tr></thead><tbody>`;
         const sortedPlayerNames = state.roster.map(p => p.name).sort();
         for (const playerName of sortedPlayerNames) {
             const data = summary[playerName];
             if (!data) continue;
-            tableHtml += `<tr><td><strong>${playerName}</strong></td><td>${data.inningsOnField}</td><td>${data.inningsOnBench}</td><td>${Array.from(data.positions).join(', ') || 'N/A'}</td></tr>`;
+            const isAtRisk = data.inningsOnBench > 2;
+            const alertClass = isAtRisk ? 'table-danger' : '';
+            tableHtml += `<tr class="${alertClass}"><td><strong>${playerName}</strong></td><td>${data.inningsOnField}</td><td>${data.inningsOnBench}</td><td>${Array.from(data.positions).join(', ') || 'N/A'}</td></tr>`;
         }
         tableHtml += `</tbody></table></div>`;
         const summaryDesktop = document.getElementById('summary-desktop');
