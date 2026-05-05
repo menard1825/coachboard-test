@@ -83,8 +83,8 @@ def calculate_cumulative_pitching_stats(player_id, all_outings):
     return stats
 
 def calculate_cumulative_position_stats(roster_players, rotations):
-    """Calculates the number of games a player appeared at each position in a rotation."""
-    stats = {player.name: {} for player in roster_players}
+    """Calculates the number of games a player appeared at each position in a rotation, as well as innings played and sat."""
+    stats = {player.name: {'_meta': {'total_innings_played': 0, 'total_innings_sat': 0, 'games_tracked': 0}} for player in roster_players}
 
     # Create a set to track which players have already been counted for a specific game
     # to prevent counting them multiple times for the same game rotation.
@@ -100,9 +100,50 @@ def calculate_cumulative_position_stats(roster_players, rotations):
             continue
 
         try:
-            innings_data = rotation.innings or {}
-            if not isinstance(innings_data, dict):
+            raw_innings = rotation.innings or {}
+            if not isinstance(raw_innings, dict):
                 continue
+
+            # Handle v2 format - only count stats for ACTUAL games played, OR legacy formats (assumed played)
+            if raw_innings.get('format') == 'v2':
+                if not raw_innings.get('is_live') and not raw_innings.get('actual'):
+                    continue # Skip planned games that haven't been played
+                innings_data = raw_innings.get('actual', {})
+            else:
+                innings_data = raw_innings
+
+            if not innings_data:
+                continue
+
+            # Update Games Tracked for all roster players
+            for p_name in stats:
+                stats[p_name]['_meta']['games_tracked'] += 1
+
+            # Inning tracking by base inning
+            innings_by_base = {}
+            for inn_key in innings_data.keys():
+                try:
+                    base = int(float(inn_key))
+                    if base not in innings_by_base:
+                        innings_by_base[base] = []
+                    innings_by_base[base].append(inn_key)
+                except ValueError:
+                    continue
+
+            # Calculate Played vs Sat
+            for p_name in stats:
+                for base, sub_innings in innings_by_base.items():
+                    played_in_base = False
+                    for sub_inn in sub_innings:
+                        positions = innings_data.get(sub_inn, {})
+                        if p_name in positions.values():
+                            played_in_base = True
+                            break
+                    if played_in_base:
+                        stats[p_name]['_meta']['total_innings_played'] += 1
+                    else:
+                        stats[p_name]['_meta']['total_innings_sat'] += 1
+
 
             players_in_this_rotation = set()
             # Iterate through each inning in the rotation
@@ -120,9 +161,11 @@ def calculate_cumulative_position_stats(roster_players, rotations):
             # Mark this game/rotation as counted
             game_rotations_counted.add(rotation_key)
 
-        except Exception:
+        except Exception as e:
             # Safely skip any rotation that has malformed data
+            print(f"Error parsing rotation stats: {e}")
             continue
+
     return stats
 
 def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None):

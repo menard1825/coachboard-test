@@ -35,8 +35,36 @@
                     {# Inning radio buttons will be inserted here by JS #}
                 </div>
                 <div class="btn-group ms-auto" role="group">
-                     <button id="addInningBtn" class="btn btn-sm btn-light"><i class="bi bi-plus"></i></button>
-                     <button id="removeInningBtn" class="btn btn-sm btn-light"><i class="bi bi-dash"></i></button>
+                     <button id="addInningBtn" class="btn btn-sm btn-light" title="Add Inning"><i class="bi bi-plus"></i></button>
+                     <button id="addSubInningBtn" class="btn btn-sm btn-light" title="Add Mid-Inning Sub"><i class="bi bi-node-plus"></i></button>
+                     <button id="removeInningBtn" class="btn btn-sm btn-light" title="Remove Inning"><i class="bi bi-dash"></i></button>
+                </div>
+
+                <!-- Game Mode Controls -->
+                <div class="btn-group ms-2" role="group">
+                     <button id="startGameBtn" class="btn btn-sm btn-primary d-flex align-items-center"><i class="bi bi-play-circle-fill me-1"></i><span class="d-none d-md-inline">Start Game</span></button>
+                     <button id="peekPlanBtn" class="btn btn-sm btn-outline-secondary d-none" title="Peek at Plan"><i class="bi bi-eye"></i></button>
+                </div>
+
+                <div class="dropdown ms-2 d-none" id="addNoteDropdownContainer">
+                    <button class="btn btn-sm btn-outline-warning dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Add Note for this Inning">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                        <li><h6 class="dropdown-header">Deviation Reason</h6></li>
+                        <li><a class="dropdown-item add-note-option" href="#" data-note="Pitch Count Limit">Pitch Count Limit</a></li>
+                        <li><a class="dropdown-item add-note-option" href="#" data-note="Injury">Injury</a></li>
+                        <li><a class="dropdown-item add-note-option" href="#" data-note="Tactical Change">Tactical Change</a></li>
+                        <li><a class="dropdown-item add-note-option" href="#" data-note="Underperforming">Underperforming</a></li>
+                        <li><a class="dropdown-item add-note-option" href="#" data-note="Other">Other</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item add-note-option text-danger" href="#" data-note="">Clear Note</a></li>
+                    </ul>
+                </div>
+
+                <div class="form-check form-switch ms-3 d-none align-self-center" id="propagateToggleContainer" title="Apply changes to this and all future innings">
+                    <input class="form-check-input" type="checkbox" id="propagateFutureInningsToggle" checked>
+                    <label class="form-check-label small" for="propagateFutureInningsToggle">Apply to Future Innings</label>
                 </div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
