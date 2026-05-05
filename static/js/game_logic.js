@@ -322,7 +322,12 @@ function initializeGameManagement(gameData) {
         const allContainers = [...document.querySelectorAll('#bench-list-desktop, #diamond-parent-desktop .position-dropzone')];
         allContainers.forEach(container => {
             state.sortableInstances[container.id] = new Sortable(container, {
-                group: 'rotation', animation: 150, onEnd: onEndHandler,
+                group: 'rotation',
+                animation: 150,
+                delay: 150,
+                delayOnTouchOnly: true,
+                touchStartThreshold: 5,
+                onEnd: onEndHandler,
                 onMove: (evt) => {
                     if (evt.to.classList.contains('position-dropzone') && evt.to.children.length > 1 && evt.to !== evt.from) {
                         evt.from.appendChild(evt.to.querySelector('.player-tag'));
@@ -740,10 +745,10 @@ function applyOutOfPositionIndicators() {
             }
         });
         document.body.addEventListener('click', function(event){
-            const mobileDropzone = event.target.closest('.d-lg-none .position-dropzone');
-            if (mobileDropzone) {
-                const position = mobileDropzone.dataset.position;
-                if (mobileDropzone.querySelector('.player-tag')) { 
+            const dropzone = event.target.closest('.position-dropzone');
+            if (dropzone) {
+                const position = dropzone.dataset.position;
+                if (dropzone.querySelector('.player-tag')) {
                     delete state.rotation.innings[state.currentInning][position];
                     renderRotationEditor();
                     triggerAutosave();

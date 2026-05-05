@@ -29,12 +29,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatDateTime = (s) => {
         if (!s || s === 'Never') return s;
         try {
+            if (s.length <= 10 && s.includes('-')) {
+                // Parse YYYY-MM-DD as local time to prevent UTC timezone shift
+                const [year, month, day] = s.split('-');
+                const localDt = new Date(year, month - 1, day);
+                return localDt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' });
+            }
+
             const dt = new Date(s.replace(' ', 'T'));
             if (isNaN(dt)) throw new Error('Invalid date');
             
-            if (s.length <= 10) {
-                 return dt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' });
-            }
             return dt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' }) + ', ' + 
                    dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
         } catch (e) {

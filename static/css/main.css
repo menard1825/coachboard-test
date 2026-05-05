@@ -464,3 +464,13 @@ body {
     .pos-RF { left: 86%; top: 14%; }
     .pos-CF { top: 6%; }
 }
+
+@media (max-width: 1366px) {
+    .position-dropzone {
+        min-height: 50px;
+        padding: 8px;
+    }
+    .player-tag {
+        padding: 6px 10px;
+    }
+}
