@@ -88,11 +88,18 @@ def create_app():
 
     @app.context_processor
     def inject_team_info():
+        info = {}
         if 'team_id' in session:
             db.session.expire_all()
             team = db.session.get(Team, session['team_id'])
-            return {'current_team': team}
-        return {}
+            info['current_team'] = team
+
+            # Add list of available teams for the current user for switching
+            if 'username' in session:
+                user_teams = db.session.query(Team).join(User).filter(func.lower(User.username) == func.lower(session['username'])).all()
+                info['available_teams'] = user_teams
+
+        return info
 
     @app.context_processor
     def inject_css_version():

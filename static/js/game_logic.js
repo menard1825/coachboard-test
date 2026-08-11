@@ -52,7 +52,7 @@ function initializeGameManagement(gameData) {
 
     function renderInningSelector() {
         const container = document.getElementById('inning-btn-group');
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
         if (innings.length === 0) { 
             state.rotation.innings['1'] = {};
             innings.push('1');
@@ -131,7 +131,7 @@ function initializeGameManagement(gameData) {
         const matrixContainer = document.getElementById('rotation-matrix-container');
         if (!matrixContainer) return;
 
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
         if (innings.length === 0) {
              matrixContainer.innerHTML = '<p class="text-muted p-2">No innings added yet.</p>';
              return;
@@ -195,7 +195,7 @@ function initializeGameManagement(gameData) {
 
     // Shared logic for rendering bench reports
     function renderBenchReportGeneric(container) {
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
         if (innings.length === 0) {
             container.innerHTML = '<div class="p-3 text-muted">No innings data available.</div>';
             return;
@@ -235,7 +235,7 @@ function initializeGameManagement(gameData) {
         const container = document.getElementById('rotation-summary-mobile-container');
         if (!container) return;
 
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
         const sortedRoster = [...state.roster].sort((a, b) => a.name.localeCompare(b.name));
 
         if (innings.length === 0) {
@@ -375,7 +375,7 @@ function applyOutOfPositionIndicators() {
         const lineupRows = (state.lineup.lineup_positions || []).map((p, i) => `<tr><td>${i+1}</td><td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td></tr>`).join('');
 
         // Rotation Grid
-        const innings = Object.keys(state.rotation.innings || {}).sort((a,b) => parseInt(a)-parseInt(b));
+        const innings = Object.keys(state.rotation.innings || {}).sort((a,b) => parseFloat(a)-parseFloat(b));
         const header = innings.map(inn => `<th>${inn}</th>`).join('');
 
         const sortedRoster = [...state.roster].sort((a,b) => a.name.localeCompare(b.name));
@@ -639,7 +639,7 @@ function applyOutOfPositionIndicators() {
                             state.rotation.innings['1'] = {};
                         }
                         // Set the current inning to the first available inning from the template
-                        state.currentInning = Object.keys(state.rotation.innings).sort((a,b) => parseInt(a) - parseInt(b))[0];
+                        state.currentInning = Object.keys(state.rotation.innings).sort((a,b) => parseFloat(a) - parseFloat(b))[0];
                         renderRotationEditor();
                         alert('Rotation template loaded successfully!');
                         triggerAutosave();
@@ -784,12 +784,12 @@ function applyOutOfPositionIndicators() {
         document.getElementById('addInningBtn')?.addEventListener('click', () => {
             if(!state.rotation) return;
             const innings = Object.keys(state.rotation.innings);
-            const nextInningNum = innings.length > 0 ? Math.max(...innings.map(Number)) + 1 : 1;
+            const nextInningNum = innings.length > 0 ? Math.floor(Math.max(...innings.map(parseFloat))) + 1 : 1;
 
             if (innings.length > 0) {
-                // Auto-copy the previous inning's data
-                const lastInningNum = Math.max(...innings.map(Number));
-                state.rotation.innings[nextInningNum] = { ...state.rotation.innings[lastInningNum] };
+                // Auto-copy the previous inning's data (find the absolute highest inning value)
+                const lastInningNum = Math.max(...innings.map(parseFloat));
+                state.rotation.innings[nextInningNum] = { ...state.rotation.innings[String(lastInningNum)] };
             } else {
                 state.rotation.innings[nextInningNum] = {};
             }
@@ -800,14 +800,40 @@ function applyOutOfPositionIndicators() {
             renderRotationEditor();
             triggerAutosave();
         });
+
+        document.getElementById('addSubInningBtn')?.addEventListener('click', () => {
+            if(!state.rotation || !state.currentInning) return;
+
+            // Get current base inning
+            const baseInning = Math.floor(parseFloat(state.currentInning));
+
+            // Find all sub-innings for this base inning
+            const allInnings = Object.keys(state.rotation.innings).map(parseFloat);
+            const subInnings = allInnings.filter(inn => Math.floor(inn) === baseInning);
+
+            // Determine next sub-inning value (e.g. if 1 and 1.1 exist, next is 1.2)
+            const maxSubInning = Math.max(...subInnings);
+            // Precision issues with floats, so round to 1 decimal place
+            const nextSubInningNum = Math.round((maxSubInning + 0.1) * 10) / 10;
+            const nextSubInningStr = String(nextSubInningNum);
+
+            // Auto-copy the data from the exact inning we were just on
+            state.rotation.innings[nextSubInningStr] = { ...state.rotation.innings[state.currentInning] };
+
+            renderInningSelector();
+            state.currentInning = nextSubInningStr;
+            renderRotationEditor();
+            triggerAutosave();
+        });
+
         document.getElementById('removeInningBtn')?.addEventListener('click', () => {
             if(!state.rotation) return;
             const innings = Object.keys(state.rotation.innings);
             if(innings.length <= 1) return alert("Cannot remove the last inning.");
-            const lastInningNum = Math.max(...innings.map(Number));
+            const lastInningNum = String(Math.max(...innings.map(parseFloat)));
             delete state.rotation.innings[lastInningNum];
-            if(state.currentInning == lastInningNum) {
-                state.currentInning = Math.max(...Object.keys(state.rotation.innings).map(Number));
+            if(String(state.currentInning) === lastInningNum) {
+                state.currentInning = String(Math.max(...Object.keys(state.rotation.innings).map(parseFloat)));
             }
             renderRotationEditor();
             triggerAutosave();

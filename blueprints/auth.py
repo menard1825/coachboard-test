@@ -56,6 +56,31 @@ def logout():
     flash('You were successfully logged out.', 'success')
     return redirect(url_for('auth.login'))
 
+@auth_bp.route('/switch_team/<int:team_id>')
+def switch_team(team_id):
+    if not session.get('logged_in'):
+        return redirect(url_for('auth.login'))
+
+    username = session.get('username')
+
+    # Check if this user has access to the requested team
+    user_for_team = db.session.query(User).filter(
+        func.lower(User.username) == func.lower(username),
+        User.team_id == team_id
+    ).first()
+
+    if not user_for_team:
+        flash('You do not have access to that team.', 'danger')
+        return redirect(url_for('home'))
+
+    # Update session to switch context
+    session['team_id'] = user_for_team.team_id
+    session['role'] = user_for_team.role
+    session['player_order'] = get_player_order_as_list(user_for_team.player_order)
+
+    flash('Switched team successfully.', 'success')
+    return redirect(url_for('home'))
+
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':

@@ -60,6 +60,17 @@
                     <li><a class="dropdown-item" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i> Team Settings</a></li>
                     <li><hr class="dropdown-divider"></li>
                     {% endif %}
+
+                    {% if available_teams and available_teams|length > 1 %}
+                    <li class="dropdown-header">Switch Team</li>
+                    {% for team in available_teams %}
+                        {% if team.id != current_team.id %}
+                        <li><a class="dropdown-item" href="{{ url_for('auth.switch_team', team_id=team.id) }}"><i class="bi bi-arrow-left-right text-muted"></i> {{ team.team_name }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    <li><hr class="dropdown-divider"></li>
+                    {% endif %}
+
                     <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i> Change Password</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
                 </ul>
@@ -110,6 +121,17 @@
             <a class="list-group-item list-group-item-action" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear-fill"></i> Team Settings</a>
             <hr class="my-2">
             {% endif %}
+
+            {% if available_teams and available_teams|length > 1 %}
+            <h6 class="text-muted ps-3 mt-2 mb-1">Switch Team</h6>
+            {% for team in available_teams %}
+                {% if team.id != current_team.id %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('auth.switch_team', team_id=team.id) }}"><i class="bi bi-arrow-left-right text-muted"></i> {{ team.team_name }}</a>
+                {% endif %}
+            {% endfor %}
+            <hr class="my-2">
+            {% endif %}
+
             <h6 class="text-muted ps-3 mt-2 mb-1">Account</h6>
             <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i> Change Password</a>
             <a class="list-group-item list-group-item-action" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a>
