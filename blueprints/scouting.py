@@ -92,11 +92,12 @@ def move_scouted_player_to_roster(player_id):
     db.session.flush() # to get the new player's ID
     db.session.delete(scouted_player)
     
-    for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
-        current_order = get_player_order_as_list(user_obj.player_order)
+    from models import TeamMembership
+    for membership in db.session.query(TeamMembership).filter_by(team_id=session['team_id']).all():
+        current_order = get_player_order_as_list(membership.player_order)
         if new_roster_player.id not in current_order:
             current_order.append(new_roster_player.id)
-            user_obj.player_order = current_order
+            membership.player_order = current_order
 
     if 'player_order' in session:
         session_order = get_player_order_as_list(session['player_order'])

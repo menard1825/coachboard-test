@@ -64,8 +64,15 @@ def user_management():
 @admin_bp.route('/teams')
 @super_admin_required
 def team_management():
-    teams = db.session.query(Team).options(joinedload(Team.users)).order_by(Team.team_name).all()
-    return render_template('team_management.html', teams=teams, session=session)
+    teams = db.session.query(Team).options(joinedload(Team.memberships)).order_by(Team.team_name).all()
+
+    # Get current team's players for the rollover modal
+    current_team_players = []
+    if session.get('team_id'):
+        from models import Player
+        current_team_players = db.session.query(Player).filter_by(team_id=session['team_id']).order_by(Player.name).all()
+
+    return render_template('team_management.html', teams=teams, current_team_players=current_team_players, session=session)
 
 
 @admin_bp.route('/add_user', methods=['POST'])
@@ -124,13 +131,19 @@ def add_user():
         username=username,
         full_name=full_name,
         password_hash=hashed_password,
-        role=role,
         tab_order=json.dumps(default_tab_keys),
-        last_login=None,
-        player_order=[],
-        team_id=team_id_for_new_user
+        last_login=None
     )
     db.session.add(new_user)
+    db.session.flush() # Flush to get new user ID
+
+    new_membership = TeamMembership(
+        user_id=new_user.id,
+        team_id=team_id_for_new_user,
+        role=role,
+        player_order=[]
+    )
+    db.session.add(new_membership)
     db.session.commit()
     
     team_name = db.session.get(Team, team_id_for_new_user).team_name
@@ -241,15 +254,18 @@ def edit_user(username):
             return redirect(url_for('.user_management'))
 
         if new_role in [HEAD_COACH, 'Assistant Coach', 'Game Changer', SUPER_ADMIN]:
-            user_to_edit.role = new_role
+            membership.role = new_role
+            # Update session role if they are editing themselves
+            if session.get('username') == user_to_edit.username:
+                session['role'] = new_role
         else:
             flash('Invalid role selected.', 'danger')
             db.session.rollback() # Rollback name change
             return redirect(url_for('.user_management'))
 
     db.session.commit()
-    flash(f"Successfully updated user {username}.", 'success')
-    socketio.emit('data_updated', {'message': f"User {username}'s details updated."})
+    flash(f"User '{username}' has been updated.", "success")
+    socketio.emit('data_updated', {'message': f"User {username} updated."})
     return redirect(url_for('.user_management'))
 
 
@@ -501,9 +517,10 @@ def delete_team(team_id):
         flash('You cannot delete your own active team.', 'danger')
         return redirect(url_for('.team_management'))
 
-    user_count = db.session.query(User).filter_by(team_id=team_id).count()
+    from models import TeamMembership
+    user_count = db.session.query(TeamMembership).filter_by(team_id=team_id).count()
     if user_count > 0:
-        flash(f'Cannot delete team "{team_to_delete.team_name}" because it has {user_count} user(s).', 'danger')
+        flash(f'Cannot delete team "{team_to_delete.team_name}" because it has {user_count} user(s) assigned.', 'danger')
         return redirect(url_for('.team_management'))
 
     flash(f'Successfully deleted team "{team_to_delete.team_name}".', 'success')
