@@ -21,17 +21,23 @@ def login_required(f):
 @api_bp.route('/session_data')
 @login_required
 def get_session_data():
-    user = db.session.query(User).options(joinedload(User.team)).filter_by(username=session['username']).first()
-    if not user or not user.team:
+    user = db.session.query(User).filter_by(username=session['username']).first()
+    team_id = session.get('team_id')
+    team = db.session.get(Team, team_id) if team_id else None
+
+    if not user or not team:
         return jsonify({"error": "User or team not found"}), 404
+
+    from models import TeamMembership
+    membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=team_id).first()
 
     return jsonify({
         'session': {
             'username': session.get('username'),
-            'role': session.get('role'),
-            'outfielder_count': user.team.outfielder_count if user.team else 3
+            'role': membership.role if membership else session.get('role'),
+            'outfielder_count': team.outfielder_count
         },
-        'player_order': get_player_order_as_list(user.player_order),
+        'player_order': get_player_order_as_list(membership.player_order) if membership else [],
     })
 
 @api_bp.route('/roster')

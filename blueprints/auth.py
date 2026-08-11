@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import User, Team
+from models import User, Team, TeamMembership
 from db import db
 from sqlalchemy import func
 from datetime import datetime
@@ -35,14 +35,25 @@ def login():
 
         if user and check_password_hash(user.password_hash, password):
             user.last_login = datetime.now()
+
+            # Find the primary team membership. If there are multiple, grab the highest ID (usually newest)
+            # or just the first one found.
+            primary_membership = db.session.query(TeamMembership).filter_by(user_id=user.id).order_by(TeamMembership.id.desc()).first()
+
+            if not primary_membership:
+                flash('Your user account has no assigned team memberships.', 'danger')
+                return render_template('login.html')
+
             db.session.commit()
 
             session['logged_in'] = True
             session['username'] = user.username
             session['full_name'] = user.full_name or ''
-            session['role'] = user.role
-            session['team_id'] = user.team_id
-            session['player_order'] = get_player_order_as_list(user.player_order)
+
+            # Context is tied to membership
+            session['role'] = primary_membership.role
+            session['team_id'] = primary_membership.team_id
+            session['player_order'] = get_player_order_as_list(primary_membership.player_order)
             session.permanent = True
             flash('You were successfully logged in.', 'success')
             return redirect(url_for('home'))
@@ -62,21 +73,24 @@ def switch_team(team_id):
         return redirect(url_for('auth.login'))
 
     username = session.get('username')
+    user = db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first()
+    if not user:
+        return redirect(url_for('auth.logout'))
 
     # Check if this user has access to the requested team
-    user_for_team = db.session.query(User).filter(
-        func.lower(User.username) == func.lower(username),
-        User.team_id == team_id
+    membership = db.session.query(TeamMembership).filter_by(
+        user_id=user.id,
+        team_id=team_id
     ).first()
 
-    if not user_for_team:
+    if not membership:
         flash('You do not have access to that team.', 'danger')
         return redirect(url_for('home'))
 
     # Update session to switch context
-    session['team_id'] = user_for_team.team_id
-    session['role'] = user_for_team.role
-    session['player_order'] = get_player_order_as_list(user_for_team.player_order)
+    session['team_id'] = membership.team_id
+    session['role'] = membership.role
+    session['player_order'] = get_player_order_as_list(membership.player_order)
 
     flash('Switched team successfully.', 'success')
     return redirect(url_for('home'))
@@ -104,7 +118,7 @@ def register():
             flash('Invalid Registration Code.', 'danger')
             return redirect(url_for('auth.register'))
 
-        is_first_user = db.session.query(User).filter_by(team_id=team.id).count() == 0
+        is_first_user = db.session.query(TeamMembership).filter_by(team_id=team.id).count() == 0
         user_role = HEAD_COACH if is_first_user else ASSISTANT_COACH
 
         hashed_password = generate_password_hash(password)
@@ -114,19 +128,25 @@ def register():
             username=username,
             full_name=full_name,
             password_hash=hashed_password,
-            role=user_role,
-            team_id=team.id,
-            tab_order=json.dumps(default_tab_keys),
-            player_order=[]
+            tab_order=json.dumps(default_tab_keys)
         )
         db.session.add(new_user)
+        db.session.flush() # Flush to get new user ID
+
+        new_membership = TeamMembership(
+            user_id=new_user.id,
+            team_id=team.id,
+            role=user_role,
+            player_order=[]
+        )
+        db.session.add(new_membership)
         db.session.commit()
 
         session['logged_in'] = True
         session['username'] = new_user.username
         session['full_name'] = new_user.full_name
-        session['role'] = new_user.role
-        session['team_id'] = new_user.team_id
+        session['role'] = new_membership.role
+        session['team_id'] = new_membership.team_id
         session['player_order'] = []
         session.permanent = True
 

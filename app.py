@@ -96,7 +96,8 @@ def create_app():
 
             # Add list of available teams for the current user for switching
             if 'username' in session:
-                user_teams = db.session.query(Team).join(User).filter(func.lower(User.username) == func.lower(session['username'])).all()
+                from models import TeamMembership
+                user_teams = db.session.query(Team).join(TeamMembership).join(User).filter(func.lower(User.username) == func.lower(session['username'])).all()
                 info['available_teams'] = user_teams
 
         return info
@@ -116,8 +117,10 @@ def create_app():
     @app.route('/')
     @login_required
     def home():
-        user = db.session.query(User).options(joinedload(User.team)).filter_by(username=session['username']).first()
-        if not user or not user.team:
+        user = db.session.query(User).filter_by(username=session['username']).first()
+        team = db.session.get(Team, session.get('team_id')) if session.get('team_id') else None
+
+        if not user or not team:
             flash('User or team not found.', 'danger')
             return redirect(url_for('auth.login'))
 

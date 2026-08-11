@@ -20,7 +20,7 @@ class Team(db.Model):
     pitching_rule_set = Column(String, default='MLB Pitch Smart', nullable=False)
     outfielder_count = Column(Integer, default=3, nullable=False)
 
-    users = relationship("User", back_populates="team")
+    memberships = relationship("TeamMembership", back_populates="team", cascade="all, delete-orphan")
     players = relationship("Player", back_populates="team")
     lineups = relationship("Lineup", back_populates="team")
     pitching_outings = relationship("PitchingOuting", back_populates="team")
@@ -40,13 +40,24 @@ class User(db.Model):
     username = Column(String, unique=True, nullable=False)
     full_name = Column(String(100), nullable=True)
     password_hash = Column(String, nullable=False)
-    role = Column(String, default='Coach')
     last_login = Column(DateTime)
     tab_order = Column(Text) # Keeping as text for simplicity
-    player_order = Column(JSON) # Changed to JSON
 
+    # We no longer have team_id, role, or player_order directly on the user.
+    # Those are now on the TeamMembership model.
+    memberships = relationship("TeamMembership", back_populates="user", cascade="all, delete-orphan")
+
+class TeamMembership(db.Model):
+    """Maps a user to a team, storing their role and preferences specific to that team."""
+    __tablename__ = 'team_memberships'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
-    team = relationship("Team", back_populates="users")
+    role = Column(String, default='Coach', nullable=False)
+    player_order = Column(JSON, default=list)
+
+    user = relationship("User", back_populates="memberships")
+    team = relationship("Team", back_populates="memberships")
 
 class Player(db.Model):
     __tablename__ = 'players'
