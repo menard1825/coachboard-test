@@ -84,6 +84,8 @@ class Player(db.Model):
     game_absences = relationship("PlayerGameAbsence", back_populates="player", cascade="all, delete-orphan")
     practice_absences = relationship("PlayerPracticeAbsence", back_populates="player", cascade="all, delete-orphan")
     pitching_outings = relationship("PitchingOuting", back_populates="player", cascade="all, delete-orphan")
+    pitching_profile = relationship("PlayerPitchingProfile", back_populates="player", uselist=False, cascade="all, delete-orphan")
+    game_pitching_plans = relationship("GamePitchingPlan", back_populates="player", cascade="all, delete-orphan")
     
     @property
     def full_name(self):
@@ -182,10 +184,41 @@ class Game(db.Model):
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
     pitching_outings = relationship("PitchingOuting", back_populates="game", cascade="all, delete-orphan")
     rotation_events = relationship("GameRotationEvent", back_populates="game", cascade="all, delete-orphan")
+    pitching_plans = relationship("GamePitchingPlan", back_populates="game", cascade="all, delete-orphan")
     
     def to_dict(self):
         """Return a dictionary representation of the Game object."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+class PlayerPitchingProfile(db.Model):
+    __tablename__ = 'player_pitching_profiles'
+    id = Column(Integer, primary_key=True)
+    traits = Column(JSON, default=list) # e.g. ["Power / Velocity", "LHP", "Strike Thrower"]
+
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False, unique=True)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+
+    player = relationship("Player", back_populates="pitching_profile")
+
+class GamePitchingPlan(db.Model):
+    __tablename__ = 'game_pitching_plans'
+    id = Column(Integer, primary_key=True)
+    role = Column(String) # e.g. "Starter", "First Relief"
+    expected_innings = Column(String)
+    coach_note = Column(Text)
+    situational_note = Column(Text)
+
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+
+    player = relationship("Player", back_populates="game_pitching_plans")
+    game = relationship("Game", back_populates="pitching_plans")
+
+    # Ensure one plan per player per game
+    __table_args__ = (
+        Index('idx_unique_game_pitching_plan', 'game_id', 'player_id', unique=True),
+    )
 
 class GameRotationEvent(db.Model):
     __tablename__ = 'game_rotation_events'

@@ -368,7 +368,8 @@ def undo_rotation_event():
 
     db.session.commit()
 
-    socketio.emit('rotation_event_undone', {'event_id': event_id})
+    room_name = f"team_{session['team_id']}_game_{event.game_id}"
+    socketio.emit('rotation_event_undone', {'event_id': event_id}, room=room_name)
     return jsonify({'status': 'success'})
 
 @gameday_bp.route('/save_final_pitch_counts', methods=['POST'])

@@ -245,9 +245,10 @@ def get_game_data(game_id):
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
     absent_player_ids = [absence.player_id for absence in absences]
 
-    from models import PlayerPitchTarget, GameRotationEvent
+    from models import PlayerPitchTarget, GameRotationEvent, GamePitchingPlan
     all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
     rotation_events = db.session.query(GameRotationEvent).filter_by(game_id=game.id, team_id=team_id).order_by(GameRotationEvent.id).all()
+    pitching_plans = db.session.query(GamePitchingPlan).filter_by(game_id=game.id, team_id=team_id).all()
 
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone, current_game_id=game.id)
@@ -266,7 +267,8 @@ def get_game_data(game_id):
         'lineup_templates': [model_to_dict(lt) for lt in lineup_templates],
         'rotation_templates': [model_to_dict(rt) for rt in rotation_templates],
         'outfielder_count': team.outfielder_count,
-        'rotation_events': [model_to_dict(e) for e in rotation_events]
+        'rotation_events': [model_to_dict(e) for e in rotation_events],
+        'pitching_plans': [model_to_dict(pp) for pp in pitching_plans]
     })
 
 

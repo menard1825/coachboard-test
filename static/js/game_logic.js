@@ -659,6 +659,12 @@ function applyOutOfPositionIndicators() {
     // --- Event Listeners ---
     function setupEventListeners() {
         const socket = io();
+
+        socket.on('connect', () => {
+            // Join the game-specific room to ensure we only get relevant live game broadcasts
+            socket.emit('join_game_room', { game_id: state.game.id });
+        });
+
         socket.on('data_updated', fetchLatestGameData);
         socket.on('lineup_add', fetchLatestGameData);
         socket.on('lineup_update', fetchLatestGameData);
@@ -667,6 +673,7 @@ function applyOutOfPositionIndicators() {
         socket.on('rotation_event', fetchLatestGameData);
         socket.on('rotation_event_undone', fetchLatestGameData);
         socket.on('game_updated', fetchLatestGameData);
+        socket.on('pitching_update', fetchLatestGameData);
 
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
@@ -679,8 +686,8 @@ function applyOutOfPositionIndicators() {
         document.getElementById('printCardBtn')?.addEventListener('click', printLineupCard);
 
         // Live Game Mode Toggle
-        document.getElementById('liveGameModeToggle')?.addEventListener('change', (e) => {
-            state.liveMode = e.target.checked;
+        const toggleLiveGame = (isLive) => {
+            state.liveMode = isLive;
 
             // Tell backend about the toggle
             fetch('/api/toggle_live_game', {
@@ -692,20 +699,26 @@ function applyOutOfPositionIndicators() {
             const liveOverlay = document.getElementById('live-game-overlay');
             const plannerControls = document.querySelectorAll('.planner-controls');
 
+            const toggle = document.getElementById('liveGameModeToggle');
+            if (toggle) toggle.checked = isLive;
+
             if (state.liveMode) {
                 liveOverlay.classList.remove('d-none');
                 plannerControls.forEach(el => el.classList.add('d-none'));
-                document.getElementById('rotation-board').classList.add('bg-light'); // slight visual diff
+                document.getElementById('rotation-board')?.classList.add('bg-light'); // slight visual diff
                 state.currentInning = state.game.live_current_inning || '1';
             } else {
                 liveOverlay.classList.add('d-none');
                 plannerControls.forEach(el => el.classList.remove('d-none'));
-                document.getElementById('rotation-board').classList.remove('bg-light');
+                document.getElementById('rotation-board')?.classList.remove('bg-light');
             }
 
             // Re-render everything with the correct state (actual vs planned)
             renderRotationEditor();
-        });
+        };
+
+        document.getElementById('liveGameModeToggle')?.addEventListener('change', (e) => toggleLiveGame(e.target.checked));
+        document.getElementById('startLiveGameBtnAction')?.addEventListener('click', () => toggleLiveGame(true));
 
         // Initialize UI state if live on load
         if (state.liveMode) {

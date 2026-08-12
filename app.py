@@ -62,6 +62,16 @@ def create_app():
     app.register_blueprint(team_management_bp)
     app.register_blueprint(api_bp)
 
+    # --- SocketIO Handlers ---
+    from flask_socketio import join_room
+    @socketio.on('join_game_room')
+    def handle_join_game_room(data):
+        game_id = data.get('game_id')
+        team_id = session.get('team_id')
+        if game_id and team_id:
+            room_name = f"team_{team_id}_game_{game_id}"
+            join_room(room_name)
+
     # --- Custom Jinja Filter for Date/Time Formatting ---
     @app.template_filter('format_datetime')
     def format_datetime_filter(dt):
