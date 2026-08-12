@@ -12,8 +12,10 @@ def model_to_dict(obj):
     d = {}
     for column in obj.__table__.columns:
         val = getattr(obj, column.name)
-        if isinstance(val, (datetime, date)):
-            # Format dates and datetimes as 'YYYY-MM-DD'
+        if isinstance(val, datetime):
+            # Preserve full exact timestamps for live events and sync accuracy
+            d[column.name] = val.isoformat()
+        elif isinstance(val, date):
             d[column.name] = val.strftime('%Y-%m-%d')
         else:
             d[column.name] = val
@@ -126,7 +128,7 @@ def calculate_cumulative_position_stats(roster_players, rotations):
             continue
     return stats
 
-def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, all_targets=None, team_timezone=None):
+def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, all_targets=None, team_timezone=None, current_game_id=None):
     """Calculates the daily/weekly pitch counts and availability for all pitchers.
     all_targets should be a list of PlayerPitchTarget objects.
     """
@@ -137,11 +139,11 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
     if target_date is None:
         today = datetime.now(tz).date()
     elif isinstance(target_date, datetime):
-        # Convert to the team's timezone before extracting the date
+        # If it's naive, assume it's already a LOCAL calendar date from legacy data
         if target_date.tzinfo is None:
-            # Assume stored naive datetimes are UTC
-            target_date = target_date.replace(tzinfo=zoneinfo.ZoneInfo('UTC'))
-        today = target_date.astimezone(tz).date()
+            today = target_date.date()
+        else:
+            today = target_date.astimezone(tz).date()
     elif isinstance(target_date, str):
         today = datetime.strptime(target_date, '%Y-%m-%d').date()
     else:
@@ -155,7 +157,7 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
             def get_local_date(d):
                 if isinstance(d, datetime):
                     if d.tzinfo is None:
-                        d = d.replace(tzinfo=zoneinfo.ZoneInfo('UTC'))
+                        return d.date()
                     return d.astimezone(tz).date()
                 return d
 
@@ -239,31 +241,40 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                 pitches_remaining = 0
 
             # Find matching coach targets for this player on this date
-            # We look for a specific daily target.
             today_str = today.strftime('%Y-%m-%d')
             player_targets = [t for t in all_targets if t.player_id == player.id and t.local_date == today_str]
-            # Prioritize game-specific targets if multiple exist, otherwise use daily
-            coach_target_obj = next((t for t in player_targets if t.game_id is not None), None) or next((t for t in player_targets if t.game_id is None), None)
+
+            # 1. Target matching game_id
+            # 2. Otherwise daily target (game_id IS NULL)
+            game_target = next((t for t in player_targets if t.game_id == current_game_id), None)
+            daily_target = next((t for t in player_targets if t.game_id is None), None)
+
+            coach_target_obj = game_target or daily_target
 
             coach_target = coach_target_obj.target_pitches if coach_target_obj else None
             coach_target_reason = coach_target_obj.reason if coach_target_obj else None
+            coach_target_reached = False
+            coach_target_remaining = None
 
-            # If coach target is reached, append warning but keep status 'Available' unless it hits official 'Resting' rules.
-            if coach_target is not None and daily_pitches >= coach_target and status != 'Resting':
-                status = 'Coach Target Reached'
+            if coach_target is not None:
+                coach_target_remaining = max(0, coach_target - daily_pitches)
+                if daily_pitches >= coach_target:
+                    coach_target_reached = True
 
             summary[player.name] = {
                 'id': player.id,
                 'name': player.name,
                 'daily': daily_pitches,
                 'weekly': weekly_pitches,
-                'status': status,
+                'status': status, # Official status remains completely intact
                 'next_available': next_available_str,
                 'max_daily': max_daily,
                 'pitches_remaining_today': pitches_remaining,
                 'last_outing_display': last_outing_display,
                 'coach_target': coach_target,
                 'coach_target_reason': coach_target_reason,
+                'coach_target_reached': coach_target_reached,
+                'coach_target_remaining': coach_target_remaining
             }
         except Exception as e:
             print(f"Error calculating pitch count summary for player {player.name} (ID: {player.id}): {e}")

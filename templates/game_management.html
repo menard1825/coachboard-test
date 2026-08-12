@@ -105,9 +105,15 @@
       </div>
       <form action="{{ url_for('gameday.edit_game', game_id=game['id']) }}" method="POST">
           <div class="modal-body">
-              <div class="mb-3">
-                  <label for="game_date" class="form-label">Date</label>
-                  <input type="date" class="form-control" id="game_date" name="game_date" value="{{ game_date_for_input }}">
+              <div class="row">
+                  <div class="col-md-6 mb-3">
+                      <label for="game_date" class="form-label">Date</label>
+                      <input type="date" class="form-control" id="game_date" name="game_date" value="{{ game_date_for_input }}">
+                  </div>
+                  <div class="col-md-6 mb-3">
+                      <label for="game_start_time" class="form-label">Time (Optional)</label>
+                      <input type="time" class="form-control" id="game_start_time" name="game_start_time" value="{{ game.get('start_time', '') }}">
+                  </div>
               </div>
               <div class="mb-3">
                   <label for="game_opponent" class="form-label">Opponent</label>

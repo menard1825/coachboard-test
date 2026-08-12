@@ -89,6 +89,27 @@
             </button>
         </div>
 
+        <!-- Final Pitch Counts Modal -->
+        <div class="modal fade" id="liveFinalCountsModal" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title">Final GameChanger Pitch Counts</h5>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">Enter the final pitch counts from GameChanger for the pitchers who threw today. Leaving an input blank skips recording it.</p>
+                        <div id="finalCountsFormContainer">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel / Skip</button>
+                        <button type="button" class="btn btn-danger fw-bold" id="confirmFinalCountsBtn">Save & End Game</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Live Pitcher Destination Modal -->
         <div class="modal fade" id="livePitcherDestinationModal" tabindex="-1" data-bs-backdrop="static">
             <div class="modal-dialog modal-dialog-centered">

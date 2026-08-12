@@ -162,10 +162,13 @@ class Rotation(db.Model):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
 
+from sqlalchemy import Index
+
 class Game(db.Model):
     __tablename__ = 'games'
     id = Column(Integer, primary_key=True)
     date = Column(DateTime, nullable=False) # Changed to DateTime
+    start_time = Column(String, nullable=True) # Optional e.g. "09:00 AM"
     opponent = Column(String, nullable=False)
     location = Column(String)
     game_notes = Column(Text)
@@ -220,6 +223,12 @@ class PlayerPitchTarget(db.Model):
     game_id = Column(Integer, ForeignKey('games.id'), nullable=True) # Nullable for daily targets
 
     player = relationship("Player")
+
+    # Partial indexes to ensure unique targets per day vs unique targets per game
+    __table_args__ = (
+        Index('idx_unique_daily_target', 'team_id', 'player_id', 'local_date', unique=True, sqlite_where=Column('game_id').is_(None)),
+        Index('idx_unique_game_target', 'team_id', 'player_id', 'local_date', 'game_id', unique=True, sqlite_where=Column('game_id').is_not(None)),
+    )
 
 class CollaborationNote(db.Model):
     __tablename__ = 'collaboration_notes'

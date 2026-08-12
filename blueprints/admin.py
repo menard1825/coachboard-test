@@ -294,6 +294,7 @@ def update_admin_settings():
     # ADDED: Handle the new color inputs
     team_settings.primary_color = request.form.get('primary_color', team_settings.primary_color)
     team_settings.secondary_color = request.form.get('secondary_color', team_settings.secondary_color)
+    team_settings.timezone = request.form.get('timezone', team_settings.timezone)
     
     db.session.commit()
     flash('Team settings updated successfully!', 'success')
@@ -333,7 +334,8 @@ def rollover_season():
             secondary_color=current_team.secondary_color,
             age_group=new_age_group or current_team.age_group,
             pitching_rule_set=current_team.pitching_rule_set,
-            outfielder_count=current_team.outfielder_count
+            outfielder_count=current_team.outfielder_count,
+            timezone=current_team.timezone
         )
         db.session.add(new_team)
         db.session.flush() # flush to get the new team id

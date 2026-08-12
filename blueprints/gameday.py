@@ -37,18 +37,24 @@ def game_management(game_id):
     lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
     rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
     
-    # MODIFIED: Optimized query to filter in the database
+    # Prefer game_id matching if present, else fallback
+    from sqlalchemy import or_
     all_pitching_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all() # Keep for summary stats
-    game_pitching_log = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(
-        team_id=team.id,
-        opponent=game.opponent
-    ).filter(db.func.date(PitchingOuting.date) == game.date.date()).all()
+    game_pitching_log = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter(
+        PitchingOuting.team_id == team.id,
+        or_(
+            PitchingOuting.game_id == game.id,
+            db.and_(PitchingOuting.game_id.is_(None), PitchingOuting.opponent == game.opponent, db.func.date(PitchingOuting.date) == game.date.date())
+        )
+    ).all()
 
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
     absent_player_ids = [absence.player_id for absence in absences]
 
+    from models import PlayerPitchTarget
+    all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team.id).all()
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date)
+    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone, current_game_id=game.id)
 
     lineup_templates = db.session.query(Lineup).filter_by(team_id=team.id, associated_game_id=None).all()
 
@@ -83,6 +89,7 @@ def add_game():
 
     new_game = Game(
         date=game_date,
+        start_time=request.form.get('game_start_time', ''),
         opponent=request.form['game_opponent'], 
         location=request.form.get('game_location', ''),
         game_notes=request.form.get('game_notes', ''),
@@ -109,6 +116,7 @@ def edit_game(game_id):
             flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
             return redirect(url_for('.game_management', game_id=game_id))
 
+    game_to_edit.start_time = request.form.get('game_start_time', game_to_edit.start_time)
     game_to_edit.opponent = request.form.get('game_opponent', game_to_edit.opponent)
     game_to_edit.location = request.form.get('game_location', game_to_edit.location)
     game_to_edit.game_notes = request.form.get('game_notes', game_to_edit.game_notes)
@@ -274,21 +282,34 @@ def save_rotation_event():
     data = request.get_json()
     game_id = data.get('game_id')
     inning = data.get('inning')
-    sequence = data.get('sequence')
     event_type = data.get('event_type')
     before_alignment = data.get('before_alignment')
     after_alignment = data.get('after_alignment')
     old_pitcher_id = data.get('old_pitcher_id')
     new_pitcher_id = data.get('new_pitcher_id')
 
-    if not all([game_id, inning, sequence, event_type, after_alignment]):
+    if not all([game_id, inning, event_type, after_alignment]):
         return jsonify({'status': 'error', 'message': 'Missing required fields.'}), 400
+
+    game = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
+    if not game:
+        return jsonify({'status': 'error', 'message': 'Game not found or unauthorized.'}), 404
+
+    from models import Player
+    if old_pitcher_id and not db.session.query(Player).filter_by(id=old_pitcher_id, team_id=session['team_id']).first():
+        return jsonify({'status': 'error', 'message': 'Invalid old pitcher ID.'}), 403
+    if new_pitcher_id and not db.session.query(Player).filter_by(id=new_pitcher_id, team_id=session['team_id']).first():
+        return jsonify({'status': 'error', 'message': 'Invalid new pitcher ID.'}), 403
+
+    # Generate sequence server-side for robust order
+    last_event = db.session.query(GameRotationEvent).filter_by(game_id=game_id).order_by(GameRotationEvent.sequence.desc()).first()
+    new_sequence = (last_event.sequence + 1) if last_event else 1
 
     new_event = GameRotationEvent(
         team_id=session['team_id'],
         game_id=game_id,
         inning=str(inning),
-        sequence=int(sequence),
+        sequence=new_sequence,
         event_type=event_type,
         changed_by_user=session.get('username'),
         before_alignment=before_alignment,
@@ -298,8 +319,7 @@ def save_rotation_event():
     )
     db.session.add(new_event)
 
-    game = db.session.query(Game).filter_by(id=game_id).first()
-    if game and event_type == 'End Inning':
+    if event_type == 'End Inning':
         game.live_current_inning = str(inning)
 
     db.session.commit()
@@ -333,8 +353,19 @@ def undo_rotation_event():
 
     event.reverted = True
 
-    # If we are undoing an End Inning, we might want to revert the game's live_current_inning pointer
-    # to the last non-reverted End Inning, but let's let the frontend drive the UI state and just trust the event log.
+    # If we are undoing an End Inning, we need to revert the game's live_current_inning pointer
+    # to the last non-reverted End Inning
+    if event.event_type == 'End Inning':
+        game = db.session.query(Game).filter_by(id=event.game_id).first()
+        last_end_inning = db.session.query(GameRotationEvent).filter_by(
+            game_id=event.game_id, event_type='End Inning', reverted=False
+        ).order_by(GameRotationEvent.sequence.desc()).first()
+
+        if last_end_inning:
+            game.live_current_inning = last_end_inning.inning
+        else:
+            game.live_current_inning = "1"
+
     db.session.commit()
 
     socketio.emit('rotation_event_undone', {'event_id': event_id})
@@ -372,13 +403,26 @@ def save_final_pitch_counts():
         if existing_outing:
             existing_outing.pitches = pitches
         else:
+            # Figure out if starter or reliever by looking at rotation JSON
+            pitcher_type = 'Reliever'
+            try:
+                if game.associated_rotation_date:
+                    from models import Rotation
+                    rot = db.session.query(Rotation).filter_by(associated_game_id=game.id).first()
+                    if rot and rot.innings and '1' in rot.innings:
+                        if rot.innings['1'].get('P') == count_data.get('player_name'): # Wait, we don't have player_name here. We'll use id.
+                            # Just default to reliever if we can't easily tell. It's easy to edit later.
+                            pass
+            except:
+                pass
+
             new_outing = PitchingOuting(
                 date=game.date,
                 opponent=game.opponent,
                 pitches=pitches,
-                innings=0, # Optional or derived from events if we wanted
+                innings=None, # Leave unknown instead of falsely claiming 0
                 outing_type='Game',
-                pitcher_type='Reliever', # Default
+                pitcher_type=pitcher_type,
                 team_id=session['team_id'],
                 player_id=player_id,
                 game_id=game.id

@@ -920,34 +920,70 @@ function applyOutOfPositionIndicators() {
              }
         });
 
+        let finalCountsModalObj = null;
+
         document.getElementById('liveEndGameBtn')?.addEventListener('click', () => {
-            // Finalize pitches logic (would be a modal in full implementation)
             const pitchedPlayers = new Set();
             for (let inn in state.actual_rotation) {
                 if (state.actual_rotation[inn]['P']) {
                     pitchedPlayers.add(state.actual_rotation[inn]['P']);
                 }
             }
-            if (pitchedPlayers.size > 0 && confirm(`Save final pitch counts for ${Array.from(pitchedPlayers).join(', ')}?`)) {
-                 const counts = [];
-                 pitchedPlayers.forEach(pName => {
-                      const player = state.roster.find(p => p.name === pName);
-                      // In a real app we'd open a modal and prompt for exact count.
-                      // For now, let's ask via prompt
-                      const count = prompt(`Enter final pitch count from GameChanger for ${pName}:`, '0');
-                      if (count !== null && !isNaN(parseInt(count))) {
-                          counts.push({ player_id: player.id, pitches: parseInt(count) });
-                      }
+
+            if (pitchedPlayers.size === 0) {
+                alert("No pitchers have been recorded in this game yet.");
+                return;
+            }
+
+            const container = document.getElementById('finalCountsFormContainer');
+            let html = '';
+            pitchedPlayers.forEach(pName => {
+                const player = state.roster.find(p => p.name === pName);
+                if (player) {
+                    html += `
+                    <div class="input-group mb-3 input-group-lg">
+                      <span class="input-group-text fw-bold" style="width: 150px;">${escapeHTML(pName)}</span>
+                      <input type="number" class="form-control text-center final-pitch-input" data-player-id="${player.id}" placeholder="Pitches">
+                    </div>`;
+                }
+            });
+            container.innerHTML = html;
+
+            finalCountsModalObj = new bootstrap.Modal(document.getElementById('liveFinalCountsModal'));
+            finalCountsModalObj.show();
+        });
+
+        document.getElementById('confirmFinalCountsBtn')?.addEventListener('click', () => {
+            const inputs = document.querySelectorAll('.final-pitch-input');
+            const counts = [];
+
+            inputs.forEach(input => {
+                const val = input.value.trim();
+                if (val && !isNaN(parseInt(val))) {
+                    counts.push({
+                        player_id: input.dataset.playerId,
+                        pitches: parseInt(val)
+                    });
+                }
+            });
+
+            if (counts.length > 0) {
+                fetch('/api/save_final_pitch_counts', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ game_id: state.game.id, counts: counts })
+                 }).then(res => res.json()).then(data => {
+                     if(data.status === 'success') {
+                         finalCountsModalObj.hide();
+                         alert('Final pitch counts saved successfully!');
+
+                         // Drop out of live mode optionally? Let's stay in it unless they manually toggle off
+                     } else {
+                         alert('Error saving pitch counts.');
+                     }
                  });
-                 if (counts.length > 0) {
-                     fetch('/api/save_final_pitch_counts', {
-                         method: 'POST',
-                         headers: { 'Content-Type': 'application/json' },
-                         body: JSON.stringify({ game_id: state.game.id, counts: counts })
-                     }).then(res => res.json()).then(data => {
-                         if(data.status === 'success') alert('Final pitch counts saved!');
-                     });
-                 }
+            } else {
+                finalCountsModalObj.hide(); // Allow skipping
             }
         });
 

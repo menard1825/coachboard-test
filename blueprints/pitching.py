@@ -1,4 +1,4 @@
-from flask import Blueprint, request, redirect, url_for, flash, session, render_template
+from flask import Blueprint, request, redirect, url_for, flash, session, render_template, jsonify
 from models import PitchingOuting, Team, Game, Player
 from db import db
 from sqlalchemy import func, case, cast, Date
