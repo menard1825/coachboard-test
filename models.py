@@ -19,6 +19,7 @@ class Team(db.Model):
     age_group = Column(String, default='12U', nullable=False)
     pitching_rule_set = Column(String, default='MLB Pitch Smart', nullable=False)
     outfielder_count = Column(Integer, default=3, nullable=False)
+    timezone = Column(String, default='America/Indiana/Indianapolis', nullable=False)
 
     memberships = relationship("TeamMembership", back_populates="team", cascade="all, delete-orphan")
     players = relationship("Player", back_populates="team")
@@ -115,9 +116,11 @@ class PitchingOuting(db.Model):
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
 
     team = relationship("Team", back_populates="pitching_outings")
     player = relationship("Player", back_populates="pitching_outings")
+    game = relationship("Game", back_populates="pitching_outings")
 
     def to_dict(self):
         return {
@@ -168,14 +171,55 @@ class Game(db.Model):
     game_notes = Column(Text)
     associated_lineup_title = Column(String)
     associated_rotation_date = Column(String)
+    is_live = Column(Boolean, default=False, nullable=False)
+    live_current_inning = Column(String, default="1", nullable=False)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="games")
     absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
+    pitching_outings = relationship("PitchingOuting", back_populates="game", cascade="all, delete-orphan")
+    rotation_events = relationship("GameRotationEvent", back_populates="game", cascade="all, delete-orphan")
     
     def to_dict(self):
         """Return a dictionary representation of the Game object."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+class GameRotationEvent(db.Model):
+    __tablename__ = 'game_rotation_events'
+    id = Column(Integer, primary_key=True)
+    inning = Column(String, nullable=False)
+    sequence = Column(Integer, nullable=False)
+    event_type = Column(String, nullable=False)  # 'Pitcher Change', 'Defensive Change', 'End Inning'
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    changed_by_user = Column(String)
+
+    before_alignment = Column(JSON)
+    after_alignment = Column(JSON)
+
+    old_pitcher_id = Column(Integer, ForeignKey('players.id'), nullable=True)
+    new_pitcher_id = Column(Integer, ForeignKey('players.id'), nullable=True)
+    reverted = Column(Boolean, default=False, nullable=False)
+
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
+
+    game = relationship("Game", back_populates="rotation_events")
+    old_pitcher = relationship("Player", foreign_keys=[old_pitcher_id])
+    new_pitcher = relationship("Player", foreign_keys=[new_pitcher_id])
+
+class PlayerPitchTarget(db.Model):
+    __tablename__ = 'player_pitch_targets'
+    id = Column(Integer, primary_key=True)
+    target_pitches = Column(Integer, nullable=False)
+    local_date = Column(String, nullable=False)  # Stored as YYYY-MM-DD
+    reason = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=True) # Nullable for daily targets
+
+    player = relationship("Player")
 
 class CollaborationNote(db.Model):
     __tablename__ = 'collaboration_notes'

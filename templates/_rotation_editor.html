@@ -2,6 +2,10 @@
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="mb-0" id="rotation-editor-title">Defensive Rotation</h5>
         <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <div class="form-check form-switch me-3 d-flex align-items-center mb-0">
+                <input class="form-check-input mt-0 me-2" type="checkbox" id="liveGameModeToggle" style="transform: scale(1.3);">
+                <label class="form-check-label fw-bold text-danger" for="liveGameModeToggle">LIVE GAME</label>
+            </div>
              <!-- Mobile Friendly Save Button -->
             <button type="button" class="btn btn-primary btn-sm d-lg-none" id="saveRotationBtnMobile">
                 <i class="bi bi-save"></i> Save
@@ -28,8 +32,103 @@
             </div>
         </div>
     </div>
+
+    <!-- LIVE GAME MODE OVERLAY (Hidden by default) -->
+    <div id="live-game-overlay" class="card-body d-none bg-light border-bottom position-relative">
+
+        <div class="row text-center mb-3">
+            <div class="col-12">
+                <h2 class="display-5 fw-bold text-danger mb-0">INNING <span id="live-inning-display">1</span></h2>
+                <p class="text-muted small">Live changes recorded separately from planned rotation.</p>
+            </div>
+        </div>
+
+        <div class="row g-2 mb-4 justify-content-center">
+            <div class="col-6 col-md-3">
+                <button id="liveChangePitcherBtn" class="btn btn-primary w-100 py-3 shadow-sm h-100 d-flex flex-column align-items-center justify-content-center" style="border-radius: 12px;">
+                    <i class="bi bi-person-up fs-2 mb-1"></i>
+                    <span class="fw-bold">Change Pitcher</span>
+                </button>
+            </div>
+            <div class="col-6 col-md-3">
+                <button id="liveDefensiveChangeBtn" class="btn btn-info text-white w-100 py-3 shadow-sm h-100 d-flex flex-column align-items-center justify-content-center" style="border-radius: 12px;">
+                    <i class="bi bi-diagram-3 fs-2 mb-1"></i>
+                    <span class="fw-bold">Defensive Change</span>
+                </button>
+            </div>
+            <div class="col-6 col-md-3">
+                <button id="liveEndInningBtn" class="btn btn-dark w-100 py-3 shadow-sm h-100 d-flex flex-column align-items-center justify-content-center" style="border-radius: 12px;">
+                    <i class="bi bi-skip-forward-fill fs-2 mb-1"></i>
+                    <span class="fw-bold">End Inning</span>
+                </button>
+            </div>
+            <div class="col-6 col-md-3">
+                <button id="liveUndoBtn" class="btn btn-outline-secondary w-100 py-3 shadow-sm h-100 d-flex flex-column align-items-center justify-content-center" style="border-radius: 12px;">
+                    <i class="bi bi-arrow-counterclockwise fs-2 mb-1"></i>
+                    <span class="fw-bold">Undo Change</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Live Pitcher Summary -->
+        <div class="card border-primary mb-3">
+            <div class="card-body p-2 d-flex align-items-center">
+                <div class="me-3">
+                    <span class="badge bg-primary fs-6 p-2 rounded-circle">P</span>
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="mb-0 fw-bold" id="live-current-pitcher">None</h5>
+                    <div class="small text-muted" id="live-pitcher-stats">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button id="liveEndGameBtn" class="btn btn-outline-danger">
+                <i class="bi bi-stop-circle-fill me-1"></i> End Game & Enter Final Pitch Counts
+            </button>
+        </div>
+
+        <!-- Live Pitcher Destination Modal -->
+        <div class="modal fade" id="livePitcherDestinationModal" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title text-dark">Where should <span id="oldPitcherNameDisplay"></span> go?</h5>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="row g-2" id="livePitcherDestinations">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Defensive Swap Modal -->
+        <div class="modal fade" id="liveDefensiveSwapModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title">Defensive Swap</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="p-3 bg-light text-center small text-muted border-bottom" id="swapInstructionText">
+                            Tap the first player to swap/move.
+                        </div>
+                        <div class="list-group list-group-flush" id="liveSwapPlayerList">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
     <div class="card-body" id="rotation-board">
-        <div class="mb-3">
+        <div class="mb-3 planner-controls">
             <div class="d-flex align-items-center border rounded p-1 mb-2">
                 <div id="inning-btn-group" class="btn-group flex-wrap" role="group">
                     {# Inning radio buttons will be inserted here by JS #}

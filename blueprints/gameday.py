@@ -5,6 +5,7 @@ from models import (
 from db import db
 from extensions import socketio
 from datetime import datetime
+from models import GameRotationEvent, PlayerPitchTarget
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
@@ -267,6 +268,126 @@ def delete_rotation(rotation_id):
         flash('Rotation not found.', 'danger')
     redirect_url = request.referrer or url_for('home', _anchor='rotations')
     return redirect(redirect_url)
+
+@gameday_bp.route('/save_rotation_event', methods=['POST'])
+def save_rotation_event():
+    data = request.get_json()
+    game_id = data.get('game_id')
+    inning = data.get('inning')
+    sequence = data.get('sequence')
+    event_type = data.get('event_type')
+    before_alignment = data.get('before_alignment')
+    after_alignment = data.get('after_alignment')
+    old_pitcher_id = data.get('old_pitcher_id')
+    new_pitcher_id = data.get('new_pitcher_id')
+
+    if not all([game_id, inning, sequence, event_type, after_alignment]):
+        return jsonify({'status': 'error', 'message': 'Missing required fields.'}), 400
+
+    new_event = GameRotationEvent(
+        team_id=session['team_id'],
+        game_id=game_id,
+        inning=str(inning),
+        sequence=int(sequence),
+        event_type=event_type,
+        changed_by_user=session.get('username'),
+        before_alignment=before_alignment,
+        after_alignment=after_alignment,
+        old_pitcher_id=old_pitcher_id,
+        new_pitcher_id=new_pitcher_id
+    )
+    db.session.add(new_event)
+
+    game = db.session.query(Game).filter_by(id=game_id).first()
+    if game and event_type == 'End Inning':
+        game.live_current_inning = str(inning)
+
+    db.session.commit()
+
+    socketio.emit('rotation_event', {'event': model_to_dict(new_event)})
+    return jsonify({'status': 'success'})
+
+@gameday_bp.route('/toggle_live_game', methods=['POST'])
+def toggle_live_game():
+    data = request.get_json()
+    game_id = data.get('game_id')
+    is_live = data.get('is_live')
+
+    game = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
+    if not game:
+        return jsonify({'status': 'error', 'message': 'Game not found'}), 404
+
+    game.is_live = bool(is_live)
+    db.session.commit()
+    socketio.emit('game_updated', {'message': 'Game live state updated.'})
+    return jsonify({'status': 'success'})
+
+@gameday_bp.route('/undo_rotation_event', methods=['POST'])
+def undo_rotation_event():
+    data = request.get_json()
+    event_id = data.get('event_id')
+
+    event = db.session.query(GameRotationEvent).filter_by(id=event_id, team_id=session['team_id']).first()
+    if not event:
+        return jsonify({'status': 'error', 'message': 'Event not found.'}), 404
+
+    event.reverted = True
+
+    # If we are undoing an End Inning, we might want to revert the game's live_current_inning pointer
+    # to the last non-reverted End Inning, but let's let the frontend drive the UI state and just trust the event log.
+    db.session.commit()
+
+    socketio.emit('rotation_event_undone', {'event_id': event_id})
+    return jsonify({'status': 'success'})
+
+@gameday_bp.route('/save_final_pitch_counts', methods=['POST'])
+def save_final_pitch_counts():
+    data = request.get_json()
+    game_id = data.get('game_id')
+    counts = data.get('counts') # list of dicts: {'player_id': 1, 'pitches': 45}
+
+    if not game_id or not counts:
+        return jsonify({'status': 'error', 'message': 'Missing game_id or counts data.'}), 400
+
+    game = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
+    if not game:
+        return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
+
+    from models import PitchingOuting
+
+    for count_data in counts:
+        player_id = count_data.get('player_id')
+        pitches = count_data.get('pitches')
+
+        if not player_id or pitches is None:
+            continue
+
+        # Check if an outing already exists for this game and player
+        existing_outing = db.session.query(PitchingOuting).filter_by(
+            game_id=game.id,
+            player_id=player_id,
+            team_id=session['team_id']
+        ).first()
+
+        if existing_outing:
+            existing_outing.pitches = pitches
+        else:
+            new_outing = PitchingOuting(
+                date=game.date,
+                opponent=game.opponent,
+                pitches=pitches,
+                innings=0, # Optional or derived from events if we wanted
+                outing_type='Game',
+                pitcher_type='Reliever', # Default
+                team_id=session['team_id'],
+                player_id=player_id,
+                game_id=game.id
+            )
+            db.session.add(new_outing)
+
+    db.session.commit()
+    socketio.emit('pitching_update', {'message': 'Final game pitch counts saved.'})
+    return jsonify({'status': 'success'})
 
 @gameday_bp.route('/save_rotation_as_template', methods=['POST'])
 def save_rotation_as_template():

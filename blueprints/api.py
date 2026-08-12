@@ -195,7 +195,7 @@ def get_overview_data():
     # 1. Next upcoming game
     next_game = db.session.query(Game).filter(
         Game.team_id == team_id,
-        Game.date >= datetime.utcnow()
+        Game.date >= datetime.now()
     ).order_by(Game.date.asc()).first()
 
     # 2. Pitchers on mandatory rest
@@ -240,8 +240,12 @@ def get_game_data(game_id):
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
     absent_player_ids = [absence.player_id for absence in absences]
 
+    from models import PlayerPitchTarget, GameRotationEvent
+    all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
+    rotation_events = db.session.query(GameRotationEvent).filter_by(game_id=game.id, team_id=team_id).order_by(GameRotationEvent.id).all()
+
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date)
+    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone)
 
     lineup_templates = db.session.query(Lineup).filter_by(team_id=team_id, associated_game_id=None).all()
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team_id, associated_game_id=None).all()
@@ -256,7 +260,8 @@ def get_game_data(game_id):
         'pitch_count_summary': pitch_count_summary,
         'lineup_templates': [model_to_dict(lt) for lt in lineup_templates],
         'rotation_templates': [model_to_dict(rt) for rt in rotation_templates],
-        'outfielder_count': team.outfielder_count
+        'outfielder_count': team.outfielder_count,
+        'rotation_events': [model_to_dict(e) for e in rotation_events]
     })
 
 

@@ -38,21 +38,27 @@
                                       <div class="progress" style="height: 20px;" title="{{ summary.daily }} pitches">
                                           <div class="progress-bar {{ daily_bg }}" role="progressbar" style="width: {{ daily_pct }}%;" aria-valuenow="{{ summary.daily }}">{{ summary.daily }}</div>
                                       </div>
-                                      <small class="text-muted">{{ summary.pitches_remaining_today }} remaining today</small>
+                                      <small class="text-muted">{{ summary.pitches_remaining_today }} official remaining today</small>
+                                      {% if summary.coach_target %}
+                                      <br><small class="text-primary fw-bold">Coach Target: {{ summary.coach_target }}</small>
+                                      {% endif %}
                                   </td>
                                   <td class="align-middle">
-                                      {% set weekly_pct = ([100, (summary.weekly / 100 * 100)] | min) | int %}
-                                      <div class="progress" style="height: 20px;" title="{{ summary.weekly }} pitches">
-                                          <div class="progress-bar" role="progressbar" style="width: {{ weekly_pct }}%;" aria-valuenow="{{ summary.weekly }}">{{ summary.weekly }}</div>
-                                      </div>
+                                      {{ summary.weekly }} <span class="text-muted small">pitches</span>
                                   </td>
                                   <td class="text-center align-middle">
                                       {% if summary.status == 'Available' %}
                                           <span class="badge bg-success">Available</span>
+                                      {% elif summary.status == 'Coach Target Reached' %}
+                                          <span class="badge bg-warning text-dark">Target Reached</span>
                                       {% else %}
                                           <span class="badge bg-danger">Resting</span>
                                           <br><small class="text-muted">Next up: {{ summary.next_available }}</small>
                                       {% endif %}
+
+                                      <button type="button" class="btn btn-sm btn-link text-primary mt-1 p-0" onclick="openTargetModal('{{ player.id }}', '{{ player.name }}', '{{ summary.coach_target or '' }}', '{{ summary.coach_target_reason or '' }}')">
+                                          Set Target
+                                      </button>
                                   </td>
                               </tr>
                           {% endif %}
@@ -131,6 +137,33 @@
     </div>
 </div>
 
+<!-- Target Modal -->
+<div class="modal fade" id="coachTargetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Set Daily Coach Target</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Set a custom target for <strong><span id="targetPlayerName"></span></strong>. This target overrides normal rules with a warning when reached.</p>
+                <div class="form-floating mb-3">
+                    <input type="number" class="form-control" id="targetPitchesInput" placeholder="Target Pitches">
+                    <label>Target Pitches (leave blank to clear)</label>
+                </div>
+                <div class="form-floating mb-3">
+                    <input type="text" class="form-control" id="targetReasonInput" placeholder="Reason (e.g. Save for Sunday)">
+                    <label>Reason (Optional)</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveTargetBtn">Save Target</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Edit Modal -->
 <div class="modal fade" id="editPitchingOutingModal" tabindex="-1">
     <div class="modal-dialog">
@@ -196,7 +229,42 @@
 {% block scripts %}
 {{ super() }}
 <script>
+let currentTargetPlayerId = null;
+
+function openTargetModal(playerId, playerName, currentTarget, currentReason) {
+    currentTargetPlayerId = playerId;
+    document.getElementById('targetPlayerName').textContent = playerName;
+    document.getElementById('targetPitchesInput').value = currentTarget !== 'None' ? currentTarget : '';
+    document.getElementById('targetReasonInput').value = currentReason !== 'None' ? currentReason : '';
+    new bootstrap.Modal(document.getElementById('coachTargetModal')).show();
+}
+
 document.addEventListener('DOMContentLoaded', function () {
+
+    document.getElementById('saveTargetBtn')?.addEventListener('click', () => {
+        if (!currentTargetPlayerId) return;
+
+        const targetPitches = document.getElementById('targetPitchesInput').value;
+        const reason = document.getElementById('targetReasonInput').value;
+        const localDate = new Date().toISOString().split('T')[0]; // Simple local date
+
+        fetch('/save_player_target', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player_id: currentTargetPlayerId,
+                target_pitches: targetPitches ? parseInt(targetPitches) : null,
+                local_date: localDate,
+                reason: reason
+            })
+        }).then(res => res.json()).then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                alert('Error saving target: ' + data.message);
+            }
+        });
+    });
     // Set default date for new pitching outings to today
     const pitchDateInput = document.getElementById('pitch_date');
     if (pitchDateInput && !pitchDateInput.value) {

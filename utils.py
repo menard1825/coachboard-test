@@ -2,6 +2,7 @@ import json
 from datetime import date, timedelta, datetime
 from sqlalchemy import func
 from models import Player, PitchingOuting
+import zoneinfo
 
 def model_to_dict(obj):
     """Converts a SQLAlchemy model instance into a dictionary."""
@@ -125,25 +126,43 @@ def calculate_cumulative_position_stats(roster_players, rotations):
             continue
     return stats
 
-def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None):
-    """Calculates the daily/weekly pitch counts and availability for all pitchers."""
+def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, all_targets=None, team_timezone=None):
+    """Calculates the daily/weekly pitch counts and availability for all pitchers.
+    all_targets should be a list of PlayerPitchTarget objects.
+    """
     summary = {}
 
+    tz = zoneinfo.ZoneInfo(team_timezone) if team_timezone else zoneinfo.ZoneInfo('America/Indiana/Indianapolis')
+
     if target_date is None:
-        today = date.today()
+        today = datetime.now(tz).date()
     elif isinstance(target_date, datetime):
-        today = target_date.date()
+        # Convert to the team's timezone before extracting the date
+        if target_date.tzinfo is None:
+            # Assume stored naive datetimes are UTC
+            target_date = target_date.replace(tzinfo=zoneinfo.ZoneInfo('UTC'))
+        today = target_date.astimezone(tz).date()
     elif isinstance(target_date, str):
         today = datetime.strptime(target_date, '%Y-%m-%d').date()
     else:
         today = target_date
 
+    all_targets = all_targets or []
+
     for player in roster:
         try:
+            # Normalize outing dates to team's local date
+            def get_local_date(d):
+                if isinstance(d, datetime):
+                    if d.tzinfo is None:
+                        d = d.replace(tzinfo=zoneinfo.ZoneInfo('UTC'))
+                    return d.astimezone(tz).date()
+                return d
+
             player_outings = sorted([o for o in all_outings if o.player_id == player.id and isinstance(o.date, (datetime, date))], key=lambda x: x.date, reverse=True)
             
-            daily_pitches = sum(o.pitches or 0 for o in player_outings if o.date.date() == today)
-            weekly_pitches = sum(o.pitches or 0 for o in player_outings if (today - o.date.date()).days < 7)
+            daily_pitches = sum(o.pitches or 0 for o in player_outings if get_local_date(o.date) == today)
+            weekly_pitches = sum(o.pitches or 0 for o in player_outings if (today - get_local_date(o.date)).days < 7)
 
             status = 'Available'
             next_available_str = 'Today'
@@ -152,18 +171,18 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None):
             last_outing_display = 'N/A'
 
             if player_outings:
-                last_outing_date = player_outings[0].date.date()
+                last_outing_date = get_local_date(player_outings[0].date)
                 last_outing_display = last_outing_date.strftime('%a, %b %d')
 
                 # Check ALL recent past outings to see if any enforce rest for TODAY
-                past_outings = [o for o in player_outings if o.date.date() < today]
+                past_outings = [o for o in player_outings if get_local_date(o.date) < today]
 
                 if past_outings:
                     # Find the unique past dates
-                    past_dates = sorted(list(set([o.date.date() for o in past_outings])), reverse=True)
+                    past_dates = sorted(list(set([get_local_date(o.date) for o in past_outings])), reverse=True)
 
                     for p_date in past_dates:
-                        p_pitches = sum(o.pitches or 0 for o in past_outings if o.date.date() == p_date)
+                        p_pitches = sum(o.pitches or 0 for o in past_outings if get_local_date(o.date) == p_date)
 
                         p_req_rest = 0
                         for threshold, rest_days in rules.get('rest_thresholds', []):
@@ -175,7 +194,7 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None):
                                 p_req_rest = rules['rest_thresholds'][-1][1] + 1
 
                         # Check consecutive days for this past outing
-                        if any(o.date.date() == p_date - timedelta(days=1) for o in past_outings) and p_req_rest < 1:
+                        if any(get_local_date(o.date) == p_date - timedelta(days=1) for o in past_outings) and p_req_rest < 1:
                             p_req_rest = 1
 
                         p_next_avail = p_date + timedelta(days=p_req_rest + 1)
@@ -202,7 +221,7 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None):
                                 req_rest = rules['rest_thresholds'][-1][1] + 1
 
                         # Did they pitch yesterday too? (Consecutive days rule)
-                        if any(o.date.date() == today - timedelta(days=1) for o in player_outings):
+                        if any(get_local_date(o.date) == today - timedelta(days=1) for o in player_outings):
                             if req_rest < 1:
                                 req_rest = 1
 
@@ -219,14 +238,32 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None):
             if status == 'Resting':
                 pitches_remaining = 0
 
+            # Find matching coach targets for this player on this date
+            # We look for a specific daily target.
+            today_str = today.strftime('%Y-%m-%d')
+            player_targets = [t for t in all_targets if t.player_id == player.id and t.local_date == today_str]
+            # Prioritize game-specific targets if multiple exist, otherwise use daily
+            coach_target_obj = next((t for t in player_targets if t.game_id is not None), None) or next((t for t in player_targets if t.game_id is None), None)
+
+            coach_target = coach_target_obj.target_pitches if coach_target_obj else None
+            coach_target_reason = coach_target_obj.reason if coach_target_obj else None
+
+            # If coach target is reached, append warning but keep status 'Available' unless it hits official 'Resting' rules.
+            if coach_target is not None and daily_pitches >= coach_target and status != 'Resting':
+                status = 'Coach Target Reached'
+
             summary[player.name] = {
+                'id': player.id,
+                'name': player.name,
                 'daily': daily_pitches,
                 'weekly': weekly_pitches,
                 'status': status,
                 'next_available': next_available_str,
                 'max_daily': max_daily,
                 'pitches_remaining_today': pitches_remaining,
-                'last_outing_display': last_outing_display
+                'last_outing_display': last_outing_display,
+                'coach_target': coach_target,
+                'coach_target_reason': coach_target_reason,
             }
         except Exception as e:
             print(f"Error calculating pitch count summary for player {player.name} (ID: {player.id}): {e}")
