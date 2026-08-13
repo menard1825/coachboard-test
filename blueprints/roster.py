@@ -92,6 +92,40 @@ def update_player_inline(player_id):
     socketio.emit('data_updated', {'message': f'Player {new_name} updated.'})
     return jsonify({'status': 'success', 'message': f'Player "{new_name}" updated successfully!'})
 
+@roster_bp.route('/update_pitching_profile/<int:player_id>', methods=['POST'])
+def update_pitching_profile(player_id):
+    player = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
+    if not player:
+        return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
+
+    data = request.get_json()
+    from models import PlayerPitchingProfile, PlayerPitchTarget
+
+    # Update or create profile
+    profile = db.session.query(PlayerPitchingProfile).filter_by(player_id=player_id, team_id=session['team_id']).first()
+    if not profile:
+        profile = PlayerPitchingProfile(player_id=player_id, team_id=session['team_id'])
+        db.session.add(profile)
+
+    profile.pitcher_role = data.get('pitcher_role')
+    profile.preferred_role = data.get('preferred_role')
+    profile.fastball_velo = data.get('fastball_velo')
+    profile.notes = data.get('notes')
+
+    # Update or create target
+    target = db.session.query(PlayerPitchTarget).filter_by(player_id=player_id, team_id=session['team_id']).first()
+    if not target:
+        target = PlayerPitchTarget(player_id=player_id, team_id=session['team_id'])
+        db.session.add(target)
+
+    target.max_pitches_per_game = data.get('max_pitches_per_game')
+    target.max_pitches_per_day = data.get('max_pitches_per_day')
+
+    db.session.commit()
+    socketio.emit('data_updated', {'message': f'Pitching profile for {player.name} updated.'})
+    return jsonify({'status': 'success'})
+
+
 @roster_bp.route('/delete_player/<int:player_id>')
 def delete_player(player_id):
     player_to_delete = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()

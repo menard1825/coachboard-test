@@ -33,21 +33,16 @@ function initializeGameManagement(gameData) {
         }
     }
 
-    // Add actual live rotation state which tracks events
-    state.actual_rotation = JSON.parse(JSON.stringify(state.rotation.innings)); // Deep copy to prevent reference mutation
+    // --- Live Mode Authoritative Syncing ---
+    // The server API now provides actual_rotation fully computed.
+    state.actual_rotation = gameData.actual_rotation || JSON.parse(JSON.stringify(state.rotation.innings || {}));
     state.rotation_events = gameData.rotation_events || [];
     state.pitch_count_summary = gameData.pitch_count_summary || {};
+    state.pitching_plans = gameData.pitching_plans || [];
+    state.pitching_profiles = gameData.pitching_profiles || [];
+
     state.liveMode = state.game.is_live || false;
     state.currentInning = state.liveMode ? state.game.live_current_inning || '1' : '1';
-
-    // Process rotation events sequentially to build the live actual_rotation state
-    if (state.rotation_events.length > 0) {
-        state.rotation_events.forEach(evt => {
-            if (!evt.reverted) {
-                state.actual_rotation[evt.inning] = evt.after_alignment;
-            }
-        });
-    }
 
     let assignPlayerModal;
     let lineupEditorModal;
@@ -88,8 +83,12 @@ function initializeGameManagement(gameData) {
         });
     }
 
+    function getActiveInnings() {
+        return state.liveMode ? state.actual_rotation : (state.rotation.innings || {});
+    }
+
     function renderRotationDiamondAndBench() {
-        const currentInningData = state.rotation.innings[state.currentInning] || {};
+        const currentInningData = getActiveInnings()[state.currentInning] || {};
 
         // Note: The original createPlayerTag is now modified to accept a player object
         // MODIFIED: Only show position if on bench (or general list). If on field, the position is implied by the dropzone.
@@ -670,10 +669,29 @@ function applyOutOfPositionIndicators() {
         socket.on('lineup_update', fetchLatestGameData);
         socket.on('rotation_save', fetchLatestGameData);
         socket.on('roster_update', fetchLatestGameData);
-        socket.on('rotation_event', fetchLatestGameData);
-        socket.on('rotation_event_undone', fetchLatestGameData);
         socket.on('game_updated', fetchLatestGameData);
         socket.on('pitching_update', fetchLatestGameData);
+
+        // Listen for authoritative state broadcasts specifically for the live game
+        socket.on('game_state_update', (newState) => {
+            console.log("Received server-authoritative live game state broadcast.", newState);
+
+            // Re-apply essential parsed objects if needed
+            if (newState.rotation && typeof newState.rotation.innings === 'string') {
+                newState.rotation.innings = JSON.parse(newState.rotation.innings);
+            }
+
+            state.actual_rotation = newState.actual_rotation;
+            state.rotation_events = newState.rotation_events;
+            state.pitch_count_summary = newState.pitch_count_summary;
+            state.pitching_plans = newState.pitching_plans;
+            state.game = newState.game;
+            state.liveMode = newState.game.is_live;
+            state.currentInning = state.liveMode ? state.game.live_current_inning || '1' : state.currentInning;
+
+            renderRotationEditor();
+            renderBenchReport();
+        });
 
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
@@ -764,21 +782,20 @@ function applyOutOfPositionIndicators() {
                  const beforeAlign = { ...state.actual_rotation[state.currentInning] };
 
                  const nextInning = Math.floor(parseFloat(state.currentInning)) + 1;
-                 state.currentInning = String(nextInning);
+                 const nextInningStr = String(nextInning);
 
-                 // If the actual rotation doesn't have this inning yet, copy from planned if it exists
-                 if (!state.actual_rotation[state.currentInning]) {
-                     if (state.rotation.innings[state.currentInning]) {
-                         state.actual_rotation[state.currentInning] = JSON.parse(JSON.stringify(state.rotation.innings[state.currentInning]));
-                     } else {
-                         // Or copy from previous actual inning
-                         state.actual_rotation[state.currentInning] = JSON.parse(JSON.stringify(state.actual_rotation[String(nextInning - 1)] || {}));
-                     }
+                 let afterAlign = {};
+
+                 // Determine what the initial alignment of the next inning should be
+                 if (state.rotation.innings && state.rotation.innings[nextInningStr]) {
+                     afterAlign = JSON.parse(JSON.stringify(state.rotation.innings[nextInningStr]));
+                 } else {
+                     afterAlign = { ...beforeAlign }; // Carry over actuals if no plan
                  }
 
-                 // Log event
-                 logLiveEvent('End Inning', beforeAlign, state.actual_rotation[state.currentInning], null, null);
-                 renderRotationEditor();
+                 // We don't manually mutate state.currentInning anymore;
+                 // logLiveEvent with 'End Inning' tells the server, which updates the game pointer
+                 logLiveEvent('End Inning', beforeAlign, afterAlign, null, null);
              }
         });
 
@@ -900,12 +917,13 @@ function applyOutOfPositionIndicators() {
                 const name1 = target1.startsWith('EMPTY_') ? null : target1;
                 const name2 = target2.startsWith('EMPTY_') ? null : target2;
 
-                // Do the swap
-                if (pos1) state.actual_rotation[state.currentInning][pos1] = name2;
-                if (pos2) state.actual_rotation[state.currentInning][pos2] = name1;
+                const afterAlign = { ...beforeAlign };
 
-                logLiveEvent('Defensive Change', beforeAlign, state.actual_rotation[state.currentInning], null, null);
-                renderRotationEditor();
+                // Do the swap
+                if (pos1) afterAlign[pos1] = name2;
+                if (pos2) afterAlign[pos2] = name1;
+
+                logLiveEvent('Defensive Change', beforeAlign, afterAlign, null, null);
                 liveDefSwapModalObj.hide();
             }
         };
@@ -913,19 +931,17 @@ function applyOutOfPositionIndicators() {
 
         document.getElementById('liveUndoBtn')?.addEventListener('click', () => {
              if (state.rotation_events.length > 0) {
+                 const unrevertedEvents = state.rotation_events.filter(e => !e.reverted);
+                 if (unrevertedEvents.length === 0) {
+                     alert("No live events to undo.");
+                     return;
+                 }
                  if (confirm("Undo the last live rotation event?")) {
-                     const lastEvent = state.rotation_events[state.rotation_events.length - 1];
+                     const lastEvent = unrevertedEvents[unrevertedEvents.length - 1];
                      fetch('/api/undo_rotation_event', {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json' },
                          body: JSON.stringify({ event_id: lastEvent.id })
-                     }).then(res => res.json()).then(data => {
-                         if (data.status === 'success') {
-                             // Temporarily update local state immediately
-                             state.actual_rotation[lastEvent.inning] = lastEvent.before_alignment;
-                             state.rotation_events.pop();
-                             renderRotationEditor();
-                         }
                      });
                  }
              } else {
@@ -1306,9 +1322,9 @@ function applyOutOfPositionIndicators() {
 
          if (!oldPitcherName) {
              // No old pitcher to worry about, just assign
-             state.actual_rotation[state.currentInning]['P'] = playerName;
-             logLiveEvent('Pitcher Change', beforeAlign, state.actual_rotation[state.currentInning], null, player.id);
-             renderRotationEditor();
+             const afterAlign = { ...beforeAlign };
+             afterAlign['P'] = playerName;
+             logLiveEvent('Pitcher Change', beforeAlign, afterAlign, null, player.id);
              assignPlayerModal.hide();
              return;
          }
@@ -1338,28 +1354,29 @@ function applyOutOfPositionIndicators() {
          if (!pendingPitcherChange) return;
          const { newPitcherName, beforeAlign, oldPitcherName } = pendingPitcherChange;
 
+         const afterAlign = { ...beforeAlign };
+
          // 1. Remove new pitcher from their old spot if they were on the field
          let oldSpotOfNewPitcher = null;
-         for (const [pos, name] of Object.entries(state.actual_rotation[state.currentInning] || {})) {
+         for (const [pos, name] of Object.entries(afterAlign)) {
              if (name === newPitcherName) oldSpotOfNewPitcher = pos;
          }
-         if (oldSpotOfNewPitcher) state.actual_rotation[state.currentInning][oldSpotOfNewPitcher] = null;
+         if (oldSpotOfNewPitcher) afterAlign[oldSpotOfNewPitcher] = null;
 
          // 2. Put new pitcher at P
-         state.actual_rotation[state.currentInning]['P'] = newPitcherName;
+         afterAlign['P'] = newPitcherName;
 
          // 3. Put old pitcher at destination
          if (destinationPos === 'BENCH') {
              // Just removed from P, so they are effectively benched.
          } else {
-             state.actual_rotation[state.currentInning][destinationPos] = oldPitcherName;
+             afterAlign[destinationPos] = oldPitcherName;
          }
 
          const oldPId = state.roster.find(p => p.name === oldPitcherName)?.id;
          const newPId = state.roster.find(p => p.name === newPitcherName)?.id;
 
-         logLiveEvent('Pitcher Change', beforeAlign, state.actual_rotation[state.currentInning], oldPId, newPId);
-         renderRotationEditor();
+         logLiveEvent('Pitcher Change', beforeAlign, afterAlign, oldPId, newPId);
          livePitcherDestModalObj.hide();
          pendingPitcherChange = null;
     };

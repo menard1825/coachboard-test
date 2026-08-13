@@ -324,7 +324,15 @@ def save_rotation_event():
 
     db.session.commit()
 
-    socketio.emit('rotation_event', {'event': model_to_dict(new_event)})
+    room_name = f"team_{session['team_id']}_game_{game_id}"
+    socketio.emit('rotation_event', {'event': model_to_dict(new_event)}, room=room_name)
+
+    # Broadcast full state update to room
+    from blueprints.api import get_live_game_state
+    full_state = get_live_game_state(game_id, session['team_id'])
+    if full_state:
+        socketio.emit('game_state_update', full_state, room=room_name)
+
     return jsonify({'status': 'success'})
 
 @gameday_bp.route('/toggle_live_game', methods=['POST'])
@@ -370,6 +378,81 @@ def undo_rotation_event():
 
     room_name = f"team_{session['team_id']}_game_{event.game_id}"
     socketio.emit('rotation_event_undone', {'event_id': event_id}, room=room_name)
+
+    # Broadcast full state update to room
+    from blueprints.api import get_live_game_state
+    full_state = get_live_game_state(event.game_id, session['team_id'])
+    if full_state:
+        socketio.emit('game_state_update', full_state, room=room_name)
+
+    return jsonify({'status': 'success'})
+
+@gameday_bp.route('/save_pitching_plan', methods=['POST'])
+def save_pitching_plan():
+    data = request.get_json()
+    game_id = data.get('game_id')
+    player_id = data.get('player_id')
+    planned_pitches = data.get('planned_pitches')
+    planned_innings = data.get('planned_innings')
+    order = data.get('order')
+
+    if not game_id or not player_id:
+        return jsonify({'status': 'error', 'message': 'Missing game_id or player_id'}), 400
+
+    from models import GamePitchingPlan
+    plan = db.session.query(GamePitchingPlan).filter_by(
+        game_id=game_id, player_id=player_id, team_id=session['team_id']
+    ).first()
+
+    if plan:
+        plan.planned_pitches = planned_pitches
+        plan.planned_innings = planned_innings
+        plan.order = order
+    else:
+        plan = GamePitchingPlan(
+            team_id=session['team_id'],
+            game_id=game_id,
+            player_id=player_id,
+            planned_pitches=planned_pitches,
+            planned_innings=planned_innings,
+            order=order
+        )
+        db.session.add(plan)
+
+    db.session.commit()
+
+    room_name = f"team_{session['team_id']}_game_{game_id}"
+    from blueprints.api import get_live_game_state
+    full_state = get_live_game_state(game_id, session['team_id'])
+    if full_state:
+        socketio.emit('game_state_update', full_state, room=room_name)
+
+    return jsonify({'status': 'success'})
+
+@gameday_bp.route('/delete_pitching_plan', methods=['POST'])
+def delete_pitching_plan():
+    data = request.get_json()
+    game_id = data.get('game_id')
+    player_id = data.get('player_id')
+
+    if not game_id or not player_id:
+        return jsonify({'status': 'error', 'message': 'Missing data'}), 400
+
+    from models import GamePitchingPlan
+    plan = db.session.query(GamePitchingPlan).filter_by(
+        game_id=game_id, player_id=player_id, team_id=session['team_id']
+    ).first()
+
+    if plan:
+        db.session.delete(plan)
+        db.session.commit()
+
+    room_name = f"team_{session['team_id']}_game_{game_id}"
+    from blueprints.api import get_live_game_state
+    full_state = get_live_game_state(game_id, session['team_id'])
+    if full_state:
+        socketio.emit('game_state_update', full_state, room=room_name)
+
     return jsonify({'status': 'success'})
 
 @gameday_bp.route('/save_final_pitch_counts', methods=['POST'])
