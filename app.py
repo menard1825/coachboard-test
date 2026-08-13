@@ -25,6 +25,7 @@ from blueprints.auth import auth_bp
 from blueprints.admin import admin_bp
 from blueprints.roster import roster_bp
 from blueprints.development import development_bp
+from blueprints.live_game_ui import live_game_ui_bp
 from blueprints.gameday import gameday_bp
 from blueprints.pitching import pitching_bp
 from blueprints.scouting import scouting_bp
@@ -52,11 +53,13 @@ def create_app():
     socketio.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
 
-    # Register Blueprints
+    # Register Blueprints. Register the new game-management UI before the
+    # legacy gameday blueprint so /game/<id> resolves to the new lifecycle UI.
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(roster_bp)
     app.register_blueprint(development_bp)
+    app.register_blueprint(live_game_ui_bp)
     app.register_blueprint(gameday_bp)
     app.register_blueprint(pitching_bp)
     app.register_blueprint(scouting_bp)
