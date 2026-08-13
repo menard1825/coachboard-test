@@ -143,8 +143,6 @@
         </div>
     </div>
 
-    <!-- LIVE GAME OVERLAY GETS INJECTED HERE VIA JS -->
-
     <div class="row planner-controls">
         <div class="col-lg-6 mb-4 d-none" id="lineup-card-container">
             {% include '_lineup_editor.html' %}
@@ -209,7 +207,6 @@
   </div>
 </div>
 
-{# Modals for editing remain the same #}
 {% include '_lineup_editor.html' %}
 
 <div class="modal fade" id="assignPlayerModal" tabindex="-1">
@@ -226,7 +223,6 @@
     </div>
 </div>
 
-{# NEW: Modal for saving a rotation as a template #}
 <div class="modal fade" id="saveRotationTemplateModal" tabindex="-1" aria-labelledby="saveRotationTemplateModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -267,5 +263,6 @@
         };
         initializeGameManagement(initialGameData);
     });
+    import('/static/js/live_game_v2.js');
 </script>
 {% endblock %}
