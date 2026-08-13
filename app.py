@@ -53,8 +53,9 @@ def create_app():
     socketio.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
 
-    # Register Blueprints. Register the new game-management UI before the
-    # legacy gameday blueprint so /game/<id> resolves to the new lifecycle UI.
+    # Register Blueprints. The authoritative live-game API must be registered
+    # before the legacy /api blueprint because both temporarily expose the
+    # same GET /api/live-game/<game_id>/state URL during this transition.
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(roster_bp)
@@ -64,8 +65,8 @@ def create_app():
     app.register_blueprint(pitching_bp)
     app.register_blueprint(scouting_bp)
     app.register_blueprint(team_management_bp)
-    app.register_blueprint(api_bp)
     app.register_blueprint(live_game_api_bp)
+    app.register_blueprint(api_bp)
 
     # --- SocketIO Handlers ---
     from flask_socketio import join_room, leave_room
