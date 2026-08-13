@@ -1,5 +1,5 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
-from models import Player, User
+from models import Player, User, TeamMembership
 from db import db
 from extensions import socketio
 import json
@@ -50,11 +50,11 @@ def add_player():
     db.session.add(new_player)
     db.session.flush() # Flush to get the new player's ID
 
-    for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
-        current_order = get_player_order_as_list(user_obj.player_order)
+    for membership in db.session.query(TeamMembership).filter_by(team_id=session['team_id']).all():
+        current_order = get_player_order_as_list(membership.player_order)
         if new_player.id not in current_order:
             current_order.append(new_player.id)
-            user_obj.player_order = current_order
+            membership.player_order = current_order
 
     db.session.commit()
     flash(f'Player "{name}" added successfully!', 'success')
@@ -92,6 +92,40 @@ def update_player_inline(player_id):
     socketio.emit('data_updated', {'message': f'Player {new_name} updated.'})
     return jsonify({'status': 'success', 'message': f'Player "{new_name}" updated successfully!'})
 
+@roster_bp.route('/update_pitching_profile/<int:player_id>', methods=['POST'])
+def update_pitching_profile(player_id):
+    player = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
+    if not player:
+        return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
+
+    data = request.get_json()
+    from models import PlayerPitchingProfile, PlayerPitchTarget
+
+    # Update or create profile
+    profile = db.session.query(PlayerPitchingProfile).filter_by(player_id=player_id, team_id=session['team_id']).first()
+    if not profile:
+        profile = PlayerPitchingProfile(player_id=player_id, team_id=session['team_id'])
+        db.session.add(profile)
+
+    profile.pitcher_role = data.get('pitcher_role')
+    profile.preferred_role = data.get('preferred_role')
+    profile.fastball_velo = data.get('fastball_velo')
+    profile.notes = data.get('notes')
+
+    # Update or create target
+    target = db.session.query(PlayerPitchTarget).filter_by(player_id=player_id, team_id=session['team_id']).first()
+    if not target:
+        target = PlayerPitchTarget(player_id=player_id, team_id=session['team_id'])
+        db.session.add(target)
+
+    target.max_pitches_per_game = data.get('max_pitches_per_game')
+    target.max_pitches_per_day = data.get('max_pitches_per_day')
+
+    db.session.commit()
+    socketio.emit('data_updated', {'message': f'Pitching profile for {player.name} updated.'})
+    return jsonify({'status': 'success'})
+
+
 @roster_bp.route('/delete_player/<int:player_id>')
 def delete_player(player_id):
     player_to_delete = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
@@ -100,10 +134,10 @@ def delete_player(player_id):
         player_id_to_delete = player_to_delete.id
         db.session.delete(player_to_delete)
 
-        for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
-            current_order = get_player_order_as_list(user_obj.player_order)
+        for membership in db.session.query(TeamMembership).filter_by(team_id=session['team_id']).all():
+            current_order = get_player_order_as_list(membership.player_order)
             updated_order = [pid for pid in current_order if pid != player_id_to_delete]
-            user_obj.player_order = updated_order
+            membership.player_order = updated_order
         
         if 'player_order' in session:
             session_order = get_player_order_as_list(session['player_order'])
@@ -122,11 +156,14 @@ def save_player_order():
     user = db.session.query(User).filter_by(username=session['username']).first()
     if not user: return jsonify({'status': 'error', 'message': 'User not found'}), 404
     
+    membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=session['team_id']).first()
+    if not membership: return jsonify({'status': 'error', 'message': 'Membership not found'}), 404
+
     new_order = request.json.get('player_order')
     if not isinstance(new_order, list): 
         return jsonify({'status': 'error', 'message': 'Invalid order format'}), 400
     
-    user.player_order = new_order
+    membership.player_order = new_order
     session['player_order'] = new_order
     session.modified = True
     db.session.commit()

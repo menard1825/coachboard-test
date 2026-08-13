@@ -30,6 +30,9 @@
                         <li class="nav-item">
                             <a class="nav-link" data-bs-toggle="tab" href="#pitching-rules-settings">Pitching Rules</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#season-management">Season Management</a>
+                        </li>
                     </ul>
                 </div>
                 <div class="card-body">
@@ -99,6 +102,56 @@
                                 </div>
                                 <p class="form-text">Changing this will update the <a href="{{ url_for('pitching.pitching_rules') }}" target="_blank">Pitching Rules</a> page and the pitch count tracker logic.</p>
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
+                            </form>
+                        </div>
+                        <div class="tab-pane fade" id="season-management">
+                            <h6 class="text-muted">Start New Season</h6>
+                            <p class="small text-muted">Create a new team for the upcoming season. Your current team and all its historical data (games, stats, absences) will remain completely untouched and accessible via the "Switch Team" menu.</p>
+
+                            <form action="{{ url_for('admin.rollover_season') }}" method="POST">
+                                <div class="form-floating mb-3">
+                                    <input type="text" class="form-control" id="new_team_name" name="new_team_name" placeholder="New Team Name (e.g. Tigers 2025)" required>
+                                    <label for="new_team_name">New Team Name</label>
+                                </div>
+                                <div class="form-floating mb-3">
+                                    <select class="form-select" id="new_age_group" name="new_age_group">
+                                        {% set sample_rule_set = all_rules['MLB Pitch Smart'] %}
+                                        {% for age_group_key in sample_rule_set.keys() %}
+                                            {% if age_group_key != 'default' %}
+                                                <option value="{{ age_group_key }}" {% if settings.age_group == age_group_key %}selected{% endif %}>
+                                                    {{ age_group_key }}
+                                                </option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <label for="new_age_group">New Age Group</label>
+                                </div>
+
+                                <h6 class="mt-4 mb-2">Data to Carry Over</h6>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="copy_roster" id="copy_roster" checked>
+                                    <label class="form-check-label" for="copy_roster">Current Roster (Players & Profiles)</label>
+                                </div>
+                                <div class="form-check ms-4 mb-2">
+                                    <input class="form-check-input" type="checkbox" name="copy_dev_notes" id="copy_dev_notes" checked>
+                                    <label class="form-check-label small" for="copy_dev_notes">Include Player Development Notes</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="copy_scouted" id="copy_scouted" checked>
+                                    <label class="form-check-label" for="copy_scouted">Scouted Players</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="copy_collab" id="copy_collab" checked>
+                                    <label class="form-check-label" for="copy_collab">Collaboration Notes (Coaches Log)</label>
+                                </div>
+                                <div class="form-check mb-4">
+                                    <input class="form-check-input" type="checkbox" name="copy_signs" id="copy_signs" checked>
+                                    <label class="form-check-label" for="copy_signs">Signs & Indicators</label>
+                                </div>
+
+                                <button type="submit" class="btn btn-warning w-100" onclick="return confirm('Are you sure you want to start a new season? Your current season data will be preserved as a historical record.')">
+                                    <i class="bi bi-arrow-repeat me-1"></i> Start New Season
+                                </button>
                             </form>
                         </div>
                     </div>

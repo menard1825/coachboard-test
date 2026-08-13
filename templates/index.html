@@ -181,7 +181,12 @@
             <div class="card-header"><h5 class="mb-0">Add New Game</h5></div>
             <div class="card-body">
                 <form action="{{ url_for('gameday.add_game') }}" method="POST" class="row g-3">
-                    <div class="col-md-3"><input type="date" name="game_date" id="add_game_date" class="form-control" required></div>
+                    <div class="col-md-3">
+                        <div class="input-group">
+                            <input type="date" name="game_date" id="add_game_date" class="form-control" title="Date" required>
+                            <input type="time" name="game_start_time" class="form-control" title="Start Time (Optional)">
+                        </div>
+                    </div>
                     <div class="col-md-3"><input type="text" name="game_opponent" class="form-control" placeholder="Opponent" required></div>
                     <div class="col-md-3"><input type="text" name="game_location" class="form-control" placeholder="Location"></div>
                     <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">Add & Manage</button></div>

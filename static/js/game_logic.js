@@ -33,6 +33,17 @@ function initializeGameManagement(gameData) {
         }
     }
 
+    // --- Live Mode Authoritative Syncing ---
+    // The server API now provides actual_rotation fully computed.
+    state.actual_rotation = gameData.actual_rotation || JSON.parse(JSON.stringify(state.rotation.innings || {}));
+    state.rotation_events = gameData.rotation_events || [];
+    state.pitch_count_summary = gameData.pitch_count_summary || {};
+    state.pitching_plans = gameData.pitching_plans || [];
+    state.pitching_profiles = gameData.pitching_profiles || [];
+
+    state.liveMode = state.game.is_live || false;
+    state.currentInning = state.liveMode ? state.game.live_current_inning || '1' : '1';
+
     let assignPlayerModal;
     let lineupEditorModal;
     let saveTemplateModal;
@@ -47,12 +58,15 @@ function initializeGameManagement(gameData) {
         renderBenchReportMobile(); // NEW: Render the mobile bench report
         renderBenchReportDesktop(); // NEW: Render the desktop bench report
         renderRotationSummaryMobile(); // NEW: Render mobile summary
-        initializeRotationSortables();
+
+        if (!state.liveMode) {
+            initializeRotationSortables();
+        }
     }
 
     function renderInningSelector() {
         const container = document.getElementById('inning-btn-group');
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
         if (innings.length === 0) { 
             state.rotation.innings['1'] = {};
             innings.push('1');
@@ -69,8 +83,12 @@ function initializeGameManagement(gameData) {
         });
     }
 
+    function getActiveInnings() {
+        return state.liveMode ? state.actual_rotation : (state.rotation.innings || {});
+    }
+
     function renderRotationDiamondAndBench() {
-        const currentInningData = state.rotation.innings[state.currentInning] || {};
+        const currentInningData = getActiveInnings()[state.currentInning] || {};
 
         // Note: The original createPlayerTag is now modified to accept a player object
         // MODIFIED: Only show position if on bench (or general list). If on field, the position is implied by the dropzone.
@@ -131,7 +149,8 @@ function initializeGameManagement(gameData) {
         const matrixContainer = document.getElementById('rotation-matrix-container');
         if (!matrixContainer) return;
 
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const inningsSource = state.liveMode ? state.actual_rotation : state.rotation.innings;
+        const innings = Object.keys(inningsSource || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
         if (innings.length === 0) {
              matrixContainer.innerHTML = '<p class="text-muted p-2">No innings added yet.</p>';
              return;
@@ -155,7 +174,7 @@ function initializeGameManagement(gameData) {
             html += `<tr><td style="text-align: left; font-weight: 500;">${escapeHTML(player.name)}</td>`;
 
             innings.forEach(inn => {
-                const inningData = state.rotation.innings[inn] || {};
+                const inningData = inningsSource[inn] || {};
                 // Find position for this player in this inning
                 // inningData format: { "P": "Player Name", "C": "Player Name", ... }
                 let position = null;
@@ -195,7 +214,8 @@ function initializeGameManagement(gameData) {
 
     // Shared logic for rendering bench reports
     function renderBenchReportGeneric(container) {
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const inningsSource = state.liveMode ? state.actual_rotation : state.rotation.innings;
+        const innings = Object.keys(inningsSource || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
         if (innings.length === 0) {
             container.innerHTML = '<div class="p-3 text-muted">No innings data available.</div>';
             return;
@@ -204,7 +224,7 @@ function initializeGameManagement(gameData) {
         let html = '<div class="list-group list-group-flush">';
 
         innings.forEach(inn => {
-            const inningData = state.rotation.innings[inn] || {};
+            const inningData = inningsSource[inn] || {};
             const assignedPlayers = new Set(Object.values(inningData));
             const benchPlayers = state.roster.filter(p => !assignedPlayers.has(p.name));
 
@@ -235,7 +255,7 @@ function initializeGameManagement(gameData) {
         const container = document.getElementById('rotation-summary-mobile-container');
         if (!container) return;
 
-        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseInt(a) - parseInt(b));
+        const innings = Object.keys(state.rotation.innings || {}).sort((a, b) => parseFloat(a) - parseFloat(b));
         const sortedRoster = [...state.roster].sort((a, b) => a.name.localeCompare(b.name));
 
         if (innings.length === 0) {
@@ -375,7 +395,7 @@ function applyOutOfPositionIndicators() {
         const lineupRows = (state.lineup.lineup_positions || []).map((p, i) => `<tr><td>${i+1}</td><td style="text-align: left; padding-left: 10px;">${escapeHTML(p)}</td></tr>`).join('');
 
         // Rotation Grid
-        const innings = Object.keys(state.rotation.innings || {}).sort((a,b) => parseInt(a)-parseInt(b));
+        const innings = Object.keys(state.rotation.innings || {}).sort((a,b) => parseFloat(a)-parseFloat(b));
         const header = innings.map(inn => `<th>${inn}</th>`).join('');
 
         const sortedRoster = [...state.roster].sort((a,b) => a.name.localeCompare(b.name));
@@ -414,7 +434,13 @@ function applyOutOfPositionIndicators() {
             </head>
             <body>
                 <h1>vs ${escapeHTML(state.game.opponent)}</h1>
-                <p>${new Date(state.game.date).toLocaleDateString()}</p>
+                <p>${(() => {
+                    const parts = state.game.date.split(/[- :T]/);
+                    if (parts.length >= 3) {
+                        return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString();
+                    }
+                    return state.game.date;
+                })()}</p>
 
                 <div class="container">
                     <div class="lineup-col">
@@ -553,6 +579,36 @@ function applyOutOfPositionIndicators() {
 
             state.lineup_templates = newData.lineup_templates || [];
             state.rotation_templates = newData.rotation_templates || [];
+            state.pitch_count_summary = newData.pitch_count_summary || {};
+
+            // Re-parse live rotation state
+            state.rotation_events = newData.rotation_events || [];
+            state.actual_rotation = JSON.parse(JSON.stringify(state.rotation.innings));
+
+            if (state.rotation_events.length > 0) {
+                state.rotation_events.forEach(evt => {
+                    if (!evt.reverted) {
+                        state.actual_rotation[evt.inning] = evt.after_alignment;
+                    }
+                });
+            }
+
+            // Update overlay toggle based on DB state
+            const toggle = document.getElementById('liveGameModeToggle');
+            if (toggle && toggle.checked !== state.game.is_live) {
+                toggle.checked = state.game.is_live;
+                state.liveMode = state.game.is_live;
+                if (state.liveMode) {
+                    document.getElementById('live-game-overlay')?.classList.remove('d-none');
+                    document.querySelectorAll('.planner-controls').forEach(el => el.classList.add('d-none'));
+                    document.getElementById('rotation-board')?.classList.add('bg-light');
+                    state.currentInning = state.game.live_current_inning;
+                } else {
+                    document.getElementById('live-game-overlay')?.classList.add('d-none');
+                    document.querySelectorAll('.planner-controls').forEach(el => el.classList.remove('d-none'));
+                    document.getElementById('rotation-board')?.classList.remove('bg-light');
+                }
+            }
 
             // Re-render
             renderRotationEditor();
@@ -602,11 +658,40 @@ function applyOutOfPositionIndicators() {
     // --- Event Listeners ---
     function setupEventListeners() {
         const socket = io();
+
+        socket.on('connect', () => {
+            // Join the game-specific room to ensure we only get relevant live game broadcasts
+            socket.emit('join_game_room', { game_id: state.game.id });
+        });
+
         socket.on('data_updated', fetchLatestGameData);
         socket.on('lineup_add', fetchLatestGameData);
         socket.on('lineup_update', fetchLatestGameData);
         socket.on('rotation_save', fetchLatestGameData);
         socket.on('roster_update', fetchLatestGameData);
+        socket.on('game_updated', fetchLatestGameData);
+        socket.on('pitching_update', fetchLatestGameData);
+
+        // Listen for authoritative state broadcasts specifically for the live game
+        socket.on('game_state_update', (newState) => {
+            console.log("Received server-authoritative live game state broadcast.", newState);
+
+            // Re-apply essential parsed objects if needed
+            if (newState.rotation && typeof newState.rotation.innings === 'string') {
+                newState.rotation.innings = JSON.parse(newState.rotation.innings);
+            }
+
+            state.actual_rotation = newState.actual_rotation;
+            state.rotation_events = newState.rotation_events;
+            state.pitch_count_summary = newState.pitch_count_summary;
+            state.pitching_plans = newState.pitching_plans;
+            state.game = newState.game;
+            state.liveMode = newState.game.is_live;
+            state.currentInning = state.liveMode ? state.game.live_current_inning || '1' : state.currentInning;
+
+            renderRotationEditor();
+            renderBenchReport();
+        });
 
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
@@ -617,6 +702,319 @@ function applyOutOfPositionIndicators() {
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
         document.getElementById('saveRotationBtnMobile')?.addEventListener('click', saveRotation); // Add mobile listener
         document.getElementById('printCardBtn')?.addEventListener('click', printLineupCard);
+
+        // Live Game Mode Toggle
+        const toggleLiveGame = (isLive) => {
+            state.liveMode = isLive;
+
+            // Tell backend about the toggle
+            fetch('/api/toggle_live_game', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ game_id: state.game.id, is_live: state.liveMode })
+            });
+
+            const liveOverlay = document.getElementById('live-game-overlay');
+            const plannerControls = document.querySelectorAll('.planner-controls');
+
+            const toggle = document.getElementById('liveGameModeToggle');
+            if (toggle) toggle.checked = isLive;
+
+            if (state.liveMode) {
+                liveOverlay.classList.remove('d-none');
+                plannerControls.forEach(el => el.classList.add('d-none'));
+                document.getElementById('rotation-board')?.classList.add('bg-light'); // slight visual diff
+                state.currentInning = state.game.live_current_inning || '1';
+            } else {
+                liveOverlay.classList.add('d-none');
+                plannerControls.forEach(el => el.classList.remove('d-none'));
+                document.getElementById('rotation-board')?.classList.remove('bg-light');
+            }
+
+            // Re-render everything with the correct state (actual vs planned)
+            renderRotationEditor();
+        };
+
+        document.getElementById('liveGameModeToggle')?.addEventListener('change', (e) => toggleLiveGame(e.target.checked));
+        document.getElementById('startLiveGameBtnAction')?.addEventListener('click', () => toggleLiveGame(true));
+
+        // Initialize UI state if live on load
+        if (state.liveMode) {
+            const toggle = document.getElementById('liveGameModeToggle');
+            if (toggle) toggle.checked = true;
+            document.getElementById('live-game-overlay')?.classList.remove('d-none');
+            document.querySelectorAll('.planner-controls').forEach(el => el.classList.add('d-none'));
+            document.getElementById('rotation-board')?.classList.add('bg-light');
+        }
+
+        // Live Game Interactions
+        document.getElementById('liveChangePitcherBtn')?.addEventListener('click', () => {
+             // In a full implementation, this opens a Pitcher selection modal.
+             // For this fast implementation, we can re-use assignPlayerModal logic but inject specific "live pitcher" UI.
+             document.getElementById('assignPlayerModalLabel').textContent = 'Live Pitcher Change';
+             const container = document.getElementById('player-list');
+
+             let html = '<div class="list-group">';
+             state.roster.forEach(p => {
+                 const stats = state.pitch_count_summary[p.name];
+                 const isResting = stats && stats.status === 'Resting';
+                 const isTargetReached = stats && stats.status === 'Coach Target Reached';
+
+                 html += `
+                 <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                         onclick="handleLivePitcherChange('${escapeHTML(p.name)}')" ${isResting ? 'disabled' : ''}>
+                    <div>
+                        <span class="fw-bold">${escapeHTML(p.name)}</span>
+                        <div class="small ${isResting ? 'text-danger' : isTargetReached ? 'text-warning' : 'text-muted'}">
+                            ${stats ? `Today: ${stats.daily} | ${stats.status}` : 'No stats'}
+                        </div>
+                    </div>
+                    <i class="bi bi-chevron-right"></i>
+                 </button>`;
+             });
+             html += '</div>';
+             container.innerHTML = html;
+             assignPlayerModal.show();
+        });
+
+        document.getElementById('liveEndInningBtn')?.addEventListener('click', () => {
+             if (confirm("End current inning and advance to the next?")) {
+                 const beforeAlign = { ...state.actual_rotation[state.currentInning] };
+
+                 const nextInning = Math.floor(parseFloat(state.currentInning)) + 1;
+                 const nextInningStr = String(nextInning);
+
+                 let afterAlign = {};
+
+                 // Determine what the initial alignment of the next inning should be
+                 if (state.rotation.innings && state.rotation.innings[nextInningStr]) {
+                     afterAlign = JSON.parse(JSON.stringify(state.rotation.innings[nextInningStr]));
+                 } else {
+                     afterAlign = { ...beforeAlign }; // Carry over actuals if no plan
+                 }
+
+                 // We don't manually mutate state.currentInning anymore;
+                 // logLiveEvent with 'End Inning' tells the server, which updates the game pointer
+                 logLiveEvent('End Inning', beforeAlign, afterAlign, null, null);
+             }
+        });
+
+        let swapPlayer1 = null;
+        let liveDefSwapModalObj = null;
+
+        document.getElementById('liveDefensiveChangeBtn')?.addEventListener('click', () => {
+            liveDefSwapModalObj = new bootstrap.Modal(document.getElementById('liveDefensiveSwapModal'));
+            swapPlayer1 = null;
+            document.getElementById('swapInstructionText').innerHTML = 'Tap the <strong>first player</strong> to swap/move.';
+            renderLiveDefensiveSwapList();
+            liveDefSwapModalObj.show();
+        });
+
+        window.handleLiveSwapClick = (playerName) => {
+            if (!swapPlayer1) {
+                swapPlayer1 = playerName;
+                document.getElementById('swapInstructionText').innerHTML = `Select position/player to swap <strong>${escapeHTML(playerName)}</strong> with.`;
+                renderLiveDefensiveSwapList();
+            } else {
+                const swapPlayer2 = playerName;
+                const beforeAlign = { ...state.actual_rotation[state.currentInning] };
+
+                // Find positions
+                let pos1 = null;
+                let pos2 = null;
+                for (const [pos, pName] of Object.entries(state.actual_rotation[state.currentInning] || {})) {
+                    if (pName === swapPlayer1) pos1 = pos;
+                    if (pName === swapPlayer2) pos2 = pos;
+                }
+
+                // Execute swap
+                if (pos1) state.actual_rotation[state.currentInning][pos1] = swapPlayer2 !== 'BENCH' ? swapPlayer2 : null;
+                if (pos2) state.actual_rotation[state.currentInning][pos2] = swapPlayer1 !== 'BENCH' ? swapPlayer1 : null;
+
+                // If they were benched, assign them back.
+                // This naive logic might leave nulls if moving to an empty bench.
+                // If moving a bench player to an empty position (swapPlayer2 is an empty position name like "1B (Empty)"):
+                if (!pos2 && state.roster.some(p => p.name === swapPlayer2)) {
+                    // Not assigned to field? We actually need to pick positions, not just players.
+                    // For a robust swap, we'll iterate through all positions.
+                }
+
+                logLiveEvent('Defensive Change', beforeAlign, state.actual_rotation[state.currentInning], null, null);
+                renderRotationEditor();
+                liveDefSwapModalObj.hide();
+            }
+        };
+
+        function renderLiveDefensiveSwapList() {
+            const container = document.getElementById('liveSwapPlayerList');
+            const currentAlign = state.actual_rotation[state.currentInning] || {};
+
+            // Build a list of all defined field positions + players on them
+            const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'LCF', 'RCF'];
+
+            let html = '';
+
+            // Fielders
+            html += '<div class="list-group-item bg-light fw-bold text-muted small">ON FIELD</div>';
+            positions.forEach(pos => {
+                // If 3 OF, skip LCF/RCF. If 4 OF, skip CF.
+                if (state.outfielder_count === 3 && (pos === 'LCF' || pos === 'RCF')) return;
+                if (state.outfielder_count === 4 && pos === 'CF') return;
+
+                const pName = currentAlign[pos];
+                const isSelected = pName === swapPlayer1;
+                const display = pName ? pName : '(Empty)';
+
+                html += `
+                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isSelected ? 'active' : ''}"
+                        onclick="handleLiveSwapClick('${pName || 'EMPTY_' + pos}')">
+                    <span><strong>${pos}</strong>: ${escapeHTML(display)}</span>
+                </button>`;
+            });
+
+            // Bench
+            html += '<div class="list-group-item bg-light fw-bold text-muted small mt-2">BENCH</div>';
+            const assignedPlayers = new Set(Object.values(currentAlign));
+            state.roster.forEach(p => {
+                if (!assignedPlayers.has(p.name)) {
+                    const isSelected = p.name === swapPlayer1;
+                    html += `
+                    <button type="button" class="list-group-item list-group-item-action ${isSelected ? 'active' : ''}"
+                            onclick="handleLiveSwapClick('${escapeHTML(p.name)}')">
+                        ${escapeHTML(p.name)}
+                    </button>`;
+                }
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Re-write handleLiveSwapClick to handle position-based swapping properly
+        window.handleLiveSwapClick = (target) => {
+            if (!swapPlayer1) {
+                swapPlayer1 = target; // Target could be a player name, or 'EMPTY_1B'
+                document.getElementById('swapInstructionText').innerHTML = `Select position/player to swap <strong>${escapeHTML(target.replace('EMPTY_', 'Empty '))}</strong> with.`;
+                renderLiveDefensiveSwapList();
+            } else {
+                const target1 = swapPlayer1;
+                const target2 = target;
+
+                const beforeAlign = { ...state.actual_rotation[state.currentInning] };
+                if (!state.actual_rotation[state.currentInning]) state.actual_rotation[state.currentInning] = {};
+
+                // Helpers to find where a target is
+                const getPos = (t) => {
+                    if (t.startsWith('EMPTY_')) return t.replace('EMPTY_', '');
+                    for (const [pos, name] of Object.entries(state.actual_rotation[state.currentInning])) {
+                        if (name === t) return pos;
+                    }
+                    return null; // Means they are on bench
+                };
+
+                const pos1 = getPos(target1);
+                const pos2 = getPos(target2);
+
+                const name1 = target1.startsWith('EMPTY_') ? null : target1;
+                const name2 = target2.startsWith('EMPTY_') ? null : target2;
+
+                const afterAlign = { ...beforeAlign };
+
+                // Do the swap
+                if (pos1) afterAlign[pos1] = name2;
+                if (pos2) afterAlign[pos2] = name1;
+
+                logLiveEvent('Defensive Change', beforeAlign, afterAlign, null, null);
+                liveDefSwapModalObj.hide();
+            }
+        };
+
+
+        document.getElementById('liveUndoBtn')?.addEventListener('click', () => {
+             if (state.rotation_events.length > 0) {
+                 const unrevertedEvents = state.rotation_events.filter(e => !e.reverted);
+                 if (unrevertedEvents.length === 0) {
+                     alert("No live events to undo.");
+                     return;
+                 }
+                 if (confirm("Undo the last live rotation event?")) {
+                     const lastEvent = unrevertedEvents[unrevertedEvents.length - 1];
+                     fetch('/api/undo_rotation_event', {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({ event_id: lastEvent.id })
+                     });
+                 }
+             } else {
+                 alert("No live events to undo.");
+             }
+        });
+
+        let finalCountsModalObj = null;
+
+        document.getElementById('liveEndGameBtn')?.addEventListener('click', () => {
+            const pitchedPlayers = new Set();
+            for (let inn in state.actual_rotation) {
+                if (state.actual_rotation[inn]['P']) {
+                    pitchedPlayers.add(state.actual_rotation[inn]['P']);
+                }
+            }
+
+            if (pitchedPlayers.size === 0) {
+                alert("No pitchers have been recorded in this game yet.");
+                return;
+            }
+
+            const container = document.getElementById('finalCountsFormContainer');
+            let html = '';
+            pitchedPlayers.forEach(pName => {
+                const player = state.roster.find(p => p.name === pName);
+                if (player) {
+                    html += `
+                    <div class="input-group mb-3 input-group-lg">
+                      <span class="input-group-text fw-bold" style="width: 150px;">${escapeHTML(pName)}</span>
+                      <input type="number" class="form-control text-center final-pitch-input" data-player-id="${player.id}" placeholder="Pitches">
+                    </div>`;
+                }
+            });
+            container.innerHTML = html;
+
+            finalCountsModalObj = new bootstrap.Modal(document.getElementById('liveFinalCountsModal'));
+            finalCountsModalObj.show();
+        });
+
+        document.getElementById('confirmFinalCountsBtn')?.addEventListener('click', () => {
+            const inputs = document.querySelectorAll('.final-pitch-input');
+            const counts = [];
+
+            inputs.forEach(input => {
+                const val = input.value.trim();
+                if (val && !isNaN(parseInt(val))) {
+                    counts.push({
+                        player_id: input.dataset.playerId,
+                        pitches: parseInt(val)
+                    });
+                }
+            });
+
+            if (counts.length > 0) {
+                fetch('/api/save_final_pitch_counts', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ game_id: state.game.id, counts: counts })
+                 }).then(res => res.json()).then(data => {
+                     if(data.status === 'success') {
+                         finalCountsModalObj.hide();
+                         alert('Final pitch counts saved successfully!');
+
+                         // Drop out of live mode optionally? Let's stay in it unless they manually toggle off
+                     } else {
+                         alert('Error saving pitch counts.');
+                     }
+                 });
+            } else {
+                finalCountsModalObj.hide(); // Allow skipping
+            }
+        });
 
         // NEW: Populate and handle the rotation template dropdown
         const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');
@@ -639,7 +1037,7 @@ function applyOutOfPositionIndicators() {
                             state.rotation.innings['1'] = {};
                         }
                         // Set the current inning to the first available inning from the template
-                        state.currentInning = Object.keys(state.rotation.innings).sort((a,b) => parseInt(a) - parseInt(b))[0];
+                        state.currentInning = Object.keys(state.rotation.innings).sort((a,b) => parseFloat(a) - parseFloat(b))[0];
                         renderRotationEditor();
                         alert('Rotation template loaded successfully!');
                         triggerAutosave();
@@ -784,12 +1182,12 @@ function applyOutOfPositionIndicators() {
         document.getElementById('addInningBtn')?.addEventListener('click', () => {
             if(!state.rotation) return;
             const innings = Object.keys(state.rotation.innings);
-            const nextInningNum = innings.length > 0 ? Math.max(...innings.map(Number)) + 1 : 1;
+            const nextInningNum = innings.length > 0 ? Math.floor(Math.max(...innings.map(parseFloat))) + 1 : 1;
 
             if (innings.length > 0) {
-                // Auto-copy the previous inning's data
-                const lastInningNum = Math.max(...innings.map(Number));
-                state.rotation.innings[nextInningNum] = { ...state.rotation.innings[lastInningNum] };
+                // Auto-copy the previous inning's data (find the absolute highest inning value)
+                const lastInningNum = Math.max(...innings.map(parseFloat));
+                state.rotation.innings[nextInningNum] = { ...state.rotation.innings[String(lastInningNum)] };
             } else {
                 state.rotation.innings[nextInningNum] = {};
             }
@@ -800,14 +1198,40 @@ function applyOutOfPositionIndicators() {
             renderRotationEditor();
             triggerAutosave();
         });
+
+        document.getElementById('addSubInningBtn')?.addEventListener('click', () => {
+            if(!state.rotation || !state.currentInning) return;
+
+            // Get current base inning
+            const baseInning = Math.floor(parseFloat(state.currentInning));
+
+            // Find all sub-innings for this base inning
+            const allInnings = Object.keys(state.rotation.innings).map(parseFloat);
+            const subInnings = allInnings.filter(inn => Math.floor(inn) === baseInning);
+
+            // Determine next sub-inning value (e.g. if 1 and 1.1 exist, next is 1.2)
+            const maxSubInning = Math.max(...subInnings);
+            // Precision issues with floats, so round to 1 decimal place
+            const nextSubInningNum = Math.round((maxSubInning + 0.1) * 10) / 10;
+            const nextSubInningStr = String(nextSubInningNum);
+
+            // Auto-copy the data from the exact inning we were just on
+            state.rotation.innings[nextSubInningStr] = { ...state.rotation.innings[state.currentInning] };
+
+            renderInningSelector();
+            state.currentInning = nextSubInningStr;
+            renderRotationEditor();
+            triggerAutosave();
+        });
+
         document.getElementById('removeInningBtn')?.addEventListener('click', () => {
             if(!state.rotation) return;
             const innings = Object.keys(state.rotation.innings);
             if(innings.length <= 1) return alert("Cannot remove the last inning.");
-            const lastInningNum = Math.max(...innings.map(Number));
+            const lastInningNum = String(Math.max(...innings.map(parseFloat)));
             delete state.rotation.innings[lastInningNum];
-            if(state.currentInning == lastInningNum) {
-                state.currentInning = Math.max(...Object.keys(state.rotation.innings).map(Number));
+            if(String(state.currentInning) === lastInningNum) {
+                state.currentInning = String(Math.max(...Object.keys(state.rotation.innings).map(parseFloat)));
             }
             renderRotationEditor();
             triggerAutosave();
@@ -864,6 +1288,98 @@ function applyOutOfPositionIndicators() {
             }
         });
     }
+
+    function logLiveEvent(eventType, beforeAlign, afterAlign, oldPitcherId, newPitcherId) {
+         fetch('/api/save_rotation_event', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+                 game_id: state.game.id,
+                 inning: state.currentInning,
+                 sequence: state.rotation_events.length + 1,
+                 event_type: eventType,
+                 before_alignment: beforeAlign,
+                 after_alignment: afterAlign,
+                 old_pitcher_id: oldPitcherId,
+                 new_pitcher_id: newPitcherId
+             })
+         }).then(res => res.json()).then(data => {
+             // In a full implementation we'd append data.event to state.rotation_events
+             if(data.status !== 'success') console.error('Failed to log event');
+         });
+    }
+
+    // Must define this in scope for the inline onclick handler to reach it
+    let pendingPitcherChange = null;
+    let livePitcherDestModalObj = null;
+
+    window.handleLivePitcherChange = (playerName) => {
+         const player = state.roster.find(p => p.name === playerName);
+         if (!player) return;
+
+         const beforeAlign = { ...state.actual_rotation[state.currentInning] };
+         let oldPitcherName = state.actual_rotation[state.currentInning]['P'];
+
+         if (!oldPitcherName) {
+             // No old pitcher to worry about, just assign
+             const afterAlign = { ...beforeAlign };
+             afterAlign['P'] = playerName;
+             logLiveEvent('Pitcher Change', beforeAlign, afterAlign, null, player.id);
+             assignPlayerModal.hide();
+             return;
+         }
+
+         // We have an old pitcher. Where should they go?
+         pendingPitcherChange = { newPitcherName: playerName, beforeAlign: beforeAlign, oldPitcherName: oldPitcherName };
+         assignPlayerModal.hide();
+
+         document.getElementById('oldPitcherNameDisplay').textContent = oldPitcherName;
+
+         const destContainer = document.getElementById('livePitcherDestinations');
+         let html = `<div class="col-6"><button class="btn btn-secondary w-100 py-3" onclick="finalizePitcherChange('BENCH')">Bench</button></div>`;
+
+         const positions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'LCF', 'RCF'];
+         positions.forEach(pos => {
+            if (state.outfielder_count === 3 && (pos === 'LCF' || pos === 'RCF')) return;
+            if (state.outfielder_count === 4 && pos === 'CF') return;
+            html += `<div class="col-6"><button class="btn btn-outline-dark w-100 py-3" onclick="finalizePitcherChange('${pos}')">${pos}</button></div>`;
+         });
+         destContainer.innerHTML = html;
+
+         livePitcherDestModalObj = new bootstrap.Modal(document.getElementById('livePitcherDestinationModal'));
+         livePitcherDestModalObj.show();
+    };
+
+    window.finalizePitcherChange = (destinationPos) => {
+         if (!pendingPitcherChange) return;
+         const { newPitcherName, beforeAlign, oldPitcherName } = pendingPitcherChange;
+
+         const afterAlign = { ...beforeAlign };
+
+         // 1. Remove new pitcher from their old spot if they were on the field
+         let oldSpotOfNewPitcher = null;
+         for (const [pos, name] of Object.entries(afterAlign)) {
+             if (name === newPitcherName) oldSpotOfNewPitcher = pos;
+         }
+         if (oldSpotOfNewPitcher) afterAlign[oldSpotOfNewPitcher] = null;
+
+         // 2. Put new pitcher at P
+         afterAlign['P'] = newPitcherName;
+
+         // 3. Put old pitcher at destination
+         if (destinationPos === 'BENCH') {
+             // Just removed from P, so they are effectively benched.
+         } else {
+             afterAlign[destinationPos] = oldPitcherName;
+         }
+
+         const oldPId = state.roster.find(p => p.name === oldPitcherName)?.id;
+         const newPId = state.roster.find(p => p.name === newPitcherName)?.id;
+
+         logLiveEvent('Pitcher Change', beforeAlign, afterAlign, oldPId, newPId);
+         livePitcherDestModalObj.hide();
+         pendingPitcherChange = null;
+    };
 
     // --- Initial Page Render ---
     if(state.game) {

@@ -111,27 +111,59 @@
                 </thead>
                 <tbody>
                     {% for user in users %}
-                    <tr class="user-row" data-username="{{ user.username }}" data-role="{{ user.role }}">
-                        <td data-label="Username"><strong>{{ user.username }}</strong></td>
-                        <td data-label="Full Name">{{ user.full_name or 'N/A' }}</td>
-                        <td data-label="Role">
-                            {% if user.username == session.username %}<span class="badge bg-success">{{ user.role }}</span>
-                            {% else %}{{ user.role }}{% endif %}
-                        </td>
+                        {% set ns = namespace(role='No Access', team_name='N/A') %}
                         {% if session.role == 'Super Admin' %}
-                        <td data-label="Team">{{ user.team.team_name if user.team else 'N/A' }}</td>
+                            {# Displaying a composite or primary team role. For clarity we pick the first membership here, but ideally we'd show all if they belong to multiple.
+                               For simple UI matching, we'll just show all memberships explicitly or group them #}
+                            {% for mem in user.memberships %}
+                                {% set ns.role = mem.role %}
+                                {% set ns.team_name = mem.team.team_name %}
+                                <tr class="user-row" data-username="{{ user.username }}" data-role="{{ ns.role }}">
+                                    <td data-label="Username"><strong>{{ user.username }}</strong></td>
+                                    <td data-label="Full Name">{{ user.full_name or 'N/A' }}</td>
+                                    <td data-label="Role">
+                                        {% if user.username == session.username %}<span class="badge bg-success">{{ ns.role }}</span>
+                                        {% else %}{{ ns.role }}{% endif %}
+                                    </td>
+                                    <td data-label="Team">{{ ns.team_name }}</td>
+                                    <td data-label="Last Login">{{ user.last_login | format_datetime }}</td>
+                                    <td data-label="Actions" class="text-center">
+                                        {% if user.username != session.username %}
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editUserModal-{{ user.username }}">
+                                            <i class="bi bi-pencil-square"></i> Edit
+                                        </button>
+                                        {% else %}
+                                        <small class="text-muted">N/A</small>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            {# Non-super admins only see memberships matching the current team #}
+                            {% for mem in user.memberships %}
+                                {% if mem.team_id == session.team_id %}
+                                    {% set ns.role = mem.role %}
+                                    <tr class="user-row" data-username="{{ user.username }}" data-role="{{ ns.role }}">
+                                        <td data-label="Username"><strong>{{ user.username }}</strong></td>
+                                        <td data-label="Full Name">{{ user.full_name or 'N/A' }}</td>
+                                        <td data-label="Role">
+                                            {% if user.username == session.username %}<span class="badge bg-success">{{ ns.role }}</span>
+                                            {% else %}{{ ns.role }}{% endif %}
+                                        </td>
+                                        <td data-label="Last Login">{{ user.last_login | format_datetime }}</td>
+                                        <td data-label="Actions" class="text-center">
+                                            {% if user.username != session.username %}
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editUserModal-{{ user.username }}">
+                                                <i class="bi bi-pencil-square"></i> Edit
+                                            </button>
+                                            {% else %}
+                                            <small class="text-muted">N/A</small>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
                         {% endif %}
-                        <td data-label="Last Login">{{ user.last_login | format_datetime }}</td>
-                        <td data-label="Actions" class="text-center">
-                            {% if user.username != session.username %}
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editUserModal-{{ user.username }}">
-                                <i class="bi bi-pencil-square"></i> Edit
-                            </button>
-                            {% else %}
-                            <small class="text-muted">N/A</small>
-                            {% endif %}
-                        </td>
-                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -158,14 +190,20 @@
                       </div>
                     </div>
                     <div class="col-md-6 mb-3">
+                      {% set ns = namespace(role='No Access') %}
+                      {% for mem in user.memberships %}
+                          {% if session.role == 'Super Admin' or mem.team_id == session.team_id %}
+                              {% set ns.role = mem.role %}
+                          {% endif %}
+                      {% endfor %}
                       <div class="form-floating">
                         <select class="form-select" id="role-{{ user.username }}" name="role">
-                          {% if session.role == 'Super Admin' %}<option value="Super Admin" {% if user.role == 'Super Admin' %}selected{% endif %}>Super Admin</option>{% endif %}
-                          <option value="Head Coach" {% if user.role == 'Head Coach' %}selected{% endif %}>Head Coach</option>
-                          <option value="Assistant Coach" {% if user.role == 'Assistant Coach' %}selected{% endif %}>Assistant Coach</option>
-                          <option value="Game Changer" {% if user.role == 'Game Changer' %}selected{% endif %}>Game Changer</option>
+                          {% if session.role == 'Super Admin' %}<option value="Super Admin" {% if ns.role == 'Super Admin' %}selected{% endif %}>Super Admin</option>{% endif %}
+                          <option value="Head Coach" {% if ns.role == 'Head Coach' %}selected{% endif %}>Head Coach</option>
+                          <option value="Assistant Coach" {% if ns.role == 'Assistant Coach' %}selected{% endif %}>Assistant Coach</option>
+                          <option value="Game Changer" {% if ns.role == 'Game Changer' %}selected{% endif %}>Game Changer</option>
                         </select>
-                        <label for="role-{{ user.username }}">Role</label>
+                        <label for="role-{{ user.username }}">Role (in this context)</label>
                       </div>
                     </div>
                   </div>

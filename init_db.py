@@ -47,16 +47,23 @@ def initialize_database():
                 hashed_password = generate_password_hash(SUPER_ADMIN_PASSWORD)
                 default_tab_keys = ['roster', 'player_development', 'lineups', 'pitching', 'scouting_list', 'rotations', 'games', 'collaboration', 'practice_plan', 'signs']
                 
+                from models import TeamMembership
                 new_user = User(
                     username=SUPER_ADMIN_USERNAME,
                     full_name="Mike",
                     password_hash=hashed_password,
-                    role='Super Admin',
-                    team_id=team.id,
-                    tab_order=json.dumps(default_tab_keys),
-                    player_order=[]
+                    tab_order=json.dumps(default_tab_keys)
                 )
                 db.session.add(new_user)
+                db.session.flush()
+
+                new_membership = TeamMembership(
+                    user_id=new_user.id,
+                    team_id=team.id,
+                    role='Super Admin',
+                    player_order=[]
+                )
+                db.session.add(new_membership)
 
             db.session.commit()
             print("\nDatabase initialized successfully!")

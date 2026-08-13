@@ -48,8 +48,8 @@
                                 <small class="text-muted" style="font-family: monospace;">{{ team.registration_code }}</small>
                             </div>
 
-                            <span class="d-inline-block" tabindex="0" {% if team.users|length > 0 %}data-bs-toggle="tooltip" title="Cannot delete a team with active users"{% endif %}>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTeamModal-{{ team.id }}" {% if team.users|length > 0 %}disabled style="pointer-events: none;"{% endif %}>
+                            <span class="d-inline-block" tabindex="0" {% if team.memberships|length > 0 %}data-bs-toggle="tooltip" title="Cannot delete a team with active users"{% endif %}>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTeamModal-{{ team.id }}" {% if team.memberships|length > 0 %}disabled style="pointer-events: none;"{% endif %}>
                                     <i class="bi bi-trash-2"></i>
                                 </button>
                             </span>

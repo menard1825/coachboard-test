@@ -21,17 +21,23 @@ def login_required(f):
 @api_bp.route('/session_data')
 @login_required
 def get_session_data():
-    user = db.session.query(User).options(joinedload(User.team)).filter_by(username=session['username']).first()
-    if not user or not user.team:
+    user = db.session.query(User).filter_by(username=session['username']).first()
+    team_id = session.get('team_id')
+    team = db.session.get(Team, team_id) if team_id else None
+
+    if not user or not team:
         return jsonify({"error": "User or team not found"}), 404
+
+    from models import TeamMembership
+    membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=team_id).first()
 
     return jsonify({
         'session': {
             'username': session.get('username'),
-            'role': session.get('role'),
-            'outfielder_count': user.team.outfielder_count if user.team else 3
+            'role': membership.role if membership else session.get('role'),
+            'outfielder_count': team.outfielder_count
         },
-        'player_order': get_player_order_as_list(user.player_order),
+        'player_order': get_player_order_as_list(membership.player_order) if membership else [],
     })
 
 @api_bp.route('/roster')
@@ -65,8 +71,11 @@ def get_pitching_data():
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
 
+    from models import PlayerPitchTarget
+    all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
+
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules)
+    pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules, all_targets=all_targets, team_timezone=team.timezone)
 
     return jsonify({
         'pitching': [pitching_outing_to_dict(po) for po in pitching_outings_db],
@@ -189,14 +198,16 @@ def get_overview_data():
     # 1. Next upcoming game
     next_game = db.session.query(Game).filter(
         Game.team_id == team_id,
-        Game.date >= datetime.utcnow()
+        Game.date >= datetime.now()
     ).order_by(Game.date.asc()).first()
 
     # 2. Pitchers on mandatory rest
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
+    from models import PlayerPitchTarget
+    all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules)
+    pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules, all_targets=all_targets, team_timezone=team.timezone)
     pitchers_on_rest = {name: data for name, data in pitch_count_summary.items() if data['status'] == 'Resting'}
 
     # 3. 3-5 most recent collaboration notes
@@ -209,20 +220,12 @@ def get_overview_data():
     })
 
 
-@api_bp.route('/game_data/<int:game_id>')
-@login_required
-def get_game_data(game_id):
-    team_id = session.get('team_id')
-    if not team_id:
-        return jsonify({"error": "Team not found"}), 404
-
+def get_live_game_state(game_id, team_id):
+    """Centralized helper to reconstruct authoritative live state and return a dict."""
     team = db.session.get(Team, team_id)
-    if not team:
-        return jsonify({"error": "Team not found"}), 404
-
     game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
-    if not game:
-        return jsonify({"error": "Game not found"}), 404
+    if not game or not team:
+        return None
 
     roster_objects = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
     lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team_id).first()
@@ -234,24 +237,72 @@ def get_game_data(game_id):
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
     absent_player_ids = [absence.player_id for absence in absences]
 
+    from models import PlayerPitchTarget, GameRotationEvent, GamePitchingPlan, PlayerPitchingProfile
+    all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
+    rotation_events = db.session.query(GameRotationEvent).filter_by(game_id=game.id, team_id=team_id).order_by(GameRotationEvent.id).all()
+    pitching_plans = db.session.query(GamePitchingPlan).filter_by(game_id=game.id, team_id=team_id).all()
+    pitching_profiles = db.session.query(PlayerPitchingProfile).filter_by(team_id=team_id).all()
+
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date)
+    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone, current_game_id=game.id)
 
     lineup_templates = db.session.query(Lineup).filter_by(team_id=team_id, associated_game_id=None).all()
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team_id, associated_game_id=None).all()
 
-    return jsonify({
+    import json
+    actual_rotation = {}
+    if rotation_obj and rotation_obj.innings:
+        # Load from planned
+        actual_rotation = json.loads(json.dumps(rotation_obj.innings))
+
+    # Overwrite with actual events
+    for event in rotation_events:
+        if not event.reverted:
+            actual_rotation[event.inning] = event.after_alignment
+
+    return {
         'game': model_to_dict(game),
         'roster': [model_to_dict(p) for p in roster_objects],
         'lineup': model_to_dict(lineup_obj) if lineup_obj else None,
         'rotation': model_to_dict(rotation_obj) if rotation_obj else None,
+        'actual_rotation': actual_rotation,
         'game_pitching_log': [pitching_outing_to_dict(o) for o in game_pitching_log],
         'absent_player_ids': absent_player_ids,
         'pitch_count_summary': pitch_count_summary,
         'lineup_templates': [model_to_dict(lt) for lt in lineup_templates],
         'rotation_templates': [model_to_dict(rt) for rt in rotation_templates],
-        'outfielder_count': team.outfielder_count
-    })
+        'outfielder_count': team.outfielder_count,
+        'rotation_events': [model_to_dict(e) for e in rotation_events],
+        'pitching_plans': [model_to_dict(pp) for pp in pitching_plans],
+        'pitching_profiles': [model_to_dict(pp) for pp in pitching_profiles]
+    }
+
+@api_bp.route('/game_data/<int:game_id>')
+@login_required
+def get_game_data(game_id):
+    team_id = session.get('team_id')
+    if not team_id:
+        return jsonify({"error": "Team not found"}), 404
+
+    state = get_live_game_state(game_id, team_id)
+    if not state:
+        return jsonify({"error": "Game or Team not found"}), 404
+
+    return jsonify(state)
+
+@api_bp.route('/live-game/<int:game_id>/state')
+@login_required
+def get_live_state(game_id):
+    """Specifically returns live game state to re-sync a client."""
+    team_id = session.get('team_id')
+    if not team_id:
+        return jsonify({"error": "Team not found"}), 404
+
+    state = get_live_game_state(game_id, team_id)
+    if not state:
+        return jsonify({"error": "Game or Team not found"}), 404
+
+    return jsonify(state)
 
 
 @api_bp.route('/stats')

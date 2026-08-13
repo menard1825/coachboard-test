@@ -26,14 +26,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
     const canEdit = (author) => AppState.session.username === author || ['Head Coach', 'Super Admin'].includes(AppState.session.role);
 
-    const formatDateTime = (s) => {
+    const formatDateTime = (s, timeString) => {
         if (!s || s === 'Never') return s;
         try {
             if (s.length <= 10 && s.includes('-')) {
                 // Parse YYYY-MM-DD as local time to prevent UTC timezone shift
                 const [year, month, day] = s.split('-');
                 const localDt = new Date(year, month - 1, day);
-                return localDt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' });
+                const dtStr = localDt.toLocaleDateString('en-US', { weekday: 'long', year: '2-digit', month: '2-digit', day: '2-digit' });
+                return timeString ? `${dtStr} @ ${timeString}` : dtStr;
             }
 
             const dt = new Date(s.replace(' ', 'T'));
@@ -430,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const lineupHTML = lineup && lineup.lineup_positions && lineup.lineup_positions.length > 0 ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
             const rotationHTML = rotation ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
             const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_game/${game.id}" data-delete-name="the game against ${escapeHTML(game.opponent)}"><i class="bi bi-trash"></i></button>`;
-            return `<li class="list-group-item"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${formatDateTime(game.date)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm"><a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a>${deleteButtonHtml}</div></div></div></li>`;
+            return `<li class="list-group-item"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${formatDateTime(game.date, game.start_time)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm"><a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a>${deleteButtonHtml}</div></div></div></li>`;
         }).join('');
     }
     
@@ -598,7 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let nextGameHtml = '<div class="card mb-4"><div class="card-header"><h5 class="mb-0">Next Game</h5></div><div class="card-body">';
         if (next_game) {
             nextGameHtml += `<h5 class="card-title">vs ${escapeHTML(next_game.opponent)}</h5>
-                             <p class="card-text">${formatDateTime(next_game.date)} at ${escapeHTML(next_game.location || 'TBD')}</p>
+                             <p class="card-text">${formatDateTime(next_game.date, next_game.start_time)} at ${escapeHTML(next_game.location || 'TBD')}</p>
                              <a href="/game/${next_game.id}" class="btn btn-primary">Manage Game</a>`;
         } else {
             nextGameHtml += '<p class="text-muted">No upcoming games scheduled.</p>';

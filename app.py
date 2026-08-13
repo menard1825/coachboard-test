@@ -62,6 +62,24 @@ def create_app():
     app.register_blueprint(team_management_bp)
     app.register_blueprint(api_bp)
 
+    # --- SocketIO Handlers ---
+    from flask_socketio import join_room, leave_room
+    @socketio.on('join_game_room')
+    def handle_join_game_room(data):
+        game_id = data.get('game_id')
+        team_id = session.get('team_id')
+        if game_id and team_id:
+            room_name = f"team_{team_id}_game_{game_id}"
+            join_room(room_name)
+
+    @socketio.on('leave_game_room')
+    def handle_leave_game_room(data):
+        game_id = data.get('game_id')
+        team_id = session.get('team_id')
+        if game_id and team_id:
+            room_name = f"team_{team_id}_game_{game_id}"
+            leave_room(room_name)
+
     # --- Custom Jinja Filter for Date/Time Formatting ---
     @app.template_filter('format_datetime')
     def format_datetime_filter(dt):
@@ -88,11 +106,19 @@ def create_app():
 
     @app.context_processor
     def inject_team_info():
+        info = {}
         if 'team_id' in session:
             db.session.expire_all()
             team = db.session.get(Team, session['team_id'])
-            return {'current_team': team}
-        return {}
+            info['current_team'] = team
+
+            # Add list of available teams for the current user for switching
+            if 'username' in session:
+                from models import TeamMembership
+                user_teams = db.session.query(Team).join(TeamMembership).join(User).filter(func.lower(User.username) == func.lower(session['username'])).all()
+                info['available_teams'] = user_teams
+
+        return info
 
     @app.context_processor
     def inject_css_version():
@@ -109,8 +135,10 @@ def create_app():
     @app.route('/')
     @login_required
     def home():
-        user = db.session.query(User).options(joinedload(User.team)).filter_by(username=session['username']).first()
-        if not user or not user.team:
+        user = db.session.query(User).filter_by(username=session['username']).first()
+        team = db.session.get(Team, session.get('team_id')) if session.get('team_id') else None
+
+        if not user or not team:
             flash('User or team not found.', 'danger')
             return redirect(url_for('auth.login'))
 

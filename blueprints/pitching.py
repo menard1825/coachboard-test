@@ -1,4 +1,4 @@
-from flask import Blueprint, request, redirect, url_for, flash, session, render_template
+from flask import Blueprint, request, redirect, url_for, flash, session, render_template, jsonify
 from models import PitchingOuting, Team, Game, Player
 from db import db
 from sqlalchemy import func, case, cast, Date
@@ -82,7 +82,8 @@ def add_pitching():
         innings=innings_pitched, 
         pitcher_type=request.form.get('pitcher_type', 'Starter'),
         outing_type=request.form.get('outing_type', 'Game'), 
-        team_id=session['team_id']
+        team_id=session['team_id'],
+        game_id=game_id if game_id else None
     )
     db.session.add(new_outing)
     db.session.commit()
@@ -199,6 +200,45 @@ def pitching_page():
         pitchers=pitchers
     )
 
+
+@pitching_bp.route('/save_player_target', methods=['POST'])
+def save_player_target():
+    data = request.get_json()
+    player_id = data.get('player_id')
+    target_pitches = data.get('target_pitches')
+    local_date = data.get('local_date')
+    game_id = data.get('game_id')
+    reason = data.get('reason')
+
+    if not player_id or not local_date or target_pitches is None:
+        return jsonify({'status': 'error', 'message': 'Missing required fields.'}), 400
+
+    from models import PlayerPitchTarget
+    # Check if target exists for this player on this date
+    # Priority: if game_id is passed, look for game_id. Otherwise look for daily (game_id=None)
+    target = db.session.query(PlayerPitchTarget).filter_by(
+        player_id=player_id,
+        local_date=local_date,
+        game_id=game_id,
+        team_id=session['team_id']
+    ).first()
+
+    if target:
+        target.target_pitches = int(target_pitches)
+        target.reason = reason
+    else:
+        target = PlayerPitchTarget(
+            player_id=player_id,
+            target_pitches=int(target_pitches),
+            local_date=local_date,
+            game_id=game_id,
+            reason=reason,
+            team_id=session['team_id']
+        )
+        db.session.add(target)
+
+    db.session.commit()
+    return jsonify({'status': 'success'})
 
 @pitching_bp.route('/rules')
 def pitching_rules():
