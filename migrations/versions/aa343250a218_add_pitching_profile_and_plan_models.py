@@ -45,23 +45,9 @@ def upgrade():
         sa.UniqueConstraint('player_id')
     )
 
-    # Live Game events already exist from 2141af5cf87f. This unique index makes
-    # (game_id, sequence) an atomic ordering key so simultaneous coaches cannot
-    # silently create two events at the same sequence number.
-    with op.batch_alter_table('game_rotation_events', schema=None) as batch_op:
-        batch_op.create_index(
-            'idx_unique_game_rotation_event_sequence',
-            ['game_id', 'sequence'],
-            unique=True,
-        )
-
 
 def downgrade():
-    with op.batch_alter_table('game_rotation_events', schema=None) as batch_op:
-        batch_op.drop_index('idx_unique_game_rotation_event_sequence')
-
     op.drop_table('player_pitching_profiles')
     with op.batch_alter_table('game_pitching_plans', schema=None) as batch_op:
         batch_op.drop_index('idx_unique_game_pitching_plan')
-
     op.drop_table('game_pitching_plans')
