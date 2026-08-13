@@ -30,6 +30,7 @@ from blueprints.pitching import pitching_bp
 from blueprints.scouting import scouting_bp
 from blueprints.team_management import team_management_bp
 from blueprints.api import api_bp
+from blueprints.live_game_api import live_game_api_bp
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
@@ -61,24 +62,53 @@ def create_app():
     app.register_blueprint(scouting_bp)
     app.register_blueprint(team_management_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(live_game_api_bp)
 
     # --- SocketIO Handlers ---
     from flask_socketio import join_room, leave_room
+    from models import TeamMembership
+
+    def _authorized_game_room(game_id):
+        if 'logged_in' not in session:
+            return None
+        username = session.get('username')
+        team_id = session.get('team_id')
+        if not username or not team_id:
+            return None
+        user = db.session.query(User).filter(func.lower(User.username) == username.lower()).first()
+        if not user:
+            return None
+        membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=team_id).first()
+        if not membership:
+            return None
+        game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
+        if not game:
+            return None
+        return f"team_{team_id}_game_{game_id}"
+
     @socketio.on('join_game_room')
     def handle_join_game_room(data):
-        game_id = data.get('game_id')
-        team_id = session.get('team_id')
-        if game_id and team_id:
-            room_name = f"team_{team_id}_game_{game_id}"
-            join_room(room_name)
+        try:
+            game_id = int((data or {}).get('game_id'))
+        except (TypeError, ValueError):
+            return {'status': 'error', 'message': 'Invalid game.'}
+        room_name = _authorized_game_room(game_id)
+        if not room_name:
+            return {'status': 'error', 'message': 'Unauthorized.'}
+        join_room(room_name)
+        return {'status': 'success', 'room': room_name}
 
     @socketio.on('leave_game_room')
     def handle_leave_game_room(data):
-        game_id = data.get('game_id')
-        team_id = session.get('team_id')
-        if game_id and team_id:
-            room_name = f"team_{team_id}_game_{game_id}"
-            leave_room(room_name)
+        try:
+            game_id = int((data or {}).get('game_id'))
+        except (TypeError, ValueError):
+            return {'status': 'error', 'message': 'Invalid game.'}
+        room_name = _authorized_game_room(game_id)
+        if not room_name:
+            return {'status': 'error', 'message': 'Unauthorized.'}
+        leave_room(room_name)
+        return {'status': 'success'}
 
     # --- Custom Jinja Filter for Date/Time Formatting ---
     @app.template_filter('format_datetime')
