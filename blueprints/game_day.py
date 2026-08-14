@@ -4,7 +4,7 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, request,
 
 from db import db
 from game_day_helpers import build_actual_game_report, build_game_readiness, team_now
-from models import Game, Team
+from models import Game, Lineup, PlayerPitchTarget, Rotation, Team
 
 
 game_day_bp = Blueprint('game_day', __name__)
@@ -85,6 +85,54 @@ def game_day_home():
         local_now=now,
         upcoming=upcoming,
     )
+
+
+@game_day_bp.route('/game-day/<int:game_id>/delete', methods=['POST'])
+def delete_game(game_id):
+    """Delete a scheduled/test game from Game Day without allowing live-game loss."""
+    team = _team_context()
+    if not team or 'logged_in' not in session:
+        return jsonify({'status': 'error', 'message': 'Unauthorized.'}), 401
+
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
+    if not game:
+        return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
+    if game.is_live:
+        return jsonify({
+            'status': 'error',
+            'message': 'A live game cannot be deleted. End the game first.',
+        }), 409
+
+    # These two planning records are associated by integer game id rather than a
+    # SQLAlchemy relationship, so remove them explicitly before deleting the game.
+    db.session.query(Lineup).filter_by(
+        associated_game_id=game.id,
+        team_id=team.id,
+    ).delete(synchronize_session=False)
+    db.session.query(Rotation).filter_by(
+        associated_game_id=game.id,
+        team_id=team.id,
+    ).delete(synchronize_session=False)
+    db.session.query(PlayerPitchTarget).filter_by(
+        game_id=game.id,
+        team_id=team.id,
+    ).delete(synchronize_session=False)
+
+    # Next-inning prep is defined in the compatibility live-game module. Import
+    # locally to avoid coupling Game Day module initialization to that model.
+    from blueprints.live_game_ui import GameNextInningPrep
+    db.session.query(GameNextInningPrep).filter_by(
+        game_id=game.id,
+        team_id=team.id,
+    ).delete(synchronize_session=False)
+
+    opponent = game.opponent
+    db.session.delete(game)
+    db.session.commit()
+    return jsonify({
+        'status': 'success',
+        'message': f'Game vs {opponent} deleted.',
+    })
 
 
 @game_day_bp.route('/api/game-day/<int:game_id>/readiness')
