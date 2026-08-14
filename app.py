@@ -33,6 +33,7 @@ from blueprints.team_management import team_management_bp
 from blueprints.api import api_bp
 from blueprints.live_game_api import live_game_api_bp
 from blueprints.live_game_bulk_api import live_game_bulk_bp
+from blueprints.live_game_safety import live_game_safety_bp
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
@@ -62,6 +63,7 @@ def create_app():
     app.register_blueprint(roster_bp)
     app.register_blueprint(development_bp)
     app.register_blueprint(live_game_ui_bp)
+    app.register_blueprint(live_game_safety_bp)
     app.register_blueprint(gameday_bp)
     app.register_blueprint(pitching_bp)
     app.register_blueprint(scouting_bp)
