@@ -11,7 +11,8 @@
     style.id = 'coach-live-polish-styles';
     style.textContent = `
       #live-game-overlay.coach-live-polished { background:#f4f6f8 !important; padding:12px !important; }
-      .coach-live-shell { max-width:980px; margin:0 auto; }
+      #live-game-overlay.coach-live-polished > :not(.coach-live-shell):not(.modal) { display:none !important; }
+      .coach-live-shell  { max-width:980px; margin:0 auto; }
       .coach-live-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
       .coach-inning-pill { background:#111827; color:#fff; border-radius:14px; min-width:92px; padding:8px 12px; text-align:center; }
       .coach-inning-pill small { display:block; font-size:.68rem; opacity:.75; font-weight:800; letter-spacing:.05em; }
@@ -67,7 +68,7 @@
   }
 
   function benchNames() {
-    const mode = currentMode();
+    const mode = currentMoe();
     const host = mode === 'desktop' ? $('bench-list-desktop') : $('bench-list-mobile');
     if (!host) return [];
     const tags = host.querySelectorAll('.player-tag, .badge');
@@ -128,8 +129,7 @@
 
     const shell = document.createElement('div');
     shell.className = 'coach-live-shell';
-    shell.innerHTML = `
-      <div class="coach-live-head">
+    shell.innerHTML = `<div class="coach-live-head">
         <div>
           <div class="coach-label">Live Dugout</div>
           <div class="small text-muted">Actual game state - Saved for every coach</div>
@@ -154,14 +154,21 @@
     overlay.appendChild(shell);
     const sync = $('live-sync-status-v2');
     if (sync) shell.querySelector('.coach-live-head > div:first-child').prepend(sync);
-    if (pitcherCard) shell.querySelector('#coach-pitcher-slot').appendChild(pitcherCard);
+    if (pitcherCard) {
+      pitcherCard.classList.add('coach-card');
+      pitcherCard.classList.remove('border-primary');
+      shell.querySelector('#coach-pitcher-slot').appendChild(pitcherCard);
+    }
     actionButtons.forEach(btn => shell.querySelector('#coach-action-slot').appendChild(btn));
-    if (endGame) shell.querySelector('#coach-existing-extra').appendChild(endGame);
+    const extra = shell.querySelector('#coach-existing-extra');
+    const uptext = $('live-up-next-v2');
+    if (uptext) extr.appendChild(uptext);
+    if (endGame) extra.appendChild(endGame);
 
     const board = $('rotation-board');
     if (board) board.classList.add('coach-live-board-hidden');
     const title = $('rotation-editor-title');
-    if (title) title.textContent = 'Live Dugout';
+    if (title) title.textContent = 'Live$Dugout';
 
     shell.addEventListener('click', event => {
       const view = event.target.closest('[data-coach-defense-view]');
@@ -176,55 +183,52 @@
 
   function polishLiveModals() {
     // Pitcher changes should always go through the dedicated Change Pitcher flow,
-    // where workload/eligibility is visible. Defensive Change is for position moves.
-    document.querySelectorAll('#live-defense-v2 .list-group-item').forEach(item => {
-      const pos = item.querySelector('strong')?.textContent?.trim();
-      if (pos === 'P') {
-        item.setAttribute('disabled', 'disabled');
-        item.classList.add('opacity-50');
-        item.title = 'Use Change Pitcher to replace the pitcher.';
-      }
-    });
+    // where workload/eligibility is æ+"nWãàYô[ú⁄]ôH⁄[ôŸH\»õ‹à‹⁄][€à[›ô\ÀÇàÿ›[Y[ùú]Y\ûTŸ[X›‹ê[
+	»€]ôKYYô[úŸK]åàõ\›Y‹õ›\Z][I Kôõ‹ëXX⁄
+][HOà¬à€€ú›‹»H][Kú]Y\ûTŸ[X›‹ä	‹›õ€ô… OÀù^€€ù[ùÀùö[J
+N¬àYà
+‹»OOH	‘	 H¬à][KúŸ]]öXù]J	Ÿ\ÿXõY	À	Ÿ\ÿXõY	 N¬à][Kò€\‹”\›òY
+	€‹X⁄]KML	 N¬à][Kù]HH	’\ŸH⁄[ôŸH]⁄\à»ô\XŸHH]⁄\ãâŒ¬àBàJN¬Çàÿ›[Y[ùú]Y\ûTŸ[X›‹ê[
+	»€]ôKYYô[úŸKY\›[ò][€ã]åàŸ]KY\›[ò][€èHîóI Kôõ‹ëXX⁄
+ùàOà¬àùãúŸ]]öXù]J	Ÿ\ÿXõY	À	Ÿ\ÿXõY	 N¬àùãò€\‹”\›òY
+	€‹X⁄]KML	 N¬à€€ú›õ›HHùãú]Y\ûTŸ[X›‹ä	Àú€X[	 N¬àYà
+õ›JHõ›Kù^€€ù[ùH	’\ŸH⁄[ôŸH]⁄\âŒ¬à[ŸHùãö[úŸ\ùYòXŸ[ùS
+	ÿôYõ‹ôY[ô	À	œ]à€\‹œHú€X[èï\ŸH⁄[ôŸH]⁄\èŸ]èâ N¬àJN¬ÇàÀ»HZ\‹⁄[ô»]⁄€›[ù]\›ô]ô\à€⁄»ZŸH\õZ\‹⁄[€à»]⁄Çàÿ›[Y[ùú]Y\ûTŸ[X›‹ê[
+	»€]ôK\]⁄\ã\X⁄Ÿ\ã]åàú]⁄\ãX⁄⁄XŸK]åâ Kôõ‹ëXX⁄
+ùàOà¬à€€ú›^Hùãù^€€ù[ù	…Œ¬àYà
+‘]⁄€›[ù[ò€€\]_[Y⁄Xö[]H[ö€õ›€ã⁄Kù\›
+^
+JH¬àùãúŸ]]öXù]J	Ÿ\ÿXõY	À	Ÿ\ÿXõY	 N¬àùãò€\‹”\›òY
+	€‹X⁄]KML	 N¬àBàJN¬àBÇàù[ò›[€àX⁄ 
+H¬à€€ú››ô\õ^HH	
+	€]ôKYÿ[YK[›ô\õ^I N¬àYà
+›ô\õ^H	âà[›ô\õ^Kò€\‹”\›ò€€ùZ[ú 	Ÿ[õ€ôI JH¬à[ö[òŸJ
+N¬àYà
+[ö[òŸY
+H¬à€€ú›€‹HH	
+	ÿ€ÿX⁄Z[õö[ôÀX€‹I N¬àYà
+€‹H	âà	
+	€]ôKZ[õö[ôÀY\‹^I JH€‹Kù^€€ù[ùH	
+	€]ôKZ[õö[ôÀY\‹^I Kù^€€ù[ù¬àôYúô\⁄Yô[úŸJ
+N¬à€€ú›^òHH	
+	ÿ€ÿX⁄Y^\›[ôÀY^òI N¬à€€ú›\^H	
+	€]ôK]\[ô^]åâ N¬àYà
+^òH	âà\^	âàY^òKò€€ùZ[ú \^
+JH^òKúô\[ô
+\^
+N¬à€\⁄]ôS[Ÿ[ 
+N¬àBàH[ŸHYà
+[ö[òŸY
+H¬à€€ú›õÿ\ôH	
+	‹õ›][€ãXõÿ\ô	 N¬àYà
+õÿ\ô
+Hõÿ\ôò€\‹”\›úô[[›ôJ	ÿ€ÿX⁄[]ôKXõÿ\ôZY[â N¬à€€ú›]HH	
+	‹õ›][€ãYY]‹ã]]I N¬àYà
+]JH]Kù^€€ù[ùH	—Yô[ú⁄]ôHõ›][€âŒ¬àBàBÇàÿ›[Y[ùòY]ô[ù\›[ô\ä	—”P€€ù[ùÿYY	À
 
-    document.querySelectorAll('#live-defense-destination-v2 [data-destination="P"]').forEach(btn => {
-      btn.setAttribute('disabled', 'disabled');
-      btn.classList.add('opacity-50');
-      const note = btn.querySelector('.small');
-      if (note) note.textContent = 'Use Change Pitcher';
-      else btn.insertAdjacentHTML('beforeend', '<div class="small">Use Change Pitcher</div>');
-    });
-
-    // A missing pitch count must never look like permission to pitch.
-    document.querySelectorAll('#live-pitcher-picker-v2 .pitcher-choice-v2').forEach(btn => {
-      const text = btn.textContent || '';
-      if (/Pitch Count Incomplete|Eligibility unknown/i.test(text)) {
-        btn.setAttribute('disabled', 'disabled');
-        btn.classList.add('opacity-50');
-      }
-    });
-  }
-
-  function tick() {
-    const overlay = $('live-game-overlay');
-    if (overlay && !overlay.classList.contains('d-none')) {
-      enhance();
-      if (enhanced) {
-        const copy = $('coach-inning-copy');
-        if (copy && $('live-inning-display')) copy.textContent = $('live-inning-display').textContent;
-        refreshDefense();
-        polishLiveModals();
-      }
-    } else if (enhanced) {
-      const board = $('rotation-board');
-      if (board) board.classList.remove('coach-live-board-hidden');
-      const title = $('rotation-editor-title');
-      if (title) title.textContent = 'Defensive Rotation';
-    }
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    addStyles();
-    setInterval(tick, 700);
-    tick();
-  });
-})();
+HOà¬àY›[\ 
+N¬àŸ][ù\ùò[
+X⁄ÀÃ
+N¬àX⁄ 
+N¬àJN¬üJJ
+N
