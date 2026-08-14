@@ -3,8 +3,8 @@
 
 {% block head %}
 <style>
-  .agr-shell{max-width:1180px;margin:0 auto;padding-bottom:28px}.agr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin:4px 0 17px}.agr-k{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}.agr-head h1{font-size:1.45rem;font-weight:850;color:#172033;margin:2px 0}.agr-meta{font-size:.76rem;color:#667085}.agr-actions{display:flex;gap:7px;flex-wrap:wrap}.agr-card{border:1px solid #e2e6eb;border-radius:14px;background:#fff;overflow:hidden;margin-bottom:14px}.agr-card-head{padding:11px 13px;border-bottom:1px solid #edf0f3;display:flex;justify-content:space-between;align-items:center}.agr-card-head strong{font-size:.82rem;color:#1d2939}.agr-card-body{padding:12px 13px}.agr-innings{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:9px}.agr-inning{border:1px solid #e4e7ec;border-radius:10px;padding:9px 10px;background:#fafbfc}.agr-inning-title{font-size:.68rem;font-weight:850;color:#344054;margin-bottom:7px}.agr-pos{display:grid;grid-template-columns:38px minmax(0,1fr);gap:6px;font-size:.7rem;margin:3px 0}.agr-pos b{color:#667085}.agr-bench{font-size:.64rem;color:#667085;border-top:1px solid #e7e9ed;margin-top:7px;padding-top:6px}.agr-table{font-size:.72rem;margin:0}.agr-table th{font-size:.59rem;text-transform:uppercase;letter-spacing:.06em;color:#667085}.agr-empty{color:#8a94a3;font-size:.76rem;padding:9px}.agr-badge{font-size:.61rem;border-radius:999px;padding:4px 7px;background:#eef1f5;color:#475467;font-weight:750}
-  @media(max-width:575.98px){.agr-head{display:block}.agr-actions{margin-top:10px}.agr-innings{grid-template-columns:1fr}.agr-card-body{padding:10px}.agr-shell{padding-bottom:70px}}
+  .agr-shell{max-width:1180px;margin:0 auto;padding-bottom:28px}.agr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin:4px 0 17px}.agr-k{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}.agr-head h1{font-size:1.45rem;font-weight:850;color:#172033;margin:2px 0}.agr-meta{font-size:.76rem;color:#667085}.agr-actions{display:flex;gap:7px;flex-wrap:wrap}.agr-card{border:1px solid #e2e6eb;border-radius:14px;background:#fff;overflow:hidden;margin-bottom:14px}.agr-card-head{padding:11px 13px;border-bottom:1px solid #edf0f3;display:flex;justify-content:space-between;align-items:center;gap:8px}.agr-card-head strong{font-size:.82rem;color:#1d2939}.agr-card-body{padding:12px 13px}.agr-innings{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:9px}.agr-inning{border:1px solid #e4e7ec;border-radius:10px;padding:9px 10px;background:#fafbfc}.agr-inning.unreliable{border-color:#efd8ac;background:#fffaf0}.agr-inning-title{font-size:.68rem;font-weight:850;color:#344054;margin-bottom:7px;display:flex;justify-content:space-between;gap:6px}.agr-pos{display:grid;grid-template-columns:38px minmax(0,1fr);gap:6px;font-size:.7rem;margin:3px 0}.agr-pos b{color:#667085}.agr-bench{font-size:.64rem;color:#667085;border-top:1px solid #e7e9ed;margin-top:7px;padding-top:6px}.agr-warning{font-size:.65rem;color:#8b5c00;background:#fff8eb;border:1px solid #efd8ac;border-radius:9px;padding:8px 9px;margin-bottom:10px}.agr-table{font-size:.72rem;margin:0}.agr-table th{font-size:.59rem;text-transform:uppercase;letter-spacing:.06em;color:#667085}.agr-empty{color:#8a94a3;font-size:.76rem;padding:9px}.agr-badge{font-size:.61rem;border-radius:999px;padding:4px 7px;background:#eef1f5;color:#475467;font-weight:750}.agr-mini-badge{font-size:.52rem;border-radius:999px;padding:3px 6px;background:#fff1d7;color:#8b5c00;font-weight:850;white-space:nowrap}
+  @media(max-width:575.98px){.agr-head{display:block}.agr-actions{margin-top:10px}.agr-innings{grid-template-columns:1fr}.agr-card-body{padding:10px}.agr-shell{padding-bottom:70px}.agr-card-head{align-items:flex-start}}
   @media(orientation:landscape) and (max-height:900px){.agr-innings{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 {% endblock %}
@@ -19,19 +19,21 @@
   <section class="agr-card">
     <div class="agr-card-head"><strong>Actual Defense by Inning</strong><span class="agr-badge">Live history, not pregame plan</span></div>
     <div class="agr-card-body">
+      {% if report.unreliable_innings %}<div class="agr-warning">Bench time is not calculated from incomplete historical snapshots: inning{% if report.unreliable_innings|length != 1 %}s{% endif %} {{ report.unreliable_innings|join(', ') }}. CoachBoard will not guess.</div>{% endif %}
       {% if report.innings %}<div class="agr-innings">
       {% for inn in report.innings %}
-        <div class="agr-inning"><div class="agr-inning-title">Inning {{ inn.inning }}</div>
+        <div class="agr-inning {% if not inn.reliable %}unreliable{% endif %}"><div class="agr-inning-title"><span>Inning {{ inn.inning }}</span>{% if not inn.reliable %}<span class="agr-mini-badge">INCOMPLETE HISTORY</span>{% endif %}</div>
         {% for pos in ['P','C','1B','2B','3B','SS','LF','LCF','CF','RCF','RF'] %}{% if inn.alignment.get(pos) %}<div class="agr-pos"><b>{{ pos }}</b><span>{{ inn.alignment.get(pos) }}</span></div>{% endif %}{% endfor %}
-        <div class="agr-bench"><strong>Bench:</strong> {{ inn.bench|join(', ') if inn.bench else 'None' }}</div></div>
+        <div class="agr-bench"><strong>Bench:</strong> {% if inn.reliable %}{{ inn.bench|join(', ') if inn.bench else 'None' }}{% else %}Unavailable — defensive snapshot was incomplete{% endif %}</div></div>
       {% endfor %}
       </div>{% else %}<div class="agr-empty">No live defensive history was recorded for this game.</div>{% endif %}
     </div>
   </section>
 
   <section class="agr-card">
-    <div class="agr-card-head"><strong>Actual Bench Usage</strong><span class="agr-badge">Completed/reached defensive innings</span></div>
-    <div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Player</th><th>Bench Innings</th><th class="pe-3">Which Innings</th></tr></thead><tbody>
+    <div class="agr-card-head"><strong>Actual Bench Usage</strong><span class="agr-badge">Confirmed complete innings only</span></div>
+    {% if report.unreliable_innings %}<div class="agr-warning mx-3 mt-3 mb-1">These totals exclude incomplete inning snapshots, so they are the confirmed minimum rather than a guessed total.</div>{% endif %}
+    <div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Player</th><th>Confirmed Bench Innings</th><th class="pe-3">Which Innings</th></tr></thead><tbody>
       {% for row in report.bench_rows %}<tr><td class="ps-3 fw-semibold">{{ row.name }}</td><td>{{ row.count }}</td><td class="pe-3">{{ row.innings|join(', ') if row.innings else '—' }}</td></tr>{% endfor %}
     </tbody></table></div>
   </section>
