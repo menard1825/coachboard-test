@@ -51,6 +51,23 @@ def game_day_home():
     ]
 
     focus_ids = {item['game'].id for item in game_cards}
+
+    # Keep postgame work visible after game day. This is especially important for
+    # GameChanger, whose final pitching numbers may not be available immediately.
+    followup_candidates = db.session.query(Game).filter(
+        Game.team_id == team.id,
+        Game.date < next_day,
+    ).order_by(Game.date.desc(), Game.id.desc()).limit(20).all()
+    followup_cards = []
+    for game in followup_candidates:
+        if game.id in focus_ids:
+            continue
+        readiness = build_game_readiness(game, team)
+        if readiness['status'] in {'GC STATS PENDING', 'NEEDS POSTGAME'}:
+            followup_cards.append({'game': game, 'readiness': readiness})
+        if len(followup_cards) >= 6:
+            break
+
     upcoming_query = db.session.query(Game).filter(
         Game.team_id == team.id,
         Game.date >= next_day,
@@ -63,6 +80,7 @@ def game_day_home():
         'game_day.html',
         current_team=team,
         game_cards=game_cards,
+        followup_cards=followup_cards,
         focus_label=focus_label,
         local_now=now,
         upcoming=upcoming,
