@@ -86,17 +86,33 @@
     return innings.join(', ');
   }
 
-  function benchOptionLabel(name, stat) {
+  function satHistoryText(innings) {
+    if (!innings?.length) return '';
+    return innings.length === 1
+      ? `Sat inning ${innings[0]}`
+      : `Sat innings ${inningListText(innings)}`;
+  }
+
+  function benchOptionLabel(name, stat, targetPosition) {
     if (!stat) return name;
-    const priorText = stat.completedBenchInningsList?.length
-      ? ` • sat ${inningListText(stat.completedBenchInningsList)}`
-      : '';
+    const history = satHistoryText(stat.completedBenchInningsList);
 
     if (stat.onBenchNow) {
-      return `${name} — BENCH NOW${priorText} • sitting ${stat.currentInning} now`;
+      const pieces = [`${name} — BENCH NOW`];
+      if (history) pieces.push(history);
+      pieces.push(`Sitting inning ${stat.currentInning}`);
+      return pieces.join(' • ');
     }
 
-    return `${name} — ${stat.positionNow} NOW${priorText}`;
+    const pieces = [name];
+    // If the player is already at this row's position, the position label on the
+    // left already communicates it. Only show location when choosing would move
+    // the player from somewhere else on the field.
+    if (stat.positionNow && stat.positionNow !== targetPosition) {
+      pieces.push(`On field at ${stat.positionNow}`);
+    }
+    if (history) pieces.push(history);
+    return pieces.join(' — ').replace(' — On field', ' — On field');
   }
 
   function installBenchStyles() {
@@ -117,10 +133,10 @@
   }
 
   function benchNowChipText(item) {
-    const prior = item.completedBenchInningsList?.length
-      ? `sat ${inningListText(item.completedBenchInningsList)} • `
-      : '';
-    return `${prior}sitting ${item.currentInning} now`;
+    const history = satHistoryText(item.completedBenchInningsList);
+    return history
+      ? `${history} • Sitting inning ${item.currentInning}`
+      : `Sitting inning ${item.currentInning}`;
   }
 
   function enhanceAdjustModal(state = latestState) {
@@ -152,6 +168,7 @@
 
     body.querySelectorAll('.ni-select').forEach(select => {
       const selectedValue = select.value;
+      const targetPosition = select.dataset.pos || '';
       const options = [...select.options];
       options.forEach(option => {
         if (!option.value) {
@@ -159,7 +176,7 @@
           return;
         }
         const stat = stats.get(option.value);
-        option.textContent = benchOptionLabel(option.value, stat);
+        option.textContent = benchOptionLabel(option.value, stat, targetPosition);
         option.dataset.benchNow = stat?.onBenchNow ? '1' : '0';
         option.dataset.benchStreak = String(stat?.currentBenchStreak || 0);
         option.dataset.completedBench = String(stat?.completedBenchInnings || 0);
@@ -193,10 +210,10 @@
       chip.dataset.playerName = rawName;
       const stat = stats.get(rawName);
       if (stat?.onBenchNow) {
-        const prior = stat.completedBenchInningsList?.length
-          ? ` • sat ${inningListText(stat.completedBenchInningsList)}`
-          : '';
-        chip.textContent = `${rawName}${prior} • sitting ${stat.currentInning}`;
+        const history = satHistoryText(stat.completedBenchInningsList);
+        chip.textContent = history
+          ? `${rawName} • ${history} • Sitting inning ${stat.currentInning}`
+          : `${rawName} • Sitting inning ${stat.currentInning}`;
         chip.title = `${rawName} is on the bench now. Completed bench innings: ${stat.completedBenchInningsList?.length ? inningListText(stat.completedBenchInningsList) : 'none'}. Current inning: ${stat.currentInning}.`;
       }
     });
