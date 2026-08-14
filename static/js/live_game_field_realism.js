@@ -4,6 +4,14 @@
   const STYLE_ID = 'coach-real-field-styles';
   const FIELD_SELECTOR = '#coach-current-defense .coach-field';
 
+  function loadPitcherChangeWizard() {
+    if (document.querySelector('script[data-live-pitcher-change-complete]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/live_game_pitcher_change_complete.js';
+    script.dataset.livePitcherChangeComplete = 'true';
+    document.head.appendChild(script);
+  }
+
   function installStyles() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement('style');
@@ -68,7 +76,6 @@
         border-radius: 7px !important;
       }
 
-      /* Phones: preserve the compact layout that already works well. */
       @media (max-width: 575.98px) {
         .coach-field.coach-real-field {
           max-width: none;
@@ -88,7 +95,6 @@
         }
       }
 
-      /* Small tablets / iPad mini portrait. */
       @media (min-width: 576px) and (max-width: 899.98px) {
         .coach-live-shell { max-width: 860px !important; padding: 0 10px; }
         .coach-actions { grid-template-columns: repeat(3, minmax(0,1fr)) !important; gap:10px !important; }
@@ -103,7 +109,6 @@
         .coach-field.coach-real-field .coach-field-spot span { font-size: .68rem !important; }
       }
 
-      /* Full-size iPad portrait and similar tablets. */
       @media (min-width: 900px) and (max-width: 1180px) {
         .coach-live-shell { max-width: 1040px !important; padding: 0 14px; }
         .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
@@ -112,7 +117,6 @@
         .coach-field.coach-real-field { max-width: 720px; }
       }
 
-      /* iPad landscape / smaller laptops. */
       @media (min-width: 1181px) and (max-width: 1440px) {
         .coach-live-shell { max-width: 1080px !important; padding: 0 14px; }
         .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
@@ -120,7 +124,6 @@
         .coach-field.coach-real-field { max-width: 735px; }
       }
 
-      /* Desktop: keep the field compact instead of stretching it with the page. */
       @media (min-width: 1441px) {
         .coach-live-shell { max-width: 1120px !important; }
         .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
@@ -140,7 +143,6 @@
         }
       }
 
-      /* Touch-friendly modal sizing for tablets. */
       @media (min-width: 576px) and (max-width: 1366px) {
         #live-defense-v2 .modal-dialog,
         #live-pitcher-picker-v2 .modal-dialog,
@@ -175,33 +177,19 @@
             <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#17351f" flood-opacity=".18"/>
           </filter>
         </defs>
-
-        <!-- Outfield shape / subtle mowing depth -->
         <path d="M78,598 Q70,210 500,55 Q930,210 922,598" fill="none" stroke="#edf5ec" stroke-opacity=".38" stroke-width="3" />
         <path d="M98,598 Q92,232 500,82 Q908,232 902,598" fill="none" stroke="#a77b49" stroke-opacity=".28" stroke-width="10" />
         <path d="M110,610 Q105,250 500,105 Q895,250 890,610 L890,760 L110,760 Z" fill="url(#coachGrassFade)" opacity=".36" />
-
-        <!-- Foul lines -->
         <line x1="500" y1="792" x2="104" y2="392" stroke="#fff" stroke-opacity=".78" stroke-width="2" />
         <line x1="500" y1="792" x2="896" y2="392" stroke="#fff" stroke-opacity=".78" stroke-width="2" />
-
-        <!-- Natural infield dirt with grass interior -->
-        <path d="M500,735 L745,555 Q758,545 744,532 L515,318 Q500,304 485,318 L256,532 Q242,545 255,557 Z"
-              fill="#c99a62" filter="url(#coachSoftShadow)" />
-        <path d="M500,676 L682,548 Q692,540 682,531 L511,374 Q500,364 489,374 L318,531 Q308,540 318,548 Z"
-              fill="#4a9358" />
-
-        <!-- Home plate dirt and mound -->
+        <path d="M500,735 L745,555 Q758,545 744,532 L515,318 Q500,304 485,318 L256,532 Q242,545 255,557 Z" fill="#c99a62" filter="url(#coachSoftShadow)" />
+        <path d="M500,676 L682,548 Q692,540 682,531 L511,374 Q500,364 489,374 L318,531 Q308,540 318,548 Z" fill="#4a9358" />
         <ellipse cx="500" cy="788" rx="70" ry="55" fill="#c99a62" />
         <circle cx="500" cy="590" r="35" fill="#c99a62" />
         <rect x="485" y="587" width="30" height="4" rx="2" fill="#faf8f1" />
-
-        <!-- Bases -->
         <rect x="704" y="541" width="15" height="15" rx="1.5" fill="#fffdf5" stroke="#8f7c5e" stroke-opacity=".28" transform="rotate(45 711.5 548.5)" />
         <rect x="492.5" y="333" width="15" height="15" rx="1.5" fill="#fffdf5" stroke="#8f7c5e" stroke-opacity=".28" transform="rotate(45 500 340.5)" />
         <rect x="281" y="541" width="15" height="15" rx="1.5" fill="#fffdf5" stroke="#8f7c5e" stroke-opacity=".28" transform="rotate(45 288.5 548.5)" />
-
-        <!-- Home plate -->
         <path d="M488,779 L512,779 L516,790 L500,805 L484,790 Z" fill="#fffdf5" stroke="#8f7c5e" stroke-opacity=".25" />
       </svg>`;
   }
@@ -213,31 +201,22 @@
     const desktop = window.matchMedia('(min-width:1181px)').matches;
 
     const common = phone
-      ? {
-          '3B':[18,56], 'SS':[36,42], '2B':[64,42], '1B':[82,56],
-          'P':[50,62], 'C':[50,91]
-        }
+      ? {'3B':[18,56],'SS':[36,42],'2B':[64,42],'1B':[82,56],'P':[50,62],'C':[50,91]}
       : desktop
-        ? {
-            '3B':[23,58], 'SS':[37,45], '2B':[63,45], '1B':[77,58],
-            'P':[50,63], 'C':[50,91]
-          }
-        : {
-            '3B':[21,57], 'SS':[36,44], '2B':[64,44], '1B':[79,57],
-            'P':[50,62], 'C':[50,91]
-          };
+        ? {'3B':[23,58],'SS':[37,45],'2B':[63,45],'1B':[77,58],'P':[50,63],'C':[50,91]}
+        : {'3B':[21,57],'SS':[36,44],'2B':[64,44],'1B':[79,57],'P':[50,62],'C':[50,91]};
 
     const outfield = fourOutfielders
       ? (phone
-          ? { 'LF':[12,22], 'LCF':[36,13], 'RCF':[64,13], 'RF':[88,22] }
-          : { 'LF':[16,25], 'LCF':[37,15], 'RCF':[63,15], 'RF':[84,25] })
+          ? {'LF':[12,22],'LCF':[36,13],'RCF':[64,13],'RF':[88,22]}
+          : {'LF':[16,25],'LCF':[37,15],'RCF':[63,15],'RF':[84,25]})
       : (phone
-          ? { 'LF':[14,22], 'CF':[50,10], 'RF':[86,22] }
+          ? {'LF':[14,22],'CF':[50,10],'RF':[86,22]}
           : desktop
-            ? { 'LF':[18,26], 'CF':[50,14], 'RF':[82,26] }
-            : { 'LF':[16,24], 'CF':[50,13], 'RF':[84,24] });
+            ? {'LF':[18,26],'CF':[50,14],'RF':[82,26]}
+            : {'LF':[16,24],'CF':[50,13],'RF':[84,24]});
 
-    return { ...common, ...outfield };
+    return {...common,...outfield};
   }
 
   function positionPlayers(field) {
@@ -255,12 +234,10 @@
   function decorateField() {
     const field = document.querySelector(FIELD_SELECTOR);
     if (!field) return;
-
     if (!field.classList.contains('coach-real-field')) {
       field.classList.add('coach-real-field');
       field.insertAdjacentHTML('afterbegin', `<div class="coach-real-field-skin">${fieldSvg()}</div>`);
     }
-
     positionPlayers(field);
   }
 
@@ -268,17 +245,16 @@
     requestAnimationFrame(() => requestAnimationFrame(decorateField));
   }
 
+  loadPitcherChangeWizard();
+
   document.addEventListener('DOMContentLoaded', () => {
     installStyles();
     scheduleDecorate();
-
     document.addEventListener('click', event => {
       if (event.target.closest('[data-coach-defense-view="field"]')) scheduleDecorate();
     });
-
-    window.addEventListener('resize', scheduleDecorate, { passive:true });
-    window.addEventListener('orientationchange', scheduleDecorate, { passive:true });
-
+    window.addEventListener('resize', scheduleDecorate, {passive:true});
+    window.addEventListener('orientationchange', scheduleDecorate, {passive:true});
     setInterval(decorateField, 1200);
   });
 })();
