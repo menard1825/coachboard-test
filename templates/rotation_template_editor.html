@@ -12,7 +12,7 @@
   .rte-card{border:1px solid #dfe4ea;border-radius:15px;background:#fff;box-shadow:0 1px 4px rgba(16,24,40,.06);overflow:hidden;margin-bottom:14px}
   .rte-card-body{padding:13px 14px}.rte-name-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}.rte-name-row label{font-size:.67rem;font-weight:800;color:#475467}.rte-name-row .form-control{min-height:44px;border-radius:9px}
   .rte-innings-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;border-bottom:1px solid #edf0f3;background:#fafbfc}.rte-tabs{display:flex;gap:5px;flex-wrap:wrap;flex:1}.rte-tab{min-width:42px;height:38px;border-radius:8px;border:1px solid #d6dbe1;background:#fff;color:#475467;font-weight:850;font-size:.75rem}.rte-tab.active{background:#172033;color:#fff;border-color:#172033}.rte-tab.incomplete:not(.active){border-color:#d59b9b;background:#fff5f5;color:#9e3636}
-  .rte-inning-actions{display:flex;gap:6px;flex-wrap:wrap}.rte-inning-actions .btn{min-height:38px;border-radius:8px;font-size:.7rem;font-weight:750}
+  .rte-max-note{font-size:.65rem;font-weight:750;color:#667085;white-space:nowrap}
   .rte-tools{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:8px;margin-bottom:11px}.rte-tools .btn,.rte-tools .form-select{min-height:42px;border-radius:9px;font-size:.74rem}
   .rte-field-card{border:1px solid #d6e2d4;border-radius:14px;overflow:hidden}.rte-field-cap{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #e4e9e4}.rte-field-cap strong{font-size:.72rem;color:#344054}.rte-field-cap span{font-size:.62rem;color:#98a2b3}
   .rte-field{position:relative;height:clamp(350px,50vw,500px);overflow:hidden;background:repeating-linear-gradient(90deg,#3c8a50 0,#3c8a50 12.5%,#438f56 12.5%,#438f56 25%)}.rte-field-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -21,7 +21,7 @@
   .rte-status{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;border-top:1px solid #eef1f4;background:#fafbfc;font-size:.66rem;color:#667085}.rte-status strong{color:#172033}.rte-status .bad{color:#a63d3d}
   .rte-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px}.rte-summary-player{border:1px solid #e3e7eb;border-radius:9px;padding:8px 9px;background:#fafbfc}.rte-summary-player strong{font-size:.7rem;color:#172033}.rte-summary-player div{font-size:.61rem;color:#667085;margin-top:2px}
   #rtePlayerModal .modal-content{border:0;border-radius:16px;overflow:hidden}#rtePlayerChoices .list-group-item{padding:11px 13px}.rte-choice-name{font-size:.78rem;font-weight:800}.rte-choice-detail{font-size:.62rem;color:#667085;margin-top:2px}
-  @media(max-width:575.98px){.rte-shell{padding-bottom:92px}.rte-head{display:block}.rte-head-actions{margin-top:10px;justify-content:stretch}.rte-head-actions .btn{flex:1}.rte-card-body{padding:10px}.rte-name-row{grid-template-columns:1fr}.rte-innings-bar{padding:9px 10px}.rte-tools{grid-template-columns:1fr 1fr}.rte-tools select{grid-column:1/-1}.rte-field{height:305px}.rte-spot{width:66px;min-height:41px;padding:4px}.rte-player{font-size:.57rem}.rte-pos{font-size:.44rem}.rte-status{align-items:flex-start}}
+  @media(max-width:575.98px){.rte-shell{padding-bottom:92px}.rte-head{display:block}.rte-head-actions{margin-top:10px;justify-content:stretch}.rte-head-actions .btn{flex:1}.rte-card-body{padding:10px}.rte-name-row{grid-template-columns:1fr}.rte-innings-bar{padding:9px 10px}.rte-tools{grid-template-columns:1fr 1fr}.rte-tools select{grid-column:1/-1}.rte-field{height:305px}.rte-spot{width:66px;min-height:41px;padding:4px}.rte-player{font-size:.57rem}.rte-pos{font-size:.44rem}.rte-status{align-items:flex-start}.rte-max-note{display:none}}
   @media(min-width:576px) and (orientation:portrait){.rte-field{height:clamp(390px,59vw,500px)}.rte-spot{width:clamp(80px,14vw,112px)}}
   @media(min-width:768px) and (orientation:landscape){.rte-shell{max-width:1220px}.rte-field{height:clamp(340px,38vw,455px)}.rte-spot{width:clamp(82px,10vw,112px)}.rte-tools{grid-template-columns:minmax(260px,1fr) auto auto}}
 </style>
@@ -33,7 +33,7 @@
     <div>
       <div class="rte-kicker">Full-Game Rotation Template</div>
       <h1 id="rtePageTitle">{% if editor_data.rotation.id %}Edit Rotation Template{% else %}New Rotation Template{% endif %}</h1>
-      <p>Build the reusable defense here, inning by inning. Nothing is tied to a scheduled game until you load this template into one.</p>
+      <p>Build the reusable six-inning defense here, inning by inning. Nothing is tied to a scheduled game until you load this template into one.</p>
     </div>
     <div class="rte-head-actions">
       <a class="btn btn-outline-secondary" href="{{ url_for('home') }}#rotations">Back to Templates</a>
@@ -56,10 +56,7 @@
   <section class="rte-card">
     <div class="rte-innings-bar">
       <div class="rte-tabs" id="rteInningTabs"></div>
-      <div class="rte-inning-actions">
-        <button type="button" class="btn btn-outline-secondary" id="rteAddInning">+ Inning</button>
-        <button type="button" class="btn btn-outline-secondary" id="rteRemoveInning">− Inning</button>
-      </div>
+      <span class="rte-max-note">6-inning template</span>
     </div>
     <div class="rte-card-body">
       <div class="rte-tools">
