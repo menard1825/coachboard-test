@@ -250,28 +250,22 @@
 <script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
 <script src="{{ url_for('static', filename='js/live_game_v2.js') }}"></script>
 <script>
-    // The legacy game script can hide every .planner-controls element when a
-    // game is already live. Because the live dashboard lives inside this row,
-    // that can blank the entire page on Safari before live_game_v2 finishes
-    // restoring lifecycle state. Keep the game shell itself visible at all times.
-    (() => {
+    // Keep the game shell visible without observing/mutating the same attributes.
+    // The previous MutationObserver could self-trigger indefinitely on Safari.
+    const keepGameShellVisible = () => {
         const plannerRow = document.getElementById('game-management-planner-row');
-        if (!plannerRow) return;
-
-        const keepGameShellVisible = () => {
+        if (plannerRow) {
             plannerRow.classList.remove('d-none');
             plannerRow.style.removeProperty('display');
-            const rotationContainer = document.getElementById('rotation-card-container');
-            if (rotationContainer) {
-                rotationContainer.classList.remove('d-none');
-                rotationContainer.style.removeProperty('display');
-            }
-        };
+        }
+        const rotationContainer = document.getElementById('rotation-card-container');
+        if (rotationContainer) {
+            rotationContainer.classList.remove('d-none');
+            rotationContainer.style.removeProperty('display');
+        }
+    };
 
-        keepGameShellVisible();
-        const observer = new MutationObserver(keepGameShellVisible);
-        observer.observe(plannerRow, { attributes: true, attributeFilter: ['class', 'style'] });
-    })();
+    keepGameShellVisible();
 
     document.addEventListener('DOMContentLoaded', () => {
         const initialGameData = {
@@ -286,6 +280,13 @@
             outfielder_count: {{ current_team.outfielder_count if current_team else 3 }}
         };
         initializeGameManagement(initialGameData);
+
+        // The legacy initializer may hide the planner row for an already-live game.
+        // Restore the shell a few times during the initial lifecycle handoff only;
+        // no observer is left running afterward.
+        keepGameShellVisible();
+        requestAnimationFrame(keepGameShellVisible);
+        setTimeout(keepGameShellVisible, 250);
     });
 </script>
 {% endblock %}
