@@ -7,6 +7,16 @@
   let latestState = null;
   let busy = false;
 
+  function loadPitchingWorkloadUi() {
+    if (document.querySelector('script[data-pitching-workload-game]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/live_game_pitching_workload.js';
+    script.dataset.pitchingWorkloadGame = 'true';
+    document.head.appendChild(script);
+  }
+
+  loadPitchingWorkloadUi();
+
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[ch]));
