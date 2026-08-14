@@ -33,8 +33,10 @@
       addPitcher(order, event.after_alignment?.P);
     });
 
+    const maxReached = Number(state.current_inning || state.game?.live_current_inning || 1);
     Object.entries(state.actual_rotation || {})
       .sort((a,b) => Number(a[0]) - Number(b[0]))
+      .filter(([inning]) => !Number.isFinite(maxReached) || Number(inning) <= maxReached)
       .forEach(([, alignment]) => addPitcher(order, alignment?.P));
 
     addPitcher(order, state.current_alignment?.P);
