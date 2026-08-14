@@ -143,7 +143,7 @@
         </div>
     </div>
 
-    <div class="row planner-controls">
+    <div class="row planner-controls" id="game-management-planner-row">
         <div class="col-lg-6 mb-4 d-none" id="lineup-card-container">
             {% include '_lineup_editor.html' %}
         </div>
@@ -248,7 +248,31 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/lineup_editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
+<script src="{{ url_for('static', filename='js/live_game_v2.js') }}"></script>
 <script>
+    // The legacy game script can hide every .planner-controls element when a
+    // game is already live. Because the live dashboard lives inside this row,
+    // that can blank the entire page on Safari before live_game_v2 finishes
+    // restoring lifecycle state. Keep the game shell itself visible at all times.
+    (() => {
+        const plannerRow = document.getElementById('game-management-planner-row');
+        if (!plannerRow) return;
+
+        const keepGameShellVisible = () => {
+            plannerRow.classList.remove('d-none');
+            plannerRow.style.removeProperty('display');
+            const rotationContainer = document.getElementById('rotation-card-container');
+            if (rotationContainer) {
+                rotationContainer.classList.remove('d-none');
+                rotationContainer.style.removeProperty('display');
+            }
+        };
+
+        keepGameShellVisible();
+        const observer = new MutationObserver(keepGameShellVisible);
+        observer.observe(plannerRow, { attributes: true, attributeFilter: ['class', 'style'] });
+    })();
+
     document.addEventListener('DOMContentLoaded', () => {
         const initialGameData = {
             game: {{ game|tojson }},
@@ -263,6 +287,5 @@
         };
         initializeGameManagement(initialGameData);
     });
-    import('/static/js/live_game_v2.js');
 </script>
 {% endblock %}
