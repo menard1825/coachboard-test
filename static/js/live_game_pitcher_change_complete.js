@@ -36,7 +36,9 @@
       #live-pitcher-finish-v3 .pitch-row{display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;align-items:center;margin-bottom:9px}
       #live-pitcher-finish-v3 .pitch-pos{width:44px;height:34px;border-radius:8px;background:#eef1f5;color:#344054;display:flex;align-items:center;justify-content:center;font-size:.74rem;font-weight:800}
       #live-pitcher-finish-v3 .pitch-row.pitcher .pitch-pos{background:#172033;color:#fff}
+      #live-pitcher-finish-v3 .pitch-row.needs-player .pitch-pos{background:#fff1f1;color:#a32929}
       #live-pitcher-finish-v3 .pitch-row .form-select,#live-pitcher-finish-v3 .pitch-row .form-control{min-height:48px;border-radius:10px;font-weight:650}
+      #live-pitcher-finish-v3 .pitch-row.needs-player .form-select{border-color:#d88b8b;background:#fffafa}
       #live-pitcher-finish-v3 .pitch-bench{display:flex;flex-wrap:wrap;gap:6px}
       #live-pitcher-finish-v3 .pitch-bench span{border:1px solid #dfe3e8;background:#f8f9fb;border-radius:999px;padding:5px 9px;font-size:.74rem;color:#475467}
       #live-pitcher-finish-v3 .pitch-warning{color:#a32929;font-size:.8rem;font-weight:650}
@@ -81,7 +83,7 @@
     modal.className = 'modal fade';
     modal.tabIndex = -1;
     modal.setAttribute('data-bs-backdrop','static');
-    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Finish Pitching Change</h5><div class="small text-muted">Confirm the whole defense before saving.</div></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="pitch-finish-body-v3"></div></div></div>`;
+    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Finish Pitching Change</h5><div class="small text-muted">Choose every defensive move yourself before saving.</div></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="pitch-finish-body-v3"></div></div></div>`;
     document.body.appendChild(modal);
     return modal;
   }
@@ -104,11 +106,11 @@
     const holes = missing();
     const benchNames = bench();
 
-    let summary = `<strong>${esc(incoming.name)}</strong> will pitch.`;
+    let summary = `<strong>${esc(incoming.name)}</strong> will pitch. No other defensive spots will be filled automatically.`;
     if (incomingPosition && oldPitcher) {
-      summary = `<strong>${esc(incoming.name)}</strong> moves from <strong>${esc(incomingPosition)}</strong> to <strong>P</strong>. <strong>${esc(oldPitcher)}</strong> is automatically placed at ${esc(incomingPosition)} so you do not leave a hole. Adjust anything below if needed.`;
+      summary = `<strong>${esc(incoming.name)}</strong> moves from <strong>${esc(incomingPosition)}</strong> to <strong>P</strong>. <strong>${esc(incomingPosition)}</strong> is now open and <strong>${esc(oldPitcher)}</strong> goes to the bench by default. Choose the replacement yourself below.`;
     } else if (oldPitcher) {
-      summary = `<strong>${esc(incoming.name)}</strong> comes in from the bench to pitch. <strong>${esc(oldPitcher)}</strong> is headed to the bench unless you assign him to another position below.`;
+      summary = `<strong>${esc(incoming.name)}</strong> comes in from the bench to pitch. <strong>${esc(oldPitcher)}</strong> goes to the bench by default. If he stays in the field, assign him to a position below.`;
     }
 
     const rows = fieldPositions.map(pos => {
@@ -116,25 +118,29 @@
         return `<div class="pitch-row pitcher"><div class="pitch-pos">P</div><div class="form-control bg-light d-flex justify-content-between align-items-center"><strong>${esc(incoming.name)}</strong><span class="badge text-bg-dark">Locked</span></div></div>`;
       }
       const selected = draft[pos] || '';
+      const needsPlayer = requiredPositions.includes(pos) && !selected;
       const options = ['<option value="">Open position</option>'].concat(
         roster.filter(p=>p.name!==incoming.name).map(p=>`<option value="${esc(p.name)}" ${p.name===selected?'selected':''}>${esc(p.name)}</option>`)
       ).join('');
-      return `<div class="pitch-row"><div class="pitch-pos">${esc(pos)}</div><select class="form-select pitch-select-v3" data-pos="${esc(pos)}">${options}</select></div>`;
+      return `<div class="pitch-row ${needsPlayer?'needs-player':''}"><div class="pitch-pos">${esc(pos)}</div><select class="form-select pitch-select-v3" data-pos="${esc(pos)}">${options}</select></div>`;
     }).join('');
 
-    body.innerHTML = `<div class="pitch-summary">${summary}</div><div class="small text-uppercase text-muted fw-bold mb-2">Defense after change</div>${rows}<div class="small text-uppercase text-muted fw-bold mt-3 mb-2">Bench after change</div><div class="pitch-bench">${benchNames.length?benchNames.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>No players on bench</span>'}</div><div class="pitch-footer"><div class="me-auto">${holes.length?`<div class="pitch-warning">Fill ${esc(holes.join(', '))} before saving.</div>`:'<div class="small text-muted">One Undo restores the entire previous defense.</div>'}</div><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-dark" id="save-pitch-finish-v3" ${holes.length?'disabled':''}>Save Pitching Change</button></div>`;
+    body.innerHTML = `<div class="pitch-summary">${summary}</div><div class="small text-uppercase text-muted fw-bold mb-2">Defense after change</div>${rows}<div class="small text-uppercase text-muted fw-bold mt-3 mb-2">Bench after change</div><div class="pitch-bench">${benchNames.length?benchNames.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>No players on bench</span>'}</div><div class="pitch-footer"><div class="me-auto">${holes.length?`<div class="pitch-warning">Choose a player for ${esc(holes.join(', '))} before saving.</div>`:'<div class="small text-muted">Nothing is auto-filled. One Undo restores the entire previous defense.</div>'}</div><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-dark" id="save-pitch-finish-v3" ${holes.length?'disabled':''}>Save Pitching Change</button></div>`;
 
     body.querySelectorAll('.pitch-select-v3').forEach(select=>{
       select.addEventListener('change',()=>{
         const pos = select.dataset.pos;
-        const oldName = draft[pos] || '';
         const newName = select.value || '';
-        if (oldName === newName) return;
+        if ((draft[pos] || '') === newName) return;
 
+        // Never swap or backfill automatically. If the coach chooses a player
+        // who is currently at another position, that old position becomes open
+        // and must be explicitly filled before the pitching change can be saved.
         if (newName) {
           const other = fieldPositions.find(otherPos=>otherPos!==pos && otherPos!=='P' && draft[otherPos]===newName);
-          if (other) draft[other] = oldName;
+          if (other) draft[other] = '';
         }
+
         draft[pos] = newName;
         render();
       });
@@ -146,7 +152,7 @@
   async function save() {
     if (busy || !incoming || !draft) return;
     const holes = missing();
-    if (holes.length) return toast(`Fill ${holes.join(', ')} before saving.`,'danger');
+    if (holes.length) return toast(`Choose a player for ${holes.join(', ')} before saving.`,'danger');
 
     busy = true;
     const button = $('save-pitch-finish-v3');
@@ -185,9 +191,11 @@
 
       draft = {};
       fieldPositions.forEach(pos=>{ if (before[pos]) draft[pos] = before[pos]; });
+
+      // Only make the requested pitching move. The outgoing pitcher goes to the
+      // bench by default and the incoming pitcher's old position stays open.
       if (incomingPosition) delete draft[incomingPosition];
       draft.P = incoming.name;
-      if (incomingPosition && oldPitcher) draft[incomingPosition] = oldPitcher;
 
       ensureModal();
       render();
