@@ -37,7 +37,7 @@
       #live-defense-v2 .modal-dialog, #live-pitcher-picker-v2 .modal-dialog, #live-defense-destination-v2 .modal-dialog, #live-pitcher-destination-v2 .modal-dialog { margin:.55rem; }
       #live-defense-v2 .list-group-item, #live-pitcher-picker-v2 .pitcher-choice-v2 { border:1px solid #e1e5ea !important; border-radius:12px !important; margin-bottom:8px; padding:13px !important; }
       #live-defense-destination-v2 .btn, #live-pitcher-destination-v2 .btn { min-height:68px; border-radius:12px; font-weight:800; }
-      #live-defense-v2 .modal-title::after { content:' Â· Pick a player, then a destination'; font-size:.72rem; font-weight:400; color:#6b7280; }
+      #live-defense-v2 .modal-title::after { content:' - Pick a player, then a destination'; font-size:.72rem; font-weight:400; color:#6b7280; }
       @media (min-width:768px) { .coach-actions { grid-template-columns:repeat(4,1fr); } }
     `;
     document.head.appendChild(style);
@@ -99,7 +99,7 @@
       <div class="coach-field-row">${['3B','SS','2B','1B'].map(pos => spot(pos, defense)).join('')}</div>
       <div class="coach-field-row">${spot('P', defense)}</div>
       <div class="coach-field-row">${spot('C', defense)}</div>
-    </div><div class="small text-muted text-center mt-2">Display only â€” use Defensive Change to move players.</div>`;
+    </div><div class="small text-muted text-center mt-2">Display only - use Defensive Change to move players.</div>`;
   }
 
   function refreshDefense() {
@@ -132,9 +132,9 @@
       <div class="coach-live-head">
         <div>
           <div class="coach-label">Live Dugout</div>
-          <div class="small text-muted">Actual game state Ã· Saved for every coach</div>
+          <div class="small text-muted">Actual game state - Saved for every coach</div>
         </div>
-        <div class="coach-inning-pill"><small>INNING</small><strong id="coach-inning-copy">${inning?.textContent || '1}</strong></div>
+        <div class="coach-inning-pill"><small>INNING</small><strong id="coach-inning-copy">${inning?.textContent || '1'}</strong></div>
       </div>
       <div id="coach-pitcher-slot"></div>
       <div class="coach-actions" id="coach-action-slot"></div>
@@ -164,4 +164,67 @@
     if (title) title.textContent = 'Live Dugout';
 
     shell.addEventListener('click', event => {
-      const view = event¹Ñ…É•Ð¹±½Í•ÍÐ m‘…Ñ„µ½… µ‘•™•¹Í”µÙ¥•Ýtœ¤ì(€€€€€¥˜€ …Ù¥•Ü¤É•ÑÕÉ¸ì(€€€€€‘•™•¹Í•Y¥•Ü€ôÙ¥•Ü¹‘…Ñ…Í•Ð¹½…¡•™•¹Í•Y¥•Üì(€€€€€É•™É•Í¡•™•¹Í” ¤ì(€€€ô¤ì((€€€•¹¡…¹•€ôÑÉÕ”ì(€€€É•™É•Í¡•™•¹Í” ¤ì(€ô((€™Õ¹Ñ¥½¸Ñ¥¬ ¤ì(€€€½¹ÍÐ½Ù•É±…ä€ô€ ±¥Ù”µ…µ”µ½Ù•É±…äœ¤ì(€€€¥˜€¡½Ù•É±…ä€˜˜€…½Ù•É±…ä¹±…ÍÍ1¥ÍÐ¹½¹Ñ…¥¹Ì µ¹½¹”œ¤¤ì(€€€€€•¹¡…¹” ¤ì(€€€€€¥˜€¡•¹¡…¹•¤ì(€€€€€€€½¹ÍÐ½Áä€ô€ ½… µ¥¹¹¥¹œµ½Áäœ¤ì(€€€€€€€¥˜€¡½Áä€˜˜€ ±¥Ù”µ¥¹¹¥¹œµ‘¥ÍÁ±…äœ¤¤½Áä¹Ñ•áÑ½¹Ñ•¹Ð€ô€ ±¥Ù”µ¥¹¹¥¹œµ‘¥ÍÁ±…äœ¤¹Ñ•áÑ½¹Ñ•¹Ðì(€€€€€€€É•™É•Í¡•™•¹Í” ¤ì(€€€€€ô(€€€ô•±Í”¥˜€¡•¹¡…¹•¤ì(€€€€€½¹ÍÐ‰½…É€ô€ É½Ñ…Ñ¥½¸µ‰½…Éœ¤ì(€€€€€¥˜€¡‰½…É¤‰½…É¹±…ÍÍ1¥ÍÐ¹É•µ½Ù” ½… µ±¥Ù”µ‰½…Éµ¡¥‘‘•¸œ¤ì(€€€€€½¹ÍÐÑ¥Ñ±”€ô€ É½Ñ…Ñ¥½¸µ•‘¥Ñ½ÈµÑ¥Ñ±”œ¤ì(€€€€€¥˜€¡Ñ¥Ñ±”¤Ñ¥Ñ±”¹Ñ•áÑ½¹Ñ•¹Ð€ô€•™•¹Í¥Ù”I½Ñ…Ñ¥½¸œì(€€€ô(€ô((€‘½Õµ•¹Ð¹…‘‘Ù•¹Ñ1¥ÍÑ•¹•È =5½¹Ñ•¹Ñ1½…‘•œ°€ ¤€ôøì(€€€…‘‘MÑå±•Ì ¤ì(€€€Í•Ñ%¹Ñ•ÉÙ…°¡Ñ¥¬°€ÜÀÀ¤ì(€€€Ñ¥¬ ¤ì(€ô¤ì)ô¤ ¤ì
+      const view = event.target.closest('[data-coach-defense-view]');
+      if (!view) return;
+      defenseView = view.dataset.coachDefenseView;
+      refreshDefense();
+    });
+
+    enhanced = true;
+    refreshDefense();
+  }
+
+  function polishLiveModals() {
+    // Pitcher changes should always go through the dedicated Change Pitcher flow,
+    // where workload/eligibility is visible. Defensive Change is for position moves.
+    document.querySelectorAll('#live-defense-v2 .list-group-item').forEach(item => {
+      const pos = item.querySelector('strong')?.textContent?.trim();
+      if (pos === 'P') {
+        item.setAttribute('disabled', 'disabled');
+        item.classList.add('opacity-50');
+        item.title = 'Use Change Pitcher to replace the pitcher.';
+      }
+    });
+
+    document.querySelectorAll('#live-defense-destination-v2 [data-destination="P"]').forEach(btn => {
+      btn.setAttribute('disabled', 'disabled');
+      btn.classList.add('opacity-50');
+      const note = btn.querySelector('.small');
+      if (note) note.textContent = 'Use Change Pitcher';
+      else btn.insertAdjacentHTML('beforeend', '<div class="small">Use Change Pitcher</div>');
+    });
+
+    // A missing pitch count must never look like permission to pitch.
+    document.querySelectorAll('#live-pitcher-picker-v2 .pitcher-choice-v2').forEach(btn => {
+      const text = btn.textContent || '';
+      if (/Pitch Count Incomplete|Eligibility unknown/i.test(text)) {
+        btn.setAttribute('disabled', 'disabled');
+        btn.classList.add('opacity-50');
+      }
+    });
+  }
+
+  function tick() {
+    const overlay = $('live-game-overlay');
+    if (overlay && !overlay.classList.contains('d-none')) {
+      enhance();
+      if (enhanced) {
+        const copy = $('coach-inning-copy');
+        if (copy && $('live-inning-display')) copy.textContent = $('live-inning-display').textContent;
+        refreshDefense();
+        polishLiveModals();
+      }
+    } else if (enhanced) {
+      const board = $('rotation-board');
+      if (board) board.classList.remove('coach-live-board-hidden');
+      const title = $('rotation-editor-title');
+      if (title) title.textContent = 'Defensive Rotation';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    addStyles();
+    setInterval(tick, 700);
+    tick();
+  });
+})();
