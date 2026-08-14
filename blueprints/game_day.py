@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 
 from db import db
+from extensions import socketio
 from game_day_helpers import build_actual_game_report, build_game_readiness, team_now
 from models import Game, Lineup, PlayerPitchTarget, Rotation, Team
 
@@ -68,13 +69,15 @@ def game_day_home():
         if len(followup_cards) >= 6:
             break
 
+    # Game Day doubles as the schedule manager. Keep a useful upcoming window
+    # here instead of forcing coaches back to the legacy home-page Games tab.
     upcoming_query = db.session.query(Game).filter(
         Game.team_id == team.id,
         Game.date >= next_day,
     )
     if focus_ids:
         upcoming_query = upcoming_query.filter(~Game.id.in_(focus_ids))
-    upcoming = upcoming_query.order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(5).all()
+    upcoming = upcoming_query.order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(12).all()
 
     return render_template(
         'game_day.html',
@@ -85,6 +88,40 @@ def game_day_home():
         local_now=now,
         upcoming=upcoming,
     )
+
+
+@game_day_bp.route('/game-day/add', methods=['POST'])
+def add_game():
+    """Create a game directly from the Game Day / Schedule experience."""
+    team = _team_context()
+    if not team or 'logged_in' not in session:
+        return redirect(url_for('auth.login'))
+
+    game_date_raw = str(request.form.get('game_date') or '').strip()
+    opponent = str(request.form.get('game_opponent') or '').strip()
+    if not game_date_raw or not opponent:
+        flash('Game date and opponent are required.', 'danger')
+        return redirect(url_for('game_day.game_day_home'))
+
+    try:
+        game_date = datetime.strptime(game_date_raw, '%Y-%m-%d')
+    except ValueError:
+        flash('Invalid game date.', 'danger')
+        return redirect(url_for('game_day.game_day_home'))
+
+    game = Game(
+        date=game_date,
+        start_time=str(request.form.get('game_start_time') or '').strip(),
+        opponent=opponent,
+        location=str(request.form.get('game_location') or '').strip(),
+        game_notes=str(request.form.get('game_notes') or '').strip(),
+        team_id=team.id,
+    )
+    db.session.add(game)
+    db.session.commit()
+    socketio.emit('data_updated', {'message': f'Game vs {game.opponent} added.'})
+    flash(f'Game vs {game.opponent} added.', 'success')
+    return redirect(url_for('gameday.game_management', game_id=game.id))
 
 
 @game_day_bp.route('/game-day/<int:game_id>/delete', methods=['POST'])
@@ -103,7 +140,7 @@ def delete_game(game_id):
             'message': 'A live game cannot be deleted. End the game first.',
         }), 409
 
-    # These two planning records are associated by integer game id rather than a
+    # These planning records are associated by integer game id rather than a
     # SQLAlchemy relationship, so remove them explicitly before deleting the game.
     db.session.query(Lineup).filter_by(
         associated_game_id=game.id,
@@ -129,6 +166,7 @@ def delete_game(game_id):
     opponent = game.opponent
     db.session.delete(game)
     db.session.commit()
+    socketio.emit('data_updated', {'message': f'Game vs {opponent} deleted.'})
     return jsonify({
         'status': 'success',
         'message': f'Game vs {opponent} deleted.',
