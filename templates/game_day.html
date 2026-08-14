@@ -127,6 +127,24 @@
     <div class="gd-empty"><strong>No games are scheduled.</strong><div class="mt-1">Add the next game from Schedule when you have it.</div><a class="btn btn-outline-primary mt-3" href="{{ url_for('home') }}#games">Open Schedule</a></div>
   {% endif %}
 
+  {% if followup_cards %}
+  <div class="gd-section-title mt-4">Postgame Follow-Up</div>
+  <div class="gd-upcoming">
+    {% for item in followup_cards %}
+      {% set g = item.game %}
+      {% set r = item.readiness %}
+      <div class="gd-up-row">
+        <div class="gd-up-date">{{ g.date.strftime('%a %m/%d') }}</div>
+        <div>
+          <div class="gd-up-name">vs {{ g.opponent }}</div>
+          {% if r.status == 'GC STATS PENDING' %}<div class="gd-up-loc">Waiting for GameChanger: {{ r.pitching_missing|join(', ') }}</div>{% else %}<div class="gd-up-loc">Live history exists, but this game still needs to be finalized.</div>{% endif %}
+        </div>
+        {% if r.status == 'GC STATS PENDING' %}<a class="btn btn-sm btn-primary" href="{{ url_for('gameday.game_management', game_id=g.id, pitching=1) }}">Enter Stats</a>{% else %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('gameday.game_management', game_id=g.id, finalize=1) }}">Finish Game</a>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% if upcoming %}
   <div class="gd-section-title mt-4">Coming Up</div>
   <div class="gd-upcoming">
@@ -157,7 +175,10 @@
 {% block scripts %}
 <script>
 (() => {
-  const gameIds = [{% for item in game_cards %}{{ item.game.id }}{% if not loop.last %},{% endif %}{% endfor %}];
+  const gameIds = [
+    {% for item in game_cards %}{{ item.game.id }},{% endfor %}
+    {% for item in followup_cards %}{{ item.game.id }},{% endfor %}
+  ];
   const socket = typeof io === 'function' ? io() : null;
   if (!socket) return;
   let reloadTimer = null;
