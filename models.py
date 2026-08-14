@@ -35,7 +35,7 @@ class Team(db.Model):
     practice_plans = relationship("PracticePlan", back_populates="team")
     signs = relationship("Sign", back_populates="team")
     player_development_focuses = relationship("PlayerDevelopmentFocus", back_populates="team")
-    player_game_absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
+    player_game_absences = relationship("PlayerGameAbsence", back_populates="team")
     player_practice_absences = relationship("PlayerPracticeAbsence", back_populates="team")
 
 class User(db.Model):
@@ -275,7 +275,7 @@ class PracticePlan(db.Model):
     id = Column(Integer, primary_key=True)
     date = Column(DateTime, nullable=False)
     general_notes = Column(Text)
-    emphasis = Column(Text)
+    emphasis = Column(String)
     warm_up = Column(Text)
     infield_outfield = Column(Text)
     hitting = Column(Text)
