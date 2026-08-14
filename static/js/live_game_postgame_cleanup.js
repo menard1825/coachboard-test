@@ -14,16 +14,6 @@
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[ch]));
 
-  function ordinal(value) {
-    const n = Number(value) || 0;
-    const mod100 = n % 100;
-    if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
-    if (n % 10 === 1) return `${n}st`;
-    if (n % 10 === 2) return `${n}nd`;
-    if (n % 10 === 3) return `${n}rd`;
-    return `${n}th`;
-  }
-
   function currentWholeInning(state) {
     const parsed = Number(state?.current_inning || state?.game?.live_current_inning || 1);
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
@@ -65,7 +55,10 @@
       const name = player.name;
       const positionNow = playerPosition(currentAlignment, name);
       const onBenchNow = !positionNow;
-      const completedBenchInnings = completed.filter(item => !playerPosition(item.alignment, name)).length;
+      const completedBenchInningsList = completed
+        .filter(item => !playerPosition(item.alignment, name))
+        .map(item => item.inning);
+      const completedBenchInnings = completedBenchInningsList.length;
 
       let priorBenchStreak = 0;
       for (let i = completed.length - 1; i >= 0; i -= 1) {
@@ -79,25 +72,31 @@
         positionNow: positionNow || 'BENCH',
         onBenchNow,
         completedBenchInnings,
+        completedBenchInningsList,
         currentBenchStreak,
+        currentInning: current,
       });
     });
 
     return stats;
   }
 
+  function inningListText(innings) {
+    if (!innings?.length) return '';
+    return innings.join(', ');
+  }
+
   function benchOptionLabel(name, stat) {
     if (!stat) return name;
-    if (stat.onBenchNow) {
-      const completedText = stat.completedBenchInnings
-        ? ` • ${stat.completedBenchInnings} full bench inn${stat.completedBenchInnings === 1 ? '' : 's'}`
-        : '';
-      return `${name} — BENCH NOW • ${ordinal(stat.currentBenchStreak)} straight${completedText}`;
-    }
-    const satText = stat.completedBenchInnings
-      ? ` • ${stat.completedBenchInnings} bench inn${stat.completedBenchInnings === 1 ? '' : 's'}`
+    const priorText = stat.completedBenchInningsList?.length
+      ? ` • sat ${inningListText(stat.completedBenchInningsList)}`
       : '';
-    return `${name} — ${stat.positionNow} now${satText}`;
+
+    if (stat.onBenchNow) {
+      return `${name} — BENCH NOW${priorText} • sitting ${stat.currentInning} now`;
+    }
+
+    return `${name} — ${stat.positionNow} NOW${priorText}`;
   }
 
   function installBenchStyles() {
@@ -110,11 +109,18 @@
       .actual-bench-context-help{font-size:.66rem;color:#8a94a3;margin:-3px 0 7px}
       .actual-bench-context-list{display:flex;flex-wrap:wrap;gap:6px}
       .actual-bench-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #d7dde5;background:#fff;border-radius:999px;padding:5px 8px;font-size:.68rem;color:#344054;white-space:nowrap}
-      .actual-bench-chip strong{font-weight:800;color:#172033}.actual-bench-chip .bench-streak{color:#8b5c00;font-weight:800}
+      .actual-bench-chip strong{font-weight:800;color:#172033}.actual-bench-chip .bench-history{color:#8b5c00;font-weight:800}
       .ni-select option[data-bench-now="1"]{font-weight:700}
       @media(max-width:575.98px){.actual-bench-context{padding:9px}.actual-bench-chip{font-size:.63rem;padding:4px 7px}}
     `;
     document.head.appendChild(style);
+  }
+
+  function benchNowChipText(item) {
+    const prior = item.completedBenchInningsList?.length
+      ? `sat ${inningListText(item.completedBenchInningsList)} • `
+      : '';
+    return `${prior}sitting ${item.currentInning} now`;
   }
 
   function enhanceAdjustModal(state = latestState) {
@@ -137,10 +143,10 @@
 
     context.innerHTML = `
       <div class="actual-bench-context-title">Bench Now — Actual Game</div>
-      <div class="actual-bench-context-help">Live defensive history only. Future planned bench time is not counted.</div>
+      <div class="actual-bench-context-help">Actual innings only. Future planned bench time is not counted.</div>
       <div class="actual-bench-context-list">
         ${benchNow.length
-          ? benchNow.map(item => `<span class="actual-bench-chip"><strong>${esc(item.name)}</strong><span class="bench-streak">${esc(ordinal(item.currentBenchStreak))} straight</span></span>`).join('')
+          ? benchNow.map(item => `<span class="actual-bench-chip"><strong>${esc(item.name)}</strong><span class="bench-history">${esc(benchNowChipText(item))}</span></span>`).join('')
           : '<span class="actual-bench-chip">Nobody is currently on the bench.</span>'}
       </div>`;
 
@@ -181,14 +187,17 @@
       select.value = selectedValue;
     });
 
-    // Upgrade the small Bench chips at the bottom with actual current streaks too.
+    // Upgrade the small Bench chips at the bottom with actual inning history too.
     body.querySelectorAll('.ni-bench span').forEach(chip => {
       const rawName = chip.dataset.playerName || chip.textContent.trim();
       chip.dataset.playerName = rawName;
       const stat = stats.get(rawName);
       if (stat?.onBenchNow) {
-        chip.textContent = `${rawName} • ${ordinal(stat.currentBenchStreak)} straight`;
-        chip.title = `${rawName}: ${stat.completedBenchInnings} completed bench inning${stat.completedBenchInnings === 1 ? '' : 's'} plus the current inning.`;
+        const prior = stat.completedBenchInningsList?.length
+          ? ` • sat ${inningListText(stat.completedBenchInningsList)}`
+          : '';
+        chip.textContent = `${rawName}${prior} • sitting ${stat.currentInning}`;
+        chip.title = `${rawName} is on the bench now. Completed bench innings: ${stat.completedBenchInningsList?.length ? inningListText(stat.completedBenchInningsList) : 'none'}. Current inning: ${stat.currentInning}.`;
       }
     });
   }
