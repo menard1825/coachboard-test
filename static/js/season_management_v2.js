@@ -44,11 +44,9 @@
     if (!tab || !accordion) return;
 
     const rotations = await loadRotations();
-    const presets = rotations.filter(item => String(item.title || '').startsWith(PRESET_PREFIX));
-    const normalIds = new Set(rotations.filter(item => !String(item.title || '').startsWith(PRESET_PREFIX)).map(item => String(item.id)));
+    const presets = rotations.filter(item => !item.associated_game_id && String(item.title || '').startsWith(PRESET_PREFIX));
+    const normalIds = new Set(rotations.filter(item => !item.associated_game_id && !String(item.title || '').startsWith(PRESET_PREFIX)).map(item => String(item.id)));
 
-    // main.js still owns the editable whole-game template list. Remove defense
-    // preset rows from that list so the two concepts are not mixed together.
     accordion.querySelectorAll('[data-rotation-id]').forEach(item => {
       if (!normalIds.has(String(item.dataset.rotationId))) item.remove();
     });
@@ -133,11 +131,10 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to reuse practice plan.');
       practiceModal?.hide();
-      window.location.assign(`/#plan-${data.new_plan_id}`);
-      window.location.reload();
+      // A full navigation lets main.js fetch the new plan before resolving #plan-ID.
+      window.location.href = `/#plan-${data.new_plan_id}`;
     } catch (error) {
       alert(error.message || 'Unable to reuse practice plan.');
-    } finally {
       practiceBusy = false;
       button.disabled = false;
       button.textContent = 'Create New Practice';
