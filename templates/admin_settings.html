@@ -57,6 +57,27 @@
                                 </div>
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                             </form>
+
+                            {% set auto_regulation = 7 if settings.age_group in ['13U','14U','15U','16U','17U','18U','19U','20U','21U','22U'] else 6 %}
+                            {% set effective_regulation = settings.regulation_innings if settings.regulation_innings is not none else auto_regulation %}
+                            <hr class="my-4">
+                            <form action="{{ url_for('rotation_templates.update_regulation_innings') }}" method="POST">
+                                <h6 class="text-muted mb-1">Game Length</h6>
+                                <p class="small text-muted mb-3">Controls how many regulation defensive innings CoachBoard prepares in new rotation templates. Extra innings can still be handled during a live game.</p>
+                                <div class="form-floating mb-2">
+                                    <select class="form-select" id="regulation_innings" name="regulation_innings">
+                                        <option value="" {% if settings.regulation_innings is none %}selected{% endif %}>Auto — follow team age group</option>
+                                        {% for inning_count in range(3, 13) %}
+                                            <option value="{{ inning_count }}" {% if settings.regulation_innings == inning_count %}selected{% endif %}>{{ inning_count }} innings</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label for="regulation_innings">Regulation Innings</label>
+                                </div>
+                                <div class="form-text mb-3" id="regulationInningsHelp">
+                                    Current: <strong>{{ effective_regulation }} innings</strong>{% if settings.regulation_innings is none %} automatically for {{ settings.age_group }}{% else %} (manual override){% endif %}.
+                                </div>
+                                <button type="submit" class="btn btn-outline-primary w-100">Save Game Length</button>
+                            </form>
                         </div>
                         <div class="tab-pane fade" id="appearance-settings">
                             <form action="{{ url_for('admin.update_admin_settings') }}" method="POST">
@@ -100,7 +121,7 @@
                                     </select>
                                     <label for="age_group">Team Age Group</label>
                                 </div>
-                                <p class="form-text">Changing this will update the <a href="{{ url_for('pitching.pitching_rules') }}" target="_blank">Pitching Rules</a> page and the pitch count tracker logic.</p>
+                                <p class="form-text">Changing this will update the <a href="{{ url_for('pitching.pitching_rules') }}" target="_blank">Pitching Rules</a> page and the pitch count tracker logic. If Regulation Innings is set to Auto, the game length follows this age group too.</p>
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                             </form>
                         </div>
@@ -126,6 +147,7 @@
                                     </select>
                                     <label for="new_age_group">New Age Group</label>
                                 </div>
+                                <p class="form-text">New seasons start with Regulation Innings on Auto, so moving from 12U to 13U automatically changes new templates from 6 to 7 innings.</p>
 
                                 <h6 class="mt-4 mb-2">Data to Carry Over</h6>
                                 <div class="form-check">
@@ -190,14 +212,40 @@
 document.addEventListener('DOMContentLoaded', function() {
     const primaryColorInput = document.getElementById('primary_color');
     const secondaryColorInput = document.getElementById('secondary_color');
+    const ageGroupInput = document.getElementById('age_group');
+    const regulationInput = document.getElementById('regulation_innings');
+    const regulationHelp = document.getElementById('regulationInningsHelp');
 
-    primaryColorInput.addEventListener('input', function() {
-        document.documentElement.style.setProperty('--primary-color', this.value);
-    });
+    if (primaryColorInput) {
+        primaryColorInput.addEventListener('input', function() {
+            document.documentElement.style.setProperty('--primary-color', this.value);
+        });
+    }
 
-    secondaryColorInput.addEventListener('input', function() {
-        document.documentElement.style.setProperty('--secondary-color', this.value);
-    });
+    if (secondaryColorInput) {
+        secondaryColorInput.addEventListener('input', function() {
+            document.documentElement.style.setProperty('--secondary-color', this.value);
+        });
+    }
+
+    function suggestedInnings(ageGroup) {
+        const age = parseInt(String(ageGroup || '').replace(/\D/g, ''), 10);
+        return Number.isFinite(age) && age >= 13 ? 7 : 6;
+    }
+
+    function refreshRegulationHelp() {
+        if (!regulationInput || !regulationHelp) return;
+        const ageGroup = ageGroupInput ? ageGroupInput.value : '{{ settings.age_group }}';
+        if (regulationInput.value) {
+            regulationHelp.innerHTML = `Current: <strong>${regulationInput.value} innings</strong> (manual override).`;
+        } else {
+            regulationHelp.innerHTML = `Current: <strong>${suggestedInnings(ageGroup)} innings</strong> automatically for ${ageGroup}.`;
+        }
+    }
+
+    if (ageGroupInput) ageGroupInput.addEventListener('change', refreshRegulationHelp);
+    if (regulationInput) regulationInput.addEventListener('change', refreshRegulationHelp);
+    refreshRegulationHelp();
 });
 </script>
 {% endblock %}
