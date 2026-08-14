@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Rotation Template - {{ current_team.team_name }}{% endblock %}
+
+{% block head %}
+<style>
+  .rte-shell{max-width:1180px;margin:0 auto;padding-bottom:88px}
+  .rte-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin:3px 0 14px}
+  .rte-kicker{font-size:.64rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}
+  .rte-head h1{font-size:1.45rem;font-weight:850;color:#172033;margin:2px 0 3px}.rte-head p{font-size:.74rem;color:#667085;margin:0;max-width:680px}
+  .rte-head-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.rte-head-actions .btn{min-height:40px;border-radius:9px;font-weight:750}
+  .rte-card{border:1px solid #dfe4ea;border-radius:15px;background:#fff;box-shadow:0 1px 4px rgba(16,24,40,.06);overflow:hidden;margin-bottom:14px}
+  .rte-card-body{padding:13px 14px}.rte-name-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}.rte-name-row label{font-size:.67rem;font-weight:800;color:#475467}.rte-name-row .form-control{min-height:44px;border-radius:9px}
+  .rte-innings-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;border-bottom:1px solid #edf0f3;background:#fafbfc}.rte-tabs{display:flex;gap:5px;flex-wrap:wrap;flex:1}.rte-tab{min-width:42px;height:38px;border-radius:8px;border:1px solid #d6dbe1;background:#fff;color:#475467;font-weight:850;font-size:.75rem}.rte-tab.active{background:#172033;color:#fff;border-color:#172033}.rte-tab.incomplete:not(.active){border-color:#d59b9b;background:#fff5f5;color:#9e3636}
+  .rte-inning-actions{display:flex;gap:6px;flex-wrap:wrap}.rte-inning-actions .btn{min-height:38px;border-radius:8px;font-size:.7rem;font-weight:750}
+  .rte-tools{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:8px;margin-bottom:11px}.rte-tools .btn,.rte-tools .form-select{min-height:42px;border-radius:9px;font-size:.74rem}
+  .rte-field-card{border:1px solid #d6e2d4;border-radius:14px;overflow:hidden}.rte-field-cap{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #e4e9e4}.rte-field-cap strong{font-size:.72rem;color:#344054}.rte-field-cap span{font-size:.62rem;color:#98a2b3}
+  .rte-field{position:relative;height:clamp(350px,50vw,500px);overflow:hidden;background:repeating-linear-gradient(90deg,#3c8a50 0,#3c8a50 12.5%,#438f56 12.5%,#438f56 25%)}.rte-field-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .rte-spot{position:absolute;transform:translate(-50%,-50%);width:clamp(76px,12vw,118px);min-height:46px;border:1px solid rgba(220,225,229,.98);border-radius:9px;background:rgba(255,255,255,.96);box-shadow:0 2px 5px rgba(16,24,40,.12);padding:5px 6px;text-align:center;z-index:2;cursor:pointer;color:#172033}.rte-spot:hover,.rte-spot:focus-visible{border-color:#667f9e;box-shadow:0 0 0 3px rgba(55,91,135,.14);outline:0}.rte-spot.open{background:#fff5f5;border-color:#d99a9a}.rte-pos{display:block;font-size:.5rem;font-weight:900;color:#667085;line-height:1;margin-bottom:3px}.rte-player{display:block;font-size:.67rem;line-height:1.08;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rte-spot.open .rte-player{color:#a63d3d}
+  .rte-bench{padding:9px 10px 10px;border-top:1px solid #e4e9e4;background:#fff}.rte-label{font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin-bottom:6px}.rte-chips{display:flex;gap:5px;flex-wrap:wrap}.rte-chips span{font-size:.64rem;border:1px solid #dde2e7;background:#f8f9fb;border-radius:999px;padding:4px 7px;color:#475467;font-weight:650}
+  .rte-status{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;border-top:1px solid #eef1f4;background:#fafbfc;font-size:.66rem;color:#667085}.rte-status strong{color:#172033}.rte-status .bad{color:#a63d3d}
+  .rte-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px}.rte-summary-player{border:1px solid #e3e7eb;border-radius:9px;padding:8px 9px;background:#fafbfc}.rte-summary-player strong{font-size:.7rem;color:#172033}.rte-summary-player div{font-size:.61rem;color:#667085;margin-top:2px}
+  #rtePlayerModal .modal-content{border:0;border-radius:16px;overflow:hidden}#rtePlayerChoices .list-group-item{padding:11px 13px}.rte-choice-name{font-size:.78rem;font-weight:800}.rte-choice-detail{font-size:.62rem;color:#667085;margin-top:2px}
+  @media(max-width:575.98px){.rte-shell{padding-bottom:92px}.rte-head{display:block}.rte-head-actions{margin-top:10px;justify-content:stretch}.rte-head-actions .btn{flex:1}.rte-card-body{padding:10px}.rte-name-row{grid-template-columns:1fr}.rte-innings-bar{padding:9px 10px}.rte-tools{grid-template-columns:1fr 1fr}.rte-tools select{grid-column:1/-1}.rte-field{height:305px}.rte-spot{width:66px;min-height:41px;padding:4px}.rte-player{font-size:.57rem}.rte-pos{font-size:.44rem}.rte-status{align-items:flex-start}}
+  @media(min-width:576px) and (orientation:portrait){.rte-field{height:clamp(390px,59vw,500px)}.rte-spot{width:clamp(80px,14vw,112px)}}
+  @media(min-width:768px) and (orientation:landscape){.rte-shell{max-width:1220px}.rte-field{height:clamp(340px,38vw,455px)}.rte-spot{width:clamp(82px,10vw,112px)}.rte-tools{grid-template-columns:minmax(260px,1fr) auto auto}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rte-shell">
+  <div class="rte-head">
+    <div>
+      <div class="rte-kicker">Full-Game Rotation Template</div>
+      <h1 id="rtePageTitle">{% if editor_data.rotation.id %}Edit Rotation Template{% else %}New Rotation Template{% endif %}</h1>
+      <p>Build the reusable defense here, inning by inning. Nothing is tied to a scheduled game until you load this template into one.</p>
+    </div>
+    <div class="rte-head-actions">
+      <a class="btn btn-outline-secondary" href="{{ url_for('home') }}#rotations">Back to Templates</a>
+      <button type="button" class="btn btn-primary" id="rteSaveTop">Save Template</button>
+    </div>
+  </div>
+
+  <section class="rte-card">
+    <div class="rte-card-body">
+      <div class="rte-name-row">
+        <div>
+          <label class="form-label mb-1" for="rteTemplateName">Template Name</label>
+          <input type="text" class="form-control" id="rteTemplateName" maxlength="120" placeholder="e.g. Pool Play, Bracket Play, Sunday Defense">
+        </div>
+        <div class="small text-muted pb-2" id="rteSaveState">Not saved yet</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="rte-card">
+    <div class="rte-innings-bar">
+      <div class="rte-tabs" id="rteInningTabs"></div>
+      <div class="rte-inning-actions">
+        <button type="button" class="btn btn-outline-secondary" id="rteAddInning">+ Inning</button>
+        <button type="button" class="btn btn-outline-secondary" id="rteRemoveInning">− Inning</button>
+      </div>
+    </div>
+    <div class="rte-card-body">
+      <div class="rte-tools">
+        <select class="form-select" id="rtePresetSelect"><option value="">Defense Preset…</option></select>
+        <button type="button" class="btn btn-outline-primary" id="rteApplyPreset" disabled>Apply to This Inning</button>
+        <button type="button" class="btn btn-outline-secondary" id="rteCopyPrevious">Copy Previous</button>
+      </div>
+      <div id="rteFieldHost"></div>
+    </div>
+  </section>
+
+  <section class="rte-card">
+    <div class="rte-card-body">
+      <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+        <div><div class="rte-kicker">Playing-Time Check</div><strong style="font-size:.82rem;color:#172033">Template Summary</strong></div>
+        <span class="small text-muted" id="rteSummaryStatus"></span>
+      </div>
+      <div class="rte-summary-grid" id="rteSummaryGrid"></div>
+    </div>
+  </section>
+</div>
+
+<div class="modal fade" id="rtePlayerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><h5 class="modal-title mb-0" id="rtePlayerTitle">Choose Player</h5><div class="small text-muted" id="rtePlayerHelp">Selecting a player already on the field opens his old position. Nothing auto-swaps.</div></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0"><div class="list-group list-group-flush" id="rtePlayerChoices"></div></div>
+    </div>
+  </div>
+</div>
+
+<script id="rteEditorData" type="application/json">{{ editor_data|tojson }}</script>
+{% endblock %}
+
+{% block bottom_nav %}
+<nav class="fixed-bottom d-lg-none bottom-nav-fixed shadow-lg bg-white">
+  <ul class="nav nav-tabs w-100">
+    <li class="nav-item flex-fill"><a class="nav-link text-center" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-diamond d-block"></i><span>Game Day</span></a></li>
+    <li class="nav-item flex-fill"><a class="nav-link text-center" href="{{ url_for('home') }}#roster"><i class="bi bi-people d-block"></i><span>Roster</span></a></li>
+    <li class="nav-item flex-fill"><a class="nav-link text-center" href="{{ url_for('home') }}#player_development"><i class="bi bi-graph-up-arrow d-block"></i><span>Development</span></a></li>
+    <li class="nav-item flex-fill"><a class="nav-link active text-center" href="{{ url_for('home') }}#rotations"><i class="bi bi-diagram-3 d-block"></i><span>Templates</span></a></li>
+    <li class="nav-item flex-fill"><a class="nav-link text-center" href="{{ url_for('home') }}#more"><i class="bi bi-three-dots d-block"></i><span>More</span></a></li>
+  </ul>
+</nav>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/rotation_template_editor.js', v=css_version) }}"></script>
+{% endblock %}
