@@ -34,6 +34,7 @@ from blueprints.api import api_bp
 from blueprints.live_game_api import live_game_api_bp
 from blueprints.live_game_bulk_api import live_game_bulk_bp
 from blueprints.live_game_safety import live_game_safety_bp
+from blueprints.live_game_pitching_api import live_game_pitching_bp
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
@@ -70,6 +71,7 @@ def create_app():
     app.register_blueprint(team_management_bp)
     app.register_blueprint(live_game_api_bp)
     app.register_blueprint(live_game_bulk_bp)
+    app.register_blueprint(live_game_pitching_bp)
     app.register_blueprint(api_bp)
 
     # --- SocketIO Handlers ---
