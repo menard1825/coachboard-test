@@ -13,9 +13,10 @@
   }
 
   const state = {
-    rotation: data.rotation || {id:null, title:'', innings:{'1':{}}},
+    rotation: data.rotation || {id:null, title:'', innings:{}},
     roster: Array.isArray(data.roster) ? data.roster : [],
     outfielderCount: Number(data.outfielder_count || 3),
+    regulationInnings: Math.max(1, Number(data.regulation_innings || 6)),
     presets: Array.isArray(data.defense_presets) ? data.defense_presets : [],
     presetPrefix: String(data.preset_prefix || 'DEFENSE PRESET — '),
     inning: '1',
@@ -34,26 +35,29 @@
       : ['P','C','1B','2B','3B','SS','LF','CF','RF'];
   }
 
-  function normalizeState() {
-    if (!state.rotation || typeof state.rotation !== 'object') state.rotation = {id:null,title:'',innings:{}};
-    if (!state.rotation.innings || typeof state.rotation.innings !== 'object') state.rotation.innings = {};
-    if (!Object.keys(state.rotation.innings).length) {
-      for (let i = 1; i <= 6; i += 1) state.rotation.innings[String(i)] = {};
-    }
-    Object.keys(state.rotation.innings).forEach((key) => {
-      if (!state.rotation.innings[key] || typeof state.rotation.innings[key] !== 'object') state.rotation.innings[key] = {};
-    });
-    const keys = inningKeys();
-    if (!keys.includes(state.inning)) state.inning = keys[0] || '1';
+  function regulationKeys() {
+    return Array.from({length: state.regulationInnings}, (_, index) => String(index + 1));
   }
 
-  function inningKeys() {
-    return Object.keys(state.rotation.innings || {}).sort((a,b) => Number(a) - Number(b));
+  function normalizeState() {
+    if (!state.rotation || typeof state.rotation !== 'object') {
+      state.rotation = {id:null, title:'', innings:{}};
+    }
+    if (!state.rotation.innings || typeof state.rotation.innings !== 'object') {
+      state.rotation.innings = {};
+    }
+
+    regulationKeys().forEach((key) => {
+      if (!state.rotation.innings[key] || typeof state.rotation.innings[key] !== 'object') {
+        state.rotation.innings[key] = {};
+      }
+    });
+
+    if (!regulationKeys().includes(state.inning)) state.inning = '1';
   }
 
   function alignment(inning = state.inning) {
     normalizeState();
-    if (!state.rotation.innings[inning]) state.rotation.innings[inning] = {};
     return state.rotation.innings[inning];
   }
 
@@ -130,16 +134,12 @@
   function renderTabs() {
     const host = $('rteInningTabs');
     if (!host) return;
-    host.innerHTML = inningKeys().map((inning) => {
+    host.innerHTML = regulationKeys().map((inning) => {
       const incomplete = openPositions(alignment(inning)).length > 0;
       return `<button type="button" class="rte-tab ${inning === state.inning ? 'active' : ''} ${incomplete ? 'incomplete' : ''}" data-rte-inning="${inning}" aria-label="Inning ${inning}">${inning}</button>`;
     }).join('');
     const copy = $('rteCopyPrevious');
     if (copy) copy.disabled = Number(state.inning) <= 1;
-    const remove = $('rteRemoveInning');
-    if (remove) remove.disabled = inningKeys().length <= 1;
-    const add = $('rteAddInning');
-    if (add) add.disabled = inningKeys().length >= 20;
   }
 
   function renderField() {
@@ -149,10 +149,8 @@
 
   function renderSummary() {
     const grid = $('rteSummaryGrid');
-    const status = $('rteSummaryStatus');
     if (!grid) return;
-    const keys = inningKeys();
-    let totalOpen = 0;
+    const keys = regulationKeys();
     const rows = state.roster.map((player) => {
       let benchCount = 0;
       const positionCounts = {};
@@ -168,9 +166,7 @@
         .join(' · ') || 'No field assignments';
       return `<div class="rte-summary-player"><strong>${esc(player.name)}</strong><div>Bench: ${benchCount} of ${keys.length} innings</div><div>${esc(positionsText)}</div></div>`;
     });
-    keys.forEach((inning) => { totalOpen += openPositions(alignment(inning)).length; });
     grid.innerHTML = rows.join('');
-    if (status) status.textContent = totalOpen ? `${totalOpen} open field spot${totalOpen === 1 ? '' : 's'} across template` : 'All defensive innings complete';
   }
 
   function renderPresetOptions() {
@@ -236,27 +232,6 @@
     renderAll();
   }
 
-  function addInning() {
-    const keys = inningKeys();
-    if (keys.length >= 20) return;
-    const next = String(Math.max(...keys.map(Number)) + 1);
-    state.rotation.innings[next] = {};
-    state.inning = next;
-    markDirty();
-    renderAll();
-  }
-
-  function removeInning() {
-    const keys = inningKeys();
-    if (keys.length <= 1) return;
-    const last = keys[keys.length - 1];
-    if (!window.confirm(`Remove inning ${last} from this template?`)) return;
-    delete state.rotation.innings[last];
-    if (state.inning === last) state.inning = inningKeys()[inningKeys().length - 1];
-    markDirty();
-    renderAll();
-  }
-
   function copyPrevious() {
     const previous = String(Number(state.inning) - 1);
     if (!state.rotation.innings[previous]) return;
@@ -307,15 +282,15 @@
       return;
     }
 
-    const incomplete = inningKeys().filter((inning) => openPositions(alignment(inning)).length > 0);
+    const incomplete = regulationKeys().filter((inning) => openPositions(alignment(inning)).length > 0);
     if (incomplete.length) {
       const okay = window.confirm(`This template still has open defensive positions in inning${incomplete.length === 1 ? '' : 's'} ${incomplete.join(', ')}.\n\nSave it anyway?`);
       if (!okay) return;
     }
 
     state.saving = true;
-    const buttons = [$('rteSaveTop')].filter(Boolean);
-    buttons.forEach((button) => { button.disabled = true; button.textContent = 'Saving…'; });
+    const button = $('rteSaveTop');
+    if (button) { button.disabled = true; button.textContent = 'Saving…'; }
     if ($('rteSaveState')) $('rteSaveState').textContent = 'Saving…';
 
     try {
@@ -342,21 +317,22 @@
       if ($('rteSaveState')) $('rteSaveState').textContent = 'Save failed';
     } finally {
       state.saving = false;
-      buttons.forEach((button) => { button.disabled = false; button.textContent = 'Save Template'; });
+      if (button) { button.disabled = false; button.textContent = 'Save Template'; }
     }
   }
 
   function bindEvents() {
-    $('rteTemplateName').value = state.rotation.title || '';
-    $('rteTemplateName').addEventListener('input', markDirty);
-    $('rteSaveTop').addEventListener('click', saveTemplate);
-    $('rteAddInning').addEventListener('click', addInning);
-    $('rteRemoveInning').addEventListener('click', removeInning);
-    $('rteCopyPrevious').addEventListener('click', copyPrevious);
-    $('rtePresetSelect').addEventListener('change', () => {
-      $('rteApplyPreset').disabled = !$('rtePresetSelect').value;
+    const nameInput = $('rteTemplateName');
+    if (nameInput) {
+      nameInput.value = state.rotation.title || '';
+      nameInput.addEventListener('input', markDirty);
+    }
+    $('rteSaveTop')?.addEventListener('click', saveTemplate);
+    $('rteCopyPrevious')?.addEventListener('click', copyPrevious);
+    $('rtePresetSelect')?.addEventListener('change', () => {
+      if ($('rteApplyPreset')) $('rteApplyPreset').disabled = !$('rtePresetSelect').value;
     });
-    $('rteApplyPreset').addEventListener('click', applyPreset);
+    $('rteApplyPreset')?.addEventListener('click', applyPreset);
 
     document.addEventListener('click', (event) => {
       const tab = event.target.closest('[data-rte-inning]');
