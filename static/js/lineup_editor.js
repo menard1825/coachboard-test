@@ -234,3 +234,13 @@ function initializeLineupEditor(options) {
         handle: '.lineup-drag-handle',
     });
 }
+
+// The dashboard still contains a legacy Pitching tab. Load the compatibility UI
+// only on the home page so it follows the same corrected pitching rules/forms as /pitching.
+(() => {
+    if (window.location.pathname !== '/' || document.querySelector('script[data-pitching-home-v2]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/pitching_dashboard_home.js';
+    script.dataset.pitchingHomeV2 = 'true';
+    document.head.appendChild(script);
+})();
