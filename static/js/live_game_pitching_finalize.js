@@ -55,13 +55,13 @@
     const logByPlayer = new Map((state.game_pitching_log || []).map(o => [Number(o.player_id), o]));
 
     if (!order.length) {
-      container.innerHTML = '<div class="text-muted text-center py-3">No pitchers were found in the live defensive history. You can still end the game.</div>';
+      container.innerHTML = '<div class="text-muted text-center py-3">No pitchers were found in the live defensive history. You can still finalize the game.</div>';
       return;
     }
 
     container.innerHTML = `
       <div class="alert alert-light border small mb-3">
-        Enter the final GameChanger numbers. Blank values stay <strong>unknown</strong> — CoachBoard will never turn them into zero.
+        Final GameChanger check-in. Blank values stay <strong>unknown</strong> — CoachBoard will never turn them into zero.
       </div>
       ${order.map((name, index) => {
         const player = (state.roster || []).find(p => p.name === name);
@@ -106,6 +106,10 @@
       renderFinalForm(state);
       const modalEl = document.getElementById('liveFinalCountsModal');
       if (!modalEl) throw new Error('Final pitching dialog is unavailable.');
+      const title = modalEl.querySelector('.modal-title');
+      if (title) title.textContent = 'Finalize Game';
+      const confirm = modalEl.querySelector('#confirmFinalCountsBtn');
+      if (confirm) confirm.textContent = 'Finalize Game';
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
     } catch (err) {
       alert(err.message || 'Unable to prepare final pitching entry.');
@@ -118,7 +122,7 @@
     if (busy) return;
     busy = true;
     const button = document.getElementById('confirmFinalCountsBtn');
-    if (button) button.disabled = true;
+    if (button) { button.disabled = true; button.textContent = 'Finalizing…'; }
 
     try {
       const counts = [...document.querySelectorAll('.final-pitcher-card')].map((card, index) => {
@@ -140,23 +144,21 @@
         body:JSON.stringify({counts}),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to end game.');
+      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to finalize game.');
 
       bootstrap.Modal.getOrCreateInstance(document.getElementById('liveFinalCountsModal')).hide();
       if (data.warnings?.length) {
         alert(`Game saved. Please verify later:\n\n${data.warnings.join('\n')}`);
       }
-      window.location.reload();
+      window.location.assign(`/game-day/${gameId}/report`);
     } catch (err) {
       alert(err.message || 'Unable to save final pitching numbers.');
+      if (button) { button.disabled = false; button.textContent = 'Finalize Game'; }
     } finally {
       busy = false;
-      if (button) button.disabled = false;
     }
   }
 
-  // This script is intentionally loaded before live_game_v2.js so these capture
-  // handlers own End Game and prevent the legacy pitch-count-only workflow.
   document.addEventListener('click', event => {
     const endButton = event.target.closest('#liveEndGameBtn');
     if (endButton) {
