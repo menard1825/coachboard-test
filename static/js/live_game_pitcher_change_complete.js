@@ -19,6 +19,14 @@
   let requiredPositions = [];
   let busy = false;
 
+  function loadBoardPrep() {
+    if (document.querySelector('script[data-live-board-prep]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/live_game_board_prep.js';
+    script.dataset.liveBoardPrep = 'true';
+    document.head.appendChild(script);
+  }
+
   function positions() {
     return Number(state?.outfielder_count) === 4
       ? ['P','C','1B','2B','3B','SS','LF','LCF','RCF','RF']
@@ -227,5 +235,6 @@
   }
 
   installStyles();
+  loadBoardPrep();
   document.addEventListener('click',intercept,true);
 })();
