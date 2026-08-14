@@ -23,6 +23,22 @@
     document.head.appendChild(style);
   }
 
+  function ensurePrimaryButtonContrast() {
+    document.querySelectorAll('.gd-primary').forEach(button => {
+      const background = window.getComputedStyle(button).backgroundColor.replace(/\s/g, '');
+      if (
+        background === 'rgba(0,0,0,0)' ||
+        background === 'transparent' ||
+        background === 'rgb(255,255,255)' ||
+        background === 'rgba(255,255,255,1)'
+      ) {
+        button.style.backgroundColor = '#102a66';
+        button.style.borderColor = '#102a66';
+        button.style.color = '#fff';
+      }
+    });
+  }
+
   function opponentFor(card) {
     return (card.querySelector('.gd-opponent')?.textContent || 'this game')
       .replace(/^\s*vs\s+/i, '')
@@ -82,6 +98,7 @@
 
   function init() {
     installStyles();
+    ensurePrimaryButtonContrast();
     document.querySelectorAll('.gd-game[data-game-id]').forEach(addMenu);
     document.addEventListener('click', event => {
       const button = event.target.closest('.gd-delete-game');
