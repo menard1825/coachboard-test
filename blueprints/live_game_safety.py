@@ -1,3 +1,4 @@
+import re
 from copy import deepcopy
 
 from flask import Blueprint, jsonify, request
@@ -195,3 +196,113 @@ def protect_complete_live_defense():
         return _guard_legacy_pitcher_change(game, team, data)
 
     return None
+
+
+@live_game_safety_bp.after_app_request
+def stabilize_live_game_first_paint(response):
+    """Render an already-live game in live mode from the very first browser paint.
+
+    The legacy Game Management markup still exists for compatibility, but an
+    already-live request must not briefly show the pregame page or old live
+    buttons while the authoritative controller boots.
+    """
+    if response.mimetype != 'text/html' or not re.fullmatch(r'/game/\d+/?', request.path):
+        return response
+
+    match = re.fullmatch(r'/game/(\d+)/?', request.path)
+    if not match:
+        return response
+
+    try:
+        game_id = int(match.group(1))
+    except (TypeError, ValueError):
+        return response
+
+    user, team, game = _authorized_context(game_id)
+    if not game or not game.is_live:
+        return response
+
+    html = response.get_data(as_text=True)
+
+    # Hide the pregame checklist before the browser can paint it.
+    html = html.replace(
+        'id="pregame-checklist-container" class="planner-controls"',
+        'id="pregame-checklist-container" class="planner-controls d-none"',
+        1,
+    )
+
+    # The rotation card must remain mounted because it owns the live overlay,
+    # but the old planner surface should never be the first thing coaches see.
+    overlay_pattern = re.compile(r'(<div id="live-game-overlay" class=")([^"]*)(">)')
+
+    def _activate_overlay(m):
+        classes = [c for c in m.group(2).split() if c != 'd-none']
+        if 'coach-live-server-active' not in classes:
+            classes.append('coach-live-server-active')
+        return m.group(1) + ' '.join(classes) + m.group(3)
+
+    html = overlay_pattern.sub(_activate_overlay, html, count=1)
+
+    loading = '''
+<div class="coach-live-server-loading" role="status" aria-live="polite">
+  <div class="coach-live-server-spinner"></div>
+  <strong>Loading Live Dugout…</strong>
+  <span>Syncing the current inning and defense</span>
+</div>
+'''
+    html = re.sub(
+        r'(<div id="live-game-overlay" class="[^"]*">)',
+        r'\1' + loading,
+        html,
+        count=1,
+    )
+
+    first_paint = '''
+<style id="coach-live-server-paint">
+  #pregame-checklist-container.d-none { display:none !important; }
+  #pitching-log-container { display:none !important; }
+  #rotation-card-container > .card > .card-header { display:none !important; }
+  #rotation-board { display:none !important; }
+  #live-game-overlay.coach-live-server-active:not(.coach-live-polished):not(.coach-live-boot-fallback) {
+    visibility:visible !important;
+    display:block !important;
+    min-height:320px;
+    background:#f5f6f8 !important;
+  }
+  #live-game-overlay.coach-live-server-active:not(.coach-live-polished):not(.coach-live-boot-fallback) > :not(.coach-live-server-loading) {
+    display:none !important;
+  }
+  .coach-live-server-loading {
+    min-height:290px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    gap:7px;
+    color:#344054;
+  }
+  .coach-live-server-loading strong { font-size:.95rem; }
+  .coach-live-server-loading span { color:#98a2b3; font-size:.72rem; }
+  .coach-live-server-spinner {
+    width:24px;
+    height:24px;
+    border-radius:50%;
+    border:3px solid #d9dee7;
+    border-top-color:var(--primary-color,#102a66);
+    animation:coachLiveBootSpin .8s linear infinite;
+  }
+  #live-game-overlay.coach-live-polished > .coach-live-server-loading,
+  #live-game-overlay.coach-live-boot-fallback > .coach-live-server-loading {
+    display:none !important;
+  }
+  @keyframes coachLiveBootSpin { to { transform:rotate(360deg); } }
+</style>
+'''
+    if '</head>' in html:
+        html = html.replace('</head>', first_paint + '</head>', 1)
+    else:
+        html = first_paint + html
+
+    response.set_data(html)
+    return response
