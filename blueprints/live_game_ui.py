@@ -158,7 +158,7 @@ def _end_inning_with_confirmed_prep():
         state = get_authoritative_live_state(game.id, team.id) or {}
         summary = (state.get('pitch_count_summary') or {}).get(new_pitcher, {})
         status = str(summary.get('status') or '').lower()
-        if any(term in status for term in ('rest', 'unavailable', 'ineligible', 'incomplete')):
+        if any(term in status for term in ('rest', 'unavailable', 'ineligible', 'incomplete', 'restriction', 'verify')):
             return jsonify({
                 'status': 'error',
                 'message': f'{new_pitcher} cannot start the next inning right now: {summary.get("status") or "not available"}.'
@@ -253,7 +253,11 @@ def protect_live_game_workflows():
     if request.method == 'POST' and request.endpoint == 'live_game_api.end_inning':
         return _end_inning_with_confirmed_prep()
 
-    if request.method == 'POST' and request.endpoint in {'live_game_api.start', 'live_game_api.end_game'}:
+    if request.method == 'POST' and request.endpoint in {
+        'live_game_api.start',
+        'live_game_api.end_game',
+        'live_game_pitching.end_with_pitching',
+    }:
         try:
             game_id = int((request.view_args or {}).get('game_id'))
         except (TypeError, ValueError):
@@ -324,6 +328,18 @@ def inject_live_game_assets(response):
             html = html.replace('</head>', first_paint + '</head>', 1)
         else:
             html = first_paint + html
+
+    # This controller must register before live_game_v2.js so it owns the End
+    # Game click and prevents the old pitch-count-only finalization workflow.
+    if 'live_game_pitching_finalize.js' not in html:
+        finalize_asset = '<script src="/static/js/live_game_pitching_finalize.js"></script>\n'
+        v2_marker = '<script src="/static/js/live_game_v2.js"></script>'
+        if v2_marker in html:
+            html = html.replace(v2_marker, finalize_asset + v2_marker, 1)
+        elif '</head>' in html:
+            html = html.replace('</head>', finalize_asset + '</head>', 1)
+        else:
+            html = finalize_asset + html
 
     if 'live_game_board_prep_v2.js' not in html:
         assets = '''
