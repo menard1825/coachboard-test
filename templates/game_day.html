@@ -83,15 +83,24 @@
               <span class="gd-ready-label">Defense</span>
               <div class="gd-ready-value">{% if r.defense_ready %}{{ r.defense_innings }} innings ready{% else %}Needs attention{% endif %}</div>
             </div>
+            {% if r.has_end_game %}
+            <div class="gd-ready-item {% if r.pitching_stats_complete %}good{% else %}need{% endif %}">
+              <span class="gd-ready-label">GameChanger</span>
+              <div class="gd-ready-value">{% if r.pitching_stats_complete %}Pitching stats entered{% else %}Waiting on {{ r.pitching_missing|length }} pitcher{% if r.pitching_missing|length != 1 %}s{% endif %}{% endif %}</div>
+            </div>
+            {% else %}
             <div class="gd-ready-item {% if r.pitching_plan_ready %}good{% else %}optional{% endif %}">
               <span class="gd-ready-label">Pitching Plan</span>
               <div class="gd-ready-value">{% if r.pitching_plan_ready %}{{ r.pitching_plan_count }} planned{% else %}Optional · not set{% endif %}</div>
             </div>
+            {% endif %}
           </div>
 
-          {% if r.blockers %}
+          {% if r.status == 'GC STATS PENDING' %}
+          <div class="gd-alerts"><strong>Game is saved — GameChanger stats can be added later</strong><div>Waiting for final pitching numbers for {{ r.pitching_missing|join(', ') }}.</div></div>
+          {% elif r.status not in ['COMPLETE'] and r.blockers %}
           <div class="gd-alerts"><strong>{{ r.blockers|length }} setup item{% if r.blockers|length != 1 %}s{% endif %} to finish</strong>{% for blocker in r.blockers %}<div>{{ blocker }}</div>{% endfor %}</div>
-          {% elif r.pitching_alerts %}
+          {% elif r.status not in ['COMPLETE'] and r.pitching_alerts %}
           <div class="gd-alerts"><strong>Pitching attention</strong>{% for alert in r.pitching_alerts[:3] %}<div>{{ alert.name }} — {{ alert.status }}{% if alert.detail %}: {{ alert.detail }}{% endif %}</div>{% endfor %}</div>
           {% endif %}
 
@@ -99,6 +108,9 @@
             {% if r.status == 'COMPLETE' %}
               <a class="btn gd-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">View Game Report</a>
               <a class="btn btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Open Game</a>
+            {% elif r.status == 'GC STATS PENDING' %}
+              <a class="btn gd-primary" href="{{ url_for('gameday.game_management', game_id=g.id, pitching=1) }}">Enter GameChanger Stats</a>
+              <a class="btn btn-outline-secondary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">View Game Report</a>
             {% elif r.status == 'NEEDS POSTGAME' %}
               <a class="btn gd-primary" href="{{ url_for('gameday.game_management', game_id=g.id, finalize=1) }}">Finish Game</a>
               <a class="btn btn-outline-secondary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">Actual Usage</a>
