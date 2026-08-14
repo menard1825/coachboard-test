@@ -13,23 +13,18 @@ function initializeLineupEditor(options) {
     // FIX: Ensure lineup_positions is always a valid array, parsing from JSON if necessary.
     if (typeof lineup.lineup_positions === 'string') {
         try {
-            // Attempt to parse the string as JSON.
             lineup.lineup_positions = JSON.parse(lineup.lineup_positions);
-            // Further check if the parsed result is actually an array.
             if (!Array.isArray(lineup.lineup_positions)) {
                 lineup.lineup_positions = [];
             }
         } catch (e) {
             console.error("Error parsing lineup_positions JSON:", e);
-            // If parsing fails, default to an empty array.
             lineup.lineup_positions = [];
         }
     } else if (!Array.isArray(lineup.lineup_positions)) {
-        // If it's not a string and not an array (e.g., null, undefined), default to an empty array.
         lineup.lineup_positions = [];
     }
 
-    // --- Utility Functions ---
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
 
     function createBenchPlayerItem(player) {
@@ -88,16 +83,13 @@ function initializeLineupEditor(options) {
     }
 
     function updatePlaceholders() {
-        // Remove existing placeholders
         benchEl.querySelector('.placeholder-text')?.remove();
         orderEl.querySelector('.placeholder-text')?.remove();
 
-        // Add placeholder to order list if empty
         if (orderEl.children.length === 0) {
             orderEl.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text"><i class="bi bi-people" style="font-size: 2rem;"></i><p class="mt-2 mb-0">Drag players from the bench to build the batting order.</p></div>`;
         }
 
-        // Add placeholder to bench list if empty
         if (benchEl.children.length === 0) {
             benchEl.innerHTML = `<div class="text-center p-5 text-muted fst-italic placeholder-text"><i class="bi bi-check-circle" style="font-size: 2rem;"></i><p class="mt-2 mb-0">All available players are in the lineup.</p></div>`;
         }
@@ -129,31 +121,25 @@ function initializeLineupEditor(options) {
                 const player = roster.find(p => p.name === playerName);
 
                 if (player) {
-                    // Update state
                     lineup.lineup_positions = lineup.lineup_positions.filter(p => p !== playerName);
-
-                    // Manipulate DOM directly
                     const newBenchItem = createBenchPlayerItem(player);
                     benchEl.appendChild(newBenchItem);
                     playerItem.remove();
-
                     updatePlaceholders();
                 }
             }
         });
     }
 
-    // Initial render
     renderLineup();
     setupEventListeners();
 
-    // Destroy existing sortable instances if they exist to prevent memory leaks
     if (benchEl.sortable) benchEl.sortable.destroy();
     if (orderEl.sortable) orderEl.sortable.destroy();
 
     let ghostPositionEl = null;
 
-    const onDragStart = (evt) => {
+    const onDragStart = () => {
         document.body.classList.add('dragging-lineup-player');
     };
 
@@ -161,20 +147,13 @@ function initializeLineupEditor(options) {
         const ghostEl = document.querySelector('.lineup-ghost');
         if (!ghostEl) return;
 
-        // Check if we've already modified this ghost to add our number element
         if (!ghostEl.dataset.ghostModified) {
             ghostEl.dataset.ghostModified = 'true';
-
-            // Find the main text span to insert our number before it
             const mainContainer = ghostEl.querySelector('.d-flex.align-items-center');
             if (mainContainer) {
                 ghostPositionEl = document.createElement('span');
                 ghostPositionEl.className = 'ghost-position-number';
-
-                // Insert the position number as the first element in the container
                 mainContainer.insertBefore(ghostPositionEl, mainContainer.firstChild);
-
-                // Add a class to the ghost itself to hide the default CSS counter
                 ghostEl.classList.add('sortable-ghost-custom');
             }
         }
@@ -186,33 +165,20 @@ function initializeLineupEditor(options) {
                     const pos = newIndex + 1;
                     ghostPositionEl.textContent = `${pos}.\u00A0`;
                 } else {
-                    // This case handles dragging over an empty lineup list that has a placeholder.
                     const isOrderEmpty = orderEl.children.length === 0 || orderEl.querySelector('.placeholder-text');
-                    if (isOrderEmpty) {
-                        ghostPositionEl.textContent = '1.\u00A0';
-                    } else {
-                        // If the index is invalid for any other reason, hide the number.
-                        ghostPositionEl.textContent = '';
-                    }
+                    ghostPositionEl.textContent = isOrderEmpty ? '1.\u00A0' : '';
                 }
             } else {
-                // We are over the bench or somewhere else, so hide the position.
                 ghostPositionEl.textContent = '';
             }
         }
     };
 
-    const onSortEnd = (evt) => {
+    const onSortEnd = () => {
         document.body.classList.remove('dragging-lineup-player');
-        ghostPositionEl = null; // Clear reference
-
-        // Update the lineup from the DOM
+        ghostPositionEl = null;
         lineup.lineup_positions = Array.from(orderEl.querySelectorAll('.list-group-item')).map(item => item.dataset.playerName);
-
-        // Full re-render to ensure consistency
         renderLineup();
-
-        // Reset scroll positions
         benchEl.scrollTop = 0;
         orderEl.scrollTop = 0;
     };
@@ -220,27 +186,15 @@ function initializeLineupEditor(options) {
     const sortableOptions = {
         group: 'lineup',
         animation: 150,
-        ghostClass: 'lineup-ghost', // Custom ghost class
+        ghostClass: 'lineup-ghost',
         onStart: onDragStart,
         onMove: onDragMove,
         onEnd: onSortEnd,
     };
 
-    // Initialize SortableJS
     benchEl.sortable = new Sortable(benchEl, sortableOptions);
-
     orderEl.sortable = new Sortable(orderEl, {
         ...sortableOptions,
         handle: '.lineup-drag-handle',
     });
 }
-
-// The dashboard still contains a legacy Pitching tab. Load the compatibility UI
-// only on the home page so it follows the same corrected pitching rules/forms as /pitching.
-(() => {
-    if (window.location.pathname !== '/' || document.querySelector('script[data-pitching-home-v2]')) return;
-    const script = document.createElement('script');
-    script.src = '/static/js/pitching_dashboard_home.js';
-    script.dataset.pitchingHomeV2 = 'true';
-    document.head.appendChild(script);
-})();
