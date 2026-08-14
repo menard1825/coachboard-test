@@ -19,6 +19,10 @@
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
   }
 
+  function requiredPositionCount(state) {
+    return Number(state?.outfielder_count) === 4 ? 10 : 9;
+  }
+
   function playerPosition(alignment, name) {
     for (const [position, playerName] of Object.entries(alignment || {})) {
       if (playerName === name) return position;
@@ -26,93 +30,121 @@
     return null;
   }
 
-  function reachedSnapshots(state) {
+  function alignmentPlayerCount(alignment) {
+    return Object.values(alignment || {}).filter(Boolean).length;
+  }
+
+  function completedActualSnapshots(state) {
     const current = currentWholeInning(state);
+    const required = requiredPositionCount(state);
     const actual = state?.actual_rotation || {};
     const snapshots = [];
 
-    for (let inning = 1; inning <= current; inning += 1) {
-      let alignment = actual[String(inning)] || {};
-      if (inning === current && state?.current_alignment) {
-        alignment = state.current_alignment;
-      }
-      // Ignore a corrupted/unknown empty inning rather than calling every player benched.
-      if (!Object.values(alignment || {}).some(Boolean)) continue;
+    for (let inning = 1; inning < current; inning += 1) {
+      const alignment = actual[String(inning)] || {};
+      // Only count a completed inning when we actually have a complete defensive
+      // snapshot. Corrupted/legacy partial innings must not manufacture bench time.
+      if (alignmentPlayerCount(alignment) !== required) continue;
       snapshots.push({ inning, alignment });
     }
     return snapshots;
   }
 
+  function plannedGameContext(state) {
+    const required = requiredPositionCount(state);
+    const innings = state?.rotation?.innings || {};
+    const wholeKeys = Object.keys(innings)
+      .map(key => Number(key))
+      .filter(value => Number.isFinite(value) && Number.isInteger(value) && value > 0)
+      .sort((a, b) => a - b);
+
+    if (!wholeKeys.length) {
+      return { reliable: false, snapshots: [], inningCount: 0 };
+    }
+
+    const maxInning = Math.max(...wholeKeys);
+    const snapshots = [];
+    let reliable = true;
+
+    for (let inning = 1; inning <= maxInning; inning += 1) {
+      const alignment = innings[String(inning)] || {};
+      if (alignmentPlayerCount(alignment) !== required) {
+        reliable = false;
+        continue;
+      }
+      snapshots.push({ inning, alignment });
+    }
+
+    return { reliable, snapshots, inningCount: maxInning };
+  }
+
   function buildBenchStats(state) {
-    if (!state) return new Map();
-    const current = currentWholeInning(state);
+    if (!state) return { stats: new Map(), planReliable: false };
+
     const currentAlignment = state.current_alignment || {};
-    const snapshots = reachedSnapshots(state);
-    const completed = snapshots.filter(item => item.inning < current);
+    const completedActual = completedActualSnapshots(state);
+    const plan = plannedGameContext(state);
     const stats = new Map();
 
     (state.roster || []).forEach(player => {
       const name = player.name;
       const positionNow = playerPosition(currentAlignment, name);
       const onBenchNow = !positionNow;
-      const completedBenchInningsList = completed
+      const actualBenchInnings = completedActual
         .filter(item => !playerPosition(item.alignment, name))
         .map(item => item.inning);
-      const completedBenchInnings = completedBenchInningsList.length;
+      const plannedBenchInnings = plan.snapshots
+        .filter(item => !playerPosition(item.alignment, name))
+        .map(item => item.inning);
 
-      let priorBenchStreak = 0;
-      for (let i = completed.length - 1; i >= 0; i -= 1) {
-        if (playerPosition(completed[i].alignment, name)) break;
-        priorBenchStreak += 1;
-      }
-
-      const currentBenchStreak = onBenchNow ? priorBenchStreak + 1 : 0;
       stats.set(name, {
         name,
         positionNow: positionNow || 'BENCH',
         onBenchNow,
-        completedBenchInnings,
-        completedBenchInningsList,
-        currentBenchStreak,
-        currentInning: current,
+        actualBenchInnings,
+        actualBenchCount: actualBenchInnings.length,
+        plannedBenchInnings,
+        plannedBenchCount: plan.reliable ? plannedBenchInnings.length : null,
       });
     });
 
-    return stats;
+    return { stats, planReliable: plan.reliable, plannedInnings: plan.inningCount };
   }
 
-  function inningListText(innings) {
-    if (!innings?.length) return '';
-    return innings.join(', ');
+  function countLabel(value) {
+    return Number(value) === 1 ? '1 inning' : `${Number(value) || 0} innings`;
   }
 
-  function satHistoryText(innings) {
-    if (!innings?.length) return '';
-    return innings.length === 1
-      ? `Sat inning ${innings[0]}`
-      : `Sat innings ${inningListText(innings)}`;
+  function balanceText(stat) {
+    const actual = `Sat ${countLabel(stat?.actualBenchCount || 0)}`;
+    const planned = stat?.plannedBenchCount === null || stat?.plannedBenchCount === undefined
+      ? 'Planned —'
+      : `Planned ${countLabel(stat.plannedBenchCount)}`;
+    return `${actual} • ${planned}`;
   }
 
   function benchOptionLabel(name, stat, targetPosition) {
     if (!stat) return name;
-    const history = satHistoryText(stat.completedBenchInningsList);
+    const context = balanceText(stat);
 
     if (stat.onBenchNow) {
-      const pieces = [`${name} — BENCH NOW`];
-      if (history) pieces.push(history);
-      pieces.push(`Sitting inning ${stat.currentInning}`);
-      return pieces.join(' • ');
+      return `${name} — BENCH NOW • ${context}`;
     }
 
-    const pieces = [name];
-    // If the player is already at this row's position, the position label on the
-    // left already communicates it. Only show location when choosing would move
-    // the player from somewhere else on the field.
     if (stat.positionNow && stat.positionNow !== targetPosition) {
-      pieces.push(`On field at ${stat.positionNow}`);
+      return `${name} — At ${stat.positionNow} • ${context}`;
     }
-    if (history) pieces.push(history);
-    return pieces.join(' — ').replace(' — On field', ' — On field');
+
+    return `${name} — ${context}`;
+  }
+
+  function benchStatus(stat) {
+    if (stat?.plannedBenchCount === null || stat?.plannedBenchCount === undefined) return '';
+    const actual = Number(stat.actualBenchCount || 0);
+    const planned = Number(stat.plannedBenchCount || 0);
+    if (actual > planned) return 'over';
+    if (actual === planned && planned > 0) return 'at';
+    return '';
   }
 
   function installBenchStyles() {
@@ -123,20 +155,17 @@
       .actual-bench-context{margin:0 0 12px;padding:10px 11px;border:1px solid #d9e1ea;border-radius:10px;background:#f8fafc}
       .actual-bench-context-title{font-size:.65rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:#667085;margin-bottom:6px}
       .actual-bench-context-help{font-size:.66rem;color:#8a94a3;margin:-3px 0 7px}
+      .actual-bench-context-help.warning{color:#9a6700;font-weight:700}
       .actual-bench-context-list{display:flex;flex-wrap:wrap;gap:6px}
       .actual-bench-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #d7dde5;background:#fff;border-radius:999px;padding:5px 8px;font-size:.68rem;color:#344054;white-space:nowrap}
-      .actual-bench-chip strong{font-weight:800;color:#172033}.actual-bench-chip .bench-history{color:#8b5c00;font-weight:800}
+      .actual-bench-chip strong{font-weight:800;color:#172033}.actual-bench-chip .bench-history{color:#667085;font-weight:750}
+      .actual-bench-chip.at{border-color:#e7c66b;background:#fff9e9}.actual-bench-chip.at .bench-history{color:#8b5c00}
+      .actual-bench-chip.over{border-color:#e1a1a1;background:#fff2f2}.actual-bench-chip.over .bench-history{color:#a32929}
+      .actual-bench-flag{font-size:.56rem;font-weight:850;letter-spacing:.04em;text-transform:uppercase}
       .ni-select option[data-bench-now="1"]{font-weight:700}
       @media(max-width:575.98px){.actual-bench-context{padding:9px}.actual-bench-chip{font-size:.63rem;padding:4px 7px}}
     `;
     document.head.appendChild(style);
-  }
-
-  function benchNowChipText(item) {
-    const history = satHistoryText(item.completedBenchInningsList);
-    return history
-      ? `${history} • Sitting inning ${item.currentInning}`
-      : `Sitting inning ${item.currentInning}`;
   }
 
   function enhanceAdjustModal(state = latestState) {
@@ -145,10 +174,16 @@
     if (!modal || !body || !state) return;
 
     installBenchStyles();
-    const stats = buildBenchStats(state);
+    const { stats, planReliable } = buildBenchStats(state);
     const benchNow = [...stats.values()]
       .filter(item => item.onBenchNow)
-      .sort((a, b) => b.currentBenchStreak - a.currentBenchStreak || b.completedBenchInnings - a.completedBenchInnings || a.name.localeCompare(b.name));
+      .sort((a, b) => {
+        if (a.actualBenchCount !== b.actualBenchCount) return b.actualBenchCount - a.actualBenchCount;
+        const aPlan = a.plannedBenchCount ?? Number.MAX_SAFE_INTEGER;
+        const bPlan = b.plannedBenchCount ?? Number.MAX_SAFE_INTEGER;
+        if (aPlan !== bPlan) return aPlan - bPlan;
+        return a.name.localeCompare(b.name);
+      });
 
     let context = body.querySelector('.actual-bench-context');
     if (!context) {
@@ -157,12 +192,20 @@
       body.prepend(context);
     }
 
+    const help = planReliable
+      ? 'Sat = completed defensive innings actually benched. Planned = full pregame bench total.'
+      : 'Actual bench time is shown. The saved pregame rotation has incomplete innings, so Planned is unavailable.';
+
     context.innerHTML = `
-      <div class="actual-bench-context-title">Bench Now — Actual Game</div>
-      <div class="actual-bench-context-help">Actual innings only. Future planned bench time is not counted.</div>
+      <div class="actual-bench-context-title">Bench Balance — Actual vs Plan</div>
+      <div class="actual-bench-context-help ${planReliable ? '' : 'warning'}">${esc(help)}</div>
       <div class="actual-bench-context-list">
         ${benchNow.length
-          ? benchNow.map(item => `<span class="actual-bench-chip"><strong>${esc(item.name)}</strong><span class="bench-history">${esc(benchNowChipText(item))}</span></span>`).join('')
+          ? benchNow.map(item => {
+              const status = benchStatus(item);
+              const flag = status === 'over' ? '<span class="actual-bench-flag">Over plan</span>' : status === 'at' ? '<span class="actual-bench-flag">At plan</span>' : '';
+              return `<span class="actual-bench-chip ${status}"><strong>${esc(item.name)}</strong><span class="bench-history">${esc(balanceText(item))}</span>${flag}</span>`;
+            }).join('')
           : '<span class="actual-bench-chip">Nobody is currently on the bench.</span>'}
       </div>`;
 
@@ -178,22 +221,23 @@
         const stat = stats.get(option.value);
         option.textContent = benchOptionLabel(option.value, stat, targetPosition);
         option.dataset.benchNow = stat?.onBenchNow ? '1' : '0';
-        option.dataset.benchStreak = String(stat?.currentBenchStreak || 0);
-        option.dataset.completedBench = String(stat?.completedBenchInnings || 0);
+        option.dataset.actualBench = String(stat?.actualBenchCount || 0);
+        option.dataset.plannedBench = stat?.plannedBenchCount === null || stat?.plannedBenchCount === undefined ? '' : String(stat.plannedBenchCount);
       });
 
-      // Put players actually sitting now first, longest current bench stretch first.
+      // Bench players first. Within that group, prioritize the players who have
+      // already accumulated the most actual bench innings.
       const playerOptions = options.filter(option => option.value);
       playerOptions.sort((a, b) => {
         const aBench = Number(a.dataset.benchNow || 0);
         const bBench = Number(b.dataset.benchNow || 0);
         if (aBench !== bBench) return bBench - aBench;
-        const aStreak = Number(a.dataset.benchStreak || 0);
-        const bStreak = Number(b.dataset.benchStreak || 0);
-        if (aStreak !== bStreak) return bStreak - aStreak;
-        const aTotal = Number(a.dataset.completedBench || 0);
-        const bTotal = Number(b.dataset.completedBench || 0);
-        if (aTotal !== bTotal) return bTotal - aTotal;
+        const aActual = Number(a.dataset.actualBench || 0);
+        const bActual = Number(b.dataset.actualBench || 0);
+        if (aActual !== bActual) return bActual - aActual;
+        const aPlan = a.dataset.plannedBench === '' ? Number.MAX_SAFE_INTEGER : Number(a.dataset.plannedBench);
+        const bPlan = b.dataset.plannedBench === '' ? Number.MAX_SAFE_INTEGER : Number(b.dataset.plannedBench);
+        if (aPlan !== bPlan) return aPlan - bPlan;
         return a.value.localeCompare(b.value);
       });
 
@@ -204,17 +248,15 @@
       select.value = selectedValue;
     });
 
-    // Upgrade the small Bench chips at the bottom with actual inning history too.
+    // Keep the compact bench chips at the bottom useful without repeating the
+    // awkward current-inning wording.
     body.querySelectorAll('.ni-bench span').forEach(chip => {
-      const rawName = chip.dataset.playerName || chip.textContent.trim();
+      const rawName = chip.dataset.playerName || chip.textContent.split(' • ')[0].trim();
       chip.dataset.playerName = rawName;
       const stat = stats.get(rawName);
       if (stat?.onBenchNow) {
-        const history = satHistoryText(stat.completedBenchInningsList);
-        chip.textContent = history
-          ? `${rawName} • ${history} • Sitting inning ${stat.currentInning}`
-          : `${rawName} • Sitting inning ${stat.currentInning}`;
-        chip.title = `${rawName} is on the bench now. Completed bench innings: ${stat.completedBenchInningsList?.length ? inningListText(stat.completedBenchInningsList) : 'none'}. Current inning: ${stat.currentInning}.`;
+        chip.textContent = `${rawName} • ${balanceText(stat)}`;
+        chip.title = `${rawName} is currently on the bench. ${balanceText(stat)}.`;
       }
     });
   }
