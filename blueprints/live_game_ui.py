@@ -188,7 +188,24 @@ def next_inning_prep(game_id):
     user, team, game = _authorized_context(game_id)
     if not game:
         return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
+
+    # The board-prep helper is present on Game Management before Live Game starts.
+    # A harmless GET should not fill DevTools with 409s while a coach is planning.
+    # Writes remain live-only so pregame code cannot accidentally create live state.
     if not game.is_live:
+        if request.method == 'GET':
+            return jsonify({
+                'status': 'inactive',
+                'game_id': game.id,
+                'is_live': False,
+                'current_inning': str(game.live_current_inning or '1'),
+                'next_inning': _next_inning_key(game.live_current_inning or '1'),
+                'current_alignment': {},
+                'planned_alignment': {},
+                'confirmed': None,
+                'roster': [],
+                'outfielder_count': team.outfielder_count,
+            })
         return jsonify({'status': 'error', 'message': 'Game is not live.'}), 409
 
     current_inning, next_inning, current_alignment, planned_alignment, prep = _next_inning_context(game, team)
