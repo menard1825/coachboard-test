@@ -1,0 +1,389 @@
+(() => {
+  'use strict';
+
+  const dataNode = document.getElementById('rteEditorData');
+  if (!dataNode) return;
+
+  let data;
+  try {
+    data = JSON.parse(dataNode.textContent || '{}');
+  } catch (error) {
+    console.error('Unable to load rotation template editor data.', error);
+    return;
+  }
+
+  const state = {
+    rotation: data.rotation || {id:null, title:'', innings:{'1':{}}},
+    roster: Array.isArray(data.roster) ? data.roster : [],
+    outfielderCount: Number(data.outfielder_count || 3),
+    presets: Array.isArray(data.defense_presets) ? data.defense_presets : [],
+    presetPrefix: String(data.preset_prefix || 'DEFENSE PRESET — '),
+    inning: '1',
+    dirty: false,
+    saving: false,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[ch]));
+
+  function positions() {
+    return state.outfielderCount === 4
+      ? ['P','C','1B','2B','3B','SS','LF','LCF','RCF','RF']
+      : ['P','C','1B','2B','3B','SS','LF','CF','RF'];
+  }
+
+  function normalizeState() {
+    if (!state.rotation || typeof state.rotation !== 'object') state.rotation = {id:null,title:'',innings:{}};
+    if (!state.rotation.innings || typeof state.rotation.innings !== 'object') state.rotation.innings = {};
+    if (!Object.keys(state.rotation.innings).length) {
+      for (let i = 1; i <= 6; i += 1) state.rotation.innings[String(i)] = {};
+    }
+    Object.keys(state.rotation.innings).forEach((key) => {
+      if (!state.rotation.innings[key] || typeof state.rotation.innings[key] !== 'object') state.rotation.innings[key] = {};
+    });
+    const keys = inningKeys();
+    if (!keys.includes(state.inning)) state.inning = keys[0] || '1';
+  }
+
+  function inningKeys() {
+    return Object.keys(state.rotation.innings || {}).sort((a,b) => Number(a) - Number(b));
+  }
+
+  function alignment(inning = state.inning) {
+    normalizeState();
+    if (!state.rotation.innings[inning]) state.rotation.innings[inning] = {};
+    return state.rotation.innings[inning];
+  }
+
+  function markDirty() {
+    state.dirty = true;
+    const label = $('rteSaveState');
+    if (label) label.textContent = 'Unsaved changes';
+  }
+
+  function openPositions(source = alignment()) {
+    return positions().filter((position) => !source?.[position]);
+  }
+
+  function playerPosition(name, source = alignment()) {
+    return Object.entries(source || {}).find(([, playerName]) => playerName === name)?.[0] || null;
+  }
+
+  function playerDetail(player) {
+    const preferred = [player.position1, player.position2, player.position3].filter(Boolean).join(' / ');
+    const pieces = [];
+    if (player.number) pieces.push(`#${player.number}`);
+    if (preferred) pieces.push(preferred);
+    return pieces.join(' · ') || 'Roster player';
+  }
+
+  function fieldSpot(position, source, left, top) {
+    const name = source?.[position] || '';
+    return `<button type="button" class="rte-spot ${name ? '' : 'open'}" data-rte-position="${esc(position)}" style="left:${left}%;top:${top}%"><span class="rte-pos">${esc(position)}</span><span class="rte-player">${esc(name || 'OPEN')}</span></button>`;
+  }
+
+  function fieldMarkup() {
+    const source = alignment();
+    const outfield = state.outfielderCount === 4
+      ? [['LF',11,23],['LCF',38,13],['RCF',62,13],['RF',89,23]]
+      : [['LF',15,22],['CF',50,11],['RF',85,22]];
+    const spots = [
+      ...outfield,
+      ['3B',18,57],['SS',38,43],['2B',62,43],['1B',82,57],
+      ['P',50,62],['C',50,85],
+    ];
+    const assigned = new Set(Object.values(source || {}).filter(Boolean));
+    const bench = state.roster.filter((player) => !assigned.has(player.name));
+    const opens = openPositions(source);
+
+    return `
+      <div class="rte-field-card">
+        <div class="rte-field-cap"><strong>Defense — Inning ${esc(state.inning)}</strong><span>Tap a position to choose the player</span></div>
+        <div class="rte-field">
+          <svg class="rte-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M7 58 Q9 13 50 5 Q91 13 93 58" fill="none" stroke="rgba(245,245,220,.38)" stroke-width="1.2"/>
+            <path d="M50 85 L7 38 M50 85 L93 38" fill="none" stroke="rgba(255,255,255,.9)" stroke-width=".72"/>
+            <polygon points="50,76 27,54 50,32 73,54" fill="#cda26b" opacity=".97"/>
+            <polygon points="50,69 34,54 50,40 66,54" fill="#438f56"/>
+            <circle cx="50" cy="62" r="4.6" fill="#cda26b"/>
+            <circle cx="50" cy="82" r="6.4" fill="#cda26b"/>
+            <rect x="49" y="31" width="2" height="2" fill="#fff" transform="rotate(45 50 32)"/>
+            <rect x="72" y="53" width="2" height="2" fill="#fff" transform="rotate(45 73 54)"/>
+            <rect x="26" y="53" width="2" height="2" fill="#fff" transform="rotate(45 27 54)"/>
+            <path d="M48.7 82 L50 80.8 L51.3 82 L50.8 83.6 L49.2 83.6 Z" fill="#fff"/>
+          </svg>
+          ${spots.map(([pos,left,top]) => fieldSpot(pos, source, left, top)).join('')}
+        </div>
+        <div class="rte-bench">
+          <div class="rte-label">Bench — Inning ${esc(state.inning)}</div>
+          <div class="rte-chips">${bench.length ? bench.map((player) => `<span>${esc(player.name)}</span>`).join('') : '<span>None</span>'}</div>
+        </div>
+        <div class="rte-status">
+          <span>${opens.length ? `<span class="bad"><strong>${opens.length}</strong> open position${opens.length === 1 ? '' : 's'}: ${esc(opens.join(', '))}</span>` : '<strong>Defense complete</strong>'}</span>
+          <span>${assigned.size} on field · ${bench.length} bench</span>
+        </div>
+      </div>`;
+  }
+
+  function renderTabs() {
+    const host = $('rteInningTabs');
+    if (!host) return;
+    host.innerHTML = inningKeys().map((inning) => {
+      const incomplete = openPositions(alignment(inning)).length > 0;
+      return `<button type="button" class="rte-tab ${inning === state.inning ? 'active' : ''} ${incomplete ? 'incomplete' : ''}" data-rte-inning="${inning}" aria-label="Inning ${inning}">${inning}</button>`;
+    }).join('');
+    const copy = $('rteCopyPrevious');
+    if (copy) copy.disabled = Number(state.inning) <= 1;
+    const remove = $('rteRemoveInning');
+    if (remove) remove.disabled = inningKeys().length <= 1;
+    const add = $('rteAddInning');
+    if (add) add.disabled = inningKeys().length >= 20;
+  }
+
+  function renderField() {
+    const host = $('rteFieldHost');
+    if (host) host.innerHTML = fieldMarkup();
+  }
+
+  function renderSummary() {
+    const grid = $('rteSummaryGrid');
+    const status = $('rteSummaryStatus');
+    if (!grid) return;
+    const keys = inningKeys();
+    let totalOpen = 0;
+    const rows = state.roster.map((player) => {
+      let benchCount = 0;
+      const positionCounts = {};
+      keys.forEach((inning) => {
+        const source = alignment(inning);
+        const pos = playerPosition(player.name, source);
+        if (pos) positionCounts[pos] = (positionCounts[pos] || 0) + 1;
+        else benchCount += 1;
+      });
+      const positionsText = Object.entries(positionCounts)
+        .sort(([a],[b]) => a.localeCompare(b))
+        .map(([pos,count]) => `${pos} ${count}`)
+        .join(' · ') || 'No field assignments';
+      return `<div class="rte-summary-player"><strong>${esc(player.name)}</strong><div>Bench: ${benchCount} of ${keys.length} innings</div><div>${esc(positionsText)}</div></div>`;
+    });
+    keys.forEach((inning) => { totalOpen += openPositions(alignment(inning)).length; });
+    grid.innerHTML = rows.join('');
+    if (status) status.textContent = totalOpen ? `${totalOpen} open field spot${totalOpen === 1 ? '' : 's'} across template` : 'All defensive innings complete';
+  }
+
+  function renderPresetOptions() {
+    const select = $('rtePresetSelect');
+    if (!select) return;
+    const current = select.value;
+    const options = state.presets.map((preset) => {
+      const label = String(preset.title || '').startsWith(state.presetPrefix)
+        ? String(preset.title).slice(state.presetPrefix.length).trim()
+        : String(preset.title || 'Defense Preset');
+      return `<option value="${preset.id}">${esc(label)}</option>`;
+    }).join('');
+    select.innerHTML = `<option value="">Defense Preset…</option>${options}`;
+    if ([...select.options].some((option) => option.value === current)) select.value = current;
+    const apply = $('rteApplyPreset');
+    if (apply) apply.disabled = !select.value;
+  }
+
+  function renderAll() {
+    normalizeState();
+    renderTabs();
+    renderField();
+    renderSummary();
+    renderPresetOptions();
+  }
+
+  function choosePlayer(position) {
+    const source = alignment();
+    const current = source[position] || '';
+    const title = $('rtePlayerTitle');
+    const choices = $('rtePlayerChoices');
+    if (!choices) return;
+    if (title) title.textContent = `${position} — Choose Player`;
+
+    const rows = [];
+    if (current) {
+      rows.push(`<button type="button" class="list-group-item list-group-item-action text-danger" data-rte-choice="" data-rte-position-choice="${esc(position)}"><span class="rte-choice-name">Open ${esc(position)}</span><span class="rte-choice-detail d-block">Move ${esc(current)} to the bench</span></button>`);
+    }
+
+    state.roster.forEach((player) => {
+      const oldPos = playerPosition(player.name, source);
+      let detail = playerDetail(player);
+      if (oldPos === position) detail = `Currently at ${position}`;
+      else if (oldPos) detail = `Currently at ${oldPos} · ${detail}`;
+      else detail = `Bench · ${detail}`;
+      rows.push(`<button type="button" class="list-group-item list-group-item-action" data-rte-choice="${esc(player.name)}" data-rte-position-choice="${esc(position)}"><span class="rte-choice-name">${esc(player.name)}</span><span class="rte-choice-detail d-block">${esc(detail)}</span></button>`);
+    });
+    choices.innerHTML = rows.join('');
+    bootstrap.Modal.getOrCreateInstance($('rtePlayerModal')).show();
+  }
+
+  function assign(position, playerName) {
+    const source = alignment();
+    if (!playerName) {
+      delete source[position];
+    } else {
+      const oldPosition = playerPosition(playerName, source);
+      if (oldPosition && oldPosition !== position) delete source[oldPosition];
+      source[position] = playerName;
+    }
+    markDirty();
+    bootstrap.Modal.getOrCreateInstance($('rtePlayerModal')).hide();
+    renderAll();
+  }
+
+  function addInning() {
+    const keys = inningKeys();
+    if (keys.length >= 20) return;
+    const next = String(Math.max(...keys.map(Number)) + 1);
+    state.rotation.innings[next] = {};
+    state.inning = next;
+    markDirty();
+    renderAll();
+  }
+
+  function removeInning() {
+    const keys = inningKeys();
+    if (keys.length <= 1) return;
+    const last = keys[keys.length - 1];
+    if (!window.confirm(`Remove inning ${last} from this template?`)) return;
+    delete state.rotation.innings[last];
+    if (state.inning === last) state.inning = inningKeys()[inningKeys().length - 1];
+    markDirty();
+    renderAll();
+  }
+
+  function copyPrevious() {
+    const previous = String(Number(state.inning) - 1);
+    if (!state.rotation.innings[previous]) return;
+    state.rotation.innings[state.inning] = {...state.rotation.innings[previous]};
+    markDirty();
+    renderAll();
+  }
+
+  function presetAlignment(preset) {
+    const innings = preset?.innings;
+    if (!innings || typeof innings !== 'object') return null;
+    const keys = Object.keys(innings).sort((a,b) => Number(a) - Number(b));
+    for (const key of keys) {
+      if (innings[key] && typeof innings[key] === 'object' && Object.keys(innings[key]).length) return {...innings[key]};
+    }
+    return keys.length ? {...(innings[keys[0]] || {})} : null;
+  }
+
+  function applyPreset() {
+    const id = Number($('rtePresetSelect')?.value || 0);
+    if (!id) return;
+    const preset = state.presets.find((item) => Number(item.id) === id);
+    const source = presetAlignment(preset);
+    if (!source) {
+      window.alert('That Defense Preset does not contain a defensive alignment.');
+      return;
+    }
+    const allowed = new Set(positions());
+    const rosterNames = new Set(state.roster.map((player) => player.name));
+    const cleaned = {};
+    const used = new Set();
+    Object.entries(source).forEach(([position,name]) => {
+      if (!allowed.has(position) || !rosterNames.has(name) || used.has(name)) return;
+      cleaned[position] = name;
+      used.add(name);
+    });
+    state.rotation.innings[state.inning] = cleaned;
+    markDirty();
+    renderAll();
+  }
+
+  async function saveTemplate() {
+    if (state.saving) return;
+    const name = String($('rteTemplateName')?.value || '').trim();
+    if (!name) {
+      $('rteTemplateName')?.focus();
+      window.alert('Give this rotation template a name first.');
+      return;
+    }
+
+    const incomplete = inningKeys().filter((inning) => openPositions(alignment(inning)).length > 0);
+    if (incomplete.length) {
+      const okay = window.confirm(`This template still has open defensive positions in inning${incomplete.length === 1 ? '' : 's'} ${incomplete.join(', ')}.\n\nSave it anyway?`);
+      if (!okay) return;
+    }
+
+    state.saving = true;
+    const buttons = [$('rteSaveTop')].filter(Boolean);
+    buttons.forEach((button) => { button.disabled = true; button.textContent = 'Saving…'; });
+    if ($('rteSaveState')) $('rteSaveState').textContent = 'Saving…';
+
+    try {
+      const response = await fetch('/api/rotation-template/save', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          id: state.rotation.id || null,
+          title: name,
+          innings: state.rotation.innings,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.status === 'error') throw new Error(result.message || 'Unable to save rotation template.');
+
+      state.rotation.id = result.id;
+      state.rotation.title = name;
+      state.dirty = false;
+      if ($('rteSaveState')) $('rteSaveState').textContent = 'Saved';
+      if ($('rtePageTitle')) $('rtePageTitle').textContent = 'Edit Rotation Template';
+      window.history.replaceState({}, '', `/rotation-template/${result.id}`);
+    } catch (error) {
+      window.alert(error.message || 'Unable to save rotation template.');
+      if ($('rteSaveState')) $('rteSaveState').textContent = 'Save failed';
+    } finally {
+      state.saving = false;
+      buttons.forEach((button) => { button.disabled = false; button.textContent = 'Save Template'; });
+    }
+  }
+
+  function bindEvents() {
+    $('rteTemplateName').value = state.rotation.title || '';
+    $('rteTemplateName').addEventListener('input', markDirty);
+    $('rteSaveTop').addEventListener('click', saveTemplate);
+    $('rteAddInning').addEventListener('click', addInning);
+    $('rteRemoveInning').addEventListener('click', removeInning);
+    $('rteCopyPrevious').addEventListener('click', copyPrevious);
+    $('rtePresetSelect').addEventListener('change', () => {
+      $('rteApplyPreset').disabled = !$('rtePresetSelect').value;
+    });
+    $('rteApplyPreset').addEventListener('click', applyPreset);
+
+    document.addEventListener('click', (event) => {
+      const tab = event.target.closest('[data-rte-inning]');
+      if (tab) {
+        state.inning = String(tab.dataset.rteInning);
+        renderAll();
+        return;
+      }
+      const spot = event.target.closest('[data-rte-position]');
+      if (spot) {
+        choosePlayer(String(spot.dataset.rtePosition));
+        return;
+      }
+      const choice = event.target.closest('[data-rte-position-choice]');
+      if (choice) {
+        assign(String(choice.dataset.rtePositionChoice), String(choice.dataset.rteChoice || ''));
+      }
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+      if (!state.dirty || state.saving) return;
+      event.preventDefault();
+      event.returnValue = '';
+    });
+  }
+
+  normalizeState();
+  bindEvents();
+  renderAll();
+})();
