@@ -136,7 +136,9 @@ def build_game_readiness(game, team):
     now = team_now(team)
     today = now.date()
     game_day = game.date.date()
-    has_events = bool(events)
+    live_events = [event for event in events if not event.reverted]
+    has_events = bool(live_events)
+    has_end_game = any(event.event_type == 'End Game' for event in live_events)
     has_pitching = bool(game_outings)
     ready = not blockers
 
@@ -144,7 +146,9 @@ def build_game_readiness(game, team):
         status = 'LIVE'
         status_tone = 'danger'
         primary_label = 'Resume Live Game'
-    elif has_events and has_pitching:
+    elif has_end_game or (has_events and has_pitching):
+        # The End Game event is the durable finalization marker going forward.
+        # The pitching fallback preserves older completed games created before it existed.
         status = 'COMPLETE'
         status_tone = 'success'
         primary_label = 'View Game Report'
@@ -185,6 +189,7 @@ def build_game_readiness(game, team):
         'pitching_plan_count': len(plans),
         'pitching_alerts': pitching_alerts,
         'has_events': has_events,
+        'has_end_game': has_end_game,
         'has_pitching': has_pitching,
         'is_live': bool(game.is_live),
         'local_today': today.isoformat(),
@@ -242,7 +247,7 @@ def build_actual_game_report(game, team):
     for event in events:
         if event.reverted:
             continue
-        if event.event_type in {'Defensive Change', 'Pitcher Change', 'End Inning', 'Set New Defense'}:
+        if event.event_type in {'Defensive Change', 'Pitcher Change', 'End Inning', 'Set New Defense', 'End Game'}:
             changes.append({
                 'inning': str(event.inning),
                 'type': event.event_type,
