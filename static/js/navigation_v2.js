@@ -26,6 +26,7 @@
         mobileItem('#more', 'three-dots', 'More', false, true),
       ].join('');
     }
+    loadScript('/static/js/season_management_v2.js', 'season-management');
   }
 
   // Every game page gets the same readiness calculation as Game Day and a tiny
