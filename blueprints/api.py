@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, session
 from db import db
 from models import User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer, Rotation, Game, CollaborationNote, PracticePlan, PlayerDevelopmentFocus, Sign, PlayerGameAbsence, PlayerPracticeAbsence
 from blueprints.auth import get_player_order_as_list
+from team_game_settings import regulation_innings_for_team
 from utils import model_to_dict, pitching_outing_to_dict, get_pitching_rules_for_team, calculate_pitch_count_summary, calculate_cumulative_pitching_stats
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
@@ -267,6 +268,7 @@ def get_live_game_state(game_id, team_id):
         'lineup_templates': [model_to_dict(lt) for lt in lineup_templates],
         'rotation_templates': [model_to_dict(rt) for rt in rotation_templates],
         'outfielder_count': team.outfielder_count,
+        'regulation_innings': regulation_innings_for_team(team),
         'rotation_events': [model_to_dict(e) for e in rotation_events],
         'pitching_plans': [model_to_dict(pp) for pp in pitching_plans],
         'pitching_profiles': [model_to_dict(pp) for pp in pitching_profiles]
