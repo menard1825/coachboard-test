@@ -1,10 +1,11 @@
 from copy import deepcopy
 
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 
 from db import db
 from extensions import socketio
 from models import Player, Rotation, Team
+from team_game_settings import regulation_innings_for_team, suggested_regulation_innings
 from utils import model_to_dict
 
 
@@ -73,18 +74,70 @@ def _editor_payload(team, rotation=None):
         Rotation.title.like(f'{PRESET_PREFIX}%'),
     ).order_by(Rotation.title.asc()).all()
 
+    regulation_innings = regulation_innings_for_team(team)
+    rotation_data = model_to_dict(rotation) if rotation else {
+        'id': None,
+        'title': '',
+        'innings': {str(i): {} for i in range(1, regulation_innings + 1)},
+        'associated_game_id': None,
+    }
+
     return {
-        'rotation': model_to_dict(rotation) if rotation else {
-            'id': None,
-            'title': '',
-            'innings': {str(i): {} for i in range(1, 7)},
-            'associated_game_id': None,
-        },
+        'rotation': rotation_data,
         'roster': [model_to_dict(player) for player in roster],
         'outfielder_count': int(team.outfielder_count or 3),
         'defense_presets': [model_to_dict(preset) for preset in presets],
         'preset_prefix': PRESET_PREFIX,
+        'regulation_innings': regulation_innings,
+        'regulation_innings_override': team.regulation_innings,
+        'suggested_regulation_innings': suggested_regulation_innings(team.age_group),
+        'age_group': team.age_group,
     }
+
+
+@rotation_templates_bp.route('/api/team-game-settings')
+def team_game_settings_api():
+    team = _team_context()
+    if not team:
+        return jsonify({'status': 'error', 'message': 'Unauthorized.'}), 401
+    return jsonify({
+        'status': 'success',
+        'age_group': team.age_group,
+        'regulation_innings': regulation_innings_for_team(team),
+        'regulation_innings_override': team.regulation_innings,
+        'suggested_regulation_innings': suggested_regulation_innings(team.age_group),
+    })
+
+
+@rotation_templates_bp.route('/admin/settings/regulation-innings', methods=['POST'])
+def update_regulation_innings():
+    team = _team_context()
+    if not team:
+        return redirect(url_for('auth.login'))
+    if session.get('role') not in {'Head Coach', 'Super Admin'}:
+        flash('You must be a Head Coach or Super Admin to change team game settings.', 'danger')
+        return redirect(url_for('home'))
+
+    raw_value = str(request.form.get('regulation_innings') or '').strip()
+    if not raw_value:
+        team.regulation_innings = None
+        message = f'Regulation innings set to Auto ({suggested_regulation_innings(team.age_group)} for {team.age_group}).'
+    else:
+        try:
+            value = int(raw_value)
+        except ValueError:
+            flash('Regulation innings must be a whole number.', 'danger')
+            return redirect(url_for('admin.admin_settings'))
+        if value < 3 or value > 12:
+            flash('Regulation innings must be between 3 and 12.', 'danger')
+            return redirect(url_for('admin.admin_settings'))
+        team.regulation_innings = value
+        message = f'Regulation innings set to {value}.'
+
+    db.session.commit()
+    socketio.emit('data_updated', {'message': 'Team regulation innings updated.'})
+    flash(message, 'success')
+    return redirect(url_for('admin.admin_settings'))
 
 
 @rotation_templates_bp.route('/rotation-template/new')
@@ -141,6 +194,11 @@ def save_rotation_template():
     if error:
         return jsonify({'status': 'error', 'message': error}), 400
 
+    regulation_innings = regulation_innings_for_team(team)
+    for inning_number in range(1, regulation_innings + 1):
+        innings.setdefault(str(inning_number), {})
+    innings = dict(sorted(innings.items(), key=lambda item: int(item[0])))
+
     rotation_id = data.get('id')
     rotation = None
     if rotation_id not in (None, ''):
@@ -186,4 +244,5 @@ def save_rotation_template():
         'message': 'Rotation template saved.',
         'id': rotation.id,
         'rotation': model_to_dict(rotation),
+        'regulation_innings': regulation_innings,
     })
