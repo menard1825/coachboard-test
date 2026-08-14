@@ -32,7 +32,7 @@ def _append_pitcher(order, name):
 
 
 def _actual_pitcher_order(game, team_id):
-    """Return pitchers in first-appearance order from authoritative live history."""
+    """Return pitchers in first-appearance order from innings the game reached."""
     _, actual_rotation, events = _actual_rotation(game, team_id)
     order = []
 
@@ -42,13 +42,24 @@ def _actual_pitcher_order(game, team_id):
         _append_pitcher(order, (event.before_alignment or {}).get('P'))
         _append_pitcher(order, (event.after_alignment or {}).get('P'))
 
+    try:
+        max_reached_inning = float(str(game.live_current_inning or '1'))
+    except (TypeError, ValueError):
+        max_reached_inning = 1.0
+
     def inning_key(item):
         try:
             return float(item[0])
         except (TypeError, ValueError):
             return 9999
 
-    for _, alignment in sorted((actual_rotation or {}).items(), key=inning_key):
+    for inning, alignment in sorted((actual_rotation or {}).items(), key=inning_key):
+        try:
+            inning_number = float(inning)
+        except (TypeError, ValueError):
+            continue
+        if inning_number > max_reached_inning:
+            continue
         _append_pitcher(order, (alignment or {}).get('P'))
 
     _append_pitcher(order, _current_alignment(game, team_id, actual_rotation).get('P'))
