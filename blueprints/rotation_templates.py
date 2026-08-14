@@ -1,10 +1,12 @@
 from copy import deepcopy
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 
 from db import db
 from extensions import socketio
-from models import Player, Rotation, Team
+from models import Game, GameRotationEvent, Player, Rotation, Team
 from team_game_settings import regulation_innings_for_team, suggested_regulation_innings
 from utils import model_to_dict
 
@@ -22,10 +24,78 @@ def _team_context():
     return db.session.get(Team, team_id)
 
 
+def _team_today(team):
+    try:
+        return datetime.now(ZoneInfo(team.timezone or 'America/Indiana/Indianapolis')).date()
+    except Exception:
+        return datetime.now().date()
+
+
 def _positions(team):
     base = ['P', 'C', '1B', '2B', '3B', 'SS']
     outfield = ['LF', 'LCF', 'RCF', 'RF'] if int(team.outfielder_count or 3) == 4 else ['LF', 'CF', 'RF']
     return base + outfield
+
+
+@rotation_templates_bp.before_app_request
+def prepare_regulation_innings_for_game_management():
+    """Give new/current pregame rotations the team's regulation inning slots.
+
+    This intentionally does not touch live games, games with live history, or
+    historical games. Extra innings remain a live-game concern rather than
+    something every pregame plan must include.
+    """
+    if request.method != 'GET' or request.endpoint != 'gameday.game_management':
+        return None
+
+    team = _team_context()
+    if not team:
+        return None
+
+    try:
+        game_id = int((request.view_args or {}).get('game_id'))
+    except (TypeError, ValueError):
+        return None
+
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
+    if not game or game.is_live or game.date.date() < _team_today(team):
+        return None
+
+    has_live_history = db.session.query(GameRotationEvent.id).filter_by(
+        game_id=game.id,
+        team_id=team.id,
+        reverted=False,
+    ).first()
+    if has_live_history:
+        return None
+
+    count = regulation_innings_for_team(team)
+    rotation = db.session.query(Rotation).filter_by(
+        associated_game_id=game.id,
+        team_id=team.id,
+    ).first()
+
+    if rotation is None:
+        db.session.add(Rotation(
+            title=f'Rotation for vs {game.opponent}',
+            innings={str(number): {} for number in range(1, count + 1)},
+            associated_game_id=game.id,
+            team_id=team.id,
+        ))
+        db.session.commit()
+        return None
+
+    innings = deepcopy(rotation.innings or {})
+    changed = False
+    for number in range(1, count + 1):
+        key = str(number)
+        if key not in innings:
+            innings[key] = {}
+            changed = True
+    if changed:
+        rotation.innings = dict(sorted(innings.items(), key=lambda item: float(item[0])))
+        db.session.commit()
+    return None
 
 
 def _clean_innings(raw_innings, team, roster_names):
