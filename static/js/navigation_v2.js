@@ -45,6 +45,10 @@
     loadScript('/static/js/season_management_v2.js', 'season-management');
   }
 
+  if (window.location.pathname === '/game-day') {
+    loadScript('/static/js/game_day_actions.js', 'game-day-actions');
+  }
+
   // Every game page gets the same readiness calculation as Game Day and a tiny
   // connection indicator while Live Game is active.
   if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
