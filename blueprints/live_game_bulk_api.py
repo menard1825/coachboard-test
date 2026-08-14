@@ -35,7 +35,9 @@ def _present_players(game, team_id):
 
 def _pitcher_status_blocks_change(summary):
     status = str((summary or {}).get('status') or '').lower()
-    return any(term in status for term in ('rest', 'unavailable', 'ineligible', 'incomplete'))
+    return any(term in status for term in (
+        'rest', 'unavailable', 'ineligible', 'incomplete', 'restriction', 'verify'
+    ))
 
 
 @live_game_bulk_bp.route('/<int:game_id>/complete-pitcher-change', methods=['POST'])
@@ -88,10 +90,10 @@ def complete_pitcher_change(game_id):
     pitcher_summary = (state.get('pitch_count_summary') or {}).get(new_pitcher.name, {})
     if _pitcher_status_blocks_change(pitcher_summary):
         status = pitcher_summary.get('status') or 'not available'
-        detail = pitcher_summary.get('next_available')
+        detail = pitcher_summary.get('status_detail') or pitcher_summary.get('next_available')
         message = f'{new_pitcher.name} cannot pitch right now: {status}.'
         if detail:
-            message += f' Next available: {detail}.'
+            message += f' {detail}'
         return jsonify({'status': 'error', 'message': message}), 409
 
     after = {}
@@ -109,8 +111,6 @@ def complete_pitcher_change(game_id):
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
 
-    # Preserve the shape of the defense that was on the field before the change.
-    # If 1B was occupied before, for example, moving that 1B to P cannot leave 1B empty.
     required_positions = [pos for pos in allowed if before.get(pos)]
     missing_positions = [pos for pos in required_positions if not after.get(pos)]
     if missing_positions:
