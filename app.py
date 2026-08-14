@@ -28,6 +28,7 @@ from blueprints.development import development_bp
 from blueprints.live_game_ui import live_game_ui_bp
 from blueprints.gameday import gameday_bp
 from blueprints.game_day import game_day_bp
+from blueprints.rotation_templates import rotation_templates_bp
 from blueprints.pitching import pitching_bp
 from blueprints.scouting import scouting_bp
 from blueprints.team_management import team_management_bp
@@ -67,6 +68,7 @@ def create_app():
     app.register_blueprint(live_game_safety_bp)
     app.register_blueprint(gameday_bp)
     app.register_blueprint(game_day_bp)
+    app.register_blueprint(rotation_templates_bp)
     app.register_blueprint(pitching_bp)
     app.register_blueprint(scouting_bp)
     app.register_blueprint(team_management_bp)
