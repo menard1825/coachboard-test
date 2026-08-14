@@ -249,9 +249,9 @@
 <script src="{{ url_for('static', filename='js/lineup_editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
 <script src="{{ url_for('static', filename='js/live_game_v2.js') }}"></script>
+<script src="{{ url_for('static', filename='js/live_game_coach_ui.js') }}"></script>
 <script>
     // Keep the game shell visible without observing/mutating the same attributes.
-    // The previous MutationObserver could self-trigger indefinitely on Safari.
     const keepGameShellVisible = () => {
         const plannerRow = document.getElementById('game-management-planner-row');
         if (plannerRow) {
@@ -281,9 +281,6 @@
         };
         initializeGameManagement(initialGameData);
 
-        // The legacy initializer may hide the planner row for an already-live game.
-        // Restore the shell a few times during the initial lifecycle handoff only;
-        // no observer is left running afterward.
         keepGameShellVisible();
         requestAnimationFrame(keepGameShellVisible);
         setTimeout(keepGameShellVisible, 250);
