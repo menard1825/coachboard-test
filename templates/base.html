@@ -26,6 +26,7 @@
         --primary-color: {{ current_team.primary_color|default('#343A40') }};
         --secondary-color: {{ current_team.secondary_color|default('#E5E7EB') }};
       }
+      .coach-primary-nav .btn { border-radius: 9px; font-weight: 700; }
     </style>
     
     {% block head %}{% endblock %}
@@ -44,9 +45,14 @@
           </span>
         </a>
 
-        {# MODIFIED: Combined desktop and a new mobile user menu #}
+        {% if session.get('logged_in') and current_team %}
+        <div class="coach-primary-nav d-none d-lg-flex align-items-center gap-2 ms-3">
+            <a class="btn btn-sm btn-light" href="{{ url_for('game_day.game_day_home') }}">Game Day</a>
+            <a class="btn btn-sm btn-outline-light" href="{{ url_for('home') }}#games">Schedule</a>
+        </div>
+        {% endif %}
+
         <ul class="navbar-nav ms-auto flex-row">
-            {# Desktop User Menu (Visible on large screens) #}
             <li class="nav-item dropdown d-none d-lg-block">
                 <a class="nav-link dropdown-toggle" href="#" id="userMenuDesktop" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-person-circle me-1"></i> Welcome, {{ session.full_name or session.username }}!
@@ -75,7 +81,6 @@
                     <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
                 </ul>
             </li>
-            {# Mobile User Menu Button (Visible on small screens) #}
             <li class="nav-item d-lg-none">
                 <a class="nav-link" href="#userOffcanvas" data-bs-toggle="offcanvas" role="button" aria-controls="userOffcanvas">
                     <i class="bi bi-person-circle" style="font-size: 1.5rem;"></i>
@@ -101,10 +106,8 @@
     </main>
 
     {% block bottom_nav %}
-    {# This block is intentionally empty here. Child templates like index.html will fill it. #}
     {% endblock %}
 
-    {# NEW: Off-canvas Menu for Mobile User Actions #}
     <div class="offcanvas offcanvas-end" tabindex="-1" id="userOffcanvas" aria-labelledby="userOffcanvasLabel">
       <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="userOffcanvasLabel">Menu</h5>
@@ -112,6 +115,13 @@
       </div>
       <div class="offcanvas-body">
         <div class="list-group list-group-flush">
+            {% if session.get('logged_in') and current_team %}
+            <h6 class="text-muted ps-3 mt-2 mb-1">CoachBoard</h6>
+            <a class="list-group-item list-group-item-action fw-semibold" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-diamond me-2"></i> Game Day</a>
+            <a class="list-group-item list-group-item-action" href="{{ url_for('home') }}#games"><i class="bi bi-calendar3 me-2"></i> Schedule</a>
+            <hr class="my-2">
+            {% endif %}
+
             {% if session.role in ['Head Coach', 'Super Admin'] %}
             <h6 class="text-muted ps-3 mt-2 mb-1">Admin Tools</h6>
             <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i> User Management</a>
@@ -162,6 +172,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     
     {% block scripts %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/navigation_v2.js', v=css_version) }}"></script>
 
 </body>
 </html>
