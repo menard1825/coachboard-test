@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from flask import Blueprint, jsonify, redirect, render_template, session, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 
 from db import db
 from game_day_helpers import build_actual_game_report, build_game_readiness, team_now
@@ -98,3 +98,19 @@ def game_report(game_id):
         readiness=readiness,
         report=report,
     )
+
+
+@game_day_bp.route('/game-day/<int:game_id>/notes', methods=['POST'])
+def save_game_notes(game_id):
+    team = _team_context()
+    if not team or 'logged_in' not in session:
+        return redirect(url_for('auth.login'))
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
+    if not game:
+        flash('Game not found.', 'danger')
+        return redirect(url_for('game_day.game_day_home'))
+
+    game.game_notes = str(request.form.get('game_notes') or '').strip()
+    db.session.commit()
+    flash('Game notes saved.', 'success')
+    return redirect(url_for('game_day.game_report', game_id=game.id))
