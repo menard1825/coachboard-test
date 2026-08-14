@@ -6,7 +6,7 @@
 
   const gameId = Number(match[1]);
   const CARD_ID = 'live-board-prep-v3';
-  const STYLE_ID = 'live-board-prep-v4-styles';
+  const STYLE_ID = 'live-board-prep-v5-styles';
   let lastSignature = '';
   let busy = false;
   let latest = null;
@@ -27,19 +27,30 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      #${CARD_ID}{border:1px solid #dfe4ea;border-radius:14px;background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.06);overflow:hidden;margin-bottom:10px}
+      #${CARD_ID}{border:1px solid #e1e5ea;border-radius:14px;background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.06);overflow:hidden;margin-bottom:10px}
       .bp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:13px 14px 10px;border-bottom:1px solid #edf0f3}
-      .bp-kicker{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}.bp-title{font-size:1.02rem;font-weight:800;color:#172033;margin-top:2px}.bp-help{font-size:.72rem;color:#8a94a3;margin-top:2px}
-      .bp-inning{min-width:62px;border-radius:10px;background:#172033;color:#fff;padding:7px 9px;text-align:center}.bp-inning small{display:block;font-size:.52rem;letter-spacing:.08em;opacity:.72;font-weight:750}.bp-inning strong{display:block;font-size:1.3rem;line-height:1.05}
-      .bp-body{padding:12px 14px 14px}.bp-status{display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:10px;padding:9px 10px;margin-bottom:10px}.bp-status.waiting{background:#fff7e8;border:1px solid #f3d39a}.bp-status.ready{background:#ecf8f0;border:1px solid #add7bb}.bp-status strong{font-size:.76rem;color:#1d2939}.bp-status small{display:block;font-size:.65rem;color:#667085;margin-top:1px}.bp-status-badge{flex:0 0 auto;border-radius:999px;padding:4px 8px;font-size:.6rem;font-weight:850;letter-spacing:.05em}.waiting .bp-status-badge{background:#8b5c00;color:#fff}.ready .bp-status-badge{background:#176b38;color:#fff}
-      .bp-actions{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}.bp-actions .btn{border-radius:9px;font-size:.72rem;font-weight:750;min-height:38px}.bp-actions .btn-primary{background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66)}
-      .bp-preview-grid,.bp-ready-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.bp-label{font-size:.62rem;text-transform:uppercase;letter-spacing:.09em;font-weight:850;color:#667085;margin-bottom:7px}.bp-note{font-size:.68rem;color:#8a94a3;margin:-3px 0 7px}
-      .bp-moves{display:flex;flex-direction:column;gap:6px}.bp-move{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e3e7ec;background:#f8fafc;border-radius:9px;padding:8px 9px}.bp-move strong{display:block;font-size:.78rem;color:#1d2939;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bp-move small{display:block;font-size:.65rem;color:#7b8492;margin-top:1px}.bp-dest{min-width:46px;border-radius:7px;background:#172033;color:#fff;padding:5px 6px;text-align:center;font-size:.68rem;font-weight:800}.bp-dest.bench{background:#eef1f5;color:#475467}.bp-none{border:1px dashed #d6dce3;border-radius:9px;padding:11px;color:#667085;font-size:.75rem;text-align:center}
-      .bp-board{border:1px solid #dfe6dd;border-radius:12px;padding:9px;background:linear-gradient(180deg,#f4f9f2 0%,#faf8ef 100%)}.bp-row{display:grid;gap:6px;margin-bottom:6px}.bp-row.of3{grid-template-columns:repeat(3,minmax(0,1fr))}.bp-row.of4{grid-template-columns:repeat(4,minmax(0,1fr))}.bp-row.if{grid-template-columns:repeat(4,minmax(0,1fr))}.bp-row.battery{grid-template-columns:repeat(2,minmax(0,1fr));max-width:68%;margin:0 auto 6px}
-      .bp-slot{min-width:0;border:1px solid #dfe4e8;border-radius:8px;background:rgba(255,255,255,.95);padding:6px 5px;text-align:center}.bp-slot .pos{display:block;font-size:.55rem;font-weight:850;letter-spacing:.05em;color:#778190;line-height:1;margin-bottom:3px}.bp-slot .name{display:block;font-size:.68rem;line-height:1.1;font-weight:760;color:#172033;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bp-slot.open{border-color:#e2b4b4;background:#fff8f8}.bp-slot.open .name{color:#b04a4a;font-weight:650}.bp-bench{margin-top:8px;padding-top:8px;border-top:1px solid #e4e8e4}.bp-bench-list{display:flex;flex-wrap:wrap;gap:5px}.bp-bench-list span{border:1px solid #dfe3e8;background:#fff;color:#475467;border-radius:999px;padding:4px 7px;font-size:.63rem;font-weight:650}
-      #next-inning-adjust-modal .modal-content{border:0;border-radius:16px;overflow:hidden}#next-inning-adjust-modal .modal-dialog{max-width:720px}#next-inning-adjust-modal .ni-row{display:grid;grid-template-columns:48px minmax(0,1fr);gap:9px;align-items:center;margin-bottom:8px}#next-inning-adjust-modal .ni-pos{height:36px;border-radius:8px;background:#eef1f5;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:850;color:#344054}#next-inning-adjust-modal .form-select{min-height:46px;border-radius:9px;font-weight:650}#next-inning-adjust-modal .ni-row.open .ni-pos{background:#fff0f0;color:#a32929}#next-inning-adjust-modal .ni-row.open .form-select{border-color:#d88b8b;background:#fffafa}#next-inning-adjust-modal .ni-bench{display:flex;flex-wrap:wrap;gap:6px}#next-inning-adjust-modal .ni-bench span{border:1px solid #dfe3e8;background:#f8f9fb;border-radius:999px;padding:5px 8px;font-size:.7rem}#next-inning-adjust-modal .ni-footer{position:sticky;bottom:0;background:#fff;border-top:1px solid #e7eaf0;margin:13px -16px -16px;padding:11px 16px;display:flex;gap:8px;align-items:center}.ni-warning{font-size:.72rem;color:#a32929;font-weight:700}
-      @media(max-width:575.98px){.bp-head{padding:11px 12px 9px}.bp-body{padding:10px 12px 12px}.bp-preview-grid,.bp-ready-grid{grid-template-columns:1fr;gap:11px}.bp-actions{display:grid;grid-template-columns:1fr 1fr}.bp-actions .btn:last-child{grid-column:1/-1}.bp-moves{display:grid;grid-template-columns:1fr 1fr;gap:6px}.bp-move{padding:7px}.bp-move strong{font-size:.71rem}.bp-move small{font-size:.59rem}.bp-dest{min-width:40px;font-size:.62rem}.bp-slot{padding:5px 3px}.bp-slot .name{font-size:.59rem}.bp-slot .pos{font-size:.49rem}.bp-row.battery{max-width:78%}#next-inning-adjust-modal .modal-dialog{margin:.5rem}}
-      @media(min-width:768px){.bp-ready-grid{grid-template-columns:minmax(240px,.8fr) minmax(420px,1.4fr)}}
+      .bp-kicker{font-size:.63rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}
+      .bp-title{font-size:1.02rem;font-weight:800;color:#172033;margin-top:2px}.bp-help{font-size:.7rem;color:#8a94a3;margin-top:2px;max-width:620px}
+      .bp-inning{min-width:60px;border-radius:10px;background:#172033;color:#fff;padding:7px 9px;text-align:center}.bp-inning small{display:block;font-size:.5rem;letter-spacing:.08em;opacity:.72;font-weight:750}.bp-inning strong{display:block;font-size:1.3rem;line-height:1.05}
+      .bp-body{padding:12px 14px 14px}.bp-status{display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:10px;padding:9px 10px;margin-bottom:10px}
+      .bp-status.waiting{background:#fff8eb;border:1px solid #f0d5a2}.bp-status.ready{background:#edf8f1;border:1px solid #b7dcc3}.bp-status strong{font-size:.78rem;color:#1d2939}.bp-status small{display:block;font-size:.65rem;color:#667085;margin-top:1px}
+      .bp-status-badge{flex:0 0 auto;border-radius:999px;padding:4px 8px;font-size:.59rem;font-weight:850;letter-spacing:.05em}.waiting .bp-status-badge{background:#8b5c00;color:#fff}.ready .bp-status-badge{background:#176b38;color:#fff}
+      .bp-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0 0}.bp-actions .btn{border-radius:9px;font-size:.72rem;font-weight:780;min-height:40px}.bp-actions .btn-primary{background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66)}
+      .bp-main{display:grid;grid-template-columns:minmax(220px,.78fr) minmax(380px,1.35fr);gap:13px;align-items:start}.bp-label{font-size:.61rem;text-transform:uppercase;letter-spacing:.09em;font-weight:850;color:#667085;margin-bottom:7px}.bp-note{font-size:.66rem;color:#8a94a3;margin:-3px 0 7px}
+      .bp-decision{padding:2px 0}.bp-decision h6{font-size:.9rem;font-weight:800;color:#1d2939;margin:0 0 4px}.bp-decision p{font-size:.72rem;color:#667085;margin:0}
+      .bp-moves{display:flex;flex-direction:column;gap:6px}.bp-move{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e3e7ec;background:#f8fafc;border-radius:9px;padding:8px 9px}.bp-move strong{display:block;font-size:.78rem;color:#1d2939;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bp-move small{display:block;font-size:.65rem;color:#7b8492;margin-top:1px}.bp-dest{min-width:46px;border-radius:7px;background:#172033;color:#fff;padding:5px 6px;text-align:center;font-size:.68rem;font-weight:800}.bp-dest.bench{background:#eef1f5;color:#475467}.bp-none{border:1px dashed #d6dce3;border-radius:9px;padding:11px;color:#667085;font-size:.75rem;text-align:center;background:#fafbfc}
+
+      .bp-field-card{border:1px solid #dce5dc;border-radius:12px;overflow:hidden;background:#f8faf8}.bp-field-caption{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 9px;border-bottom:1px solid #e4e9e4;background:#fff}.bp-field-caption strong{font-size:.72rem;color:#344054}.bp-field-caption span{font-size:.61rem;color:#98a2b3}
+      .bp-field{position:relative;aspect-ratio:1.32/1;min-height:245px;overflow:hidden;background:repeating-linear-gradient(90deg,#3d8f55 0,#3d8f55 12.5%,#438f58 12.5%,#438f58 25%)}
+      .bp-field-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.bp-field-spot{position:absolute;transform:translate(-50%,-50%);min-width:64px;max-width:112px;text-align:center;z-index:2}.bp-field-spot .pos{display:block;color:#fff;font-size:.5rem;font-weight:900;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45);margin-bottom:3px}.bp-field-spot .name{display:block;background:rgba(255,255,255,.95);border:1px solid rgba(220,225,229,.95);border-radius:7px;padding:4px 6px;font-size:.64rem;line-height:1.05;font-weight:780;color:#172033;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(16,24,40,.08)}.bp-field-spot.open .name{background:#fff3f3;border-color:#e3a8a8;color:#a32929}
+      .bp-bench{padding:8px 9px 9px;background:#fff;border-top:1px solid #e4e9e4}.bp-bench-list{display:flex;flex-wrap:wrap;gap:5px}.bp-bench-list span{border:1px solid #dfe3e8;background:#f8f9fb;color:#475467;border-radius:999px;padding:4px 7px;font-size:.62rem;font-weight:650}
+
+      #next-inning-adjust-modal .modal-content{border:0;border-radius:16px;overflow:hidden}#next-inning-adjust-modal .modal-dialog{max-width:720px}
+      #next-inning-adjust-modal .ni-row{display:grid;grid-template-columns:48px minmax(0,1fr);gap:9px;align-items:center;margin-bottom:8px}#next-inning-adjust-modal .ni-pos{height:36px;border-radius:8px;background:#eef1f5;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:850;color:#344054}#next-inning-adjust-modal .form-select{min-height:46px;border-radius:9px;font-weight:650}#next-inning-adjust-modal .ni-row.open .ni-pos{background:#fff0f0;color:#a32929}#next-inning-adjust-modal .ni-row.open .form-select{border-color:#d88b8b;background:#fffafa}
+      #next-inning-adjust-modal .ni-bench{display:flex;flex-wrap:wrap;gap:6px}#next-inning-adjust-modal .ni-bench span{border:1px solid #dfe3e8;background:#f8f9fb;border-radius:999px;padding:5px 8px;font-size:.7rem}#next-inning-adjust-modal .ni-footer{position:sticky;bottom:0;background:#fff;border-top:1px solid #e7eaf0;margin:13px -16px -16px;padding:11px 16px;display:flex;gap:8px;align-items:center}.ni-warning{font-size:.72rem;color:#a32929;font-weight:700}
+
+      @media(max-width:575.98px){.bp-head{padding:11px 12px 9px}.bp-body{padding:10px 12px 12px}.bp-main{grid-template-columns:1fr;gap:11px}.bp-actions{grid-template-columns:1fr 1fr}.bp-actions .btn:last-child{grid-column:1/-1}.bp-moves{display:grid;grid-template-columns:1fr 1fr;gap:6px}.bp-move{padding:7px}.bp-move strong{font-size:.7rem}.bp-move small{font-size:.58rem}.bp-dest{min-width:40px;font-size:.61rem}.bp-field{min-height:225px}.bp-field-spot{min-width:52px;max-width:74px}.bp-field-spot .name{font-size:.56rem;padding:4px}.bp-field-spot .pos{font-size:.45rem}#next-inning-adjust-modal .modal-dialog{margin:.5rem}}
+      @media(min-width:576px) and (max-width:1023.98px){.bp-main{grid-template-columns:minmax(210px,.75fr) minmax(390px,1.35fr)}.bp-field{min-height:270px}.bp-field-spot .name{font-size:.68rem}}
     `;
     document.head.appendChild(style);
   }
@@ -65,21 +76,20 @@
       });
   }
 
-  function slot(pos, alignment) {
+  function fieldSpot(pos, alignment, left, top) {
     const name = alignment?.[pos] || '';
-    return `<div class="bp-slot ${name ? '' : 'open'}"><span class="pos">${esc(pos)}</span><span class="name">${esc(name || 'Open')}</span></div>`;
+    return `<div class="bp-field-spot ${name ? '' : 'open'}" style="left:${left}%;top:${top}%"><span class="pos">${esc(pos)}</span><span class="name">${esc(name || 'Open')}</span></div>`;
   }
 
-  function boardMarkup(alignment, roster, outfielderCount) {
+  function fieldMarkup(alignment, roster, outfielderCount, caption, note) {
     const four = Number(outfielderCount) === 4;
     const outfield = four
-      ? `<div class="bp-row of4">${['LF','LCF','RCF','RF'].map(pos => slot(pos,alignment)).join('')}</div>`
-      : `<div class="bp-row of3">${['LF','CF','RF'].map(pos => slot(pos,alignment)).join('')}</div>`;
-    const infield = `<div class="bp-row if">${['3B','SS','2B','1B'].map(pos => slot(pos,alignment)).join('')}</div>`;
-    const battery = `<div class="bp-row battery">${['P','C'].map(pos => slot(pos,alignment)).join('')}</div>`;
+      ? [['LF',11,24],['LCF',38,14],['RCF',62,14],['RF',89,24]]
+      : [['LF',15,22],['CF',50,11],['RF',85,22]];
+    const spots = [...outfield,['3B',18,57],['SS',38,43],['2B',62,43],['1B',82,57],['P',50,61],['C',50,84]];
     const assigned = new Set(Object.values(alignment || {}).filter(Boolean));
     const bench = (roster || []).filter(player => !assigned.has(player.name)).map(player => player.name);
-    return `${outfield}${infield}${battery}<div class="bp-bench"><div class="bp-label">Bench</div><div class="bp-bench-list">${bench.length ? bench.map(name=>`<span>${esc(name)}</span>`).join('') : '<span>None</span>'}</div></div>`;
+    return `<div class="bp-field-card"><div class="bp-field-caption"><strong>${esc(caption)}</strong><span>${esc(note || '')}</span></div><div class="bp-field"><svg class="bp-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true"><path d="M7 57 Q9 13 50 6 Q91 13 93 57" fill="none" stroke="rgba(245,245,220,.35)" stroke-width="1.2"/><path d="M50 84 L8 38 M50 84 L92 38" fill="none" stroke="rgba(255,255,255,.88)" stroke-width=".7"/><polygon points="50,75 27,54 50,32 73,54" fill="#cfa56c" opacity=".95"/><polygon points="50,68 34,54 50,40 66,54" fill="#438f58"/><circle cx="50" cy="61" r="4.8" fill="#cfa56c"/><circle cx="50" cy="81" r="6.2" fill="#cfa56c"/><rect x="49" y="31" width="2" height="2" fill="#fff" transform="rotate(45 50 32)"/><rect x="72" y="53" width="2" height="2" fill="#fff" transform="rotate(45 73 54)"/><rect x="26" y="53" width="2" height="2" fill="#fff" transform="rotate(45 27 54)"/><path d="M48.8 81.5 L50 80.4 L51.2 81.5 L50.8 83 L49.2 83 Z" fill="#fff"/></svg>${spots.map(([pos,left,top])=>fieldSpot(pos,alignment,left,top)).join('')}</div><div class="bp-bench"><div class="bp-label">Bench</div><div class="bp-bench-list">${bench.length ? bench.map(name=>`<span>${esc(name)}</span>`).join('') : '<span>None</span>'}</div></div></div>`;
   }
 
   function ensureCard() {
@@ -97,31 +107,34 @@
   }
 
   function sourceLabel(source) {
-    if (source === 'current') return 'Keeping current defense';
-    if (source === 'planned') return 'Using pregame plan';
-    return 'Custom next-inning setup';
+    if (source === 'current') return 'Current defense is staying';
+    if (source === 'planned') return 'Pregame plan confirmed';
+    return 'Custom defense confirmed';
   }
 
   function actionButtons(data) {
     const hasPlan = Object.values(data.planned_alignment || {}).some(Boolean);
-    return `<div class="bp-actions"><button class="btn btn-outline-dark" data-bp-action="current">Keep Current Defense</button><button class="btn btn-outline-primary" data-bp-action="planned" ${hasPlan?'':'disabled'}>Use Pregame Plan</button><button class="btn btn-primary" data-bp-action="adjust">Adjust Next Inning</button></div>`;
+    return `<div class="bp-actions"><button class="btn btn-outline-dark" data-bp-action="current">Keep Current</button><button class="btn btn-outline-primary" data-bp-action="planned" ${hasPlan?'':'disabled'}>Use Plan</button><button class="btn btn-primary" data-bp-action="adjust">Adjust Defense</button></div>`;
   }
 
   function render(data) {
     latest = data;
     const card = ensureCard();
     if (!card) return false;
+
     const next = data.next_inning;
     const current = data.current_alignment || {};
     const planned = data.planned_alignment || {};
     const confirmed = data.confirmed;
     const roster = data.roster || [];
-
-    const head = `<div class="bp-head"><div><div class="bp-kicker">Physical Board Prep</div><div class="bp-title">Next Inning Setup — Inning ${esc(next)}</div><div class="bp-help">Pregame plan is a suggestion until a coach confirms what you actually want.</div></div><div class="bp-inning"><small>UP NEXT</small><strong>${esc(next)}</strong></div></div>`;
+    const head = `<div class="bp-head"><div><div class="bp-kicker">Next Inning Prep</div><div class="bp-title">Get the board ready for Inning ${esc(next)}</div><div class="bp-help">Confirm the defense first. Then the app shows only the magnet moves you actually need.</div></div><div class="bp-inning"><small>NEXT</small><strong>${esc(next)}</strong></div></div>`;
 
     if (!confirmed) {
       const planExists = Object.values(planned).some(Boolean);
-      card.innerHTML = `${head}<div class="bp-body"><div class="bp-status waiting"><div><strong>No next-inning defense has been confirmed.</strong><small>Do not move magnets yet. Choose what the team will actually use.</small></div><span class="bp-status-badge">NOT CONFIRMED</span></div>${actionButtons(data)}<div class="bp-preview-grid"><section><div class="bp-label">Current defense</div><div class="bp-note">What is on the field right now</div><div class="bp-board">${boardMarkup(current,roster,data.outfielder_count)}</div></section><section><div class="bp-label">Pregame plan — preview only</div><div class="bp-note">${planExists ? 'Not active until you choose Use Pregame Plan.' : 'No pregame plan is saved for this inning.'}</div>${planExists ? `<div class="bp-board">${boardMarkup(planned,roster,data.outfielder_count)}</div>` : '<div class="bp-none">No planned next inning.</div>'}</section></div></div>`;
+      const preview = planExists
+        ? fieldMarkup(planned, roster, data.outfielder_count, 'Pregame Plan Preview', 'Not active yet')
+        : '<div class="bp-none">No pregame plan is saved for this inning.</div>';
+      card.innerHTML = `${head}<div class="bp-body"><div class="bp-status waiting"><div><strong>Next inning not set</strong><small>Choose what you actually want before moving the board.</small></div><span class="bp-status-badge">NOT SET</span></div><div class="bp-main"><section class="bp-decision"><div class="bp-label">Choose next inning</div><h6>What defense are we using?</h6><p>Current defense is already shown above. The plan on the right is only a preview.</p>${actionButtons(data)}</section><section>${preview}</section></div></div>`;
       wireActions(card);
       return true;
     }
@@ -130,9 +143,9 @@
     const moves = movesBetween(current,target,roster);
     const movesHtml = moves.length
       ? moves.map(move => `<div class="bp-move"><div><strong>${esc(move.name)}</strong><small>${esc(move.from)} → ${esc(move.to)}</small></div><div class="bp-dest ${move.to==='BENCH'?'bench':''}">${esc(move.to)}</div></div>`).join('')
-      : '<div class="bp-none">No magnets need to move. Keep the current defense.</div>';
-    const updated = confirmed.updated_by ? ` • confirmed by ${esc(confirmed.updated_by)}` : '';
-    card.innerHTML = `${head}<div class="bp-body"><div class="bp-status ready"><div><strong>${esc(sourceLabel(confirmed.source))}</strong><small>This is the defense End Inning will load${updated}.</small></div><span class="bp-status-badge">READY</span></div>${actionButtons(data)}<div class="bp-ready-grid"><section><div class="bp-label">Magnets to move</div><div class="bp-moves">${movesHtml}</div></section><section><div class="bp-label">Confirmed next-inning board</div><div class="bp-board">${boardMarkup(target,roster,data.outfielder_count)}</div></section></div></div>`;
+      : '<div class="bp-none">No magnet moves. Keep the board as-is.</div>';
+    const updated = confirmed.updated_by ? `Confirmed by ${esc(confirmed.updated_by)}` : 'Confirmed';
+    card.innerHTML = `${head}<div class="bp-body"><div class="bp-status ready"><div><strong>${esc(sourceLabel(confirmed.source))}</strong><small>${updated}. End Inning will load this defense.</small></div><span class="bp-status-badge">BOARD READY</span></div><div class="bp-main"><section><div class="bp-label">Moves to make</div><div class="bp-moves">${movesHtml}</div>${actionButtons(data)}</section><section>${fieldMarkup(target,roster,data.outfielder_count,'Confirmed Board','Ready for next inning')}</section></div></div>`;
     wireActions(card);
     return true;
   }
@@ -174,7 +187,7 @@
       const data = await api('POST',{mode});
       lastSignature = '';
       render(data);
-      toast(mode === 'current' ? 'Next inning will keep the current defense.' : 'Pregame plan confirmed for the next inning.');
+      toast(mode === 'current' ? 'Current defense confirmed for next inning.' : 'Pregame plan confirmed for next inning.');
     } catch (err) {
       toast(err.message,'danger');
     } finally {
@@ -218,7 +231,7 @@
       return `<div class="ni-row ${selected?'':'open'}"><div class="ni-pos">${esc(pos)}</div><select class="form-select ni-select" data-pos="${esc(pos)}">${options}</select></div>`;
     }).join('');
     const bench = draftBench();
-    body.innerHTML = `${rows}<div class="bp-label mt-3">Bench</div><div class="ni-bench">${bench.length?bench.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>None</span>'}</div><div class="ni-footer"><div class="me-auto">${holes.length?`<div class="ni-warning">Fill ${esc(holes.join(', '))} before confirming.</div>`:'<div class="small text-muted">This exact setup will become the Board Prep instructions.</div>'}</div><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-dark fw-bold" id="save-next-inning-adjust" ${holes.length?'disabled':''}>Confirm Setup</button></div>`;
+    body.innerHTML = `${rows}<div class="bp-label mt-3">Bench</div><div class="ni-bench">${bench.length?bench.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>None</span>'}</div><div class="ni-footer"><div class="me-auto">${holes.length?`<div class="ni-warning">Fill ${esc(holes.join(', '))} before confirming.</div>`:'<div class="small text-muted">This exact setup becomes the next-inning board.</div>'}</div><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-dark fw-bold" id="save-next-inning-adjust" ${holes.length?'disabled':''}>Confirm Setup</button></div>`;
 
     body.querySelectorAll('.ni-select').forEach(select=>select.addEventListener('change',()=>{
       const pos = select.dataset.pos;
@@ -254,7 +267,7 @@
       bootstrap.Modal.getOrCreateInstance(document.getElementById('next-inning-adjust-modal')).hide();
       lastSignature = '';
       render(data);
-      toast('Custom next-inning defense confirmed.');
+      toast('Next-inning defense confirmed.');
     } catch (err) {
       toast(err.message,'danger');
       if (btn) { btn.disabled = false; btn.textContent = 'Confirm Setup'; }
@@ -280,7 +293,7 @@
 
   installStyles();
   document.addEventListener('DOMContentLoaded',()=>{
-    setTimeout(refresh,180);
+    setTimeout(refresh,120);
     setInterval(refresh,1000);
   });
 })();
