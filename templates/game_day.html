@@ -22,7 +22,7 @@
   .gd-body{padding:13px 16px 15px}
   .gd-readiness{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
   .gd-ready-item{border:1px solid #e4e7ec;border-radius:10px;padding:9px 10px;min-width:0;background:#fafbfc}
-  .gd-ready-item.good{background:#f1f9f4;border-color:#cce8d5}.gd-ready-item.need{background:#fff8eb;border-color:#f1d7a5}
+  .gd-ready-item.good{background:#f1f9f4;border-color:#cce8d5}.gd-ready-item.need{background:#fff8eb;border-color:#f1d7a5}.gd-ready-item.optional{background:#f8f9fb;border-color:#e4e7ec}
   .gd-ready-label{font-size:.57rem;text-transform:uppercase;letter-spacing:.07em;font-weight:850;color:#667085}
   .gd-ready-value{font-size:.8rem;font-weight:800;color:#1d2939;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .gd-alerts{margin-top:10px;border-radius:10px;background:#fff8eb;border:1px solid #f1d7a5;padding:9px 10px}
@@ -57,7 +57,7 @@
     {% for item in game_cards %}
       {% set g = item.game %}
       {% set r = item.readiness %}
-      <article class="gd-game {% if r.is_live %}live{% endif %}">
+      <article class="gd-game {% if r.is_live %}live{% endif %}" data-game-id="{{ g.id }}">
         <div class="gd-top">
           <div>
             <div class="gd-opponent">vs {{ g.opponent }}</div>
@@ -83,9 +83,9 @@
               <span class="gd-ready-label">Defense</span>
               <div class="gd-ready-value">{% if r.defense_ready %}{{ r.defense_innings }} innings ready{% else %}Needs attention{% endif %}</div>
             </div>
-            <div class="gd-ready-item {% if r.pitching_plan_ready %}good{% else %}need{% endif %}">
+            <div class="gd-ready-item {% if r.pitching_plan_ready %}good{% else %}optional{% endif %}">
               <span class="gd-ready-label">Pitching Plan</span>
-              <div class="gd-ready-value">{% if r.pitching_plan_ready %}{{ r.pitching_plan_count }} planned{% else %}Not set{% endif %}</div>
+              <div class="gd-ready-value">{% if r.pitching_plan_ready %}{{ r.pitching_plan_count }} planned{% else %}Optional · not set{% endif %}</div>
             </div>
           </div>
 
@@ -99,6 +99,9 @@
             {% if r.status == 'COMPLETE' %}
               <a class="btn gd-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">View Game Report</a>
               <a class="btn btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Open Game</a>
+            {% elif r.status == 'NEEDS POSTGAME' %}
+              <a class="btn gd-primary" href="{{ url_for('gameday.game_management', game_id=g.id, finalize=1) }}">Finish Game</a>
+              <a class="btn btn-outline-secondary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">Actual Usage</a>
             {% else %}
               <a class="btn gd-primary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">{{ r.primary_label }}</a>
               {% if r.has_events %}<a class="btn btn-outline-secondary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">Actual Usage</a>{% endif %}
@@ -142,9 +145,15 @@
 {% block scripts %}
 <script>
 (() => {
+  const gameIds = [{% for item in game_cards %}{{ item.game.id }}{% if not loop.last %},{% endif %}{% endfor %}];
   const socket = typeof io === 'function' ? io() : null;
   if (!socket) return;
-  const reloadSoon = () => window.setTimeout(() => window.location.reload(), 350);
+  let reloadTimer = null;
+  const reloadSoon = () => {
+    window.clearTimeout(reloadTimer);
+    reloadTimer = window.setTimeout(() => window.location.reload(), 300);
+  };
+  socket.on('connect', () => gameIds.forEach(gameId => socket.emit('join_game_room', {game_id: gameId})));
   socket.on('data_updated', reloadSoon);
   socket.on('pitching_update', reloadSoon);
   socket.on('game_state_update', reloadSoon);
