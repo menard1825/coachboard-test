@@ -124,7 +124,7 @@ def build_game_readiness(game, team):
     for player in present:
         summary = pitch_summary.get(player.name) or {}
         status = str(summary.get('status') or '')
-        if status and status != 'Available' and player.pitcher_role != 'Not a Pitcher':
+        if status and status != 'Available' and player.pitcher_role and player.pitcher_role != 'Not a Pitcher':
             pitching_alerts.append({
                 'name': player.name,
                 'status': status,
@@ -194,6 +194,8 @@ def build_game_readiness(game, team):
 def build_actual_game_report(game, team):
     roster = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
     _, actual, events, reached = actual_game_rotation(game, team.id)
+    required = required_positions(team)
+    roster_names = {player.name for player in roster}
 
     def inning_sort(value):
         try:
@@ -204,16 +206,26 @@ def build_actual_game_report(game, team):
     inning_keys = sorted(reached, key=inning_sort)
     innings = []
     bench_totals = {player.name: [] for player in roster}
+    unreliable_innings = []
+
     for inning in inning_keys:
         alignment = actual.get(inning) or {}
-        assigned = {name for name in alignment.values() if name}
-        bench = [player.name for player in roster if player.name not in assigned]
-        for name in bench:
-            bench_totals[name].append(inning)
+        reliable, missing = _complete_alignment(alignment, required, roster_names)
+        if reliable:
+            assigned = {alignment.get(pos) for pos in required if alignment.get(pos)}
+            bench = [player.name for player in roster if player.name not in assigned]
+            for name in bench:
+                bench_totals[name].append(inning)
+        else:
+            bench = None
+            unreliable_innings.append(inning)
+
         innings.append({
             'inning': inning,
             'alignment': alignment,
             'bench': bench,
+            'reliable': reliable,
+            'missing': missing,
         })
 
     pitching = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(
@@ -244,4 +256,5 @@ def build_actual_game_report(game, team):
         'bench_rows': bench_rows,
         'pitching': pitching,
         'changes': changes,
+        'unreliable_innings': unreliable_innings,
     }
