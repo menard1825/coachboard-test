@@ -1,13 +1,14 @@
 from flask import Blueprint, jsonify, request
 
 from db import db
-from models import PitchingOuting, Player
+from models import GameRotationEvent, PitchingOuting, Player
 from utils import normalize_baseball_innings
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
     _broadcast_state,
     _current_alignment,
+    _event,
 )
 
 
@@ -139,6 +140,26 @@ def end_with_pitching(game_id):
         outing.pitcher_type = 'Starter' if index == 0 else 'Reliever'
         outing.pitches = pitches
         outing.innings = innings
+
+    # Persist a durable lifecycle marker. is_live=False alone cannot distinguish
+    # a finalized game from a scheduled game that never started.
+    already_finalized = db.session.query(GameRotationEvent).filter_by(
+        game_id=game.id,
+        team_id=team.id,
+        event_type='End Game',
+        reverted=False,
+    ).first()
+    if not already_finalized:
+        _, actual_rotation, _ = _actual_rotation(game, team.id)
+        current = _current_alignment(game, team.id, actual_rotation)
+        _event(
+            game,
+            team.id,
+            'End Game',
+            str(game.live_current_inning or '1'),
+            current,
+            current,
+        )
 
     game.is_live = False
     db.session.commit()
