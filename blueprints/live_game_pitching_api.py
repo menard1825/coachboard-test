@@ -14,6 +14,17 @@ from blueprints.live_game_api import (
 live_game_pitching_bp = Blueprint('live_game_pitching', __name__, url_prefix='/api/live-game')
 
 
+@live_game_pitching_bp.before_app_request
+def block_legacy_live_end_game():
+    """Prevent old cached clients from creating incomplete pitching records."""
+    if request.method == 'POST' and request.endpoint == 'live_game_api.end_game':
+        return jsonify({
+            'status': 'error',
+            'message': 'Use the current End Game pitching check-in so pitch count and innings are recorded correctly.'
+        }), 409
+    return None
+
+
 def _append_pitcher(order, name):
     if name and name not in order:
         order.append(name)
