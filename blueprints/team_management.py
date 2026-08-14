@@ -107,6 +107,59 @@ def add_practice_plan():
     socketio.emit('data_updated', {'message': 'New practice plan created.'})
     return redirect(url_for('home', _anchor='practice_plan'))
 
+@team_management_bp.route('/clone_practice_plan/<int:plan_id>', methods=['POST'])
+def clone_practice_plan(plan_id):
+    """Reuse a practice plan without copying old attendance or completion state."""
+    team_id = session.get('team_id')
+    source = db.session.query(PracticePlan).filter_by(id=plan_id, team_id=team_id).first()
+    if not source:
+        return jsonify({'status': 'error', 'message': 'Practice plan not found.'}), 404
+
+    data = request.get_json(silent=True) or request.form
+    date_value = str(data.get('plan_date') or '').strip()
+    if not date_value:
+        return jsonify({'status': 'error', 'message': 'Choose the date for the new practice.'}), 400
+    try:
+        new_date = datetime.strptime(date_value, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'status': 'error', 'message': 'Practice date must use YYYY-MM-DD.'}), 400
+
+    copy_tasks = str(data.get('copy_tasks', 'true')).lower() not in {'0', 'false', 'no'}
+    new_plan = PracticePlan(
+        date=new_date,
+        general_notes=source.general_notes or '',
+        emphasis=source.emphasis or '',
+        warm_up=source.warm_up or '',
+        infield_outfield=source.infield_outfield or '',
+        hitting=source.hitting or '',
+        pitching_catching=source.pitching_catching or '',
+        team_id=team_id,
+    )
+    db.session.add(new_plan)
+    db.session.flush()
+
+    if copy_tasks:
+        author_name = session.get('full_name') or session.get('username')
+        source_tasks = db.session.query(PracticeTask).filter_by(practice_plan_id=source.id).order_by(PracticeTask.id).all()
+        for task in source_tasks:
+            db.session.add(PracticeTask(
+                text=task.text,
+                status='pending',
+                author=author_name,
+                timestamp=datetime.now(),
+                practice_plan_id=new_plan.id,
+            ))
+
+    # Attendance is intentionally NOT copied. A reused practice is a fresh day.
+    db.session.commit()
+    socketio.emit('data_updated', {'message': 'Practice plan reused.'})
+    return jsonify({
+        'status': 'success',
+        'message': 'Practice plan copied to the new date.',
+        'new_plan_id': new_plan.id,
+        'new_date': new_date.strftime('%Y-%m-%d'),
+    })
+
 @team_management_bp.route('/edit_practice_plan/<int:plan_id>', methods=['POST'])
 def edit_practice_plan(plan_id):
     plan_to_edit = db.session.get(PracticePlan, plan_id)
