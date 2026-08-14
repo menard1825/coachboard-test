@@ -65,8 +65,9 @@ def actual_game_rotation(game, team_id):
     return rotation, actual, events, reached
 
 
-def _actual_pitcher_names(actual, events):
+def _actual_pitcher_names(actual, events, reached=None):
     order = []
+    reached_keys = {str(value) for value in reached} if reached is not None else None
 
     def add(name):
         if name and name not in order:
@@ -84,7 +85,9 @@ def _actual_pitcher_names(actual, events):
         except (TypeError, ValueError):
             return 9999
 
-    for _, alignment in sorted((actual or {}).items(), key=inning_key):
+    for inning, alignment in sorted((actual or {}).items(), key=inning_key):
+        if reached_keys is not None and str(inning) not in reached_keys:
+            continue
         add((alignment or {}).get('P'))
 
     return order
@@ -181,8 +184,8 @@ def build_game_readiness(game, team):
     has_pitching = bool(game_outings)
     ready = not blockers
 
-    _, actual, actual_events, _ = actual_game_rotation(game, team_id)
-    expected_pitchers = _actual_pitcher_names(actual, actual_events)
+    _, actual, actual_events, reached = actual_game_rotation(game, team_id)
+    expected_pitchers = _actual_pitcher_names(actual, actual_events, reached)
     pitching_stats_complete, pitching_missing = _pitching_completion(expected_pitchers, game_outings)
     pitching_stats_pending = bool(expected_pitchers) and not pitching_stats_complete
 
@@ -298,7 +301,7 @@ def build_actual_game_report(game, team):
         game_id=game.id,
         team_id=team.id,
     ).order_by(PitchingOuting.id.asc()).all()
-    expected_pitchers = _actual_pitcher_names(actual, events)
+    expected_pitchers = _actual_pitcher_names(actual, events, reached)
     pitching_stats_complete, pitching_missing = _pitching_completion(expected_pitchers, pitching)
     pitching_stats_pending = bool(expected_pitchers) and not pitching_stats_complete
 
