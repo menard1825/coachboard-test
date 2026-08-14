@@ -26,6 +26,22 @@
         mobileItem('#more', 'three-dots', 'More', false, true),
       ].join('');
     }
+
+    // There is now one canonical pitching screen. Convert every old home-tab
+    // link into normal navigation before main.js attaches Bootstrap tab handlers.
+    document.querySelectorAll('a[href="#pitching"]').forEach((link) => {
+      link.removeAttribute('data-bs-toggle');
+      link.removeAttribute('role');
+      link.setAttribute('href', '/pitching');
+      const label = link.querySelector('span');
+      if (label && /pitching/i.test(label.textContent || '')) label.textContent = 'Pitching';
+      if (!label && /pitching log/i.test(link.textContent || '')) {
+        link.childNodes.forEach(node => {
+          if (node.nodeType === Node.TEXT_NODE && /pitching log/i.test(node.textContent || '')) node.textContent = ' Pitching';
+        });
+      }
+    });
+
     loadScript('/static/js/season_management_v2.js', 'season-management');
   }
 
