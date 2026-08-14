@@ -50,10 +50,14 @@ def game_day_home():
         if game is not None
     ]
 
-    upcoming = db.session.query(Game).filter(
+    focus_ids = {item['game'].id for item in game_cards}
+    upcoming_query = db.session.query(Game).filter(
         Game.team_id == team.id,
         Game.date >= next_day,
-    ).order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(5).all()
+    )
+    if focus_ids:
+        upcoming_query = upcoming_query.filter(~Game.id.in_(focus_ids))
+    upcoming = upcoming_query.order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(5).all()
 
     return render_template(
         'game_day.html',
