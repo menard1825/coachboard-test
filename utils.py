@@ -1,39 +1,33 @@
-import json
 from datetime import date, timedelta, datetime
-from sqlalchemy import func
-from models import Player, PitchingOuting
 import zoneinfo
 
 
 def model_to_dict(obj):
-    """Converts a SQLAlchemy model instance into a dictionary."""
+    """Convert a SQLAlchemy model instance into a JSON-friendly dictionary."""
     if obj is None:
         return None
-
-    d = {}
+    result = {}
     for column in obj.__table__.columns:
-        val = getattr(obj, column.name)
-        if isinstance(val, datetime):
-            # Preserve full exact timestamps for live events and sync accuracy
-            d[column.name] = val.isoformat()
-        elif isinstance(val, date):
-            d[column.name] = val.strftime('%Y-%m-%d')
+        value = getattr(obj, column.name)
+        if isinstance(value, datetime):
+            result[column.name] = value.isoformat()
+        elif isinstance(value, date):
+            result[column.name] = value.strftime('%Y-%m-%d')
         else:
-            d[column.name] = val
-    return d
+            result[column.name] = value
+    return result
 
 
 def pitching_outing_to_dict(outing):
     if not outing:
         return None
-    d = model_to_dict(outing)
-    d['player_name'] = outing.player.name if outing.player else "Unknown"
-    return d
+    result = model_to_dict(outing)
+    result['player_name'] = outing.player.name if outing.player else 'Unknown'
+    return result
 
 
-# Rule configuration is intentionally explicit. Pitch Smart uses GAME pitch counts;
-# USSSA uses innings/outs. Practice and lesson throws are workload context, not
-# silently converted into official competition limits.
+# Pitch Smart is game-pitch-count based. USSSA youth pitching limits are
+# innings/outs based. Practice and lesson throws remain workload context only.
 PITCHING_RULES = {
     'MLB Pitch Smart': {
         '7U': {'rule_type': 'pitch_count', 'max_daily': 50, 'rest_thresholds': [(20, 0), (35, 1), (50, 2)]},
@@ -55,14 +49,12 @@ PITCHING_RULES = {
         'default': {'rule_type': 'pitch_count', 'max_daily': 85, 'rest_thresholds': [(20, 0), (35, 1), (50, 2), (65, 3), (85, 4)]},
     },
     'USSSA': {
-        # National-style youth limits: Column A = max in one day and still pitch
-        # next day; Column B = one-day max; Column C = three-day max.
         **{
             age: {
                 'rule_type': 'innings',
-                'next_day_max_outs': 9,
-                'max_daily_outs': 18,
-                'rolling_3_day_max_outs': 24,
+                'next_day_max_outs': 9,       # 3.0 IP
+                'max_daily_outs': 18,          # 6.0 IP
+                'rolling_3_day_max_outs': 24,  # 8.0 IP
                 'max_consecutive_days': 3,
             }
             for age in ('7U', '8U', '9U', '10U', '11U', '12U')
@@ -70,9 +62,9 @@ PITCHING_RULES = {
         **{
             age: {
                 'rule_type': 'innings',
-                'next_day_max_outs': 9,
-                'max_daily_outs': 21,
-                'rolling_3_day_max_outs': 24,
+                'next_day_max_outs': 9,       # 3.0 IP
+                'max_daily_outs': 21,          # 7.0 IP
+                'rolling_3_day_max_outs': 24,  # 8.0 IP
                 'max_consecutive_days': 3,
             }
             for age in ('13U', '14U')
@@ -89,52 +81,46 @@ PITCHING_RULES = {
 
 
 def allowed_file(filename):
-    """Checks if a filename has an allowed extension."""
     allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
 
 def get_pitching_rules_for_team(team):
-    """Return a copy of the configured rule set for the team's age group."""
-    rule_set_name = getattr(team, 'pitching_rule_set', 'MLB Pitch Smart') or 'MLB Pitch Smart'
+    """Return a copy of the configured pitching rules for the team's age."""
+    configured_name = getattr(team, 'pitching_rule_set', 'MLB Pitch Smart') or 'MLB Pitch Smart'
     age_group = getattr(team, 'age_group', 'default') or 'default'
 
-    # Do not pretend an unknown ruleset is something else. Fall back only when
-    # the stored value is genuinely unknown, and identify the effective source.
-    rule_set = PITCHING_RULES.get(rule_set_name)
-    effective_name = rule_set_name
+    rule_set = PITCHING_RULES.get(configured_name)
+    effective_name = configured_name
+    source_note = None
     if rule_set is None:
         rule_set = PITCHING_RULES['MLB Pitch Smart']
         effective_name = 'MLB Pitch Smart'
+        source_note = f'Unknown configured ruleset "{configured_name}"; using MLB Pitch Smart until the team setting is corrected.'
 
-    # Pitch Smart's published table begins at age 7. For younger legacy team
-    # records, use the 7-8 guidance but clearly expose that it is a proxy.
     effective_age = age_group
-    source_note = None
     if effective_name == 'MLB Pitch Smart' and age_group in {'4U', '5U', '6U'}:
         effective_age = '7U'
-        source_note = 'Using MLB Pitch Smart 7-8 guidance for this younger age setting.'
+        source_note = 'MLB Pitch Smart publishes its first pitch-count table at ages 7–8; using that guidance for this younger team setting.'
+
+    if effective_name == 'USSSA' and age_group not in rule_set:
+        source_note = f'USSSA youth limits for {age_group} are not explicitly configured; verify the event rules before relying on eligibility.'
 
     rules = dict(rule_set.get(effective_age, rule_set.get('default', {})))
     rules['rule_set_name'] = effective_name
-    rules['configured_rule_set_name'] = rule_set_name
+    rules['configured_rule_set_name'] = configured_name
     rules['age_group'] = age_group
     rules['source_note'] = source_note
     return rules
 
 
 def baseball_innings_to_outs(value):
-    """Convert baseball innings notation (e.g. 2.1 = 7 outs) to outs.
-
-    Returns None for blank/invalid values. Only .0, .1, and .2 are valid
-    fractional components because baseball innings are recorded in outs.
-    """
+    """Convert baseball notation (2.1 = 7 outs) to outs; reject .3, .4, etc."""
     if value is None:
         return None
     text = str(value).strip()
     if not text:
         return None
-
     try:
         if '.' in text:
             whole_text, frac_text = text.split('.', 1)
@@ -148,14 +134,12 @@ def baseball_innings_to_outs(value):
             partial_outs = 0
     except (TypeError, ValueError):
         return None
-
     if whole < 0:
         return None
     return whole * 3 + partial_outs
 
 
 def outs_to_baseball_innings(outs):
-    """Format a number of outs as baseball innings notation."""
     if outs is None:
         return None
     try:
@@ -168,7 +152,6 @@ def outs_to_baseball_innings(outs):
 
 
 def normalize_baseball_innings(value):
-    """Validate user innings input and return storage-compatible float notation."""
     outs = baseball_innings_to_outs(value)
     if outs is None:
         return None
@@ -180,7 +163,7 @@ def _is_game_outing(outing):
 
 
 def calculate_cumulative_pitching_stats(player_id, all_outings):
-    """Calculate GAME pitching totals using outs, never decimal inning math."""
+    """Calculate game pitching totals by outs, never decimal-float addition."""
     total_outs = 0
     total_pitches = 0
     appearances = 0
@@ -193,7 +176,7 @@ def calculate_cumulative_pitching_stats(player_id, all_outings):
         if outing.pitches is not None:
             try:
                 total_pitches += int(outing.pitches)
-            except (ValueError, TypeError):
+            except (TypeError, ValueError):
                 pass
         outs = baseball_innings_to_outs(outing.innings)
         if outs is None:
@@ -211,53 +194,47 @@ def calculate_cumulative_pitching_stats(player_id, all_outings):
 
 
 def calculate_cumulative_position_stats(roster_players, rotations):
-    """Calculates the number of games a player appeared at each position in a rotation."""
     stats = {player.name: {} for player in roster_players}
     game_rotations_counted = set()
-
     for rotation in rotations:
         rotation_key = rotation.associated_game_id or rotation.id
         if rotation_key in game_rotations_counted:
             continue
-
         try:
             innings_data = rotation.innings or {}
             if not isinstance(innings_data, dict):
                 continue
-
-            players_in_this_rotation = set()
-            for inning, positions in innings_data.items():
+            positions_seen = set()
+            for positions in innings_data.values():
                 for position, player_name in positions.items():
-                    player_position_tuple = (player_name, position)
-                    if player_name in stats and player_position_tuple not in players_in_this_rotation:
+                    key = (player_name, position)
+                    if player_name in stats and key not in positions_seen:
                         stats[player_name][position] = stats[player_name].get(position, 0) + 1
-                        players_in_this_rotation.add(player_position_tuple)
-
+                        positions_seen.add(key)
             game_rotations_counted.add(rotation_key)
         except Exception:
             continue
     return stats
 
 
-def _required_rest_days(pitches, rest_thresholds):
+def _required_rest_days(pitches, thresholds):
     if pitches is None:
         return None
     if pitches <= 0:
         return 0
-    for threshold, rest_days in rest_thresholds or []:
+    for threshold, rest_days in thresholds or []:
         if pitches <= threshold:
             return rest_days
-    if rest_thresholds:
-        return rest_thresholds[-1][1] + 1
-    return 0
+    return (thresholds[-1][1] + 1) if thresholds else 0
 
 
 def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, all_targets=None, team_timezone=None, current_game_id=None):
-    """Calculate official eligibility, recorded workload, and coach targets.
+    """Calculate official eligibility, separate throwing workload, and targets.
 
-    Official eligibility uses only GAME outings. Practice/lesson throws remain
-    visible as workload, but they are not silently treated as official game
-    pitches or USSSA innings. Missing official data stays unknown.
+    * Official Pitch Smart eligibility uses GAME pitches only.
+    * Official USSSA eligibility uses GAME innings/outs only.
+    * Practice/lesson pitches are workload context, not official competition usage.
+    * Missing official values remain unknown; they are never silently zero-filled.
     """
     summary = {}
     tz = zoneinfo.ZoneInfo(team_timezone) if team_timezone else zoneinfo.ZoneInfo('America/Indiana/Indianapolis')
@@ -275,7 +252,7 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
     rule_type = rules.get('rule_type', 'pitch_count')
     rule_set_name = rules.get('rule_set_name', 'MLB Pitch Smart')
 
-    def get_local_date(value):
+    def local_date(value):
         if isinstance(value, datetime):
             return value.date() if value.tzinfo is None else value.astimezone(tz).date()
         return value
@@ -284,132 +261,127 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
         try:
             player_outings = sorted(
                 [o for o in all_outings if o.player_id == player.id and isinstance(o.date, (datetime, date))],
-                key=lambda x: x.date,
+                key=lambda o: o.date,
                 reverse=True,
             )
             game_outings = [o for o in player_outings if _is_game_outing(o)]
 
-            today_workload = [o for o in player_outings if get_local_date(o.date) == today]
-            seven_day_workload = [o for o in player_outings if 0 <= (today - get_local_date(o.date)).days < 7]
-            today_games = [o for o in game_outings if get_local_date(o.date) == today]
-            seven_day_games = [o for o in game_outings if 0 <= (today - get_local_date(o.date)).days < 7]
+            today_workload = [o for o in player_outings if local_date(o.date) == today]
+            week_workload = [o for o in player_outings if 0 <= (today - local_date(o.date)).days < 7]
+            today_games = [o for o in game_outings if local_date(o.date) == today]
+            week_games = [o for o in game_outings if 0 <= (today - local_date(o.date)).days < 7]
 
             workload_daily_complete = all(o.pitches is not None for o in today_workload)
-            workload_weekly_complete = all(o.pitches is not None for o in seven_day_workload)
+            workload_weekly_complete = all(o.pitches is not None for o in week_workload)
             workload_daily_known = sum(int(o.pitches) for o in today_workload if o.pitches is not None)
-            workload_weekly_known = sum(int(o.pitches) for o in seven_day_workload if o.pitches is not None)
+            workload_weekly_known = sum(int(o.pitches) for o in week_workload if o.pitches is not None)
             workload_daily_pitches = workload_daily_known if workload_daily_complete else None
             workload_weekly_pitches = workload_weekly_known if workload_weekly_complete else None
 
             official_daily_complete = all(o.pitches is not None for o in today_games)
-            official_weekly_complete = all(o.pitches is not None for o in seven_day_games)
+            official_weekly_complete = all(o.pitches is not None for o in week_games)
             official_daily_known = sum(int(o.pitches) for o in today_games if o.pitches is not None)
-            official_weekly_known = sum(int(o.pitches) for o in seven_day_games if o.pitches is not None)
+            official_weekly_known = sum(int(o.pitches) for o in week_games if o.pitches is not None)
             official_daily_pitches = official_daily_known if official_daily_complete else None
             official_weekly_pitches = official_weekly_known if official_weekly_complete else None
 
-            status = 'Available'
-            status_detail = ''
-            next_available_str = 'Today'
-            last_game_outing_display = 'N/A'
-            official_history_complete = True
-
-            if game_outings:
-                last_game_date = get_local_date(game_outings[0].date)
-                last_game_outing_display = last_game_date.strftime('%a, %b %d')
-
-            # Group official game outings by calendar date.
             games_by_date = {}
             for outing in game_outings:
-                games_by_date.setdefault(get_local_date(outing.date), []).append(outing)
+                games_by_date.setdefault(local_date(outing.date), []).append(outing)
 
+            status = 'Available'
+            status_detail = ''
+            next_available = 'Today'
+            official_history_complete = True
+            last_game_outing = 'N/A'
+            if game_outings:
+                last_game_outing = local_date(game_outings[0].date).strftime('%a, %b %d')
+
+            max_daily = None
+            pitches_remaining_today = None
             daily_outs = None
             rolling_3_day_outs = None
             innings_remaining_today_outs = None
 
             if rule_type == 'pitch_count':
-                max_daily = rules.get('max_daily', 85)
-                rest_thresholds = rules.get('rest_thresholds', [])
+                max_daily = int(rules.get('max_daily', 85))
+                thresholds = rules.get('rest_thresholds', [])
 
-                # Unknown GAME pitch counts in the recent window must never be zero-filled.
                 relevant_dates = [d for d in games_by_date if 0 <= (today - d).days <= 7]
-                missing_official = any(
-                    outing.pitches is None
-                    for d in relevant_dates
-                    for outing in games_by_date[d]
+                missing_game_counts = any(
+                    o.pitches is None for d in relevant_dates for o in games_by_date[d]
                 )
-                if missing_official:
+
+                if missing_game_counts:
                     status = 'Pitch Count Incomplete'
-                    status_detail = 'Verify missing game pitch counts.'
-                    next_available_str = 'Verify game pitch counts'
+                    status_detail = 'Verify missing game pitch counts before using this pitcher.'
+                    next_available = 'Verify game pitch counts'
                     official_history_complete = False
                 else:
-                    # Required rest from prior game-pitch totals.
-                    for p_date in sorted((d for d in games_by_date if d < today), reverse=True):
-                        p_pitches = sum(int(o.pitches) for o in games_by_date[p_date])
-                        rest_days = _required_rest_days(p_pitches, rest_thresholds)
-                        next_date = p_date + timedelta(days=rest_days + 1)
-                        if today < next_date:
+                    # Rest owed from prior days. A 1–20 pitch outing correctly requires
+                    # zero rest days and therefore does not force a day off tomorrow.
+                    for outing_date in sorted((d for d in games_by_date if d < today), reverse=True):
+                        day_pitches = sum(int(o.pitches) for o in games_by_date[outing_date])
+                        rest_days = _required_rest_days(day_pitches, thresholds)
+                        eligible_date = outing_date + timedelta(days=rest_days + 1)
+                        if today < eligible_date:
                             status = 'Resting'
-                            status_detail = f'{p_pitches} game pitches on {p_date.strftime("%a, %b %d")} require {rest_days} day(s) rest.'
-                            next_available_str = next_date.strftime('%a, %b %d')
+                            status_detail = f'{day_pitches} game pitches on {outing_date.strftime("%a, %b %d")} require {rest_days} day(s) rest.'
+                            next_available = eligible_date.strftime('%a, %b %d')
                             break
 
-                    # Pitch Smart: no appearance as a pitcher on a third consecutive day.
+                    # Pitch Smart guidance forbids an appearance as pitcher on a third
+                    # consecutive day, regardless of the individual pitch counts.
                     if status == 'Available' and (today - timedelta(days=1)) in games_by_date and (today - timedelta(days=2)) in games_by_date:
                         status = 'Resting'
                         status_detail = 'Pitch Smart: do not pitch on a third consecutive day.'
-                        next_available_str = (today + timedelta(days=1)).strftime('%a, %b %d')
+                        next_available = (today + timedelta(days=1)).strftime('%a, %b %d')
 
                     if status == 'Available' and today_games:
                         if not official_daily_complete:
                             status = 'Pitch Count Incomplete'
                             status_detail = 'Verify today\'s game pitch count.'
-                            next_available_str = 'Verify game pitch counts'
+                            next_available = 'Verify game pitch counts'
                             official_history_complete = False
                         else:
-                            # Pitch Smart 9-12 guidance also says not to pitch in multiple
-                            # games on the same day. When evaluating a specific later game,
-                            # distinguish an outing from that same game from another game.
-                            other_game_today = any(
-                                o.game_id is None or current_game_id is None or int(o.game_id) != int(current_game_id)
-                                for o in today_games
+                            today_rest_days = _required_rest_days(official_daily_pitches, thresholds)
+                            after_today_date = today + timedelta(days=today_rest_days + 1)
+
+                            same_current_game_only = (
+                                current_game_id is not None
+                                and all(o.game_id is not None and int(o.game_id) == int(current_game_id) for o in today_games)
                             )
-                            if other_game_today:
-                                status = 'Same-Day Game Restriction'
-                                status_detail = 'Pitch Smart recommends no pitching in multiple games on the same day.'
-                                next_available_str = (today + timedelta(days=1)).strftime('%a, %b %d')
-                            elif official_daily_pitches is not None and official_daily_pitches >= max_daily:
+                            other_game_today = not same_current_game_only
+
+                            if official_daily_pitches >= max_daily:
                                 status = 'Resting'
                                 status_detail = f'Daily game-pitch maximum reached ({max_daily}).'
+                                next_available = after_today_date.strftime('%a, %b %d')
+                            elif other_game_today:
+                                status = 'Same-Day Game Restriction'
+                                status_detail = 'Pitch Smart guidance: do not pitch in multiple games on the same day.'
+                                next_available = after_today_date.strftime('%a, %b %d')
+                            # While evaluating the same live/scheduled game, a pitcher can
+                            # still be available within that game until a limit is reached.
 
-                            if official_daily_pitches is not None:
-                                rest_days = _required_rest_days(official_daily_pitches, rest_thresholds)
-                                if rest_days and status == 'Available':
-                                    next_available_str = (today + timedelta(days=rest_days + 1)).strftime('%a, %b %d')
+                if official_daily_pitches is not None and status == 'Available':
+                    pitches_remaining_today = max(0, max_daily - official_daily_pitches)
 
-                pitches_remaining = None if official_daily_pitches is None else max(0, max_daily - official_daily_pitches)
-                if status in {'Resting', 'Same-Day Game Restriction'}:
-                    pitches_remaining = 0
-
-            else:
-                max_daily = None
+            elif rule_type == 'innings':
                 next_day_max_outs = int(rules.get('next_day_max_outs', 9))
                 max_daily_outs = int(rules.get('max_daily_outs', 18))
                 rolling_max_outs = int(rules.get('rolling_3_day_max_outs', 24))
 
-                # Under USSSA-style innings rules, missing GAME innings are the
-                # eligibility-critical unknown—not missing lesson/practice innings.
                 relevant_dates = [d for d in games_by_date if 0 <= (today - d).days <= 3]
-                missing_innings = any(
-                    baseball_innings_to_outs(outing.innings) is None
-                    for d in relevant_dates
-                    for outing in games_by_date[d]
+                missing_game_innings = any(
+                    baseball_innings_to_outs(o.innings) is None
+                    for d in relevant_dates for o in games_by_date[d]
                 )
-                if missing_innings:
+
+                if missing_game_innings:
                     status = 'Innings Incomplete'
-                    status_detail = 'Verify missing game innings/outs.'
-                    next_available_str = 'Verify game innings'
+                    status_detail = 'Verify missing game innings/outs before using this pitcher.'
+                    next_available = 'Verify game innings'
                     official_history_complete = False
                 else:
                     outs_by_date = {
@@ -417,8 +389,8 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                         for d, outings in games_by_date.items()
                     }
                     daily_outs = outs_by_date.get(today, 0)
-                    previous_two_outs = sum(outs_by_date.get(today - timedelta(days=n), 0) for n in (1, 2))
-                    rolling_3_day_outs = daily_outs + previous_two_outs
+                    prior_two_outs = sum(outs_by_date.get(today - timedelta(days=n), 0) for n in (1, 2))
+                    rolling_3_day_outs = prior_two_outs + daily_outs
                     innings_remaining_today_outs = max(
                         0,
                         min(max_daily_outs - daily_outs, rolling_max_outs - rolling_3_day_outs),
@@ -427,56 +399,74 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                     yesterday_outs = outs_by_date.get(today - timedelta(days=1), 0)
                     if yesterday_outs > next_day_max_outs:
                         status = 'Resting'
-                        status_detail = f'Pitched {outs_to_baseball_innings(yesterday_outs)} innings yesterday; more than 3.0 requires today off.'
-                        next_available_str = (today + timedelta(days=1)).strftime('%a, %b %d')
+                        status_detail = f'Pitched {outs_to_baseball_innings(yesterday_outs)} IP yesterday; more than 3.0 IP requires today off.'
+                        next_available = (today + timedelta(days=1)).strftime('%a, %b %d')
                     elif all(outs_by_date.get(today - timedelta(days=n), 0) > 0 for n in (1, 2, 3)):
                         status = 'Resting'
-                        status_detail = 'USSSA: pitcher must rest after pitching three consecutive days.'
-                        next_available_str = (today + timedelta(days=1)).strftime('%a, %b %d')
+                        status_detail = 'USSSA: pitcher must rest after pitching on three consecutive days.'
+                        next_available = (today + timedelta(days=1)).strftime('%a, %b %d')
                     elif innings_remaining_today_outs <= 0:
                         status = 'Ineligible'
-                        status_detail = 'Daily or three-day innings limit reached.'
-                        next_available_str = (today + timedelta(days=1)).strftime('%a, %b %d')
+                        status_detail = 'One-day or rolling three-day innings limit reached.'
+                        next_available = (today + timedelta(days=1)).strftime('%a, %b %d')
 
-                pitches_remaining = None
+            else:
+                status = 'Verify Rules'
+                status_detail = 'The configured pitching rule set is not supported for automatic eligibility.'
+                next_available = 'Verify event rules'
+                official_history_complete = False
 
-            today_str = today.strftime('%Y-%m-%d')
-            player_targets = [t for t in all_targets if t.player_id == player.id and t.local_date == today_str]
-            game_target = next((t for t in player_targets if t.game_id == current_game_id), None)
+            today_string = today.strftime('%Y-%m-%d')
+            player_targets = [t for t in all_targets if t.player_id == player.id and t.local_date == today_string]
+            game_target = next((t for t in player_targets if current_game_id is not None and t.game_id == current_game_id), None)
             daily_target = next((t for t in player_targets if t.game_id is None), None)
-            coach_target_obj = game_target or daily_target
-            coach_target = coach_target_obj.target_pitches if coach_target_obj else None
-            coach_target_reason = coach_target_obj.reason if coach_target_obj else None
-            coach_target_reached = False
+            target_obj = game_target or daily_target
+            coach_target = target_obj.target_pitches if target_obj else None
+            coach_target_reason = target_obj.reason if target_obj else None
             coach_target_remaining = None
+            coach_target_reached = False
 
-            # Coach pitch targets are pitch-based guidance, so compare them with
-            # total recorded throwing workload for the day, not USSSA innings.
-            if coach_target is not None and workload_daily_pitches is not None:
-                coach_target_remaining = max(0, coach_target - workload_daily_pitches)
-                coach_target_reached = workload_daily_pitches >= coach_target
+            # Targets are coach guidance for game pitching, not practice/lesson workload.
+            if coach_target is not None:
+                target_basis = None
+                if game_target and current_game_id is not None:
+                    exact_game = [o for o in today_games if o.game_id is not None and int(o.game_id) == int(current_game_id)]
+                    if exact_game and all(o.pitches is not None for o in exact_game):
+                        target_basis = sum(int(o.pitches) for o in exact_game)
+                elif daily_target:
+                    target_basis = official_daily_pitches
+
+                if target_basis is not None:
+                    coach_target_remaining = max(0, coach_target - target_basis)
+                    coach_target_reached = target_basis >= coach_target
+
+            eligibility_complete = official_history_complete
+            if rule_type == 'pitch_count':
+                eligibility_complete = eligibility_complete and official_weekly_complete
 
             summary[player.name] = {
                 'id': player.id,
                 'name': player.name,
                 'rule_type': rule_type,
                 'rule_set_name': rule_set_name,
+                # Compatibility aliases used by existing Live Game UI.
                 'daily': official_daily_pitches,
                 'weekly': official_weekly_pitches,
                 'daily_known_pitches': official_daily_known,
                 'weekly_known_pitches': official_weekly_known,
+                'pitch_history_complete': eligibility_complete,
+                # Explicit official/workload values for new UI.
                 'official_daily_pitches': official_daily_pitches,
                 'official_7_day_pitches': official_weekly_pitches,
                 'workload_daily_pitches': workload_daily_pitches,
                 'workload_7_day_pitches': workload_weekly_pitches,
                 'workload_history_complete': workload_daily_complete and workload_weekly_complete,
-                'pitch_history_complete': official_history_complete and official_weekly_complete,
                 'status': status,
                 'status_detail': status_detail,
-                'next_available': next_available_str,
+                'next_available': next_available,
                 'max_daily': max_daily,
-                'pitches_remaining_today': pitches_remaining,
-                'last_outing_display': last_game_outing_display,
+                'pitches_remaining_today': pitches_remaining_today,
+                'last_outing_display': last_game_outing,
                 'daily_outs': daily_outs,
                 'daily_innings': outs_to_baseball_innings(daily_outs) if daily_outs is not None else None,
                 'rolling_3_day_outs': rolling_3_day_outs,
@@ -488,7 +478,8 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                 'coach_target_reached': coach_target_reached,
                 'coach_target_remaining': coach_target_remaining,
             }
-        except Exception as e:
-            print(f"Error calculating pitch count summary for player {player.name} (ID: {player.id}): {e}")
+        except Exception as exc:
+            print(f'Error calculating pitching summary for {player.name} (ID {player.id}): {exc}')
             continue
+
     return summary
