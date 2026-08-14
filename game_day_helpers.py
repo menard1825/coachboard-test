@@ -15,6 +15,7 @@ from models import (
     PlayerPitchTarget,
     Rotation,
 )
+from team_game_settings import regulation_innings_for_team
 from utils import calculate_pitch_count_summary, get_pitching_rules_for_team
 
 
@@ -130,13 +131,17 @@ def build_game_readiness(game, team):
 
     required = required_positions(team)
     innings = deepcopy(rotation.innings or {}) if rotation else {}
-    inning_keys = sorted(innings.keys(), key=lambda value: float(value)) if innings else []
+    regulation_innings = regulation_innings_for_team(team)
+    regulation_keys = [str(number) for number in range(1, regulation_innings + 1)]
     incomplete_innings = []
-    for inning in inning_keys:
+    complete_inning_count = 0
+    for inning in regulation_keys:
         valid, missing = _complete_alignment(innings.get(inning), required, present_names)
-        if not valid:
+        if valid:
+            complete_inning_count += 1
+        else:
             incomplete_innings.append({'inning': inning, 'missing': missing})
-    defense_ready = bool(inning_keys) and not incomplete_innings
+    defense_ready = complete_inning_count == regulation_innings
 
     blockers = []
     if not present:
@@ -144,11 +149,12 @@ def build_game_readiness(game, team):
     if not lineup_ready:
         blockers.append('Batting lineup is not ready.')
     if not defense_ready:
-        if not inning_keys:
-            blockers.append('Defensive rotation is not set.')
+        if not innings:
+            blockers.append(f'Defensive rotation is not set for the {regulation_innings}-inning regulation game.')
         else:
             labels = ', '.join(item['inning'] for item in incomplete_innings[:4])
-            blockers.append(f'Defense is incomplete in inning(s) {labels}.')
+            suffix = '…' if len(incomplete_innings) > 4 else ''
+            blockers.append(f'Defense needs attention in regulation inning(s) {labels}{suffix}.')
 
     all_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
     all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
@@ -238,7 +244,9 @@ def build_game_readiness(game, team):
         'lineup_ready': lineup_ready,
         'lineup_count': lineup_count,
         'defense_ready': defense_ready,
-        'defense_innings': len(inning_keys),
+        'defense_innings': regulation_innings,
+        'defense_completed_innings': complete_inning_count,
+        'regulation_innings': regulation_innings,
         'incomplete_innings': incomplete_innings,
         'pitching_plan_ready': bool(plans),
         'pitching_plan_count': len(plans),
