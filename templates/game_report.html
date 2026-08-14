@@ -3,16 +3,21 @@
 
 {% block head %}
 <style>
-  .agr-shell{max-width:1180px;margin:0 auto;padding-bottom:28px}.agr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin:4px 0 17px}.agr-k{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}.agr-head h1{font-size:1.45rem;font-weight:850;color:#172033;margin:2px 0}.agr-meta{font-size:.76rem;color:#667085}.agr-actions{display:flex;gap:7px;flex-wrap:wrap}.agr-card{border:1px solid #e2e6eb;border-radius:14px;background:#fff;overflow:hidden;margin-bottom:14px}.agr-card-head{padding:11px 13px;border-bottom:1px solid #edf0f3;display:flex;justify-content:space-between;align-items:center;gap:8px}.agr-card-head strong{font-size:.82rem;color:#1d2939}.agr-card-body{padding:12px 13px}.agr-innings{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:9px}.agr-inning{border:1px solid #e4e7ec;border-radius:10px;padding:9px 10px;background:#fafbfc}.agr-inning.unreliable{border-color:#efd8ac;background:#fffaf0}.agr-inning-title{font-size:.68rem;font-weight:850;color:#344054;margin-bottom:7px;display:flex;justify-content:space-between;gap:6px}.agr-pos{display:grid;grid-template-columns:38px minmax(0,1fr);gap:6px;font-size:.7rem;margin:3px 0}.agr-pos b{color:#667085}.agr-bench{font-size:.64rem;color:#667085;border-top:1px solid #e7e9ed;margin-top:7px;padding-top:6px}.agr-warning{font-size:.65rem;color:#8b5c00;background:#fff8eb;border:1px solid #efd8ac;border-radius:9px;padding:8px 9px;margin-bottom:10px}.agr-table{font-size:.72rem;margin:0}.agr-table th{font-size:.59rem;text-transform:uppercase;letter-spacing:.06em;color:#667085}.agr-empty{color:#8a94a3;font-size:.76rem;padding:9px}.agr-badge{font-size:.61rem;border-radius:999px;padding:4px 7px;background:#eef1f5;color:#475467;font-weight:750}.agr-mini-badge{font-size:.52rem;border-radius:999px;padding:3px 6px;background:#fff1d7;color:#8b5c00;font-weight:850;white-space:nowrap}
+  .agr-shell{max-width:1180px;margin:0 auto;padding-bottom:28px}.agr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin:4px 0 17px}.agr-k{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}.agr-head h1{font-size:1.45rem;font-weight:850;color:#172033;margin:2px 0}.agr-meta{font-size:.76rem;color:#667085}.agr-actions{display:flex;gap:7px;flex-wrap:wrap}.agr-card{border:1px solid #e2e6eb;border-radius:14px;background:#fff;overflow:hidden;margin-bottom:14px}.agr-card-head{padding:11px 13px;border-bottom:1px solid #edf0f3;display:flex;justify-content:space-between;align-items:center;gap:8px}.agr-card-head strong{font-size:.82rem;color:#1d2939}.agr-card-body{padding:12px 13px}.agr-innings{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:9px}.agr-inning{border:1px solid #e4e7ec;border-radius:10px;padding:9px 10px;background:#fafbfc}.agr-inning.unreliable{border-color:#efd8ac;background:#fffaf0}.agr-inning-title{font-size:.68rem;font-weight:850;color:#344054;margin-bottom:7px;display:flex;justify-content:space-between;gap:6px}.agr-pos{display:grid;grid-template-columns:38px minmax(0,1fr);gap:6px;font-size:.7rem;margin:3px 0}.agr-pos b{color:#667085}.agr-bench{font-size:.64rem;color:#667085;border-top:1px solid #e7e9ed;margin-top:7px;padding-top:6px}.agr-warning{font-size:.65rem;color:#8b5c00;background:#fff8eb;border:1px solid #efd8ac;border-radius:9px;padding:8px 9px;margin-bottom:10px}.agr-table{font-size:.72rem;margin:0}.agr-table th{font-size:.59rem;text-transform:uppercase;letter-spacing:.06em;color:#667085}.agr-empty{color:#8a94a3;font-size:.76rem;padding:9px}.agr-badge{font-size:.61rem;border-radius:999px;padding:4px 7px;background:#eef1f5;color:#475467;font-weight:750}.agr-mini-badge{font-size:.52rem;border-radius:999px;padding:3px 6px;background:#fff1d7;color:#8b5c00;font-weight:850;white-space:nowrap}.agr-absent{font-size:.68rem;color:#667085;margin-top:6px}.agr-notes textarea{min-height:110px;resize:vertical}.agr-notes .form-text{font-size:.65rem}
   @media(max-width:575.98px){.agr-head{display:block}.agr-actions{margin-top:10px}.agr-innings{grid-template-columns:1fr}.agr-card-body{padding:10px}.agr-shell{padding-bottom:70px}.agr-card-head{align-items:flex-start}}
-  @media(orientation:landscape) and (max-height:900px){.agr-innings{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media(orientation:landscape) and (max-height:900px){.agr-innings{grid-template-columns:repeat(3,minmax(0,1fr))}.agr-notes textarea{min-height:82px}}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="agr-shell">
   <div class="agr-head">
-    <div><div class="agr-k">Actual Game Report</div><h1>{{ current_team.team_name }} vs {{ game.opponent }}</h1><div class="agr-meta">{{ game.date.strftime('%A, %m/%d/%Y') }}{% if game.start_time %} · {{ game.start_time }}{% endif %}{% if game.location %} · {{ game.location }}{% endif %}</div></div>
+    <div>
+      <div class="agr-k">Actual Game Report</div>
+      <h1>{{ current_team.team_name }} vs {{ game.opponent }}</h1>
+      <div class="agr-meta">{{ game.date.strftime('%A, %m/%d/%Y') }}{% if game.start_time %} · {{ game.start_time }}{% endif %}{% if game.location %} · {{ game.location }}{% endif %}</div>
+      {% if report.absent_names %}<div class="agr-absent"><strong>Absent:</strong> {{ report.absent_names|join(', ') }} — excluded from bench totals.</div>{% endif %}
+    </div>
     <div class="agr-actions"><a class="btn btn-outline-secondary btn-sm" href="{{ url_for('game_day.game_day_home') }}">Game Day</a><a class="btn btn-outline-primary btn-sm" href="{{ url_for('gameday.game_management', game_id=game.id) }}">Open Game</a></div>
   </div>
 
@@ -31,7 +36,7 @@
   </section>
 
   <section class="agr-card">
-    <div class="agr-card-head"><strong>Actual Bench Usage</strong><span class="agr-badge">Confirmed complete innings only</span></div>
+    <div class="agr-card-head"><strong>Actual Bench Usage</strong><span class="agr-badge">Confirmed complete snapshots only</span></div>
     {% if report.unreliable_innings %}<div class="agr-warning mx-3 mt-3 mb-1">These totals exclude incomplete inning snapshots, so they are the confirmed minimum rather than a guessed total.</div>{% endif %}
     <div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Player</th><th>Confirmed Bench Innings</th><th class="pe-3">Which Innings</th></tr></thead><tbody>
       {% for row in report.bench_rows %}<tr><td class="ps-3 fw-semibold">{{ row.name }}</td><td>{{ row.count }}</td><td class="pe-3">{{ row.innings|join(', ') if row.innings else '—' }}</td></tr>{% endfor %}
@@ -48,6 +53,16 @@
   <section class="agr-card">
     <div class="agr-card-head"><strong>Live Changes</strong><span class="agr-badge">Audit trail</span></div>
     {% if report.changes %}<div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Inning</th><th>Change</th><th class="pe-3">Coach</th></tr></thead><tbody>{% for change in report.changes %}<tr><td class="ps-3">{{ change.inning }}</td><td>{{ change.type }}</td><td class="pe-3">{{ change.changed_by or '—' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="agr-empty">No live changes were recorded.</div>{% endif %}
+  </section>
+
+  <section class="agr-card agr-notes">
+    <div class="agr-card-head"><strong>Game Notes</strong><span class="agr-badge">Pregame + postgame context</span></div>
+    <div class="agr-card-body">
+      <form method="POST" action="{{ url_for('game_day.save_game_notes', game_id=game.id) }}">
+        <textarea class="form-control" name="game_notes" placeholder="What should the coaches remember from this game?">{{ game.game_notes or '' }}</textarea>
+        <div class="d-flex justify-content-between align-items-center gap-2 mt-2 flex-wrap"><div class="form-text">Useful for coaching observations, follow-up work, or tournament context.</div><button type="submit" class="btn btn-sm btn-primary">Save Game Notes</button></div>
+      </form>
+    </div>
   </section>
 </div>
 {% endblock %}
