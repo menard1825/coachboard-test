@@ -2,7 +2,7 @@
   'use strict';
   const m = location.pathname.match(/^\/game\/(\d+)\/?$/); if (!m) return;
   const gameId = +m[1], PREFIX='DEFENSE PRESET — ', $=id=>document.getElementById(id);
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let state=null, inning='1', busy=false, refreshTimer=null;
 
   const positions=()=>+state?.outfielder_count===4?['P','C','1B','2B','3B','SS','LF','LCF','RCF','RF']:['P','C','1B','2B','3B','SS','LF','CF','RF'];
