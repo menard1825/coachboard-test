@@ -42,8 +42,6 @@
 
     for (let inning = 1; inning < current; inning += 1) {
       const alignment = actual[String(inning)] || {};
-      // Only count a completed inning when we actually have a complete defensive
-      // snapshot. Corrupted/legacy partial innings must not manufacture bench time.
       if (alignmentPlayerCount(alignment) !== required) continue;
       snapshots.push({ inning, alignment });
     }
@@ -154,15 +152,9 @@
     style.textContent = `
       .actual-bench-context{margin:0 0 12px;padding:10px 11px;border:1px solid #d9e1ea;border-radius:10px;background:#f8fafc}
       .actual-bench-context-title{font-size:.65rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:#667085;margin-bottom:6px}
-      .actual-bench-context-help{font-size:.66rem;color:#8a94a3;margin:-3px 0 7px}
-      .actual-bench-context-help.warning{color:#9a6700;font-weight:700}
-      .actual-bench-context-list{display:flex;flex-wrap:wrap;gap:6px}
-      .actual-bench-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #d7dde5;background:#fff;border-radius:999px;padding:5px 8px;font-size:.68rem;color:#344054;white-space:nowrap}
-      .actual-bench-chip strong{font-weight:800;color:#172033}.actual-bench-chip .bench-history{color:#667085;font-weight:750}
-      .actual-bench-chip.at{border-color:#e7c66b;background:#fff9e9}.actual-bench-chip.at .bench-history{color:#8b5c00}
-      .actual-bench-chip.over{border-color:#e1a1a1;background:#fff2f2}.actual-bench-chip.over .bench-history{color:#a32929}
-      .actual-bench-flag{font-size:.56rem;font-weight:850;letter-spacing:.04em;text-transform:uppercase}
-      .ni-select option[data-bench-now="1"]{font-weight:700}
+      .actual-bench-context-help{font-size:.66rem;color:#8a94a3;margin:-3px 0 7px}.actual-bench-context-help.warning{color:#9a6700;font-weight:700}
+      .actual-bench-context-list{display:flex;flex-wrap:wrap;gap:6px}.actual-bench-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #d7dde5;background:#fff;border-radius:999px;padding:5px 8px;font-size:.68rem;color:#344054;white-space:nowrap}
+      .actual-bench-chip strong{font-weight:800;color:#172033}.actual-bench-chip .bench-history{color:#667085;font-weight:750}.actual-bench-chip.at{border-color:#e7c66b;background:#fff9e9}.actual-bench-chip.at .bench-history{color:#8b5c00}.actual-bench-chip.over{border-color:#e1a1a1;background:#fff2f2}.actual-bench-chip.over .bench-history{color:#a32929}.actual-bench-flag{font-size:.56rem;font-weight:850;letter-spacing:.04em;text-transform:uppercase}.ni-select option[data-bench-now="1"]{font-weight:700}
       @media(max-width:575.98px){.actual-bench-context{padding:9px}.actual-bench-chip{font-size:.63rem;padding:4px 7px}}
     `;
     document.head.appendChild(style);
@@ -225,8 +217,6 @@
         option.dataset.plannedBench = stat?.plannedBenchCount === null || stat?.plannedBenchCount === undefined ? '' : String(stat.plannedBenchCount);
       });
 
-      // Bench players first. Within that group, prioritize the players who have
-      // already accumulated the most actual bench innings.
       const playerOptions = options.filter(option => option.value);
       playerOptions.sort((a, b) => {
         const aBench = Number(a.dataset.benchNow || 0);
@@ -248,8 +238,6 @@
       select.value = selectedValue;
     });
 
-    // Keep the compact bench chips at the bottom useful without repeating the
-    // awkward current-inning wording.
     body.querySelectorAll('.ni-bench span').forEach(chip => {
       const rawName = chip.dataset.playerName || chip.textContent.split(' • ')[0].trim();
       chip.dataset.playerName = rawName;
@@ -277,9 +265,9 @@
       }
       if (seenLive) {
         reloading = true;
-        // Rebuild Game Management from the saved planned rotation instead of
-        // leaving the legacy planner in a stale live-state DOM.
-        window.location.reload();
+        // A completed game belongs in the actual-usage flow, not back in the
+        // pregame planner. This also moves secondary coaches when another coach ends it.
+        window.location.assign(`/game-day/${gameId}/report`);
       }
     } catch (_) {
       // The main Live Game controller owns user-facing sync errors.
@@ -302,7 +290,6 @@
 
   document.addEventListener('change', event => {
     if (event.target?.classList?.contains('ni-select')) {
-      // Board Prep rebuilds the modal body after a selection; enrich the new DOM.
       setTimeout(() => enhanceAdjustModal(), 0);
     }
   }, true);
@@ -310,8 +297,8 @@
   document.addEventListener('click', event => {
     if (event.target.closest('#confirmFinalCountsBtn')) {
       seenLive = true;
-      setTimeout(checkState, 200);
-      setTimeout(checkState, 600);
+      setTimeout(checkState, 250);
+      setTimeout(checkState, 700);
     }
   }, true);
 })();
