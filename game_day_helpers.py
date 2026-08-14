@@ -193,9 +193,14 @@ def build_game_readiness(game, team):
 
 def build_actual_game_report(game, team):
     roster = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
+    absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team.id).all()
+    absent_ids = {row.player_id for row in absences}
+    present_roster = [player for player in roster if player.id not in absent_ids]
+    absent_names = [player.name for player in roster if player.id in absent_ids]
+
     _, actual, events, reached = actual_game_rotation(game, team.id)
     required = required_positions(team)
-    roster_names = {player.name for player in roster}
+    present_names = {player.name for player in present_roster}
 
     def inning_sort(value):
         try:
@@ -205,15 +210,15 @@ def build_actual_game_report(game, team):
 
     inning_keys = sorted(reached, key=inning_sort)
     innings = []
-    bench_totals = {player.name: [] for player in roster}
+    bench_totals = {player.name: [] for player in present_roster}
     unreliable_innings = []
 
     for inning in inning_keys:
         alignment = actual.get(inning) or {}
-        reliable, missing = _complete_alignment(alignment, required, roster_names)
+        reliable, missing = _complete_alignment(alignment, required, present_names)
         if reliable:
             assigned = {alignment.get(pos) for pos in required if alignment.get(pos)}
-            bench = [player.name for player in roster if player.name not in assigned]
+            bench = [player.name for player in present_roster if player.name not in assigned]
             for name in bench:
                 bench_totals[name].append(inning)
         else:
@@ -257,4 +262,5 @@ def build_actual_game_report(game, team):
         'pitching': pitching,
         'changes': changes,
         'unreliable_innings': unreliable_innings,
+        'absent_names': absent_names,
     }
