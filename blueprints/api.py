@@ -195,13 +195,11 @@ def get_overview_data():
 
     team = db.session.get(Team, team_id)
 
-    # 1. Next upcoming game
     next_game = db.session.query(Game).filter(
         Game.team_id == team_id,
         Game.date >= datetime.now()
     ).order_by(Game.date.asc()).first()
 
-    # 2. Pitchers on mandatory rest
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
     from models import PlayerPitchTarget
@@ -210,7 +208,6 @@ def get_overview_data():
     pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules, all_targets=all_targets, team_timezone=team.timezone)
     pitchers_on_rest = {name: data for name, data in pitch_count_summary.items() if data['status'] == 'Resting'}
 
-    # 3. 3-5 most recent collaboration notes
     recent_notes = db.session.query(CollaborationNote).filter_by(team_id=team_id).order_by(CollaborationNote.timestamp.desc()).limit(5).all()
 
     return jsonify({
@@ -221,7 +218,7 @@ def get_overview_data():
 
 
 def get_live_game_state(game_id, team_id):
-    """Centralized helper to reconstruct authoritative live state and return a dict."""
+    """Legacy game-data helper retained for /api/game_data and old non-live consumers."""
     team = db.session.get(Team, team_id)
     game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
     if not game or not team:
@@ -252,10 +249,8 @@ def get_live_game_state(game_id, team_id):
     import json
     actual_rotation = {}
     if rotation_obj and rotation_obj.innings:
-        # Load from planned
         actual_rotation = json.loads(json.dumps(rotation_obj.innings))
 
-    # Overwrite with actual events
     for event in rotation_events:
         if not event.reverted:
             actual_rotation[event.inning] = event.after_alignment
@@ -290,21 +285,6 @@ def get_game_data(game_id):
 
     return jsonify(state)
 
-@api_bp.route('/live-game/<int:game_id>/state')
-@login_required
-def get_live_state(game_id):
-    """Specifically returns live game state to re-sync a client."""
-    team_id = session.get('team_id')
-    if not team_id:
-        return jsonify({"error": "Team not found"}), 404
-
-    state = get_live_game_state(game_id, team_id)
-    if not state:
-        return jsonify({"error": "Game or Team not found"}), 404
-
-    return jsonify(state)
-
-
 @api_bp.route('/stats')
 @login_required
 def get_stats():
@@ -314,29 +294,14 @@ def get_stats():
 
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
-
-    # --- MODIFICATION START ---
-    # Query for rotations for position stats
     rotations_db = db.session.query(Rotation).filter_by(team_id=team_id).all()
-    # --- MODIFICATION END ---
 
-    # Get players designated as pitchers
     designated_pitchers = {p.id: p for p in roster_db if p.pitcher_role != 'Not a Pitcher'}
-
-    # Get players who have any pitching outings logged
     players_with_outings = {o.player_id: o.player for o in pitching_outings_db if o.player is not None}
-
-    # Combine the two lists (duplicates are handled by the dictionary)
     combined_pitchers_dict = {**designated_pitchers, **players_with_outings}
-
-    # This is the final list of all players who should be in the summary
     pitchers = list(combined_pitchers_dict.values())
     cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings_db) for p in pitchers}
-
-    # --- MODIFICATION START ---
-    # Pass rotations_db to the function
     cumulative_position_data = calculate_cumulative_position_stats(roster_db, rotations_db)
-    # --- MODIFICATION END ---
 
     game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=team_id).group_by(PlayerGameAbsence.player_id).all()
     practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=team_id).group_by(PlayerPracticeAbsence.player_id).all()
