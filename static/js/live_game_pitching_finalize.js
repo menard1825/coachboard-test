@@ -177,4 +177,13 @@
       saveAndEnd();
     }
   }, true);
+
+  // Game Day uses ?finalize=1 to recover an older/unfinished game that has live
+  // history but no durable End Game marker. Open the same final check-in directly.
+  if (new URLSearchParams(window.location.search).get('finalize') === '1') {
+    const launch = () => window.setTimeout(openEndGame, 100);
+    document.readyState === 'loading'
+      ? document.addEventListener('DOMContentLoaded', launch, {once:true})
+      : launch();
+  }
 })();
