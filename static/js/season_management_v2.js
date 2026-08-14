@@ -21,9 +21,10 @@
       #dev-player-list{display:grid;gap:7px}#dev-player-list .list-group-item{border:1px solid #e2e6eb!important;border-radius:10px!important;margin:0!important;padding:10px 11px}#dev-player-list .list-group-item.active{background:#f1f5fb;color:#172033;border-color:#9eb3d3!important}#dev-player-list .list-group-item.active small{color:#475467!important}
       #player-dev-content>.card,#player-dev-content>.list-group,#player-dev-content>div{border-radius:12px}
       #rotations .defense-preset-home{border:1px solid #dce5dc;border-radius:13px;background:#f8fbf8;margin-bottom:14px;overflow:hidden}#rotations .dph-head{padding:11px 13px;border-bottom:1px solid #e3e9e3;display:flex;justify-content:space-between;gap:10px;align-items:center}#rotations .dph-head strong{font-size:.82rem;color:#172033}#rotations .dph-head span{font-size:.65rem;color:#667085}#rotations .dph-list{display:flex;flex-wrap:wrap;gap:7px;padding:11px 13px}#rotations .dph-chip{border:1px solid #d6ded6;background:#fff;border-radius:999px;padding:6px 9px;font-size:.7rem;font-weight:750;color:#344054}
+      #rotations .rotation-template-card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}#rotations .rotation-template-toolbar{display:flex;align-items:center;gap:7px}#rotations .rotation-template-toolbar .btn{border-radius:8px;font-weight:750;white-space:nowrap}#rotations .rotation-template-edit-btn{font-weight:750}
       .practice-reuse-btn{white-space:nowrap}.reuse-practice-note{font-size:.68rem;color:#667085;margin-top:6px}
       #reusePracticeModal .modal-content{border:0;border-radius:16px;overflow:hidden}#reusePracticeModal .form-control{min-height:46px}
-      @media(max-width:575.98px){#player_development .season-dev-summary{align-items:flex-start}.practice-plan-details-form .reuse-practice-btn{width:100%;order:-1}#rotations .dph-list{padding:9px 10px}}
+      @media(max-width:575.98px){#player_development .season-dev-summary{align-items:flex-start}.practice-plan-details-form .reuse-practice-btn{width:100%;order:-1}#rotations .dph-list{padding:9px 10px}#rotations .rotation-template-toolbar{width:100%}#rotations .rotation-template-toolbar .btn{width:100%;min-height:42px}}
     `;
     document.head.appendChild(style);
   }
@@ -48,7 +49,19 @@
     const normalIds = new Set(rotations.filter(item => !item.associated_game_id && !String(item.title || '').startsWith(PRESET_PREFIX)).map(item => String(item.id)));
 
     accordion.querySelectorAll('[data-rotation-id]').forEach(item => {
-      if (!normalIds.has(String(item.dataset.rotationId))) item.remove();
+      const rotationId = String(item.dataset.rotationId);
+      if (!normalIds.has(rotationId)) {
+        item.remove();
+        return;
+      }
+      const actions = item.querySelector('.accordion-body .d-flex.justify-content-end');
+      if (actions && !actions.querySelector('.rotation-template-edit-btn')) {
+        const edit = document.createElement('a');
+        edit.className = 'btn btn-sm btn-outline-primary me-2 rotation-template-edit-btn';
+        edit.href = `/rotation-template/${encodeURIComponent(rotationId)}`;
+        edit.textContent = 'Edit Template';
+        actions.prepend(edit);
+      }
     });
 
     let panel = document.getElementById('defense-preset-home-v2');
@@ -64,8 +77,20 @@
       <div class="dph-head"><div><strong>Defense Presets</strong><span class="d-block">Single-inning defenses saved from Game Management</span></div><span>${presets.length} saved</span></div>
       <div class="dph-list">${presets.length ? presets.map(item => `<span class="dph-chip">${esc(String(item.title).slice(PRESET_PREFIX.length).trim())}</span>`).join('') : '<span class="text-muted small">No defense presets saved yet.</span>'}</div>`;
 
-    const header = accordion.closest('.card')?.querySelector('.card-header h5');
+    const mainCard = accordion.closest('.card');
+    const cardHeader = mainCard?.querySelector('.card-header');
+    const header = cardHeader?.querySelector('h5');
     if (header) header.textContent = 'Full-Game Rotation Templates';
+    if (cardHeader) {
+      cardHeader.classList.add('rotation-template-card-head');
+      let toolbar = cardHeader.querySelector('.rotation-template-toolbar');
+      if (!toolbar) {
+        toolbar = document.createElement('div');
+        toolbar.className = 'rotation-template-toolbar';
+        toolbar.innerHTML = '<a class="btn btn-sm btn-primary" href="/rotation-template/new"><i class="bi bi-plus-lg me-1"></i>New Rotation Template</a>';
+        cardHeader.appendChild(toolbar);
+      }
+    }
   }
 
   function ensurePracticeModal() {
