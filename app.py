@@ -57,9 +57,8 @@ def create_app():
     socketio.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
 
-    # Register Blueprints. The authoritative live-game API must be registered
-    # before the legacy /api blueprint because both temporarily expose the
-    # same GET /api/live-game/<game_id>/state URL during this transition.
+    # Register Blueprints. Live Game now has one authoritative state route;
+    # the legacy /api blueprint remains only for older non-live data endpoints.
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(roster_bp)
@@ -184,7 +183,7 @@ def create_app():
             flash('User or team not found.', 'danger')
             return redirect(url_for('auth.login'))
 
-        all_tabs = {'overview': 'Overview', 'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineup Templates', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotation Templates', 'games': 'Schedule', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
+        all_tabs = {'overview': 'Overview', 'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineup Templates', 'pitching': 'Pitching', 'scouting_list': 'Scouting List', 'rotations': 'Rotation Templates', 'games': 'Schedule', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
         default_tab_order = list(all_tabs.keys())
 
         final_tab_order = []
@@ -193,7 +192,8 @@ def create_app():
             if not isinstance(user_tab_order, list) or not user_tab_order:
                 final_tab_order = default_tab_order
             else:
-                final_tab_order = user_tab_order
+                # Ignore stale/unknown tab keys from older saved layouts.
+                final_tab_order = [tab for tab in user_tab_order if tab in all_tabs]
                 for tab in default_tab_order:
                     if tab not in final_tab_order:
                         final_tab_order.append(tab)
