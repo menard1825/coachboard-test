@@ -27,6 +27,7 @@ from blueprints.roster import roster_bp
 from blueprints.development import development_bp
 from blueprints.live_game_ui import live_game_ui_bp
 from blueprints.gameday import gameday_bp
+from blueprints.game_day import game_day_bp
 from blueprints.pitching import pitching_bp
 from blueprints.scouting import scouting_bp
 from blueprints.team_management import team_management_bp
@@ -66,6 +67,7 @@ def create_app():
     app.register_blueprint(live_game_ui_bp)
     app.register_blueprint(live_game_safety_bp)
     app.register_blueprint(gameday_bp)
+    app.register_blueprint(game_day_bp)
     app.register_blueprint(pitching_bp)
     app.register_blueprint(scouting_bp)
     app.register_blueprint(team_management_bp)
@@ -182,7 +184,7 @@ def create_app():
             flash('User or team not found.', 'danger')
             return redirect(url_for('auth.login'))
 
-        all_tabs = {'overview': 'Overview', 'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineup Templates', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotation Templates', 'games': 'Games', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
+        all_tabs = {'overview': 'Overview', 'roster': 'Roster', 'player_development': 'Player Development', 'lineups': 'Lineup Templates', 'pitching': 'Pitching Log', 'scouting_list': 'Scouting List', 'rotations': 'Rotation Templates', 'games': 'Schedule', 'collaboration': 'Coaches Log', 'practice_plan': 'Practice Plan', 'signs': 'Signs', 'stats': 'Stats'}
         default_tab_order = list(all_tabs.keys())
 
         final_tab_order = []
