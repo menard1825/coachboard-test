@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, session
 from db import db
 from models import User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer, Rotation, Game, CollaborationNote, PracticePlan, PlayerDevelopmentFocus, Sign, PlayerGameAbsence, PlayerPracticeAbsence
 from blueprints.auth import get_player_order_as_list
-from utils import model_to_dict, pitching_outing_to_dict, get_pitching_rules_for_team, calculate_pitch_count_summary, calculate_cumulative_pitching_stats, calculate_cumulative_position_stats
+from utils import model_to_dict, pitching_outing_to_dict, get_pitching_rules_for_team, calculate_pitch_count_summary, calculate_cumulative_pitching_stats
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from functools import wraps
@@ -292,16 +292,20 @@ def get_stats():
     if not team_id:
         return jsonify({"error": "Team not found"}), 404
 
+    from actual_stats import calculate_actual_position_game_stats
+    from models import GameRotationEvent
+
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
     rotations_db = db.session.query(Rotation).filter_by(team_id=team_id).all()
+    rotation_events_db = db.session.query(GameRotationEvent).filter_by(team_id=team_id).all()
 
     designated_pitchers = {p.id: p for p in roster_db if p.pitcher_role != 'Not a Pitcher'}
     players_with_outings = {o.player_id: o.player for o in pitching_outings_db if o.player is not None}
     combined_pitchers_dict = {**designated_pitchers, **players_with_outings}
     pitchers = list(combined_pitchers_dict.values())
     cumulative_pitching_data = {p.name: calculate_cumulative_pitching_stats(p.id, pitching_outings_db) for p in pitchers}
-    cumulative_position_data = calculate_cumulative_position_stats(roster_db, rotations_db)
+    cumulative_position_data = calculate_actual_position_game_stats(roster_db, rotations_db, rotation_events_db)
 
     game_absences = db.session.query(PlayerGameAbsence.player_id, func.count(PlayerGameAbsence.id)).filter_by(team_id=team_id).group_by(PlayerGameAbsence.player_id).all()
     practice_absences = db.session.query(PlayerPracticeAbsence.player_id, func.count(PlayerPracticeAbsence.id)).filter_by(team_id=team_id).group_by(PlayerPracticeAbsence.player_id).all()
