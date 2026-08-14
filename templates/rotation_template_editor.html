@@ -33,7 +33,7 @@
     <div>
       <div class="rte-kicker">Full-Game Rotation Template</div>
       <h1 id="rtePageTitle">{% if editor_data.rotation.id %}Edit Rotation Template{% else %}New Rotation Template{% endif %}</h1>
-      <p>Build the reusable six-inning defense here, inning by inning. Nothing is tied to a scheduled game until you load this template into one.</p>
+      <p>Build the reusable {{ editor_data.regulation_innings }}-inning regulation defense here, inning by inning. Extra innings are handled during the live game if needed.</p>
     </div>
     <div class="rte-head-actions">
       <a class="btn btn-outline-secondary" href="{{ url_for('home') }}#rotations">Back to Templates</a>
@@ -56,7 +56,7 @@
   <section class="rte-card">
     <div class="rte-innings-bar">
       <div class="rte-tabs" id="rteInningTabs"></div>
-      <span class="rte-max-note">6-inning template</span>
+      <span class="rte-max-note">{{ editor_data.regulation_innings }} regulation innings · {% if editor_data.regulation_innings_override is none %}Auto for {{ editor_data.age_group }}{% else %}Team override{% endif %}</span>
     </div>
     <div class="rte-card-body">
       <div class="rte-tools">
