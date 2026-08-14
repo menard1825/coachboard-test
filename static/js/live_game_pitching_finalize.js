@@ -47,7 +47,7 @@
     return [whole, ['0','1','2'].includes(outs) ? outs : '0'];
   }
 
-  function renderFinalForm(state) {
+  function renderPitchingForm(state) {
     const container = document.getElementById('finalCountsFormContainer');
     if (!container) return;
 
@@ -55,13 +55,13 @@
     const logByPlayer = new Map((state.game_pitching_log || []).map(o => [Number(o.player_id), o]));
 
     if (!order.length) {
-      container.innerHTML = '<div class="text-muted text-center py-3">No pitchers were found in the live defensive history. You can still finalize the game.</div>';
+      container.innerHTML = '<div class="text-muted text-center py-3">No pitchers were found in the live defensive history.</div>';
       return;
     }
 
     container.innerHTML = `
       <div class="alert alert-light border small mb-3">
-        Final GameChanger check-in. Blank values stay <strong>unknown</strong> — CoachBoard will never turn them into zero.
+        Enter the final numbers from <strong>GameChanger</strong>. If GameChanger is not ready yet, close this window and come back later. Blank values remain unknown — CoachBoard never turns them into zero.
       </div>
       ${order.map((name, index) => {
         const player = (state.roster || []).find(p => p.name === name);
@@ -98,31 +98,67 @@
       <div class="small text-muted">Game innings are stored by outs. Example: 2 full innings + 1 out = 2.1 IP.</div>`;
   }
 
-  async function openEndGame() {
+  function configureVisibleLabels() {
+    const endButton = document.getElementById('liveEndGameBtn');
+    if (endButton) {
+      endButton.innerHTML = '<i class="bi bi-stop-circle-fill me-1"></i> End Game';
+      endButton.title = 'Finalize the game now. GameChanger pitching stats can be entered later.';
+    }
+  }
+
+  async function finishGame() {
     if (busy) return;
+    const okay = window.confirm('End this game now?\n\nThe actual defense and live history will be saved. You can enter the final GameChanger pitching stats later when they are ready.');
+    if (!okay) return;
+
     busy = true;
     try {
-      const state = await loadState();
-      renderFinalForm(state);
-      const modalEl = document.getElementById('liveFinalCountsModal');
-      if (!modalEl) throw new Error('Final pitching dialog is unavailable.');
-      const title = modalEl.querySelector('.modal-title');
-      if (title) title.textContent = 'Finalize Game';
-      const confirm = modalEl.querySelector('#confirmFinalCountsBtn');
-      if (confirm) confirm.textContent = 'Finalize Game';
-      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      const response = await fetch(`/api/live-game/${gameId}/end-with-pitching`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({defer_pitching:true}),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to end game.');
+      window.location.assign(`/game-day/${gameId}/report`);
     } catch (err) {
-      alert(err.message || 'Unable to prepare final pitching entry.');
+      alert(err.message || 'Unable to end game.');
     } finally {
       busy = false;
     }
   }
 
-  async function saveAndEnd() {
+  async function openPitchingEntry() {
+    if (busy) return;
+    busy = true;
+    try {
+      const state = await loadState();
+      renderPitchingForm(state);
+      const modalEl = document.getElementById('liveFinalCountsModal');
+      if (!modalEl) throw new Error('GameChanger pitching dialog is unavailable.');
+      const title = modalEl.querySelector('.modal-title');
+      if (title) title.textContent = 'Enter GameChanger Pitching Stats';
+      const confirm = modalEl.querySelector('#confirmFinalCountsBtn');
+      if (confirm) {
+        confirm.textContent = 'Save GameChanger Stats';
+        confirm.classList.remove('btn-danger');
+        confirm.classList.add('btn-primary');
+      }
+      const cancel = modalEl.querySelector('.modal-footer [data-bs-dismiss="modal"]');
+      if (cancel) cancel.textContent = 'Not Ready Yet';
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    } catch (err) {
+      alert(err.message || 'Unable to prepare GameChanger pitching entry.');
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function savePitching() {
     if (busy) return;
     busy = true;
     const button = document.getElementById('confirmFinalCountsBtn');
-    if (button) { button.disabled = true; button.textContent = 'Finalizing…'; }
+    if (button) { button.disabled = true; button.textContent = 'Saving…'; }
 
     try {
       const counts = [...document.querySelectorAll('.final-pitcher-card')].map((card, index) => {
@@ -144,16 +180,16 @@
         body:JSON.stringify({counts}),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to finalize game.');
+      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to save GameChanger pitching stats.');
 
       bootstrap.Modal.getOrCreateInstance(document.getElementById('liveFinalCountsModal')).hide();
       if (data.warnings?.length) {
-        alert(`Game saved. Please verify later:\n\n${data.warnings.join('\n')}`);
+        alert(`GameChanger stats saved, but these values are still missing:\n\n${data.warnings.join('\n')}`);
       }
       window.location.assign(`/game-day/${gameId}/report`);
     } catch (err) {
-      alert(err.message || 'Unable to save final pitching numbers.');
-      if (button) { button.disabled = false; button.textContent = 'Finalize Game'; }
+      alert(err.message || 'Unable to save GameChanger pitching stats.');
+      if (button) { button.disabled = false; button.textContent = 'Save GameChanger Stats'; }
     } finally {
       busy = false;
     }
@@ -165,7 +201,7 @@
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      openEndGame();
+      finishGame();
       return;
     }
 
@@ -174,14 +210,22 @@
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      saveAndEnd();
+      savePitching();
     }
   }, true);
 
-  // Game Day uses ?finalize=1 to recover an older/unfinished game that has live
-  // history but no durable End Game marker. Open the same final check-in directly.
-  if (new URLSearchParams(window.location.search).get('finalize') === '1') {
-    const launch = () => window.setTimeout(openEndGame, 100);
+  configureVisibleLabels();
+  document.addEventListener('DOMContentLoaded', configureVisibleLabels, {once:true});
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('pitching') === '1') {
+    const launch = () => window.setTimeout(openPitchingEntry, 100);
+    document.readyState === 'loading'
+      ? document.addEventListener('DOMContentLoaded', launch, {once:true})
+      : launch();
+  } else if (params.get('finalize') === '1') {
+    // Recovery path for an older game with live history but no End Game marker.
+    const launch = () => window.setTimeout(finishGame, 100);
     document.readyState === 'loading'
       ? document.addEventListener('DOMContentLoaded', launch, {once:true})
       : launch();
