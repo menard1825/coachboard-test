@@ -19,15 +19,15 @@
       #${ID}.ready{border-color:#b9dcc4;background:#f7fcf8}#${ID}.needs{border-color:#eed4a4;background:#fffdf8}
       .cgr-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.06)}
       .cgr-head strong{font-size:.82rem;color:#172033}.cgr-head small{display:block;font-size:.65rem;color:#667085;margin-top:1px}.cgr-badge{border-radius:999px;padding:4px 8px;font-size:.59rem;font-weight:900;letter-spacing:.06em;white-space:nowrap}.ready .cgr-badge{background:#176b38;color:#fff}.needs .cgr-badge{background:#8b5c00;color:#fff}
-      .cgr-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding:10px 12px}.cgr-item{border:1px solid #e2e6eb;border-radius:9px;padding:7px 8px;background:#fff}.cgr-item.good{border-color:#cce7d4}.cgr-item.need{border-color:#efd8ac;background:#fffaf0}.cgr-l{font-size:.54rem;text-transform:uppercase;letter-spacing:.07em;font-weight:850;color:#667085}.cgr-v{font-size:.72rem;font-weight:800;color:#1d2939;margin-top:1px}.cgr-blockers{padding:0 12px 10px;font-size:.68rem;color:#8b5c00}.cgr-blockers div+div{margin-top:2px}
+      .cgr-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding:10px 12px}.cgr-item{border:1px solid #e2e6eb;border-radius:9px;padding:7px 8px;background:#fff}.cgr-item.good{border-color:#cce7d4;background:#f8fcf9}.cgr-item.need{border-color:#efd8ac;background:#fffaf0}.cgr-item.optional{background:#f8f9fb;border-color:#e4e7ec}.cgr-l{font-size:.54rem;text-transform:uppercase;letter-spacing:.07em;font-weight:850;color:#667085}.cgr-v{font-size:.72rem;font-weight:800;color:#1d2939;margin-top:1px}.cgr-blockers{padding:0 12px 10px;font-size:.68rem;color:#8b5c00}.cgr-blockers div+div{margin-top:2px}
       @media(max-width:575.98px){.cgr-grid{grid-template-columns:1fr 1fr;padding:9px 10px}.cgr-head{padding:9px 10px}}
       @media(orientation:landscape) and (max-height:900px){.cgr-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
     `;
     document.head.appendChild(style);
   }
 
-  function item(label, good, value) {
-    return `<div class="cgr-item ${good ? 'good' : 'need'}"><div class="cgr-l">${esc(label)}</div><div class="cgr-v">${esc(value)}</div></div>`;
+  function item(label, state, value) {
+    return `<div class="cgr-item ${state}"><div class="cgr-l">${esc(label)}</div><div class="cgr-v">${esc(value)}</div></div>`;
   }
 
   function render(r) {
@@ -49,10 +49,10 @@
     panel.innerHTML = `
       <div class="cgr-head"><div><strong>${r.ready ? 'Game setup is ready' : `${r.blockers.length} setup item${r.blockers.length === 1 ? '' : 's'} need attention`}</strong><small>Same readiness status shown on Game Day.</small></div><span class="cgr-badge">${r.ready ? 'READY' : 'PREP'}</span></div>
       <div class="cgr-grid">
-        ${item('Availability', r.present_count > 0, `${r.present_count} present`)}
-        ${item('Lineup', r.lineup_ready, r.lineup_ready ? `${r.lineup_count} set` : 'Not ready')}
-        ${item('Defense', r.defense_ready, r.defense_ready ? `${r.defense_innings} innings` : 'Not ready')}
-        ${item('Pitching Plan', r.pitching_plan_ready, r.pitching_plan_ready ? `${r.pitching_plan_count} planned` : 'Not set')}
+        ${item('Availability', r.present_count > 0 ? 'good' : 'need', `${r.present_count} present`)}
+        ${item('Lineup', r.lineup_ready ? 'good' : 'need', r.lineup_ready ? `${r.lineup_count} set` : 'Not ready')}
+        ${item('Defense', r.defense_ready ? 'good' : 'need', r.defense_ready ? `${r.defense_innings} innings` : 'Not ready')}
+        ${item('Pitching Plan', r.pitching_plan_ready ? 'good' : 'optional', r.pitching_plan_ready ? `${r.pitching_plan_count} planned` : 'Optional · not set')}
       </div>
       ${blockers ? `<div class="cgr-blockers">${blockers}</div>` : ''}`;
   }
