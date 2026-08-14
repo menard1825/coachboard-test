@@ -65,6 +65,45 @@ def actual_game_rotation(game, team_id):
     return rotation, actual, events, reached
 
 
+def _actual_pitcher_names(actual, events):
+    order = []
+
+    def add(name):
+        if name and name not in order:
+            order.append(name)
+
+    for event in events or []:
+        if event.reverted:
+            continue
+        add((event.before_alignment or {}).get('P'))
+        add((event.after_alignment or {}).get('P'))
+
+    def inning_key(item):
+        try:
+            return float(item[0])
+        except (TypeError, ValueError):
+            return 9999
+
+    for _, alignment in sorted((actual or {}).items(), key=inning_key):
+        add((alignment or {}).get('P'))
+
+    return order
+
+
+def _pitching_completion(expected_pitchers, outings):
+    by_name = {
+        outing.player.name: outing
+        for outing in outings or []
+        if outing.player is not None
+    }
+    missing = []
+    for name in expected_pitchers:
+        outing = by_name.get(name)
+        if not outing or outing.pitches is None or outing.innings is None:
+            missing.append(name)
+    return not missing, missing
+
+
 def build_game_readiness(game, team):
     team_id = team.id
     roster = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
@@ -142,13 +181,26 @@ def build_game_readiness(game, team):
     has_pitching = bool(game_outings)
     ready = not blockers
 
+    _, actual, actual_events, _ = actual_game_rotation(game, team_id)
+    expected_pitchers = _actual_pitcher_names(actual, actual_events)
+    pitching_stats_complete, pitching_missing = _pitching_completion(expected_pitchers, game_outings)
+    pitching_stats_pending = bool(expected_pitchers) and not pitching_stats_complete
+
     if game.is_live:
         status = 'LIVE'
         status_tone = 'danger'
         primary_label = 'Resume Live Game'
-    elif has_end_game or (has_events and has_pitching):
-        # The End Game event is the durable finalization marker going forward.
-        # The pitching fallback preserves older completed games created before it existed.
+    elif has_end_game and pitching_stats_pending:
+        status = 'GC STATS PENDING'
+        status_tone = 'warning'
+        primary_label = 'Enter GameChanger Stats'
+    elif has_end_game:
+        status = 'COMPLETE'
+        status_tone = 'success'
+        primary_label = 'View Game Report'
+    elif has_events and expected_pitchers and pitching_stats_complete and has_pitching:
+        # Backward compatibility for older completed games created before the
+        # durable End Game event existed.
         status = 'COMPLETE'
         status_tone = 'success'
         primary_label = 'View Game Report'
@@ -191,6 +243,10 @@ def build_game_readiness(game, team):
         'has_events': has_events,
         'has_end_game': has_end_game,
         'has_pitching': has_pitching,
+        'expected_pitchers': expected_pitchers,
+        'pitching_stats_complete': pitching_stats_complete,
+        'pitching_stats_pending': pitching_stats_pending,
+        'pitching_missing': pitching_missing,
         'is_live': bool(game.is_live),
         'local_today': today.isoformat(),
     }
@@ -242,6 +298,9 @@ def build_actual_game_report(game, team):
         game_id=game.id,
         team_id=team.id,
     ).order_by(PitchingOuting.id.asc()).all()
+    expected_pitchers = _actual_pitcher_names(actual, events)
+    pitching_stats_complete, pitching_missing = _pitching_completion(expected_pitchers, pitching)
+    pitching_stats_pending = bool(expected_pitchers) and not pitching_stats_complete
 
     changes = []
     for event in events:
@@ -268,4 +327,8 @@ def build_actual_game_report(game, team):
         'changes': changes,
         'unreliable_innings': unreliable_innings,
         'absent_names': absent_names,
+        'expected_pitchers': expected_pitchers,
+        'pitching_stats_complete': pitching_stats_complete,
+        'pitching_stats_pending': pitching_stats_pending,
+        'pitching_missing': pitching_missing,
     }
