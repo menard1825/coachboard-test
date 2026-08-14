@@ -14,7 +14,7 @@
         overflow: hidden;
         isolation: isolate;
         width: 100%;
-        max-width: 820px;
+        max-width: 760px;
         aspect-ratio: 1.12 / 1;
         margin: 10px auto 0;
         border: 1px solid #aebfac;
@@ -37,155 +37,60 @@
         pointer-events: none;
       }
 
-      .coach-real-outfield-fence {
-        position: absolute;
-        left: 5%;
-        right: 5%;
-        top: 4%;
-        height: 58%;
-        border: 1.5px solid rgba(242,247,241,.42);
-        border-bottom: 0;
-        border-radius: 52% 52% 0 0 / 68% 68% 0 0;
-      }
-
-      .coach-real-warning-track {
-        position: absolute;
-        left: 7%;
-        right: 7%;
-        top: 6%;
-        height: 56%;
-        border: 4px solid rgba(171,129,79,.22);
-        border-bottom: 0;
-        border-radius: 52% 52% 0 0 / 68% 68% 0 0;
-      }
-
-      .coach-real-basepath {
-        position: absolute;
-        height: 4.8%;
-        min-height: 12px;
-        background: #c99c67;
-        border-radius: 999px;
-        transform-origin: 0 50%;
-        box-shadow: inset 0 0 0 1px rgba(126,86,43,.05);
-      }
-      .coach-real-basepath.home-first { left:50%; top:84.5%; width:32.8%; transform:rotate(-45deg); }
-      .coach-real-basepath.first-second { left:73.2%; top:61.3%; width:32.8%; transform:rotate(-135deg); }
-      .coach-real-basepath.second-third { left:50%; top:38.1%; width:32.8%; transform:rotate(135deg); }
-      .coach-real-basepath.third-home { left:26.8%; top:61.3%; width:32.8%; transform:rotate(45deg); }
-
-      .coach-real-home-dirt {
-        position: absolute;
-        left: 50%;
-        top: 87%;
-        width: 15%;
-        aspect-ratio: 1.15 / 1;
-        transform: translate(-50%,-50%);
-        border-radius: 48% 48% 54% 54%;
-        background: #c99c67;
-      }
-
-      .coach-real-mound {
-        position: absolute;
-        left: 50%;
-        top: 57%;
-        width: 8.4%;
-        aspect-ratio: 1;
-        transform: translate(-50%,-50%);
-        border-radius: 50%;
-        background: #c99c67;
-        box-shadow: inset 0 0 0 1px rgba(122,85,46,.10);
-      }
-      .coach-real-mound::after {
-        content: '';
-        position: absolute;
-        left: 29%;
-        right: 29%;
-        top: 47%;
-        height: 2px;
-        border-radius: 2px;
-        background: rgba(252,250,244,.94);
-      }
-
-      .coach-real-foul-line {
-        position: absolute;
-        bottom: 11%;
-        left: 50%;
-        width: 61%;
-        height: 1.4px;
-        background: rgba(255,255,255,.76);
-        transform-origin: 0 50%;
-      }
-      .coach-real-foul-line.left { transform: rotate(-43.5deg); }
-      .coach-real-foul-line.right { transform: rotate(-136.5deg); }
-
-      .coach-real-base {
-        position: absolute;
-        width: 9px;
-        height: 9px;
-        background: #fffef7;
-        border: 1px solid rgba(93,83,65,.18);
-        border-radius: 1px;
-        transform: translate(-50%,-50%) rotate(45deg);
-        box-shadow: 0 1px 1px rgba(0,0,0,.10);
-      }
-      .coach-real-base.first { left:73.2%; top:61.4%; }
-      .coach-real-base.second { left:50%; top:38.1%; }
-      .coach-real-base.third { left:26.8%; top:61.4%; }
-
-      .coach-real-home-plate {
-        position: absolute;
-        left: 50%;
-        top: 86.8%;
-        width: 12px;
-        height: 11px;
-        transform: translate(-50%,-50%);
-        background: #fffef7;
-        clip-path: polygon(12% 0,88% 0,100% 55%,50% 100%,0 55%);
-        filter: drop-shadow(0 1px 1px rgba(0,0,0,.12));
+      .coach-real-field-skin svg {
+        display: block;
+        width: 100%;
+        height: 100%;
       }
 
       .coach-field.coach-real-field .coach-field-spot {
         z-index: 4;
+        min-width: 62px;
+        max-width: 98px;
       }
+
       .coach-field.coach-real-field .coach-field-spot strong {
         color: rgba(255,255,255,.94) !important;
-        text-shadow: 0 1px 2px rgba(0,0,0,.34);
+        text-shadow: 0 1px 2px rgba(0,0,0,.36);
+        font-size: .55rem !important;
         font-weight: 850;
         letter-spacing: .05em;
+        margin-bottom: 2px !important;
       }
+
       .coach-field.coach-real-field .coach-field-spot span {
         background: rgba(255,255,255,.95) !important;
         border-color: rgba(255,255,255,.72) !important;
         box-shadow: 0 2px 5px rgba(18,49,26,.15) !important;
+        font-size: .64rem !important;
+        line-height: 1.15;
+        padding: 5px 7px !important;
+        border-radius: 7px !important;
       }
 
+      /* Phones: preserve the compact layout that already works well. */
       @media (max-width: 575.98px) {
         .coach-field.coach-real-field {
+          max-width: none;
           border-radius: 14px;
           aspect-ratio: 1.03 / 1;
         }
         .coach-field.coach-real-field .coach-field-spot {
-          min-width: 50px !important;
-          max-width: 74px !important;
+          min-width: 48px !important;
+          max-width: 72px !important;
         }
         .coach-field.coach-real-field .coach-field-spot strong {
-          font-size: .52rem !important;
-          margin-bottom: 2px !important;
+          font-size: .49rem !important;
         }
         .coach-field.coach-real-field .coach-field-spot span {
-          font-size: .57rem !important;
+          font-size: .55rem !important;
           padding: 4px 5px !important;
-          border-radius: 7px !important;
         }
-        .coach-real-warning-track { border-width: 3px; opacity:.8; }
-        .coach-real-outfield-fence { opacity:.78; }
-        .coach-real-basepath { height: 4.2%; min-height: 10px; }
-        .coach-real-base { width:8px; height:8px; }
-        .coach-real-home-plate { width:10px; height:9px; }
       }
 
-      @media (min-width: 576px) and (max-width: 1023.98px) {
-        .coach-live-shell { max-width: 900px !important; padding: 0 10px; }
+      /* Small tablets / iPad mini portrait. */
+      @media (min-width: 576px) and (max-width: 899.98px) {
+        .coach-live-shell { max-width: 860px !important; padding: 0 10px; }
         .coach-actions { grid-template-columns: repeat(3, minmax(0,1fr)) !important; gap:10px !important; }
         #liveSetDefenseBtnCoach { grid-column: auto !important; }
         .coach-actions .btn { min-height: 66px !important; padding: 10px 12px !important; }
@@ -193,70 +98,144 @@
         .coach-action-note { font-size: .72rem !important; }
         .coach-card { padding: 15px !important; }
         .coach-view-toggle .btn { padding: 7px 14px !important; }
+        .coach-field.coach-real-field { max-width: 680px; }
+        .coach-field.coach-real-field .coach-field-spot { min-width: 68px !important; max-width: 102px !important; }
+        .coach-field.coach-real-field .coach-field-spot span { font-size: .68rem !important; }
+      }
+
+      /* Full-size iPad portrait and similar tablets. */
+      @media (min-width: 900px) and (max-width: 1180px) {
+        .coach-live-shell { max-width: 1040px !important; padding: 0 14px; }
+        .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
+        #liveSetDefenseBtnCoach { grid-column:auto !important; }
+        .coach-actions .btn { min-height:64px !important; }
         .coach-field.coach-real-field { max-width: 720px; }
-        .coach-field.coach-real-field .coach-field-spot { min-width: 72px !important; max-width: 108px !important; }
-        .coach-field.coach-real-field .coach-field-spot span { font-size: .7rem !important; padding: 5px 7px !important; }
+      }
+
+      /* iPad landscape / smaller laptops. */
+      @media (min-width: 1181px) and (max-width: 1440px) {
+        .coach-live-shell { max-width: 1080px !important; padding: 0 14px; }
+        .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
+        #liveSetDefenseBtnCoach { grid-column:auto !important; }
+        .coach-field.coach-real-field { max-width: 735px; }
+      }
+
+      /* Desktop: keep the field compact instead of stretching it with the page. */
+      @media (min-width: 1441px) {
+        .coach-live-shell { max-width: 1120px !important; }
+        .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
+        #liveSetDefenseBtnCoach { grid-column:auto !important; }
+        .coach-card:has(#coach-current-defense) { padding: 14px 18px 16px !important; }
+        .coach-field.coach-real-field {
+          width: min(100%, 720px);
+          max-width: 720px;
+          aspect-ratio: 1.12 / 1;
+        }
+        .coach-field.coach-real-field .coach-field-spot {
+          min-width: 66px !important;
+          max-width: 100px !important;
+        }
+        .coach-field.coach-real-field .coach-field-spot span {
+          font-size: .65rem !important;
+        }
+      }
+
+      /* Touch-friendly modal sizing for tablets. */
+      @media (min-width: 576px) and (max-width: 1366px) {
         #live-defense-v2 .modal-dialog,
         #live-pitcher-picker-v2 .modal-dialog,
         #live-defense-destination-v2 .modal-dialog,
         #live-pitcher-destination-v2 .modal-dialog,
         #live-bulk-defense-coach .modal-dialog {
-          max-width: 680px !important;
-          width: calc(100% - 40px) !important;
+          max-width: 700px !important;
+          width: calc(100% - 48px) !important;
           margin: 1.75rem auto !important;
         }
         #live-defense-v2 .list-group-item,
-        #live-pitcher-picker-v2 .pitcher-choice-v2 { padding: 14px !important; }
-      }
-
-      @media (min-width: 1024px) and (max-width: 1366px) {
-        .coach-live-shell { max-width: 1080px !important; padding: 0 14px; }
-        .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
-        #liveSetDefenseBtnCoach { grid-column: auto !important; }
-        .coach-actions .btn { min-height: 64px !important; }
-        .coach-field.coach-real-field { max-width: 790px; }
-        #live-defense-v2 .modal-dialog,
-        #live-pitcher-picker-v2 .modal-dialog,
-        #live-defense-destination-v2 .modal-dialog,
-        #live-pitcher-destination-v2 .modal-dialog,
-        #live-bulk-defense-coach .modal-dialog {
-          max-width: 760px !important;
-          width: calc(100% - 60px) !important;
-          margin: 2rem auto !important;
+        #live-pitcher-picker-v2 .pitcher-choice-v2 {
+          padding: 14px !important;
         }
-      }
-
-      @media (min-width: 768px) and (max-width: 1366px) {
-        .coach-game-header { gap: 20px !important; }
-        .coach-game-header h3 { max-width: 720px; }
-        .coach-game-header-actions .btn { min-width: 82px; min-height: 42px; }
+        .coach-game-header { gap:20px !important; }
+        .coach-game-header h3 { max-width:720px; }
+        .coach-game-header-actions .btn { min-width:82px; min-height:42px; }
       }
     `;
     document.head.appendChild(style);
   }
 
+  function fieldSvg() {
+    return `
+      <svg viewBox="0 0 1000 890" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="coachGrassFade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#57a565" stop-opacity=".10" />
+            <stop offset="100%" stop-color="#1e5d32" stop-opacity=".08" />
+          </linearGradient>
+          <filter id="coachSoftShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#17351f" flood-opacity=".18"/>
+          </filter>
+        </defs>
+
+        <!-- Outfield shape / subtle mowing depth -->
+        <path d="M78,598 Q70,210 500,55 Q930,210 922,598" fill="none" stroke="#edf5ec" stroke-opacity=".38" stroke-width="3" />
+        <path d="M98,598 Q92,232 500,82 Q908,232 902,598" fill="none" stroke="#a77b49" stroke-opacity=".28" stroke-width="10" />
+        <path d="M110,610 Q105,250 500,105 Q895,250 890,610 L890,760 L110,760 Z" fill="url(#coachGrassFade)" opacity=".36" />
+
+        <!-- Foul lines -->
+        <line x1="500" y1="792" x2="104" y2="392" stroke="#fff" stroke-opacity=".78" stroke-width="2" />
+        <line x1="500" y1="792" x2="896" y2="392" stroke="#fff" stroke-opacity=".78" stroke-width="2" />
+
+        <!-- Natural infield dirt with grass interior -->
+        <path d="M500,735 L745,555 Q758,545 744,532 L515,318 Q500,304 485,318 L256,532 Q242,545 255,557 Z"
+              fill="#c99a62" filter="url(#coachSoftShadow)" />
+        <path d="M500,676 L682,548 Q692,540 682,531 L511,374 Q500,364 489,374 L318,531 Q308,540 318,548 Z"
+              fill="#4a9358" />
+
+        <!-- Home plate dirt and mound -->
+        <ellipse cx="500" cy="788" rx="70" ry="55" fill="#c99a62" />
+        <circle cx="500" cy="590" r="35" fill="#c99a62" />
+        <rect x="485" y="587" width="30" height="4" rx="2" fill="#faf8f1" />
+
+        <!-- Bases -->
+        <rect x="704" y="541" width="15" height="15" rx="1.5" fill="#fffdf5" stroke="#8f7c5e" stroke-opacity=".28" transform="rotate(45 711.5 548.5)" />
+        <rect x="492.5" y="333" width="15" height="15" rx="1.5" fill="#fffdf5" stroke="#8f7c5e" stroke-opacity=".28" transform="rotate(45 500 340.5)" />
+        <rect x="281" y="541" width="15" height="15" rx="1.5" fill="#fffdf5" stroke="#8f7c5e" stroke-opacity=".28" transform="rotate(45 288.5 548.5)" />
+
+        <!-- Home plate -->
+        <path d="M488,779 L512,779 L516,790 L500,805 L484,790 Z" fill="#fffdf5" stroke="#8f7c5e" stroke-opacity=".25" />
+      </svg>`;
+  }
+
   function playerCoordinates(field) {
-    const fourOutfielders = Boolean(field.querySelector('.coach-field-spot strong') &&
-      [...field.querySelectorAll('.coach-field-spot strong')].some(el => el.textContent.trim() === 'LCF'));
-    const phone = window.matchMedia('(max-width: 575.98px)').matches;
+    const labels = [...field.querySelectorAll('.coach-field-spot strong')].map(el => el.textContent.trim());
+    const fourOutfielders = labels.includes('LCF');
+    const phone = window.matchMedia('(max-width:575.98px)').matches;
+    const desktop = window.matchMedia('(min-width:1181px)').matches;
 
     const common = phone
       ? {
-          '3B': [17, 53], 'SS': [35, 38], '2B': [65, 38], '1B': [83, 53],
-          'P': [50, 55], 'C': [50, 93]
+          '3B':[18,56], 'SS':[36,42], '2B':[64,42], '1B':[82,56],
+          'P':[50,62], 'C':[50,91]
         }
-      : {
-          '3B': [19, 54], 'SS': [36, 39], '2B': [64, 39], '1B': [81, 54],
-          'P': [50, 56], 'C': [50, 92]
-        };
+      : desktop
+        ? {
+            '3B':[23,58], 'SS':[37,45], '2B':[63,45], '1B':[77,58],
+            'P':[50,63], 'C':[50,91]
+          }
+        : {
+            '3B':[21,57], 'SS':[36,44], '2B':[64,44], '1B':[79,57],
+            'P':[50,62], 'C':[50,91]
+          };
 
     const outfield = fourOutfielders
       ? (phone
-          ? { 'LF':[11,21], 'LCF':[36,12], 'RCF':[64,12], 'RF':[89,21] }
-          : { 'LF':[13,22], 'LCF':[37,13], 'RCF':[63,13], 'RF':[87,22] })
+          ? { 'LF':[12,22], 'LCF':[36,13], 'RCF':[64,13], 'RF':[88,22] }
+          : { 'LF':[16,25], 'LCF':[37,15], 'RCF':[63,15], 'RF':[84,25] })
       : (phone
-          ? { 'LF':[13,21], 'CF':[50,9], 'RF':[87,21] }
-          : { 'LF':[15,22], 'CF':[50,10], 'RF':[85,22] });
+          ? { 'LF':[14,22], 'CF':[50,10], 'RF':[86,22] }
+          : desktop
+            ? { 'LF':[18,26], 'CF':[50,14], 'RF':[82,26] }
+            : { 'LF':[16,24], 'CF':[50,13], 'RF':[84,24] });
 
     return { ...common, ...outfield };
   }
@@ -279,25 +258,9 @@
 
     if (!field.classList.contains('coach-real-field')) {
       field.classList.add('coach-real-field');
-      field.insertAdjacentHTML('afterbegin', `
-        <div class="coach-real-field-skin" aria-hidden="true">
-          <div class="coach-real-warning-track"></div>
-          <div class="coach-real-outfield-fence"></div>
-          <div class="coach-real-basepath home-first"></div>
-          <div class="coach-real-basepath first-second"></div>
-          <div class="coach-real-basepath second-third"></div>
-          <div class="coach-real-basepath third-home"></div>
-          <div class="coach-real-home-dirt"></div>
-          <div class="coach-real-foul-line left"></div>
-          <div class="coach-real-foul-line right"></div>
-          <div class="coach-real-mound"></div>
-          <span class="coach-real-base first"></span>
-          <span class="coach-real-base second"></span>
-          <span class="coach-real-base third"></span>
-          <span class="coach-real-home-plate"></span>
-        </div>
-      `);
+      field.insertAdjacentHTML('afterbegin', `<div class="coach-real-field-skin">${fieldSvg()}</div>`);
     }
+
     positionPlayers(field);
   }
 
@@ -313,8 +276,8 @@
       if (event.target.closest('[data-coach-defense-view="field"]')) scheduleDecorate();
     });
 
-    window.addEventListener('resize', scheduleDecorate, { passive: true });
-    window.addEventListener('orientationchange', scheduleDecorate, { passive: true });
+    window.addEventListener('resize', scheduleDecorate, { passive:true });
+    window.addEventListener('orientationchange', scheduleDecorate, { passive:true });
 
     setInterval(decorateField, 1200);
   });
