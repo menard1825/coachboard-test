@@ -3,14 +3,6 @@
 
   document.body.classList.add('cb-ui');
 
-  const coreStyles = document.querySelector('link[href*="/static/css/coachboard.css"]');
-  const coreQuery = coreStyles?.href?.includes('?') ? `?${coreStyles.href.split('?')[1]}` : '';
-  const pageStyles = document.createElement('link');
-  pageStyles.rel = 'stylesheet';
-  pageStyles.href = `/static/css/coachboard_pages.css${coreQuery}`;
-  pageStyles.dataset.coachboardStyles = 'pages';
-  document.head.appendChild(pageStyles);
-
   const path = window.location.pathname;
   if (path === '/') document.body.classList.add('cb-home');
   if (path === '/pitching') document.body.classList.add('cb-pitching');
