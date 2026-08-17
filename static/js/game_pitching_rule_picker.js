@@ -45,7 +45,9 @@
 
   function render(data) {
     const card = container();
-    const isLive = Boolean(document.getElementById('liveGameModeToggle')?.checked) || !document.getElementById('live-game-overlay')?.classList.contains('d-none');
+    const toggle = document.getElementById('liveGameModeToggle');
+    const overlay = document.getElementById('live-game-overlay');
+    const isLive = Boolean(toggle?.checked || (overlay && !overlay.classList.contains('d-none')));
     const source = data.source === 'game' ? 'Game override' : 'Team default';
     const options = Array.isArray(data.options) ? data.options : [];
     card.innerHTML = `
