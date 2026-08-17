@@ -69,6 +69,7 @@
     loadScript('/static/js/game_management_team_theme_availability.js', 'game-management-team-theme-availability');
     loadScript('/static/js/pregame_defense_picker_clarity.js', 'pregame-defense-picker-clarity');
     loadScript('/static/js/game_management_coach_simplify.js', 'game-management-coach-simplify');
+    loadScript('/static/js/future_pitcher_tbd.js', 'future-pitcher-tbd');
     loadScript('/static/js/game_prep_readiness.js', 'game-readiness');
     loadScript('/static/js/game_pitching_rule_picker.js', 'game-pitching-rules');
     loadScript('/static/js/live_game_sync_status.js', 'live-sync');
