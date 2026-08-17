@@ -52,10 +52,12 @@
   }
 
   // Every game page gets the same readiness calculation as Game Day, the game-
-  // specific pitching rule picker, responsive visual polish, and a connection
-  // indicator while Live Game is active.
+  // specific pitching rule picker, responsive visual polish, team theming,
+  // clearer availability controls, and a connection indicator while Live Game
+  // is active.
   if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
     loadScript('/static/js/game_management_visual_polish.js', 'game-management-visual-polish');
+    loadScript('/static/js/game_management_team_theme_availability.js', 'game-management-team-theme-availability');
     loadScript('/static/js/game_prep_readiness.js', 'game-readiness');
     loadScript('/static/js/game_pitching_rule_picker.js', 'game-pitching-rules');
     loadScript('/static/js/live_game_sync_status.js', 'live-sync');
