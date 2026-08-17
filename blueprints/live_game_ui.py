@@ -228,9 +228,18 @@ def next_inning_prep(game_id):
             source = 'current'
         elif mode == 'planned':
             if not planned_alignment:
-                return jsonify({'status': 'error', 'message': f'No complete pregame plan is saved for Inning {next_inning}.'}), 409
-            candidate = planned_alignment
+                return jsonify({'status': 'error', 'message': f'No pregame defense is saved for Inning {next_inning}.'}), 409
+            candidate = deepcopy(planned_alignment)
             source = 'planned'
+            if not candidate.get('P'):
+                current_pitcher = current_alignment.get('P')
+                if not current_pitcher:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'The pregame pitcher is TBD and there is no current pitcher to carry forward. Choose the next pitcher in Adjust Defense.'
+                    }), 409
+                candidate['P'] = current_pitcher
+                source = 'planned_current_pitcher'
         elif mode == 'custom':
             candidate = data.get('alignment')
             source = 'custom'
@@ -281,6 +290,24 @@ def protect_live_game_workflows():
             game_id = None
         if game_id:
             user, team, game = _authorized_context(game_id)
+            if game and request.endpoint == 'live_game_api.start':
+                rotation = db.session.query(Rotation).filter_by(
+                    associated_game_id=game.id,
+                    team_id=team.id,
+                ).first()
+                inning_one = deepcopy((rotation.innings or {}).get('1', {}) if rotation else {})
+                if not inning_one.get('P'):
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Choose the starting pitcher for Inning 1 before starting Live Game.'
+                    }), 409
+                cleaned, message = _clean_complete_alignment(inning_one, game, team)
+                if not cleaned:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Finish the Inning 1 defense before starting Live Game. {message}'
+                    }), 409
+
             if game and _clear_prep(game.id, team.id):
                 db.session.commit()
 
