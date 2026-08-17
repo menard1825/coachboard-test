@@ -53,6 +53,7 @@
 
     loadScript('/static/js/season_management_v2.js', 'season-management');
     loadScript('/static/js/roster_pitching_traits.js', 'roster-pitching-traits');
+    loadScript('/static/js/touch_reorder_guard.js', 'touch-reorder-guard');
   }
 
   if (window.location.pathname === '/game-day') {
