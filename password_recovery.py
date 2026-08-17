@@ -33,6 +33,22 @@ def _serializer():
     return URLSafeTimedSerializer(current_app.secret_key, salt=RESET_SALT)
 
 
+def _setting(name, default=None):
+    value = current_app.config.get(name)
+    if value not in (None, ''):
+        return value
+    return os.environ.get(name, default)
+
+
+def _bool_setting(name, default=False):
+    value = _setting(name)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 def create_password_reset_token(user):
     return _serializer().dumps({
         'uid': int(user.id),
@@ -42,7 +58,7 @@ def create_password_reset_token(user):
 
 def password_reset_max_age():
     try:
-        return int(current_app.config.get('PASSWORD_RESET_MAX_AGE', DEFAULT_RESET_SECONDS))
+        return int(_setting('PASSWORD_RESET_MAX_AGE', DEFAULT_RESET_SECONDS))
     except (TypeError, ValueError):
         return DEFAULT_RESET_SECONDS
 
@@ -72,7 +88,7 @@ def password_reset_url(user):
 
 
 def email_delivery_configured():
-    return bool(current_app.config.get('SMTP_HOST') and current_app.config.get('SMTP_FROM'))
+    return bool(_setting('SMTP_HOST') and _setting('SMTP_FROM'))
 
 
 def send_password_reset_email(user, reset_url):
@@ -81,13 +97,13 @@ def send_password_reset_email(user, reset_url):
     if not email_delivery_configured():
         raise RuntimeError('Email delivery is not configured on this CoachBoard server.')
 
-    host = current_app.config['SMTP_HOST']
-    port = int(current_app.config.get('SMTP_PORT') or 587)
-    username = current_app.config.get('SMTP_USERNAME')
-    password = current_app.config.get('SMTP_PASSWORD')
-    use_tls = bool(current_app.config.get('SMTP_USE_TLS', True))
-    use_ssl = bool(current_app.config.get('SMTP_USE_SSL', False))
-    sender = current_app.config['SMTP_FROM']
+    host = _setting('SMTP_HOST')
+    port = int(_setting('SMTP_PORT', 587))
+    username = _setting('SMTP_USERNAME')
+    password = _setting('SMTP_PASSWORD')
+    use_tls = _bool_setting('SMTP_USE_TLS', True)
+    use_ssl = _bool_setting('SMTP_USE_SSL', False)
+    sender = _setting('SMTP_FROM')
 
     minutes = max(1, password_reset_max_age() // 60)
     message = EmailMessage()
