@@ -7,8 +7,11 @@
   const profiles = new Map();
   let loaded = false;
   let loading = false;
+  let activeTeamId = null;
   let activePlayerId = null;
   let keepOpenUntil = 0;
+  let profileSocket = null;
+  let refreshTimer = null;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -28,17 +31,19 @@
       .roster-trait-grid .btn{border-radius:999px;font-size:.68rem;font-weight:700;padding:6px 9px;line-height:1.15}
       .roster-trait-status{font-size:.66rem;color:#667085;margin-top:8px;min-height:1em}
       .roster-trait-status.saved{color:#176b38;font-weight:750}
+      .roster-trait-status.synced{color:#365b87;font-weight:750}
       .roster-trait-status.error{color:#b42318;font-weight:750}
       @media(max-width:575.98px){.roster-pitch-profile{padding:10px}.roster-trait-grid .btn{font-size:.64rem;padding:6px 8px}}
     `;
     document.head.appendChild(style);
   }
 
+  function normalizeTraits(value) {
+    return Array.isArray(value) ? value.filter(trait => typeof trait === 'string') : [];
+  }
+
   function rememberActivePlayer(playerId) {
     activePlayerId = Number(playerId);
-    // General CoachBoard socket refreshes can rebuild the roster after every
-    // trait save. Keep the player being edited open long enough for a coach to
-    // make several trait selections without repeatedly reopening the card.
     keepOpenUntil = Date.now() + 30000;
   }
 
@@ -58,33 +63,66 @@
     }
   }
 
+  function sectionForPlayer(playerId) {
+    return document.querySelector(`.roster-pitch-profile[data-player-id="${Number(playerId)}"]`);
+  }
+
   function statusForPlayer(playerId, className, text) {
-    const section = document.querySelector(`.roster-pitch-profile[data-player-id="${Number(playerId)}"]`);
-    const status = section?.querySelector('.roster-trait-status');
+    const status = sectionForPlayer(playerId)?.querySelector('.roster-trait-status');
     if (!status) return;
     status.className = `roster-trait-status${className ? ` ${className}` : ''}`;
     status.textContent = text;
+  }
+
+  function applyTraitsToVisibleSection(playerId, traits, statusText = null) {
+    const section = sectionForPlayer(playerId);
+    if (!section) return;
+    const selected = new Set(normalizeTraits(traits).filter(trait => !['LHP','RHP'].includes(trait)));
+    section.querySelectorAll('.roster-pitch-trait').forEach(input => {
+      input.checked = selected.has(input.value);
+    });
+    if (statusText) statusForPlayer(playerId, 'synced', statusText);
+  }
+
+  function applyAllProfilesToVisibleRoster() {
+    document.querySelectorAll('.roster-pitch-profile[data-player-id]').forEach(section => {
+      const playerId = Number(section.dataset.playerId);
+      if (!Number.isFinite(playerId)) return;
+      applyTraitsToVisibleSection(playerId, profiles.get(playerId) || []);
+    });
   }
 
   async function loadProfiles() {
     if (loading) return;
     loading = true;
     try {
-      const response = await fetch('/api/roster-pitching-profiles', {cache:'no-store'});
+      const response = await fetch(`/api/roster-pitching-profiles?_=${Date.now()}`, {
+        cache:'no-store',
+        headers:{'Cache-Control':'no-cache'},
+      });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to load pitching profiles.');
+
+      const teamId = Number(data.team_id);
+      activeTeamId = Number.isFinite(teamId) ? teamId : activeTeamId;
       traitOptions = Array.isArray(data.traits) ? data.traits : [];
       profiles.clear();
       Object.entries(data.profiles || {}).forEach(([playerId, traits]) => {
-        profiles.set(Number(playerId), Array.isArray(traits) ? traits : []);
+        profiles.set(Number(playerId), normalizeTraits(traits));
       });
       loaded = true;
       patchRoster();
+      applyAllProfilesToVisibleRoster();
     } catch (error) {
       console.error('Unable to load roster pitching profiles:', error);
     } finally {
       loading = false;
     }
+  }
+
+  function scheduleProfileRefresh(delay = 60) {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(loadProfiles, delay);
   }
 
   function selectedTraits(section) {
@@ -98,10 +136,6 @@
     const previousTraits = [...(profiles.get(Number(playerId)) || [])];
     const traits = selectedTraits(section);
 
-    // Update local profile state before the request. The backend emits the
-    // general data_updated socket event as part of this save, so the roster may
-    // be rebuilt before the fetch response reaches this browser. Optimistic
-    // state makes the rebuilt trait buttons immediately reflect the coach's tap.
     profiles.set(Number(playerId), traits);
     inputs.forEach(input => { input.disabled = true; });
     statusForPlayer(playerId, '', 'Saving…');
@@ -114,24 +148,19 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to save pitching traits.');
-      profiles.set(Number(playerId), Array.isArray(data.traits) ? data.traits : traits);
+      const savedTraits = normalizeTraits(data.traits || traits);
+      profiles.set(Number(playerId), savedTraits);
+      if (Number.isFinite(Number(data.team_id))) activeTeamId = Number(data.team_id);
+      applyTraitsToVisibleSection(playerId, savedTraits);
       statusForPlayer(playerId, 'saved', 'Saved — add another trait or continue editing this player.');
       keepPlayerCardOpen(playerId);
     } catch (error) {
       profiles.set(Number(playerId), previousTraits);
+      applyTraitsToVisibleSection(playerId, previousTraits);
       statusForPlayer(playerId, 'error', error.message || 'Unable to save traits.');
-
-      // If the card was rebuilt while the request failed, synchronize the
-      // visible checkboxes back to the last successfully saved values.
-      const current = document.querySelector(`.roster-pitch-profile[data-player-id="${Number(playerId)}"]`);
-      const restored = new Set(previousTraits);
-      current?.querySelectorAll('.roster-pitch-trait').forEach(input => {
-        input.checked = restored.has(input.value);
-      });
       keepPlayerCardOpen(playerId);
     } finally {
-      const current = document.querySelector(`.roster-pitch-profile[data-player-id="${Number(playerId)}"]`);
-      current?.querySelectorAll('.roster-pitch-trait').forEach(input => { input.disabled = false; });
+      sectionForPlayer(playerId)?.querySelectorAll('.roster-pitch-trait').forEach(input => { input.disabled = false; });
     }
   }
 
@@ -187,18 +216,52 @@
         const section = buildSection(playerId, cardBody);
         if (saveRow?.parentNode) saveRow.parentNode.insertBefore(section, saveRow);
         else cardBody.appendChild(section);
+      } else {
+        applyTraitsToVisibleSection(playerId, profiles.get(playerId) || []);
       }
 
       keepPlayerCardOpen(playerId);
     });
   }
 
+  function handleProfileUpdate(payload) {
+    const playerId = Number(payload?.player_id);
+    const teamId = Number(payload?.team_id);
+    if (!Number.isFinite(playerId)) return;
+    if (Number.isFinite(activeTeamId) && Number.isFinite(teamId) && activeTeamId !== teamId) return;
+
+    const traits = normalizeTraits(payload?.traits);
+    profiles.set(playerId, traits);
+    applyTraitsToVisibleSection(playerId, traits, 'Updated from another CoachBoard device.');
+  }
+
+  function connectProfileSocket() {
+    if (profileSocket || typeof io !== 'function') return;
+    profileSocket = io();
+    profileSocket.on('pitching_profile_update', handleProfileUpdate);
+  }
+
+  function rosterTabWasShown(event) {
+    const target = event?.target;
+    const href = target?.getAttribute?.('href') || target?.dataset?.bsTarget || '';
+    if (href === '#roster') scheduleProfileRefresh(0);
+  }
+
   installStyles();
   const observer = new MutationObserver(() => window.requestAnimationFrame(patchRoster));
   const start = () => {
     observer.observe(document.body, {childList:true, subtree:true});
+    connectProfileSocket();
     loadProfiles();
+
+    document.addEventListener('shown.bs.tab', rosterTabWasShown);
+    window.addEventListener('pageshow', () => scheduleProfileRefresh(0));
+    window.addEventListener('focus', () => scheduleProfileRefresh(80));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') scheduleProfileRefresh(80);
+    });
   };
+
   document.readyState === 'loading'
     ? document.addEventListener('DOMContentLoaded', start, {once:true})
     : start();
