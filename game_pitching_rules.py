@@ -86,14 +86,14 @@ def request_aware_team_rules(team):
 
 
 def install_request_rule_adapters():
-    """Point existing game-state modules at the request-aware rules function."""
-    try:
-        from blueprints import live_game_api
-        live_game_api.get_pitching_rules_for_team = request_aware_team_rules
-    except Exception:
-        pass
-    try:
-        from blueprints import api
-        api.get_pitching_rules_for_team = request_aware_team_rules
-    except Exception:
-        pass
+    """Point existing game-specific modules at the request-aware rules function."""
+    # These modules imported get_pitching_rules_for_team directly before game
+    # overrides existed. Rebind only their module-local reference so standalone
+    # team pitching screens continue to use the team's default rules normally.
+    for module_name in ('live_game_api', 'live_game_common', 'api', 'gameday'):
+        try:
+            module = __import__(f'blueprints.{module_name}', fromlist=[module_name])
+            if hasattr(module, 'get_pitching_rules_for_team'):
+                module.get_pitching_rules_for_team = request_aware_team_rules
+        except Exception:
+            pass
