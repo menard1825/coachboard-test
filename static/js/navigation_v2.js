@@ -43,16 +43,18 @@
     });
 
     loadScript('/static/js/season_management_v2.js', 'season-management');
+    loadScript('/static/js/roster_pitching_traits.js', 'roster-pitching-traits');
   }
 
   if (window.location.pathname === '/game-day') {
     loadScript('/static/js/game_day_actions.js', 'game-day-actions');
   }
 
-  // Every game page gets the same readiness calculation as Game Day and a tiny
-  // connection indicator while Live Game is active.
+  // Every game page gets the same readiness calculation as Game Day, the game-
+  // specific pitching rule picker, and a tiny connection indicator while live.
   if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
     loadScript('/static/js/game_prep_readiness.js', 'game-readiness');
+    loadScript('/static/js/game_pitching_rule_picker.js', 'game-pitching-rules');
     loadScript('/static/js/live_game_sync_status.js', 'live-sync');
   }
 
