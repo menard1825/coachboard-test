@@ -3,9 +3,11 @@
 
   document.body.classList.add('cb-ui');
 
+  const coreStyles = document.querySelector('link[href*="/static/css/coachboard.css"]');
+  const coreQuery = coreStyles?.href?.includes('?') ? `?${coreStyles.href.split('?')[1]}` : '';
   const pageStyles = document.createElement('link');
   pageStyles.rel = 'stylesheet';
-  pageStyles.href = '/static/css/coachboard_pages.css';
+  pageStyles.href = `/static/css/coachboard_pages.css${coreQuery}`;
   pageStyles.dataset.coachboardStyles = 'pages';
   document.head.appendChild(pageStyles);
 
@@ -43,6 +45,9 @@
       intro.innerHTML = `<div><div class="cb-kicker">CoachBoard</div><h1>${title}</h1><p>${subtitle}</p></div>`;
       pane.prepend(intro);
     });
+
+    const rosterHeader = document.querySelector('#roster > .card > .card-header h5');
+    if (rosterHeader && rosterHeader.textContent.trim() === 'Current Roster') rosterHeader.textContent = 'Players';
   }
 
   function modernizeLegacyAdminHeader() {
@@ -89,10 +94,11 @@
 
   function markDesktopNav() {
     const activeHomeSection = window.location.hash.replace('#', '') || 'roster';
+    const gameArea = path === '/game-day' || /^\/game\/\d+\/?$/.test(path) || /^\/game-day\/\d+\/report\/?$/.test(path);
     document.querySelectorAll('.coach-primary-nav [data-cb-section]').forEach((link) => {
       link.classList.remove('active');
       const section = link.dataset.cbSection;
-      if (section === 'game-day' && path === '/game-day') link.classList.add('active');
+      if (section === 'game-day' && gameArea) link.classList.add('active');
       if (section === 'pitching' && path === '/pitching') link.classList.add('active');
       if (path === '/' && activeHomeSection === section) link.classList.add('active');
     });
