@@ -73,8 +73,10 @@
 
     pitcher.classList.remove('open');
     pitcher.classList.add('pitcher-tbd');
-    if (name) name.textContent = 'PITCHER TBD';
-    pitcher.title = 'Optional before the game. Choose the actual pitcher during Live Game.';
+    if (name && name.textContent !== 'PITCHER TBD') name.textContent = 'PITCHER TBD';
+    if (pitcher.title !== 'Optional before the game. Choose the actual pitcher during Live Game.') {
+      pitcher.title = 'Optional before the game. Choose the actual pitcher during Live Game.';
+    }
 
     const status = panel.querySelector('.pde-status');
     const open = status?.querySelector('.open');
@@ -87,9 +89,11 @@
         .filter(value => value !== 'P');
 
       if (spots.length) {
-        open.textContent = `Open: ${spots.join(', ')}`;
+        const desired = `Open: ${spots.join(', ')}`;
+        if (open.textContent !== desired) open.textContent = desired;
       } else if (status) {
-        status.innerHTML = '<strong>Defense complete</strong> <span class="mx-1">•</span> Changes save automatically';
+        const desired = '<strong>Defense complete</strong> <span class="mx-1">•</span> Changes save automatically';
+        if (status.innerHTML !== desired) status.innerHTML = desired;
       }
     }
 
@@ -101,7 +105,8 @@
       if (status) status.insertAdjacentElement('afterend', note);
       else panel.querySelector('.pde-body')?.appendChild(note);
     }
-    note.innerHTML = '<i class="bi bi-info-circle me-1"></i>Future-inning pitcher is optional. Leave P as TBD and choose the actual pitcher during Live Game.';
+    const noteHtml = '<i class="bi bi-info-circle me-1"></i>Future-inning pitcher is optional. Leave P as TBD and choose the actual pitcher during Live Game.';
+    if (note.innerHTML !== noteHtml) note.innerHTML = noteHtml;
   }
 
   function queuePatch() {
