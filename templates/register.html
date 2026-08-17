@@ -1,54 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Register - Coach Planner</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body { background-color: #f9f9f9; }
-    .btn-primary { background-color: #c8102e; border-color: #c8102e; }
-  </style>
-</head>
-<body>
-<div class="container mt-5">
-  <div class="row justify-content-center">
-    <div class="col-md-6">
-      <h2 class="text-center mb-4">Create Your Account</h2>
-      <p class="text-center text-muted">Enter your details and the registration code provided by your team administrator to join your team.</p>
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">{{ message }}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-      <form method="POST" action="{{ url_for('auth.register') }}">
-        <div class="form-floating mb-3">
-          <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
-          <label for="username">Username</label>
-        </div>
-        <div class="form-floating mb-3">
-            <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Full Name" required>
-            <label for="full_name">Full Name</label>
-        </div>
-        <div class="form-floating mb-3">
-          <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
-          <label for="password">Password (min. 4 characters)</label>
-        </div>
-        <hr>
-        <div class="form-floating mb-3">
-            <input type="text" class="form-control" id="registration_code" name="registration_code" placeholder="Registration Code" value="{{ registration_code }}" required>
-            <label for="registration_code">Team Registration Code</label>
-        </div>
-
-        <button type="submit" class="btn btn-primary w-100">Register</button>
-        <div class="text-center mt-3">
-            <a href="{{ url_for('auth.login') }}">Already have an account? Login</a>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-</body>
-</html>
+{% extends "auth_base.html" %}
+{% block title %}Create Account - CoachBoard{% endblock %}
+{% block content %}
+<h2 class="auth-title">Join your team</h2>
+<p class="auth-subtitle">Use the registration code from your Head Coach. Your email is used for password recovery.</p>
+<form method="POST" action="{{ url_for('auth.register') }}">
+  <div class="mb-3"><label class="form-label" for="full_name">Full name</label><input class="form-control" id="full_name" name="full_name" value="{{ form.get('full_name','') }}" autocomplete="name" required></div>
+  <div class="mb-3"><label class="form-label" for="email">Email</label><input type="email" class="form-control" id="email" name="email" value="{{ form.get('email','') }}" autocomplete="email" required></div>
+  <div class="mb-3"><label class="form-label" for="username">Username</label><input class="form-control" id="username" name="username" value="{{ form.get('username','') }}" autocomplete="username" autocapitalize="none" required></div>
+  <div class="mb-3"><label class="form-label" for="password">Password</label><div class="password-wrap"><input type="password" class="form-control" id="password" name="password" minlength="8" autocomplete="new-password" required><button type="button" class="password-toggle" data-password-toggle="password" aria-label="Show password"><i class="bi bi-eye"></i></button></div><div class="form-text">At least 8 characters.</div></div>
+  <div class="mb-3"><label class="form-label" for="registration_code">Team registration code</label><input class="form-control" id="registration_code" name="registration_code" value="{{ registration_code }}" autocapitalize="none" required></div>
+  <button class="btn btn-primary w-100" type="submit"><i class="bi bi-person-plus me-1"></i> Create Account</button>
+</form>
+<div class="auth-divider">ALREADY HAVE AN ACCOUNT?</div>
+<div class="text-center small"><a class="auth-link" href="{{ url_for('auth.login') }}">Back to sign in</a></div>
+{% endblock %}
