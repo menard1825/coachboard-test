@@ -1,8 +1,10 @@
 (() => {
   'use strict';
 
-  if (!/^\/game\/\d+\/?$/.test(window.location.pathname)) return;
+  const routeMatch = window.location.pathname.match(/^\/game\/(\d+)\/?$/);
+  if (!routeMatch) return;
 
+  const gameId = Number(routeMatch[1]);
   const PANEL_ID = 'pregame-defense-editor-v3';
   let reportsCollapsed = false;
   let patchQueued = false;
@@ -13,6 +15,7 @@
   const setHtml = (element, value) => {
     if (element && element.innerHTML !== value) element.innerHTML = value;
   };
+  const sleep = (ms) => new Promise(resolve => window.setTimeout(resolve, ms));
 
   function installStyles() {
     if (document.getElementById('game-management-coach-simplify-styles')) return;
@@ -46,6 +49,25 @@
       #rotation-card-container .gm-coach-actions .dropdown-toggle{
         border-radius:9px;
         min-height:38px;
+      }
+      #rotation-card-container .gm-sub-inning-label{
+        border-style:dashed!important;
+        position:relative;
+      }
+      #rotation-card-container .gm-sub-inning-label::after{
+        content:'SUB';
+        position:absolute;
+        top:-7px;
+        right:-5px;
+        font-size:.42rem;
+        line-height:1;
+        font-weight:900;
+        letter-spacing:.04em;
+        padding:2px 3px;
+        border-radius:4px;
+        color:#7a4b00;
+        background:#fff3cd;
+        border:1px solid #f2d38a;
       }
       #${PANEL_ID} .pde-inning{display:none!important}
       #${PANEL_ID} .pde-head{align-items:center!important}
@@ -90,11 +112,140 @@
   }
 
   function currentInning() {
+    const checked = document.querySelector('#inning-btn-group input[name="inning-radio"]:checked');
+    if (checked?.value) return checked.value;
     const panelValue = document.querySelector(`#${PANEL_ID} .pde-inning strong`)?.textContent?.trim();
     if (panelValue) return panelValue;
-    const active = document.querySelector('#inning-btn-group .active, #inning-btn-group input:checked + label, #inning-btn-group input:checked');
-    const text = active?.textContent?.trim() || active?.value;
-    return text || '1';
+    return '1';
+  }
+
+  function isSubInning(value = currentInning()) {
+    const number = Number.parseFloat(value);
+    return Number.isFinite(number) && Math.abs(number - Math.floor(number)) > 0.001;
+  }
+
+  function subIndex(value) {
+    const number = Number.parseFloat(value);
+    if (!Number.isFinite(number)) return 1;
+    return Math.max(1, Math.round((number - Math.floor(number)) * 10));
+  }
+
+  function shortInningLabel(value) {
+    if (!isSubInning(value)) return String(value);
+    const base = Math.floor(Number.parseFloat(value));
+    const letter = String.fromCharCode(64 + Math.min(subIndex(value), 26));
+    return `${base}${letter}`;
+  }
+
+  function fullInningLabel(value) {
+    if (!isSubInning(value)) return `Inning ${value}`;
+    const base = Math.floor(Number.parseFloat(value));
+    const letter = String.fromCharCode(64 + Math.min(subIndex(value), 26));
+    return `Inning ${base} · Planned Mid-Inning Change ${letter}`;
+  }
+
+  function toast(message, kind = 'success') {
+    let holder = document.getElementById('gm-coach-toast-holder');
+    if (!holder) {
+      holder = document.createElement('div');
+      holder.id = 'gm-coach-toast-holder';
+      holder.className = 'toast-container position-fixed top-0 end-0 p-3';
+      holder.style.zIndex = '6000';
+      document.body.appendChild(holder);
+    }
+    const el = document.createElement('div');
+    el.className = `toast text-bg-${kind} border-0`;
+    el.innerHTML = `<div class="d-flex"><div class="toast-body fw-semibold"></div><button class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+    el.querySelector('.toast-body').textContent = message;
+    holder.appendChild(el);
+    const instance = bootstrap.Toast.getOrCreateInstance(el, {delay: 2600});
+    el.addEventListener('hidden.bs.toast', () => el.remove(), {once:true});
+    instance.show();
+  }
+
+  function preventActionAnchorJumps(event) {
+    const action = event.target.closest('#copyInningBtn, #clearInningBtn, #saveAsTemplateBtn, #printCardBtn, #deleteRotationBtn, #saveRotationBtn');
+    if (action?.tagName === 'A') event.preventDefault();
+  }
+
+  async function fetchLatestRotationUntil(inningKey, attempts = 16) {
+    let lastData = null;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const response = await fetch(`/api/game_data/${gameId}?_=${Date.now()}`, {cache:'no-store'});
+      if (!response.ok) throw new Error('Could not read the latest defense plan.');
+      lastData = await response.json();
+      let innings = lastData?.rotation?.innings || {};
+      if (typeof innings === 'string') {
+        try { innings = JSON.parse(innings); } catch (_) { innings = {}; }
+      }
+      if (Object.prototype.hasOwnProperty.call(innings, inningKey)) {
+        lastData.rotation.innings = innings;
+        return lastData;
+      }
+      await sleep(180);
+    }
+    return lastData;
+  }
+
+  async function removeCurrentMidInningChange() {
+    const raw = currentInning();
+    if (!isSubInning(raw)) return;
+    const base = String(Math.floor(Number.parseFloat(raw)));
+    const display = shortInningLabel(raw);
+    if (!window.confirm(`Remove planned change ${display}?\n\nThe normal Inning ${base} defense will stay in place.`)) return;
+
+    const removeButton = document.getElementById('gmRemoveCurrentSubInning');
+    if (removeButton) {
+      removeButton.disabled = true;
+      removeButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Removing…';
+    }
+
+    try {
+      // Force the original editor to persist the newly-created sub-inning before
+      // we remove it. This matters if the coach adds it and immediately changes
+      // their mind before the normal autosave timer fires.
+      document.getElementById('saveRotationBtn')?.click();
+      const data = await fetchLatestRotationUntil(raw);
+      if (!data?.rotation) throw new Error('Could not find the current defense plan.');
+
+      let innings = data.rotation.innings || {};
+      if (typeof innings === 'string') innings = JSON.parse(innings);
+      if (!Object.prototype.hasOwnProperty.call(innings, raw)) {
+        throw new Error('That planned change was not found. Refresh the page and try again.');
+      }
+
+      // Move the original game editor back to the base inning before the server
+      // broadcasts the updated rotation, so its private currentInning state never
+      // points at a key that is about to disappear.
+      document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`)?.click();
+
+      delete innings[raw];
+      const response = await fetch('/save_rotation', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          id:data.rotation.id,
+          title:data.rotation.title || `Rotation for game ${gameId}`,
+          innings,
+          associated_game_id:gameId,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Could not remove that planned change.');
+
+      toast(`Removed planned change ${display}.`);
+      window.setTimeout(() => {
+        document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`)?.click();
+        queuePatch();
+      }, 250);
+    } catch (error) {
+      toast(error.message || 'Could not remove that planned change.', 'danger');
+    } finally {
+      if (removeButton?.isConnected) {
+        removeButton.disabled = false;
+        removeButton.innerHTML = '<i class="bi bi-trash me-2"></i>Remove This Planned Change';
+      }
+    }
   }
 
   function simplifyHeader() {
@@ -150,6 +301,36 @@
       }
       item.querySelector('button')?.addEventListener('click', () => document.getElementById('pde-save')?.click());
     }
+
+    if (menu && !document.getElementById('gmPlanMidInningChange')) {
+      const deleteItem = deleteRotation?.closest('li');
+      const divider = document.createElement('li');
+      divider.id = 'gmAdvancedPlanningDivider';
+      divider.innerHTML = '<hr class="dropdown-divider"><div class="dropdown-header">Advanced planning</div>';
+      const item = document.createElement('li');
+      item.innerHTML = '<button type="button" class="dropdown-item" id="gmPlanMidInningChange"><i class="bi bi-arrow-left-right me-1"></i> Plan a Change During This Inning…</button>';
+      if (deleteItem) {
+        menu.insertBefore(divider, deleteItem);
+        menu.insertBefore(item, deleteItem);
+      } else {
+        menu.appendChild(divider);
+        menu.appendChild(item);
+      }
+      item.querySelector('button')?.addEventListener('click', () => {
+        const raw = currentInning();
+        const base = Math.floor(Number.parseFloat(raw));
+        if (isSubInning(raw)) {
+          toast('You are already editing a planned change during this inning.', 'warning');
+          return;
+        }
+        const ok = window.confirm(
+          `Plan a defensive change during Inning ${base}?\n\n` +
+          'Use this only when you already know you want a substitution or defensive change during the same inning. ' +
+          'For normal inning-to-inning changes, use Add Another Inning instead.'
+        );
+        if (ok) document.getElementById('addSubInningBtn')?.click();
+      });
+    }
   }
 
   function addInningOption(menu, id, icon, label, targetId, danger = false) {
@@ -160,9 +341,39 @@
     menu.appendChild(li);
   }
 
+  function syncSubInningSelectorLabels(group) {
+    group.querySelectorAll('input[name="inning-radio"]').forEach(input => {
+      const label = group.querySelector(`label[for="${CSS.escape(input.id)}"]`);
+      if (!label) return;
+      if (isSubInning(input.value)) {
+        setText(label, shortInningLabel(input.value));
+        if (!label.classList.contains('gm-sub-inning-label')) label.classList.add('gm-sub-inning-label');
+        label.title = fullInningLabel(input.value);
+      } else {
+        setText(label, input.value);
+        label.classList.remove('gm-sub-inning-label');
+        label.removeAttribute('title');
+      }
+    });
+  }
+
+  function syncRemoveCurrentSubAction(toolsMenu) {
+    const existing = document.getElementById('gmRemoveCurrentSubInning')?.closest('li');
+    if (!isSubInning()) {
+      existing?.remove();
+      return;
+    }
+    if (existing || !toolsMenu) return;
+    const li = document.createElement('li');
+    li.innerHTML = '<button type="button" class="dropdown-item text-danger" id="gmRemoveCurrentSubInning"><i class="bi bi-trash me-2"></i>Remove This Planned Change</button>';
+    toolsMenu.appendChild(li);
+    li.querySelector('button')?.addEventListener('click', removeCurrentMidInningChange);
+  }
+
   function simplifyInningControls() {
     const group = document.getElementById('inning-btn-group');
     if (!group) return;
+    syncSubInningSelectorLabels(group);
 
     const pickerRow = group.closest('.d-flex.align-items-center');
     if (pickerRow) {
@@ -185,7 +396,7 @@
     if (copyPrevious) {
       setHtml(copyPrevious, '<i class="bi bi-copy me-1"></i> Use Previous Inning');
       const inning = Number.parseFloat(currentInning());
-      const shouldHide = Number.isFinite(inning) && inning <= 1;
+      const shouldHide = isSubInning() || (Number.isFinite(inning) && inning <= 1);
       if (copyPrevious.classList.contains('d-none') !== shouldHide) copyPrevious.classList.toggle('d-none', shouldHide);
       copyPrevious.title = 'Copy the previous inning defense into this inning';
     }
@@ -212,9 +423,12 @@
       divider.innerHTML = '<hr class="dropdown-divider"><div class="dropdown-header">Inning structure</div>';
       toolsMenu.appendChild(divider);
       addInningOption(toolsMenu, 'gmAddInningAction', 'plus-circle', 'Add Another Inning', 'addInningBtn');
-      addInningOption(toolsMenu, 'gmAddSubInningAction', 'node-plus', 'Add Mid-Inning Change', 'addSubInningBtn');
       addInningOption(toolsMenu, 'gmRemoveInningAction', 'dash-circle', 'Remove Last Inning', 'removeInningBtn', true);
+      // Mid-inning planning intentionally lives under Defense Options now. It is
+      // a rare/advanced workflow and should not compete with normal inning setup.
+      document.getElementById('gmAddSubInningAction')?.closest('li')?.remove();
     }
+    syncRemoveCurrentSubAction(toolsMenu);
 
     const planner = pickerRow?.closest('.planner-controls');
     if (planner && !planner.querySelector('.gm-coach-help')) {
@@ -232,8 +446,13 @@
     const inning = currentInning();
     const title = panel.querySelector('.pde-title');
     const help = panel.querySelector('.pde-help');
-    setText(title, `Set Defense — Inning ${inning}`);
-    setText(help, 'Tap a position to assign or change a player. Changes save automatically.');
+    setText(title, `Set Defense — ${fullInningLabel(inning)}`);
+    setText(
+      help,
+      isSubInning(inning)
+        ? `Set the defense after this planned change during Inning ${Math.floor(Number.parseFloat(inning))}. Changes save automatically.`
+        : 'Tap a position to assign or change a player. Changes save automatically.'
+    );
 
     const tools = panel.querySelector('.pde-tools');
     const select = document.getElementById('pde-preset');
@@ -299,9 +518,10 @@
   }
 
   function start() {
+    document.addEventListener('click', preventActionAnchorJumps, true);
     patch();
     const observer = new MutationObserver(queuePatch);
-    observer.observe(document.body, {childList:true, subtree:true,attributes:true,attributeFilter:['class']});
+    observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
   }
 
   document.readyState === 'loading'
