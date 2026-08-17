@@ -116,13 +116,24 @@
     return 'Custom defense confirmed';
   }
 
+  function plannedPitcherConflict(data) {
+    const planned = data.planned_alignment || {};
+    const currentPitcher = data.current_alignment?.P || '';
+    if (!currentPitcher || planned.P) return null;
+    return Object.entries(planned).find(([pos,name]) => pos !== 'P' && name === currentPitcher)?.[0] || null;
+  }
+
   function actionButtons(data) {
     const planned = data.planned_alignment || {};
     const hasPlan = Object.values(planned).some(Boolean);
-    const pitcherTbd = hasPlan && !planned.P && Boolean(data.current_alignment?.P);
-    const planLabel = pitcherTbd ? 'Use Plan + Keep Pitcher' : 'Use Plan';
+    const currentPitcher = data.current_alignment?.P || '';
+    const pitcherTbd = hasPlan && !planned.P && Boolean(currentPitcher);
+    const conflict = pitcherTbd ? plannedPitcherConflict(data) : null;
+    const planUsable = hasPlan && !conflict;
+    const planLabel = pitcherTbd && !conflict ? 'Use Plan + Keep Pitcher' : 'Use Plan';
     const adjustLabel = pitcherTbd ? 'Choose Pitcher / Adjust' : 'Adjust Defense';
-    return `<div class="bp-actions"><button class="btn btn-outline-dark" data-bp-action="current">Keep Current</button><button class="btn btn-outline-primary" data-bp-action="planned" ${hasPlan?'':'disabled'}>${esc(planLabel)}</button><button class="btn btn-primary" data-bp-action="adjust">${esc(adjustLabel)}</button></div>`;
+    const title = conflict ? `${currentPitcher} is planned at ${conflict}; resolve the pitcher and that position first.` : '';
+    return `<div class="bp-actions"><button class="btn btn-outline-dark" data-bp-action="current">Keep Current</button><button class="btn btn-outline-primary" data-bp-action="planned" ${planUsable?'':'disabled'} title="${esc(title)}">${esc(planLabel)}</button><button class="btn btn-primary" data-bp-action="adjust">${esc(adjustLabel)}</button></div>`;
   }
 
   function render(data) {
@@ -136,6 +147,7 @@
     const confirmed = data.confirmed;
     const roster = data.roster || [];
     const plannedPitcherTbd = Object.values(planned).some(Boolean) && !planned.P;
+    const conflict = plannedPitcherConflict(data);
     const head = `<div class="bp-head"><div><div class="bp-kicker">Next Inning Prep</div><div class="bp-title">Get the board ready for Inning ${esc(next)}</div><div class="bp-help">Confirm the actual defense before ending the inning. A pregame pitcher marked TBD can stay current or be changed now.</div></div><div class="bp-inning"><small>NEXT</small><strong>${esc(next)}</strong></div></div>`;
 
     if (!confirmed) {
@@ -143,9 +155,12 @@
       const preview = planExists
         ? fieldMarkup(planned, roster, data.outfielder_count, 'Pregame Plan Preview', plannedPitcherTbd ? 'Pitcher TBD · choose now or keep current' : 'Not active yet', plannedPitcherTbd)
         : '<div class="bp-none">No pregame plan is saved for this inning.</div>';
-      const pitcherNote = plannedPitcherTbd && current.P
-        ? `<div class="bp-pitcher-note"><i class="bi bi-info-circle me-1"></i>Pregame pitcher is TBD. “Use Plan + Keep Pitcher” will keep ${esc(current.P)} on the mound while using the planned fielders.</div>`
-        : '';
+      let pitcherNote = '';
+      if (plannedPitcherTbd && current.P && conflict) {
+        pitcherNote = `<div class="bp-pitcher-note"><i class="bi bi-exclamation-triangle me-1"></i>${esc(current.P)} is the current pitcher but is planned at ${esc(conflict)}. Use “Choose Pitcher / Adjust” to decide the pitcher and fill ${esc(conflict)}.</div>`;
+      } else if (plannedPitcherTbd && current.P) {
+        pitcherNote = `<div class="bp-pitcher-note"><i class="bi bi-info-circle me-1"></i>Pregame pitcher is TBD. “Use Plan + Keep Pitcher” will keep ${esc(current.P)} on the mound while using the planned fielders.</div>`;
+      }
       card.innerHTML = `${head}<div class="bp-body"><div class="bp-status waiting"><div><strong>Next inning not set</strong><small>Choose what you actually want before moving the board.</small></div><span class="bp-status-badge">NOT SET</span></div><div class="bp-main"><section class="bp-decision"><div class="bp-label">Choose next inning</div><h6>What defense are we using?</h6><p>Current defense is already shown above. The plan on the right is only a preview.</p>${pitcherNote}${actionButtons(data)}</section><section>${preview}</section></div></div>`;
       wireActions(card);
       return true;
@@ -252,9 +267,13 @@
       return `<div class="ni-row ${selected?'':'open'}"><div class="ni-pos">${esc(pos)}</div><select class="form-select ni-select" data-pos="${esc(pos)}">${options}</select></div>`;
     }).join('');
     const bench = draftBench();
-    const pitcherHint = latest.planned_alignment && !latest.planned_alignment.P && currentPitcher
-      ? `<div class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i>${esc(currentPitcher)} is carried forward at P by default because the pregame pitcher was TBD. Choose another pitcher here if the game situation calls for it.</div>`
-      : '';
+    const conflict = plannedPitcherConflict(latest);
+    let pitcherHint = '';
+    if (latest.planned_alignment && !latest.planned_alignment.P && currentPitcher && conflict) {
+      pitcherHint = `<div class="small text-muted mb-2"><i class="bi bi-exclamation-triangle me-1"></i>${esc(currentPitcher)} stays at P by default, so ${esc(conflict)} has been opened for you to fill. Choose a different pitcher if that better matches the game situation.</div>`;
+    } else if (latest.planned_alignment && !latest.planned_alignment.P && currentPitcher) {
+      pitcherHint = `<div class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i>${esc(currentPitcher)} is carried forward at P by default because the pregame pitcher was TBD. Choose another pitcher here if the game situation calls for it.</div>`;
+    }
     body.innerHTML = `${pitcherHint}${rows}<div class="bp-label mt-3">Bench</div><div class="ni-bench">${bench.length?bench.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>None</span>'}</div><div class="ni-footer"><div class="me-auto">${holes.length?`<div class="ni-warning">Fill ${esc(holes.join(', '))} before confirming.</div>`:'<div class="small text-muted">This exact setup becomes the next-inning board.</div>'}</div><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-dark fw-bold" id="save-next-inning-adjust" ${holes.length?'disabled':''}>Confirm Setup</button></div>`;
 
     body.querySelectorAll('.ni-select').forEach(select=>select.addEventListener('change',()=>{
@@ -277,8 +296,14 @@
     const hasPlan = Object.values(planned).some(Boolean);
     const source = latest.confirmed?.alignment || (hasPlan ? planned : latest.current_alignment) || {};
     draft = {};
-    positions(latest.outfielder_count).forEach(pos=>{ draft[pos] = source[pos] || ''; });
-    if (!draft.P && latest.current_alignment?.P) draft.P = latest.current_alignment.P;
+    const posList = positions(latest.outfielder_count);
+    posList.forEach(pos=>{ draft[pos] = source[pos] || ''; });
+    if (!draft.P && latest.current_alignment?.P) {
+      const currentPitcher = latest.current_alignment.P;
+      const conflictPos = posList.find(pos => pos !== 'P' && draft[pos] === currentPitcher);
+      if (conflictPos) draft[conflictPos] = '';
+      draft.P = currentPitcher;
+    }
     ensureAdjustModal();
     renderAdjust();
     bootstrap.Modal.getOrCreateInstance(document.getElementById('next-inning-adjust-modal')).show();
