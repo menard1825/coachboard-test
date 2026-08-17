@@ -10,13 +10,13 @@ from models import Team, TeamMembership, User
 from password_recovery import (
     email_delivery_configured,
     normalize_email,
+    password_reset_max_age,
     password_reset_url,
     resolve_password_reset_token,
     send_password_reset_email,
     valid_email,
 )
 
-# Define role constants for clarity
 HEAD_COACH = 'Head Coach'
 ASSISTANT_COACH = 'Assistant Coach'
 SUPER_ADMIN = 'Super Admin'
@@ -26,7 +26,6 @@ auth_bp = Blueprint('auth', __name__, template_folder='templates')
 
 
 def get_player_order_as_list(player_order_data):
-    """Safely returns player_order as a list, decoding from JSON if necessary."""
     if not player_order_data:
         return []
     if isinstance(player_order_data, list):
@@ -57,6 +56,42 @@ def _email_available(email, exclude_user_id=None):
     return query.first() is None
 
 
+def _admin_can_help_user(user):
+    if not user or not session.get('logged_in'):
+        return False
+    if session.get('role') == SUPER_ADMIN:
+        return True
+    if session.get('role') != HEAD_COACH or not session.get('team_id'):
+        return False
+    return db.session.query(TeamMembership).filter_by(
+        user_id=user.id,
+        team_id=session['team_id'],
+    ).first() is not None
+
+
+def _password_help_page(user):
+    return render_template(
+        'password_help.html',
+        user=user,
+        reset_url=password_reset_url(user),
+        expires_minutes=max(1, password_reset_max_age() // 60),
+        email_delivery_enabled=email_delivery_configured(),
+    )
+
+
+@auth_bp.before_app_request
+def replace_legacy_admin_password_reset():
+    """Turn the old random-password admin action into secure password help."""
+    if request.method != 'POST' or request.endpoint != 'admin.reset_password':
+        return None
+    username = (request.view_args or {}).get('username')
+    user = _find_user_by_identity(username)
+    if not _admin_can_help_user(user):
+        flash('You do not have permission to help with that account.', 'danger')
+        return redirect(url_for('admin.user_management'))
+    return _password_help_page(user)
+
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if session.get('logged_in'):
@@ -69,8 +104,6 @@ def login():
 
         if user and check_password_hash(user.password_hash, password):
             user.last_login = datetime.now()
-
-            # Use the newest membership as the default active team context.
             primary_membership = db.session.query(TeamMembership).filter_by(
                 user_id=user.id
             ).order_by(TeamMembership.id.desc()).first()
@@ -112,11 +145,7 @@ def switch_team(team_id):
     if not user:
         return redirect(url_for('auth.logout'))
 
-    membership = db.session.query(TeamMembership).filter_by(
-        user_id=user.id,
-        team_id=team_id
-    ).first()
-
+    membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=team_id).first()
     if not membership:
         flash('You do not have access to that team.', 'danger')
         return redirect(url_for('home'))
@@ -141,7 +170,7 @@ def register():
             flash('Name, username, email, password, and team registration code are required.', 'danger')
             return render_template('register.html', registration_code=reg_code, form=request.form)
         if not valid_email(email):
-            flash('Enter a valid email address. This is what CoachBoard will use if you ever forget your password.', 'danger')
+            flash('Enter a valid email address. CoachBoard uses it if you ever forget your password.', 'danger')
             return render_template('register.html', registration_code=reg_code, form=request.form)
         if len(password) < MIN_PASSWORD_LENGTH:
             flash(f'Password must be at least {MIN_PASSWORD_LENGTH} characters long.', 'danger')
@@ -171,7 +200,6 @@ def register():
         )
         db.session.add(new_user)
         db.session.flush()
-
         new_membership = TeamMembership(
             user_id=new_user.id,
             team_id=team.id,
@@ -188,7 +216,6 @@ def register():
         session['team_id'] = new_membership.team_id
         session['player_order'] = []
         session.permanent = True
-
         flash(f'Welcome to CoachBoard. You joined {team.team_name}.', 'success')
         return redirect(url_for('home'))
 
@@ -205,9 +232,6 @@ def forgot_password():
         submitted = True
         identity = str(request.form.get('identity') or '').strip()
         user = _find_user_by_identity(identity)
-
-        # Deliberately keep the user-facing result generic so this route cannot
-        # be used to discover which usernames/emails exist in CoachBoard.
         if user and user.email and email_available:
             try:
                 reset_url = password_reset_url(user)
@@ -222,6 +246,37 @@ def forgot_password():
     )
 
 
+@auth_bp.route('/password_help/<username>', methods=['GET'])
+def password_help(username):
+    user = _find_user_by_identity(username)
+    if not _admin_can_help_user(user):
+        flash('You do not have permission to help with that account.', 'danger')
+        return redirect(url_for('home'))
+    return _password_help_page(user)
+
+
+@auth_bp.route('/password_help/<username>/email', methods=['POST'])
+def email_password_help(username):
+    user = _find_user_by_identity(username)
+    if not _admin_can_help_user(user):
+        flash('You do not have permission to help with that account.', 'danger')
+        return redirect(url_for('home'))
+    if not user.email:
+        flash('That coach does not have a recovery email on file. Copy the reset link instead.', 'warning')
+        return _password_help_page(user)
+    if not email_delivery_configured():
+        flash('Email delivery is not configured yet. Copy the reset link and text it to the coach.', 'warning')
+        return _password_help_page(user)
+    try:
+        send_password_reset_email(user, password_reset_url(user))
+        flash(f'Password reset email sent to {user.email}.', 'success')
+        return redirect(url_for('admin.user_management'))
+    except Exception:
+        current_app.logger.exception('Unable to send admin password reset email for user id %s', user.id)
+        flash('CoachBoard could not send the email. Copy the reset link instead.', 'danger')
+        return _password_help_page(user)
+
+
 @auth_bp.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password_token(token):
     user = resolve_password_reset_token(token)
@@ -232,7 +287,6 @@ def reset_password_token(token):
     if request.method == 'POST':
         new_password = request.form.get('new_password') or ''
         confirm_password = request.form.get('confirm_password') or ''
-
         if len(new_password) < MIN_PASSWORD_LENGTH:
             flash(f'Choose a password with at least {MIN_PASSWORD_LENGTH} characters.', 'danger')
             return render_template('reset_password.html', token=token, user=user)
@@ -259,10 +313,23 @@ def change_password():
         return redirect(url_for('auth.logout'))
 
     if request.method == 'POST':
+        action = request.form.get('action') or 'password'
+        if action == 'email':
+            email = normalize_email(request.form.get('email'))
+            if not valid_email(email):
+                flash('Enter a valid recovery email address.', 'danger')
+                return redirect(url_for('auth.change_password'))
+            if not _email_available(email, exclude_user_id=user.id):
+                flash('That email is already connected to another CoachBoard account.', 'danger')
+                return redirect(url_for('auth.change_password'))
+            user.email = email
+            db.session.commit()
+            flash('Your recovery email has been saved.', 'success')
+            return redirect(url_for('auth.change_password'))
+
         current_password = request.form.get('current_password') or ''
         new_password = request.form.get('new_password') or ''
         confirm_new_password = request.form.get('confirm_new_password') or ''
-
         if not check_password_hash(user.password_hash, current_password):
             flash('Your current password was incorrect.', 'danger')
             return redirect(url_for('auth.change_password'))
