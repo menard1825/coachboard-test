@@ -54,6 +54,9 @@
     loadScript('/static/js/season_management_v2.js', 'season-management');
     loadScript('/static/js/roster_pitching_traits.js', 'roster-pitching-traits');
     loadScript('/static/js/touch_reorder_guard.js', 'touch-reorder-guard');
+    loadScript('/static/js/stats_dashboard_style.js', 'stats-dashboard-style');
+    loadScript('/static/js/stats_dashboard_render.js', 'stats-dashboard-render');
+    loadScript('/static/js/stats_dashboard_v2.js', 'stats-dashboard-v2');
   }
 
   if (window.location.pathname === '/game-day') {
