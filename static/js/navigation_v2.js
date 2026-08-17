@@ -64,6 +64,10 @@
     loadScript('/static/js/game_day_pitching_rules.js', 'game-day-pitching-rules');
   }
 
+  if (window.location.pathname === '/admin/users') {
+    loadScript('/static/js/user_management_password_help.js', 'user-management-password-help');
+  }
+
   if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
     loadScript('/static/js/game_management_visual_polish.js', 'game-management-visual-polish');
     loadScript('/static/js/game_management_team_theme_availability.js', 'game-management-team-theme-availability');
