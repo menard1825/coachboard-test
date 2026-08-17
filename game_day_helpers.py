@@ -32,11 +32,14 @@ def required_positions(team):
     return base + outfield
 
 
-def _complete_alignment(alignment, required, present_names):
+def _complete_alignment(alignment, required, present_names, optional_positions=None):
     if not isinstance(alignment, dict):
         return False, list(required)
+
+    optional_positions = list(optional_positions or [])
     missing = [pos for pos in required if not alignment.get(pos)]
-    names = [alignment.get(pos) for pos in required if alignment.get(pos)]
+    positions_to_validate = list(dict.fromkeys([*required, *optional_positions]))
+    names = [alignment.get(pos) for pos in positions_to_validate if alignment.get(pos)]
     valid = (
         not missing
         and len(names) == len(set(names))
@@ -130,13 +133,27 @@ def build_game_readiness(game, team):
     lineup_count = len(lineup_names)
 
     required = required_positions(team)
+    future_required = [pos for pos in required if pos != 'P']
     innings = deepcopy(rotation.innings or {}) if rotation else {}
     regulation_innings = regulation_innings_for_team(team)
     regulation_keys = [str(number) for number in range(1, regulation_innings + 1)]
     incomplete_innings = []
+    pitcher_tbd_innings = []
     complete_inning_count = 0
     for inning in regulation_keys:
-        valid, missing = _complete_alignment(innings.get(inning), required, present_names)
+        alignment = innings.get(inning)
+        if inning == '1':
+            valid, missing = _complete_alignment(alignment, required, present_names)
+        else:
+            valid, missing = _complete_alignment(
+                alignment,
+                future_required,
+                present_names,
+                optional_positions=['P'],
+            )
+            if valid and not (alignment or {}).get('P'):
+                pitcher_tbd_innings.append(inning)
+
         if valid:
             complete_inning_count += 1
         else:
@@ -152,9 +169,21 @@ def build_game_readiness(game, team):
         if not innings:
             blockers.append(f'Defensive rotation is not set for the {regulation_innings}-inning regulation game.')
         else:
-            labels = ', '.join(item['inning'] for item in incomplete_innings[:4])
-            suffix = '…' if len(incomplete_innings) > 4 else ''
-            blockers.append(f'Defense needs attention in regulation inning(s) {labels}{suffix}.')
+            starting_pitcher_only = any(
+                item['inning'] == '1' and item['missing'] == ['P']
+                for item in incomplete_innings
+            )
+            if starting_pitcher_only:
+                blockers.append('Choose the starting pitcher for Inning 1.')
+
+            remaining = [
+                item for item in incomplete_innings
+                if not (item['inning'] == '1' and item['missing'] == ['P'])
+            ]
+            if remaining:
+                labels = ', '.join(item['inning'] for item in remaining[:4])
+                suffix = '…' if len(remaining) > 4 else ''
+                blockers.append(f'Defense needs attention in regulation inning(s) {labels}{suffix}.')
 
     all_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
     all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
@@ -248,6 +277,7 @@ def build_game_readiness(game, team):
         'defense_completed_innings': complete_inning_count,
         'regulation_innings': regulation_innings,
         'incomplete_innings': incomplete_innings,
+        'pitcher_tbd_innings': pitcher_tbd_innings,
         'pitching_plan_ready': bool(plans),
         'pitching_plan_count': len(plans),
         'pitching_alerts': pitching_alerts,
