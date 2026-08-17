@@ -84,6 +84,10 @@ def resolve_password_reset_token(token):
 
 def password_reset_url(user):
     token = create_password_reset_token(user)
+    path = url_for('auth.reset_password_token', token=token, _external=False)
+    public_base = str(_setting('PUBLIC_BASE_URL', '') or '').strip().rstrip('/')
+    if public_base:
+        return f'{public_base}{path}'
     return url_for('auth.reset_password_token', token=token, _external=True)
 
 
