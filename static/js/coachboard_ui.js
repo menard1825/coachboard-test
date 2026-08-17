@@ -6,7 +6,9 @@
   const path = window.location.pathname;
   if (path === '/') document.body.classList.add('cb-home');
   if (path === '/pitching') document.body.classList.add('cb-pitching');
-  if (path === '/admin/settings') document.body.classList.add('cb-settings');
+  if (path === '/rules') document.body.classList.add('cb-rules');
+  if (path === '/admin/settings') document.body.classList.add('cb-settings', 'cb-admin');
+  if (path.startsWith('/admin/')) document.body.classList.add('cb-admin');
   if (path === '/game-day') document.body.classList.add('cb-game-day');
   if (/^\/game\/\d+\/?$/.test(path)) document.body.classList.add('cb-game-management');
   if (/^\/game-day\/\d+\/report\/?$/.test(path)) document.body.classList.add('cb-game-report');
@@ -37,30 +39,47 @@
     });
   }
 
-  function settingsHeader() {
-    if (!document.body.classList.contains('cb-settings')) return;
-    const head = document.querySelector('main > .container-fluid.mt-4 > .d-flex:first-child');
+  function modernizeLegacyAdminHeader() {
+    if (!document.body.classList.contains('cb-admin')) return;
+    const root = document.querySelector('main > .container-fluid.mt-4');
+    if (!root) return;
+    root.classList.add('cb-legacy-admin-shell');
+    const head = root.querySelector(':scope > .d-flex:first-child');
     const title = head?.querySelector('h1');
-    if (!head || !title || head.querySelector('.cb-settings-kicker')) return;
-    title.textContent = 'Team Settings';
+    if (!head || !title || head.querySelector('.cb-admin-kicker')) return;
+
+    if (path === '/admin/settings') title.textContent = 'Team Settings';
     const wrap = document.createElement('div');
-    wrap.className = 'cb-settings-title-wrap';
+    wrap.className = 'cb-admin-title-wrap';
     const kicker = document.createElement('div');
-    kicker.className = 'cb-kicker cb-settings-kicker';
+    kicker.className = 'cb-kicker cb-admin-kicker';
     kicker.textContent = 'CoachBoard';
     title.parentNode.insertBefore(wrap, title);
     wrap.append(kicker, title);
+
     const back = head.querySelector('a.btn');
     if (back) back.innerHTML = '<i class="bi bi-arrow-left me-1"></i>Back to CoachBoard';
   }
 
+  function enhancePitchingStructure() {
+    if (!document.body.classList.contains('cb-pitching')) return;
+    const root = document.querySelector('main > .container-fluid.pb-4');
+    if (!root) return;
+    root.classList.add('cb-pitching-shell');
+    const head = root.querySelector(':scope > .d-flex:first-child');
+    if (head) head.classList.add('cb-pitching-head');
+    const firstTable = root.querySelector('.card table');
+    if (firstTable) firstTable.classList.add('cb-pitcher-status-table');
+  }
+
   function markDesktopNav() {
+    const activeHomeSection = window.location.hash.replace('#', '') || 'roster';
     document.querySelectorAll('.coach-primary-nav [data-cb-section]').forEach((link) => {
       link.classList.remove('active');
       const section = link.dataset.cbSection;
       if (section === 'game-day' && path === '/game-day') link.classList.add('active');
       if (section === 'pitching' && path === '/pitching') link.classList.add('active');
-      if (path === '/' && window.location.hash.replace('#', '') === section) link.classList.add('active');
+      if (path === '/' && activeHomeSection === section) link.classList.add('active');
     });
   }
 
@@ -74,7 +93,8 @@
 
   function init() {
     addHomeIntros();
-    settingsHeader();
+    modernizeLegacyAdminHeader();
+    enhancePitchingStructure();
     markDesktopNav();
     window.setTimeout(applyHomeHash, 0);
   }
