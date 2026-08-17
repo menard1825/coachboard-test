@@ -13,8 +13,6 @@
     document.head.appendChild(script);
   }
 
-  // Run immediately at the bottom of <body> so main.js sees the final links when
-  // DOMContentLoaded fires and attaches its tab behavior.
   if (window.location.pathname === '/') {
     const nav = document.querySelector('nav.bottom-nav-fixed ul');
     if (nav) {
@@ -27,8 +25,6 @@
       ].join('');
     }
 
-    // There is now one canonical pitching screen. Convert every old home-tab
-    // link into normal navigation before main.js attaches Bootstrap tab handlers.
     document.querySelectorAll('a[href="#pitching"]').forEach((link) => {
       link.removeAttribute('data-bs-toggle');
       link.removeAttribute('role');
@@ -51,19 +47,15 @@
     loadScript('/static/js/game_day_pitching_rules.js', 'game-day-pitching-rules');
   }
 
-  // Every game page gets the same readiness calculation as Game Day, the game-
-  // specific pitching rule picker, responsive visual polish, team theming,
-  // clearer availability controls, and a connection indicator while Live Game
-  // is active.
   if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
     loadScript('/static/js/game_management_visual_polish.js', 'game-management-visual-polish');
     loadScript('/static/js/game_management_team_theme_availability.js', 'game-management-team-theme-availability');
+    loadScript('/static/js/pregame_defense_picker_clarity.js', 'pregame-defense-picker-clarity');
     loadScript('/static/js/game_prep_readiness.js', 'game-readiness');
     loadScript('/static/js/game_pitching_rule_picker.js', 'game-pitching-rules');
     loadScript('/static/js/live_game_sync_status.js', 'live-sync');
   }
 
-  // Normalize old visible wording anywhere it still says Games.
   document.querySelectorAll('a[href="#games"] span, a[href="#games"], [data-nav-games]').forEach((el) => {
     if (el.childElementCount === 0 && el.textContent.trim() === 'Games') el.textContent = 'Schedule';
   });
