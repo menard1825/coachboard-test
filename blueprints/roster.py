@@ -118,6 +118,7 @@ def roster_pitching_profiles():
     profiles = db.session.query(PlayerPitchingProfile).filter_by(team_id=session['team_id']).all()
     return jsonify({
         'status': 'success',
+        'team_id': session['team_id'],
         'traits': list(PITCHER_TRAITS),
         'profiles': {
             str(profile.player_id): list(profile.traits or [])
@@ -158,12 +159,9 @@ def update_pitching_profile(player_id):
     profile.traits = traits
     db.session.commit()
 
-    # Pitching traits are a small, player-profile-only change. Do not broadcast
-    # the generic data_updated event here: the legacy dashboard responds to that
-    # event by re-fetching and re-rendering the entire application, which
-    # collapses the player card being edited and causes every connected coach's
-    # screen to redraw. A targeted event leaves the existing roster DOM intact
-    # while still giving newer clients a hook for lightweight synchronization.
+    # A profile edit should synchronize only the affected profile. The old
+    # generic data_updated broadcast makes every connected dashboard re-fetch
+    # and redraw all application data.
     socketio.emit('pitching_profile_update', {
         'team_id': session['team_id'],
         'player_id': player.id,
@@ -172,6 +170,7 @@ def update_pitching_profile(player_id):
 
     return jsonify({
         'status': 'success',
+        'team_id': session['team_id'],
         'player_id': player.id,
         'traits': traits,
     })
