@@ -1,14 +1,27 @@
 (() => {
   'use strict';
 
+  const ownScript = document.currentScript;
+  let helperQuery = '';
+  try {
+    helperQuery = ownScript?.src ? new URL(ownScript.src, window.location.href).search : '';
+  } catch (_) {
+    helperQuery = '';
+  }
+
   function mobileItem(href, icon, label, active = false, isTab = false) {
     return `<li class="nav-item flex-fill"><a class="nav-link text-center ${active ? 'active' : ''}" ${isTab ? 'data-bs-toggle="tab" role="tab"' : ''} href="${href}"><i class="bi bi-${icon} d-block"></i><span>${label}</span></a></li>`;
+  }
+
+  function versionedHelperSrc(src) {
+    if (!helperQuery || src.includes('?')) return src;
+    return `${src}${helperQuery}`;
   }
 
   function loadScript(src, key) {
     if (document.querySelector(`script[data-coach-helper="${key}"]`)) return;
     const script = document.createElement('script');
-    script.src = src;
+    script.src = versionedHelperSrc(src);
     script.dataset.coachHelper = key;
     document.head.appendChild(script);
   }
