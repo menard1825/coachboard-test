@@ -1,11 +1,26 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
-from models import Player, User, TeamMembership
+from models import Player, PlayerPitchingProfile, User, TeamMembership
 from db import db
 from extensions import socketio
 import json
 from datetime import datetime
 
 roster_bp = Blueprint('roster', __name__, template_folder='templates')
+
+PITCHER_TRAITS = [
+    'Power / Velocity',
+    'Change of Pace',
+    'Changes Speeds',
+    'Command / Strike Thrower',
+    'Breaking Ball',
+    'Ground Ball',
+    'Swing & Miss',
+    'Deception',
+    'Composed Under Pressure',
+    'Holds Runners Well',
+    'Gets Out of Trouble',
+]
+
 
 def get_player_order_as_list(player_order_data):
     """Safely returns player_order as a list, decoding from JSON if necessary."""
@@ -18,7 +33,8 @@ def get_player_order_as_list(player_order_data):
             return json.loads(player_order_data)
         except (json.JSONDecodeError, TypeError):
             return []
-    return [] # default to empty list
+    return []
+
 
 @roster_bp.route('/add_player', methods=['POST'])
 def add_player():
@@ -48,7 +64,7 @@ def add_player():
         team_id=session['team_id']
     )
     db.session.add(new_player)
-    db.session.flush() # Flush to get the new player's ID
+    db.session.flush()
 
     for membership in db.session.query(TeamMembership).filter_by(team_id=session['team_id']).all():
         current_order = get_player_order_as_list(membership.player_order)
@@ -59,18 +75,19 @@ def add_player():
     db.session.commit()
     flash(f'Player "{name}" added successfully!', 'success')
     socketio.emit('data_updated', {'message': f'Player {name} added.'})
-    
+
     if 'X-Requested-With' in request.headers and request.headers['X-Requested-With'] == 'XMLHttpRequest':
-         return jsonify({'status': 'success'})
+        return jsonify({'status': 'success'})
 
     return redirect(url_for('home', _anchor='roster'))
+
 
 @roster_bp.route('/update_player_inline/<int:player_id>', methods=['POST'])
 def update_player_inline(player_id):
     player_to_edit = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
     if not player_to_edit:
         return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
-    
+
     original_name = player_to_edit.name
     new_name = request.form.get('name', original_name)
     if new_name != original_name and db.session.query(Player).filter_by(name=new_name, team_id=session['team_id']).first():
@@ -92,38 +109,60 @@ def update_player_inline(player_id):
     socketio.emit('data_updated', {'message': f'Player {new_name} updated.'})
     return jsonify({'status': 'success', 'message': f'Player "{new_name}" updated successfully!'})
 
+
+@roster_bp.route('/api/roster-pitching-profiles')
+def roster_pitching_profiles():
+    if 'logged_in' not in session or not session.get('team_id'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized.'}), 401
+
+    profiles = db.session.query(PlayerPitchingProfile).filter_by(team_id=session['team_id']).all()
+    return jsonify({
+        'status': 'success',
+        'traits': list(PITCHER_TRAITS),
+        'profiles': {
+            str(profile.player_id): list(profile.traits or [])
+            for profile in profiles
+        },
+    })
+
+
 @roster_bp.route('/update_pitching_profile/<int:player_id>', methods=['POST'])
 def update_pitching_profile(player_id):
+    if 'logged_in' not in session or not session.get('team_id'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized.'}), 401
+
     player = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
     if not player:
         return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
 
-    data = request.get_json()
-    from models import PlayerPitchingProfile, PlayerPitchTarget
+    data = request.get_json(silent=True) or {}
+    requested_traits = data.get('traits') or []
+    if not isinstance(requested_traits, list):
+        return jsonify({'status': 'error', 'message': 'Traits must be a list.'}), 400
 
-    # Update or create profile
-    profile = db.session.query(PlayerPitchingProfile).filter_by(player_id=player_id, team_id=session['team_id']).first()
+    allowed = set(PITCHER_TRAITS)
+    traits = []
+    for raw_trait in requested_traits:
+        trait = str(raw_trait or '').strip()
+        if trait in allowed and trait not in traits:
+            traits.append(trait)
+
+    profile = db.session.query(PlayerPitchingProfile).filter_by(
+        player_id=player_id,
+        team_id=session['team_id'],
+    ).first()
     if not profile:
         profile = PlayerPitchingProfile(player_id=player_id, team_id=session['team_id'])
         db.session.add(profile)
 
-    profile.pitcher_role = data.get('pitcher_role')
-    profile.preferred_role = data.get('preferred_role')
-    profile.fastball_velo = data.get('fastball_velo')
-    profile.notes = data.get('notes')
-
-    # Update or create target
-    target = db.session.query(PlayerPitchTarget).filter_by(player_id=player_id, team_id=session['team_id']).first()
-    if not target:
-        target = PlayerPitchTarget(player_id=player_id, team_id=session['team_id'])
-        db.session.add(target)
-
-    target.max_pitches_per_game = data.get('max_pitches_per_game')
-    target.max_pitches_per_day = data.get('max_pitches_per_day')
-
+    profile.traits = traits
     db.session.commit()
-    socketio.emit('data_updated', {'message': f'Pitching profile for {player.name} updated.'})
-    return jsonify({'status': 'success'})
+    socketio.emit('data_updated', {'message': f'Pitching traits for {player.name} updated.'})
+    return jsonify({
+        'status': 'success',
+        'player_id': player.id,
+        'traits': traits,
+    })
 
 
 @roster_bp.route('/delete_player/<int:player_id>')
@@ -138,7 +177,7 @@ def delete_player(player_id):
             current_order = get_player_order_as_list(membership.player_order)
             updated_order = [pid for pid in current_order if pid != player_id_to_delete]
             membership.player_order = updated_order
-        
+
         if 'player_order' in session:
             session_order = get_player_order_as_list(session['player_order'])
             session['player_order'] = [pid for pid in session_order if pid != player_id_to_delete]
@@ -150,23 +189,26 @@ def delete_player(player_id):
     else:
         flash('Player not found.', 'danger')
     return redirect(url_for('home', _anchor=request.args.get('active_tab', 'roster').lstrip('#')))
-        
+
+
 @roster_bp.route('/save_player_order', methods=['POST'])
 def save_player_order():
     user = db.session.query(User).filter_by(username=session['username']).first()
-    if not user: return jsonify({'status': 'error', 'message': 'User not found'}), 404
-    
+    if not user:
+        return jsonify({'status': 'error', 'message': 'User not found'}), 404
+
     membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=session['team_id']).first()
-    if not membership: return jsonify({'status': 'error', 'message': 'Membership not found'}), 404
+    if not membership:
+        return jsonify({'status': 'error', 'message': 'Membership not found'}), 404
 
     new_order = request.json.get('player_order')
-    if not isinstance(new_order, list): 
+    if not isinstance(new_order, list):
         return jsonify({'status': 'error', 'message': 'Invalid order format'}), 400
-    
+
     membership.player_order = new_order
     session['player_order'] = new_order
     session.modified = True
     db.session.commit()
-    
+
     socketio.emit('data_updated', {'message': 'Player order saved.'})
     return jsonify({'status': 'success', 'message': 'Player order saved.'})
