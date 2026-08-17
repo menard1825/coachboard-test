@@ -1,0 +1,204 @@
+/* Page adapters for the shared CoachBoard component system. */
+
+/* Keep account/team menus visually consistent with the main CoachBoard menu. */
+body.cb-ui .navbar .navbar-nav .dropdown-menu {
+  min-width: 220px;
+  border: 1px solid var(--cb-border) !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: var(--cb-shadow-raised) !important;
+  padding: 7px !important;
+}
+
+body.cb-ui .navbar .navbar-nav .dropdown-item,
+body.cb-ui .navbar .navbar-nav .dropdown-header {
+  color: var(--cb-ink) !important;
+}
+
+body.cb-ui .navbar .navbar-nav .dropdown-item {
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: .8rem;
+  font-weight: 650;
+}
+
+body.cb-ui .navbar .navbar-nav .dropdown-item i {
+  color: var(--cb-muted) !important;
+}
+
+body.cb-ui .navbar .navbar-nav .dropdown-item:hover,
+body.cb-ui .navbar .navbar-nav .dropdown-item:focus {
+  background: var(--cb-surface-soft) !important;
+  color: var(--cb-ink) !important;
+}
+
+/* Admin/user/team management pages that still use the older container markup. */
+body.cb-admin main.container-fluid {
+  max-width: 1220px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+body.cb-admin .cb-legacy-admin-shell {
+  margin-top: 0 !important;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+body.cb-admin .cb-legacy-admin-shell > .d-flex:first-child {
+  border-bottom: 0 !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  margin-bottom: 14px !important;
+}
+
+body.cb-admin .cb-legacy-admin-shell > .d-flex:first-child h1 {
+  color: var(--cb-ink);
+  font-size: 1.6rem;
+  font-weight: 850;
+  margin: 2px 0 0;
+}
+
+body.cb-admin .cb-legacy-admin-shell .table-responsive {
+  border-radius: 0 0 var(--cb-radius) var(--cb-radius);
+}
+
+body.cb-admin #user-search {
+  min-width: 210px;
+}
+
+/* Pitching: turn the dense eligibility table into readable pitcher cards on phones. */
+@media (max-width: 767.98px) {
+  body.cb-pitching .cb-pitcher-status-table thead {
+    display: none;
+  }
+
+  body.cb-pitching .cb-pitcher-status-table,
+  body.cb-pitching .cb-pitcher-status-table tbody,
+  body.cb-pitching .cb-pitcher-status-table tr,
+  body.cb-pitching .cb-pitcher-status-table td {
+    display: block;
+    width: 100%;
+  }
+
+  body.cb-pitching .cb-pitcher-status-table tr {
+    margin: 0 10px 11px;
+    width: calc(100% - 20px);
+    border: 1px solid var(--cb-border);
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  body.cb-pitching .cb-pitcher-status-table td {
+    border-bottom: 1px solid #edf0f3;
+    padding: 10px 12px !important;
+    min-width: 0 !important;
+  }
+
+  body.cb-pitching .cb-pitcher-status-table td:last-child {
+    border-bottom: 0;
+  }
+
+  body.cb-pitching .cb-pitcher-status-table td:first-child {
+    background: #fbfcfd;
+  }
+
+  body.cb-pitching .cb-pitcher-status-table td::before {
+    display: block;
+    color: var(--cb-muted);
+    font-size: .56rem;
+    font-weight: 850;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  body.cb-pitching .cb-pitcher-status-table td:nth-child(2)::before { content: 'Official Status'; }
+  body.cb-pitching .cb-pitcher-status-table td:nth-child(3)::before { content: 'Official Usage'; }
+  body.cb-pitching .cb-pitcher-status-table td:nth-child(4)::before { content: 'Throwing Workload'; }
+  body.cb-pitching .cb-pitcher-status-table td:nth-child(5)::before { content: 'Coach Target'; }
+
+  body.cb-pitching .cb-pitcher-status-table td:first-child::before {
+    content: 'Pitcher';
+  }
+}
+
+/* Team Settings tab strip should work like a compact segmented menu on phones. */
+@media (max-width: 767.98px) {
+  body.cb-settings .card-header-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  body.cb-settings .card-header-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  body.cb-settings .card-header-tabs .nav-link {
+    white-space: nowrap;
+  }
+
+  body.cb-admin .cb-legacy-admin-shell > .d-flex:first-child {
+    align-items: flex-start !important;
+  }
+
+  body.cb-admin .cb-legacy-admin-shell > .d-flex:first-child .btn-toolbar {
+    margin-left: 10px;
+  }
+
+  body.cb-admin .card-header > .d-flex {
+    align-items: stretch !important;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  body.cb-admin .card-header > .d-flex > .d-flex {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  body.cb-admin #user-search,
+  body.cb-admin #role-filter {
+    flex: 1 1 150px;
+    min-width: 0;
+    margin-right: 0 !important;
+  }
+}
+
+/* Rules/account utility pages: don't let simple forms stretch across a monitor. */
+body.cb-rules main.container-fluid,
+body.cb-ui:has(form[action*="change_password"]) main.container-fluid {
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Newer dedicated pages already have their own shells; normalize small details. */
+body.cb-game-day .gd-primary,
+body.cb-game-report .btn-primary,
+body.cb-rotation-template .btn-primary {
+  background: var(--cb-primary) !important;
+  border-color: var(--cb-primary) !important;
+}
+
+body.cb-rotation-template .rte-tab.active {
+  box-shadow: inset 0 -3px 0 var(--cb-accent);
+}
+
+body.cb-game-report .agr-card-head,
+body.cb-rotation-template .rte-innings-bar {
+  background: #fbfcfd;
+}
+
+/* Better neutral empty states wherever legacy code emits simple centered messages. */
+body.cb-ui main .cb-empty-state {
+  padding: 24px 18px;
+  border: 1px dashed var(--cb-border-strong);
+  border-radius: 12px;
+  background: #fafbfc;
+  color: var(--cb-muted);
+  text-align: center;
+}
