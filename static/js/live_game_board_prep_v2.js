@@ -6,7 +6,7 @@
 
   const gameId = Number(match[1]);
   const CARD_ID = 'live-board-prep-v3';
-  const STYLE_ID = 'live-board-prep-v5-styles';
+  const STYLE_ID = 'live-board-prep-v6-styles';
   let lastSignature = '';
   let busy = false;
   let latest = null;
@@ -37,12 +37,12 @@
       .bp-status-badge{flex:0 0 auto;border-radius:999px;padding:4px 8px;font-size:.59rem;font-weight:850;letter-spacing:.05em}.waiting .bp-status-badge{background:#8b5c00;color:#fff}.ready .bp-status-badge{background:#176b38;color:#fff}
       .bp-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0 0}.bp-actions .btn{border-radius:9px;font-size:.72rem;font-weight:780;min-height:40px}.bp-actions .btn-primary{background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66)}
       .bp-main{display:grid;grid-template-columns:minmax(220px,.78fr) minmax(380px,1.35fr);gap:13px;align-items:start}.bp-label{font-size:.61rem;text-transform:uppercase;letter-spacing:.09em;font-weight:850;color:#667085;margin-bottom:7px}.bp-note{font-size:.66rem;color:#8a94a3;margin:-3px 0 7px}
-      .bp-decision{padding:2px 0}.bp-decision h6{font-size:.9rem;font-weight:800;color:#1d2939;margin:0 0 4px}.bp-decision p{font-size:.72rem;color:#667085;margin:0}
+      .bp-decision{padding:2px 0}.bp-decision h6{font-size:.9rem;font-weight:800;color:#1d2939;margin:0 0 4px}.bp-decision p{font-size:.72rem;color:#667085;margin:0}.bp-pitcher-note{margin-top:8px;padding:7px 9px;border:1px solid #efd8ac;border-radius:8px;background:#fffaf0;color:#7a4b00;font-size:.68rem;font-weight:700}
       .bp-moves{display:flex;flex-direction:column;gap:6px}.bp-move{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e3e7ec;background:#f8fafc;border-radius:9px;padding:8px 9px}.bp-move strong{display:block;font-size:.78rem;color:#1d2939;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bp-move small{display:block;font-size:.65rem;color:#7b8492;margin-top:1px}.bp-dest{min-width:46px;border-radius:7px;background:#172033;color:#fff;padding:5px 6px;text-align:center;font-size:.68rem;font-weight:800}.bp-dest.bench{background:#eef1f5;color:#475467}.bp-none{border:1px dashed #d6dce3;border-radius:9px;padding:11px;color:#667085;font-size:.75rem;text-align:center;background:#fafbfc}
 
       .bp-field-card{border:1px solid #dce5dc;border-radius:12px;overflow:hidden;background:#f8faf8}.bp-field-caption{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 9px;border-bottom:1px solid #e4e9e4;background:#fff}.bp-field-caption strong{font-size:.72rem;color:#344054}.bp-field-caption span{font-size:.61rem;color:#98a2b3}
       .bp-field{position:relative;aspect-ratio:1.32/1;min-height:245px;overflow:hidden;background:repeating-linear-gradient(90deg,#3d8f55 0,#3d8f55 12.5%,#438f58 12.5%,#438f58 25%)}
-      .bp-field-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.bp-field-spot{position:absolute;transform:translate(-50%,-50%);min-width:64px;max-width:112px;text-align:center;z-index:2}.bp-field-spot .pos{display:block;color:#fff;font-size:.5rem;font-weight:900;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45);margin-bottom:3px}.bp-field-spot .name{display:block;background:rgba(255,255,255,.95);border:1px solid rgba(220,225,229,.95);border-radius:7px;padding:4px 6px;font-size:.64rem;line-height:1.05;font-weight:780;color:#172033;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(16,24,40,.08)}.bp-field-spot.open .name{background:#fff3f3;border-color:#e3a8a8;color:#a32929}
+      .bp-field-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.bp-field-spot{position:absolute;transform:translate(-50%,-50%);min-width:64px;max-width:112px;text-align:center;z-index:2}.bp-field-spot .pos{display:block;color:#fff;font-size:.5rem;font-weight:900;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45);margin-bottom:3px}.bp-field-spot .name{display:block;background:rgba(255,255,255,.95);border:1px solid rgba(220,225,229,.95);border-radius:7px;padding:4px 6px;font-size:.64rem;line-height:1.05;font-weight:780;color:#172033;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(16,24,40,.08)}.bp-field-spot.open .name{background:#fff3f3;border-color:#e3a8a8;color:#a32929}.bp-field-spot.tbd .name{background:#fff8e8;border-color:#e7c46b;color:#7a4b00}
       .bp-bench{padding:8px 9px 9px;background:#fff;border-top:1px solid #e4e9e4}.bp-bench-list{display:flex;flex-wrap:wrap;gap:5px}.bp-bench-list span{border:1px solid #dfe3e8;background:#f8f9fb;color:#475467;border-radius:999px;padding:4px 7px;font-size:.62rem;font-weight:650}
 
       #next-inning-adjust-modal .modal-content{border:0;border-radius:16px;overflow:hidden}#next-inning-adjust-modal .modal-dialog{max-width:720px}
@@ -76,12 +76,15 @@
       });
   }
 
-  function fieldSpot(pos, alignment, left, top) {
+  function fieldSpot(pos, alignment, left, top, pitcherTbd=false) {
     const name = alignment?.[pos] || '';
-    return `<div class="bp-field-spot ${name ? '' : 'open'}" style="left:${left}%;top:${top}%"><span class="pos">${esc(pos)}</span><span class="name">${esc(name || 'Open')}</span></div>`;
+    const tbd = pitcherTbd && pos === 'P' && !name;
+    const className = name ? '' : (tbd ? 'tbd' : 'open');
+    const label = name || (tbd ? 'TBD' : 'Open');
+    return `<div class="bp-field-spot ${className}" style="left:${left}%;top:${top}%"><span class="pos">${esc(pos)}</span><span class="name">${esc(label)}</span></div>`;
   }
 
-  function fieldMarkup(alignment, roster, outfielderCount, caption, note) {
+  function fieldMarkup(alignment, roster, outfielderCount, caption, note, pitcherTbd=false) {
     const four = Number(outfielderCount) === 4;
     const outfield = four
       ? [['LF',11,24],['LCF',38,14],['RCF',62,14],['RF',89,24]]
@@ -89,7 +92,7 @@
     const spots = [...outfield,['3B',18,57],['SS',38,43],['2B',62,43],['1B',82,57],['P',50,61],['C',50,84]];
     const assigned = new Set(Object.values(alignment || {}).filter(Boolean));
     const bench = (roster || []).filter(player => !assigned.has(player.name)).map(player => player.name);
-    return `<div class="bp-field-card"><div class="bp-field-caption"><strong>${esc(caption)}</strong><span>${esc(note || '')}</span></div><div class="bp-field"><svg class="bp-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true"><path d="M7 57 Q9 13 50 6 Q91 13 93 57" fill="none" stroke="rgba(245,245,220,.35)" stroke-width="1.2"/><path d="M50 84 L8 38 M50 84 L92 38" fill="none" stroke="rgba(255,255,255,.88)" stroke-width=".7"/><polygon points="50,75 27,54 50,32 73,54" fill="#cfa56c" opacity=".95"/><polygon points="50,68 34,54 50,40 66,54" fill="#438f58"/><circle cx="50" cy="61" r="4.8" fill="#cfa56c"/><circle cx="50" cy="81" r="6.2" fill="#cfa56c"/><rect x="49" y="31" width="2" height="2" fill="#fff" transform="rotate(45 50 32)"/><rect x="72" y="53" width="2" height="2" fill="#fff" transform="rotate(45 73 54)"/><rect x="26" y="53" width="2" height="2" fill="#fff" transform="rotate(45 27 54)"/><path d="M48.8 81.5 L50 80.4 L51.2 81.5 L50.8 83 L49.2 83 Z" fill="#fff"/></svg>${spots.map(([pos,left,top])=>fieldSpot(pos,alignment,left,top)).join('')}</div><div class="bp-bench"><div class="bp-label">Bench</div><div class="bp-bench-list">${bench.length ? bench.map(name=>`<span>${esc(name)}</span>`).join('') : '<span>None</span>'}</div></div></div>`;
+    return `<div class="bp-field-card"><div class="bp-field-caption"><strong>${esc(caption)}</strong><span>${esc(note || '')}</span></div><div class="bp-field"><svg class="bp-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true"><path d="M7 57 Q9 13 50 6 Q91 13 93 57" fill="none" stroke="rgba(245,245,220,.35)" stroke-width="1.2"/><path d="M50 84 L8 38 M50 84 L92 38" fill="none" stroke="rgba(255,255,255,.88)" stroke-width=".7"/><polygon points="50,75 27,54 50,32 73,54" fill="#cfa56c" opacity=".95"/><polygon points="50,68 34,54 50,40 66,54" fill="#438f58"/><circle cx="50" cy="61" r="4.8" fill="#cfa56c"/><circle cx="50" cy="81" r="6.2" fill="#cfa56c"/><rect x="49" y="31" width="2" height="2" fill="#fff" transform="rotate(45 50 32)"/><rect x="72" y="53" width="2" height="2" fill="#fff" transform="rotate(45 73 54)"/><rect x="26" y="53" width="2" height="2" fill="#fff" transform="rotate(45 27 54)"/><path d="M48.8 81.5 L50 80.4 L51.2 81.5 L50.8 83 L49.2 83 Z" fill="#fff"/></svg>${spots.map(([pos,left,top])=>fieldSpot(pos,alignment,left,top,pitcherTbd)).join('')}</div><div class="bp-bench"><div class="bp-label">Bench</div><div class="bp-bench-list">${bench.length ? bench.map(name=>`<span>${esc(name)}</span>`).join('') : '<span>None</span>'}</div></div></div>`;
   }
 
   function ensureCard() {
@@ -108,13 +111,18 @@
 
   function sourceLabel(source) {
     if (source === 'current') return 'Current defense is staying';
-    if (source === 'planned') return 'Pregame plan confirmed';
+    if (source === 'planned_current_pitcher') return 'Pregame defense confirmed · current pitcher continues';
+    if (source === 'planned') return 'Pregame defense confirmed';
     return 'Custom defense confirmed';
   }
 
   function actionButtons(data) {
-    const hasPlan = Object.values(data.planned_alignment || {}).some(Boolean);
-    return `<div class="bp-actions"><button class="btn btn-outline-dark" data-bp-action="current">Keep Current</button><button class="btn btn-outline-primary" data-bp-action="planned" ${hasPlan?'':'disabled'}>Use Plan</button><button class="btn btn-primary" data-bp-action="adjust">Adjust Defense</button></div>`;
+    const planned = data.planned_alignment || {};
+    const hasPlan = Object.values(planned).some(Boolean);
+    const pitcherTbd = hasPlan && !planned.P && Boolean(data.current_alignment?.P);
+    const planLabel = pitcherTbd ? 'Use Plan + Keep Pitcher' : 'Use Plan';
+    const adjustLabel = pitcherTbd ? 'Choose Pitcher / Adjust' : 'Adjust Defense';
+    return `<div class="bp-actions"><button class="btn btn-outline-dark" data-bp-action="current">Keep Current</button><button class="btn btn-outline-primary" data-bp-action="planned" ${hasPlan?'':'disabled'}>${esc(planLabel)}</button><button class="btn btn-primary" data-bp-action="adjust">${esc(adjustLabel)}</button></div>`;
   }
 
   function render(data) {
@@ -127,14 +135,18 @@
     const planned = data.planned_alignment || {};
     const confirmed = data.confirmed;
     const roster = data.roster || [];
-    const head = `<div class="bp-head"><div><div class="bp-kicker">Next Inning Prep</div><div class="bp-title">Get the board ready for Inning ${esc(next)}</div><div class="bp-help">Confirm the defense first. Then the app shows only the magnet moves you actually need.</div></div><div class="bp-inning"><small>NEXT</small><strong>${esc(next)}</strong></div></div>`;
+    const plannedPitcherTbd = Object.values(planned).some(Boolean) && !planned.P;
+    const head = `<div class="bp-head"><div><div class="bp-kicker">Next Inning Prep</div><div class="bp-title">Get the board ready for Inning ${esc(next)}</div><div class="bp-help">Confirm the actual defense before ending the inning. A pregame pitcher marked TBD can stay current or be changed now.</div></div><div class="bp-inning"><small>NEXT</small><strong>${esc(next)}</strong></div></div>`;
 
     if (!confirmed) {
       const planExists = Object.values(planned).some(Boolean);
       const preview = planExists
-        ? fieldMarkup(planned, roster, data.outfielder_count, 'Pregame Plan Preview', 'Not active yet')
+        ? fieldMarkup(planned, roster, data.outfielder_count, 'Pregame Plan Preview', plannedPitcherTbd ? 'Pitcher TBD · choose now or keep current' : 'Not active yet', plannedPitcherTbd)
         : '<div class="bp-none">No pregame plan is saved for this inning.</div>';
-      card.innerHTML = `${head}<div class="bp-body"><div class="bp-status waiting"><div><strong>Next inning not set</strong><small>Choose what you actually want before moving the board.</small></div><span class="bp-status-badge">NOT SET</span></div><div class="bp-main"><section class="bp-decision"><div class="bp-label">Choose next inning</div><h6>What defense are we using?</h6><p>Current defense is already shown above. The plan on the right is only a preview.</p>${actionButtons(data)}</section><section>${preview}</section></div></div>`;
+      const pitcherNote = plannedPitcherTbd && current.P
+        ? `<div class="bp-pitcher-note"><i class="bi bi-info-circle me-1"></i>Pregame pitcher is TBD. “Use Plan + Keep Pitcher” will keep ${esc(current.P)} on the mound while using the planned fielders.</div>`
+        : '';
+      card.innerHTML = `${head}<div class="bp-body"><div class="bp-status waiting"><div><strong>Next inning not set</strong><small>Choose what you actually want before moving the board.</small></div><span class="bp-status-badge">NOT SET</span></div><div class="bp-main"><section class="bp-decision"><div class="bp-label">Choose next inning</div><h6>What defense are we using?</h6><p>Current defense is already shown above. The plan on the right is only a preview.</p>${pitcherNote}${actionButtons(data)}</section><section>${preview}</section></div></div>`;
       wireActions(card);
       return true;
     }
@@ -187,7 +199,12 @@
       const data = await api('POST',{mode});
       lastSignature = '';
       render(data);
-      toast(mode === 'current' ? 'Current defense confirmed for next inning.' : 'Pregame plan confirmed for next inning.');
+      const carried = data.confirmed?.source === 'planned_current_pitcher';
+      toast(mode === 'current'
+        ? 'Current defense confirmed for next inning.'
+        : carried
+          ? 'Pregame defense confirmed. Current pitcher will continue.'
+          : 'Pregame defense confirmed for next inning.');
     } catch (err) {
       toast(err.message,'danger');
     } finally {
@@ -209,7 +226,7 @@
     modal.className = 'modal fade';
     modal.tabIndex = -1;
     modal.setAttribute('data-bs-backdrop','static');
-    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Adjust Next Inning</h5><div class="small text-muted">Choose the exact defense. Nothing moves automatically.</div></div><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="next-inning-adjust-body"></div></div></div>`;
+    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Set Next Inning</h5><div class="small text-muted">Confirm the fielders and the pitcher who will actually start the inning.</div></div><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="next-inning-adjust-body"></div></div></div>`;
     document.body.appendChild(modal);
     return modal;
   }
@@ -224,14 +241,21 @@
     if (!body || !latest || !draft) return;
     const posList = positions(latest.outfielder_count);
     const roster = [...(latest.roster || [])].sort((a,b)=>a.name.localeCompare(b.name));
+    const currentPitcher = latest.current_alignment?.P || '';
     const holes = posList.filter(pos=>!draft[pos]);
     const rows = posList.map(pos => {
       const selected = draft[pos] || '';
-      const options = ['<option value="">Open position</option>'].concat(roster.map(p=>`<option value="${esc(p.name)}" ${p.name===selected?'selected':''}>${esc(p.name)}</option>`)).join('');
+      const options = ['<option value="">Open position</option>'].concat(roster.map(p=>{
+        const keepLabel = pos === 'P' && currentPitcher && p.name === currentPitcher ? ' — keep current pitcher' : '';
+        return `<option value="${esc(p.name)}" ${p.name===selected?'selected':''}>${esc(p.name + keepLabel)}</option>`;
+      })).join('');
       return `<div class="ni-row ${selected?'':'open'}"><div class="ni-pos">${esc(pos)}</div><select class="form-select ni-select" data-pos="${esc(pos)}">${options}</select></div>`;
     }).join('');
     const bench = draftBench();
-    body.innerHTML = `${rows}<div class="bp-label mt-3">Bench</div><div class="ni-bench">${bench.length?bench.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>None</span>'}</div><div class="ni-footer"><div class="me-auto">${holes.length?`<div class="ni-warning">Fill ${esc(holes.join(', '))} before confirming.</div>`:'<div class="small text-muted">This exact setup becomes the next-inning board.</div>'}</div><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-dark fw-bold" id="save-next-inning-adjust" ${holes.length?'disabled':''}>Confirm Setup</button></div>`;
+    const pitcherHint = latest.planned_alignment && !latest.planned_alignment.P && currentPitcher
+      ? `<div class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i>${esc(currentPitcher)} is carried forward at P by default because the pregame pitcher was TBD. Choose another pitcher here if the game situation calls for it.</div>`
+      : '';
+    body.innerHTML = `${pitcherHint}${rows}<div class="bp-label mt-3">Bench</div><div class="ni-bench">${bench.length?bench.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>None</span>'}</div><div class="ni-footer"><div class="me-auto">${holes.length?`<div class="ni-warning">Fill ${esc(holes.join(', '))} before confirming.</div>`:'<div class="small text-muted">This exact setup becomes the next-inning board.</div>'}</div><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-dark fw-bold" id="save-next-inning-adjust" ${holes.length?'disabled':''}>Confirm Setup</button></div>`;
 
     body.querySelectorAll('.ni-select').forEach(select=>select.addEventListener('change',()=>{
       const pos = select.dataset.pos;
@@ -249,9 +273,12 @@
 
   function openAdjust() {
     if (!latest) return;
-    const source = latest.confirmed?.alignment || latest.current_alignment || {};
+    const planned = latest.planned_alignment || {};
+    const hasPlan = Object.values(planned).some(Boolean);
+    const source = latest.confirmed?.alignment || (hasPlan ? planned : latest.current_alignment) || {};
     draft = {};
     positions(latest.outfielder_count).forEach(pos=>{ draft[pos] = source[pos] || ''; });
+    if (!draft.P && latest.current_alignment?.P) draft.P = latest.current_alignment.P;
     ensureAdjustModal();
     renderAdjust();
     bootstrap.Modal.getOrCreateInstance(document.getElementById('next-inning-adjust-modal')).show();
