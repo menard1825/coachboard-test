@@ -160,33 +160,119 @@ class Rotation(db.Model):
     __tablename__ = 'rotations'
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
-    innings = Column(JSON)
-    associated_game_id = Column(Integer)
+    innings = Column(JSON) # Changed to JSON
+    associated_game_id = Column(Integer, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
 
+from sqlalchemy import Index
+
 class Game(db.Model):
     __tablename__ = 'games'
     id = Column(Integer, primary_key=True)
-    date = Column(DateTime, nullable=False)
-    start_time = Column(String)
+    date = Column(DateTime, nullable=False) # Changed to DateTime
+    start_time = Column(String, nullable=True) # Optional e.g. "09:00 AM"
     opponent = Column(String, nullable=False)
     location = Column(String)
     game_notes = Column(Text)
+    associated_lineup_title = Column(String)
+    associated_rotation_date = Column(String)
     is_live = Column(Boolean, default=False, nullable=False)
-    live_current_inning = Column(String, default='1', nullable=True)
+    live_current_inning = Column(String, default="1", nullable=False)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="games")
-    pitching_outings = relationship("PitchingOuting", back_populates="game")
+    absences = relationship("PlayerGameAbsence", back_populates="game", cascade="all, delete-orphan")
+    pitching_outings = relationship("PitchingOuting", back_populates="game", cascade="all, delete-orphan")
+    rotation_events = relationship("GameRotationEvent", back_populates="game", cascade="all, delete-orphan")
+    pitching_plans = relationship("GamePitchingPlan", back_populates="game", cascade="all, delete-orphan")
+    
+    def to_dict(self):
+        """Return a dictionary representation of the Game object."""
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+class PlayerPitchingProfile(db.Model):
+    __tablename__ = 'player_pitching_profiles'
+    id = Column(Integer, primary_key=True)
+    traits = Column(JSON, default=list) # e.g. ["Power / Velocity", "LHP", "Strike Thrower"]
+
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False, unique=True)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+
+    player = relationship("Player", back_populates="pitching_profile")
+
+class GamePitchingPlan(db.Model):
+    __tablename__ = 'game_pitching_plans'
+    id = Column(Integer, primary_key=True)
+    role = Column(String) # e.g. "Starter", "First Relief"
+    expected_innings = Column(String)
+    coach_note = Column(Text)
+    situational_note = Column(Text)
+
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+
+    player = relationship("Player", back_populates="game_pitching_plans")
+    game = relationship("Game", back_populates="pitching_plans")
+
+    # Ensure one plan per player per game
+    __table_args__ = (
+        Index('idx_unique_game_pitching_plan', 'game_id', 'player_id', unique=True),
+    )
+
+class GameRotationEvent(db.Model):
+    __tablename__ = 'game_rotation_events'
+    id = Column(Integer, primary_key=True)
+    inning = Column(String, nullable=False)
+    sequence = Column(Integer, nullable=False)
+    event_type = Column(String, nullable=False)  # 'Pitcher Change', 'Defensive Change', 'End Inning'
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    changed_by_user = Column(String)
+
+    before_alignment = Column(JSON)
+    after_alignment = Column(JSON)
+
+    old_pitcher_id = Column(Integer, ForeignKey('players.id'), nullable=True)
+    new_pitcher_id = Column(Integer, ForeignKey('players.id'), nullable=True)
+    reverted = Column(Boolean, default=False, nullable=False)
+
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
+
+    game = relationship("Game", back_populates="rotation_events")
+    old_pitcher = relationship("Player", foreign_keys=[old_pitcher_id])
+    new_pitcher = relationship("Player", foreign_keys=[new_pitcher_id])
+
+class PlayerPitchTarget(db.Model):
+    __tablename__ = 'player_pitch_targets'
+    id = Column(Integer, primary_key=True)
+    target_pitches = Column(Integer, nullable=False)
+    local_date = Column(String, nullable=False)  # Stored as YYYY-MM-DD
+    reason = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=True) # Nullable for daily targets
+
+    player = relationship("Player")
+
+    # Partial indexes to ensure unique targets per day vs unique targets per game
+    __table_args__ = (
+        Index('idx_unique_daily_target', 'team_id', 'player_id', 'local_date', unique=True, sqlite_where=Column('game_id').is_(None)),
+        Index('idx_unique_game_target', 'team_id', 'player_id', 'local_date', 'game_id', unique=True, sqlite_where=Column('game_id').is_not(None)),
+    )
 
 class CollaborationNote(db.Model):
     __tablename__ = 'collaboration_notes'
     id = Column(Integer, primary_key=True)
-    note = Column(Text, nullable=False)
+    note_type = Column(String, nullable=False)
+    text = Column(Text, nullable=False)
     author = Column(String)
-    created_at = Column(DateTime, default=datetime.now)
+    timestamp = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
+    player_name = Column(String, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="collaboration_notes")
@@ -194,39 +280,55 @@ class CollaborationNote(db.Model):
 class PracticePlan(db.Model):
     __tablename__ = 'practice_plans'
     id = Column(Integer, primary_key=True)
-    date = Column(DateTime, nullable=False)
-    title = Column(String)
-    focus = Column(Text)
-    drills = Column(JSON)
-    notes = Column(Text)
+    date = Column(DateTime, nullable=False) # Changed to DateTime
+    general_notes = Column(Text)
+    emphasis = Column(Text)
+    warm_up = Column(Text)
+    infield_outfield = Column(Text)
+    hitting = Column(Text)
+    pitching_catching = Column(Text)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="practice_plans")
+    tasks = relationship("PracticeTask", back_populates="practice_plan", order_by="PracticeTask.id")
+    absences = relationship("PlayerPracticeAbsence", back_populates="practice_plan", cascade="all, delete-orphan")
+
+class PracticeTask(db.Model):
+    __tablename__ = 'practice_tasks'
+    id = Column(Integer, primary_key=True)
+    text = Column(Text, nullable=False)
+    status = Column(String, default="pending")
+    author = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
+
+    practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
+    practice_plan = relationship("PracticePlan", back_populates="tasks")
 
 class PlayerDevelopmentFocus(db.Model):
-    __tablename__ = 'player_development_focus'
+    __tablename__ = 'player_development_focuses'
     id = Column(Integer, primary_key=True)
-    focus = Column(String, nullable=False)
-    status = Column(String)
+    focus = Column(Text, nullable=False)
+    status = Column(String, default="active")
     notes = Column(Text)
-    progress_notes = Column(Text)
-    created_date = Column(DateTime, default=datetime.now)
-    completed_date = Column(DateTime)
+    progress_notes = Column(Text, nullable=True) # New field
+    created_date = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
+    completed_date = Column(DateTime, nullable=True) # Changed to DateTime
     author = Column(String)
     last_edited_by = Column(String)
-    last_edited_date = Column(DateTime)
+    last_edited_date = Column(DateTime) # Changed to DateTime
 
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
-    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     player = relationship("Player", back_populates="development_focuses")
+    skill_type = Column(String, nullable=False)
+
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="player_development_focuses")
 
 class Sign(db.Model):
     __tablename__ = 'signs'
     id = Column(Integer, primary_key=True)
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    image_path = Column(String)
+    name = Column(String, nullable=False)
+    indicator = Column(String, nullable=False)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="signs")
@@ -234,74 +336,23 @@ class Sign(db.Model):
 class PlayerGameAbsence(db.Model):
     __tablename__ = 'player_game_absences'
     id = Column(Integer, primary_key=True)
-    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
+
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
 
     player = relationship("Player", back_populates="game_absences")
+    game = relationship("Game", back_populates="absences")
     team = relationship("Team", back_populates="player_game_absences")
 
 class PlayerPracticeAbsence(db.Model):
     __tablename__ = 'player_practice_absences'
     id = Column(Integer, primary_key=True)
-    practice_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
+
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
+    practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
 
     player = relationship("Player", back_populates="practice_absences")
+    practice_plan = relationship("PracticePlan", back_populates="absences")
     team = relationship("Team", back_populates="player_practice_absences")
-
-class PlayerPitchingProfile(db.Model):
-    __tablename__ = 'player_pitching_profiles'
-    id = Column(Integer, primary_key=True)
-    player_id = Column(Integer, ForeignKey('players.id'), nullable=False, unique=True)
-    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
-    traits = Column(JSON, default=list)
-    coach_note = Column(Text)
-
-    player = relationship("Player", back_populates="pitching_profile")
-
-class GamePitchingPlan(db.Model):
-    __tablename__ = 'game_pitching_plans'
-    id = Column(Integer, primary_key=True)
-    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
-    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
-    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
-    role = Column(String)
-    expected_innings = Column(Float)
-    coach_note = Column(Text)
-
-    player = relationship("Player", back_populates="game_pitching_plans")
-
-class GameRotationEvent(db.Model):
-    __tablename__ = 'game_rotation_events'
-    id = Column(Integer, primary_key=True)
-    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
-    game_id = Column(Integer, ForeignKey('games.id'), nullable=False)
-    inning = Column(String, nullable=False)
-    sequence = Column(Integer, nullable=False)
-    event_type = Column(String, nullable=False)
-    before_alignment = Column(JSON)
-    after_alignment = Column(JSON)
-    changed_by_user = Column(String)
-    timestamp = Column(DateTime, default=datetime.now)
-    reverted = Column(Boolean, default=False, nullable=False)
-    old_pitcher_id = Column(Integer, ForeignKey('players.id'))
-    new_pitcher_id = Column(Integer, ForeignKey('players.id'))
-
-class PlayerPitchTarget(db.Model):
-    __tablename__ = 'player_pitch_targets'
-    id = Column(Integer, primary_key=True)
-    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
-    player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
-    game_id = Column(Integer, ForeignKey('games.id'), nullable=True)
-    target_date = Column(DateTime, nullable=True)
-    target_pitches = Column(Integer, nullable=False)
-    note = Column(Text)
-
-class GamePitchingRule(db.Model):
-    __tablename__ = 'game_pitching_rules'
-    id = Column(Integer, primary_key=True)
-    rule_set = Column(String, nullable=False)
-    game_id = Column(Integer, ForeignKey('games.id', ondelete='CASCADE'), nullable=False, unique=True)
-    team_id = Column(Integer, ForeignKey('teams.id', ondelete='CASCADE'), nullable=False)
