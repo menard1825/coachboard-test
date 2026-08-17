@@ -1,0 +1,603 @@
+/* CoachBoard shared UI system
+   Loaded after main.css so it can modernize presentation without replacing
+   legacy functional styles used by lineup/rotation controllers. */
+
+:root {
+  --cb-primary: var(--primary-color, #173b6c);
+  --cb-accent: var(--secondary-color, #c9a227);
+  --cb-bg: #f3f5f8;
+  --cb-surface: #ffffff;
+  --cb-surface-soft: #f8fafc;
+  --cb-border: #dfe5ec;
+  --cb-border-strong: #cfd7e2;
+  --cb-ink: #172033;
+  --cb-muted: #667085;
+  --cb-muted-2: #8a94a3;
+  --cb-success: #16794a;
+  --cb-success-bg: #eef9f2;
+  --cb-warning: #8a5b00;
+  --cb-warning-bg: #fff8e8;
+  --cb-danger: #b42318;
+  --cb-danger-bg: #fff1f0;
+  --cb-radius: 14px;
+  --cb-radius-sm: 10px;
+  --cb-shadow: 0 2px 9px rgba(16, 24, 40, .055);
+  --cb-shadow-raised: 0 8px 24px rgba(16, 24, 40, .10);
+  --cb-shell: 1240px;
+}
+
+body.cb-ui {
+  background: var(--cb-bg);
+  color: var(--cb-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+body.cb-ui main.container-fluid {
+  width: 100%;
+}
+
+body.cb-ui .cb-shell,
+body.cb-ui .cb-page-shell {
+  width: min(100%, var(--cb-shell));
+  margin-left: auto;
+  margin-right: auto;
+}
+
+body.cb-ui .cb-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin: 4px 0 18px;
+}
+
+body.cb-ui .cb-kicker {
+  color: var(--cb-muted);
+  font-size: .68rem;
+  font-weight: 850;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+body.cb-ui .cb-page-title {
+  color: var(--cb-ink);
+  font-size: clamp(1.45rem, 2vw, 1.8rem);
+  font-weight: 850;
+  line-height: 1.1;
+  margin: 2px 0 4px;
+}
+
+body.cb-ui .cb-page-subtitle {
+  color: var(--cb-muted);
+  font-size: .84rem;
+  margin: 0;
+  max-width: 760px;
+}
+
+body.cb-ui .cb-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Top navigation */
+body.cb-ui .navbar {
+  background: var(--cb-primary) !important;
+  border-bottom: 3px solid var(--cb-accent);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, .12) !important;
+}
+
+body.cb-ui .navbar-brand-text {
+  font-weight: 800;
+  letter-spacing: -.015em;
+}
+
+body.cb-ui .navbar-logo {
+  border-radius: 8px;
+  padding: 3px;
+}
+
+body.cb-ui .coach-primary-nav .cb-nav-link,
+body.cb-ui .coach-primary-nav .cb-nav-more {
+  min-height: 35px;
+  border-radius: 9px;
+  padding: 7px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255,255,255,.82);
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.04);
+  text-decoration: none;
+  font-size: .78rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+body.cb-ui .coach-primary-nav .cb-nav-link:hover,
+body.cb-ui .coach-primary-nav .cb-nav-link:focus,
+body.cb-ui .coach-primary-nav .cb-nav-more:hover,
+body.cb-ui .coach-primary-nav .cb-nav-more:focus,
+body.cb-ui .coach-primary-nav .cb-nav-link.active {
+  color: #fff;
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.34);
+}
+
+body.cb-ui .coach-primary-nav .dropdown-menu {
+  min-width: 220px;
+  border: 1px solid var(--cb-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--cb-shadow-raised);
+  padding: 7px;
+}
+
+body.cb-ui .coach-primary-nav .dropdown-item {
+  color: var(--cb-ink) !important;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: .8rem;
+  font-weight: 650;
+}
+
+body.cb-ui .coach-primary-nav .dropdown-item i {
+  color: var(--cb-muted) !important;
+}
+
+body.cb-ui .coach-primary-nav .dropdown-item:hover,
+body.cb-ui .coach-primary-nav .dropdown-item:focus {
+  background: var(--cb-surface-soft) !important;
+  color: var(--cb-ink) !important;
+}
+
+/* Shared cards */
+body.cb-ui main .card,
+body.cb-ui main .accordion-item,
+body.cb-ui main .list-group.cb-surface {
+  border: 1px solid var(--cb-border) !important;
+  border-radius: var(--cb-radius);
+  background: var(--cb-surface);
+  box-shadow: var(--cb-shadow);
+}
+
+body.cb-ui main .card {
+  overflow: hidden;
+}
+
+body.cb-ui main .card-header {
+  background: #fbfcfd !important;
+  border-bottom: 1px solid #e7ebef;
+  padding: 12px 14px;
+}
+
+body.cb-ui main .card-header h1,
+body.cb-ui main .card-header h2,
+body.cb-ui main .card-header h3,
+body.cb-ui main .card-header h4,
+body.cb-ui main .card-header h5,
+body.cb-ui main .card-header h6 {
+  color: var(--cb-ink);
+  font-weight: 800;
+}
+
+body.cb-ui main .card-body {
+  color: var(--cb-ink);
+}
+
+body.cb-ui .accordion-item {
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+body.cb-ui .accordion-button {
+  background: #fff;
+  color: var(--cb-ink);
+  font-weight: 750;
+}
+
+body.cb-ui .accordion-button:not(.collapsed) {
+  background: color-mix(in srgb, var(--cb-primary) 7%, white) !important;
+  color: var(--cb-ink) !important;
+  box-shadow: inset 3px 0 0 var(--cb-primary);
+}
+
+/* Buttons */
+body.cb-ui .btn {
+  border-radius: 9px;
+  font-weight: 700;
+}
+
+body.cb-ui .btn-primary {
+  background: var(--cb-primary) !important;
+  border-color: var(--cb-primary) !important;
+  color: #fff !important;
+}
+
+body.cb-ui .btn-primary:hover,
+body.cb-ui .btn-primary:focus {
+  filter: brightness(.93);
+}
+
+body.cb-ui .btn-outline-primary {
+  color: var(--cb-primary) !important;
+  border-color: color-mix(in srgb, var(--cb-primary) 55%, #d8dee7) !important;
+  background: #fff;
+}
+
+body.cb-ui .btn-outline-primary:hover,
+body.cb-ui .btn-outline-primary:focus {
+  color: #fff !important;
+  background: var(--cb-primary) !important;
+  border-color: var(--cb-primary) !important;
+}
+
+body.cb-ui .btn-danger,
+body.cb-ui .btn-outline-danger:hover,
+body.cb-ui .btn-outline-danger:focus {
+  background: var(--cb-danger) !important;
+  border-color: var(--cb-danger) !important;
+  color: #fff !important;
+}
+
+body.cb-ui .btn-outline-danger {
+  color: var(--cb-danger) !important;
+  border-color: #d9a7a2 !important;
+  background: #fff;
+}
+
+/* Forms */
+body.cb-ui .form-control,
+body.cb-ui .form-select {
+  min-height: 44px;
+  border-radius: 10px;
+  border-color: #d8dee7;
+  background-color: #fff;
+}
+
+body.cb-ui textarea.form-control {
+  min-height: auto;
+}
+
+body.cb-ui .form-control-sm,
+body.cb-ui .form-select-sm {
+  min-height: 36px;
+  border-radius: 8px;
+}
+
+body.cb-ui .form-control:focus,
+body.cb-ui .form-select:focus,
+body.cb-ui .form-check-input:focus {
+  border-color: var(--cb-primary);
+  box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--cb-primary) 14%, transparent);
+}
+
+body.cb-ui .form-label {
+  color: #344054;
+  font-weight: 650;
+}
+
+body.cb-ui .form-text,
+body.cb-ui .text-muted {
+  color: var(--cb-muted) !important;
+}
+
+body.cb-ui .form-check-input:checked {
+  background-color: var(--cb-primary);
+  border-color: var(--cb-primary);
+}
+
+/* Modals */
+body.cb-ui .modal-content {
+  border: 0;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(16,24,40,.24);
+  overflow: hidden;
+}
+
+body.cb-ui .modal-header {
+  background: #fbfcfd;
+  border-bottom-color: #e8ecf1;
+}
+
+body.cb-ui .modal-footer {
+  background: #fbfcfd;
+  border-top-color: #e8ecf1;
+}
+
+/* Alerts/status semantics */
+body.cb-ui .alert {
+  border-radius: 11px;
+  border-width: 1px;
+}
+
+body.cb-ui .alert-info {
+  color: #344054;
+  background: #f4f7fb;
+  border-color: #dce4ef;
+}
+
+body.cb-ui .alert-success {
+  color: #135f3a;
+  background: var(--cb-success-bg);
+  border-color: #cde8d7;
+}
+
+body.cb-ui .alert-warning {
+  color: #795000;
+  background: var(--cb-warning-bg);
+  border-color: #ecd7a7;
+}
+
+body.cb-ui .alert-danger {
+  color: #8f1d14;
+  background: var(--cb-danger-bg);
+  border-color: #ebc7c3;
+}
+
+body.cb-ui .badge.bg-primary,
+body.cb-ui .badge.text-bg-primary {
+  background: var(--cb-primary) !important;
+}
+
+/* Tables */
+body.cb-ui .table {
+  --bs-table-bg: transparent;
+  color: var(--cb-ink);
+}
+
+body.cb-ui .table thead th,
+body.cb-ui .table-light th {
+  color: #475467;
+  background: #f4f7fa !important;
+  border-bottom-color: #dbe2ea;
+  font-size: .72rem;
+}
+
+body.cb-ui .table > :not(caption) > * > * {
+  border-bottom-color: #edf0f3;
+}
+
+/* Home/dashboard shell */
+body.cb-home main.container-fluid {
+  max-width: 1320px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-top: 4px;
+}
+
+body.cb-home .desktop-nav-tabs {
+  display: none !important;
+}
+
+body.cb-home #mainTabContent {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+body.cb-home #mainTabContent > .tab-pane {
+  padding: 0;
+}
+
+body.cb-home .cb-tab-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  margin: 4px 0 14px;
+}
+
+body.cb-home .cb-tab-intro h1 {
+  color: var(--cb-ink);
+  font-size: 1.55rem;
+  font-weight: 850;
+  margin: 2px 0 3px;
+}
+
+body.cb-home .cb-tab-intro p {
+  color: var(--cb-muted);
+  font-size: .8rem;
+  margin: 0;
+}
+
+body.cb-home #roster > .card,
+body.cb-home #practice_plan > .card,
+body.cb-home #lineups > .card,
+body.cb-home #rotations > .card,
+body.cb-home #games > .card,
+body.cb-home #collaboration .card,
+body.cb-home #scouting_list .card,
+body.cb-home #player_development .card {
+  box-shadow: var(--cb-shadow) !important;
+}
+
+body.cb-home .player-card {
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+body.cb-home .player-card:hover {
+  transform: none;
+  border-color: var(--cb-border-strong) !important;
+  box-shadow: 0 3px 10px rgba(16,24,40,.06) !important;
+}
+
+body.cb-home .player-card .card-body.bg-light {
+  background: #fbfcfd !important;
+}
+
+body.cb-home #rosterSearch {
+  min-width: 220px;
+}
+
+/* Dedicated Pitching */
+body.cb-pitching main.container-fluid {
+  max-width: 1240px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+body.cb-pitching main > .container-fluid.pb-4 {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+body.cb-pitching main > .container-fluid.pb-4 > .d-flex:first-child {
+  padding: 4px 2px 2px;
+}
+
+body.cb-pitching main > .container-fluid.pb-4 > .d-flex:first-child h3 {
+  font-size: 1.6rem;
+  font-weight: 850;
+  color: var(--cb-ink);
+}
+
+/* Team/admin settings */
+body.cb-settings main.container-fluid {
+  max-width: 1220px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+body.cb-settings main > .container-fluid.mt-4 {
+  margin-top: 0 !important;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+body.cb-settings main > .container-fluid.mt-4 > .d-flex:first-child {
+  border-bottom: 0 !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  margin-bottom: 14px !important;
+}
+
+body.cb-settings main > .container-fluid.mt-4 > .d-flex:first-child h1 {
+  font-size: 1.6rem;
+  font-weight: 850;
+  color: var(--cb-ink);
+}
+
+body.cb-settings .card-header-tabs {
+  gap: 4px;
+  border-bottom: 0;
+}
+
+body.cb-settings .card-header-tabs .nav-link {
+  border: 0;
+  border-radius: 8px;
+  color: var(--cb-muted);
+  font-weight: 700;
+  font-size: .78rem;
+}
+
+body.cb-settings .card-header-tabs .nav-link.active {
+  color: var(--cb-primary);
+  background: color-mix(in srgb, var(--cb-primary) 8%, white);
+}
+
+body.cb-settings input[type="color"].form-control-color {
+  width: 100%;
+  min-height: 52px;
+}
+
+/* Existing newer pages: harmonize their hard-coded dark controls with team theme. */
+body.cb-ui .rte-tab.active,
+body.cb-ui #pregame-defense-editor-v3 .pde-inning {
+  background: var(--cb-primary) !important;
+  border-color: var(--cb-primary) !important;
+}
+
+body.cb-ui .rte-card,
+body.cb-ui .agr-card,
+body.cb-ui .gd-game,
+body.cb-ui .gd-upcoming {
+  border-color: var(--cb-border) !important;
+  box-shadow: var(--cb-shadow) !important;
+}
+
+body.cb-ui .rte-head h1,
+body.cb-ui .agr-head h1,
+body.cb-ui .gd-hero h1 {
+  color: var(--cb-ink) !important;
+}
+
+/* Bottom nav */
+@media (max-width: 991.98px) {
+  body.cb-ui main.container-fluid {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  body.cb-ui .bottom-nav-fixed {
+    border-top: 1px solid var(--cb-border);
+    box-shadow: 0 -5px 18px rgba(16,24,40,.08) !important;
+  }
+
+  body.cb-ui .bottom-nav-fixed .nav-link {
+    color: #697386;
+    font-weight: 600;
+  }
+
+  body.cb-ui .bottom-nav-fixed .nav-link.active {
+    color: var(--cb-primary);
+    border-top-color: var(--cb-primary);
+  }
+
+  body.cb-ui .cb-page-head,
+  body.cb-home .cb-tab-intro {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 767.98px) {
+  body.cb-ui .cb-page-head,
+  body.cb-home .cb-tab-intro {
+    display: block;
+  }
+
+  body.cb-ui .cb-page-actions {
+    justify-content: stretch;
+    margin-top: 10px;
+  }
+
+  body.cb-ui .cb-page-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  body.cb-home #rosterSearch {
+    min-width: 0;
+    width: 100%;
+  }
+
+  body.cb-home #roster > .card > .card-header {
+    align-items: stretch !important;
+  }
+
+  body.cb-home #roster > .card > .card-header > div {
+    width: 100%;
+  }
+
+  body.cb-home #roster > .card > .card-header .btn {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  body.cb-ui main.container-fluid {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  body.cb-ui .card-header {
+    padding: 11px 12px;
+  }
+
+  body.cb-ui .card-body {
+    padding: 12px;
+  }
+}
