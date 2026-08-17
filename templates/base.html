@@ -10,6 +10,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css', v=css_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/coachboard.css', v=css_version) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/coachboard_pages.css', v=css_version) }}">
 
     {% if current_team and current_team.logo_path %}
         <link rel="icon" href="{{ url_for('static', filename='uploads/logos/' + current_team.logo_path) }}">
