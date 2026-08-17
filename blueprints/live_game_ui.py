@@ -238,6 +238,15 @@ def next_inning_prep(game_id):
                         'status': 'error',
                         'message': 'The pregame pitcher is TBD and there is no current pitcher to carry forward. Choose the next pitcher in Adjust Defense.'
                     }), 409
+                planned_position = next((
+                    pos for pos, name in candidate.items()
+                    if pos != 'P' and name == current_pitcher
+                ), None)
+                if planned_position:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'{current_pitcher} is the current pitcher but is planned at {planned_position} next inning. Use Choose Pitcher / Adjust to resolve that move.'
+                    }), 409
                 candidate['P'] = current_pitcher
                 source = 'planned_current_pitcher'
         elif mode == 'custom':
