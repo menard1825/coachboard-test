@@ -3,6 +3,12 @@
 
   document.body.classList.add('cb-ui');
 
+  const pageStyles = document.createElement('link');
+  pageStyles.rel = 'stylesheet';
+  pageStyles.href = '/static/css/coachboard_pages.css';
+  pageStyles.dataset.coachboardStyles = 'pages';
+  document.head.appendChild(pageStyles);
+
   const path = window.location.pathname;
   if (path === '/') document.body.classList.add('cb-home');
   if (path === '/pitching') document.body.classList.add('cb-pitching');
@@ -72,6 +78,15 @@
     if (firstTable) firstTable.classList.add('cb-pitcher-status-table');
   }
 
+  function markSimpleEmptyStates() {
+    document.querySelectorAll('main .text-center.text-muted').forEach((el) => {
+      const text = (el.textContent || '').trim();
+      if (/^(No |Select a player|Nothing )/i.test(text) && !el.closest('table')) {
+        el.classList.add('cb-empty-state');
+      }
+    });
+  }
+
   function markDesktopNav() {
     const activeHomeSection = window.location.hash.replace('#', '') || 'roster';
     document.querySelectorAll('.coach-primary-nav [data-cb-section]').forEach((link) => {
@@ -95,12 +110,16 @@
     addHomeIntros();
     modernizeLegacyAdminHeader();
     enhancePitchingStructure();
+    markSimpleEmptyStates();
     markDesktopNav();
     window.setTimeout(applyHomeHash, 0);
   }
 
   window.addEventListener('hashchange', applyHomeHash);
-  document.addEventListener('shown.bs.tab', markDesktopNav);
+  document.addEventListener('shown.bs.tab', () => {
+    markDesktopNav();
+    markSimpleEmptyStates();
+  });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, {once: true});
   else init();
