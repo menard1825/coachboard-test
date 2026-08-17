@@ -54,9 +54,11 @@
     const scope=event.target.closest('[data-sv2-scope]');
     if(scope){state.scope=scope.dataset.sv2Scope;load(true);return;}
     if(event.target.closest('#sv2ApplyRange')){
-      state.start=document.getElementById('sv2Start')?.value||'';
-      state.end=document.getElementById('sv2End')?.value||'';
-      state.scope='range';
+      const start=document.getElementById('sv2Start')?.value||'';
+      const end=document.getElementById('sv2End')?.value||'';
+      if(!start||!end){window.alert('Choose both a start and end date.');return;}
+      if(start>end){window.alert('Start date must be before end date.');return;}
+      state.start=start;state.end=end;state.scope='range';
       load(true);return;
     }
     const player=event.target.closest('[data-sv2-player]');
@@ -64,6 +66,9 @@
   }
 
   function start(){
+    const legacyTitle=document.querySelector('#stats > h2');
+    if(legacyTitle)legacyTitle.style.display='none';
+
     document.addEventListener('click',handleClick);
     document.addEventListener('shown.bs.tab',event=>{
       const target=event.target?.getAttribute?.('href')||event.target?.dataset?.bsTarget||'';
