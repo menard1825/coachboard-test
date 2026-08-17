@@ -33,6 +33,7 @@ from blueprints.pitching import pitching_bp
 from blueprints.scouting import scouting_bp
 from blueprints.team_management import team_management_bp
 from blueprints.api import api_bp
+from blueprints.stats_dashboard import stats_dashboard_bp
 from blueprints.live_game_api import live_game_api_bp
 from blueprints.live_game_bulk_api import live_game_bulk_bp
 from blueprints.live_game_safety import live_game_safety_bp
@@ -76,6 +77,7 @@ def create_app():
     app.register_blueprint(live_game_bulk_bp)
     app.register_blueprint(live_game_pitching_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(stats_dashboard_bp)
 
     # --- SocketIO Handlers ---
     from flask_socketio import join_room, leave_room
