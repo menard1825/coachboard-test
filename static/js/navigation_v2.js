@@ -48,6 +48,7 @@
 
   if (window.location.pathname === '/game-day') {
     loadScript('/static/js/game_day_actions.js', 'game-day-actions');
+    loadScript('/static/js/game_day_pitching_rules.js', 'game-day-pitching-rules');
   }
 
   // Every game page gets the same readiness calculation as Game Day, the game-
