@@ -1,9 +1,10 @@
 from contextlib import contextmanager
 
+from flask import g, has_request_context
 from sqlalchemy.orm.attributes import set_committed_value
 
 from db import db
-from utils import PITCHING_RULES, get_pitching_rules_for_team
+from utils import PITCHING_RULES, get_pitching_rules_for_team as _base_team_rules
 
 
 RULE_SET_OPTIONS = tuple(PITCHING_RULES.keys())
@@ -49,22 +50,50 @@ def rule_settings_payload(team, game=None):
 
 
 @contextmanager
-def game_rule_context(team, game):
-    """Temporarily expose a game's rule override to the existing rules engine.
-
-    set_committed_value changes the in-memory mapped value without marking Team
-    dirty, so a game override can never be persisted back over the team default
-    when another game route commits.
-    """
+def rule_name_context(team, rule_set_name):
+    """Expose a ruleset to the existing team-based calculator without persisting it."""
     original = getattr(team, 'pitching_rule_set', None)
-    effective = effective_rule_set_name(team, game)
-    set_committed_value(team, 'pitching_rule_set', effective)
+    set_committed_value(team, 'pitching_rule_set', rule_set_name)
     try:
         yield
     finally:
         set_committed_value(team, 'pitching_rule_set', original)
 
 
+@contextmanager
+def game_rule_context(team, game):
+    with rule_name_context(team, effective_rule_set_name(team, game)):
+        yield
+
+
 def pitching_rules_for_game(team, game):
     with game_rule_context(team, game):
-        return get_pitching_rules_for_team(team)
+        return _base_team_rules(team)
+
+
+def request_aware_team_rules(team):
+    """Use the current game's override when an HTTP game route is being handled.
+
+    The override name is kept on Flask's request context instead of the Team row,
+    so a db.session.commit() during Live Game cannot accidentally erase or persist
+    the temporary ruleset.
+    """
+    override = getattr(g, 'coachboard_game_pitching_rule', None) if has_request_context() else None
+    if override in RULE_SET_OPTIONS:
+        with rule_name_context(team, override):
+            return _base_team_rules(team)
+    return _base_team_rules(team)
+
+
+def install_request_rule_adapters():
+    """Point existing game-state modules at the request-aware rules function."""
+    try:
+        from blueprints import live_game_api
+        live_game_api.get_pitching_rules_for_team = request_aware_team_rules
+    except Exception:
+        pass
+    try:
+        from blueprints import api
+        api.get_pitching_rules_for_team = request_aware_team_rules
+    except Exception:
+        pass
