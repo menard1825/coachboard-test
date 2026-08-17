@@ -202,3 +202,51 @@ body.cb-ui main .cb-empty-state {
   color: var(--cb-muted);
   text-align: center;
 }
+
+/* Game Management boot guard.
+   The original rotation markup is server-rendered before the modern pregame
+   defense editor is built. Hide that brief legacy frame so Prepare Game feels
+   like one UI instead of flashing old -> new. :has() is supported by the
+   current Chrome/Safari targets used by CoachBoard. A timed fallback reveals
+   the page if the modern helper ever fails to initialize. */
+@keyframes cb-game-boot-fallback {
+  to { opacity: 1; visibility: visible; }
+}
+@keyframes cb-game-boot-message-fallback {
+  to { opacity: 0; visibility: hidden; }
+}
+
+body.cb-ui:has(#rotation-card-container):not(:has(#pregame-defense-editor-v3)) main > .container-fluid {
+  opacity: 0;
+  visibility: hidden;
+  animation: cb-game-boot-fallback 0s 2.5s forwards;
+}
+
+body.cb-ui:has(#rotation-card-container):not(:has(#pregame-defense-editor-v3)) main::before {
+  content: 'Preparing game…';
+  display: block;
+  width: min(1180px, calc(100% - 24px));
+  margin: 28px auto;
+  padding: 18px 20px;
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius);
+  background: #fff;
+  box-shadow: var(--cb-shadow);
+  color: var(--cb-muted);
+  font-size: .82rem;
+  font-weight: 700;
+  text-align: center;
+  opacity: 1;
+  visibility: visible;
+  animation: cb-game-boot-message-fallback 0s 2.5s forwards;
+}
+
+body.cb-ui:has(#pregame-defense-editor-v3) main > .container-fluid {
+  opacity: 1;
+  visibility: visible;
+  animation: none;
+}
+
+body.cb-ui:has(#pregame-defense-editor-v3) main::before {
+  content: none;
+}
