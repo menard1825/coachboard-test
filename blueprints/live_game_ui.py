@@ -1,8 +1,9 @@
+import os
 import re
 from copy import deepcopy
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, current_app, jsonify, request, session, url_for
 from sqlalchemy import JSON, UniqueConstraint
 
 from db import db
@@ -282,6 +283,16 @@ def next_inning_prep(game_id):
     })
 
 
+def _versioned_static(filename):
+    """Return a static URL that changes when the file changes on disk."""
+    path = os.path.join(current_app.root_path, 'static', filename)
+    try:
+        version = str(int(os.path.getmtime(path)))
+    except OSError:
+        version = None
+    return url_for('static', filename=filename, v=version) if version else url_for('static', filename=filename)
+
+
 @live_game_ui_bp.before_app_request
 def protect_live_game_workflows():
     """Protect the pregame plan and require an explicit next-inning decision."""
@@ -385,7 +396,7 @@ def inject_live_game_assets(response):
     # This controller must register before live_game_v2.js so it owns the End
     # Game click and prevents the old pitch-count-only finalization workflow.
     if 'live_game_pitching_finalize.js' not in html:
-        finalize_asset = '<script src="/static/js/live_game_pitching_finalize.js"></script>\n'
+        finalize_asset = f'<script src="{_versioned_static("js/live_game_pitching_finalize.js")}"></script>\n'
         v2_marker = '<script src="/static/js/live_game_v2.js"></script>'
         if v2_marker in html:
             html = html.replace(v2_marker, finalize_asset + v2_marker, 1)
@@ -395,18 +406,18 @@ def inject_live_game_assets(response):
             html = finalize_asset + html
 
     if 'live_game_board_prep_v2.js' not in html:
-        assets = '''
+        assets = f'''
 <script>
-  window.setTimeout(function () {
+  window.setTimeout(function () {{
     var overlay = document.getElementById('live-game-overlay');
-    if (overlay && !overlay.classList.contains('coach-live-polished')) {
+    if (overlay && !overlay.classList.contains('coach-live-polished')) {{
       overlay.classList.add('coach-live-boot-fallback');
-    }
-  }, 2500);
+    }}
+  }}, 2500);
 </script>
-<script src="/static/js/live_game_pitcher_change_complete.js"></script>
-<script src="/static/js/live_game_board_prep_v2.js"></script>
-<script src="/static/js/live_game_postgame_cleanup.js"></script>
+<script src="{_versioned_static('js/live_game_pitcher_change_complete.js')}"></script>
+<script src="{_versioned_static('js/live_game_board_prep_v2.js')}"></script>
+<script src="{_versioned_static('js/live_game_postgame_cleanup.js')}"></script>
 '''
         if '</body>' in html:
             html = html.replace('</body>', assets + '</body>', 1)
