@@ -133,19 +133,6 @@
       </div>
       <div class="offcanvas-body">
         <div class="list-group list-group-flush">
-            {% if session.get('logged_in') and current_team %}
-            <h6 class="text-muted ps-3 mt-2 mb-1">CoachBoard</h6>
-            <a class="list-group-item list-group-item-action fw-semibold" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-diamond me-2"></i>Game Day</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('home') }}#roster"><i class="bi bi-people me-2"></i>Roster</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('home') }}#player_development"><i class="bi bi-graph-up-arrow me-2"></i>Development</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('home') }}#practice_plan"><i class="bi bi-clipboard-check me-2"></i>Practice</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('pitching.pitching_page') }}"><i class="bi bi-bullseye me-2"></i>Pitching</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('home') }}#games"><i class="bi bi-calendar3 me-2"></i>Schedule</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('home') }}#rotations"><i class="bi bi-diagram-3 me-2"></i>Templates</a>
-            <a class="list-group-item list-group-item-action" href="{{ url_for('home') }}#stats"><i class="bi bi-bar-chart me-2"></i>Stats</a>
-            <hr class="my-2">
-            {% endif %}
-
             {% if session.role in ['Head Coach', 'Super Admin'] %}
             <h6 class="text-muted ps-3 mt-2 mb-1">Admin Tools</h6>
             <a class="list-group-item list-group-item-action" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people-fill"></i> User Management</a>
