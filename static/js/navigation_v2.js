@@ -22,7 +22,7 @@
     if (document.querySelector(`script[data-coach-helper="${key}"]`)) return;
     const script = document.createElement('script');
     // Dynamically inserted scripts are async by default. Turning async off keeps
-    // dependent helpers (renderer -> integrity guard -> controller) deterministic.
+    // dependent helpers deterministic.
     script.async = false;
     script.src = versionedHelperSrc(src);
     script.dataset.coachHelper = key;
@@ -70,6 +70,7 @@
 
   if (window.location.pathname === '/admin/users') {
     loadScript('/static/js/user_management_password_help.js', 'user-management-password-help');
+    loadScript('/static/js/user_management_cleanup.js', 'user-management-cleanup');
   }
 
   if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
