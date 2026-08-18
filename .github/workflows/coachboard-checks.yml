@@ -1,0 +1,43 @@
+name: CoachBoard Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Python compile checks
+        run: |
+          python -m py_compile \
+            app.py \
+            season_stats.py \
+            blueprints/security_guard.py \
+            blueprints/live_game_bulk_api.py \
+            blueprints/live_game_write_lock.py \
+            blueprints/stats_dashboard.py
+
+      - name: JavaScript syntax checks
+        run: |
+          node --check static/js/navigation_v2.js
+          node --check static/js/stats_dashboard_integrity.js
+          node --check static/js/stats_dashboard_render.js
+          node --check static/js/stats_dashboard_v2.js
+
+      - name: Regression tests
+        env:
+          SECRET_KEY: ci-test-secret
+          COACHBOARD_ENV: test
+          DATABASE_URL: sqlite:///:memory:
+        run: pytest -q
