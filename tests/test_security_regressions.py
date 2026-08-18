@@ -230,3 +230,40 @@ def test_time_limit_can_exclude_loaded_but_unplayed_next_inning(monkeypatch):
         assert transition.reverted is True
         assert end_event.inning == '4'
         assert end_event.after_alignment == {'P': 'Pitcher Four'}
+
+
+def test_completed_game_opens_actual_report_by_default(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game, GameRotationEvent
+
+    with app.app_context():
+        game = Game(
+            id=12,
+            date=datetime(2026, 8, 18),
+            opponent='Completed Game',
+            team_id=1,
+            is_live=False,
+            live_current_inning='3',
+        )
+        db.session.add(game)
+        db.session.flush()
+        db.session.add(GameRotationEvent(
+            team_id=1,
+            game_id=12,
+            inning='3',
+            sequence=1,
+            event_type='End Game',
+            before_alignment={'P': 'Pitcher'},
+            after_alignment={'P': 'Pitcher'},
+            reverted=False,
+        ))
+        db.session.commit()
+
+    response = client.get('/game/12', follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith('/game-day/12/report')
