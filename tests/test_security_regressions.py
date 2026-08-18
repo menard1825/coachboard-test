@@ -307,7 +307,7 @@ def test_game_management_renders_dugout_friendly_pitching_controls(monkeypatch):
     assert 'title="Games + practice + lessons"' in html
 
 
-def test_game_management_assets_keep_readiness_compact_and_primary_fill_safe():
+def test_game_management_assets_keep_readiness_compact_without_ambiguous_primary_fill():
     project_root = Path(__file__).resolve().parents[1]
     navigation = (project_root / 'static/js/navigation_v2.js').read_text()
     pitching_rules = (project_root / 'static/js/game_pitching_rule_picker.js').read_text()
@@ -315,6 +315,6 @@ def test_game_management_assets_keep_readiness_compact_and_primary_fill_safe():
 
     assert 'game_prep_readiness.js' not in navigation
     assert 'game-pitch-rule-editor-v2" hidden' in pitching_rules
-    assert 'Quick-Fill Primaries' in defense
-    assert "pitch_count_summary?.[player.name]?.status === 'Available'" in defense
-    assert 'more than one player has that primary position' in defense
+    assert 'Quick-Fill Primaries' not in defense
+    assert 'pde-primary-fill' not in defense
+    assert 'fillPrimaryPositions' not in defense

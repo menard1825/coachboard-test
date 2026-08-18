@@ -280,7 +280,6 @@
             ${savedPresets.map((preset) => `<option value="${preset.id}">${esc(presetName(preset))}</option>`).join('')}
           </select>
           <button class="btn btn-outline-primary" id="pde-apply" disabled>Apply to Inning ${esc(inning)}</button>
-          <button class="btn btn-outline-dark" id="pde-primary-fill" title="Fill open spots from each player's saved primary position"><i class="bi bi-lightning-charge-fill me-1"></i>Quick-Fill Primaries</button>
           <button class="btn btn-outline-secondary" id="pde-save">Save This Inning</button>
         </div>
         ${baseballField(source)}
@@ -303,7 +302,6 @@
     const applyButton = $('pde-apply');
     presetSelect.addEventListener('change', () => { applyButton.disabled = !presetSelect.value; });
     applyButton.addEventListener('click', applyPreset);
-    $('pde-primary-fill').addEventListener('click', fillPrimaryPositions);
     $('pde-save').addEventListener('click', openPresetModal);
   }
 
@@ -449,54 +447,6 @@
           : `${name} applied to Inning ${inning}.`,
         unavailable.length ? 'warning' : 'success'
       );
-    } catch (error) {
-      toast(error.message, 'danger');
-      await refresh();
-    }
-  }
-
-  async function fillPrimaryPositions() {
-    if (busy) return;
-
-    const next = {...alignment()};
-    const assigned = new Set(Object.values(next).filter(Boolean));
-    const bench = presentPlayers().filter((player) => !assigned.has(player.name));
-    const filled = [];
-    const conflicts = [];
-    const open = positions().filter((pos) => !next[pos]);
-
-    open.forEach((pos) => {
-      const candidates = bench.filter((player) => {
-        if (assigned.has(player.name) || String(player.position1 || '').toUpperCase() !== pos) return false;
-        if (pos !== 'P') return true;
-        return state?.pitch_count_summary?.[player.name]?.status === 'Available';
-      });
-
-      if (candidates.length === 1) {
-        next[pos] = candidates[0].name;
-        assigned.add(candidates[0].name);
-        filled.push(pos);
-      } else if (candidates.length > 1) {
-        conflicts.push(pos);
-      }
-    });
-
-    if (!filled.length) {
-      toast(
-        conflicts.length
-          ? `Choose players manually for ${conflicts.join(', ')} because more than one player has that primary position.`
-          : 'No open spots had one clear, available primary-position match.',
-        'warning'
-      );
-      return;
-    }
-
-    state.rotation.innings[inning] = next;
-    render();
-    try {
-      await saveRotation();
-      const conflictNote = conflicts.length ? ` Choose ${conflicts.join(', ')} manually.` : '';
-      toast(`Filled ${filled.join(', ')} from saved primary positions.${conflictNote}`, conflicts.length ? 'warning' : 'success');
     } catch (error) {
       toast(error.message, 'danger');
       await refresh();
