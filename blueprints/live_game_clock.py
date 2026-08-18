@@ -15,7 +15,7 @@ live_game_clock_bp = Blueprint('live_game_clock', __name__, url_prefix='/api/liv
 class GameClockState(db.Model):
     __tablename__ = 'game_clock_states'
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key_key=True)
     game_id = db.Column(db.Integer, db.ForeignKey('games.id', ondelete='CASCADE'), nullable=False)
     team_id = db.Column(db.Integer, db.ForeignKey('teams.id', ondelete='CASCADE'), nullable=False)
     started_at = db.Column(db.DateTime, nullable=True)
@@ -96,6 +96,32 @@ def _emit_clock(game, team_id, row=None):
 
 def _response_succeeded(response):
     return 200 <= int(getattr(response, 'status_code', 500)) < 300
+
+
+def _current_inning_has_recorded_activity(game, team_id):
+    """Return True when current-inning live changes prove that inning was used."""
+    current = str(game.live_current_inning or '1')
+    transition = db.session.query(GameRotationEvent).filter_by(
+        game_id=game.id,
+        team_id=team_id,
+        inning=current,
+        event_type='End Inning',
+        reverted=False,
+    ).order_by(GameRotationEvent.sequence.desc(), GameRotationEvent.id.desc()).first()
+    transition_sequence = int(transition.sequence or 0) if transition else 0
+
+    events = db.session.query(GameRotationEvent).filter_by(
+        game_id=game.id,
+        team_id=team_id,
+        inning=current,
+        reverted=False,
+    ).order_by(GameRotationEvent.sequence.asc(), GameRotationEvent.id.asc()).all()
+
+    return any(
+        event.event_type not in {'End Inning', 'End Game'}
+        and int(event.sequence or 0) > transition_sequence
+        for event in events
+    )
 
 
 def _adjust_unplayed_current_inning(game, team_id):
@@ -225,7 +251,23 @@ def capture_live_game_clock_lifecycle():
     g.coachboard_clock_team_id = team.id
     g.coachboard_clock_was_live = bool(game.is_live)
     if endpoint == 'live_game_pitching.end_with_pitching':
-        g.coachboard_clock_end_payload = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True) or {}
+        g.coachboard_clock_end_payload = data
+        reason = str(data.get('end_reason') or '').strip().lower()
+        current_played = data.get('current_inning_played', True)
+        if isinstance(current_played, str):
+            current_played = current_played.strip().lower() not in {'0', 'false', 'no', 'off'}
+        else:
+            current_played = bool(current_played)
+
+        if reason == 'time_limit' and not current_played and _current_inning_has_recorded_activity(game, team.id):
+            return jsonify({
+                'status': 'error',
+                'message': (
+                    f'Inning {game.live_current_inning} already has a recorded live change, so CoachBoard will not erase it as unplayed. '
+                    'Choose that the inning was played, or undo the recorded change first.'
+                ),
+            }), 409
     return None
 
 
