@@ -15,7 +15,7 @@ live_game_clock_bp = Blueprint('live_game_clock', __name__, url_prefix='/api/liv
 class GameClockState(db.Model):
     __tablename__ = 'game_clock_states'
 
-    id = db.Column(db.Integer, primary_key_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     game_id = db.Column(db.Integer, db.ForeignKey('games.id', ondelete='CASCADE'), nullable=False)
     team_id = db.Column(db.Integer, db.ForeignKey('teams.id', ondelete='CASCADE'), nullable=False)
     started_at = db.Column(db.DateTime, nullable=True)
