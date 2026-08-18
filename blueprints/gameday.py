@@ -30,7 +30,7 @@ def game_management(game_id):
     game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
     if not game:
         flash('Game not found.', 'danger')
-        return redirect(url_for('home', _anchor='games'))
+        return redirect(url_for('game_day.game_day_home'))
     
     roster_objects = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
     
@@ -85,7 +85,7 @@ def add_game():
         game_date = datetime.strptime(game_date_str, '%Y-%m-%d')
     except ValueError:
         flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
-        return redirect(url_for('home', _anchor='games'))
+        return redirect(url_for('game_day.game_day_home'))
 
     new_game = Game(
         date=game_date,
@@ -106,7 +106,7 @@ def edit_game(game_id):
     game_to_edit = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
     if not game_to_edit:
         flash('Game not found.', 'danger')
-        return redirect(url_for('home', _anchor='games'))
+        return redirect(url_for('game_day.game_day_home'))
 
     game_date_str = request.form.get('game_date')
     if game_date_str:
@@ -142,7 +142,7 @@ def delete_game(game_id):
         socketio.emit('data_updated', {'message': 'Game deleted.'})
     else:
         flash('Game not found.', 'danger')
-    return redirect(url_for('home', _anchor='games'))
+    return redirect(url_for('game_day.game_day_home'))
 
 @gameday_bp.route('/game/<int:game_id>/update_absences', methods=['POST'])
 def update_absences(game_id):
@@ -150,7 +150,7 @@ def update_absences(game_id):
     game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
     if not game:
         flash('Game not found.', 'danger')
-        return redirect(url_for('home', _anchor='games'))
+        return redirect(url_for('game_day.game_day_home'))
 
     absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
     db.session.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=team_id).delete()
