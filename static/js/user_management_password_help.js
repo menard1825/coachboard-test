@@ -28,24 +28,9 @@
       }
     });
 
-    document.querySelectorAll('.user-row').forEach(row => {
-      const username = row.dataset.username;
-      if (!username) return;
-      const modal = document.getElementById(`resetPasswordModal-${username}`);
-      const actionCell = row.querySelector('[data-label="Actions"]');
-      if (!modal || !actionCell || actionCell.querySelector('.cb-password-help-row')) return;
-
-      const editButton = actionCell.querySelector('button[data-bs-target^="#editUserModal-"]');
-      if (!editButton) return;
-
-      const help = document.createElement('button');
-      help.type = 'button';
-      help.className = 'btn btn-sm btn-outline-primary ms-1 cb-password-help-row';
-      help.dataset.bsToggle = 'modal';
-      help.dataset.bsTarget = `#resetPasswordModal-${username}`;
-      help.innerHTML = '<i class="bi bi-key me-1"></i>Password Help';
-      editButton.insertAdjacentElement('afterend', help);
-    });
+    // Password Help now lives inside the Manage dialog. Keeping it out of every
+    // table row makes the user list much easier to scan, especially on phones.
+    document.querySelectorAll('.cb-password-help-row').forEach(button => button.remove());
   }
 
   document.readyState === 'loading'
