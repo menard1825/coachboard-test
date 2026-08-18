@@ -19,7 +19,7 @@ TEST_PASSWORD = 'playwright-password'
 def login(page: Page, coachboard_url: str):
     page.goto(f'{coachboard_url}/login')
     page.get_by_label('Username or email').fill(TEST_USERNAME)
-    page.get_by_label('Password').fill(TEST_PASSWORD)
+    page.locator('#password').fill(TEST_PASSWORD)
     page.get_by_role('button', name='Sign In').click()
     expect(page).to_have_url(
         re.compile(rf'^{re.escape(coachboard_url)}/?(?:#games)?$')
