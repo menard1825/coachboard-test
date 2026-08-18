@@ -6,6 +6,8 @@ venv-staging/
 __pycache__/
 *.pyc
 .pytest_cache/
+test-results/
+playwright-report/
 
 # Environment variables / secrets
 .env
