@@ -120,6 +120,23 @@ def test_stale_membership_session_is_rejected(monkeypatch):
     assert 'team access is no longer active' in response.get_json()['message']
 
 
+def test_head_coach_can_rotate_team_join_code(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Team
+
+    response = client.post('/admin/settings/rotate-registration-code')
+
+    assert response.status_code == 302
+    with app.app_context():
+        team = db.session.get(Team, 1)
+        assert team.registration_code != 'test-code'
+        assert len(team.registration_code) >= 10
+
+
 def test_incomplete_pitch_history_never_becomes_zero_total():
     from blueprints.stats_dashboard import _apply_pitch_completeness
 
