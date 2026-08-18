@@ -138,7 +138,7 @@
       }
     });
 
-    const toolbarHost = card.querySelector('.card-header .d-flex.align-items-center');
+    const toolbarHost = card.querySelector('.card-header > .d-flex > .d-flex.align-items-center');
     if (toolbarHost) {
       toolbarHost.classList.remove('d-flex', 'align-items-center');
       toolbarHost.classList.add('cb-user-admin-toolbar');
