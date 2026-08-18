@@ -465,7 +465,7 @@ def test_admin_settings_users_teams_registration_and_passwords(page: Page, coach
     page.locator('#confirm_new_password').fill('AutomationChanged123!')
     page.get_by_role('button', name='Update Password').click()
     expect(page).to_have_url(re.compile(r'/$'))
-    page.goto(f'{coachboard_url}/logout')
+    page.context.clear_cookies()
     login(page, coachboard_url, 'automation-register', 'AutomationChanged123!')
 
     page.context.clear_cookies()

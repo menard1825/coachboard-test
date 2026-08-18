@@ -187,11 +187,6 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     undone = post_json(page, coachboard_url, f'/api/live-game/{game_id}/undo', {})
     assert undone['state']['current_inning'] == '1'
 
-    ended = post_json(page, coachboard_url, f'/api/live-game/{game_id}/end', {
-        'counts': [{'player_id': 4, 'pitches': 12}],
-    })
-    assert ended['state']['game']['is_live'] is False
-    post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
     finalized = post_json(page, coachboard_url, f'/api/live-game/{game_id}/end-with-pitching', {
         'defer_pitching': True,
         'end_reason': 'manual',

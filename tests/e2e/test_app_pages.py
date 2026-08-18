@@ -68,7 +68,7 @@ def test_every_authenticated_screen_renders(page: Page, coachboard_url: str):
         ('/rules', 'Pitching Rules'),
         ('/admin/users', 'User Management'),
         ('/admin/teams', 'Team Management'),
-        ('/admin/settings', 'Admin Settings'),
+        ('/admin/settings', 'Team Settings'),
         ('/rotation-template/new', 'Rotation'),
         ('/rotation-template/2', 'Six Inning Rotation'),
         ('/starting-defense-template/new', 'Starting Defense'),
@@ -170,7 +170,8 @@ def test_role_and_team_boundaries_are_enforced(page: Page, coachboard_url: str):
 
     page.goto(f'{coachboard_url}/admin/settings')
     expect(page).to_have_url(re.compile(r'/(?:#roster)?$'))
-    expect(page.get_by_text('You must be a Head Coach or Super Admin')).to_be_visible()
+    expect(page.get_by_role('heading', name='Roster')).to_be_visible()
+    expect(page.get_by_role('heading', name='Team Settings')).to_have_count(0)
 
     response = page.request.get(f'{coachboard_url}/api/game_data/2')
     assert response.status == 404
