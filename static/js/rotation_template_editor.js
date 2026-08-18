@@ -19,10 +19,15 @@
     regulationInnings: Math.max(1, Number(data.regulation_innings || 6)),
     presets: Array.isArray(data.defense_presets) ? data.defense_presets : [],
     presetPrefix: String(data.preset_prefix || 'DEFENSE PRESET — '),
+    templateKind: String(data.template_kind || 'rotation'),
+    saveUrl: String(data.save_url || '/api/rotation-template/save'),
+    editUrlBase: String(data.edit_url_base || '/rotation-template'),
+    saveButtonLabel: String(data.save_button_label || 'Save Template'),
     inning: '1',
     dirty: false,
     saving: false,
   };
+  state.isStartingDefense = state.templateKind === 'starting_defense';
 
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
@@ -71,6 +76,10 @@
     return positions().filter((position) => !source?.[position]);
   }
 
+  function requiredOpenPositions(source = alignment()) {
+    return openPositions(source).filter((position) => !state.isStartingDefense || position !== 'P');
+  }
+
   function playerPosition(name, source = alignment()) {
     return Object.entries(source || {}).find(([, playerName]) => playerName === name)?.[0] || null;
   }
@@ -85,7 +94,9 @@
 
   function fieldSpot(position, source, left, top) {
     const name = source?.[position] || '';
-    return `<button type="button" class="rte-spot ${name ? '' : 'open'}" data-rte-position="${esc(position)}" style="left:${left}%;top:${top}%"><span class="rte-pos">${esc(position)}</span><span class="rte-player">${esc(name || 'OPEN')}</span></button>`;
+    const openClass = name ? '' : state.isStartingDefense && position === 'P' ? 'optional' : 'open';
+    const openLabel = state.isStartingDefense && position === 'P' ? 'GAME DAY' : 'OPEN';
+    return `<button type="button" class="rte-spot ${openClass}" data-rte-position="${esc(position)}" style="left:${left}%;top:${top}%"><span class="rte-pos">${esc(position)}</span><span class="rte-player">${esc(name || openLabel)}</span></button>`;
   }
 
   function fieldMarkup() {
@@ -100,11 +111,14 @@
     ];
     const assigned = new Set(Object.values(source || {}).filter(Boolean));
     const bench = state.roster.filter((player) => !assigned.has(player.name));
-    const opens = openPositions(source);
+    const opens = requiredOpenPositions(source);
+    const pitcherStatus = state.isStartingDefense
+      ? source.P ? `Pitcher saved: ${esc(source.P)}` : 'Pitcher will be chosen on Game Day'
+      : '';
 
     return `
       <div class="rte-field-card">
-        <div class="rte-field-cap"><strong>Defense — Inning ${esc(state.inning)}</strong><span>Tap a position to choose the player</span></div>
+        <div class="rte-field-cap"><strong>${state.isStartingDefense ? 'Starting Defense' : `Defense — Inning ${esc(state.inning)}`}</strong><span>Tap a position to choose the player</span></div>
         <div class="rte-field">
           <svg class="rte-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true">
             <path d="M7 58 Q9 13 50 5 Q91 13 93 58" fill="none" stroke="rgba(245,245,220,.38)" stroke-width="1.2"/>
@@ -125,8 +139,8 @@
           <div class="rte-chips">${bench.length ? bench.map((player) => `<span>${esc(player.name)}</span>`).join('') : '<span>None</span>'}</div>
         </div>
         <div class="rte-status">
-          <span>${opens.length ? `<span class="bad"><strong>${opens.length}</strong> open position${opens.length === 1 ? '' : 's'}: ${esc(opens.join(', '))}</span>` : '<strong>Defense complete</strong>'}</span>
-          <span>${assigned.size} on field · ${bench.length} bench</span>
+          <span>${opens.length ? `<span class="bad"><strong>${opens.length}</strong> required position${opens.length === 1 ? '' : 's'} open: ${esc(opens.join(', '))}</span>` : `<strong>${state.isStartingDefense ? 'Starting defense ready' : 'Defense complete'}</strong>`}</span>
+          <span>${pitcherStatus || `${assigned.size} on field · ${bench.length} bench`}</span>
         </div>
       </div>`;
   }
@@ -135,7 +149,7 @@
     const host = $('rteInningTabs');
     if (!host) return;
     host.innerHTML = regulationKeys().map((inning) => {
-      const incomplete = openPositions(alignment(inning)).length > 0;
+      const incomplete = requiredOpenPositions(alignment(inning)).length > 0;
       return `<button type="button" class="rte-tab ${inning === state.inning ? 'active' : ''} ${incomplete ? 'incomplete' : ''}" data-rte-inning="${inning}" aria-label="Inning ${inning}">${inning}</button>`;
     }).join('');
     const copy = $('rteCopyPrevious');
@@ -176,10 +190,10 @@
     const options = state.presets.map((preset) => {
       const label = String(preset.title || '').startsWith(state.presetPrefix)
         ? String(preset.title).slice(state.presetPrefix.length).trim()
-        : String(preset.title || 'Defense Preset');
+        : String(preset.title || 'Starting Defense');
       return `<option value="${preset.id}">${esc(label)}</option>`;
     }).join('');
-    select.innerHTML = `<option value="">Defense Preset…</option>${options}`;
+    select.innerHTML = `<option value="">Starting Defense Template…</option>${options}`;
     if ([...select.options].some((option) => option.value === current)) select.value = current;
     const apply = $('rteApplyPreset');
     if (apply) apply.disabled = !select.value;
@@ -256,7 +270,7 @@
     const preset = state.presets.find((item) => Number(item.id) === id);
     const source = presetAlignment(preset);
     if (!source) {
-      window.alert('That Defense Preset does not contain a defensive alignment.');
+      window.alert('That Starting Defense template does not contain a defensive alignment.');
       return;
     }
     const allowed = new Set(positions());
@@ -282,8 +296,14 @@
       return;
     }
 
-    const incomplete = regulationKeys().filter((inning) => openPositions(alignment(inning)).length > 0);
-    if (incomplete.length) {
+    const missingRequired = requiredOpenPositions(alignment('1'));
+    if (state.isStartingDefense && missingRequired.length) {
+      window.alert(`Fill ${missingRequired.join(', ')} before saving. Pitcher may remain open.`);
+      return;
+    }
+
+    const incomplete = regulationKeys().filter((inning) => requiredOpenPositions(alignment(inning)).length > 0);
+    if (!state.isStartingDefense && incomplete.length) {
       const okay = window.confirm(`This template still has open defensive positions in inning${incomplete.length === 1 ? '' : 's'} ${incomplete.join(', ')}.\n\nSave it anyway?`);
       if (!okay) return;
     }
@@ -294,30 +314,32 @@
     if ($('rteSaveState')) $('rteSaveState').textContent = 'Saving…';
 
     try {
-      const response = await fetch('/api/rotation-template/save', {
+      const response = await fetch(state.saveUrl, {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           id: state.rotation.id || null,
           title: name,
-          innings: state.rotation.innings,
+          innings: state.isStartingDefense ? {'1': {...alignment('1')}} : state.rotation.innings,
         }),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok || result.status === 'error') throw new Error(result.message || 'Unable to save rotation template.');
+      if (!response.ok || result.status === 'error') {
+        throw new Error(result.message || (state.isStartingDefense ? 'Unable to save starting defense.' : 'Unable to save rotation template.'));
+      }
 
       state.rotation.id = result.id;
       state.rotation.title = name;
       state.dirty = false;
       if ($('rteSaveState')) $('rteSaveState').textContent = 'Saved';
-      if ($('rtePageTitle')) $('rtePageTitle').textContent = 'Edit Rotation Template';
-      window.history.replaceState({}, '', `/rotation-template/${result.id}`);
+      if ($('rtePageTitle')) $('rtePageTitle').textContent = state.isStartingDefense ? 'Edit Starting Defense' : 'Edit Rotation Template';
+      window.history.replaceState({}, '', `${state.editUrlBase}/${result.id}`);
     } catch (error) {
-      window.alert(error.message || 'Unable to save rotation template.');
+      window.alert(error.message || (state.isStartingDefense ? 'Unable to save starting defense.' : 'Unable to save rotation template.'));
       if ($('rteSaveState')) $('rteSaveState').textContent = 'Save failed';
     } finally {
       state.saving = false;
-      if (button) { button.disabled = false; button.textContent = 'Save Template'; }
+      if (button) { button.disabled = false; button.textContent = state.saveButtonLabel; }
     }
   }
 

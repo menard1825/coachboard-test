@@ -80,7 +80,7 @@
       #${PANEL_ID} .pde-inning small{display:block;font-size:.53rem;letter-spacing:.08em;opacity:.75;font-weight:750}
       #${PANEL_ID} .pde-inning strong{display:block;font-size:1.4rem;line-height:1.05}
       #${PANEL_ID} .pde-body{padding:13px 16px 15px;background:#fff}
-      #${PANEL_ID} .pde-tools{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px;margin-bottom:12px}
+      #${PANEL_ID} .pde-tools{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;margin-bottom:12px}
       #${PANEL_ID} .pde-tools .btn,#${PANEL_ID} .pde-tools .form-select{min-height:42px;border-radius:9px}
       #${PANEL_ID} .pde-field-card{border:1px solid #d6e2d4;border-radius:14px;overflow:hidden;background:#fff}
       #${PANEL_ID} .pde-field-caption{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #e4e9e4;background:#fff}
@@ -132,7 +132,7 @@
         #${PANEL_ID} .pde-body{padding:12px 14px 14px}
         #${PANEL_ID} .pde-field{height:clamp(330px,39vw,455px)}
         #${PANEL_ID} .pde-spot{width:clamp(80px,10vw,112px)}
-        #${PANEL_ID} .pde-tools{grid-template-columns:minmax(260px,1fr) auto auto auto}
+        #${PANEL_ID} .pde-tools{grid-template-columns:minmax(260px,1fr) auto auto}
       }
     `;
     document.head.appendChild(style);
@@ -276,11 +276,11 @@
       <div class="pde-body">
         <div class="pde-tools">
           <select class="form-select" id="pde-preset">
-            <option value="">Defense Preset…</option>
+            <option value="">Starting Defense Template…</option>
             ${savedPresets.map((preset) => `<option value="${preset.id}">${esc(presetName(preset))}</option>`).join('')}
           </select>
           <button class="btn btn-outline-primary" id="pde-apply" disabled>Apply to Inning ${esc(inning)}</button>
-          <button class="btn btn-outline-secondary" id="pde-save">Save This Inning</button>
+          <button class="btn btn-outline-secondary" id="pde-save">Save as Starting Defense</button>
         </div>
         ${baseballField(source)}
         <div class="pde-status ${open.length ? 'needs' : 'complete'}">
@@ -444,7 +444,7 @@
       toast(
         unavailable.length
           ? `Preset applied. Open spots remain because ${[...new Set(unavailable)].join(', ')} is unavailable.`
-          : `${name} applied to Inning ${inning}.`,
+          : next.P ? `${name} applied to Inning ${inning}.` : `${name} applied. Choose the pitcher for Inning ${inning}.`,
         unavailable.length ? 'warning' : 'success'
       );
     } catch (error) {
@@ -464,14 +464,14 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <div><h5 class="modal-title mb-0">Save Defense Preset</h5><div class="small text-muted">Save this inning's defense for use in any single inning later.</div></div>
+            <div><h5 class="modal-title mb-0">Save Starting Defense</h5><div class="small text-muted">Reuse this starting defense from any Game Day planning screen.</div></div>
             <button class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <label class="form-label fw-semibold">Preset name</label>
+            <label class="form-label fw-semibold">Template name</label>
             <input id="pde-name" class="form-control form-control-lg" maxlength="60" placeholder="e.g. #1 Defense">
-            <div class="form-text">Separate from full-game Pool/Bracket templates.</div>
-            <div class="d-grid mt-3"><button class="btn btn-primary btn-lg" id="pde-confirm">Save Defense Preset</button></div>
+            <div class="form-text">Pitcher may remain open so you can choose him for each game.</div>
+            <div class="d-grid mt-3"><button class="btn btn-primary btn-lg" id="pde-confirm">Save Starting Defense</button></div>
           </div>
         </div>
       </div>`;
@@ -480,9 +480,9 @@
   }
 
   function openPresetModal() {
-    const open = positions().filter((pos) => !alignment()[pos]);
+    const open = positions().filter((pos) => pos !== 'P' && !alignment()[pos]);
     if (open.length) {
-      toast(`Fill ${open.join(', ')} before saving a defense preset.`, 'warning');
+      toast(`Fill ${open.join(', ')} before saving. Pitcher may remain open.`, 'warning');
       return;
     }
     const modal = presetModal();
@@ -502,7 +502,7 @@
     }
     input.classList.remove('is-invalid');
     if (presets().some((preset) => presetName(preset).toLowerCase() === name.toLowerCase())) {
-      toast(`A defense preset named “${name}” already exists.`, 'warning');
+      toast(`A Starting Defense named “${name}” already exists.`, 'warning');
       return;
     }
 
@@ -511,10 +511,10 @@
     button.disabled = true;
     button.textContent = 'Saving…';
     try {
-      const response = await fetch('/save_rotation_as_template', {
+      const response = await fetch('/api/starting-defense-template/save', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({title: PREFIX + name, innings: {'1': {...alignment()}}}),
+        body: JSON.stringify({title: name, innings: {'1': {...alignment()}}}),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.status === 'error') throw new Error(result.message || 'Unable to save preset.');
@@ -522,13 +522,13 @@
       bootstrap.Modal.getOrCreateInstance($('pde-preset-modal')).hide();
       filterWholeGameTemplates();
       render();
-      toast(`${name} saved as a one-inning defense preset.`);
+      toast(`${name} saved as a Starting Defense template.`);
     } catch (error) {
       toast(error.message, 'danger');
     } finally {
       busy = false;
       button.disabled = false;
-      button.textContent = 'Save Defense Preset';
+      button.textContent = 'Save Starting Defense';
     }
   }
 

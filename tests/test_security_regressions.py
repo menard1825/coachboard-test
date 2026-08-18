@@ -307,14 +307,88 @@ def test_game_management_renders_dugout_friendly_pitching_controls(monkeypatch):
     assert 'title="Games + practice + lessons"' in html
 
 
+def test_starting_defense_template_allows_open_pitcher_and_reaches_game_day(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game, Player, Rotation
+
+    alignment = {
+        'C': 'Starting Catcher',
+        '1B': 'Starting First',
+        '2B': 'Starting Second',
+        '3B': 'Starting Third',
+        'SS': 'Starting Shortstop',
+        'LF': 'Starting Left',
+        'CF': 'Starting Center',
+        'RF': 'Starting Right',
+    }
+    with app.app_context():
+        db.session.add_all([
+            Player(name=player_name, team_id=1)
+            for player_name in alignment.values()
+        ])
+        db.session.add(Game(
+            id=14,
+            date=datetime(2026, 8, 18),
+            opponent='Starting Defense Test',
+            team_id=1,
+        ))
+        db.session.commit()
+
+    response = client.post('/api/starting-defense-template/save', json={
+        'title': 'Standard Starters',
+        'innings': {'1': alignment},
+    })
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    template_id = payload['id']
+    assert payload['display_title'] == 'Standard Starters'
+    assert payload['rotation']['title'] == 'DEFENSE PRESET — Standard Starters'
+    assert payload['rotation']['innings'] == {'1': alignment}
+    assert 'P' not in payload['rotation']['innings']['1']
+
+    with app.app_context():
+        saved = db.session.get(Rotation, template_id)
+        assert saved.title == 'DEFENSE PRESET — Standard Starters'
+        assert saved.innings == {'1': alignment}
+
+    editor = client.get(f'/starting-defense-template/{template_id}')
+    assert editor.status_code == 200
+    editor_html = editor.get_data(as_text=True)
+    assert 'Pitcher is optional' in editor_html
+    assert 'Standard Starters' in editor_html
+
+    game_data = client.get('/api/game_data/14')
+    assert game_data.status_code == 200
+    game_templates = game_data.get_json()['rotation_templates']
+    assert any(template['id'] == template_id for template in game_templates)
+
+    incomplete = dict(alignment)
+    incomplete.pop('1B')
+    rejected = client.post('/api/starting-defense-template/save', json={
+        'title': 'Incomplete Defense',
+        'innings': {'1': incomplete},
+    })
+    assert rejected.status_code == 400
+    assert 'Fill 1B before saving' in rejected.get_json()['message']
+
+
 def test_game_management_assets_keep_readiness_compact_without_ambiguous_primary_fill():
     project_root = Path(__file__).resolve().parents[1]
     navigation = (project_root / 'static/js/navigation_v2.js').read_text()
     pitching_rules = (project_root / 'static/js/game_pitching_rule_picker.js').read_text()
     defense = (project_root / 'static/js/live_game_board_prep.js').read_text()
+    season_management = (project_root / 'static/js/season_management_v2.js').read_text()
 
     assert 'game_prep_readiness.js' not in navigation
     assert 'game-pitch-rule-editor-v2" hidden' in pitching_rules
     assert 'Quick-Fill Primaries' not in defense
     assert 'pde-primary-fill' not in defense
     assert 'fillPrimaryPositions' not in defense
+    assert '/api/starting-defense-template/save' in defense
+    assert 'pos !== \'P\'' in defense
+    assert '/starting-defense-template/new' in season_management

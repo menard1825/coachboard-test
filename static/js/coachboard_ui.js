@@ -20,7 +20,7 @@
     player_development: ['Player Development', 'Keep each player’s coaching focus, progress, and notes in one place.'],
     practice_plan: ['Practice', 'Build, reuse, and adjust practice plans without starting from scratch.'],
     lineups: ['Lineup Templates', 'Create reusable batting orders that can be loaded into any game.'],
-    rotations: ['Defensive Templates', 'Manage one-inning defense presets and full-game rotation templates.'],
+    rotations: ['Defensive Templates', 'Manage Starting Defense templates and full-game rotation templates.'],
     stats: ['Team Stats', 'Review actual playing history and season-level usage.'],
     scouting_list: ['Scouting', 'Track prospects, committed players, and roster possibilities.'],
     collaboration: ['Coach Notes', 'Keep team and player notes shared among the coaching staff.'],

@@ -458,8 +458,8 @@
     const tools = panel.querySelector('.pde-tools');
     const select = document.getElementById('pde-preset');
     const apply = document.getElementById('pde-apply');
-    if (select?.options?.length) setText(select.options[0], 'Optional: choose a defense preset…');
-    setText(apply, 'Use Preset');
+    if (select?.options?.length) setText(select.options[0], 'Choose a starting defense…');
+    setText(apply, 'Apply');
 
     if (tools && select && !tools.querySelector('.gm-preset-wrap')) {
       const wrap = document.createElement('div');
@@ -467,7 +467,7 @@
       const label = document.createElement('label');
       label.className = 'gm-preset-label';
       label.htmlFor = 'pde-preset';
-      label.textContent = 'Quick Setup (Optional)';
+      label.textContent = 'Starting Defense (Optional)';
       tools.insertBefore(wrap, select);
       wrap.appendChild(label);
       wrap.appendChild(select);
