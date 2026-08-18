@@ -77,7 +77,7 @@ def test_every_authenticated_screen_renders(page: Page, coachboard_url: str):
         ('/rotation-template/new', 'Rotation'),
         ('/rotation-template/2', 'Edit Rotation Template'),
         ('/starting-defense-template/new', 'Starting Defense'),
-        ('/starting-defense-template/1', 'Edit Starting Defense Template'),
+        ('/starting-defense-template/1', 'Edit Starting Defense'),
         ('/change_password', 'Password'),
     ]
     for path, expected_text in screens:

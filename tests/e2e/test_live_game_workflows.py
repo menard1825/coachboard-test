@@ -197,7 +197,10 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     delete_json(page, coachboard_url, f'/api/live-game/{game_id}/pitching-plan/2')
 
     page.goto(f'{coachboard_url}/game-day/{game_id}/report')
-    expect(page.get_by_text('Automation Live Opponent')).to_be_visible()
+    expect(page.get_by_role(
+        'heading',
+        name=re.compile(r'Automation Live Opponent'),
+    )).to_be_visible()
     expect(page.locator('body')).to_contain_text('Automation notes updated and persisted')
 
     deleted = post_json(page, coachboard_url, f'/game-day/{game_id}/delete', {})
