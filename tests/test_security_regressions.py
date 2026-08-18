@@ -305,6 +305,8 @@ def test_game_management_renders_dugout_friendly_pitching_controls(monkeypatch):
     assert '<span class="pitch-header-limit">Max 85</span>' in html
     assert '/ 85 game pitches' not in html
     assert 'title="Games + practice + lessons"' in html
+    assert 'href="/game-day"' in html
+    assert '/#games' not in html
 
 
 def test_starting_defense_template_allows_open_pitcher_and_reaches_game_day(monkeypatch):
@@ -392,3 +394,5 @@ def test_game_management_assets_keep_readiness_compact_without_ambiguous_primary
     assert '/api/starting-defense-template/save' in defense
     assert 'pos !== \'P\'' in defense
     assert '/starting-defense-template/new' in season_management
+    assert "window.location.replace('/game-day')" in navigation
+    assert "moreLink('/game-day', 'calendar3', 'Schedule'" in navigation
