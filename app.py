@@ -41,6 +41,7 @@ from blueprints.live_game_bulk_api import live_game_bulk_bp
 from blueprints.live_game_safety import live_game_safety_bp
 from blueprints.live_game_pitching_api import live_game_pitching_bp
 from blueprints.security_guard import security_guard_bp
+from blueprints.live_game_write_lock import live_game_write_lock_bp
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
@@ -96,20 +97,17 @@ def create_app():
         'connect_args': {'timeout': 15} if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:') else {},
     }
 
-    # Stable for the life of the process, so normal browser caching works while
-    # still changing whenever the app is restarted after a deployment.
     asset_version = os.environ.get('ASSET_VERSION') or str(int(datetime.now().timestamp()))
 
-    # Initialize extensions with the app
     db.init_app(app)
     socketio.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
 
-    # Register security first so it can protect legacy routes before they run.
+    # Register guards before application routes so their before_request handlers
+    # protect all later blueprints.
     app.register_blueprint(security_guard_bp)
+    app.register_blueprint(live_game_write_lock_bp)
 
-    # Register Blueprints. Live Game now has one authoritative state route;
-    # the legacy /api blueprint remains only for older non-live data endpoints.
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(roster_bp)
@@ -128,7 +126,6 @@ def create_app():
     app.register_blueprint(api_bp)
     app.register_blueprint(stats_dashboard_bp)
 
-    # --- SocketIO Handlers ---
     from flask_socketio import join_room, leave_room
     from models import TeamMembership
 
@@ -174,7 +171,6 @@ def create_app():
         leave_room(room_name)
         return {'status': 'success'}
 
-    # --- Custom Jinja Filter for Date/Time Formatting ---
     @app.template_filter('format_datetime')
     def format_datetime_filter(dt):
         if not dt or not isinstance(dt, (datetime, date)):
@@ -185,7 +181,6 @@ def create_app():
             return dt.strftime('%A, %m/%d/%y')
         return dt
 
-    # --- Decorators & Context Processors ---
     def login_required(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
@@ -206,7 +201,6 @@ def create_app():
             team = db.session.get(Team, session['team_id'])
             info['current_team'] = team
 
-            # Add list of available teams for the current user for switching
             if 'username' in session:
                 from models import TeamMembership
                 user_teams = db.session.query(Team).join(TeamMembership).join(User).filter(func.lower(User.username) == func.lower(session['username'])).all()
@@ -225,7 +219,6 @@ def create_app():
             'current_year_timestamp': asset_version
         }
 
-    # --- CORE APP ROUTES ---
     @app.route('/')
     @login_required
     def home():
@@ -245,7 +238,6 @@ def create_app():
             if not isinstance(user_tab_order, list) or not user_tab_order:
                 final_tab_order = default_tab_order
             else:
-                # Ignore stale/unknown tab keys from older saved layouts.
                 final_tab_order = [tab for tab in user_tab_order if tab in all_tabs]
                 for tab in default_tab_order:
                     if tab not in final_tab_order:
