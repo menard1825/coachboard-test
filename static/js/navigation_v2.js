@@ -29,6 +29,14 @@
     document.head.appendChild(script);
   }
 
+  function redirectLegacySchedule() {
+    if (window.location.pathname === '/' && window.location.hash.toLowerCase() === '#games') {
+      window.location.replace('/game-day');
+      return true;
+    }
+    return false;
+  }
+
   function installMobileNavigationStyles() {
     if (document.getElementById('cb-mobile-navigation-v2-styles')) return;
     const style = document.createElement('style');
@@ -122,7 +130,7 @@
         </div>
         <div class="cb-mobile-more-card">
           ${moreLink('/pitching', 'bullseye', 'Pitching', 'Eligibility, workload, targets, and pitching history.', false)}
-          ${moreLink('#games', 'calendar3', 'Schedule', 'Add games and review the team schedule.')}
+          ${moreLink('/game-day', 'calendar3', 'Schedule', 'Add games and review the team schedule.', false)}
           ${moreLink('#lineups', 'card-list', 'Lineup Templates', 'Reusable batting orders for Game Day.')}
           ${moreLink('#rotations', 'diagram-3', 'Defensive Templates', 'Starting Defense and full-game rotations.')}
           ${moreLink('#stats', 'bar-chart', 'Stats', 'Actual season usage and playing history.')}
@@ -144,6 +152,9 @@
       }
     });
   }
+
+  window.addEventListener('hashchange', redirectLegacySchedule);
+  if (redirectLegacySchedule()) return;
 
   installMobileNavigationStyles();
   cleanAccountDrawer();
