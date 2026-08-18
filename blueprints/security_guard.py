@@ -14,6 +14,8 @@ from models import (
     PlayerGameAbsence,
     PlayerPracticeAbsence,
     Rotation,
+    TeamMembership,
+    User,
 )
 
 security_guard_bp = Blueprint('security_guard', __name__)
@@ -30,9 +32,6 @@ LEGACY_LIVE_MUTATIONS = {
     'gameday.save_final_pitch_counts',
 }
 
-# These routes predate proper HTTP verbs. Keep existing same-origin UI working
-# during the transition, but reject cross-site GET requests so an image/link on
-# another site cannot silently delete CoachBoard data.
 DESTRUCTIVE_GET_ENDPOINTS = {
     'gameday.delete_game',
     'gameday.delete_lineup',
@@ -65,24 +64,22 @@ def _cross_site_request():
     if fetch_site == 'cross-site':
         return True
 
-    origin = request.headers.get('Origin')
-    if origin:
+    for header in ('Origin', 'Referer'):
+        value = request.headers.get(header)
+        if not value:
+            continue
         try:
-            if urlparse(origin).netloc and urlparse(origin).netloc != request.host:
-                return True
-        except ValueError:
-            return True
-
-    referer = request.headers.get('Referer')
-    if referer:
-        try:
-            parsed = urlparse(referer)
+            parsed = urlparse(value)
             if parsed.netloc and parsed.netloc != request.host:
                 return True
         except ValueError:
             return True
 
     return False
+
+
+def _api_request():
+    return request.path.startswith('/api/') or request.is_json
 
 
 def _contains_player_name(value, player_name):
@@ -131,37 +128,68 @@ def _player_has_linked_history(player):
     return any(linked)
 
 
+def _validate_session_membership():
+    username = session.get('username')
+    team_id = session.get('team_id')
+    if not username or not team_id:
+        return False
+
+    user = db.session.query(User).filter(db.func.lower(User.username) == str(username).lower()).first()
+    if not user:
+        return False
+
+    membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=team_id).first()
+    if not membership:
+        return False
+
+    # Keep permissions current even if a Head Coach changes a role while the
+    # coach still has an old signed session cookie.
+    session['role'] = membership.role
+    return True
+
+
 @security_guard_bp.before_app_request
 def enforce_security_guards():
     endpoint = request.endpoint or ''
+
+    # Flask-SocketIO owns this path outside normal page authorization.
+    if request.path.startswith('/socket.io'):
+        return None
+
+    public = endpoint == 'static' or endpoint == 'serve_manifest' or endpoint.startswith('auth.')
+    if not public:
+        if not session.get('logged_in'):
+            if _api_request():
+                return jsonify({'status': 'error', 'message': 'Unauthorized.'}), 401
+            return redirect(url_for('auth.login'))
+        if not _validate_session_membership():
+            session.clear()
+            if _api_request():
+                return jsonify({'status': 'error', 'message': 'Your team access is no longer active.'}), 401
+            flash('Your team access changed. Please sign in again.', 'warning')
+            return redirect(url_for('auth.login'))
+
     cross_site = _cross_site_request()
 
     # Transitional CSRF protection that does not break the many existing forms.
-    # Explicit cross-site writes are rejected; proper per-form CSRF tokens can be
-    # added as the remaining legacy forms are modernized.
     if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'} and cross_site:
         return jsonify({'status': 'error', 'message': 'Cross-site request blocked.'}), 403
 
     if request.method == 'GET' and endpoint in DESTRUCTIVE_GET_ENDPOINTS and cross_site:
         return jsonify({'status': 'error', 'message': 'Cross-site destructive request blocked.'}), 403
 
-    # Old Live Game mutation routes are intentionally retired. They accepted
-    # client-authored state and could bypass the authoritative workflow.
     if endpoint in LEGACY_LIVE_MUTATIONS:
         return jsonify({
             'status': 'error',
             'message': 'This Live Game action is from an older CoachBoard client. Refresh the page and try again.',
         }), 410
 
-    # Never trust a hidden HTML option for authorization. A Head Coach must not
-    # be able to forge a request that grants Super Admin.
     if endpoint in {'admin.add_user', 'admin.edit_user'} and request.method == 'POST':
         requested_role = str(request.form.get('role') or '').strip()
         if requested_role == SUPER_ADMIN and session.get('role') != SUPER_ADMIN:
             flash('Only a Super Admin can assign the Super Admin role.', 'danger')
             return redirect(url_for('admin.user_management'))
 
-    # Game Changer is an operational game-day role, not a team-management role.
     if session.get('role') == GAME_CHANGER:
         blocked_prefix = endpoint.startswith(GAME_CHANGER_BLOCKED_PREFIXES)
         if blocked_prefix and (request.method != 'GET' or endpoint in DESTRUCTIVE_GET_ENDPOINTS):
