@@ -30,6 +30,26 @@ LEGACY_LIVE_MUTATIONS = {
     'gameday.save_final_pitch_counts',
 }
 
+# These routes predate proper HTTP verbs. Keep existing same-origin UI working
+# during the transition, but reject cross-site GET requests so an image/link on
+# another site cannot silently delete CoachBoard data.
+DESTRUCTIVE_GET_ENDPOINTS = {
+    'gameday.delete_game',
+    'gameday.delete_lineup',
+    'gameday.delete_rotation',
+    'roster.delete_player',
+    'pitching.delete_pitching',
+    'development.complete_focus',
+    'development.delete_focus',
+    'development.delete_lesson_info',
+    'scouting.delete_scouted_player',
+    'team_management.delete_note',
+    'team_management.delete_practice_plan',
+    'team_management.delete_task',
+    'team_management.delete_sign',
+    'admin.delete_team',
+}
+
 GAME_CHANGER_BLOCKED_PREFIXES = (
     'admin.',
     'roster.',
@@ -49,6 +69,15 @@ def _cross_site_request():
     if origin:
         try:
             if urlparse(origin).netloc and urlparse(origin).netloc != request.host:
+                return True
+        except ValueError:
+            return True
+
+    referer = request.headers.get('Referer')
+    if referer:
+        try:
+            parsed = urlparse(referer)
+            if parsed.netloc and parsed.netloc != request.host:
                 return True
         except ValueError:
             return True
@@ -105,12 +134,16 @@ def _player_has_linked_history(player):
 @security_guard_bp.before_app_request
 def enforce_security_guards():
     endpoint = request.endpoint or ''
+    cross_site = _cross_site_request()
 
-    # Transitional CSRF protection that works without breaking every existing
-    # form. Same-origin requests continue to work; explicit cross-site writes
-    # are rejected. We can move to per-form tokens after legacy forms are retired.
-    if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'} and _cross_site_request():
+    # Transitional CSRF protection that does not break the many existing forms.
+    # Explicit cross-site writes are rejected; proper per-form CSRF tokens can be
+    # added as the remaining legacy forms are modernized.
+    if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'} and cross_site:
         return jsonify({'status': 'error', 'message': 'Cross-site request blocked.'}), 403
+
+    if request.method == 'GET' and endpoint in DESTRUCTIVE_GET_ENDPOINTS and cross_site:
+        return jsonify({'status': 'error', 'message': 'Cross-site destructive request blocked.'}), 403
 
     # Old Live Game mutation routes are intentionally retired. They accepted
     # client-authored state and could bypass the authoritative workflow.
@@ -129,8 +162,9 @@ def enforce_security_guards():
             return redirect(url_for('admin.user_management'))
 
     # Game Changer is an operational game-day role, not a team-management role.
-    if session.get('role') == GAME_CHANGER and request.method != 'GET':
-        if endpoint.startswith(GAME_CHANGER_BLOCKED_PREFIXES):
+    if session.get('role') == GAME_CHANGER:
+        blocked_prefix = endpoint.startswith(GAME_CHANGER_BLOCKED_PREFIXES)
+        if blocked_prefix and (request.method != 'GET' or endpoint in DESTRUCTIVE_GET_ENDPOINTS):
             return jsonify({'status': 'error', 'message': 'This account does not have permission to change team setup.'}), 403
 
     # Current defensive history is still name-based. Until that schema is
