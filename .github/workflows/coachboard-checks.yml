@@ -41,6 +41,14 @@ jobs:
           node --check static/js/stats_dashboard_render.js
           node --check static/js/stats_dashboard_v2.js
 
+      - name: Migration chain check
+        env:
+          SECRET_KEY: ci-test-secret
+          COACHBOARD_ENV: test
+          DATABASE_URL: sqlite:///:memory:
+          FLASK_APP: app.py
+        run: flask db heads
+
       - name: Regression tests
         env:
           SECRET_KEY: ci-test-secret
