@@ -85,9 +85,8 @@ def test_other_team_game_is_not_exposed(page: Page, coachboard_url: str):
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/game/2')
 
-    expect(page).to_have_url(
-        re.compile(rf'^{re.escape(coachboard_url)}/?(?:#games)?$')
-    )
+    expect(page).to_have_url(f'{coachboard_url}/game-day')
+    expect(page.get_by_role('heading', name='Game Day')).to_be_visible()
     expect(page.get_by_text('Game not found.')).to_be_visible()
     expect(page.get_by_text('Private Opponent')).to_have_count(0)
 
