@@ -74,6 +74,7 @@
   }
 
   if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
+    loadScript('/static/js/postgame_game_management_cleanup.js', 'postgame-game-management-cleanup');
     loadScript('/static/js/game_management_visual_polish.js', 'game-management-visual-polish');
     loadScript('/static/js/game_management_team_theme_availability.js', 'game-management-team-theme-availability');
     loadScript('/static/js/pregame_defense_picker_clarity.js', 'pregame-defense-picker-clarity');
