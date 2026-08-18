@@ -1,0 +1,188 @@
+"""App-wide page, navigation, API, and responsive-layout coverage."""
+
+import os
+import re
+
+import pytest
+
+
+pytestmark = pytest.mark.e2e
+
+if os.environ.get('COACHBOARD_E2E') != '1':
+    pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
+
+from playwright.sync_api import Page, expect
+
+
+TEST_USERNAME = 'playwright-coach'
+TEST_PASSWORD = 'playwright-password'
+ASSISTANT_USERNAME = 'playwright-assistant'
+ASSISTANT_PASSWORD = 'playwright-assistant-password'
+
+
+def login(page: Page, coachboard_url: str, username=TEST_USERNAME, password=TEST_PASSWORD):
+    page.goto(f'{coachboard_url}/login')
+    page.get_by_label('Username or email').fill(username)
+    page.locator('#password').fill(password)
+    page.get_by_role('button', name='Sign In').click()
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#games)?$'))
+
+
+def assert_healthy_document(page: Page, coachboard_url: str, path: str, expected_text: str):
+    response = page.goto(f'{coachboard_url}{path}', wait_until='domcontentloaded')
+    assert response is not None, f'{path} did not return a document response'
+    assert response.status < 500, f'{path} returned HTTP {response.status}'
+    body = page.locator('body').inner_text().strip()
+    assert body, f'{path} rendered an empty page'
+    assert 'Internal Server Error' not in body, f'{path} rendered an internal error'
+    assert expected_text.lower() in body.lower(), f'{path} did not render {expected_text!r}'
+
+
+def test_public_account_pages_and_protected_redirects(page: Page, coachboard_url: str):
+    public_pages = [
+        ('/login', 'Sign In'),
+        ('/register', 'Create Account'),
+        ('/forgot_password', 'Forgot'),
+        ('/password_help/playwright-assistant', 'Password'),
+    ]
+    for path, expected_text in public_pages:
+        assert_healthy_document(page, coachboard_url, path, expected_text)
+
+    for path in ('/', '/game-day', '/pitching', '/admin/users', '/admin/settings'):
+        page.goto(f'{coachboard_url}{path}')
+        expect(page).to_have_url(re.compile(r'/login$'))
+
+
+def test_every_authenticated_screen_renders(page: Page, coachboard_url: str):
+    login(page, coachboard_url)
+    screens = [
+        ('/', 'Playwright Prospects'),
+        ('/game-day', 'Game Day'),
+        ('/game/1', 'Browser Bears'),
+        ('/game-day/1/report', 'Browser Bears'),
+        ('/pitching', 'Pitching'),
+        ('/rules', 'Pitching Rules'),
+        ('/admin/users', 'User Management'),
+        ('/admin/teams', 'Team Management'),
+        ('/admin/settings', 'Admin Settings'),
+        ('/rotation-template/new', 'Rotation'),
+        ('/rotation-template/2', 'Six Inning Rotation'),
+        ('/starting-defense-template/new', 'Starting Defense'),
+        ('/starting-defense-template/1', 'Everyday Defense'),
+        ('/change_password', 'Password'),
+    ]
+    for path, expected_text in screens:
+        assert_healthy_document(page, coachboard_url, path, expected_text)
+
+
+def test_all_dashboard_data_services_return_team_scoped_data(page: Page, coachboard_url: str):
+    login(page, coachboard_url)
+    endpoints = (
+        '/api/session_data',
+        '/api/overview_data',
+        '/api/roster',
+        '/api/lineups',
+        '/api/pitching_data',
+        '/api/scouting_list',
+        '/api/rotations',
+        '/api/games',
+        '/api/collaboration_notes',
+        '/api/practice_plans',
+        '/api/player_development',
+        '/api/signs',
+        '/api/stats',
+        '/api/stats-dashboard',
+        '/api/game_data/1',
+        '/api/game-day/1/readiness',
+        '/api/game-day/1/pitching-rules',
+        '/api/game-day/pitching-rule-options',
+        '/api/team-game-settings',
+        '/api/roster-pitching-profiles',
+    )
+    for endpoint in endpoints:
+        response = page.request.get(f'{coachboard_url}{endpoint}')
+        assert response.status == 200, f'{endpoint} returned HTTP {response.status}: {response.text()}'
+        assert response.json() is not None, f'{endpoint} did not return JSON'
+
+    roster = page.request.get(f'{coachboard_url}/api/roster').json()
+    assert {player['name'] for player in roster} >= {'Pitcher Pat', 'Right Riley'}
+    assert 'Private Player' not in {player['name'] for player in roster}
+
+
+def test_every_home_dashboard_area_loads_seeded_content(page: Page, coachboard_url: str):
+    login(page, coachboard_url)
+    page.goto(coachboard_url)
+
+    areas = [
+        ('overview', '#overview-content-container'),
+        ('roster', '#roster-cards-container'),
+        ('player_development', '#dev-player-list'),
+        ('stats', '#stats-content-container'),
+        ('lineups', '#lineupsAccordion'),
+        ('rotations', '#rotationsAccordion'),
+        ('scouting_list', '#scouting-list-container'),
+        ('collaboration', '#team-notes-container'),
+        ('practice_plan', '#practicePlanAccordion'),
+        ('signs', '#signs-list-container'),
+    ]
+    for tab_name, container_selector in areas:
+        tab = page.locator(f'#mainTabsDesktop [href="#{tab_name}"]')
+        expect(tab).to_be_visible()
+        tab.click()
+        expect(page.locator(f'#{tab_name}')).to_have_class(re.compile(r'\bactive\b'))
+        container = page.locator(container_selector)
+        expect(container).to_be_visible()
+        expect(container).not_to_be_empty(timeout=15_000)
+
+
+def test_mobile_navigation_reaches_every_primary_area(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+    page.goto(coachboard_url)
+
+    bottom_nav = page.locator('nav.bottom-nav-fixed')
+    expect(bottom_nav).to_be_visible()
+    for label in ('Game Day', 'Roster', 'Development', 'Practice', 'More'):
+        expect(bottom_nav.get_by_text(label, exact=True)).to_be_visible()
+
+    bottom_nav.get_by_text('Roster', exact=True).click()
+    expect(page.locator('#roster')).to_have_class(re.compile(r'\bactive\b'))
+    expect(page.locator('#roster-cards-container')).to_contain_text('Pitcher Pat', timeout=15_000)
+
+    bottom_nav.get_by_text('Development', exact=True).click()
+    expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
+
+    bottom_nav.get_by_text('Practice', exact=True).click()
+    expect(page.locator('#practice_plan')).to_have_class(re.compile(r'\bactive\b'))
+
+    bottom_nav.get_by_text('More', exact=True).click()
+    expect(page.locator('#more')).to_have_class(re.compile(r'\bactive\b'))
+    for label in ('Pitching', 'Schedule', 'Lineup Templates', 'Defensive Templates', 'Stats', 'Scouting', 'Coach Notes'):
+        expect(page.locator('#more').get_by_text(label, exact=True)).to_be_visible()
+
+
+def test_role_and_team_boundaries_are_enforced(page: Page, coachboard_url: str):
+    login(page, coachboard_url, ASSISTANT_USERNAME, ASSISTANT_PASSWORD)
+
+    page.goto(f'{coachboard_url}/admin/settings')
+    expect(page).to_have_url(re.compile(r'/$'))
+    expect(page.get_by_text('You must be a Head Coach or Super Admin')).to_be_visible()
+
+    response = page.request.get(f'{coachboard_url}/api/game_data/2')
+    assert response.status == 404
+    assert 'Private Opponent' not in response.text()
+
+    page.context.clear_cookies()
+    login(page, coachboard_url)
+    page.goto(f'{coachboard_url}/switch_team/2')
+    expect(page.locator('.navbar-brand-text')).to_contain_text('Other Team')
+    team_two_roster = page.request.get(f'{coachboard_url}/api/roster').json()
+    assert [player['name'] for player in team_two_roster] == ['Private Player']
+
+
+def test_logout_ends_the_authenticated_session(page: Page, coachboard_url: str):
+    login(page, coachboard_url)
+    page.goto(f'{coachboard_url}/logout')
+    expect(page).to_have_url(re.compile(r'/login$'))
+    response = page.request.get(f'{coachboard_url}/api/roster')
+    assert response.status == 401
