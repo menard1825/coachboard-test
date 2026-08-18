@@ -40,15 +40,13 @@ def _pitcher_status_blocks_change(summary):
     ))
 
 
+def _missing_positions(alignment, allowed):
+    return [pos for pos in allowed if not (alignment or {}).get(pos)]
+
+
 @live_game_bulk_bp.route('/<int:game_id>/complete-pitcher-change', methods=['POST'])
 def complete_pitcher_change(game_id):
-    """Apply a pitcher change and the resulting defensive alignment as one live event.
-
-    The incoming pitcher may be coming from the bench or another defensive position.
-    The submitted alignment must keep every position that was occupied before the
-    pitching change occupied afterward, so moving a fielder to the mound cannot
-    silently create a defensive hole.
-    """
+    """Apply a pitcher change and resulting complete defense as one event."""
     user, team, game = _authorized_context(game_id)
     if not game:
         return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
@@ -107,18 +105,16 @@ def complete_pitcher_change(game_id):
     if after.get('P') != new_pitcher.name:
         return jsonify({'status': 'error', 'message': f'{new_pitcher.name} must be assigned to P for this pitching change.'}), 409
 
+    missing_positions = _missing_positions(after, allowed)
+    if missing_positions:
+        return jsonify({
+            'status': 'error',
+            'message': f"Finish the defense before saving. {', '.join(missing_positions)} still needs a player.",
+        }), 409
+
     valid, message = _validate_alignment(after, present_names)
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
-
-    required_positions = [pos for pos in allowed if before.get(pos)]
-    missing_positions = [pos for pos in required_positions if not after.get(pos)]
-    if missing_positions:
-        label = ', '.join(missing_positions)
-        return jsonify({
-            'status': 'error',
-            'message': f'Finish the defense before saving. {label} still needs a player.'
-        }), 409
 
     old_pitcher_id = _player_id_by_name(old_pitcher_name, team.id)
     _event(
@@ -172,10 +168,7 @@ def set_defense(game_id):
 
     after = {}
     for pos in allowed:
-        if pos == 'P':
-            value = current_pitcher
-        else:
-            value = proposed.get(pos)
+        value = current_pitcher if pos == 'P' else proposed.get(pos)
         if value:
             if value not in present_names:
                 return jsonify({
@@ -183,6 +176,13 @@ def set_defense(game_id):
                     'message': f'{value} is not available for this game.'
                 }), 409
             after[pos] = value
+
+    missing_positions = _missing_positions(after, allowed)
+    if missing_positions:
+        return jsonify({
+            'status': 'error',
+            'message': f"Set New Defense must fill every position. Missing: {', '.join(missing_positions)}.",
+        }), 409
 
     valid, message = _validate_alignment(after, present_names)
     if not valid:
