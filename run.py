@@ -1,5 +1,11 @@
 import os
 
+from dotenv import load_dotenv
+
+# Load a server-local .env before importing extensions/app because Socket.IO and
+# security configuration read environment variables during module import.
+load_dotenv()
+
 import eventlet
 
 eventlet.monkey_patch()
