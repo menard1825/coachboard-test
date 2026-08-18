@@ -25,6 +25,7 @@ jobs:
             models.py \
             season_stats.py \
             blueprints/security_guard.py \
+            blueprints/postgame_navigation.py \
             blueprints/live_game_bulk_api.py \
             blueprints/live_game_write_lock.py \
             blueprints/live_game_clock.py \
@@ -34,6 +35,7 @@ jobs:
       - name: JavaScript syntax checks
         run: |
           node --check static/js/navigation_v2.js
+          node --check static/js/postgame_game_management_cleanup.js
           node --check static/js/user_management_password_help.js
           node --check static/js/user_management_cleanup.js
           node --check static/js/live_game_pitching_finalize.js
