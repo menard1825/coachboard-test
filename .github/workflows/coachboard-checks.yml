@@ -22,6 +22,7 @@ jobs:
         run: |
           python -m py_compile \
             app.py \
+            models.py \
             season_stats.py \
             blueprints/security_guard.py \
             blueprints/live_game_bulk_api.py \
