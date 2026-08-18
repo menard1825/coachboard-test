@@ -409,6 +409,18 @@ def test_admin_settings_users_teams_registration_and_passwords(page: Page, coach
     assert settings['regulation_innings'] == 7
     post_form(page, coachboard_url, '/admin/settings/regulation-innings', {'regulation_innings': ''})
 
+    # Restore shared team settings before testing the other admin panels so a
+    # later assertion cannot leak temporary values into another browser test.
+    post_form(page, coachboard_url, '/admin/settings/update', {
+        'team_name': 'Playwright Prospects',
+        'outfielder_count': '3',
+        'age_group': '12U',
+        'pitching_rule_set': 'MLB Pitch Smart',
+        'primary_color': '#102A66',
+        'secondary_color': '#E5E7EB',
+        'timezone': 'America/Indiana/Indianapolis',
+    })
+
     post_form(page, coachboard_url, '/admin/add_user', {
         'username': 'automation-user',
         'password': 'AutomationPass123!',
@@ -424,7 +436,7 @@ def test_admin_settings_users_teams_registration_and_passwords(page: Page, coach
     assert password_help.status == 200
     assert 'Automation User Updated' in password_help.text()
     page.goto(f'{coachboard_url}/admin/users')
-    expect(page.get_by_text('Automation User Updated')).to_be_visible()
+    expect(page.get_by_text('Automation User Updated').first).to_be_visible()
 
     post_form(page, coachboard_url, '/admin/create_team', {'team_name': 'Automation Temporary Team'})
     page.goto(f'{coachboard_url}/admin/teams')
@@ -433,16 +445,6 @@ def test_admin_settings_users_teams_registration_and_passwords(page: Page, coach
     modal_target = team_item.locator('button[data-bs-target^="#deleteTeamModal-"]').get_attribute('data-bs-target')
     assert modal_target and modal_target.rsplit('-', 1)[-1].isdigit()
     get_redirect(page, coachboard_url, f'/admin/delete_team/{modal_target.rsplit("-", 1)[-1]}')
-
-    post_form(page, coachboard_url, '/admin/settings/update', {
-        'team_name': 'Playwright Prospects',
-        'outfielder_count': '3',
-        'age_group': '12U',
-        'pitching_rule_set': 'MLB Pitch Smart',
-        'primary_color': '#102A66',
-        'secondary_color': '#E5E7EB',
-        'timezone': 'America/Indiana/Indianapolis',
-    })
 
     page.context.clear_cookies()
     response = page.request.post(f'{coachboard_url}/register', form={

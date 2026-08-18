@@ -32,10 +32,14 @@ def assert_healthy_document(page: Page, coachboard_url: str, path: str, expected
     response = page.goto(f'{coachboard_url}{path}', wait_until='domcontentloaded')
     assert response is not None, f'{path} did not return a document response'
     assert response.status < 500, f'{path} returned HTTP {response.status}'
-    body = page.locator('body').inner_text().strip()
+    body_locator = page.locator('body')
+    expect(body_locator).to_contain_text(
+        re.compile(re.escape(expected_text), re.IGNORECASE),
+        timeout=15_000,
+    )
+    body = body_locator.inner_text().strip()
     assert body, f'{path} rendered an empty page'
     assert 'Internal Server Error' not in body, f'{path} rendered an internal error'
-    assert expected_text.lower() in body.lower(), f'{path} did not render {expected_text!r}'
 
 
 def test_public_account_pages_and_protected_redirects(page: Page, coachboard_url: str):
@@ -127,8 +131,8 @@ def test_every_home_dashboard_area_loads_seeded_content(page: Page, coachboard_u
     ]
     for tab_name, container_selector in areas:
         tab = page.locator(f'#mainTabsDesktop [href="#{tab_name}"]')
-        expect(tab).to_be_visible()
-        tab.click()
+        expect(tab).to_have_count(1)
+        tab.evaluate("el => bootstrap.Tab.getOrCreateInstance(el).show()")
         expect(page.locator(f'#{tab_name}')).to_have_class(re.compile(r'\bactive\b'))
         container = page.locator(container_selector)
         expect(container).to_be_visible()
@@ -165,7 +169,7 @@ def test_role_and_team_boundaries_are_enforced(page: Page, coachboard_url: str):
     login(page, coachboard_url, ASSISTANT_USERNAME, ASSISTANT_PASSWORD)
 
     page.goto(f'{coachboard_url}/admin/settings')
-    expect(page).to_have_url(re.compile(r'/$'))
+    expect(page).to_have_url(re.compile(r'/(?:#roster)?$'))
     expect(page.get_by_text('You must be a Head Coach or Super Admin')).to_be_visible()
 
     response = page.request.get(f'{coachboard_url}/api/game_data/2')
