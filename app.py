@@ -1,10 +1,12 @@
 import os
 import json
+import sqlite3
 from flask import Flask, render_template, session, jsonify, send_from_directory, redirect, url_for, flash, make_response
 from datetime import datetime, timedelta, date
 from functools import wraps
 from sqlalchemy.orm import joinedload
-from sqlalchemy import func
+from sqlalchemy import event, func
+from sqlalchemy.engine import Engine
 
 # Local Imports
 from db import db
@@ -38,26 +40,73 @@ from blueprints.live_game_api import live_game_api_bp
 from blueprints.live_game_bulk_api import live_game_bulk_bp
 from blueprints.live_game_safety import live_game_safety_bp
 from blueprints.live_game_pitching_api import live_game_pitching_bp
+from blueprints.security_guard import security_guard_bp
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
 HEAD_COACH = 'Head Coach'
 
 
+@event.listens_for(Engine, 'connect')
+def _configure_sqlite_connection(dbapi_connection, connection_record):
+    """Make SQLite safer for concurrent coaches and enforce foreign keys."""
+    if not isinstance(dbapi_connection, sqlite3.Connection):
+        return
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute('PRAGMA foreign_keys=ON')
+        cursor.execute('PRAGMA busy_timeout=15000')
+        cursor.execute('PRAGMA journal_mode=WAL')
+    finally:
+        cursor.close()
+
+
+def _env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 def create_app():
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
-    app.secret_key = os.environ.get('SECRET_KEY', 'a-fallback-secret-key-for-development')
+
+    runtime = str(os.environ.get('COACHBOARD_ENV') or os.environ.get('FLASK_ENV') or 'development').lower()
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key:
+        if runtime in {'production', 'prod'}:
+            raise RuntimeError('SECRET_KEY must be set when COACHBOARD_ENV=production.')
+        secret_key = 'coachboard-development-only-secret-change-me'
+        app.logger.warning('SECRET_KEY is not set. Using a development-only fallback.')
+    app.secret_key = secret_key
+
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = _env_bool('SESSION_COOKIE_SECURE', runtime in {'production', 'prod'})
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
     app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or (
+        'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
+    )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'connect_args': {'timeout': 15} if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:') else {},
+    }
+
+    # Stable for the life of the process, so normal browser caching works while
+    # still changing whenever the app is restarted after a deployment.
+    asset_version = os.environ.get('ASSET_VERSION') or str(int(datetime.now().timestamp()))
 
     # Initialize extensions with the app
     db.init_app(app)
     socketio.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
+
+    # Register security first so it can protect legacy routes before they run.
+    app.register_blueprint(security_guard_bp)
 
     # Register Blueprints. Live Game now has one authoritative state route;
     # the legacy /api blueprint remains only for older non-live data endpoints.
@@ -167,13 +216,13 @@ def create_app():
 
     @app.context_processor
     def inject_css_version():
-        return {'css_version': datetime.now().strftime('%Y%m%d%H%M%S')}
+        return {'css_version': asset_version}
 
     @app.context_processor
     def inject_current_year_and_timestamp():
         return {
             'current_year': datetime.now().year,
-            'current_year_timestamp': datetime.now().timestamp()
+            'current_year_timestamp': asset_version
         }
 
     # --- CORE APP ROUTES ---
@@ -217,6 +266,5 @@ def create_app():
     @app.route('/manifest.json')
     def serve_manifest():
         return send_from_directory('static', 'manifest.json')
-
 
     return app
