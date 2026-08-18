@@ -43,6 +43,7 @@ from blueprints.live_game_pitching_api import live_game_pitching_bp
 from blueprints.security_guard import security_guard_bp
 from blueprints.live_game_write_lock import live_game_write_lock_bp
 from blueprints.live_game_clock import live_game_clock_bp
+from blueprints.postgame_navigation import postgame_navigation_bp
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
@@ -109,6 +110,7 @@ def create_app():
     app.register_blueprint(security_guard_bp)
     app.register_blueprint(live_game_write_lock_bp)
     app.register_blueprint(live_game_clock_bp)
+    app.register_blueprint(postgame_navigation_bp)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
