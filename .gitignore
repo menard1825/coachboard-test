@@ -5,9 +5,28 @@ venv-staging/
 # Python cache
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Environment variables / secrets
 .env
+.env.*
+!.env.example
+
+# Databases and local backups
+app.db
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+instance/
+backups/
+data.json
+data_backup*.json
+data_export*.json
+
+# Runtime files
+app.log
+nohup.out
 
 # OS junk
 .DS_Store
@@ -17,6 +36,3 @@ __pycache__/
 .idea/
 *.swp
 team-coach-app-test/
-app.db
-app.log
-nohup.out
