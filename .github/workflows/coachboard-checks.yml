@@ -26,6 +26,7 @@ jobs:
             blueprints/security_guard.py \
             blueprints/live_game_bulk_api.py \
             blueprints/live_game_write_lock.py \
+            blueprints/live_game_clock.py \
             blueprints/live_game_pitching_api.py \
             blueprints/stats_dashboard.py
 
@@ -35,6 +36,7 @@ jobs:
           node --check static/js/user_management_password_help.js
           node --check static/js/user_management_cleanup.js
           node --check static/js/live_game_pitching_finalize.js
+          node --check static/js/live_game_clock.js
           node --check static/js/stats_dashboard_integrity.js
           node --check static/js/stats_dashboard_render.js
           node --check static/js/stats_dashboard_v2.js
