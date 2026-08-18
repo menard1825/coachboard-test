@@ -142,6 +142,26 @@ def _adjust_unplayed_current_inning(game, team_id):
     return previous
 
 
+def _recover_running_clock(game, team_id, row):
+    """Give games already live before this feature a sensible persisted start."""
+    if not game.is_live or (row and row.started_at):
+        return row
+
+    row = row or _clock_row(game.id, team_id, create=True)
+    first_event = db.session.query(GameRotationEvent).filter_by(
+        game_id=game.id,
+        team_id=team_id,
+        reverted=False,
+    ).order_by(GameRotationEvent.sequence.asc(), GameRotationEvent.id.asc()).first()
+    row.started_at = first_event.timestamp if first_event and first_event.timestamp else datetime.utcnow()
+    row.ended_at = None
+    row.end_reason = None
+    row.last_played_inning = str(game.live_current_inning or '1')
+    row.updated_at = datetime.utcnow()
+    db.session.commit()
+    return row
+
+
 @live_game_clock_bp.route('/<int:game_id>/clock', methods=['GET', 'POST'])
 def game_clock(game_id):
     user, team, game = _authorized_context(game_id)
@@ -149,38 +169,38 @@ def game_clock(game_id):
         return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
 
     row = _clock_row(game.id, team.id, create=request.method == 'POST')
+    if request.method == 'GET':
+        row = _recover_running_clock(game, team.id, row)
+        return jsonify({'status': 'success', 'clock': _clock_payload(game, row)})
 
-    if request.method == 'POST':
-        data = request.get_json(silent=True) or {}
-        action = str(data.get('action') or '').strip().lower()
+    data = request.get_json(silent=True) or {}
+    action = str(data.get('action') or '').strip().lower()
 
-        if 'time_limit_minutes' in data:
-            raw_limit = data.get('time_limit_minutes')
-            if raw_limit in (None, '', 0, '0'):
-                row.time_limit_minutes = None
-            else:
-                try:
-                    minutes = int(raw_limit)
-                except (TypeError, ValueError):
-                    return jsonify({'status': 'error', 'message': 'Enter a valid game time limit in minutes.'}), 400
-                if minutes < 15 or minutes > 300:
-                    return jsonify({'status': 'error', 'message': 'Game time limit must be between 15 and 300 minutes.'}), 400
-                row.time_limit_minutes = minutes
+    if 'time_limit_minutes' in data:
+        raw_limit = data.get('time_limit_minutes')
+        if raw_limit in (None, '', 0, '0'):
+            row.time_limit_minutes = None
+        else:
+            try:
+                minutes = int(raw_limit)
+            except (TypeError, ValueError):
+                return jsonify({'status': 'error', 'message': 'Enter a valid game time limit in minutes.'}), 400
+            if minutes < 15 or minutes > 300:
+                return jsonify({'status': 'error', 'message': 'Game time limit must be between 15 and 300 minutes.'}), 400
+            row.time_limit_minutes = minutes
 
-        if action == 'restart':
-            if not game.is_live:
-                return jsonify({'status': 'error', 'message': 'The game clock can only be restarted while Live Game is active.'}), 409
-            row.started_at = datetime.utcnow()
-            row.ended_at = None
-            row.end_reason = None
-            row.last_played_inning = str(game.live_current_inning or '1')
+    if action == 'restart':
+        if not game.is_live:
+            return jsonify({'status': 'error', 'message': 'The game clock can only be restarted while Live Game is active.'}), 409
+        row.started_at = datetime.utcnow()
+        row.ended_at = None
+        row.end_reason = None
+        row.last_played_inning = str(game.live_current_inning or '1')
 
-        row.updated_at = datetime.utcnow()
-        db.session.commit()
-        payload = _emit_clock(game, team.id, row)
-        return jsonify({'status': 'success', 'clock': payload})
-
-    return jsonify({'status': 'success', 'clock': _clock_payload(game, row)})
+    row.updated_at = datetime.utcnow()
+    db.session.commit()
+    payload = _emit_clock(game, team.id, row)
+    return jsonify({'status': 'success', 'clock': payload})
 
 
 @live_game_clock_bp.before_app_request
