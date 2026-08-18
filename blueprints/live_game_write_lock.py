@@ -20,6 +20,7 @@ def _live_game_write():
         endpoint.startswith('live_game_api.')
         or endpoint.startswith('live_game_bulk.')
         or endpoint.startswith('live_game_pitching.')
+        or endpoint.startswith('live_game_clock.')
         or endpoint == 'live_game_ui.next_inning_prep'
     )
 
