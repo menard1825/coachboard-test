@@ -83,6 +83,11 @@
     loadScript('/static/js/game_pitching_rule_picker.js', 'game-pitching-rules');
     loadScript('/static/js/live_game_sync_status.js', 'live-sync');
     loadScript('/static/js/live_game_clock.js', 'live-game-clock');
+    loadScript('/static/js/assignment_picker_availability.js', 'assignment-picker-availability');
+  }
+
+  if (/^\/(?:rotation-template|starting-defense-template)\/(?:new|\d+)\/?$/.test(window.location.pathname)) {
+    loadScript('/static/js/assignment_picker_availability.js', 'assignment-picker-availability');
   }
 
   document.querySelectorAll('a[href="#games"] span, a[href="#games"], [data-nav-games]').forEach((el) => {
