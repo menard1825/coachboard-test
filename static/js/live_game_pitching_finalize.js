@@ -59,6 +59,47 @@
     return [whole, ['0','1','2'].includes(outs) ? outs : '0'];
   }
 
+  function clearStaleModalLayer(modalEl) {
+    const otherOpenModals = [...document.querySelectorAll('.modal.show')]
+      .filter(modal => modal !== modalEl);
+    if (otherOpenModals.length) return;
+
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+    if (!modalEl?.classList.contains('show')) {
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+    }
+  }
+
+  function prepareFinalCountsModal() {
+    const modalEl = document.getElementById('liveFinalCountsModal');
+    if (!modalEl) return null;
+
+    // Bootstrap modals must not live inside the Live Game overlay/card. On iOS
+    // Safari that nesting creates a stacking context where the backdrop can sit
+    // above the dialog and swallow every tap. Keep this modal directly under body.
+    if (modalEl.parentElement !== document.body) {
+      document.body.appendChild(modalEl);
+    }
+    modalEl.style.zIndex = '1060';
+
+    if (modalEl.dataset.coachboardLayerFixed !== '1') {
+      modalEl.dataset.coachboardLayerFixed = '1';
+      modalEl.addEventListener('show.bs.modal', () => clearStaleModalLayer(modalEl));
+      modalEl.addEventListener('shown.bs.modal', () => {
+        const backdrops = [...document.querySelectorAll('.modal-backdrop')];
+        if (backdrops.length > 1 && !document.querySelector('.modal.show:not(#liveFinalCountsModal)')) {
+          backdrops.slice(0, -1).forEach(backdrop => backdrop.remove());
+        }
+        modalEl.querySelector('input, select, button')?.focus({preventScroll:true});
+      });
+      modalEl.addEventListener('hidden.bs.modal', () => clearStaleModalLayer(modalEl));
+    }
+
+    return modalEl;
+  }
+
   function renderPitchingForm(state) {
     const container = document.getElementById('finalCountsFormContainer');
     if (!container) return;
@@ -145,19 +186,24 @@
     busy = true;
     try {
       const state = await loadState();
-      renderPitchingForm(state);
-      const modalEl = document.getElementById('liveFinalCountsModal');
+      const modalEl = prepareFinalCountsModal();
       if (!modalEl) throw new Error('GameChanger pitching dialog is unavailable.');
+      renderPitchingForm(state);
       const title = modalEl.querySelector('.modal-title');
       if (title) title.textContent = 'Enter GameChanger Pitching Stats';
       const confirm = modalEl.querySelector('#confirmFinalCountsBtn');
       if (confirm) {
+        confirm.disabled = false;
         confirm.textContent = 'Save GameChanger Stats';
         confirm.classList.remove('btn-danger');
         confirm.classList.add('btn-primary');
       }
       const cancel = modalEl.querySelector('.modal-footer [data-bs-dismiss="modal"]');
-      if (cancel) cancel.textContent = 'Not Ready Yet';
+      if (cancel) {
+        cancel.disabled = false;
+        cancel.textContent = 'Not Ready Yet';
+      }
+      clearStaleModalLayer(modalEl);
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
     } catch (err) {
       alert(err.message || 'Unable to prepare GameChanger pitching entry.');
@@ -194,7 +240,8 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to save GameChanger pitching stats.');
 
-      bootstrap.Modal.getOrCreateInstance(document.getElementById('liveFinalCountsModal')).hide();
+      const modalEl = prepareFinalCountsModal();
+      if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
       if (data.warnings?.length) {
         alert(`GameChanger stats saved, but these values are still missing:\n\n${data.warnings.join('\n')}`);
       }
@@ -226,8 +273,12 @@
     }
   }, true);
 
+  prepareFinalCountsModal();
   configureVisibleLabels();
-  document.addEventListener('DOMContentLoaded', configureVisibleLabels, {once:true});
+  document.addEventListener('DOMContentLoaded', () => {
+    prepareFinalCountsModal();
+    configureVisibleLabels();
+  }, {once:true});
 
   const params = new URLSearchParams(window.location.search);
   if (params.get('pitching') === '1') {
