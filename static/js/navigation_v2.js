@@ -21,6 +21,9 @@
   function loadScript(src, key) {
     if (document.querySelector(`script[data-coach-helper="${key}"]`)) return;
     const script = document.createElement('script');
+    // Dynamically inserted scripts are async by default. Turning async off keeps
+    // dependent helpers (renderer -> integrity guard -> controller) deterministic.
+    script.async = false;
     script.src = versionedHelperSrc(src);
     script.dataset.coachHelper = key;
     document.head.appendChild(script);
@@ -56,6 +59,7 @@
     loadScript('/static/js/touch_reorder_guard.js', 'touch-reorder-guard');
     loadScript('/static/js/stats_dashboard_style.js', 'stats-dashboard-style');
     loadScript('/static/js/stats_dashboard_render.js', 'stats-dashboard-render');
+    loadScript('/static/js/stats_dashboard_integrity.js', 'stats-dashboard-integrity');
     loadScript('/static/js/stats_dashboard_v2.js', 'stats-dashboard-v2');
   }
 
