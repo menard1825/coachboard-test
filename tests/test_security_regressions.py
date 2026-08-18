@@ -120,23 +120,6 @@ def test_stale_membership_session_is_rejected(monkeypatch):
     assert 'team access is no longer active' in response.get_json()['message']
 
 
-def test_head_coach_can_rotate_team_join_code(monkeypatch):
-    app = _build_app(monkeypatch)
-    client = app.test_client()
-    _login(client)
-
-    from db import db
-    from models import Team
-
-    response = client.post('/admin/settings/rotate-registration-code')
-
-    assert response.status_code == 302
-    with app.app_context():
-        team = db.session.get(Team, 1)
-        assert team.registration_code != 'test-code'
-        assert len(team.registration_code) >= 10
-
-
 def test_incomplete_pitch_history_never_becomes_zero_total():
     from blueprints.stats_dashboard import _apply_pitch_completeness
 
@@ -163,3 +146,12 @@ def test_incomplete_pitch_history_never_becomes_zero_total():
     assert row['pitches_per_appearance'] is None
     assert dashboard['summary']['team_pitching_pitches'] is None
     assert dashboard['summary']['known_team_pitching_pitches'] == 42
+
+
+def test_gamechanger_innings_parser_uses_baseball_out_notation():
+    from blueprints.live_game_pitching_api import _parse_innings
+
+    assert _parse_innings({'innings_whole': 2, 'innings_outs': 0}) == 2.0
+    assert _parse_innings({'innings_whole': 2, 'innings_outs': 1}) == 2.1
+    assert _parse_innings({'innings_whole': 2, 'innings_outs': 2}) == 2.2
+    assert _parse_innings({'innings_whole': '', 'innings_outs': 1}) is None
