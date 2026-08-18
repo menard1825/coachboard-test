@@ -1,0 +1,60 @@
+name: CoachBoard Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Python compile checks
+        run: |
+          python -m py_compile \
+            app.py \
+            models.py \
+            season_stats.py \
+            blueprints/security_guard.py \
+            blueprints/postgame_navigation.py \
+            blueprints/live_game_bulk_api.py \
+            blueprints/live_game_write_lock.py \
+            blueprints/live_game_clock.py \
+            blueprints/live_game_pitching_api.py \
+            blueprints/stats_dashboard.py
+
+      - name: JavaScript syntax checks
+        run: |
+          node --check static/js/navigation_v2.js
+          node --check static/js/postgame_game_management_cleanup.js
+          node --check static/js/user_management_password_help.js
+          node --check static/js/user_management_cleanup.js
+          node --check static/js/live_game_pitching_finalize.js
+          node --check static/js/live_game_clock.js
+          node --check static/js/stats_dashboard_integrity.js
+          node --check static/js/stats_dashboard_render.js
+          node --check static/js/stats_dashboard_v2.js
+
+      - name: Migration chain check
+        env:
+          SECRET_KEY: ci-test-secret
+          COACHBOARD_ENV: test
+          DATABASE_URL: sqlite:///:memory:
+          FLASK_APP: app.py
+        run: flask db heads
+
+      - name: Regression tests
+        env:
+          SECRET_KEY: ci-test-secret
+          COACHBOARD_ENV: test
+          DATABASE_URL: sqlite:///:memory:
+        run: pytest -q

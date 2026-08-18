@@ -191,9 +191,15 @@ def end_with_pitching(game_id):
     warnings = []
     if not defer_pitching:
         if missing_pitch_counts:
-            warnings.append('Missing pitch count: ' + ', '.join(missing_pitch_counts))
+            warnings.append(
+                'Pitch Count is missing for: ' + ', '.join(missing_pitch_counts) +
+                '. Open GameChanger Pitching and copy the final pitch total.'
+            )
         if missing_innings:
-            warnings.append('Missing innings: ' + ', '.join(missing_innings))
+            warnings.append(
+                'Innings Pitched (IP) is missing for: ' + ', '.join(missing_innings) +
+                '. Copy the GameChanger IP value; for example, 2.1 IP means 2 full innings plus 1 extra out.'
+            )
 
     return jsonify({
         'status': 'success',

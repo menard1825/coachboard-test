@@ -4,7 +4,13 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float
 from sqlalchemy.orm import relationship
 from db import db
 import json
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def utcnow_naive():
+    """Return UTC as a naive datetime for existing SQLAlchemy DateTime columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 # All models now inherit from db.Model
 class Team(db.Model):
@@ -228,7 +234,7 @@ class GameRotationEvent(db.Model):
     inning = Column(String, nullable=False)
     sequence = Column(Integer, nullable=False)
     event_type = Column(String, nullable=False)  # 'Pitcher Change', 'Defensive Change', 'End Inning'
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=utcnow_naive)
     changed_by_user = Column(String)
 
     before_alignment = Column(JSON)
@@ -251,7 +257,7 @@ class PlayerPitchTarget(db.Model):
     target_pitches = Column(Integer, nullable=False)
     local_date = Column(String, nullable=False)  # Stored as YYYY-MM-DD
     reason = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
 
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
@@ -271,7 +277,7 @@ class CollaborationNote(db.Model):
     note_type = Column(String, nullable=False)
     text = Column(Text, nullable=False)
     author = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
+    timestamp = Column(DateTime, default=utcnow_naive) # Changed to DateTime
     player_name = Column(String, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
@@ -299,7 +305,7 @@ class PracticeTask(db.Model):
     text = Column(Text, nullable=False)
     status = Column(String, default="pending")
     author = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
+    timestamp = Column(DateTime, default=utcnow_naive) # Changed to DateTime
 
     practice_plan_id = Column(Integer, ForeignKey('practice_plans.id'), nullable=False)
     practice_plan = relationship("PracticePlan", back_populates="tasks")
@@ -311,7 +317,7 @@ class PlayerDevelopmentFocus(db.Model):
     status = Column(String, default="active")
     notes = Column(Text)
     progress_notes = Column(Text, nullable=True) # New field
-    created_date = Column(DateTime, default=datetime.utcnow) # Changed to DateTime
+    created_date = Column(DateTime, default=utcnow_naive) # Changed to DateTime
     completed_date = Column(DateTime, nullable=True) # Changed to DateTime
     author = Column(String)
     last_edited_by = Column(String)

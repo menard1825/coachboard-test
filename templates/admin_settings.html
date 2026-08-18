@@ -181,7 +181,7 @@
             </div>
         </div>
         <div class="col-lg-4 mb-4">
-            <div class="card h-100">
+            <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">Team Logo</h5>
                 </div>
@@ -192,7 +192,7 @@
                     {% else %}
                         <p class="text-muted">No custom logo uploaded.</p>
                     {% endif %}
-                    
+
                     <form action="{{ url_for('admin.upload_logo') }}" method="POST" enctype="multipart/form-data">
                         <div class="mb-3">
                             <label for="logo" class="form-label">Upload New Logo</label>
@@ -200,6 +200,26 @@
                             <div class="form-text">Allowed types: png, jpg, gif, svg.</div>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Upload Logo</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-shield-lock me-1"></i> Team Join Code</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">Coaches use this code when registering for your team. Treat it like an invitation link and only share it with people who should have team access.</p>
+                    <label for="teamRegistrationCode" class="form-label fw-semibold">Current Code</label>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control font-monospace" id="teamRegistrationCode" value="{{ settings.registration_code }}" readonly>
+                        <button class="btn btn-outline-secondary" type="button" id="copyTeamRegistrationCode"><i class="bi bi-copy me-1"></i>Copy</button>
+                    </div>
+                    <div class="alert alert-warning small py-2" role="alert">
+                        Rotating the code immediately invalidates the old one. Existing coach accounts are not affected.
+                    </div>
+                    <form action="{{ url_for('security_guard.rotate_registration_code') }}" method="POST" onsubmit="return confirm('Rotate the team join code? The current code will stop working immediately.');">
+                        <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-arrow-repeat me-1"></i>Rotate Join Code</button>
                     </form>
                 </div>
             </div>
@@ -215,6 +235,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const ageGroupInput = document.getElementById('age_group');
     const regulationInput = document.getElementById('regulation_innings');
     const regulationHelp = document.getElementById('regulationInningsHelp');
+    const copyJoinCode = document.getElementById('copyTeamRegistrationCode');
+    const joinCodeInput = document.getElementById('teamRegistrationCode');
 
     if (primaryColorInput) {
         primaryColorInput.addEventListener('input', function() {
@@ -241,6 +263,20 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             regulationHelp.innerHTML = `Current: <strong>${suggestedInnings(ageGroup)} innings</strong> automatically for ${ageGroup}.`;
         }
+    }
+
+    if (copyJoinCode && joinCodeInput) {
+        copyJoinCode.addEventListener('click', async function() {
+            try {
+                await navigator.clipboard.writeText(joinCodeInput.value);
+                const original = this.innerHTML;
+                this.innerHTML = '<i class="bi bi-check-lg me-1"></i>Copied';
+                window.setTimeout(() => { this.innerHTML = original; }, 1400);
+            } catch (_) {
+                joinCodeInput.select();
+                document.execCommand('copy');
+            }
+        });
     }
 
     if (ageGroupInput) ageGroupInput.addEventListener('change', refreshRegulationHelp);

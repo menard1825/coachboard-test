@@ -1,10 +1,12 @@
 import os
 import json
+import sqlite3
 from flask import Flask, render_template, session, jsonify, send_from_directory, redirect, url_for, flash, make_response
 from datetime import datetime, timedelta, date
 from functools import wraps
 from sqlalchemy.orm import joinedload
-from sqlalchemy import func
+from sqlalchemy import event, func
+from sqlalchemy.engine import Engine
 
 # Local Imports
 from db import db
@@ -38,29 +40,78 @@ from blueprints.live_game_api import live_game_api_bp
 from blueprints.live_game_bulk_api import live_game_bulk_bp
 from blueprints.live_game_safety import live_game_safety_bp
 from blueprints.live_game_pitching_api import live_game_pitching_bp
+from blueprints.security_guard import security_guard_bp
+from blueprints.live_game_write_lock import live_game_write_lock_bp
+from blueprints.live_game_clock import live_game_clock_bp
+from blueprints.postgame_navigation import postgame_navigation_bp
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
 HEAD_COACH = 'Head Coach'
 
 
+@event.listens_for(Engine, 'connect')
+def _configure_sqlite_connection(dbapi_connection, connection_record):
+    """Make SQLite safer for concurrent coaches and enforce foreign keys."""
+    if not isinstance(dbapi_connection, sqlite3.Connection):
+        return
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute('PRAGMA foreign_keys=ON')
+        cursor.execute('PRAGMA busy_timeout=15000')
+        cursor.execute('PRAGMA journal_mode=WAL')
+    finally:
+        cursor.close()
+
+
+def _env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 def create_app():
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
-    app.secret_key = os.environ.get('SECRET_KEY', 'a-fallback-secret-key-for-development')
+
+    runtime = str(os.environ.get('COACHBOARD_ENV') or os.environ.get('FLASK_ENV') or 'development').lower()
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key:
+        if runtime in {'production', 'prod'}:
+            raise RuntimeError('SECRET_KEY must be set when COACHBOARD_ENV=production.')
+        secret_key = 'coachboard-development-only-secret-change-me'
+        app.logger.warning('SECRET_KEY is not set. Using a development-only fallback.')
+    app.secret_key = secret_key
+
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = _env_bool('SESSION_COOKIE_SECURE', runtime in {'production', 'prod'})
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
     app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or (
+        'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
+    )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'connect_args': {'timeout': 15} if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:') else {},
+    }
 
-    # Initialize extensions with the app
+    asset_version = os.environ.get('ASSET_VERSION') or str(int(datetime.now().timestamp()))
+
     db.init_app(app)
     socketio.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
 
-    # Register Blueprints. Live Game now has one authoritative state route;
-    # the legacy /api blueprint remains only for older non-live data endpoints.
+    # Register guards before application routes so their before_request handlers
+    # protect all later blueprints.
+    app.register_blueprint(security_guard_bp)
+    app.register_blueprint(live_game_write_lock_bp)
+    app.register_blueprint(live_game_clock_bp)
+    app.register_blueprint(postgame_navigation_bp)
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(roster_bp)
@@ -79,7 +130,6 @@ def create_app():
     app.register_blueprint(api_bp)
     app.register_blueprint(stats_dashboard_bp)
 
-    # --- SocketIO Handlers ---
     from flask_socketio import join_room, leave_room
     from models import TeamMembership
 
@@ -125,7 +175,6 @@ def create_app():
         leave_room(room_name)
         return {'status': 'success'}
 
-    # --- Custom Jinja Filter for Date/Time Formatting ---
     @app.template_filter('format_datetime')
     def format_datetime_filter(dt):
         if not dt or not isinstance(dt, (datetime, date)):
@@ -136,7 +185,6 @@ def create_app():
             return dt.strftime('%A, %m/%d/%y')
         return dt
 
-    # --- Decorators & Context Processors ---
     def login_required(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
@@ -157,7 +205,6 @@ def create_app():
             team = db.session.get(Team, session['team_id'])
             info['current_team'] = team
 
-            # Add list of available teams for the current user for switching
             if 'username' in session:
                 from models import TeamMembership
                 user_teams = db.session.query(Team).join(TeamMembership).join(User).filter(func.lower(User.username) == func.lower(session['username'])).all()
@@ -167,16 +214,15 @@ def create_app():
 
     @app.context_processor
     def inject_css_version():
-        return {'css_version': datetime.now().strftime('%Y%m%d%H%M%S')}
+        return {'css_version': asset_version}
 
     @app.context_processor
     def inject_current_year_and_timestamp():
         return {
             'current_year': datetime.now().year,
-            'current_year_timestamp': datetime.now().timestamp()
+            'current_year_timestamp': asset_version
         }
 
-    # --- CORE APP ROUTES ---
     @app.route('/')
     @login_required
     def home():
@@ -196,7 +242,6 @@ def create_app():
             if not isinstance(user_tab_order, list) or not user_tab_order:
                 final_tab_order = default_tab_order
             else:
-                # Ignore stale/unknown tab keys from older saved layouts.
                 final_tab_order = [tab for tab in user_tab_order if tab in all_tabs]
                 for tab in default_tab_order:
                     if tab not in final_tab_order:
@@ -217,6 +262,5 @@ def create_app():
     @app.route('/manifest.json')
     def serve_manifest():
         return send_from_directory('static', 'manifest.json')
-
 
     return app

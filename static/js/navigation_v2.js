@@ -21,6 +21,9 @@
   function loadScript(src, key) {
     if (document.querySelector(`script[data-coach-helper="${key}"]`)) return;
     const script = document.createElement('script');
+    // Dynamically inserted scripts are async by default. Turning async off keeps
+    // dependent helpers deterministic.
+    script.async = false;
     script.src = versionedHelperSrc(src);
     script.dataset.coachHelper = key;
     document.head.appendChild(script);
@@ -56,6 +59,7 @@
     loadScript('/static/js/touch_reorder_guard.js', 'touch-reorder-guard');
     loadScript('/static/js/stats_dashboard_style.js', 'stats-dashboard-style');
     loadScript('/static/js/stats_dashboard_render.js', 'stats-dashboard-render');
+    loadScript('/static/js/stats_dashboard_integrity.js', 'stats-dashboard-integrity');
     loadScript('/static/js/stats_dashboard_v2.js', 'stats-dashboard-v2');
   }
 
@@ -66,9 +70,11 @@
 
   if (window.location.pathname === '/admin/users') {
     loadScript('/static/js/user_management_password_help.js', 'user-management-password-help');
+    loadScript('/static/js/user_management_cleanup.js', 'user-management-cleanup');
   }
 
   if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
+    loadScript('/static/js/postgame_game_management_cleanup.js', 'postgame-game-management-cleanup');
     loadScript('/static/js/game_management_visual_polish.js', 'game-management-visual-polish');
     loadScript('/static/js/game_management_team_theme_availability.js', 'game-management-team-theme-availability');
     loadScript('/static/js/pregame_defense_picker_clarity.js', 'pregame-defense-picker-clarity');
@@ -77,6 +83,7 @@
     loadScript('/static/js/game_prep_readiness.js', 'game-readiness');
     loadScript('/static/js/game_pitching_rule_picker.js', 'game-pitching-rules');
     loadScript('/static/js/live_game_sync_status.js', 'live-sync');
+    loadScript('/static/js/live_game_clock.js', 'live-game-clock');
   }
 
   document.querySelectorAll('a[href="#games"] span, a[href="#games"], [data-nav-games]').forEach((el) => {
