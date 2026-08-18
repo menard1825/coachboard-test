@@ -1,3 +1,4 @@
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -155,3 +156,77 @@ def test_gamechanger_innings_parser_uses_baseball_out_notation():
     assert _parse_innings({'innings_whole': 2, 'innings_outs': 1}) == 2.1
     assert _parse_innings({'innings_whole': 2, 'innings_outs': 2}) == 2.2
     assert _parse_innings({'innings_whole': '', 'innings_outs': 1}) is None
+
+
+def test_game_clock_time_limit_persists(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game
+
+    with app.app_context():
+        db.session.add(Game(
+            id=10,
+            date=datetime(2026, 8, 18),
+            opponent='Clock Test',
+            team_id=1,
+        ))
+        db.session.commit()
+
+    response = client.post('/api/live-game/10/clock', json={'time_limit_minutes': 100})
+
+    assert response.status_code == 200
+    payload = response.get_json()['clock']
+    assert payload['time_limit_minutes'] == 100
+    assert payload['is_live'] is False
+
+
+def test_time_limit_can_exclude_loaded_but_unplayed_next_inning(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    from blueprints.live_game_clock import _adjust_unplayed_current_inning
+    from db import db
+    from models import Game, GameRotationEvent
+
+    with app.app_context():
+        game = Game(
+            id=11,
+            date=datetime(2026, 8, 18),
+            opponent='Time Limit Test',
+            team_id=1,
+            is_live=False,
+            live_current_inning='5',
+        )
+        transition = GameRotationEvent(
+            team_id=1,
+            game_id=11,
+            inning='5',
+            sequence=1,
+            event_type='End Inning',
+            before_alignment={'P': 'Pitcher Four'},
+            after_alignment={'P': 'Pitcher Five'},
+            reverted=False,
+        )
+        end_event = GameRotationEvent(
+            team_id=1,
+            game_id=11,
+            inning='5',
+            sequence=2,
+            event_type='End Game',
+            before_alignment={'P': 'Pitcher Five'},
+            after_alignment={'P': 'Pitcher Five'},
+            reverted=False,
+        )
+        db.session.add_all([game, transition, end_event])
+        db.session.commit()
+
+        last_played = _adjust_unplayed_current_inning(game, 1)
+        db.session.commit()
+
+        assert last_played == '4'
+        assert game.live_current_inning == '4'
+        assert transition.reverted is True
+        assert end_event.inning == '4'
+        assert end_event.after_alignment == {'P': 'Pitcher Four'}
