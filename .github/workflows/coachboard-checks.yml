@@ -53,7 +53,7 @@ jobs:
         env:
           SECRET_KEY: ci-test-secret
           COACHBOARD_ENV: test
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: 'sqlite:///:memory:'
           FLASK_APP: app.py
         run: flask db heads
 
@@ -61,7 +61,7 @@ jobs:
         env:
           SECRET_KEY: ci-test-secret
           COACHBOARD_ENV: test
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: 'sqlite:///:memory:'
         run: python -m pytest -q
 
   browser-tests:
