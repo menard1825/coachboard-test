@@ -12,6 +12,11 @@ from blueprints.live_game_api import _authorized_context, _broadcast_state
 live_game_clock_bp = Blueprint('live_game_clock', __name__, url_prefix='/api/live-game')
 
 
+def _utcnow_naive():
+    """Return UTC in the naive form used by CoachBoard's existing DateTime columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class GameClockState(db.Model):
     __tablename__ = 'game_clock_states'
 
@@ -23,7 +28,7 @@ class GameClockState(db.Model):
     time_limit_minutes = db.Column(db.Integer, nullable=True)
     end_reason = db.Column(db.String(32), nullable=True)
     last_played_inning = db.Column(db.String, nullable=True)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
+    updated_at = db.Column(db.DateTime, default=_utcnow_naive, nullable=True)
 
     __table_args__ = (
         UniqueConstraint('game_id', 'team_id', name='uq_game_clock_state_game_team'),
@@ -56,7 +61,7 @@ def _inning_number(value):
 
 
 def _clock_payload(game, row):
-    now = datetime.utcnow()
+    now = _utcnow_naive()
     started = row.started_at if row else None
     ended = row.ended_at if row else None
     elapsed = None
@@ -179,11 +184,11 @@ def _recover_running_clock(game, team_id, row):
         team_id=team_id,
         reverted=False,
     ).order_by(GameRotationEvent.sequence.asc(), GameRotationEvent.id.asc()).first()
-    row.started_at = first_event.timestamp if first_event and first_event.timestamp else datetime.utcnow()
+    row.started_at = first_event.timestamp if first_event and first_event.timestamp else _utcnow_naive()
     row.ended_at = None
     row.end_reason = None
     row.last_played_inning = str(game.live_current_inning or '1')
-    row.updated_at = datetime.utcnow()
+    row.updated_at = _utcnow_naive()
     db.session.commit()
     return row
 
@@ -218,12 +223,12 @@ def game_clock(game_id):
     if action == 'restart':
         if not game.is_live:
             return jsonify({'status': 'error', 'message': 'The game clock can only be restarted while Live Game is active.'}), 409
-        row.started_at = datetime.utcnow()
+        row.started_at = _utcnow_naive()
         row.ended_at = None
         row.end_reason = None
         row.last_played_inning = str(game.live_current_inning or '1')
 
-    row.updated_at = datetime.utcnow()
+    row.updated_at = _utcnow_naive()
     db.session.commit()
     payload = _emit_clock(game, team.id, row)
     return jsonify({'status': 'success', 'clock': payload})
@@ -289,11 +294,11 @@ def persist_live_game_clock_lifecycle(response):
     if endpoint == 'live_game_api.start':
         row = _clock_row(game.id, team_id, create=True)
         if row.started_at is None or row.ended_at is not None:
-            row.started_at = datetime.utcnow()
+            row.started_at = _utcnow_naive()
         row.ended_at = None
         row.end_reason = None
         row.last_played_inning = '1'
-        row.updated_at = datetime.utcnow()
+        row.updated_at = _utcnow_naive()
         db.session.commit()
         _emit_clock(game, team_id, row)
         return response
@@ -315,11 +320,11 @@ def persist_live_game_clock_lifecycle(response):
             last_played = _adjust_unplayed_current_inning(game, team_id)
 
         row = _clock_row(game.id, team_id, create=True)
-        row.started_at = row.started_at or datetime.utcnow()
-        row.ended_at = row.ended_at or datetime.utcnow()
+        row.started_at = row.started_at or _utcnow_naive()
+        row.ended_at = row.ended_at or _utcnow_naive()
         row.end_reason = reason
         row.last_played_inning = last_played
-        row.updated_at = datetime.utcnow()
+        row.updated_at = _utcnow_naive()
         db.session.commit()
 
         # The normal end workflow broadcasts before this hook runs. Broadcast one
