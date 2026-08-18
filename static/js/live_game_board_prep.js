@@ -80,7 +80,7 @@
       #${PANEL_ID} .pde-inning small{display:block;font-size:.53rem;letter-spacing:.08em;opacity:.75;font-weight:750}
       #${PANEL_ID} .pde-inning strong{display:block;font-size:1.4rem;line-height:1.05}
       #${PANEL_ID} .pde-body{padding:13px 16px 15px;background:#fff}
-      #${PANEL_ID} .pde-tools{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;margin-bottom:12px}
+      #${PANEL_ID} .pde-tools{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px;margin-bottom:12px}
       #${PANEL_ID} .pde-tools .btn,#${PANEL_ID} .pde-tools .form-select{min-height:42px;border-radius:9px}
       #${PANEL_ID} .pde-field-card{border:1px solid #d6e2d4;border-radius:14px;overflow:hidden;background:#fff}
       #${PANEL_ID} .pde-field-caption{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #e4e9e4;background:#fff}
@@ -98,10 +98,16 @@
       #${PANEL_ID} .pde-label{font-size:.61rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin-bottom:6px}
       #${PANEL_ID} .pde-chips{display:flex;gap:5px;flex-wrap:wrap}
       #${PANEL_ID} .pde-chips span{font-size:.65rem;border:1px solid #dde2e7;background:#f8f9fb;border-radius:999px;padding:4px 7px;color:#475467;font-weight:650}
-      #${PANEL_ID} .pde-status{text-align:center;font-size:.71rem;color:#667085;margin-top:9px}
-      #${PANEL_ID} .pde-status .open{color:#a63d3d;font-weight:800}
+      #${PANEL_ID} .pde-status{display:flex;align-items:center;gap:10px;text-align:left;font-size:.72rem;margin-top:10px;border:2px solid #a66500;border-radius:11px;background:#fff4d8;color:#3f2b00;padding:9px 10px;box-shadow:0 2px 5px rgba(75,48,0,.08)}
+      #${PANEL_ID} .pde-status.complete{border-color:#176b38;background:#edf8f1;color:#123d23}
+      #${PANEL_ID} .pde-status-icon{font-size:1.05rem;line-height:1;flex:0 0 auto}
+      #${PANEL_ID} .pde-status-copy{min-width:0;flex:1}
+      #${PANEL_ID} .pde-status-copy strong{display:block;font-size:.76rem;font-weight:900;color:inherit}
+      #${PANEL_ID} .pde-status-copy span{display:block;font-size:.68rem;font-weight:700;color:inherit;margin-top:1px;line-height:1.25}
+      #${PANEL_ID} .pde-status-badge{flex:0 0 auto;background:#694200;color:#fff;border-radius:999px;padding:4px 8px;font-size:.56rem;font-weight:900;letter-spacing:.05em}
+      #${PANEL_ID} .pde-status.complete .pde-status-badge{background:#176b38}
       #pde-player-modal .modal-content,#pde-preset-modal .modal-content{border:0;border-radius:16px;overflow:hidden}
-      #pde-player-modal .pde-choice{padding:12px 14px}
+      #pde-player-modal .pde-choice{padding:14px;min-height:56px}
       #pde-player-modal .pde-choice small{display:block;color:#667085;margin-top:2px}
 
       @media (max-width:575.98px){
@@ -109,6 +115,8 @@
         #${PANEL_ID} .pde-body{padding:11px 12px 13px}
         #${PANEL_ID} .pde-tools{grid-template-columns:1fr 1fr}
         #${PANEL_ID} .pde-tools select{grid-column:1/-1}
+        #${PANEL_ID} .pde-status{align-items:flex-start}
+        #${PANEL_ID} .pde-status-badge{display:none}
         #${PANEL_ID} .pde-field{height:300px}
         #${PANEL_ID} .pde-spot{width:66px;min-height:41px;padding:4px}
         #${PANEL_ID} .pde-name{font-size:.58rem}
@@ -124,7 +132,7 @@
         #${PANEL_ID} .pde-body{padding:12px 14px 14px}
         #${PANEL_ID} .pde-field{height:clamp(330px,39vw,455px)}
         #${PANEL_ID} .pde-spot{width:clamp(80px,10vw,112px)}
-        #${PANEL_ID} .pde-tools{grid-template-columns:minmax(260px,1fr) auto auto}
+        #${PANEL_ID} .pde-tools{grid-template-columns:minmax(260px,1fr) auto auto auto}
       }
     `;
     document.head.appendChild(style);
@@ -272,10 +280,19 @@
             ${savedPresets.map((preset) => `<option value="${preset.id}">${esc(presetName(preset))}</option>`).join('')}
           </select>
           <button class="btn btn-outline-primary" id="pde-apply" disabled>Apply to Inning ${esc(inning)}</button>
+          <button class="btn btn-outline-dark" id="pde-primary-fill" title="Fill open spots from each player's saved primary position"><i class="bi bi-lightning-charge-fill me-1"></i>Quick-Fill Primaries</button>
           <button class="btn btn-outline-secondary" id="pde-save">Save This Inning</button>
         </div>
         ${baseballField(source)}
-        <div class="pde-status">${open.length ? `<span class="open">Open: ${esc(open.join(', '))}</span>` : '<strong>Defense complete</strong>'} • Changes save to this inning only.</div>
+        <div class="pde-status ${open.length ? 'needs' : 'complete'}">
+          <i class="bi ${open.length ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill'} pde-status-icon" aria-hidden="true"></i>
+          <div class="pde-status-copy">
+            <strong>${open.length ? `${open.length} open position${open.length === 1 ? '' : 's'}` : 'Defense complete'}</strong>
+            <span class="pde-status-detail">${open.length ? esc(open.join(', ')) : 'Every field position has a player.'}</span>
+            <span class="pde-status-note">Changes save to this inning only.</span>
+          </div>
+          <span class="pde-status-badge">${open.length ? 'ACTION NEEDED' : 'READY'}</span>
+        </div>
       </div>`;
 
     panel.querySelectorAll('[data-pde-pos]').forEach((button) => {
@@ -286,6 +303,7 @@
     const applyButton = $('pde-apply');
     presetSelect.addEventListener('change', () => { applyButton.disabled = !presetSelect.value; });
     applyButton.addEventListener('click', applyPreset);
+    $('pde-primary-fill').addEventListener('click', fillPrimaryPositions);
     $('pde-save').addEventListener('click', openPresetModal);
   }
 
@@ -297,7 +315,7 @@
     modal.className = 'modal fade';
     modal.tabIndex = -1;
     modal.innerHTML = `
-      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
           <div class="modal-header">
             <div><h5 class="modal-title mb-0"></h5><div class="small text-muted" id="pde-help"></div></div>
@@ -431,6 +449,54 @@
           : `${name} applied to Inning ${inning}.`,
         unavailable.length ? 'warning' : 'success'
       );
+    } catch (error) {
+      toast(error.message, 'danger');
+      await refresh();
+    }
+  }
+
+  async function fillPrimaryPositions() {
+    if (busy) return;
+
+    const next = {...alignment()};
+    const assigned = new Set(Object.values(next).filter(Boolean));
+    const bench = presentPlayers().filter((player) => !assigned.has(player.name));
+    const filled = [];
+    const conflicts = [];
+    const open = positions().filter((pos) => !next[pos]);
+
+    open.forEach((pos) => {
+      const candidates = bench.filter((player) => {
+        if (assigned.has(player.name) || String(player.position1 || '').toUpperCase() !== pos) return false;
+        if (pos !== 'P') return true;
+        return state?.pitch_count_summary?.[player.name]?.status === 'Available';
+      });
+
+      if (candidates.length === 1) {
+        next[pos] = candidates[0].name;
+        assigned.add(candidates[0].name);
+        filled.push(pos);
+      } else if (candidates.length > 1) {
+        conflicts.push(pos);
+      }
+    });
+
+    if (!filled.length) {
+      toast(
+        conflicts.length
+          ? `Choose players manually for ${conflicts.join(', ')} because more than one player has that primary position.`
+          : 'No open spots had one clear, available primary-position match.',
+        'warning'
+      );
+      return;
+    }
+
+    state.rotation.innings[inning] = next;
+    render();
+    try {
+      await saveRotation();
+      const conflictNote = conflicts.length ? ` Choose ${conflicts.join(', ')} manually.` : '';
+      toast(`Filled ${filled.join(', ')} from saved primary positions.${conflictNote}`, conflicts.length ? 'warning' : 'success');
     } catch (error) {
       toast(error.message, 'danger');
       await refresh();

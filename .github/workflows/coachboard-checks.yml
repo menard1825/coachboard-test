@@ -40,6 +40,10 @@ jobs:
           node --check static/js/user_management_cleanup.js
           node --check static/js/live_game_pitching_finalize.js
           node --check static/js/live_game_clock.js
+          node --check static/js/game_pitching_rule_picker.js
+          node --check static/js/live_game_board_prep.js
+          node --check static/js/game_management_coach_simplify.js
+          node --check static/js/gameday_pitching_steppers.js
           node --check static/js/stats_dashboard_integrity.js
           node --check static/js/stats_dashboard_render.js
           node --check static/js/stats_dashboard_v2.js
@@ -57,4 +61,4 @@ jobs:
           SECRET_KEY: ci-test-secret
           COACHBOARD_ENV: test
           DATABASE_URL: sqlite:///:memory:
-        run: pytest -q
+        run: python -m pytest -q

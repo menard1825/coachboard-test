@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -267,3 +268,53 @@ def test_completed_game_opens_actual_report_by_default(monkeypatch):
 
     assert response.status_code == 302
     assert response.headers['Location'].endswith('/game-day/12/report')
+
+
+def test_game_management_renders_dugout_friendly_pitching_controls(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game, Player
+
+    with app.app_context():
+        db.session.add_all([
+            Game(
+                id=13,
+                date=datetime(2026, 8, 18),
+                opponent='Dugout UX Test',
+                team_id=1,
+            ),
+            Player(
+                id=2,
+                name='Primary First Baseman',
+                position1='1B',
+                team_id=1,
+            ),
+        ])
+        db.session.commit()
+
+    response = client.get('/game/13')
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'data-pitch-step="5"' in html
+    assert 'data-pitch-target="innings_whole"' in html
+    assert 'gameday_pitching_steppers.js' in html
+    assert '<span class="pitch-header-limit">Max 85</span>' in html
+    assert '/ 85 game pitches' not in html
+    assert 'title="Games + practice + lessons"' in html
+
+
+def test_game_management_assets_keep_readiness_compact_and_primary_fill_safe():
+    project_root = Path(__file__).resolve().parents[1]
+    navigation = (project_root / 'static/js/navigation_v2.js').read_text()
+    pitching_rules = (project_root / 'static/js/game_pitching_rule_picker.js').read_text()
+    defense = (project_root / 'static/js/live_game_board_prep.js').read_text()
+
+    assert 'game_prep_readiness.js' not in navigation
+    assert 'game-pitch-rule-editor-v2" hidden' in pitching_rules
+    assert 'Quick-Fill Primaries' in defense
+    assert "pitch_count_summary?.[player.name]?.status === 'Available'" in defense
+    assert 'more than one player has that primary position' in defense

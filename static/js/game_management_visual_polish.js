@@ -101,26 +101,6 @@
         transform:translateY(-1px);
       }
 
-      body.coach-game-page #coach-game-readiness-v2{
-        border-radius:14px!important;
-        box-shadow:0 2px 8px rgba(16,24,40,.045)!important;
-      }
-      body.coach-game-page #coach-game-readiness-v2.needs{
-        background:#fffdf8!important;
-        border-color:#e6d6aa!important;
-      }
-      body.coach-game-page #coach-game-readiness-v2.ready{
-        background:#f8fcf9!important;
-        border-color:#c8dfcf!important;
-      }
-      body.coach-game-page #coach-game-readiness-v2 .cgr-item.need{
-        background:#fffaf0!important;
-        border-color:#e6d4a2!important;
-      }
-      body.coach-game-page #coach-game-readiness-v2 .cgr-badge{
-        box-shadow:none!important;
-      }
-
       body.coach-game-page #game-pitching-rules-v2{
         border:1px solid var(--gm-border)!important;
         border-left:4px solid var(--gm-gold)!important;

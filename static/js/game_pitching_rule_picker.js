@@ -44,21 +44,25 @@
     const style = document.createElement('style');
     style.id = 'game-pitching-rule-picker-styles';
     style.textContent = `
-      #game-pitching-rules-v2{border:1px solid #dfe5ec;border-radius:14px;background:#fff;box-shadow:0 2px 7px rgba(16,24,40,.05);margin-bottom:14px;overflow:hidden}
-      #game-pitching-rules-v2 .gpr-body{padding:13px 14px}
-      #game-pitching-rules-v2 .gpr-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
-      #game-pitching-rules-v2 .gpr-title{font-size:.83rem;font-weight:850;color:#1d2939}
-      #game-pitching-rules-v2 .gpr-help{font-size:.68rem;color:#667085;margin-top:2px;max-width:620px}
+      #game-pitching-rules-v2{border:1px solid #dfe5ec;border-radius:12px;background:#fff;box-shadow:0 1px 4px rgba(16,24,40,.04);margin-bottom:14px;overflow:hidden}
+      #game-pitching-rules-v2 .gpr-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 11px}
+      #game-pitching-rules-v2 .gpr-summary-copy{display:flex;align-items:center;gap:7px;min-width:0;flex-wrap:wrap}
+      #game-pitching-rules-v2 .gpr-label{font-size:.64rem;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#667085}
+      #game-pitching-rules-v2 .gpr-rule{font-size:.8rem;font-weight:850;color:#1d2939}
+      #game-pitching-rules-v2 .gpr-edit{min-height:34px;border-radius:8px;font-size:.7rem;font-weight:800;white-space:nowrap}
+      #game-pitching-rules-v2 .gpr-editor{padding:11px;border-top:1px solid #e7ebef;background:#fbfcfd}
+      #game-pitching-rules-v2 .gpr-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:9px}
+      #game-pitching-rules-v2 .gpr-title{font-size:.78rem;font-weight:850;color:#1d2939}
+      #game-pitching-rules-v2 .gpr-help{font-size:.67rem;color:#667085;margin-top:2px;max-width:620px}
       #game-pitching-rules-v2 .gpr-badge{font-size:.62rem;font-weight:850;border-radius:999px;padding:5px 8px;white-space:nowrap}
       #game-pitching-rules-v2 .gpr-badge.team{background:#eef2f6;color:#475467}
       #game-pitching-rules-v2 .gpr-badge.game{background:#fff4dd;color:#8b5c00}
-      #game-pitching-rules-v2 .form-select{min-height:48px;border-radius:10px;font-weight:750;color:#1d2939}
+      #game-pitching-rules-v2 .form-select{min-height:44px;border-radius:9px;font-weight:750;color:#1d2939}
       #game-pitching-rules-v2 .gpr-explain{margin-top:9px;padding:9px 10px;border:1px solid #e4e7ec;border-radius:10px;background:#f8fafc}
       #game-pitching-rules-v2 .gpr-explain strong{display:block;font-size:.74rem;color:#344054}
       #game-pitching-rules-v2 .gpr-explain span{display:block;font-size:.67rem;color:#667085;margin-top:2px;line-height:1.35}
       #game-pitching-rules-v2 .gpr-ref{font-size:.63rem!important;color:#8a94a3!important;margin-top:4px!important}
-      #game-pitching-rules-v2 .gpr-current{font-size:.67rem;color:#667085;margin-top:7px}
-      @media(max-width:575.98px){#game-pitching-rules-v2 .gpr-body{padding:11px 12px}.gpr-badge{display:none}}
+      @media(max-width:575.98px){#game-pitching-rules-v2 .gpr-summary{padding:9px 10px}#game-pitching-rules-v2 .gpr-label{width:100%}#game-pitching-rules-v2 .gpr-badge{display:none}}
     `;
     document.head.appendChild(style);
   }
@@ -70,7 +74,9 @@
     card.id = 'game-pitching-rules-v2';
     const pregame = document.getElementById('pregame-checklist-container');
     const overlay = document.getElementById('live-game-overlay');
-    if (pregame) pregame.insertBefore(card, pregame.firstChild);
+    const gameHeading = pregame?.querySelector(':scope > .d-flex:first-child');
+    if (gameHeading) gameHeading.insertAdjacentElement('afterend', card);
+    else if (pregame) pregame.prepend(card);
     else if (overlay) overlay.prepend(card);
     else document.querySelector('main, .container, .container-fluid')?.prepend(card);
     return card;
@@ -89,7 +95,17 @@
     const defaultInfo = infoFor(teamDefault);
 
     card.innerHTML = `
-      <div class="gpr-body">
+      <div class="gpr-summary">
+        <div class="gpr-summary-copy">
+          <span class="gpr-label">Pitching rule</span>
+          <span class="gpr-rule">${esc(effectiveInfo.label)}</span>
+          <span class="gpr-badge ${data.source === 'game' ? 'game' : 'team'}">${esc(source)}</span>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary gpr-edit" id="game-pitch-rule-edit-v2" aria-expanded="false" aria-controls="game-pitch-rule-editor-v2" ${isLive ? 'disabled' : ''}>
+          ${isLive ? '<i class="bi bi-lock-fill me-1"></i>Locked' : '<i class="bi bi-pencil me-1"></i>Edit'}
+        </button>
+      </div>
+      <div class="gpr-editor" id="game-pitch-rule-editor-v2" hidden>
         <div class="gpr-head">
           <div>
             <div class="gpr-title">How are pitchers limited in this game?</div>
@@ -106,10 +122,20 @@
           <span>${esc(effectiveInfo.description)}</span>
           <span class="gpr-ref">Rule reference: ${esc(effectiveInfo.reference)}</span>
         </div>
-        <div class="gpr-current">CoachBoard is using <strong>${esc(effectiveInfo.short)}</strong> rules for this game${isLive ? ' · Locked while Live Game is active' : ''}.</div>
       </div>`;
 
     card.querySelector('#game-pitch-rule-select-v2')?.addEventListener('change', save);
+    card.querySelector('#game-pitch-rule-edit-v2')?.addEventListener('click', (event) => {
+      const editor = card.querySelector('#game-pitch-rule-editor-v2');
+      if (!editor) return;
+      const opening = editor.hidden;
+      editor.hidden = !opening;
+      event.currentTarget.setAttribute('aria-expanded', opening ? 'true' : 'false');
+      event.currentTarget.innerHTML = opening
+        ? '<i class="bi bi-chevron-up me-1"></i>Close'
+        : '<i class="bi bi-pencil me-1"></i>Edit';
+      if (opening) card.querySelector('#game-pitch-rule-select-v2')?.focus();
+    });
   }
 
   async function load() {

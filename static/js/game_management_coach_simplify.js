@@ -74,7 +74,7 @@
       #${PANEL_ID} .pde-title{font-size:1rem!important}
       #${PANEL_ID} .pde-help{font-size:.72rem!important}
       #${PANEL_ID} .pde-tools{
-        grid-template-columns:minmax(0,1fr) auto!important;
+        grid-template-columns:minmax(0,1fr) auto auto!important;
         align-items:end;
         padding:10px;
         background:#f8fafc;
@@ -95,6 +95,7 @@
       }
       #${PANEL_ID} #pde-save{display:none!important}
       #${PANEL_ID} #pde-apply{white-space:nowrap}
+      #${PANEL_ID} #pde-primary-fill{white-space:nowrap}
       #${PANEL_ID} .pde-status{font-size:.7rem!important}
       #${PANEL_ID} .pde-field-caption strong{font-size:.72rem!important}
       #rotation-card-container .gm-secondary-report .accordion-collapse,
@@ -105,7 +106,7 @@
         #rotation-card-container .gm-coach-actions{display:grid!important;grid-template-columns:1fr auto;width:100%}
         #rotation-card-container .gm-coach-actions #copyPreviousInningBtn{width:100%}
         #${PANEL_ID} .pde-tools{grid-template-columns:1fr!important}
-        #${PANEL_ID} #pde-apply{width:100%}
+        #${PANEL_ID} #pde-apply,#${PANEL_ID} #pde-primary-fill{width:100%}
       }
     `;
     document.head.appendChild(style);
@@ -477,11 +478,7 @@
 
     const status = panel.querySelector('.pde-status');
     if (status) {
-      const open = status.querySelector('.open')?.textContent?.trim();
-      const desired = open
-        ? `<span class="open">${open}</span> <span class="mx-1">•</span> Changes save automatically`
-        : '<strong>Defense complete</strong> <span class="mx-1">•</span> Changes save automatically';
-      setHtml(status, desired);
+      setText(status.querySelector('.pde-status-note'), 'Changes save automatically.');
     }
   }
 
