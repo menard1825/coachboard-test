@@ -1,3 +1,4 @@
+import secrets
 from urllib.parse import urlparse
 
 from flask import Blueprint, flash, jsonify, redirect, request, session, url_for
@@ -14,6 +15,7 @@ from models import (
     PlayerGameAbsence,
     PlayerPracticeAbsence,
     Rotation,
+    Team,
     TeamMembership,
     User,
 )
@@ -21,6 +23,7 @@ from models import (
 security_guard_bp = Blueprint('security_guard', __name__)
 
 SUPER_ADMIN = 'Super Admin'
+HEAD_COACH = 'Head Coach'
 GAME_CHANGER = 'Game Changer'
 
 LEGACY_LIVE_MUTATIONS = {
@@ -146,6 +149,32 @@ def _validate_session_membership():
     # coach still has an old signed session cookie.
     session['role'] = membership.role
     return True
+
+
+def _new_registration_code():
+    """Return a short, unguessable code that is not already assigned."""
+    for _ in range(20):
+        code = secrets.token_urlsafe(9)
+        if not db.session.query(Team.id).filter_by(registration_code=code).first():
+            return code
+    raise RuntimeError('Unable to generate a unique team registration code.')
+
+
+@security_guard_bp.route('/admin/settings/rotate-registration-code', methods=['POST'])
+def rotate_registration_code():
+    if session.get('role') not in {HEAD_COACH, SUPER_ADMIN}:
+        flash('You must be a Head Coach or Super Admin to rotate the team join code.', 'danger')
+        return redirect(url_for('home'))
+
+    team = db.session.get(Team, session.get('team_id'))
+    if not team:
+        flash('Team not found.', 'danger')
+        return redirect(url_for('admin.admin_settings'))
+
+    team.registration_code = _new_registration_code()
+    db.session.commit()
+    flash('Team join code rotated. The previous code no longer works.', 'success')
+    return redirect(url_for('admin.admin_settings'))
 
 
 @security_guard_bp.before_app_request
