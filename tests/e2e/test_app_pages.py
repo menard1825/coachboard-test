@@ -201,6 +201,11 @@ def test_mobile_navigation_reaches_every_primary_area(page: Page, coachboard_url
 
     bottom_nav.get_by_text('Development', exact=True).click()
     expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
+    expect(page.locator('#player_development > .cb-tab-intro')).to_have_count(0)
+    expect(page.locator('#season-dev-summary-v2')).to_have_count(0)
+    expect(page.locator('.cb-dev-mobile-picker')).to_be_visible()
+    expect(page.locator('.cb-dev-player-card')).to_be_hidden()
+    expect(page.locator('#player-dev-content')).to_contain_text('Individual development plan', timeout=15_000)
 
     bottom_nav.get_by_text('Practice', exact=True).click()
     expect(page.locator('#practice_plan')).to_have_class(re.compile(r'\bactive\b'))

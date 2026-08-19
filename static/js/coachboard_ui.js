@@ -31,7 +31,7 @@
     if (path !== '/') return;
     Object.entries(HOME_SECTIONS).forEach(([id, [title, subtitle]]) => {
       const pane = document.getElementById(id);
-      if (!pane || pane.querySelector(':scope > .cb-tab-intro')) return;
+      if (!pane || pane.querySelector(':scope > .cb-tab-intro') || pane.querySelector(':scope > .cb-page-head')) return;
       const intro = document.createElement('div');
       intro.className = 'cb-tab-intro';
       intro.innerHTML = `<div><div class="cb-kicker">CoachBoard</div><h1>${title}</h1><p>${subtitle}</p></div>`;

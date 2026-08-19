@@ -390,6 +390,24 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
   padding: 11px 12px;
 }
 
+.cb-dev-mobile-picker {
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--cb-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--cb-shadow);
+}
+
+.cb-dev-mobile-picker .form-label {
+  margin-bottom: 5px;
+  color: var(--cb-muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
 .cb-dev-player.active {
   border-color: var(--cb-primary);
   background: #eef3ff;
@@ -636,5 +654,26 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
   .cb-practice-preview,
   .cb-practice-work-grid {
     grid-template-columns: 1fr;
+  }
+
+  #player_development .cb-workspace-head {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  #player_development .cb-page-title {
+    font-size: 1.25rem;
+  }
+
+  #player_development .cb-page-subtitle {
+    font-size: .72rem;
+  }
+
+  #player_development .cb-page-actions {
+    margin-top: 0;
+  }
+
+  #player_development .cb-dev-detail-head h3 {
+    font-size: 1.22rem;
   }
 }

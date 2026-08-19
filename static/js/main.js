@@ -200,6 +200,21 @@ document.addEventListener('DOMContentLoaded', () => {
             AppState.active_player_dev_name = filteredRoster[0]?.name || roster[0]?.name || null;
         }
 
+        const mobilePicker = document.getElementById('devPlayerSelectMobile');
+        if (mobilePicker) {
+            mobilePicker.innerHTML = roster.map(player => {
+                const focuses = (playerDevData[player.name] || []).filter(log => log.type === 'Development');
+                const activeCount = focuses.filter(log => log.status !== 'completed').length;
+                const countLabel = activeCount ? ` — ${activeCount} active` : '';
+                return `<option value="${escapeHTML(player.name)}" ${player.name === AppState.active_player_dev_name ? 'selected' : ''}>${escapeHTML(player.name)}${countLabel}</option>`;
+            }).join('');
+            mobilePicker.onchange = () => {
+                AppState.active_player_dev_name = mobilePicker.value;
+                renderPlayerDevelopmentList();
+                renderPlayerDevelopmentDetails();
+            };
+        }
+
         container.innerHTML = filteredRoster.map(p => {
             const pNameSafe = escapeHTML(p.name);
             const focuses = (playerDevData[p.name] || []).filter(log => log.type === 'Development');

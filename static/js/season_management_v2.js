@@ -192,6 +192,10 @@
     const pane = document.getElementById('player_development');
     const list = document.getElementById('dev-player-list');
     if (!pane || !list) return;
+    if (pane.querySelector(':scope > .cb-workspace-head')) {
+      document.getElementById('season-dev-summary-v2')?.remove();
+      return;
+    }
     let summary = document.getElementById('season-dev-summary-v2');
     if (!summary) {
       summary = document.createElement('div');

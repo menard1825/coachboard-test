@@ -106,8 +106,12 @@
                 </select>
             </div>
         </div>
+        <div class="cb-dev-mobile-picker d-lg-none">
+            <label for="devPlayerSelectMobile" class="form-label">Player</label>
+            <select id="devPlayerSelectMobile" class="form-select" aria-label="Choose a player"></select>
+        </div>
         <div class="row g-3">
-            <div class="col-lg-4 mb-3 mb-lg-0">
+            <div class="col-lg-4 mb-3 mb-lg-0 d-none d-lg-block">
                 <div class="card cb-dev-player-card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <div><h5 class="mb-0">Choose a player</h5><div class="small text-muted">Active priorities appear beside each name.</div></div>
@@ -123,7 +127,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-lg-8">
+            <div class="col-12 col-lg-8">
                 <div id="player-dev-content"></div>
             </div>
         </div>
