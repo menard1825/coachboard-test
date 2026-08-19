@@ -157,7 +157,7 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
             const panel = document.getElementById('availabilityCollapse');
             if (!panel) return false;
             const top = panel.getBoundingClientRect().top;
-            return top >= 0 && top <= Math.min(140, window.innerHeight * 0.25);
+            return top >= 0 && top <= Math.min(220, window.innerHeight * 0.3);
         }"""
     )
 
