@@ -54,6 +54,16 @@
     return negative && allowNegative ? `+${text}` : text;
   }
 
+  function formatTimeLimit(totalMinutes) {
+    const minutes = Number(totalMinutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) return 'No limit';
+    const whole = Math.floor(minutes);
+    const hours = Math.floor(whole / 60);
+    const remainder = whole % 60;
+    if (!hours) return `${whole} min`;
+    return `${hours}:${String(remainder).padStart(2, '0')}`;
+  }
+
   function liveElapsedSeconds() {
     if (!clock || clock.elapsed_seconds === null || clock.elapsed_seconds === undefined) return null;
     let elapsed = Number(clock.elapsed_seconds) || 0;
@@ -108,6 +118,14 @@
     return data;
   }
 
+  function syncPresetButtons(modal) {
+    modal?.querySelectorAll('.cb-clock-preset').forEach(btn => {
+      const selected = Number(btn.dataset.minutes || 0) === Number(clock?.time_limit_minutes || 0);
+      btn.classList.toggle('btn-primary', selected);
+      btn.classList.toggle('btn-outline-secondary', !selected);
+    });
+  }
+
   function ensureConfigModal() {
     let modal = document.getElementById('cbGameClockConfigModal');
     if (modal) return modal;
@@ -147,9 +165,7 @@
         try {
           const minutes = Number(preset.dataset.minutes || 0);
           await postClock({time_limit_minutes: minutes || null});
-          modal.querySelectorAll('.cb-clock-preset').forEach(btn => btn.classList.remove('btn-primary'));
-          preset.classList.add('btn-primary');
-          preset.classList.remove('btn-outline-secondary');
+          syncPresetButtons(modal);
           const custom = document.getElementById('cbClockCustomMinutes');
           if (custom) custom.value = minutes || '';
         } catch (err) { window.alert(err.message); }
@@ -159,8 +175,10 @@
     const custom = modal.querySelector('#cbClockCustomMinutes');
     custom?.addEventListener('change', async () => {
       if (custom.value.trim() === '') return;
-      try { await postClock({time_limit_minutes: Number(custom.value)}); }
-      catch (err) { window.alert(err.message); }
+      try {
+        await postClock({time_limit_minutes: Number(custom.value)});
+        syncPresetButtons(modal);
+      } catch (err) { window.alert(err.message); }
     });
 
     modal.querySelector('#cbClockRestartBtn')?.addEventListener('click', async () => {
@@ -179,11 +197,7 @@
     const custom = modal.querySelector('#cbClockCustomMinutes');
     if (custom) custom.value = clock?.time_limit_minutes || '';
     modal.querySelector('#cbClockRestartWrap')?.classList.toggle('d-none', !clock?.is_live);
-    modal.querySelectorAll('.cb-clock-preset').forEach(btn => {
-      const selected = Number(btn.dataset.minutes || 0) === Number(clock?.time_limit_minutes || 0);
-      btn.classList.toggle('btn-primary', selected);
-      btn.classList.toggle('btn-outline-secondary', !selected);
-    });
+    syncPresetButtons(modal);
     bootstrap.Modal.getOrCreateInstance(modal).show();
   }
 
@@ -302,7 +316,7 @@
         </div>
         <div class="cb-game-clock-actions"><button type="button" class="btn btn-sm btn-outline-secondary cb-clock-config"><i class="bi bi-clock-history me-1"></i>Set Clock</button><button type="button" class="btn btn-sm btn-outline-danger cb-clock-end-time"><i class="bi bi-stop-circle me-1"></i>End — Time Limit</button></div>
       </div>
-      <div class="cb-game-clock-note">${limit ? `${limit} minute limit. ` : ''}The clock starts with Live Game and stays synced to the server. CoachBoard never ends the game automatically.</div>`;
+      <div class="cb-game-clock-note">${limit ? `${formatTimeLimit(limit)} time limit. ` : ''}The clock starts with Live Game and stays synced to the server. CoachBoard never ends the game automatically.</div>`;
     card.querySelector('.cb-clock-config')?.addEventListener('click', openConfig);
     card.querySelector('.cb-clock-end-time')?.addEventListener('click', openTimeLimitEnd);
   }
@@ -314,7 +328,7 @@
       return;
     }
     const limit = Number(clock?.time_limit_minutes || 0);
-    card.innerHTML = `<div><strong><i class="bi bi-clock me-1"></i>Game Clock</strong><span class="d-block">${limit ? `Time limit: ${limit} minutes` : 'No time limit set yet'} · starts when you tap Start Live Game</span></div><button type="button" class="btn btn-sm btn-outline-primary cb-clock-config">${limit ? 'Change' : 'Set Time Limit'}</button>`;
+    card.innerHTML = `<div><strong><i class="bi bi-clock me-1"></i>Game Clock</strong><span class="d-block">${limit ? `Time limit: ${formatTimeLimit(limit)}` : 'No time limit set yet'} · starts when you tap Start Live Game</span></div><button type="button" class="btn btn-sm btn-outline-primary cb-clock-config">${limit ? 'Change' : 'Set Time Limit'}</button>`;
     card.querySelector('.cb-clock-config')?.addEventListener('click', openConfig);
   }
 
