@@ -24,3 +24,16 @@
     input.dispatchEvent(new Event('change', {bubbles: true}));
   });
 })();
+
+(() => {
+  'use strict';
+  if (!/^\/game\/\d+\/?$/.test(window.location.pathname)) return;
+
+  window.addEventListener('load', () => {
+    if (document.querySelector('script[data-live-dugout-mode]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/live_game_dugout_mode.js';
+    script.dataset.liveDugoutMode = '1';
+    document.head.appendChild(script);
+  }, {once: true});
+})();
