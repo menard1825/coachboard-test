@@ -100,6 +100,21 @@ def test_game_day_core_flow_works_on_phone_size(page: Page, coachboard_url: str)
     game_card = page.locator('[data-game-id="1"]')
     expect(game_card).to_be_visible()
     expect(game_card.locator('.gd-actions a').first).to_be_visible()
+
+    page.get_by_role('button', name='Add Game').first.click()
+    add_modal = page.locator('#game-day-add-modal')
+    expect(add_modal).to_be_visible()
+    expect(add_modal.locator('#gd-add-pitching-rules')).to_be_visible(timeout=15_000)
+    add_action = add_modal.get_by_role('button', name='Add & Prepare Game')
+    expect(add_action).to_be_visible()
+    footer_geometry = add_modal.locator('.modal-footer').evaluate(
+        "footer => ({bottom: footer.getBoundingClientRect().bottom, viewport: window.innerHeight})"
+    )
+    assert footer_geometry['bottom'] <= footer_geometry['viewport'] + 1
+    expect(add_modal.locator('.modal-body')).to_have_css('overflow-y', 'auto')
+    add_modal.get_by_role('button', name='Cancel').click()
+    expect(add_modal).to_be_hidden()
+
     game_card.locator('.gd-actions a').first.click()
 
     expect(page).to_have_url(re.compile(r'/game/1$'))

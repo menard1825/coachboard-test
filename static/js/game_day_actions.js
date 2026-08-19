@@ -38,6 +38,12 @@
         .gd-schedule-head{margin-top:20px}
         .gd-schedule-actions{grid-column:2!important;justify-content:flex-start;margin-top:4px}
         .gd-schedule-actions>.btn:first-child{flex:1 1 auto}
+        #game-day-add-modal .modal-dialog{height:calc(100dvh - 16px);margin:8px}
+        #game-day-add-modal .modal-content{max-height:100%}
+        #game-day-add-modal .modal-header{padding:14px 16px}
+        #game-day-add-modal .modal-body{padding:16px;overscroll-behavior:contain}
+        #game-day-add-modal .modal-footer{flex:0 0 auto;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:#fff}
+        #game-day-add-modal .modal-footer .btn-primary{flex:1 1 auto;min-height:46px}
       }
     `;
     document.head.appendChild(style);
@@ -76,7 +82,7 @@
     modal.setAttribute('aria-hidden', 'true');
     modal.innerHTML = `
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
+        <form class="modal-content" action="/game-day/add" method="POST">
           <div class="modal-header">
             <div>
               <h5 class="modal-title mb-0">Add Game</h5>
@@ -84,8 +90,7 @@
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <form action="/game-day/add" method="POST">
-            <div class="modal-body">
+          <div class="modal-body">
               <div class="row g-3">
                 <div class="col-7">
                   <label class="form-label" for="gd-add-date">Date</label>
@@ -108,13 +113,12 @@
                   <textarea class="form-control" id="gd-add-notes" name="game_notes" rows="3" placeholder="Pool play, arrival time, opponent notes, etc."></textarea>
                 </div>
               </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-              <button type="submit" class="btn btn-primary">Add & Prepare Game</button>
-            </div>
-          </form>
-        </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Add & Prepare Game</button>
+          </div>
+        </form>
       </div>`;
     document.body.appendChild(modal);
     return modal;
