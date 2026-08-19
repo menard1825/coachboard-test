@@ -89,7 +89,7 @@
 
     if (!hardBlockers.length && readiness.ready) {
       box.className = 'alert alert-success border-0 shadow-sm mb-3';
-      box.innerHTML = '<strong>Ready to start.</strong> Inning 1 defense and starting pitcher still need to be set on the board below if you have not finished them yet.';
+      box.innerHTML = '<strong>Ready to start.</strong> Pregame setup is complete. Tap Start Live Game when you are ready for first pitch.';
       btn.disabled = false;
       btn.classList.remove('disabled');
       return;
