@@ -75,7 +75,17 @@
 
   <section class="agr-card">
     <div class="agr-card-head"><strong>Live Changes</strong><span class="agr-badge">Audit trail</span></div>
-    {% if report.changes %}<div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Inning</th><th>Change</th><th class="pe-3">Coach</th></tr></thead><tbody>{% for change in report.changes %}<tr><td class="ps-3">{{ change.inning }}</td><td>{{ change.type }}</td><td class="pe-3">{{ change.changed_by or '—' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="agr-empty">No live changes were recorded.</div>{% endif %}
+    {% if report.changes %}<div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Inning</th><th>Change</th><th class="pe-3">Coach</th></tr></thead><tbody>
+      {% for change in report.changes %}
+      {% set coach = namespace(name=change.changed_by or '—') %}
+      {% for membership in current_team.memberships %}
+        {% if change.changed_by and membership.user and membership.user.username|lower == change.changed_by|lower %}
+          {% set coach.name = membership.user.full_name or membership.user.username %}
+        {% endif %}
+      {% endfor %}
+      <tr><td class="ps-3">{{ change.inning }}</td><td>{{ change.type }}</td><td class="pe-3">{{ coach.name }}</td></tr>
+      {% endfor %}
+    </tbody></table></div>{% else %}<div class="agr-empty">No live changes were recorded.</div>{% endif %}
   </section>
 
   <section class="agr-card agr-notes">
