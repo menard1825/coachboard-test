@@ -170,6 +170,53 @@ def test_mobile_navigation_reaches_every_primary_area(page: Page, coachboard_url
         expect(page.locator('#more').get_by_text(label, exact=True)).to_be_visible()
 
 
+
+def test_user_management_mobile_cards_do_not_overlap(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+    page.goto(f'{coachboard_url}/admin/users')
+
+    table = page.locator('.cb-user-admin-table')
+    expect(table).to_be_visible()
+
+    role_cell = table.locator('td[data-label="Role"]:visible').first
+    expect(role_cell).to_be_visible()
+    mobile_layout = role_cell.evaluate(
+        """cell => {
+            const cellStyle = getComputedStyle(cell);
+            const labelStyle = getComputedStyle(cell, '::before');
+            return {
+                display: cellStyle.display,
+                gridColumns: cellStyle.gridTemplateColumns,
+                labelDisplay: labelStyle.display,
+                labelPosition: labelStyle.position,
+            };
+        }"""
+    )
+    assert mobile_layout['display'] == 'grid'
+    assert mobile_layout['gridColumns'] != 'none'
+    assert mobile_layout['labelDisplay'] == 'block'
+    assert mobile_layout['labelPosition'] == 'static'
+
+    coach_cell = table.locator('td[data-label="Username"]:visible').first
+    coach_label = coach_cell.evaluate(
+        "cell => getComputedStyle(cell, '::before').display"
+    )
+    assert coach_label == 'none'
+
+    card_bounds = table.locator('tbody .user-row:visible').evaluate_all(
+        """rows => rows.map(row => {
+            const rect = row.getBoundingClientRect();
+            return {left: rect.left, right: rect.right, viewport: innerWidth};
+        })"""
+    )
+    assert card_bounds
+    assert all(
+        bounds['left'] >= -1 and bounds['right'] <= bounds['viewport'] + 1
+        for bounds in card_bounds
+    )
+
+
 def test_role_and_team_boundaries_are_enforced(page: Page, coachboard_url: str):
     login(page, coachboard_url, ASSISTANT_USERNAME, ASSISTANT_PASSWORD)
 
