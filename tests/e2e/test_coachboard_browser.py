@@ -162,7 +162,7 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     expect(page).to_have_url(re.compile(r'/game/1#availabilityCollapse$'))
     expect(availability_panel).to_have_class(re.compile(r'\bshow\b'), timeout=15_000)
     expect(absent_player).to_be_checked()
-    availability_card = page.locator('#availabilityToggleBtn').locator('xpath=ancestor::div[contains(@class,"card")]')
+    availability_card = page.locator('#availabilitySummaryCard')
     expect(availability_card).to_contain_text('8 Available')
     expect(availability_card).to_contain_text('1 out')
 

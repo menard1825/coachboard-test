@@ -140,9 +140,11 @@ def _validate_session_membership():
     if not membership:
         return False
 
-    # Keep permissions current even if a Head Coach changes a role while the
-    # coach still has an old signed session cookie.
-    session['role'] = membership.role
+    # Keep permissions current without marking every read-only request as a
+    # session write. Reissuing stale signed cookies from concurrent API calls
+    # can otherwise undo a just-completed team switch in the browser.
+    if session.get('role') != membership.role:
+        session['role'] = membership.role
     return True
 
 

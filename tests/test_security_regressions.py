@@ -123,6 +123,19 @@ def test_stale_membership_session_is_rejected(monkeypatch):
     assert 'team access is no longer active' in response.get_json()['message']
 
 
+def test_read_only_api_does_not_reissue_a_stale_permanent_session(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    with client.session_transaction() as session:
+        session.permanent = True
+
+    response = client.get('/api/roster')
+
+    assert response.status_code == 200
+    assert 'Set-Cookie' not in response.headers
+
+
 def test_incomplete_pitch_history_never_becomes_zero_total():
     from blueprints.stats_dashboard import _apply_pitch_completeness
 

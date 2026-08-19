@@ -32,7 +32,7 @@
         <div class="row g-3 mb-4">
             <!-- Player Availability Card -->
             <div class="col-md-6 col-lg-3">
-                <div class="card h-100 shadow-sm border-0">
+                <div class="card h-100 shadow-sm border-0" id="availabilitySummaryCard">
                     <div class="card-body">
                         {% set absent_count = absent_player_ids | length %}
                         {% set present_count = roster | length - absent_count %}

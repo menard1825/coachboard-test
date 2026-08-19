@@ -85,6 +85,10 @@ def create_app():
     app.secret_key = secret_key
 
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+    # Do not rewrite the signed session cookie on every background API request.
+    # Concurrent responses from a page opened before a team switch can otherwise
+    # overwrite the newer team selection with stale session data.
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = False
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_SECURE'] = _env_bool('SESSION_COOKIE_SECURE', runtime in {'production', 'prod'})
