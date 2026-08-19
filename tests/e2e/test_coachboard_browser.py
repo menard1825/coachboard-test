@@ -152,6 +152,14 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     expect(availability_panel).to_have_class(re.compile(r'\bshow\b'))
     expect(availability_toggle).to_have_attribute('aria-expanded', 'true')
     expect(page.locator('#availability-out-count-v2-value')).to_have_text('0')
+    page.wait_for_function(
+        """() => {
+            const panel = document.getElementById('availabilityCollapse');
+            if (!panel) return false;
+            const top = panel.getBoundingClientRect().top;
+            return top >= 0 && top <= Math.min(140, window.innerHeight * 0.25);
+        }"""
+    )
 
     absent_player = page.locator('#absent_9')
     absent_player.check()

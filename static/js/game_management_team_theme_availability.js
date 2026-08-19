@@ -39,6 +39,10 @@
         color:var(--gm-accent,var(--gm-gold,#98a2b3))!important;
       }
 
+      #availabilityCollapse{
+        scroll-margin-top:78px;
+      }
+
       #availabilityCollapse .availability-guide-v2{
         display:flex;
         justify-content:space-between;
@@ -227,6 +231,26 @@
     collapse.style.removeProperty('height');
   }
 
+  function revealAvailability(collapse) {
+    collapse.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+
+  function openAndRevealAvailability(trigger, collapse) {
+    let revealed = false;
+    const revealOnce = () => {
+      if (revealed) return;
+      revealed = true;
+      revealAvailability(collapse);
+    };
+
+    // Bootstrap hides the panel until its collapse transition completes, so
+    // scroll after the shown event. The timeout also covers a missing/delayed
+    // Bootstrap script and reduced-motion browsers that skip the transition.
+    collapse.addEventListener('shown.bs.collapse', revealOnce, {once: true});
+    setAvailabilityOpen(trigger, collapse, true);
+    window.setTimeout(revealOnce, window.bootstrap?.Collapse ? 450 : 0);
+  }
+
   function bindAvailabilityTrigger(collapse) {
     const trigger = availabilityTrigger();
     if (!trigger || trigger.dataset.availabilityBound === 'true') return;
@@ -237,7 +261,12 @@
     trigger.removeAttribute('data-bs-toggle');
     trigger.addEventListener('click', (event) => {
       event.preventDefault();
-      setAvailabilityOpen(trigger, collapse, !collapse.classList.contains('show'));
+      const opening = !collapse.classList.contains('show');
+      if (opening) {
+        openAndRevealAvailability(trigger, collapse);
+      } else {
+        setAvailabilityOpen(trigger, collapse, false);
+      }
     });
     collapse.addEventListener('shown.bs.collapse', () => setAvailabilityExpanded(trigger, collapse, true));
     collapse.addEventListener('hidden.bs.collapse', () => setAvailabilityExpanded(trigger, collapse, false));
@@ -245,8 +274,7 @@
 
     if (['#availability', '#availabilityCollapse'].includes(window.location.hash)) {
       window.requestAnimationFrame(() => {
-        setAvailabilityOpen(trigger, collapse, true);
-        window.setTimeout(() => collapse.scrollIntoView({behavior: 'smooth', block: 'start'}), 180);
+        openAndRevealAvailability(trigger, collapse);
       });
     }
   }
