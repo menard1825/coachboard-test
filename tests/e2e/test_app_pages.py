@@ -274,7 +274,18 @@ def test_role_and_team_boundaries_are_enforced(page: Page, coachboard_url: str):
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/switch_team/2')
     expect(page.locator('.navbar-brand-text')).to_contain_text('Other Team')
-    team_two_roster = page.request.get(f'{coachboard_url}/api/roster').json()
+    team_two_roster = page.evaluate(
+        """async () => {
+            const response = await fetch('/api/roster', {
+                cache: 'no-store',
+                credentials: 'same-origin',
+            });
+            if (!response.ok) {
+                throw new Error(`Roster request failed with HTTP ${response.status}`);
+            }
+            return response.json();
+        }"""
+    )
     assert [player['name'] for player in team_two_roster] == ['Private Player']
 
 
