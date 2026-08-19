@@ -506,3 +506,81 @@ def test_game_management_assets_keep_readiness_compact_without_ambiguous_primary
     assert '/starting-defense-template/new' in season_management
     assert "window.location.replace('/game-day')" in navigation
     assert "moreLink('/game-day', 'calendar3', 'Schedule'" in navigation
+
+
+def test_pitch_target_scope_is_explicit_and_game_is_team_scoped(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game, Player, PlayerPitchTarget, Team
+
+    with app.app_context():
+        db.session.add_all([
+            Player(id=41, name='Target Pitcher', pitcher_role='Starter', team_id=1),
+            Game(id=41, date=datetime(2026, 8, 23), opponent='Target Opponent', team_id=1),
+            Team(
+                id=2,
+                team_name='Other Target Team',
+                registration_code='other-target-code',
+                age_group='12U',
+                pitching_rule_set='MLB Pitch Smart',
+                outfielder_count=3,
+                timezone='America/Indiana/Indianapolis',
+            ),
+            Game(id=42, date=datetime(2026, 8, 24), opponent='Other Team Game', team_id=2),
+        ])
+        db.session.commit()
+
+    invalid_date = client.post('/save_player_target', json={
+        'player_id': 41,
+        'local_date': 'next Sunday',
+        'target_pitches': 35,
+    })
+    assert invalid_date.status_code == 400
+
+    cross_team_game = client.post('/save_player_target', json={
+        'player_id': 41,
+        'local_date': '2026-08-24',
+        'game_id': 42,
+        'target_pitches': 35,
+    })
+    assert cross_team_game.status_code == 404
+
+    saved = client.post('/save_player_target', json={
+        'player_id': 41,
+        'local_date': '2026-08-01',
+        'game_id': 41,
+        'target_pitches': 42,
+        'reason': ' Short start ',
+    })
+    assert saved.status_code == 200
+
+    with app.app_context():
+        target = db.session.query(PlayerPitchTarget).filter_by(player_id=41, game_id=41).one()
+        assert target.local_date == '2026-08-23'
+        assert target.target_pitches == 42
+        assert target.reason == 'Short start'
+
+
+def test_pitching_page_explains_target_scope(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Player
+
+    with app.app_context():
+        db.session.add(Player(id=51, name='Scope Pitcher', pitcher_role='Starter', team_id=1))
+        db.session.commit()
+
+    response = client.get('/pitching')
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'Game-pitch targets are coaching plans, not rule limits.' in html
+    assert 'does not set a weekly or season limit' in html
+    assert 'id="targetScopeInput"' in html
+    assert 'id="targetGameInput"' in html

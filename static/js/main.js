@@ -48,6 +48,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const localDateInputValue = (date = new Date()) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const renderPositionSelect = (name, id, selectedVal = '', title = 'Select Position', classes = 'form-select form-select-sm') => {
         let positions = ['P', 'C', '1B', '2B', '3B', 'SS'];
         if (AppState.session.outfielder_count === 4) {
@@ -71,38 +78,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
         const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}" data-delete-name="${pNameSafe}">Delete</button>`;
 
-        const positions = [p.position1, p.position2, p.position3].filter(Boolean).map(pos => `<span class="badge bg-secondary me-1">${pos}</span>`).join('') || '<span class="text-muted small">N/A</span>';
-        const batsThrows = `B/T: ${p.bats?.[0] || 'N'}/${p.throws?.[0] || 'N'}`;
+        const positionValues = [p.position1, p.position2, p.position3].filter(Boolean);
+        const positions = positionValues.map((pos, index) => `<span class="badge ${index === 0 ? 'text-bg-primary' : 'text-bg-secondary'}">${escapeHTML(pos)}</span>`).join('') || '<span class="badge text-bg-warning">Positions needed</span>';
+        const batsThrows = `Bats ${p.bats || 'not set'} · Throws ${p.throws || 'not set'}`;
+        const profileComplete = Boolean(p.number && p.position1 && p.throws && p.bats);
+        const pitcherRole = p.pitcher_role && p.pitcher_role !== 'Not a Pitcher' ? p.pitcher_role : 'Position player';
+        const initial = p.name ? escapeHTML(p.name.trim().charAt(0).toUpperCase()) : '?';
 
         return `
         <div class="col-12" data-player-name="${pNameSafe}">
-            <div class="card player-card">
-                <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#collapse-roster-${p.id}" style="cursor: pointer;">
-                    <h6 class="mb-0">
+            <div class="card player-card cb-roster-player ${profileComplete ? '' : 'cb-profile-incomplete'}">
+                <div class="card-header cb-roster-player-summary" data-bs-toggle="collapse" href="#collapse-roster-${p.id}" style="cursor: pointer;">
+                    <div class="cb-roster-player-main">
                         <i class="bi bi-grip-vertical text-muted drag-handle" style="cursor: move;" title="Drag to reorder"></i>
-                        <strong class="ms-2">${pNameSafe}</strong>
-                    </h6>
-                    <div class="d-flex align-items-center">
-                        <div class="me-3 d-none d-sm-block">${positions}</div>
-                        <span class="badge bg-primary rounded-pill">#${p.number || 'N/A'}</span>
+                        <span class="cb-player-initial">${initial}</span>
+                        <div class="min-w-0">
+                            <div class="d-flex align-items-center flex-wrap gap-2"><strong class="cb-roster-name">${pNameSafe}</strong><span class="cb-jersey-number">#${escapeHTML(p.number || '—')}</span></div>
+                            <div class="cb-roster-meta">${escapeHTML(batsThrows)} · ${escapeHTML(pitcherRole)}</div>
+                        </div>
+                    </div>
+                    <div class="cb-roster-player-side">
+                        <div class="cb-position-badges">${positions}</div>
+                        <i class="bi bi-chevron-down cb-expand-icon" aria-hidden="true"></i>
                     </div>
                 </div>
                 <div id="collapse-roster-${p.id}" class="collapse">
-                    <div class="card-body bg-light">
+                    <div class="card-body cb-roster-editor">
                         <div class="row g-3 align-items-end">
-                            <div class="col-12"><h5>Player Notes</h5></div>
-                            <div class="col-12"><textarea class="form-control" name="notes" rows="2" placeholder="Notes">${pNotesSafe}</textarea></div>
+                            <div class="col-12"><div class="cb-form-section-title">Player identity and defensive profile</div></div>
+                            <div class="col-12 col-md-5"><label class="form-label">Player name</label><input type="text" class="form-control" name="name" value="${pNameSafe}"></div>
+                            <div class="col-5 col-md-2"><label class="form-label">Jersey #</label><input type="number" class="form-control" name="number" value="${p.number || ''}"></div>
+                            <div class="col-7 col-md-5"><label class="form-label">Player type</label><select name="pitcher_role" class="form-select"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Position player</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starting pitcher</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Relief pitcher</option></select></div>
+                            <div class="col-6 col-md-4"><label class="form-label">Primary position</label>${renderPositionSelect('position1', `position1_${p.id}`, p.position1, 'Choose primary', 'form-select')}</div>
+                            <div class="col-6 col-md-4"><label class="form-label">Secondary position</label>${renderPositionSelect('position2', `position2_${p.id}`, p.position2, 'Optional', 'form-select')}</div>
+                            <div class="col-6 col-md-4"><label class="form-label">Additional position</label>${renderPositionSelect('position3', `position3_${p.id}`, p.position3, 'Optional', 'form-select')}</div>
+                            <div class="col-6 col-md-3"><label class="form-label">Throws</label><select name="throws" class="form-select"><option value="" ${!p.throws ? 'selected' : ''}>Not set</option><option value="Right" ${p.throws === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.throws === 'Left' ? 'selected' : ''}>Left</option></select></div>
+                            <div class="col-6 col-md-3"><label class="form-label">Bats</label><select name="bats" class="form-select"><option value="" ${!p.bats ? 'selected' : ''}>Not set</option><option value="Right" ${p.bats === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.bats === 'Left' ? 'selected' : ''}>Left</option></select></div>
+                            <div class="col-12"><div class="cb-form-section-title mt-2">Coach notes</div></div>
+                            <div class="col-12"><textarea class="form-control" name="notes" rows="3" placeholder="Medical considerations, communication notes, role context, or anything coaches should remember...">${pNotesSafe}</textarea></div>
                             ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${formattedTimestamp}</small></div>` : ''}
-                            <hr class="my-3">
-                            <div class="col-12 col-md-4"><label class="form-label">Name</label><input type="text" class="form-control" name="name" value="${pNameSafe}"></div>
-                            <div class="col-6 col-md-2"><label class="form-label">J#</label><input type="number" class="form-control" name="number" value="${p.number || ''}"></div>
-                            <div class="col-6 col-md-3"><label class="form-label">Pos 1</label>${renderPositionSelect('position1', `position1_${p.id}`, p.position1, '', 'form-select')}</div>
-                            <div class="col-6 col-md-3"><label class="form-label">Pos 2</label>${renderPositionSelect('position2', `position2_${p.id}`, p.position2, '', 'form-select')}</div>
-                            <div class="col-6 col-md-3"><label class="form-label">Pos 3</label>${renderPositionSelect('position3', `position3_${p.id}`, p.position3, '', 'form-select')}</div>
-                            <div class="col-6 col-md-3"><label class="form-label">Throws</label><select name="throws" class="form-select"><option value="Right" ${p.throws === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.throws === 'Left' ? 'selected' : ''}>Left</option></select></div>
-                            <div class="col-6 col-md-3"><label class="form-label">Bats</label><select name="bats" class="form-select"><option value="Right" ${p.bats === 'Right' ? 'selected' : ''}>Right</option><option value="Left" ${p.bats === 'Left' ? 'selected' : ''}>Left</option></select></div>
-                            <div class="col-6 col-md-3"><label class="form-label">Pitcher Role</label><select name="pitcher_role" class="form-select"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Not a Pitcher</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starter</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Reliever</option></select></div>
-                            <div class="col-12 d-flex justify-content-end mt-3"><button type="button" class="btn btn-sm btn-primary me-2 save-player-btn" data-player-id="${p.id}">Save</button>${deleteButtonHtml}</div>
+                            <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3"><button type="button" class="btn btn-sm btn-outline-primary open-player-development" data-player-name="${pNameSafe}"><i class="bi bi-graph-up-arrow me-1"></i>Player Development</button><div class="d-flex gap-2"><button type="button" class="btn btn-sm btn-primary save-player-btn" data-player-id="${p.id}">Save Player</button>${deleteButtonHtml}</div></div>
                             <div class="col-12 mt-2"><div class="save-feedback" style="display: none;"></div></div>
                         </div>
                     </div>
@@ -131,8 +146,33 @@ document.addEventListener('DOMContentLoaded', () => {
             !searchTerm || p.name.toLowerCase().includes(searchTerm) || (p.number || '').toString().includes(searchTerm)
         );
 
-        container.innerHTML = filteredRoster.length > 0 ? filteredRoster.map(playerTemplate).join('') : `<div class="p-3 text-center text-muted">No players found.</div>`;
+        const fullRoster = AppState.full_data.roster || [];
+        const pitcherCount = fullRoster.filter(player => player.pitcher_role && player.pitcher_role !== 'Not a Pitcher').length;
+        const incompleteCount = fullRoster.filter(player => !(player.number && player.position1 && player.throws && player.bats)).length;
+        const countEl = document.getElementById('rosterPlayerCount');
+        const pitcherCountEl = document.getElementById('rosterPitcherCount');
+        const profileStatusEl = document.getElementById('rosterProfileStatus');
+        if (countEl) countEl.textContent = fullRoster.length;
+        if (pitcherCountEl) pitcherCountEl.textContent = pitcherCount;
+        if (profileStatusEl) {
+            profileStatusEl.innerHTML = incompleteCount
+                ? `<strong>${incompleteCount}</strong> profile${incompleteCount === 1 ? '' : 's'} to finish`
+                : '<strong>All</strong> profiles complete';
+            profileStatusEl.classList.toggle('is-complete', incompleteCount === 0);
+        }
+
+        container.innerHTML = filteredRoster.length > 0 ? filteredRoster.map(playerTemplate).join('') : `<div class="p-4 text-center text-muted">No players match that search.</div>`;
         attachRosterSaveListeners();
+        container.querySelectorAll('.open-player-development').forEach(button => {
+            button.addEventListener('click', event => {
+                event.stopPropagation();
+                AppState.active_player_dev_name = button.dataset.playerName;
+                const tabLink = document.querySelector('a[data-bs-toggle="tab"][href="#player_development"]');
+                if (tabLink) bootstrap.Tab.getOrCreateInstance(tabLink).show();
+                renderPlayerDevelopmentList();
+                renderPlayerDevelopmentDetails();
+            });
+        });
     }
 
     function renderPlayerDevelopmentList() {
@@ -142,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const playerDevData = AppState.full_data.player_development || {};
         const roster = [...(AppState.full_data.roster || [])];
         const searchTerm = document.getElementById('devPlayerSearch').value.toLowerCase();
+        const statusFilter = document.getElementById('devStatusFilter')?.value || 'active';
 
         const filteredRoster = roster.filter(p => p.name.toLowerCase().includes(searchTerm));
 
@@ -155,21 +196,32 @@ document.addEventListener('DOMContentLoaded', () => {
              filteredRoster.sort((a,b) => customOrderedNames.indexOf(a.name) - customOrderedNames.indexOf(b.name));
         }
 
+        if (!AppState.active_player_dev_name || !roster.some(player => player.name === AppState.active_player_dev_name)) {
+            AppState.active_player_dev_name = filteredRoster[0]?.name || roster[0]?.name || null;
+        }
+
         container.innerHTML = filteredRoster.map(p => {
             const pNameSafe = escapeHTML(p.name);
-            const activeFocusCount = (playerDevData[p.name] || []).filter(log => log.type === 'Development' && log.status === 'active').length;
-            const summaryText = activeFocusCount > 0 ? `${activeFocusCount} active focus${activeFocusCount > 1 ? 'es' : ''}` : 'No active focuses';
+            const focuses = (playerDevData[p.name] || []).filter(log => log.type === 'Development');
+            const activeFocusCount = focuses.filter(log => log.status !== 'completed').length;
+            const completedFocusCount = focuses.filter(log => log.status === 'completed').length;
+            const summaryText = statusFilter === 'completed'
+                ? `${completedFocusCount} completed`
+                : activeFocusCount > 0
+                    ? `${activeFocusCount} active priorit${activeFocusCount === 1 ? 'y' : 'ies'}`
+                    : 'Ready for a priority';
 
-            return `<a href="#" class="list-group-item list-group-item-action" data-player-name="${pNameSafe}">
+            return `<a href="#" class="list-group-item list-group-item-action cb-dev-player ${p.name === AppState.active_player_dev_name ? 'active' : ''}" data-player-name="${pNameSafe}">
                         <div class="d-flex w-100 justify-content-between align-items-center">
-                            <div>
+                            <div class="d-flex align-items-center min-w-0">
                                <i class="bi bi-grip-vertical me-2 drag-handle"></i>
-                               <span class="fw-bold">${pNameSafe}</span>
+                               <span class="cb-player-initial cb-player-initial-sm">${escapeHTML(p.name.trim().charAt(0).toUpperCase())}</span>
+                               <span class="fw-bold ms-2 text-truncate">${pNameSafe}</span>
                             </div>
-                            <small>${summaryText}</small>
+                            <small class="cb-dev-count">${summaryText}</small>
                         </div>
                     </a>`;
-        }).join('');
+        }).join('') || '<div class="p-4 text-center text-muted">No players match that search.</div>';
 
         container.querySelectorAll('.list-group-item').forEach(item => {
             item.addEventListener('click', (e) => {
@@ -209,45 +261,84 @@ document.addEventListener('DOMContentLoaded', () => {
         const playerDevData = AppState.full_data.player_development || {};
         const activityLog = playerDevData[playerName] || [];
         const pNameSafe = escapeHTML(playerName);
-        
-        const getIconForType = (type) => ({'Development': '<i class="bi bi-graph-up-arrow text-primary"></i>', 'Coach Note': '<i class="bi bi-chat-left-text-fill text-info"></i>', 'Lessons': '<i class="bi bi-person-video3 text-success"></i>'}[type] || '<i class="bi bi-record-circle"></i>');
-        const activityHtml = activityLog.length > 0 ? `<ul class="list-group">${activityLog.map(log => {
-            let itemClass = '', statusText = '', mainText = escapeHTML(log.text || log.focus); // FIX: check for log.focus as well
-            if (log.type === 'Development') {
-                itemClass = log.status === 'completed' ? 'completed-focus' : 'active-focus';
-                if (log.status === 'completed') {
-                    statusText = `<span class="badge bg-success ms-2">Completed: ${formatDateTime(log.completed_date)}</span>`;
-                }
-            } else if (log.type === 'Lessons') {
-                itemClass = 'lesson-entry';
-            } else if (log.type === 'Coach Note') {
-                itemClass = 'coach-note-entry';
-            }
-            
-            let actions = '';
-            if (canEdit(log.author) || log.type === 'Development') {
-                if (log.type === 'Development') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-focus-id="${log.id}" data-player-name="${pNameSafe}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_focus/${log.id}" data-delete-name="this focus">Delete</button>`;
-                else if (log.type === 'Coach Note') actions = `<button class="btn btn-sm btn-link text-secondary py-0" data-bs-toggle="modal" data-bs-target="#editNoteModal" data-note-id="${log.id}" data-note-type="player_notes" data-note-text="${escapeHTML(log.text)}">Edit</button><button type="button" class="btn btn-sm btn-link text-danger py-0" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_note/player_notes/${log.id}" data-delete-name="this note">Delete</button>`;
-            }
-            return `<li class="list-group-item ${itemClass}"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">${getIconForType(log.type)} ${escapeHTML(log.subtype)}: <span class="text-muted fw-normal">${mainText}</span>${statusText}</h6><small>${formatDateTime(log.date)}</small></div>${log.notes ? `<p class="mb-1 text-muted small fst-italic">Notes: ${escapeHTML(log.notes)}</p>` : ''}${log.progress_notes ? `<p class="mb-1 text-muted small fst-italic">Progress: ${escapeHTML(log.progress_notes)}</p>` : ''}<small class="text-muted">By: ${escapeHTML(log.author)}</small>${actions ? `<div class="mt-2">${actions}</div>` : ''}</li>`;
-        }).join('')}</ul>` : `<div class="text-center p-3 border rounded"><p class="mb-0">No activity logged.</p></div>`;
+
+        const player = (AppState.full_data.roster || []).find(item => item.name === playerName);
+        const developmentFocuses = activityLog.filter(item => item.type === 'Development');
+        const activeFocuses = developmentFocuses.filter(item => item.status !== 'completed');
+        const completedFocuses = developmentFocuses.filter(item => item.status === 'completed');
+        const statusFilter = document.getElementById('devStatusFilter')?.value || 'active';
+        const visibleFocuses = statusFilter === 'completed'
+            ? completedFocuses
+            : statusFilter === 'all'
+                ? [...activeFocuses, ...completedFocuses]
+                : activeFocuses;
+        const focusCards = visibleFocuses.length ? visibleFocuses.map(focus => {
+            const isCompleted = focus.status === 'completed';
+            const dateLabel = isCompleted && focus.completed_date
+                ? `Completed ${formatDateTime(focus.completed_date)}`
+                : `Started ${formatDateTime(focus.date)}`;
+            return `<article class="cb-focus-card ${isCompleted ? 'is-completed' : ''}">
+                <div class="cb-focus-topline">
+                    <span class="cb-skill-badge"><i class="bi bi-bullseye"></i>${escapeHTML(focus.subtype || focus.skill_type || 'Focus')}</span>
+                    <span class="small text-muted">${dateLabel}</span>
+                </div>
+                <h5>${escapeHTML(focus.text || focus.focus)}</h5>
+                ${focus.notes ? `<div class="cb-focus-note"><strong>Coach cue:</strong> ${escapeHTML(focus.notes)}</div>` : ''}
+                ${focus.progress_notes ? `<div class="cb-focus-progress"><strong>Progress:</strong> ${escapeHTML(focus.progress_notes)}</div>` : ''}
+                <div class="cb-focus-actions">
+                    ${!isCompleted ? `<a class="btn btn-sm btn-success" href="/complete_focus/${focus.id}"><i class="bi bi-check2-circle me-1"></i>Mark complete</a>` : '<span class="badge text-bg-success">Completed</span>'}
+                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-focus-id="${focus.id}" data-player-name="${pNameSafe}">Edit</button>
+                    <button type="button" class="btn btn-sm btn-link text-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_focus/${focus.id}" data-delete-name="this development focus">Delete</button>
+                </div>
+            </article>`;
+        }).join('') : `<div class="cb-empty-state"><i class="bi bi-bullseye"></i><h5>${statusFilter === 'completed' ? 'No completed priorities yet' : 'No active priorities yet'}</h5><p>${statusFilter === 'completed' ? 'Completed player work will collect here.' : 'Add one clear, coachable priority to start the next development cycle.'}</p></div>`;
+        const lessonValue = player?.has_lessons || 'No';
+
         container.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0">${pNameSafe} - Development Log</h4>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown">Add New</button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">Hitting Focus</a></li>
-                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">Pitching Focus</a></li>
-                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">Fielding Focus</a></li>
-                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">Baserunning Focus</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#collaboration" onclick="document.querySelector('#collab-player-select').value='${pNameSafe}'; window.switchTab(document.querySelector('a[href=\\'#collaboration\\']'));">Coach Note</a></li>
-                    </ul>
+            <div class="cb-dev-detail-head">
+                <div>
+                    <div class="cb-kicker">Individual development plan</div>
+                    <h3 class="mb-1">${pNameSafe}</h3>
+                    <div class="text-muted small">Keep the active list short enough to coach during practice and games.</div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-outline-secondary edit-roster-profile" data-player-id="${player?.id || ''}"><i class="bi bi-person-lines-fill me-1"></i>Roster profile</button>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-plus-circle me-1"></i>Add priority</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="hitting">Hitting focus</a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="pitching">Pitching focus</a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="fielding">Fielding focus</a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editFocusModal" data-player-name="${pNameSafe}" data-skill="baserunning">Baserunning focus</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
-            ${activityHtml}
+            <div class="cb-dev-metrics">
+                <span><strong>${activeFocuses.length}</strong> active</span>
+                <span><strong>${completedFocuses.length}</strong> completed</span>
+                <span><strong>${lessonValue === 'Yes' ? 'Yes' : 'No'}</strong> external lessons</span>
+            </div>
+            <div class="cb-focus-grid">${focusCards}</div>
+            ${player ? `<div class="card cb-lesson-card mt-3"><div class="card-body">
+                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3"><div><h5 class="mb-1">External instruction</h5><div class="small text-muted">Keep private-lesson work visible so team coaching reinforces the same cue.</div></div><i class="bi bi-person-video3 fs-3 text-primary"></i></div>
+                <form action="/update_lesson_info/${player.id}" method="POST" class="row g-2 align-items-end">
+                    <div class="col-sm-4"><label class="form-label">Taking lessons?</label><select name="has_lessons" class="form-select"><option value="No" ${lessonValue !== 'Yes' ? 'selected' : ''}>No</option><option value="Yes" ${lessonValue === 'Yes' ? 'selected' : ''}>Yes</option></select></div>
+                    <div class="col-sm-6"><label class="form-label">Current lesson focus</label><input type="text" name="lesson_focus" class="form-control" value="${escapeHTML(player.lesson_focus || '')}" placeholder="e.g. Direction to the plate"></div>
+                    <div class="col-sm-2"><button class="btn btn-outline-primary w-100" type="submit">Save</button></div>
+                </form>
+            </div></div>` : ''}
         `;
+
+        container.querySelector('.edit-roster-profile')?.addEventListener('click', () => {
+            const tabLink = document.querySelector('a[data-bs-toggle="tab"][href="#roster"]');
+            if (tabLink) bootstrap.Tab.getOrCreateInstance(tabLink).show();
+            const rosterCard = document.querySelector(`#collapse-roster-${player?.id}`);
+            if (rosterCard) {
+                bootstrap.Collapse.getOrCreateInstance(rosterCard, { toggle: false }).show();
+                rosterCard.closest('.player-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
     }
 
     function renderLineups() {
@@ -441,21 +532,95 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderPracticePlans() {
         const container = document.getElementById('practicePlanAccordion');
         if (!container) return;
-        const plans = (AppState.full_data.practice_plans || []).sort((a, b) => b.date.localeCompare(a.date));
+        const plans = [...(AppState.full_data.practice_plans || [])];
         const roster = AppState.full_data.roster || [];
+        const summary = document.getElementById('practicePlanSummary');
+        const today = localDateInputValue();
+        const orderedPlans = plans.sort((a, b) => {
+            const aDate = a.date.split('T')[0];
+            const bDate = b.date.split('T')[0];
+            const aUpcoming = aDate >= today;
+            const bUpcoming = bDate >= today;
+            if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+            return aUpcoming ? aDate.localeCompare(bDate) : bDate.localeCompare(aDate);
+        });
+        const upcomingPlans = orderedPlans.filter(plan => plan.date.split('T')[0] >= today);
 
-        if (plans.length === 0) {
-            container.innerHTML = `<div class="text-center p-4 border rounded"><p class="mb-0">No practice plans saved.</p></div>`;
+        if (summary) {
+            summary.innerHTML = upcomingPlans.length
+                ? `<strong>${upcomingPlans.length}</strong> upcoming · Next ${formatDateTime(upcomingPlans[0].date.split('T')[0])}`
+                : plans.length
+                    ? `<strong>${plans.length}</strong> saved plan${plans.length === 1 ? '' : 's'} · Nothing upcoming`
+                    : 'No practices planned yet';
+        }
+
+        const newPracticeDate = document.querySelector('#createPracticePlanForm input[name="plan_date"]');
+        if (newPracticeDate && !newPracticeDate.value) newPracticeDate.value = today;
+
+        if (orderedPlans.length === 0) {
+            container.innerHTML = `<div class="cb-empty-state m-3"><i class="bi bi-clipboard-plus"></i><h5>Build your first practice plan</h5><p>Give the practice a purpose, outline the work areas, and reuse it when the structure works.</p></div>`;
             return;
         }
 
-        container.innerHTML = plans.map(plan => {
+        const workArea = (icon, label, value) => value
+            ? `<div class="cb-practice-work"><i class="bi ${icon}"></i><div><strong>${label}</strong><p>${escapeHTML(value)}</p></div></div>`
+            : '';
+
+        container.innerHTML = orderedPlans.map(plan => {
+            const dateOnly = plan.date.split('T')[0];
+            const isUpcoming = dateOnly >= today;
             const absentPlayerIds = new Set(plan.absent_player_ids || []);
-            const attendanceHtml = roster.map(player => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="absent_players" value="${player.id}" id="attendance-${plan.id}-${player.id}" ${absentPlayerIds.has(player.id) ? 'checked' : ''}><label class="form-check-label" for="attendance-${plan.id}-${player.id}">${escapeHTML(player.name)}</label></div>`).join('');
-            const tasksHtml = (plan.tasks || []).map(task => `<li class="list-group-item d-flex justify-content-between align-items-center task-item ${task.status === 'complete' ? 'complete' : ''}" data-task-id="${task.id}" data-plan-id="${plan.id}"><div class="form-check"><input class="form-check-input task-checkbox" type="checkbox" ${task.status === 'complete' ? 'checked' : ''} id="task-${task.id}"><label class="form-check-label" for="task-${task.id}">${escapeHTML(task.text)}<div class="text-muted small">By ${escapeHTML(task.author)}</div></label></div><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_task/${plan.id}/${task.id}" data-delete-name="this task"><i class="bi bi-trash"></i></button></li>`).join('') || '<li class="list-group-item text-muted text-center">No tasks.</li>';
-            return `<div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}"><strong>${formatDateTime(plan.date)}</strong> - ${escapeHTML(plan.general_notes || 'No general notes')}</button></h2><div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body"><form action="/edit_practice_plan/${plan.id}" method="POST" class="practice-plan-details-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" value="${plan.date.split('T')[0]}" required></div><div class="col-md-8"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}"></div><div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2">${escapeHTML(plan.emphasis || '')}</textarea></div><div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3">${escapeHTML(plan.warm_up || '')}</textarea></div><div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3">${escapeHTML(plan.infield_outfield || '')}</textarea></div><div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3">${escapeHTML(plan.hitting || '')}</textarea></div><div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3">${escapeHTML(plan.pitching_catching || '')}</textarea></div><div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_practice_plan/${plan.id}" data-delete-name="this practice plan">Delete Plan</button><button type="submit" class="btn btn-sm btn-primary">Save Plan Details</button></div></div></form><hr><div class="row mt-4"><div class="col-lg-6"><h5>Attendance</h5><p class="text-muted small">Check the box for any player who is absent.</p><form action="/update_practice_attendance/${plan.id}" method="POST"><div class="mb-3">${attendanceHtml}</div><button type="submit" class="btn btn-sm btn-primary">Save Attendance</button></form></div><div class="col-lg-6"><h5>Tasks / To-Do</h5><form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add task..." required><button type="submit" class="btn btn-primary">Add</button></div></form><ul class="list-group task-list">${tasksHtml}</ul></div></div></div></div></div>`;
+            const completedTasks = (plan.tasks || []).filter(task => task.status === 'complete').length;
+            const taskTotal = (plan.tasks || []).length;
+            const title = plan.general_notes || 'Untitled practice';
+            const attendanceHtml = roster.map(player => `<div class="form-check cb-attendance-check"><input class="form-check-input" type="checkbox" name="absent_players" value="${player.id}" id="attendance-${plan.id}-${player.id}" ${absentPlayerIds.has(player.id) ? 'checked' : ''}><label class="form-check-label" for="attendance-${plan.id}-${player.id}">${escapeHTML(player.name)}</label></div>`).join('');
+            const tasksHtml = (plan.tasks || []).map(task => `<li class="list-group-item d-flex justify-content-between align-items-center task-item ${task.status === 'complete' ? 'complete' : ''}" data-task-id="${task.id}" data-plan-id="${plan.id}"><div class="form-check"><input class="form-check-input task-checkbox" type="checkbox" ${task.status === 'complete' ? 'checked' : ''} id="task-${task.id}"><label class="form-check-label" for="task-${task.id}">${escapeHTML(task.text)}<div class="text-muted small">Added by ${escapeHTML(task.author)}</div></label></div><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_task/${plan.id}/${task.id}" data-delete-name="this task"><i class="bi bi-trash"></i></button></li>`).join('') || '<li class="list-group-item text-muted text-center">No setup tasks yet.</li>';
+            const preview = [
+                workArea('bi-activity', 'Arrival, warm-up & throwing', plan.warm_up),
+                workArea('bi-shield-check', 'Team defense', plan.infield_outfield),
+                workArea('bi-lightning-charge', 'Offensive work', plan.hitting),
+                workArea('bi-bullseye', 'Pitching & catching', plan.pitching_catching),
+            ].join('') || '<div class="text-muted small">Work areas have not been outlined yet.</div>';
+
+            return `<div class="accordion-item cb-practice-plan ${isUpcoming ? 'is-upcoming' : 'is-past'}">
+                <h2 class="accordion-header"><button class="accordion-button collapsed cb-practice-plan-button" type="button" data-bs-toggle="collapse" data-bs-target="#plan-${plan.id}">
+                    <span class="cb-practice-date"><strong>${formatDateTime(dateOnly)}</strong><small>${isUpcoming ? 'Upcoming' : 'Past practice'}</small></span>
+                    <span class="cb-practice-title"><strong>${escapeHTML(title)}</strong><small>${escapeHTML(plan.emphasis || 'Add the top priorities for this practice.')}</small></span>
+                    <span class="cb-practice-meta"><span>${absentPlayerIds.size} absent</span><span>${completedTasks}/${taskTotal} tasks</span></span>
+                </button></h2>
+                <div id="plan-${plan.id}" class="accordion-collapse collapse" data-bs-parent="#practicePlanAccordion"><div class="accordion-body">
+                    <div class="cb-practice-preview"><div class="cb-practice-purpose"><span class="cb-kicker">Practice purpose</span><p>${escapeHTML(plan.emphasis || 'No priorities added yet.')}</p></div><div class="cb-practice-work-grid">${preview}</div></div>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 my-3">
+                        <button type="button" class="btn btn-sm btn-outline-primary reuse-practice-btn" data-plan-id="${plan.id}" data-plan-name="${escapeHTML(title)}" data-plan-date="${dateOnly}"><i class="bi bi-copy me-1"></i>Reuse on another date</button>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#edit-plan-${plan.id}"><i class="bi bi-pencil me-1"></i>Edit plan details</button>
+                    </div>
+                    <div class="collapse" id="edit-plan-${plan.id}"><form action="/edit_practice_plan/${plan.id}" method="POST" class="practice-plan-details-form cb-practice-edit"><div class="row g-3">
+                        <div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" value="${dateOnly}" required></div>
+                        <div class="col-md-8"><label class="form-label">Practice title</label><input type="text" name="general_notes" class="form-control" value="${escapeHTML(plan.general_notes || '')}"></div>
+                        <div class="col-12"><label class="form-label">Top priorities</label><textarea name="emphasis" class="form-control" rows="2">${escapeHTML(plan.emphasis || '')}</textarea></div>
+                        <div class="col-md-6"><label class="form-label">Arrival, warm-up & throwing</label><textarea name="warm_up" class="form-control" rows="3">${escapeHTML(plan.warm_up || '')}</textarea></div>
+                        <div class="col-md-6"><label class="form-label">Team defense</label><textarea name="infield_outfield" class="form-control" rows="3">${escapeHTML(plan.infield_outfield || '')}</textarea></div>
+                        <div class="col-md-6"><label class="form-label">Offensive work</label><textarea name="hitting" class="form-control" rows="3">${escapeHTML(plan.hitting || '')}</textarea></div>
+                        <div class="col-md-6"><label class="form-label">Pitching & catching</label><textarea name="pitching_catching" class="form-control" rows="3">${escapeHTML(plan.pitching_catching || '')}</textarea></div>
+                        <div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_practice_plan/${plan.id}" data-delete-name="this practice plan">Delete plan</button><button type="submit" class="btn btn-sm btn-primary">Save plan details</button></div>
+                    </div></form></div>
+                    <div class="row g-4 mt-1 cb-practice-operations"><div class="col-lg-6"><h5>Attendance</h5><p class="text-muted small">Check only players who will be absent.</p><form action="/update_practice_attendance/${plan.id}" method="POST"><div class="cb-attendance-grid mb-3">${attendanceHtml}</div><button type="submit" class="btn btn-sm btn-outline-primary">Save attendance</button></form></div>
+                    <div class="col-lg-6"><h5>Setup tasks</h5><p class="text-muted small">Equipment, field setup, coach assignments, or reminders.</p><form action="/add_task_to_plan/${plan.id}" method="POST" class="mb-3 add-task-form"><div class="input-group"><input type="text" name="task_text" class="form-control" placeholder="Add a setup task..." required><button type="submit" class="btn btn-primary">Add</button></div></form><ul class="list-group task-list">${tasksHtml}</ul></div></div>
+                </div></div>
+            </div>`;
         }).join('');
         attachTaskListeners();
+        container.querySelectorAll('.reuse-practice-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const sourceDate = new Date(`${button.dataset.planDate}T12:00:00`);
+                sourceDate.setDate(sourceDate.getDate() + 7);
+                document.getElementById('reusePracticePlanId').value = button.dataset.planId;
+                document.getElementById('reusePracticeName').textContent = button.dataset.planName;
+                document.getElementById('reusePracticeDate').value = localDateInputValue(sourceDate);
+                document.getElementById('reusePracticeError').classList.add('d-none');
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('reusePracticeModal')).show();
+            });
+        });
     }
     
     function renderCollaborationNotes() {
@@ -1139,6 +1304,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.getElementById('devPlayerSearch').addEventListener('input', renderPlayerDevelopmentList);
+        document.getElementById('devStatusFilter')?.addEventListener('change', () => {
+            renderPlayerDevelopmentList();
+            renderPlayerDevelopmentDetails();
+        });
         document.getElementById('dev-sort-az').addEventListener('click', () => {
             AppState.dev_player_sort = { key: 'name', order: 'asc' };
             renderPlayerDevelopmentList();
@@ -1150,6 +1319,39 @@ document.addEventListener('DOMContentLoaded', () => {
          document.getElementById('dev-sort-custom').addEventListener('click', () => {
             AppState.dev_player_sort = { key: 'custom', order: 'asc' };
             renderPlayerDevelopmentList();
+        });
+
+        document.getElementById('confirmReusePractice')?.addEventListener('click', async () => {
+            const button = document.getElementById('confirmReusePractice');
+            const planId = document.getElementById('reusePracticePlanId').value;
+            const dateValue = document.getElementById('reusePracticeDate').value;
+            const error = document.getElementById('reusePracticeError');
+            if (!planId || !dateValue) {
+                error.textContent = 'Choose a date for the copied practice.';
+                error.classList.remove('d-none');
+                return;
+            }
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating…';
+            try {
+                const response = await fetch(`/clone_practice_plan/${planId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        plan_date: dateValue,
+                        copy_tasks: document.getElementById('reusePracticeTasks').checked,
+                    }),
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || 'Unable to reuse this plan.');
+                window.location.assign(`/?_t=${Date.now()}#practice_plan`);
+            } catch (err) {
+                error.textContent = err.message;
+                error.classList.remove('d-none');
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
         });
 
         document.getElementById('confirmDeleteModal')?.addEventListener('show.bs.modal', (e) => {
@@ -1191,7 +1393,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 form.action = `/update_focus/${focusId}`;
                 const focusItem = AppState.full_data.player_development[btn.dataset.playerName]?.find(item => item.id == focusId);
                 if (focusItem) {
-                    form.querySelector('#focusSkill').value = focusItem.subtype;
+                    form.querySelector('#focusSkill').value = String(focusItem.skill_type || focusItem.subtype || '').toLowerCase();
                     form.querySelector('#focusText').value = focusItem.text;
                     form.querySelector('#focusNotes').value = focusItem.notes || '';
                     form.querySelector('#focusProgressNotes').value = focusItem.progress_notes || '';

@@ -250,3 +250,391 @@ body.cb-ui:has(#pregame-defense-editor-v3) main > .container-fluid {
 body.cb-ui:has(#pregame-defense-editor-v3) main::before {
   content: none;
 }
+
+/* Coaching workspaces: roster, development, and practice planning. */
+.cb-workspace-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.cb-roster-metrics,
+.cb-dev-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cb-roster-metrics > span,
+.cb-dev-metrics > span,
+.cb-practice-summary {
+  padding: 8px 11px;
+  border: 1px solid var(--cb-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--cb-muted);
+  font-size: .76rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.cb-roster-metrics strong,
+.cb-dev-metrics strong,
+.cb-practice-summary strong {
+  color: var(--cb-ink);
+}
+
+.cb-roster-metrics .is-complete {
+  border-color: #a7d9bd;
+  background: #f0faf4;
+  color: #17653b;
+}
+
+.cb-roster-player {
+  overflow: hidden;
+  border-color: var(--cb-border);
+  box-shadow: none;
+}
+
+.cb-roster-player.cb-profile-incomplete {
+  border-left: 3px solid #d6a526;
+}
+
+.cb-roster-player-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.cb-roster-player-main,
+.cb-roster-player-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cb-player-initial {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #edf2ff;
+  color: var(--cb-primary);
+  font-size: .9rem;
+  font-weight: 800;
+}
+
+.cb-player-initial-sm {
+  flex-basis: 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: .72rem;
+}
+
+.cb-roster-name {
+  color: var(--cb-ink);
+  font-size: .94rem;
+}
+
+.cb-jersey-number {
+  color: var(--cb-primary);
+  font-size: .74rem;
+  font-weight: 800;
+}
+
+.cb-roster-meta {
+  margin-top: 2px;
+  color: var(--cb-muted);
+  font-size: .72rem;
+}
+
+.cb-position-badges {
+  display: flex;
+  gap: 5px;
+}
+
+.cb-expand-icon {
+  color: var(--cb-muted);
+  transition: transform .2s ease;
+}
+
+.cb-roster-player-summary[aria-expanded="true"] .cb-expand-icon {
+  transform: rotate(180deg);
+}
+
+.cb-roster-editor {
+  border-top: 1px solid var(--cb-border);
+  background: #f8fafc;
+}
+
+.cb-form-section-title {
+  color: var(--cb-primary);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.cb-dev-player-card .list-group-item {
+  border-left: 0;
+  border-right: 0;
+  padding: 11px 12px;
+}
+
+.cb-dev-player.active {
+  border-color: var(--cb-primary);
+  background: #eef3ff;
+  color: var(--cb-ink);
+}
+
+.cb-dev-count {
+  color: var(--cb-muted);
+  font-size: .68rem;
+  text-align: right;
+}
+
+.cb-dev-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.cb-dev-metrics {
+  margin-bottom: 14px;
+}
+
+.cb-focus-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.cb-focus-card {
+  padding: 14px;
+  border: 1px solid #cfdaf0;
+  border-left: 4px solid var(--cb-primary);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.cb-focus-card.is-completed {
+  border-color: var(--cb-border);
+  border-left-color: #5ca578;
+  background: #fbfdfb;
+}
+
+.cb-focus-topline,
+.cb-focus-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cb-skill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--cb-primary);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.cb-focus-card h5 {
+  margin: 9px 0;
+  font-size: .98rem;
+}
+
+.cb-focus-note,
+.cb-focus-progress {
+  margin-top: 7px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f5f7fa;
+  color: #4d5b70;
+  font-size: .76rem;
+}
+
+.cb-focus-progress {
+  background: #eef8f1;
+}
+
+.cb-focus-actions {
+  justify-content: flex-start;
+  margin-top: 11px;
+}
+
+.cb-lesson-card {
+  border-color: var(--cb-border);
+  box-shadow: none;
+}
+
+.cb-empty-state i {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--cb-primary);
+  font-size: 1.7rem;
+}
+
+.cb-empty-state h5 {
+  margin-bottom: 4px;
+}
+
+.cb-empty-state p {
+  margin-bottom: 0;
+}
+
+.cb-practice-plan-button {
+  display: grid;
+  grid-template-columns: 190px minmax(240px, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 15px 18px;
+}
+
+.cb-practice-date,
+.cb-practice-title {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  text-align: left;
+}
+
+.cb-practice-date small,
+.cb-practice-title small {
+  overflow: hidden;
+  color: var(--cb-muted);
+  font-size: .69rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cb-practice-plan.is-upcoming .cb-practice-date small {
+  color: #17653b;
+  font-weight: 750;
+}
+
+.cb-practice-meta {
+  display: flex;
+  gap: 6px;
+  margin-right: 20px;
+}
+
+.cb-practice-meta span {
+  padding: 4px 7px;
+  border: 1px solid var(--cb-border);
+  border-radius: 999px;
+  color: var(--cb-muted);
+  font-size: .65rem;
+  white-space: nowrap;
+}
+
+.cb-practice-preview {
+  display: grid;
+  grid-template-columns: minmax(180px, .7fr) minmax(0, 1.8fr);
+  gap: 14px;
+}
+
+.cb-practice-purpose,
+.cb-practice-work {
+  padding: 12px;
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.cb-practice-purpose p,
+.cb-practice-work p {
+  margin: 5px 0 0;
+  color: #536074;
+  font-size: .75rem;
+  white-space: pre-line;
+}
+
+.cb-practice-work-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cb-practice-work {
+  display: flex;
+  gap: 9px;
+  background: #fff;
+}
+
+.cb-practice-work > i {
+  color: var(--cb-primary);
+}
+
+.cb-practice-work strong {
+  font-size: .74rem;
+}
+
+.cb-practice-edit {
+  padding: 15px;
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.cb-practice-operations {
+  padding-top: 14px;
+  border-top: 1px solid var(--cb-border);
+}
+
+.cb-attendance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+
+@media (max-width: 767.98px) {
+  .cb-workspace-head,
+  .cb-dev-detail-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cb-roster-player-summary {
+    align-items: flex-start;
+  }
+
+  .cb-roster-player-side {
+    align-items: flex-end;
+    flex-direction: column-reverse;
+  }
+
+  .cb-position-badges {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .cb-practice-plan-button {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .cb-practice-meta {
+    margin-right: 0;
+  }
+
+  .cb-practice-preview,
+  .cb-practice-work-grid {
+    grid-template-columns: 1fr;
+  }
+}

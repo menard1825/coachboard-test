@@ -211,6 +211,36 @@ def test_mobile_navigation_reaches_every_primary_area(page: Page, coachboard_url
         expect(page.locator('#more').get_by_text(label, exact=True)).to_be_visible()
 
 
+def test_coaching_workspaces_expose_new_primary_actions(page: Page, coachboard_url: str):
+    login(page, coachboard_url)
+    page.goto(coachboard_url)
+
+    expect(page.locator('#rosterPlayerCount')).not_to_have_text('0', timeout=15_000)
+    expect(page.locator('.cb-roster-player')).not_to_have_count(0)
+    first_player = page.locator('.cb-roster-player').first
+    first_player.locator('.cb-roster-player-summary').click()
+    first_player.get_by_role('button', name='Player Development').click()
+    expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
+    expect(page.locator('.cb-dev-detail-head')).to_be_visible()
+    expect(page.get_by_role('button', name='Add priority')).to_be_visible()
+
+    page.locator('#mainTabsDesktop [href="#practice_plan"]').evaluate(
+        "el => bootstrap.Tab.getOrCreateInstance(el).show()"
+    )
+    expect(page.locator('#practicePlanSummary')).to_be_visible()
+    expect(page.locator('.cb-practice-plan')).not_to_have_count(0)
+    page.locator('.cb-practice-plan-button').first.click()
+    expect(page.get_by_role('button', name='Reuse on another date').first).to_be_visible()
+
+    page.goto(f'{coachboard_url}/pitching')
+    expect(page.get_by_text('Game-pitch targets are coaching plans, not rule limits.')).to_be_visible()
+    page.get_by_role('button', name='Plan a target').click()
+    expect(page.locator('#coachTargetModal')).to_be_visible()
+    expect(page.locator('#targetScopeInput')).to_have_value('day')
+    page.locator('#targetScopeInput').select_option('game')
+    expect(page.locator('#targetGameField')).to_be_visible()
+
+
 
 def test_user_management_mobile_cards_do_not_overlap(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})

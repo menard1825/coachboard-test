@@ -7,7 +7,7 @@
     <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
         <div>
             <h3 class="mb-1">Pitching Dashboard</h3>
-            <div class="text-muted">Eligibility, workload, targets, and outing history without mixing them together.</div>
+            <div class="text-muted">Official eligibility, total throwing workload, and optional game-pitch plans—kept separate on purpose.</div>
         </div>
         <a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-outline-secondary">View {{ rules.rule_set_name }} Rules</a>
     </div>
@@ -15,6 +15,11 @@
     {% if rules.source_note %}
     <div class="alert alert-warning py-2">{{ rules.source_note }}</div>
     {% endif %}
+
+    <div class="alert alert-primary d-flex gap-3 align-items-start" role="note">
+        <i class="bi bi-info-circle-fill mt-1"></i>
+        <div><strong>Game-pitch targets are coaching plans, not rule limits.</strong><br><span class="small">Choose one scheduled game or the entire game day. Targets count official game pitches only; practice and lessons stay in throwing workload. Weekly and season totals remain informational, while official eligibility is always determined by {{ rules.rule_set_name }}.</span></div>
+    </div>
 
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -36,7 +41,7 @@
                             <th>Official Status</th>
                             <th>Official Today</th>
                             <th>Throwing Workload</th>
-                            <th>Coach Target</th>
+                            <th>Today’s Game-Pitch Target</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -83,14 +88,18 @@
                             </td>
                             <td style="min-width:155px">
                                 {% if s.coach_target is not none %}
-                                    <div class="fw-bold">{{ s.coach_target }} pitches</div>
+                                    <div class="fw-bold">Today · {{ s.coach_target }} game pitches</div>
                                     {% if s.coach_target_reason %}<div class="small text-muted">{{ s.coach_target_reason }}</div>{% endif %}
                                     {% if s.coach_target_reached %}<span class="badge text-bg-warning mt-1">Target Reached</span>{% elif s.coach_target_remaining is not none %}<div class="small">{{ s.coach_target_remaining }} target pitches left</div>{% endif %}
                                 {% else %}
                                     <span class="text-muted small">No target set</span>
                                 {% endif %}
                                 <br>
-                                <button type="button" class="btn btn-sm btn-link px-0" onclick="openTargetModal('{{ player.id }}', '{{ player.name|e }}', '{{ s.coach_target if s.coach_target is not none else '' }}', '{{ s.coach_target_reason|default('', true)|e }}')">Set / Edit Target</button>
+                                <button type="button" class="btn btn-sm btn-link px-0 open-target-modal"
+                                    data-player-id="{{ player.id }}" data-player-name="{{ player.name|e }}"
+                                    data-target-pitches="{{ s.coach_target if s.coach_target is not none else '' }}"
+                                    data-target-reason="{{ s.coach_target_reason|default('', true)|e }}"
+                                    data-target-date="{{ today_string }}" data-game-id="">Set / Edit Today</button>
                             </td>
                         </tr>
                         {% endif %}
@@ -100,6 +109,29 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div><h5 class="mb-0">Planned Game-Pitch Targets</h5><div class="small text-muted">Today and future plans. A game-day target covers all games on that date; a scheduled-game target covers only that game.</div></div>
+            <button type="button" class="btn btn-sm btn-primary open-target-modal" data-player-id="" data-player-name="Choose a pitcher" data-target-pitches="" data-target-reason="" data-target-date="{{ today_string }}" data-game-id=""><i class="bi bi-plus-circle me-1"></i>Plan a target</button>
+        </div>
+        <div class="list-group list-group-flush">
+            {% for target in planned_targets %}
+            <div class="list-group-item d-flex justify-content-between align-items-center gap-3 py-3 flex-wrap">
+                <div>
+                    <div><strong>{{ target.player_name }}</strong> <span class="badge text-bg-light border">{{ target.game_label }}</span></div>
+                    <div class="small text-muted mt-1">{{ target.local_date }} · <strong>{{ target.target_pitches }} game pitches</strong>{% if target.reason %} · {{ target.reason }}{% endif %}</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary open-target-modal"
+                    data-player-id="{{ target.player_id }}" data-player-name="{{ target.player_name|e }}"
+                    data-target-pitches="{{ target.target_pitches }}" data-target-reason="{{ target.reason|e }}"
+                    data-target-date="{{ target.local_date }}" data-game-id="{{ target.game_id or '' }}">Edit</button>
+            </div>
+            {% else %}
+            <div class="list-group-item text-center text-muted py-4">No game-pitch targets are planned. Add one only when it helps communicate pitcher usage.</div>
+            {% endfor %}
         </div>
     </div>
 
@@ -205,14 +237,15 @@
 <div class="modal fade" id="coachTargetModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Coach Pitch Target</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Game-Pitch Target</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <p class="mb-3">Set optional workload guidance for <strong><span id="targetPlayerName"></span></strong>. This does not override official eligibility.</p>
-                <label for="targetPitchesInput" class="form-label">Target pitches</label>
-                <input type="number" min="0" step="1" class="form-control mb-3" id="targetPitchesInput">
-                <label for="targetReasonInput" class="form-label">Reason</label>
-                <input type="text" class="form-control" id="targetReasonInput" placeholder="e.g. Save for Sunday">
-                <div class="form-text">Leave target blank and save to clear it.</div>
+                <div class="alert alert-light border small"><strong>This is optional coaching guidance.</strong> It counts game pitches only and does not set a weekly or season limit, include practices/lessons, or override official eligibility.</div>
+                <div class="mb-3"><label for="targetPlayerInput" class="form-label fw-semibold">Pitcher</label><select id="targetPlayerInput" class="form-select" required><option value="">Choose a pitcher…</option>{% for p in pitchers | sort(attribute='name') %}<option value="{{ p.id }}">{{ p.full_name }}</option>{% endfor %}</select></div>
+                <div class="mb-3"><label for="targetScopeInput" class="form-label fw-semibold">Target applies to</label><select id="targetScopeInput" class="form-select"><option value="day">Entire game day</option><option value="game">One scheduled game</option></select><div class="form-text" id="targetScopeHelp">Use this when the same pitcher may appear across a doubleheader or multiple games that day.</div></div>
+                <div class="mb-3" id="targetDateField"><label for="targetDateInput" class="form-label fw-semibold">Game date</label><input type="date" id="targetDateInput" class="form-control" value="{{ today_string }}"></div>
+                <div class="mb-3 d-none" id="targetGameField"><label for="targetGameInput" class="form-label fw-semibold">Scheduled game</label><select id="targetGameInput" class="form-select"><option value="">Choose a game…</option>{% for game in scheduled_games %}<option value="{{ game.id }}" data-date="{{ game.date.strftime('%Y-%m-%d') }}">{{ game.date.strftime('%a, %b %-d') }} · vs {{ game.opponent }}</option>{% endfor %}</select>{% if not scheduled_games %}<div class="form-text text-warning">Add the game to Schedule first, or use an entire game-day target.</div>{% endif %}</div>
+                <div class="mb-3"><label for="targetPitchesInput" class="form-label fw-semibold">Planned game pitches</label><input type="number" min="0" step="1" class="form-control" id="targetPitchesInput"><div class="form-text">Leave blank and save to clear this exact target.</div></div>
+                <div class="mb-0"><label for="targetReasonInput" class="form-label fw-semibold">Reason or coaching note</label><input type="text" class="form-control" id="targetReasonInput" placeholder="e.g. Short start; available again Sunday"></div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" id="saveTargetBtn">Save Target</button></div>
         </div>
@@ -251,8 +284,6 @@
 {% block scripts %}
 {{ super() }}
 <script>
-let currentTargetPlayerId = null;
-
 function localDateString() {
     const d = new Date();
     const y = d.getFullYear();
@@ -261,11 +292,25 @@ function localDateString() {
     return `${y}-${m}-${day}`;
 }
 
-function openTargetModal(playerId, playerName, currentTarget, currentReason) {
-    currentTargetPlayerId = playerId;
-    document.getElementById('targetPlayerName').textContent = playerName;
-    document.getElementById('targetPitchesInput').value = currentTarget || '';
-    document.getElementById('targetReasonInput').value = currentReason || '';
+function applyTargetScopeUI() {
+    const scope = document.getElementById('targetScopeInput').value;
+    const isGame = scope === 'game';
+    document.getElementById('targetDateField').classList.toggle('d-none', isGame);
+    document.getElementById('targetGameField').classList.toggle('d-none', !isGame);
+    document.getElementById('targetScopeHelp').textContent = isGame
+        ? 'This target is counted only against the selected scheduled game.'
+        : 'This target is counted across all games on the selected date.';
+}
+
+function openTargetModal(button) {
+    const gameId = button.dataset.gameId || '';
+    document.getElementById('targetPlayerInput').value = button.dataset.playerId || '';
+    document.getElementById('targetPitchesInput').value = button.dataset.targetPitches || '';
+    document.getElementById('targetReasonInput').value = button.dataset.targetReason || '';
+    document.getElementById('targetDateInput').value = button.dataset.targetDate || localDateString();
+    document.getElementById('targetGameInput').value = gameId;
+    document.getElementById('targetScopeInput').value = gameId ? 'game' : 'day';
+    applyTargetScopeUI();
     bootstrap.Modal.getOrCreateInstance(document.getElementById('coachTargetModal')).show();
 }
 
@@ -295,18 +340,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('outing_type')?.addEventListener('change', () => applyOutingTypeUI());
     document.getElementById('edit_outing_type')?.addEventListener('change', () => applyOutingTypeUI('edit_'));
+    document.getElementById('targetScopeInput')?.addEventListener('change', applyTargetScopeUI);
+    document.querySelectorAll('.open-target-modal').forEach(button => button.addEventListener('click', () => openTargetModal(button)));
     applyOutingTypeUI();
+    applyTargetScopeUI();
 
     document.getElementById('saveTargetBtn')?.addEventListener('click', async () => {
-        if (!currentTargetPlayerId) return;
+        const playerId = document.getElementById('targetPlayerInput').value;
+        const scope = document.getElementById('targetScopeInput').value;
+        const gameSelect = document.getElementById('targetGameInput');
+        const gameId = scope === 'game' ? gameSelect.value : null;
+        if (!playerId) {
+            document.getElementById('targetPlayerInput').focus();
+            return;
+        }
+        if (scope === 'game' && !gameId) {
+            gameSelect.focus();
+            return;
+        }
+        const selectedGame = gameSelect.selectedOptions[0];
+        const targetDate = scope === 'game'
+            ? selectedGame?.dataset.date
+            : document.getElementById('targetDateInput').value;
+        if (!targetDate) {
+            document.getElementById('targetDateInput').focus();
+            return;
+        }
         const raw = document.getElementById('targetPitchesInput').value.trim();
         const response = await fetch('/save_player_target', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({
-                player_id: currentTargetPlayerId,
+                player_id: playerId,
                 target_pitches: raw === '' ? null : Number(raw),
-                local_date: localDateString(),
+                local_date: targetDate,
+                game_id: gameId,
                 reason: document.getElementById('targetReasonInput').value.trim() || null,
             }),
         });
