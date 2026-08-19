@@ -1,5 +1,5 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
-from models import Player, PlayerPitchingProfile, User, TeamMembership
+from models import LineupEntry, Player, PlayerPitchingProfile, User, TeamMembership
 from db import db
 from extensions import socketio
 import json
@@ -92,6 +92,16 @@ def update_player_inline(player_id):
     new_name = request.form.get('name', original_name)
     if new_name != original_name and db.session.query(Player).filter_by(name=new_name, team_id=session['team_id']).first():
         return jsonify({'status': 'error', 'message': f'Player name "{new_name}" already exists.'}), 400
+
+    if new_name != original_name:
+        linked_entries = db.session.query(LineupEntry).filter_by(player_id=player_to_edit.id).all()
+        for entry in linked_entries:
+            entry.player_name_snapshot = new_name
+            legacy_names = list(entry.lineup.lineup_positions or [])
+            entry.lineup.lineup_positions = [
+                new_name if name == original_name else name
+                for name in legacy_names
+            ]
 
     player_to_edit.name = new_name
     player_to_edit.number = request.form.get('number', player_to_edit.number)

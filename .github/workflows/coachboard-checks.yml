@@ -23,6 +23,9 @@ jobs:
           python -m py_compile \
             app.py \
             models.py \
+            lineup_service.py \
+            migrations/versions/d4f8b2a719ce_normalize_lineup_templates.py \
+            blueprints/roster.py \
             season_stats.py \
             blueprints/security_guard.py \
             blueprints/postgame_navigation.py \
@@ -35,6 +38,9 @@ jobs:
       - name: JavaScript syntax checks
         run: |
           node --check static/js/navigation_v2.js
+          node --check static/js/main.js
+          node --check static/js/game_logic.js
+          node --check static/js/lineup_editor.js
           node --check static/js/assignment_picker_availability.js
           node --check static/js/postgame_game_management_cleanup.js
           node --check static/js/user_management_password_help.js
@@ -53,9 +59,11 @@ jobs:
         env:
           SECRET_KEY: ci-test-secret
           COACHBOARD_ENV: test
-          DATABASE_URL: 'sqlite:///:memory:'
+          DATABASE_URL: 'sqlite:///ci-lineup-migration.db'
           FLASK_APP: app.py
-        run: flask db heads
+        run: |
+          flask db heads
+          flask db upgrade
 
       - name: Regression tests
         env:

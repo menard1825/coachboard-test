@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let sortableInstances = {};
     let lineupEditorModal;
+    let lineupEditorController;
     let confirmDeleteModal;
     
     // --- UTILITY FUNCTIONS ---
@@ -254,23 +255,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!container) return;
         const lineups = AppState.full_data.lineups.filter(l => !l.associated_game_id) || [];
         container.innerHTML = lineups.length === 0 
-            ? `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned lineups saved yet.</p></div>` 
+            ? `<div class="text-center p-4 border rounded"><p class="mb-0">No lineup templates saved yet.</p></div>`
             : lineups.map((l) => {
                 const lineupHtml = (l.lineup_positions && l.lineup_positions.length > 0)
                     ? `<ol class="list-group list-group-numbered">${l.lineup_positions.map(name => `<li class="list-group-item">${escapeHTML(name)}</li>`).join('')}</ol>`
                     : `<p class="text-center text-muted">This lineup is empty.</p>`;
-                const editButtonHtml = `<button type="button" class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#lineupEditorModal" data-lineup-id="${l.id}">Edit</button>`;
+                const editButtonHtml = `<button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#lineupEditorModal" data-lineup-id="${l.id}">Edit</button>`;
+                const duplicateButtonHtml = `<button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#lineupEditorModal" data-lineup-id="${l.id}" data-duplicate="true">Duplicate</button>`;
                 const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_lineup/${l.id}" data-delete-name="${escapeHTML(l.title)}">Delete</button>`;
                 return `<div class="accordion-item" data-lineup-id="${l.id}">
                             <h2 class="accordion-header">
                                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#lineup-collapse-${l.id}">
-                                    <strong>${escapeHTML(l.title)}</strong>
+                                    <strong>${escapeHTML(l.title)}</strong>${l.is_default ? '<span class="badge text-bg-primary ms-2">Default</span>' : ''}
                                 </button>
                             </h2>
                             <div id="lineup-collapse-${l.id}" class="accordion-collapse collapse" data-bs-parent="#lineupsAccordion">
                                 <div class="accordion-body">
-                                    <div class="d-flex justify-content-end mb-3">
+                                    <div class="d-flex flex-wrap gap-2 justify-content-end mb-3">
                                         ${editButtonHtml}
+                                        ${duplicateButtonHtml}
                                         ${deleteButtonHtml}
                                     </div>
                                     ${lineupHtml}
@@ -899,12 +902,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         socket.on('lineup_add', (data) => {
             console.log('lineup_add received', data);
+            if (data.lineup.is_default) AppState.full_data.lineups.forEach(lineup => { lineup.is_default = false; });
             AppState.full_data.lineups.push(data.lineup);
             renderLineups();
             renderGames();
         });
         socket.on('lineup_update', (data) => {
             console.log('lineup_update received', data);
+            if (data.lineup.is_default) AppState.full_data.lineups.forEach(lineup => { lineup.is_default = false; });
             const index = AppState.full_data.lineups.findIndex(l => l.id === data.lineup.id);
             if (index > -1) AppState.full_data.lineups[index] = data.lineup;
             else AppState.full_data.lineups.push(data.lineup);
@@ -1035,12 +1040,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const modal = btn.closest('.modal');
         const lineupId = modal.querySelector('#lineupId').value;
         const title = modal.querySelector('#lineupTitle').value;
-        const lineup_positions = Array.from(modal.querySelectorAll('#lineup-order .list-group-item')).map(item => item.dataset.playerName);
+        const lineup_player_ids = lineupEditorController?.getPlayerIds() || [];
+        const lineup_positions = lineupEditorController?.getPlayerNames() || [];
+
+        if (!title.trim()) {
+            modal.querySelector('#lineupTitle').focus();
+            return;
+        }
+        if (!lineup_player_ids.length) {
+            alert('Add at least one player to the batting order.');
+            return;
+        }
+        if (lineupEditorController?.getUnavailableEntries().length) {
+            alert('Remove unavailable players before saving this template.');
+            return;
+        }
 
         const url = lineupId ? `/edit_lineup/${lineupId}` : '/add_lineup';
         const payload = {
             title: title,
             lineup_data: lineup_positions,
+            lineup_player_ids,
+            is_default: modal.querySelector('#lineupIsDefault').checked,
             associated_game_id: null // Explicitly null for unassigned lineups
         };
 
@@ -1070,6 +1091,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupEventListeners() {
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
+        document.getElementById('rotateLineupBtn')?.addEventListener('click', () => lineupEditorController?.rotate());
+        document.getElementById('applyLineupSourceBtn')?.addEventListener('click', () => {
+            const modal = document.getElementById('lineupEditorModal');
+            const selectedId = modal.querySelector('#lineupTemplateSelect').value;
+            const source = selectedId
+                ? AppState.full_data.lineups.find(lineup => String(lineup.id) === String(selectedId))
+                : { lineup_positions: [], lineup_player_ids: [], lineup_entries: [] };
+            const feedback = modal.querySelector('#lineupEditorFeedback');
+            if (!source) {
+                feedback.className = 'alert alert-warning py-2';
+                feedback.textContent = 'That template is no longer available.';
+                return;
+            }
+            lineupEditorController?.setLineup(source);
+            feedback.className = 'alert alert-info py-2';
+            feedback.textContent = `Applied ${source.title || 'a blank lineup'}. Review the order, then save.`;
+        });
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         
         const addScoutedPlayerForm = document.getElementById('addScoutedPlayerForm');
@@ -1131,7 +1169,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('lineupEditorModal')?.addEventListener('show.bs.modal', (e) => {
             const lineupId = e.relatedTarget ? e.relatedTarget.dataset.lineupId : null;
-            openLineupEditor(lineupId ? AppState.full_data.lineups.find(l => l.id == lineupId) : null);
+            const duplicate = e.relatedTarget?.dataset.duplicate === 'true';
+            openLineupEditor(lineupId ? AppState.full_data.lineups.find(l => l.id == lineupId) : null, duplicate);
         });
         document.getElementById('editNoteModal')?.addEventListener('show.bs.modal', (e) => {
             e.target.querySelector('#editNoteId').value = e.relatedTarget.dataset.noteId;
@@ -1201,18 +1240,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    function openLineupEditor(lineup = null) {
+    function openLineupEditor(lineup = null, duplicate = false) {
         const modal = document.getElementById('lineupEditorModal');
-        const currentLineup = lineup || { id: null, title: 'New Unassigned Lineup', lineup_positions: [] };
+        const currentLineup = lineup || { id: null, title: 'New Lineup Template', lineup_positions: [] };
 
-        modal.querySelector('#lineupId').value = currentLineup.id;
-        modal.querySelector('#lineupTitle').value = currentLineup.title;
+        modal.querySelector('#lineupId').value = duplicate ? '' : (currentLineup.id || '');
+        modal.querySelector('#lineupTitle').value = duplicate ? `${currentLineup.title} Copy` : currentLineup.title;
+        modal.querySelector('#lineupIsDefault').checked = duplicate ? false : Boolean(currentLineup.is_default);
+        modal.querySelector('#lineupDefaultWrap').classList.remove('d-none');
+        modal.querySelector('#lineupEditorSubtitle').textContent = duplicate ? 'Review this copied order and save it as a new template.' : 'Build the order with taps or drag handles.';
+        modal.querySelector('#lineupEditorFeedback').className = 'd-none';
+        const sourceSelect = modal.querySelector('#lineupTemplateSelect');
+        const templates = (AppState.full_data.lineups || []).filter(item => !item.associated_game_id && item.id !== currentLineup.id);
+        sourceSelect.innerHTML = '<option value="">Blank lineup</option>' + templates.map(item =>
+            `<option value="${item.id}">${escapeHTML(item.title)} (${item.lineup_positions?.length || 0})</option>`
+        ).join('');
 
-        initializeLineupEditor({
+        lineupEditorController?.destroy();
+        lineupEditorController = initializeLineupEditor({
             roster: AppState.full_data.roster,
             lineup: currentLineup,
             benchEl: modal.querySelector('#lineup-bench'),
-            orderEl: modal.querySelector('#lineup-order')
+            orderEl: modal.querySelector('#lineup-order'),
+            statusEl: modal.querySelector('#lineupEditorStatus')
         });
     }
 

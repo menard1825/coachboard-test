@@ -7,6 +7,12 @@ from extensions import socketio
 from datetime import datetime
 from models import GameRotationEvent, PlayerPitchTarget
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
+from lineup_service import (
+    LineupValidationError,
+    lineup_to_dict,
+    sync_lineup,
+    validate_lineup_payload,
+)
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 
@@ -56,7 +62,24 @@ def game_management(game_id):
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone, current_game_id=game.id)
 
-    lineup_templates = db.session.query(Lineup).filter_by(team_id=team.id, associated_game_id=None).all()
+    lineup_templates = db.session.query(Lineup).filter_by(
+        team_id=team.id,
+        associated_game_id=None,
+    ).order_by(Lineup.is_default.desc(), Lineup.title.asc()).all()
+
+    previous_game = db.session.query(Game).filter(
+        Game.team_id == team.id,
+        db.or_(
+            Game.date < game.date,
+            db.and_(Game.date == game.date, Game.id < game.id),
+        ),
+    ).order_by(Game.date.desc(), Game.id.desc()).first()
+    previous_lineup = None
+    if previous_game:
+        previous_lineup = db.session.query(Lineup).filter_by(
+            team_id=team.id,
+            associated_game_id=previous_game.id,
+        ).first()
 
     # NEW: Query for unassigned rotations to use as templates
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team.id, associated_game_id=None).all()
@@ -68,13 +91,16 @@ def game_management(game_id):
                            game=model_to_dict(game),
                            game_date_for_input=game_date_for_input,
                            roster=[model_to_dict(p) for p in roster_objects],
-                           lineup=model_to_dict(lineup_obj),
+                           lineup=lineup_to_dict(lineup_obj),
                            rotation=model_to_dict(rotation_obj),
                            game_pitching_log=[pitching_outing_to_dict(o) for o in game_pitching_log],
                            session=session, 
                            absent_player_ids=absent_player_ids,
                            pitch_count_summary=pitch_count_summary,
-                           lineup_templates=[model_to_dict(lt) for lt in lineup_templates],
+                           lineup_templates=[lineup_to_dict(lt) for lt in lineup_templates],
+                           previous_lineup=lineup_to_dict(previous_lineup),
+                           batting_order_mode=team.batting_order_mode,
+                           fixed_lineup_size=team.fixed_lineup_size,
                            # NEW: Pass rotation templates to the render_template call
                            rotation_templates=[model_to_dict(rt) for rt in rotation_templates])
 
@@ -170,19 +196,21 @@ def update_absences(game_id):
 @gameday_bp.route('/add_lineup', methods=['POST'])
 def add_lineup():
     payload = request.get_json()
-    if not payload or 'title' not in payload or 'lineup_data' not in payload:
-        return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
-    
-    new_lineup = Lineup(
-        title=payload['title'], 
-        lineup_positions=payload['lineup_data'],
-        associated_game_id=int(payload['associated_game_id']) if payload.get('associated_game_id') else None, 
-        team_id=session['team_id']
+    try:
+        title, players, associated_game_id, is_default = validate_lineup_payload(payload, session['team_id'])
+    except LineupValidationError as exc:
+        return jsonify({'status': 'error', 'message': str(exc)}), 400
+
+    new_lineup = sync_lineup(
+        Lineup(team_id=session['team_id']),
+        players,
+        title=title,
+        associated_game_id=associated_game_id,
+        is_default=is_default,
     )
-    db.session.add(new_lineup)
     db.session.commit()
 
-    lineup_dict = model_to_dict(new_lineup)
+    lineup_dict = lineup_to_dict(new_lineup)
     socketio.emit('lineup_add', {'lineup': lineup_dict})
 
     return jsonify({'status': 'success', 'message': f'Lineup "{new_lineup.title}" created successfully!', 'new_id': new_lineup.id, 'lineup': lineup_dict})
@@ -194,15 +222,23 @@ def edit_lineup(lineup_id):
         return jsonify({'status': 'error', 'message': 'Lineup not found.'}), 404
     
     payload = request.get_json()
-    if not payload or 'title' not in payload or 'lineup_data' not in payload:
-        return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
-        
-    lineup_to_edit.title = payload['title']
-    lineup_to_edit.lineup_positions = payload['lineup_data']
-    lineup_to_edit.associated_game_id = int(payload.get('associated_game_id')) if payload.get('associated_game_id') else None
+    try:
+        title, players, associated_game_id, is_default = validate_lineup_payload(payload, session['team_id'])
+    except LineupValidationError as exc:
+        return jsonify({'status': 'error', 'message': str(exc)}), 400
+    if 'is_default' not in payload and associated_game_id is None:
+        is_default = lineup_to_edit.is_default
+
+    sync_lineup(
+        lineup_to_edit,
+        players,
+        title=title,
+        associated_game_id=associated_game_id,
+        is_default=is_default,
+    )
     db.session.commit()
 
-    lineup_dict = model_to_dict(lineup_to_edit)
+    lineup_dict = lineup_to_dict(lineup_to_edit)
     socketio.emit('lineup_update', {'lineup': lineup_dict})
 
     return jsonify({'status': 'success', 'message': f'Lineup "{lineup_to_edit.title}" updated successfully!', 'lineup': lineup_dict})

@@ -16,6 +16,7 @@ from models import (
     Rotation,
 )
 from team_game_settings import regulation_innings_for_team
+from lineup_service import lineup_to_dict
 from utils import calculate_pitch_count_summary, get_pitching_rules_for_team
 
 
@@ -128,9 +129,30 @@ def build_game_readiness(game, team):
         team_id=team_id,
     ).all()
 
-    lineup_names = list(lineup.lineup_positions or []) if lineup else []
-    lineup_ready = bool(lineup_names) and all(name in present_names for name in lineup_names)
-    lineup_count = len(lineup_names)
+    lineup_data = lineup_to_dict(lineup) if lineup else None
+    lineup_entries = list((lineup_data or {}).get('lineup_entries') or [])
+    lineup_names = [entry['name'] for entry in lineup_entries]
+    lineup_player_ids = [entry['player_id'] for entry in lineup_entries if entry.get('player_id') is not None]
+    present_ids = {player.id for player in present}
+    unavailable_lineup_names = [
+        entry['name'] for entry in lineup_entries
+        if entry.get('player_id') is None or entry.get('player_id') not in present_ids
+    ]
+    batting_order_mode = team.batting_order_mode or 'bat_all'
+    expected_lineup_count = (
+        len(present)
+        if batting_order_mode == 'bat_all'
+        else min(int(team.fixed_lineup_size or 9), len(present))
+    )
+    unique_valid_ids = set(lineup_player_ids)
+    lineup_ready = bool(lineup_entries) and not unavailable_lineup_names
+    lineup_ready = lineup_ready and len(lineup_entries) == expected_lineup_count
+    if batting_order_mode == 'bat_all':
+        lineup_ready = lineup_ready and unique_valid_ids == present_ids
+    else:
+        lineup_ready = lineup_ready and len(unique_valid_ids) == expected_lineup_count
+    lineup_count = len(lineup_entries)
+    missing_lineup_names = [player.name for player in present if player.id not in unique_valid_ids]
 
     required = required_positions(team)
     future_required = [pos for pos in required if pos != 'P']
@@ -164,7 +186,16 @@ def build_game_readiness(game, team):
     if not present:
         blockers.append('No available players are marked for this game.')
     if not lineup_ready:
-        blockers.append('Batting lineup is not ready.')
+        if not lineup_entries:
+            blockers.append('Batting lineup is not set.')
+        elif unavailable_lineup_names:
+            names = ', '.join(unavailable_lineup_names[:3])
+            suffix = '…' if len(unavailable_lineup_names) > 3 else ''
+            blockers.append(f'Remove unavailable lineup player(s): {names}{suffix}.')
+        elif batting_order_mode == 'bat_all':
+            blockers.append(f'Bat Everyone requires all {expected_lineup_count} available players in the lineup.')
+        else:
+            blockers.append(f'Fixed Lineup requires {expected_lineup_count} batter(s) for this game.')
     if not defense_ready:
         if not innings:
             blockers.append(f'Defensive rotation is not set for the {regulation_innings}-inning regulation game.')
@@ -272,6 +303,10 @@ def build_game_readiness(game, team):
         'roster_count': len(roster),
         'lineup_ready': lineup_ready,
         'lineup_count': lineup_count,
+        'lineup_expected_count': expected_lineup_count,
+        'lineup_mode': batting_order_mode,
+        'lineup_missing_names': missing_lineup_names,
+        'lineup_unavailable_names': unavailable_lineup_names,
         'defense_ready': defense_ready,
         'defense_innings': regulation_innings,
         'defense_completed_innings': complete_inning_count,

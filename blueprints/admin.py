@@ -285,11 +285,28 @@ def update_admin_settings():
         flash('Team settings not found.', 'danger')
         return redirect(url_for('.admin_settings'))
 
-    team_settings.team_name = request.form.get('team_name', team_settings.team_name)
-    team_settings.display_coach_names = 'display_coach_names' in request.form
+    batting_order_mode = request.form.get('batting_order_mode', team_settings.batting_order_mode)
+    if batting_order_mode not in {'bat_all', 'fixed'}:
+        flash('Choose either Bat Everyone or Fixed Lineup.', 'danger')
+        return redirect(url_for('.admin_settings'))
+    try:
+        fixed_lineup_size = int(request.form.get('fixed_lineup_size', team_settings.fixed_lineup_size or 9))
+    except (TypeError, ValueError):
+        flash('Fixed lineup size must be a number.', 'danger')
+        return redirect(url_for('.admin_settings'))
+    if fixed_lineup_size < 1 or fixed_lineup_size > 30:
+        flash('Fixed lineup size must be between 1 and 30.', 'danger')
+        return redirect(url_for('.admin_settings'))
+
+    if 'team_name' in request.form:
+        team_settings.team_name = request.form.get('team_name', team_settings.team_name)
+        team_settings.display_coach_names = 'display_coach_names' in request.form
     team_settings.age_group = request.form.get('age_group', team_settings.age_group)
     team_settings.pitching_rule_set = request.form.get('pitching_rule_set', team_settings.pitching_rule_set)
-    team_settings.outfielder_count = int(request.form.get('outfielder_count', 3))
+    if 'outfielder_count' in request.form:
+        team_settings.outfielder_count = int(request.form['outfielder_count'])
+    team_settings.batting_order_mode = batting_order_mode
+    team_settings.fixed_lineup_size = fixed_lineup_size
     
     # ADDED: Handle the new color inputs
     team_settings.primary_color = request.form.get('primary_color', team_settings.primary_color)
@@ -335,7 +352,9 @@ def rollover_season():
             age_group=new_age_group or current_team.age_group,
             pitching_rule_set=current_team.pitching_rule_set,
             outfielder_count=current_team.outfielder_count,
-            timezone=current_team.timezone
+            timezone=current_team.timezone,
+            batting_order_mode=current_team.batting_order_mode,
+            fixed_lineup_size=current_team.fixed_lineup_size,
         )
         db.session.add(new_team)
         db.session.flush() # flush to get the new team id

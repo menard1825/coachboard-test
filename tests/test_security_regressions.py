@@ -184,6 +184,116 @@ def test_game_clock_time_limit_persists(monkeypatch):
     assert payload['is_live'] is False
 
 
+def test_lineups_use_stable_player_ids_and_follow_safe_renames(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Player, Team
+
+    with app.app_context():
+        db.session.add_all([
+            Player(id=1, name='Alpha', team_id=1),
+            Player(id=2, name='Bravo', team_id=1),
+            Team(
+                id=2,
+                team_name='Other Team',
+                registration_code='other-code',
+                age_group='12U',
+                pitching_rule_set='MLB Pitch Smart',
+                outfielder_count=3,
+                timezone='America/Indiana/Indianapolis',
+            ),
+            Player(id=20, name='Other Player', team_id=2),
+        ])
+        db.session.commit()
+
+    created = client.post('/add_lineup', json={
+        'title': 'ID Order',
+        'lineup_player_ids': [2, 1],
+        'is_default': True,
+    })
+    assert created.status_code == 200
+    payload = created.get_json()['lineup']
+    assert payload['lineup_player_ids'] == [2, 1]
+    assert payload['is_default'] is True
+
+    renamed = client.post('/update_player_inline/2', data={'name': 'Bravo Renamed'})
+    assert renamed.status_code == 200
+    saved = client.get('/api/lineups').get_json()[0]
+    assert saved['lineup_player_ids'] == [2, 1]
+    assert saved['lineup_positions'] == ['Bravo Renamed', 'Alpha']
+    assert saved['lineup_entries'][0]['player_name_snapshot'] == 'Bravo Renamed'
+
+    deleted = client.get('/delete_player/2')
+    assert deleted.status_code == 302
+    archived = client.get('/api/lineups').get_json()[0]
+    assert archived['lineup_positions'] == ['Bravo Renamed', 'Alpha']
+    assert archived['lineup_entries'][0]['player_id'] is None
+    assert archived['lineup_entries'][0]['available'] is False
+
+    rejected = client.post('/add_lineup', json={
+        'title': 'Cross Team',
+        'lineup_player_ids': [20],
+    })
+    assert rejected.status_code == 400
+    assert 'not on this team' in rejected.get_json()['message']
+
+
+def test_lineup_readiness_respects_bat_all_and_fixed_modes(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game, Player, Team
+
+    with app.app_context():
+        db.session.add_all([
+            Player(id=1, name='Alpha', team_id=1),
+            Player(id=2, name='Bravo', team_id=1),
+            Player(id=3, name='Charlie', team_id=1),
+            Game(id=30, date=datetime(2026, 8, 19), opponent='Readiness Test', team_id=1),
+        ])
+        db.session.commit()
+
+    created = client.post('/add_lineup', json={
+        'title': 'Game Order',
+        'lineup_player_ids': [1, 2],
+        'associated_game_id': 30,
+    }).get_json()
+    lineup_id = created['new_id']
+    readiness = client.get('/api/game-day/30/readiness').get_json()['readiness']
+    assert readiness['lineup_mode'] == 'bat_all'
+    assert readiness['lineup_expected_count'] == 3
+    assert readiness['lineup_ready'] is False
+
+    client.post(f'/edit_lineup/{lineup_id}', json={
+        'title': 'Game Order',
+        'lineup_player_ids': [1, 2, 3],
+        'associated_game_id': 30,
+    })
+    readiness = client.get('/api/game-day/30/readiness').get_json()['readiness']
+    assert readiness['lineup_ready'] is True
+
+    with app.app_context():
+        team = db.session.get(Team, 1)
+        team.batting_order_mode = 'fixed'
+        team.fixed_lineup_size = 2
+        db.session.commit()
+
+    client.post(f'/edit_lineup/{lineup_id}', json={
+        'title': 'Game Order',
+        'lineup_player_ids': [3, 1],
+        'associated_game_id': 30,
+    })
+    readiness = client.get('/api/game-day/30/readiness').get_json()['readiness']
+    assert readiness['lineup_mode'] == 'fixed'
+    assert readiness['lineup_expected_count'] == 2
+    assert readiness['lineup_ready'] is True
+
+
 def test_time_limit_can_exclude_loaded_but_unplayed_next_inning(monkeypatch):
     app = _build_app(monkeypatch)
 

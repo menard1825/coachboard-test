@@ -8,7 +8,6 @@ from models import (
     CollaborationNote,
     GamePitchingPlan,
     GameRotationEvent,
-    Lineup,
     PitchingOuting,
     Player,
     PlayerDevelopmentFocus,
@@ -105,10 +104,6 @@ def _name_has_history(player):
 
     for event in db.session.query(GameRotationEvent).filter_by(team_id=team_id).all():
         if _contains_player_name(event.before_alignment or {}, name) or _contains_player_name(event.after_alignment or {}, name):
-            return True
-
-    for lineup in db.session.query(Lineup).filter_by(team_id=team_id).all():
-        if _contains_player_name(lineup.lineup_positions or [], name):
             return True
 
     if db.session.query(CollaborationNote.id).filter_by(team_id=team_id, player_name=name).first():

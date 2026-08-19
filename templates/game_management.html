@@ -144,9 +144,7 @@
     </div>
 
     <div class="row planner-controls" id="game-management-planner-row">
-        <div class="col-lg-6 mb-4 d-none" id="lineup-card-container">
-            {% include '_lineup_editor.html' %}
-        </div>
+        <div class="col-lg-6 mb-4 d-none" id="lineup-card-container"></div>
 
         <div class="col-lg-12 mb-4" id="rotation-card-container">
             {% include '_rotation_editor.html' %}
@@ -277,6 +275,9 @@
             rotation: {{ rotation|tojson }},
             absent_player_ids: {{ absent_player_ids|tojson }},
             lineup_templates: {{ lineup_templates|tojson }},
+            previous_lineup: {{ previous_lineup|tojson }},
+            batting_order_mode: {{ batting_order_mode|tojson }},
+            fixed_lineup_size: {{ fixed_lineup_size|tojson }},
             rotation_templates: {{ rotation_templates|tojson }},
             pitch_count_summary: {{ pitch_count_summary|tojson }},
             outfielder_count: {{ current_team.outfielder_count if current_team else 3 }}

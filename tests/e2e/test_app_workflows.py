@@ -134,18 +134,52 @@ def test_roster_profiles_order_and_lineup_crud(page: Page, coachboard_url: str):
     lineup = post_json(page, coachboard_url, '/add_lineup', {
         'title': 'Automation Lineup',
         'lineup_data': ['Pitcher Pat', 'Catcher Cole', 'First Frank'],
+        'lineup_player_ids': [1, 2, 3],
+        'is_default': True,
     })
     lineup_id = lineup['new_id']
+    assert lineup['lineup']['is_default'] is True
+    assert lineup['lineup']['lineup_player_ids'] == [1, 2, 3]
+    assert [entry['batting_order'] for entry in lineup['lineup']['lineup_entries']] == [1, 2, 3]
     edited = post_json(page, coachboard_url, f'/edit_lineup/{lineup_id}', {
         'title': 'Automation Lineup Updated',
         'lineup_data': ['Catcher Cole', 'Pitcher Pat', 'First Frank'],
+        'lineup_player_ids': [2, 1, 3],
+        'is_default': True,
     })
     assert edited['lineup']['lineup_positions'][0] == 'Catcher Cole'
+    invalid = post_json(page, coachboard_url, '/add_lineup', {
+        'title': 'Invalid Cross-Team Lineup',
+        'lineup_player_ids': [100],
+    }, expected_status=400)
+    assert 'not on this team' in invalid['message']
     get_redirect(page, coachboard_url, f'/delete_lineup/{lineup_id}')
     assert item_named(get_json(page, coachboard_url, '/api/lineups'), 'Automation Lineup Updated', 'title') is None
 
+    identity_lineup = post_json(page, coachboard_url, '/add_lineup', {
+        'title': 'Stable Player Identity',
+        'lineup_player_ids': [player['id']],
+    })
+    renamed = page.request.post(f'{coachboard_url}/update_player_inline/{player["id"]}', form={
+        'name': 'Automation Alexis',
+        'number': '45',
+        'position1': 'CF',
+        'position2': '2B',
+        'position3': '',
+        'throws': 'Right',
+        'bats': 'Left',
+        'pitcher_role': 'Reliever',
+        'notes': 'Renamed after saving a lineup',
+    })
+    assert renamed.status == 200
+    saved_identity = item_named(get_json(page, coachboard_url, '/api/lineups'), 'Stable Player Identity', 'title')
+    assert saved_identity['lineup_player_ids'] == [player['id']]
+    assert saved_identity['lineup_positions'] == ['Automation Alexis']
+    get_redirect(page, coachboard_url, f'/delete_lineup/{identity_lineup["new_id"]}')
+
     get_redirect(page, coachboard_url, f'/delete_player/{player["id"]}')
     assert item_named(get_json(page, coachboard_url, '/api/roster'), 'Automation Alex') is None
+    assert item_named(get_json(page, coachboard_url, '/api/roster'), 'Automation Alexis') is None
 
 
 def test_rotation_and_starting_defense_template_crud(page: Page, coachboard_url: str):
@@ -406,12 +440,26 @@ def test_admin_settings_users_teams_registration_and_passwords(page: Page, coach
         'primary_color': '#102A66',
         'secondary_color': '#E5E7EB',
         'timezone': 'America/Indiana/Indianapolis',
+        'batting_order_mode': 'fixed',
+        'fixed_lineup_size': '8',
     })
     page.goto(coachboard_url)
     expect(page.locator('.navbar-brand-text')).to_contain_text('Playwright Prospects Updated')
     post_form(page, coachboard_url, '/admin/settings/regulation-innings', {'regulation_innings': '7'})
     settings = get_json(page, coachboard_url, '/api/team-game-settings')
     assert settings['regulation_innings'] == 7
+    assert settings['batting_order_mode'] == 'fixed'
+    assert settings['fixed_lineup_size'] == 8
+    fixed_lineup = post_json(page, coachboard_url, '/add_lineup', {
+        'title': 'Eight Batter Game Lineup',
+        'lineup_player_ids': list(range(1, 9)),
+        'associated_game_id': 1,
+    })
+    readiness = get_json(page, coachboard_url, '/api/game-day/1/readiness')['readiness']
+    assert readiness['lineup_mode'] == 'fixed'
+    assert readiness['lineup_expected_count'] == 8
+    assert readiness['lineup_ready'] is True
+    get_redirect(page, coachboard_url, f'/delete_lineup/{fixed_lineup["new_id"]}')
     post_form(page, coachboard_url, '/admin/settings/regulation-innings', {'regulation_innings': ''})
 
     # Restore shared team settings before testing the other admin panels so a
@@ -424,6 +472,8 @@ def test_admin_settings_users_teams_registration_and_passwords(page: Page, coach
         'primary_color': '#102A66',
         'secondary_color': '#E5E7EB',
         'timezone': 'America/Indiana/Indianapolis',
+        'batting_order_mode': 'bat_all',
+        'fixed_lineup_size': '9',
     })
 
     post_form(page, coachboard_url, '/admin/add_user', {

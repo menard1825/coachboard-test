@@ -198,6 +198,8 @@ def team_game_settings_api():
         'regulation_innings': regulation_innings_for_team(team),
         'regulation_innings_override': team.regulation_innings,
         'suggested_regulation_innings': suggested_regulation_innings(team.age_group),
+        'batting_order_mode': team.batting_order_mode,
+        'fixed_lineup_size': team.fixed_lineup_size,
     })
 
 

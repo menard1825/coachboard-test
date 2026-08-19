@@ -27,6 +27,8 @@ class Team(db.Model):
     outfielder_count = Column(Integer, default=3, nullable=False)
     timezone = Column(String, default='America/Indiana/Indianapolis', nullable=False)
     regulation_innings = Column(Integer, nullable=True)  # NULL = auto from age group
+    batting_order_mode = Column(String(20), default='bat_all', nullable=False)
+    fixed_lineup_size = Column(Integer, default=9, nullable=False)
 
     memberships = relationship("TeamMembership", back_populates="team", cascade="all, delete-orphan")
     players = relationship("Player", back_populates="team")
@@ -110,9 +112,36 @@ class Lineup(db.Model):
     title = Column(String, nullable=False)
     lineup_positions = Column(JSON) # Changed to JSON
     associated_game_id = Column(Integer)
+    is_default = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="lineups")
+    entries = relationship(
+        "LineupEntry",
+        back_populates="lineup",
+        cascade="all, delete-orphan",
+        order_by="LineupEntry.batting_order",
+    )
+
+
+class LineupEntry(db.Model):
+    """Stable, ordered lineup membership with a historical name fallback."""
+    __tablename__ = 'lineup_entries'
+    __table_args__ = (
+        db.UniqueConstraint('lineup_id', 'batting_order', name='uq_lineup_entry_order'),
+        db.UniqueConstraint('lineup_id', 'player_id', name='uq_lineup_entry_player'),
+    )
+
+    id = Column(Integer, primary_key=True)
+    lineup_id = Column(Integer, ForeignKey('lineups.id', ondelete='CASCADE'), nullable=False)
+    player_id = Column(Integer, ForeignKey('players.id', ondelete='SET NULL'), nullable=True)
+    player_name_snapshot = Column(String, nullable=False)
+    batting_order = Column(Integer, nullable=False)
+
+    lineup = relationship("Lineup", back_populates="entries")
+    player = relationship("Player")
 
 class PitchingOuting(db.Model):
     __tablename__ = 'pitching_outings'

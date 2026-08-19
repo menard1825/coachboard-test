@@ -84,6 +84,47 @@ def test_every_authenticated_screen_renders(page: Page, coachboard_url: str):
         assert_healthy_document(page, coachboard_url, path, expected_text)
 
 
+def test_lineup_editor_is_unique_and_cancel_discards_mobile_draft(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+
+    page.goto(coachboard_url)
+    page.locator('#mainTabsDesktop [href="#lineups"]').evaluate(
+        "el => bootstrap.Tab.getOrCreateInstance(el).show()"
+    )
+    page.locator('[data-bs-target="#lineup-collapse-1"]').click()
+    edit_template = page.locator('[data-bs-target="#lineupEditorModal"][data-lineup-id="1"]').first
+    edit_template.click()
+    expect(page.locator('#lineupEditorModal')).to_be_visible()
+    expect(page.locator('#lineup-order .list-group-item')).to_have_count(9)
+    page.locator('#lineup-order .remove-player-btn').first.click()
+    expect(page.locator('#lineup-order .list-group-item')).to_have_count(8)
+    page.locator('#lineupEditorModal').get_by_role('button', name='Cancel').click()
+    expect(page.locator('#lineupEditorModal')).to_be_hidden()
+
+    edit_template.click()
+    expect(page.locator('#lineup-order .list-group-item')).to_have_count(9)
+    page.locator('#lineupEditorModal').get_by_role('button', name='Cancel').click()
+    expect(page.locator('#lineupEditorModal')).to_be_hidden()
+
+    page.goto(f'{coachboard_url}/game/1')
+    expect(page.locator('#lineupEditorModal')).to_have_count(1)
+    page.get_by_role('button', name='Edit Lineup').click()
+    expect(page.locator('#lineupEditorModal')).to_be_visible()
+    page.locator('#lineupTemplateSelect').select_option('template:1')
+    page.locator('#applyLineupSourceBtn').click()
+    expect(page.locator('#lineup-order .list-group-item')).to_have_count(9)
+    page.locator('#rotateLineupBtn').click()
+    expect(page.locator('#lineup-order .list-group-item').first).to_contain_text('Catcher Cole')
+    with page.expect_navigation(wait_until='domcontentloaded'):
+        page.locator('#saveLineupBtn').click()
+
+    game_data = page.request.get(f'{coachboard_url}/api/game_data/1').json()
+    assert game_data['lineup']['lineup_player_ids'][0] == 2
+    assert game_data['lineup']['lineup_positions'][0] == 'Catcher Cole'
+    page.request.get(f'{coachboard_url}/delete_lineup/{game_data["lineup"]["id"]}')
+
+
 def test_all_dashboard_data_services_return_team_scoped_data(page: Page, coachboard_url: str):
     login(page, coachboard_url)
     endpoints = (

@@ -55,6 +55,20 @@
                                     </select>
                                     <label for="outfielder_count">Defensive Setup</label>
                                 </div>
+                                <hr class="my-4">
+                                <h6 class="text-muted mb-1">Batting Lineup Readiness</h6>
+                                <p class="small text-muted mb-3">CoachBoard uses this rule to decide whether a Game Day lineup is complete.</p>
+                                <div class="form-floating mb-3">
+                                    <select class="form-select" id="batting_order_mode" name="batting_order_mode">
+                                        <option value="bat_all" {% if settings.batting_order_mode == 'bat_all' %}selected{% endif %}>Bat Everyone</option>
+                                        <option value="fixed" {% if settings.batting_order_mode == 'fixed' %}selected{% endif %}>Fixed Lineup</option>
+                                    </select>
+                                    <label for="batting_order_mode">Batting Order Rule</label>
+                                </div>
+                                <div class="form-floating mb-3" id="fixedLineupSizeWrap">
+                                    <input type="number" class="form-control" id="fixed_lineup_size" name="fixed_lineup_size" min="1" max="30" value="{{ settings.fixed_lineup_size or 9 }}">
+                                    <label for="fixed_lineup_size">Fixed Number of Batters</label>
+                                </div>
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                             </form>
 
@@ -237,6 +251,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const regulationHelp = document.getElementById('regulationInningsHelp');
     const copyJoinCode = document.getElementById('copyTeamRegistrationCode');
     const joinCodeInput = document.getElementById('teamRegistrationCode');
+    const battingOrderMode = document.getElementById('batting_order_mode');
+    const fixedLineupSizeWrap = document.getElementById('fixedLineupSizeWrap');
 
     if (primaryColorInput) {
         primaryColorInput.addEventListener('input', function() {
@@ -281,6 +297,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (ageGroupInput) ageGroupInput.addEventListener('change', refreshRegulationHelp);
     if (regulationInput) regulationInput.addEventListener('change', refreshRegulationHelp);
+    function refreshBattingOrderFields() {
+        if (fixedLineupSizeWrap && battingOrderMode) {
+            fixedLineupSizeWrap.classList.toggle('d-none', battingOrderMode.value !== 'fixed');
+        }
+    }
+    if (battingOrderMode) battingOrderMode.addEventListener('change', refreshBattingOrderFields);
+    refreshBattingOrderFields();
     refreshRegulationHelp();
 });
 </script>

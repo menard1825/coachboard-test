@@ -75,7 +75,7 @@
   </div>
 
   <div class="row planner-controls">
-    <div class="col-12 mb-4 d-none" id="lineup-card-container">{% include '_lineup_editor.html' %}</div>
+    <div class="col-12 mb-4 d-none" id="lineup-card-container"></div>
     <div class="col-12 mb-4" id="rotation-card-container">{% include '_rotation_editor.html' %}</div>
     <div class="col-12 mb-4" id="pitching-log-container">
       <div class="card shadow-sm border-0"><div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitching Log & Targets</h5></div><div class="card-body">{% include '_pitching_log.html' %}</div></div>
@@ -103,6 +103,9 @@ document.addEventListener('DOMContentLoaded', () => {
     rotation: {{ rotation|tojson }},
     absent_player_ids: {{ absent_player_ids|tojson }},
     lineup_templates: {{ lineup_templates|tojson }},
+    previous_lineup: {{ previous_lineup|tojson }},
+    batting_order_mode: {{ batting_order_mode|tojson }},
+    fixed_lineup_size: {{ fixed_lineup_size|tojson }},
     rotation_templates: {{ rotation_templates|tojson }},
     pitch_count_summary: {{ pitch_count_summary|tojson }},
     outfielder_count: {{ current_team.outfielder_count if current_team else 3 }}
