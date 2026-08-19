@@ -30,10 +30,18 @@
   if (!/^\/game\/\d+\/?$/.test(window.location.pathname)) return;
 
   window.addEventListener('load', () => {
-    if (document.querySelector('script[data-live-dugout-mode]')) return;
-    const script = document.createElement('script');
-    script.src = '/static/js/live_game_dugout_mode.js';
-    script.dataset.liveDugoutMode = '1';
-    document.head.appendChild(script);
+    if (!document.querySelector('script[data-live-dugout-mode]')) {
+      const dugout = document.createElement('script');
+      dugout.src = '/static/js/live_game_dugout_mode.js';
+      dugout.dataset.liveDugoutMode = '1';
+      document.head.appendChild(dugout);
+    }
+
+    if (!document.querySelector('script[data-live-clock-controls]')) {
+      const controls = document.createElement('script');
+      controls.src = '/static/js/live_game_clock_controls.js';
+      controls.dataset.liveClockControls = '1';
+      document.head.appendChild(controls);
+    }
   }, {once: true});
 })();
