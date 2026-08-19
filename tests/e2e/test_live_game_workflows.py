@@ -137,7 +137,13 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
 
     pregame_state = get_json(page, coachboard_url, f'/api/live-game/{game_id}/state')
     assert pregame_state['game']['is_live'] is False
-    post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+
+    page.goto(f'{coachboard_url}/game/{game_id}')
+    start_button = page.locator('#startLiveGameBtnAction')
+    expect(start_button).to_be_visible()
+    start_button.click()
+    expect(page.locator('#live-game-overlay')).to_be_visible(timeout=15_000)
+    expect(page.locator('#live-inning-display')).to_have_text('1')
 
     state = get_json(page, coachboard_url, f'/api/live-game/{game_id}/state')
     assert state['game']['is_live'] is True

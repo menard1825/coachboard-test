@@ -200,10 +200,63 @@
     if (value) value.textContent = String(count);
   }
 
+  function availabilityTrigger() {
+    return document.getElementById('availabilityToggleBtn')
+      || document.querySelector('[data-bs-target="#availabilityCollapse"]');
+  }
+
+  function setAvailabilityExpanded(trigger, collapse, expanded) {
+    trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    collapse.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+  }
+
+  function setAvailabilityOpen(trigger, collapse, open) {
+    setAvailabilityExpanded(trigger, collapse, open);
+    const Collapse = window.bootstrap?.Collapse;
+    if (Collapse) {
+      const instance = Collapse.getOrCreateInstance(collapse, {toggle: false});
+      open ? instance.show() : instance.hide();
+      return;
+    }
+
+    // Keep this essential Game Day control usable even if Bootstrap's CDN
+    // script is delayed or unavailable. Bootstrap's CSS already treats .show
+    // as the visible state for a collapse panel.
+    collapse.classList.remove('collapsing');
+    collapse.classList.toggle('show', open);
+    collapse.style.removeProperty('height');
+  }
+
+  function bindAvailabilityTrigger(collapse) {
+    const trigger = availabilityTrigger();
+    if (!trigger || trigger.dataset.availabilityBound === 'true') return;
+    trigger.dataset.availabilityBound = 'true';
+
+    // Use one explicit handler instead of depending on Bootstrap's document
+    // data API. Removing data-bs-toggle prevents a second automatic toggle.
+    trigger.removeAttribute('data-bs-toggle');
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      setAvailabilityOpen(trigger, collapse, !collapse.classList.contains('show'));
+    });
+    collapse.addEventListener('shown.bs.collapse', () => setAvailabilityExpanded(trigger, collapse, true));
+    collapse.addEventListener('hidden.bs.collapse', () => setAvailabilityExpanded(trigger, collapse, false));
+    setAvailabilityExpanded(trigger, collapse, collapse.classList.contains('show'));
+
+    if (['#availability', '#availabilityCollapse'].includes(window.location.hash)) {
+      window.requestAnimationFrame(() => {
+        setAvailabilityOpen(trigger, collapse, true);
+        window.setTimeout(() => collapse.scrollIntoView({behavior: 'smooth', block: 'start'}), 180);
+      });
+    }
+  }
+
   function enhanceAvailability() {
     const collapse = document.getElementById('availabilityCollapse');
     const form = collapse?.querySelector('form');
-    if (!collapse || !form || form.dataset.availabilityEnhanced === 'true') return;
+    if (!collapse || !form) return;
+    bindAvailabilityTrigger(collapse);
+    if (form.dataset.availabilityEnhanced === 'true') return;
 
     const inputs = [...form.querySelectorAll('input[name="absent_players"]')];
     if (!inputs.length) return;
@@ -264,7 +317,7 @@
       save.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Save Game Availability';
     }
 
-    const trigger = document.querySelector('[data-bs-target="#availabilityCollapse"]');
+    const trigger = availabilityTrigger();
     if (trigger) trigger.textContent = "Set Who's Out";
 
     const availabilityCard = trigger?.closest('.card');

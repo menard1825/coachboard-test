@@ -142,10 +142,15 @@ def edit_game(game_id):
             flash('Invalid date format. Please use YYYY-MM-DD.', 'danger')
             return redirect(url_for('.game_management', game_id=game_id))
 
-    game_to_edit.start_time = request.form.get('game_start_time', game_to_edit.start_time)
-    game_to_edit.opponent = request.form.get('game_opponent', game_to_edit.opponent)
-    game_to_edit.location = request.form.get('game_location', game_to_edit.location)
-    game_to_edit.game_notes = request.form.get('game_notes', game_to_edit.game_notes)
+    opponent = (request.form.get('game_opponent', game_to_edit.opponent) or '').strip()
+    if not opponent:
+        flash('Opponent is required.', 'danger')
+        return redirect(url_for('.game_management', game_id=game_id))
+
+    game_to_edit.start_time = (request.form.get('game_start_time', game_to_edit.start_time) or '').strip()
+    game_to_edit.opponent = opponent
+    game_to_edit.location = (request.form.get('game_location', game_to_edit.location) or '').strip()
+    game_to_edit.game_notes = (request.form.get('game_notes', game_to_edit.game_notes) or '').strip()
     db.session.commit()
     flash('Game details updated successfully!', 'success')
     socketio.emit('data_updated', {'message': 'Game details updated.'})
@@ -178,19 +183,37 @@ def update_absences(game_id):
         flash('Game not found.', 'danger')
         return redirect(url_for('game_day.game_day_home'))
 
-    absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
-    db.session.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=team_id).delete()
+    try:
+        absent_player_ids = {
+            int(player_id)
+            for player_id in request.form.getlist('absent_players')
+            if str(player_id).strip()
+        }
+    except (TypeError, ValueError):
+        flash('Player availability was not changed. Refresh the page and try again.', 'danger')
+        return redirect(url_for('.game_management', game_id=game_id, _anchor='availabilityCollapse'))
 
-    for player_id in absent_player_ids:
-        player = db.session.query(Player).filter_by(id=player_id, team_id=team_id).first()
-        if player:
-            new_absence = PlayerGameAbsence(player_id=player.id, game_id=game.id, team_id=team_id)
-            db.session.add(new_absence)
+    valid_player_ids = {
+        player_id
+        for (player_id,) in db.session.query(Player.id).filter(
+            Player.team_id == team_id,
+            Player.id.in_(absent_player_ids),
+        ).all()
+    } if absent_player_ids else set()
+    if valid_player_ids != absent_player_ids:
+        flash('Player availability was not changed because the submitted roster was invalid.', 'danger')
+        return redirect(url_for('.game_management', game_id=game_id, _anchor='availabilityCollapse'))
+
+    db.session.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=team_id).delete()
+    db.session.add_all([
+        PlayerGameAbsence(player_id=player_id, game_id=game.id, team_id=team_id)
+        for player_id in sorted(absent_player_ids)
+    ])
 
     db.session.commit()
     flash('Player availability updated for this game.', 'success')
     socketio.emit('data_updated', {'message': f'Availability updated for game {game_id}.'})
-    return redirect(url_for('.game_management', game_id=game_id, _anchor='availability'))
+    return redirect(url_for('.game_management', game_id=game_id, _anchor='availabilityCollapse'))
 
 # --- Lineup & Rotation API-like routes ---
 @gameday_bp.route('/add_lineup', methods=['POST'])

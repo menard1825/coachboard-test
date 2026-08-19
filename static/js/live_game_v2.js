@@ -485,6 +485,11 @@
     }
 
     function connectSocket() {
+        if (typeof io !== 'function') {
+            connected = false;
+            setSyncStatus(liveState?.game?.is_live ? 'offline' : 'synced');
+            return;
+        }
         socket = io();
         socket.on('connect', async () => {
             connected = true;

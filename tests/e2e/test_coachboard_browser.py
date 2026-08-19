@@ -115,8 +115,79 @@ def test_game_day_core_flow_works_on_phone_size(page: Page, coachboard_url: str)
     add_modal.get_by_role('button', name='Cancel').click()
     expect(add_modal).to_be_hidden()
 
+    page.get_by_role('button', name='Add Game').first.click()
+    expect(add_modal).to_be_visible()
+    add_modal.locator('#gd-add-opponent').fill('Browser Added Opponent')
+    add_modal.locator('#gd-add-location').fill('Browser Test Field')
+    add_modal.get_by_role('button', name='Add & Prepare Game').click()
+    expect(page).to_have_url(re.compile(r'/game/\d+$'))
+    added_match = re.search(r'/game/(\d+)$', page.url)
+    assert added_match
+    added_game_id = int(added_match.group(1))
+    expect(page.get_by_role('heading', name=re.compile('Browser Added Opponent'))).to_be_visible()
+    deleted = page.request.post(f'{coachboard_url}/game-day/{added_game_id}/delete', data={})
+    assert deleted.status == 200 and deleted.json()['status'] == 'success'
+
+    page.goto(f'{coachboard_url}/game-day')
+    game_card = page.locator('[data-game-id="1"]')
+
     game_card.locator('.gd-actions a').first.click()
 
     expect(page).to_have_url(re.compile(r'/game/1$'))
     expect(page.locator('#pregame-checklist-container')).to_be_visible()
     expect(page.locator('#pde-preset')).to_be_visible(timeout=15_000)
+
+
+def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+    page.goto(f'{coachboard_url}/game/1')
+
+    availability_toggle = page.locator('#availabilityToggleBtn')
+    availability_panel = page.locator('#availabilityCollapse')
+    expect(availability_toggle).to_have_text("Set Who's Out", timeout=15_000)
+    expect(availability_toggle).to_have_attribute('aria-expanded', 'false')
+
+    availability_toggle.click()
+    expect(availability_panel).to_have_class(re.compile(r'\bshow\b'))
+    expect(availability_toggle).to_have_attribute('aria-expanded', 'true')
+    expect(page.locator('#availability-out-count-v2-value')).to_have_text('0')
+
+    absent_player = page.locator('#absent_9')
+    absent_player.check()
+    expect(page.locator('#availability-out-count-v2-value')).to_have_text('1')
+    expect(absent_player.locator('xpath=ancestor::div[contains(@class,"availability-player-v2")]')).to_contain_text('OUT for this game')
+    page.locator('#saveGameAvailabilityBtn').click()
+
+    expect(page).to_have_url(re.compile(r'/game/1#availabilityCollapse$'))
+    expect(availability_panel).to_have_class(re.compile(r'\bshow\b'), timeout=15_000)
+    expect(absent_player).to_be_checked()
+    availability_card = page.locator('#availabilityToggleBtn').locator('xpath=ancestor::div[contains(@class,"card")]')
+    expect(availability_card).to_contain_text('8 Available')
+    expect(availability_card).to_contain_text('1 out')
+
+    page.goto(f'{coachboard_url}/game-day')
+    expect(page.locator('[data-game-id="1"]')).to_contain_text('8 present · 1 out')
+
+    # Restore the shared seeded game so later browser checks start with the full roster.
+    page.goto(f'{coachboard_url}/game/1#availabilityCollapse')
+    expect(page.locator('#availabilityCollapse')).to_have_class(re.compile(r'\bshow\b'), timeout=15_000)
+    page.locator('#absent_9').uncheck()
+    page.locator('#saveGameAvailabilityBtn').click()
+    expect(page.locator('#absent_9')).not_to_be_checked()
+
+    edit_game = page.locator('[data-bs-target="#editGameModal"]')
+    edit_game.click()
+    expect(page.locator('#editGameModal')).to_be_visible()
+    page.locator('#editGameModal .btn-close').click()
+    expect(page.locator('#editGameModal')).to_be_hidden()
+
+    page.get_by_role('button', name='Edit Lineup').click()
+    expect(page.locator('#lineupEditorModal')).to_be_visible()
+    page.locator('#lineupEditorModal').get_by_role('button', name='Cancel').click()
+    expect(page.locator('#lineupEditorModal')).to_be_hidden()
+
+    page.locator('#editDefenseBtn').click()
+    expect(page.locator('#pde-preset')).to_be_visible(timeout=15_000)
+    page.locator('#viewPitchingBtn').click()
+    expect(page.locator('#pitching-log-container')).to_be_visible()

@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from werkzeug.datastructures import MultiDict
 from werkzeug.security import generate_password_hash
 
 
@@ -419,6 +420,78 @@ def test_game_management_renders_dugout_friendly_pitching_controls(monkeypatch):
     assert '/#games' not in html
 
 
+def test_game_availability_updates_safely_and_returns_to_open_panel(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game, Player, PlayerGameAbsence
+
+    with app.app_context():
+        db.session.add_all([
+            Game(
+                id=15,
+                date=datetime(2026, 8, 19),
+                opponent='Availability Test',
+                team_id=1,
+            ),
+            Player(id=21, name='Available Player', team_id=1),
+        ])
+        db.session.commit()
+
+    saved = client.post(
+        '/game/15/update_absences',
+        data=MultiDict([
+            ('absent_players', '21'),
+            ('absent_players', '21'),
+        ]),
+        follow_redirects=False,
+    )
+    assert saved.status_code == 302
+    assert saved.headers['Location'].endswith('/game/15#availabilityCollapse')
+
+    with app.app_context():
+        rows = db.session.query(PlayerGameAbsence).filter_by(game_id=15, team_id=1).all()
+        assert [row.player_id for row in rows] == [21]
+
+    rejected = client.post(
+        '/game/15/update_absences',
+        data={'absent_players': 'not-a-player'},
+        follow_redirects=False,
+    )
+    assert rejected.status_code == 302
+    assert rejected.headers['Location'].endswith('/game/15#availabilityCollapse')
+    with app.app_context():
+        assert db.session.query(PlayerGameAbsence).filter_by(game_id=15, team_id=1).count() == 1
+
+    page = client.get('/game/15')
+    html = page.get_data(as_text=True)
+    assert 'id="availabilityToggleBtn"' in html
+    assert 'aria-controls="availabilityCollapse"' in html
+    assert 'id="saveGameAvailabilityBtn"' in html
+
+    blank_opponent = client.post('/edit_game/15', data={'game_opponent': '   '})
+    assert blank_opponent.status_code == 302
+    with app.app_context():
+        assert db.session.get(Game, 15).opponent == 'Availability Test'
+
+    edited = client.post('/edit_game/15', data={
+        'game_date': '2026-08-20',
+        'game_start_time': ' 18:30 ',
+        'game_opponent': ' Updated Opponent ',
+        'game_location': ' Field 7 ',
+        'game_notes': ' Bring water ',
+    })
+    assert edited.status_code == 302
+    with app.app_context():
+        game = db.session.get(Game, 15)
+        assert game.opponent == 'Updated Opponent'
+        assert game.start_time == '18:30'
+        assert game.location == 'Field 7'
+        assert game.game_notes == 'Bring water'
+
+
 def test_starting_defense_template_allows_open_pitcher_and_reaches_game_day(monkeypatch):
     app = _build_app(monkeypatch)
     client = app.test_client()
@@ -492,11 +565,16 @@ def test_starting_defense_template_allows_open_pitcher_and_reaches_game_day(monk
 def test_game_management_assets_keep_readiness_compact_without_ambiguous_primary_fill():
     project_root = Path(__file__).resolve().parents[1]
     navigation = (project_root / 'static/js/navigation_v2.js').read_text()
+    game_logic = (project_root / 'static/js/game_logic.js').read_text()
+    live_game = (project_root / 'static/js/live_game_v2.js').read_text()
     pitching_rules = (project_root / 'static/js/game_pitching_rule_picker.js').read_text()
     defense = (project_root / 'static/js/live_game_board_prep.js').read_text()
     season_management = (project_root / 'static/js/season_management_v2.js').read_text()
 
     assert 'game_prep_readiness.js' not in navigation
+    assert "typeof io === 'function' ? io() : null" in game_logic
+    assert '/api/toggle_live_game' not in game_logic
+    assert "typeof io !== 'function'" in live_game
     assert 'game-pitch-rule-editor-v2" hidden' in pitching_rules
     assert 'Quick-Fill Primaries' not in defense
     assert 'pde-primary-fill' not in defense

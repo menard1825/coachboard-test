@@ -638,29 +638,33 @@ function applyOutOfPositionIndicators() {
             // Check if we need to update the availability list UI
             const presentCount = newData.roster.length - newData.absent_player_ids.length;
             const absentCount = newData.absent_player_ids.length;
-            const cardBody = document.querySelector('#availabilityCollapse').closest('.card-body');
-            if(cardBody) {
-                 const pTag = cardBody.querySelector('p');
-                 if(pTag) pTag.innerHTML = `<strong>${presentCount}</strong> players present, <strong>${absentCount}</strong> absent.`;
+            const presentMetric = document.getElementById('availabilityPresentCount');
+            const absentMetric = document.getElementById('availabilityAbsentCount');
+            if (presentMetric) presentMetric.textContent = String(presentCount);
+            if (absentMetric) absentMetric.textContent = `${absentCount} out`;
 
-                 // Update checkboxes
-                 newData.roster.forEach(player => {
-                     const cb = document.getElementById(`player-${player.id}`);
-                     if (cb) {
-                         cb.checked = newData.absent_player_ids.includes(player.id);
-                     }
-                 });
-            }
+            // Keep the open availability editor synchronized when another
+            // coach updates the same game. Dispatching change also refreshes
+            // the OUT labels and counter added by the availability helper.
+            newData.roster.forEach(player => {
+                const checkbox = document.getElementById(`absent_${player.id}`);
+                if (!checkbox) return;
+                const checked = newData.absent_player_ids.includes(player.id);
+                if (checkbox.checked !== checked) {
+                    checkbox.checked = checked;
+                    checkbox.dispatchEvent(new Event('change', {bubbles: true}));
+                }
+            });
 
-            // Update lineup text list on the main page
-            const lineupCardBody = document.querySelector('.card:has(#lineupEditorModal) .card-body') || document.querySelector('.card:nth-child(2) .card-body');
-            if (lineupCardBody && !lineupCardBody.closest('.modal')) {
-                 if (state.lineup && state.lineup.lineup_positions && state.lineup.lineup_positions.length > 0) {
-                      lineupCardBody.innerHTML = `<ol class="list-group list-group-numbered">${state.lineup.lineup_positions.map(p => `<li class="list-group-item">${escapeHTML(p)}</li>`).join('')}</ol>`;
-                 } else {
-                      lineupCardBody.innerHTML = `<div class="text-center p-3 text-muted"><p class="mb-1">No lineup has been set.</p></div>`;
-                 }
-            }
+            // Refresh the compact checklist metric without replacing the card
+            // body (which previously removed its Edit Lineup button).
+            const lineupCount = state.lineup?.lineup_positions?.length || 0;
+            const lineupMetric = document.getElementById('lineupSummaryCount');
+            const lineupTitle = document.getElementById('lineupSummaryTitle');
+            if (lineupMetric) lineupMetric.textContent = String(lineupCount);
+            if (lineupTitle) lineupTitle.textContent = lineupCount
+                ? (state.lineup.title || 'Game lineup')
+                : 'Not set';
 
         } catch (e) {
             console.error(e);
@@ -669,41 +673,43 @@ function applyOutOfPositionIndicators() {
 
     // --- Event Listeners ---
     function setupEventListeners() {
-        const socket = io();
+        const socket = typeof io === 'function' ? io() : null;
 
-        socket.on('connect', () => {
-            // Join the game-specific room to ensure we only get relevant live game broadcasts
-            socket.emit('join_game_room', { game_id: state.game.id });
-        });
+        if (socket) {
+            socket.on('connect', () => {
+                // Join the game-specific room to ensure we only get relevant live game broadcasts
+                socket.emit('join_game_room', { game_id: state.game.id });
+            });
 
-        socket.on('data_updated', fetchLatestGameData);
-        socket.on('lineup_add', fetchLatestGameData);
-        socket.on('lineup_update', fetchLatestGameData);
-        socket.on('rotation_save', fetchLatestGameData);
-        socket.on('roster_update', fetchLatestGameData);
-        socket.on('game_updated', fetchLatestGameData);
-        socket.on('pitching_update', fetchLatestGameData);
+            socket.on('data_updated', fetchLatestGameData);
+            socket.on('lineup_add', fetchLatestGameData);
+            socket.on('lineup_update', fetchLatestGameData);
+            socket.on('rotation_save', fetchLatestGameData);
+            socket.on('roster_update', fetchLatestGameData);
+            socket.on('game_updated', fetchLatestGameData);
+            socket.on('pitching_update', fetchLatestGameData);
 
-        // Listen for authoritative state broadcasts specifically for the live game
-        socket.on('game_state_update', (newState) => {
-            console.log("Received server-authoritative live game state broadcast.", newState);
+            // Listen for authoritative state broadcasts specifically for the live game
+            socket.on('game_state_update', (newState) => {
+                console.log("Received server-authoritative live game state broadcast.", newState);
 
-            // Re-apply essential parsed objects if needed
-            if (newState.rotation && typeof newState.rotation.innings === 'string') {
-                newState.rotation.innings = JSON.parse(newState.rotation.innings);
-            }
+                // Re-apply essential parsed objects if needed
+                if (newState.rotation && typeof newState.rotation.innings === 'string') {
+                    newState.rotation.innings = JSON.parse(newState.rotation.innings);
+                }
 
-            state.actual_rotation = newState.actual_rotation;
-            state.rotation_events = newState.rotation_events;
-            state.pitch_count_summary = newState.pitch_count_summary;
-            state.pitching_plans = newState.pitching_plans;
-            state.game = newState.game;
-            state.liveMode = newState.game.is_live;
-            state.currentInning = state.liveMode ? state.game.live_current_inning || '1' : state.currentInning;
+                state.actual_rotation = newState.actual_rotation;
+                state.rotation_events = newState.rotation_events;
+                state.pitch_count_summary = newState.pitch_count_summary;
+                state.pitching_plans = newState.pitching_plans;
+                state.game = newState.game;
+                state.liveMode = newState.game.is_live;
+                state.currentInning = state.liveMode ? state.game.live_current_inning || '1' : state.currentInning;
 
-            renderRotationEditor();
-            renderBenchReport();
-        });
+                renderRotationEditor();
+                renderBenchReport();
+            });
+        }
 
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
@@ -747,40 +753,9 @@ function applyOutOfPositionIndicators() {
         document.getElementById('saveRotationBtnMobile')?.addEventListener('click', saveRotation); // Add mobile listener
         document.getElementById('printCardBtn')?.addEventListener('click', printLineupCard);
 
-        // Live Game Mode Toggle
-        const toggleLiveGame = (isLive) => {
-            state.liveMode = isLive;
-
-            // Tell backend about the toggle
-            fetch('/api/toggle_live_game', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ game_id: state.game.id, is_live: state.liveMode })
-            });
-
-            const liveOverlay = document.getElementById('live-game-overlay');
-            const plannerControls = document.querySelectorAll('.planner-controls');
-
-            const toggle = document.getElementById('liveGameModeToggle');
-            if (toggle) toggle.checked = isLive;
-
-            if (state.liveMode) {
-                liveOverlay.classList.remove('d-none');
-                plannerControls.forEach(el => el.classList.add('d-none'));
-                document.getElementById('rotation-board')?.classList.add('bg-light'); // slight visual diff
-                state.currentInning = state.game.live_current_inning || '1';
-            } else {
-                liveOverlay.classList.add('d-none');
-                plannerControls.forEach(el => el.classList.remove('d-none'));
-                document.getElementById('rotation-board')?.classList.remove('bg-light');
-            }
-
-            // Re-render everything with the correct state (actual vs planned)
-            renderRotationEditor();
-        };
-
-        document.getElementById('liveGameModeToggle')?.addEventListener('change', (e) => toggleLiveGame(e.target.checked));
-        document.getElementById('startLiveGameBtnAction')?.addEventListener('click', () => toggleLiveGame(true));
+        // Live Game start/change/end actions are owned by live_game_v2.js so the
+        // server remains authoritative. Do not bind the retired toggle endpoint
+        // here; duplicate listeners can otherwise make a failed start look live.
 
         // Initialize UI state if live on load
         if (state.liveMode) {
