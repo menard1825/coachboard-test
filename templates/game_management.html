@@ -45,7 +45,7 @@
                             {% endif %}
                         </div>
                         <p class="h4 mb-0"><span id="availabilityPresentCount">{{ present_count }}</span> <span class="fs-6 text-muted fw-normal" id="availabilityPresentLabel">Present</span></p>
-                        <p class="small text-muted mb-3" id="availabilityAbsentCount">{{ absent_count }} absent</p>
+                        <p class="small text-muted mb-3" id="availabilityAbsentCount">{{ absent_count }} out</p>
                         <button type="button" class="btn btn-sm btn-outline-primary w-100" id="availabilityToggleBtn" data-bs-toggle="collapse" data-bs-target="#availabilityCollapse" aria-expanded="false" aria-controls="availabilityCollapse">Edit Availability</button>
                     </div>
                 </div>
@@ -101,15 +101,9 @@
                             <i class="bi bi-exclamation-circle-fill text-warning fs-5"></i>
                             {% endif %}
                         </div>
-                        {% set ns = namespace(count=0) %}
-                        {% for player in roster %}
-                            {% if pitch_count_summary.get(player.name, {}).get('coach_target') %}
-                                {% set ns.count = ns.count + 1 %}
-                            {% endif %}
-                        {% endfor %}
-                        <p class="h4 mb-0">{{ ns.count }} <span class="fs-6 text-muted fw-normal">Targets Set</span></p>
-                        <p class="small text-muted mb-3 text-truncate">Plan and restrictions</p>
-                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="viewPitchingBtn" onclick="document.getElementById('pitching-log-container').scrollIntoView({behavior: 'smooth'})">View Pitching</button>
+                        <p class="h4 mb-0"><span class="fs-6 text-muted fw-normal">Eligibility</span></p>
+                        <p class="small text-muted mb-3 text-truncate">Who can pitch today</p>
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="viewPitchingBtn" onclick="document.getElementById('pitching-log-container').scrollIntoView({behavior: 'smooth'})">View Availability</button>
                     </div>
                 </div>
             </div>
@@ -123,7 +117,7 @@
                         <div class="row">
                             {% for player in roster %}
                             <div class="col-md-4 col-sm-6 mb-2">
-                                <div class="form-check form-switch">
+                                <div class="form-check form-switch border rounded p-2 ps-5">
                                     <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player['id'] }}" id="absent_{{ player['id'] }}" {% if player['id'] in absent_player_ids %}checked{% endif %}>
                                     <label class="form-check-label" for="absent_{{ player['id'] }}">{{ player['name'] }}</label>
                                 </div>
@@ -153,7 +147,7 @@
         <div class="col-lg-12 mb-4" id="pitching-log-container">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitching Log & Targets</h5>
+                    <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitcher Availability & Plan</h5>
                 </div>
                 <div class="card-body">
                   {% include '_pitching_log.html' %}
@@ -248,6 +242,8 @@
 <script src="{{ url_for('static', filename='js/live_game_coach_ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/live_game_field_realism.js') }}"></script>
 <script src="{{ url_for('static', filename='js/gameday_pitching_steppers.js') }}"></script>
+<script src="{{ url_for('static', filename='js/game_prep_readiness.js') }}"></script>
+<script src="{{ url_for('static', filename='js/game_setup_ux.js') }}"></script>
 <script>
     // Keep the game shell visible without observing/mutating the same attributes.
     const keepGameShellVisible = () => {
