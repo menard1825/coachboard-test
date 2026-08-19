@@ -44,23 +44,23 @@
 
   function workloadText(summary, compact = false) {
     const values = workloadNumbers(summary);
-    const official = values.officialDay === null ? 'Official: unknown' : `Official: ${values.officialDay}`;
-    const day = values.workloadDay === null ? 'Game-day workload: unknown' : `Game-day workload: ${values.workloadDay}`;
+    const official = values.officialDay === null ? 'Game pitches: unknown' : `Game pitches: ${values.officialDay}`;
+    const day = values.workloadDay === null ? 'Today workload: unknown' : `Today workload: ${values.workloadDay}`;
     const seven = values.workload7 === null ? '7-day workload: unknown' : `7-day workload: ${values.workload7}`;
-    const extra = values.nonGameDay > 0 ? ` • ${values.nonGameDay} non-game throws` : '';
+    const extra = values.nonGameDay > 0 ? ` • ${values.nonGameDay} practice/lesson throws today` : '';
 
     if (compact) return `${official} • ${day} • ${seven}${extra}`;
-    return `${official} game pitches • ${day} pitches • ${seven} pitches${extra}`;
+    return `${official} • ${day} • ${seven}${extra}`;
   }
 
-  function decisionDetail(player) {
+  function decisionDetail(player, includeRole = true) {
     const summary = summaryForPlayer(player);
     const plan = planFor(player.id);
     const pieces = [
       summary.status || 'Eligibility unknown',
       workloadText(summary, true),
       summary.coach_target != null ? `Coach target: ${summary.coach_target}` : null,
-      plan?.role || null,
+      includeRole ? plan?.role || null : null,
     ].filter(Boolean);
     return pieces.join(' • ');
   }
@@ -103,7 +103,7 @@
       const card = editButton.closest('.border.rounded');
       if (!player || !card) return;
       const detail = card.querySelector('.small.text-muted');
-      if (detail) detail.textContent = decisionDetail(player);
+      if (detail) detail.textContent = decisionDetail(player, false);
     });
   }
 
