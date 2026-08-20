@@ -3,13 +3,15 @@ from contextlib import contextmanager
 from flask import g, has_request_context
 from sqlalchemy.orm.attributes import set_committed_value
 
+from blueprints.fair_play import pitching_preferences_for_team, pitching_rules_for_name
 from db import db
 from pitching_rule_presets import install_additional_pitching_rules
-from utils import PITCHING_RULES, get_pitching_rules_for_team as _base_team_rules
+from utils import PITCHING_RULES, calculate_pitch_count_summary as _base_calculate_pitch_summary
 
 
 install_additional_pitching_rules(PITCHING_RULES)
 RULE_SET_OPTIONS = tuple(PITCHING_RULES.keys())
+_CONTEXT_ATTR = 'coachboard_game_pitching_rule_context'
 
 
 class GamePitchingRule(db.Model):
@@ -35,31 +37,48 @@ def effective_rule_set_name(team, game=None):
         override = game_rule_override(game.id, team.id)
         if override and override.rule_set in RULE_SET_OPTIONS:
             return override.rule_set
-    configured = getattr(team, 'pitching_rule_set', None) or 'MLB Pitch Smart'
-    return configured if configured in RULE_SET_OPTIONS else 'MLB Pitch Smart'
+    return pitching_preferences_for_team(team)['competition_default_rule']
 
 
 def rule_settings_payload(team, game=None):
     override = game_rule_override(game.id, team.id) if game is not None else None
-    team_default = getattr(team, 'pitching_rule_set', None) or 'MLB Pitch Smart'
+    preferences = pitching_preferences_for_team(team)
+    team_default = preferences['competition_default_rule']
+    effective = effective_rule_set_name(team, game)
+    if override:
+        source = 'game'
+    elif team_default:
+        source = 'team'
+    else:
+        source = 'unselected'
     return {
         'team_default': team_default,
         'override': override.rule_set if override else None,
-        'effective': effective_rule_set_name(team, game),
-        'source': 'game' if override else 'team',
+        'effective': effective,
+        'source': source,
         'options': list(RULE_SET_OPTIONS),
+        'arm_care_rule_set': preferences['arm_care_rule_set'],
     }
 
 
 @contextmanager
 def rule_name_context(team, rule_set_name):
-    """Expose a ruleset to the existing team-based calculator without persisting it."""
+    """Expose one game's competition rules to legacy calculators without persisting them."""
     original = getattr(team, 'pitching_rule_set', None)
+    had_context = has_request_context() and hasattr(g, _CONTEXT_ATTR)
+    previous_context = getattr(g, _CONTEXT_ATTR, None) if has_request_context() else None
+    if has_request_context():
+        setattr(g, _CONTEXT_ATTR, rule_set_name)
     set_committed_value(team, 'pitching_rule_set', rule_set_name)
     try:
         yield
     finally:
         set_committed_value(team, 'pitching_rule_set', original)
+        if has_request_context():
+            if had_context:
+                setattr(g, _CONTEXT_ATTR, previous_context)
+            else:
+                g.pop(_CONTEXT_ATTR, None)
 
 
 @contextmanager
@@ -69,33 +88,105 @@ def game_rule_context(team, game):
 
 
 def pitching_rules_for_game(team, game):
-    with game_rule_context(team, game):
-        return _base_team_rules(team)
+    return pitching_rules_for_name(team, effective_rule_set_name(team, game))
+
+
+def _request_rule_name(team):
+    if has_request_context() and hasattr(g, _CONTEXT_ATTR):
+        return getattr(g, _CONTEXT_ATTR)
+    override = getattr(g, 'coachboard_game_pitching_rule', None) if has_request_context() else None
+    if override in RULE_SET_OPTIONS:
+        return override
+    return pitching_preferences_for_team(team)['competition_default_rule']
 
 
 def request_aware_team_rules(team):
-    """Use the current game's override when an HTTP game route is being handled.
+    """Return the effective competition rules, which may intentionally be unselected."""
+    return pitching_rules_for_name(team, _request_rule_name(team))
 
-    The override name is kept on Flask's request context instead of the Team row,
-    so a db.session.commit() during Live Game cannot accidentally erase or persist
-    the temporary ruleset.
+
+def gameplay_pitch_summary(
+    roster,
+    all_outings,
+    rules,
+    target_date=None,
+    all_targets=None,
+    team_timezone=None,
+    current_game_id=None,
+):
+    """Keep gameplay usable when a coach intentionally chooses rules per event.
+
+    With no competition rules selected, CoachBoard still tracks pitch totals and
+    workload but does not invent tournament eligibility restrictions. The game
+    planning rule picker is responsible for prompting the coach to select the
+    event rules when they matter.
     """
-    override = getattr(g, 'coachboard_game_pitching_rule', None) if has_request_context() else None
-    if override in RULE_SET_OPTIONS:
-        with rule_name_context(team, override):
-            return _base_team_rules(team)
-    return _base_team_rules(team)
+    if not rules.get('competition_unselected'):
+        return _base_calculate_pitch_summary(
+            roster,
+            all_outings,
+            rules,
+            target_date=target_date,
+            all_targets=all_targets,
+            team_timezone=team_timezone,
+            current_game_id=current_game_id,
+        )
+
+    age_group = rules.get('age_group') or 'default'
+    pitch_smart = PITCHING_RULES['MLB Pitch Smart']
+    effective_age = '7U' if age_group in {'4U', '5U', '6U'} else age_group
+    proxy_rules = dict(pitch_smart.get(effective_age, pitch_smart['default']))
+    proxy_rules.update({
+        'rule_set_name': 'Rules Not Selected',
+        'configured_rule_set_name': None,
+        'age_group': age_group,
+        'source_note': rules.get('source_note'),
+    })
+    summary = _base_calculate_pitch_summary(
+        roster,
+        all_outings,
+        proxy_rules,
+        target_date=target_date,
+        all_targets=all_targets,
+        team_timezone=team_timezone,
+        current_game_id=current_game_id,
+    )
+    for item in summary.values():
+        item['rule_type'] = 'none'
+        item['rule_set_name'] = 'Rules Not Selected'
+        item['status'] = 'Available'
+        item['status_detail'] = ''
+        item['next_available'] = 'Today'
+        item['max_daily'] = None
+        item['pitches_remaining_today'] = None
+    return summary
 
 
 def install_request_rule_adapters():
-    """Point existing game-specific modules at the request-aware rules function."""
-    # These modules imported get_pitching_rules_for_team directly before game
-    # overrides existed. Rebind only their module-local reference so standalone
-    # team pitching screens continue to use the team's default rules normally.
-    for module_name in ('live_game_api', 'live_game_common', 'api', 'gameday'):
+    """Rebind legacy module imports to the new competition-rule preference layer."""
+    gameplay_modules = (
+        'blueprints.live_game_api',
+        'blueprints.live_game_common',
+        'blueprints.api',
+        'blueprints.gameday',
+        'game_day_helpers',
+    )
+    for module_name in gameplay_modules:
         try:
-            module = __import__(f'blueprints.{module_name}', fromlist=[module_name])
+            module = __import__(module_name, fromlist=[module_name.rsplit('.', 1)[-1]])
             if hasattr(module, 'get_pitching_rules_for_team'):
                 module.get_pitching_rules_for_team = request_aware_team_rules
+            if hasattr(module, 'calculate_pitch_count_summary'):
+                module.calculate_pitch_count_summary = gameplay_pitch_summary
         except Exception:
             pass
+
+    # The standalone Pitching dashboard should explicitly show that competition
+    # eligibility is unknown until rules are selected, rather than silently
+    # treating the team's arm-care preference as the tournament rule.
+    try:
+        pitching_module = __import__('blueprints.pitching', fromlist=['pitching'])
+        if hasattr(pitching_module, 'get_pitching_rules_for_team'):
+            pitching_module.get_pitching_rules_for_team = request_aware_team_rules
+    except Exception:
+        pass
