@@ -4,7 +4,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from sqlalchemy import func, or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from blueprints.security_guard import record_activity
+from blueprints.security_guard import normalize_timezone_name, normalize_utc_offset_minutes, record_activity
 from db import db
 from models import Team, TeamMembership, User, utcnow_naive
 from password_recovery import (
@@ -87,6 +87,16 @@ def _signed_in_destination(role):
     return url_for('game_day.game_day_home') if role == GAME_CHANGER else url_for('home')
 
 
+def _capture_submitted_client_context():
+    """Persist browser-reported timezone in the signed-in session."""
+    timezone_name = normalize_timezone_name(request.form.get('client_timezone'))
+    offset_minutes = normalize_utc_offset_minutes(request.form.get('client_utc_offset_minutes'))
+    if timezone_name:
+        session['client_timezone'] = timezone_name
+    if offset_minutes is not None:
+        session['client_utc_offset_minutes'] = offset_minutes
+
+
 @auth_bp.before_app_request
 def replace_legacy_admin_password_reset():
     """Turn the old random-password admin action into secure password help."""
@@ -116,7 +126,7 @@ def login():
                 flash('Your CoachBoard account is not assigned to a team yet. Ask your Head Coach for access.', 'danger')
                 return render_template('login.html', identity=identity)
 
-            # Store login timestamps consistently in UTC.  The audit/user UI
+            # Store login timestamps consistently in UTC. The audit/user UI
             # converts them to the active team's timezone for display.
             user.last_login = utcnow_naive()
             db.session.commit()
@@ -128,6 +138,7 @@ def login():
             session['team_id'] = primary_membership.team_id
             session['player_order'] = get_player_order_as_list(primary_membership.player_order)
             session.permanent = True
+            _capture_submitted_client_context()
 
             team = db.session.get(Team, primary_membership.team_id)
             record_activity(
@@ -253,6 +264,7 @@ def register():
         session['team_id'] = new_membership.team_id
         session['player_order'] = []
         session.permanent = True
+        _capture_submitted_client_context()
         record_activity(
             'account_created',
             user=new_user,
