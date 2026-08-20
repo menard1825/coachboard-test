@@ -12,16 +12,28 @@
 
   const RULE_INFO = {
     'MLB Pitch Smart': {
-      label: 'Pitch Count Limits',
+      label: 'Pitch Smart',
       short: 'Pitch count',
-      description: 'Tracks pitches thrown and required rest before the pitcher can throw again.',
+      description: 'MLB / USA Baseball pitch-count limits and required rest guidance based on age.',
       reference: 'MLB Pitch Smart',
     },
+    'Bullpen Tournaments': {
+      label: 'Bullpen Tournaments',
+      short: 'Pitch Smart guidance',
+      description: 'Uses Bullpen’s published USA Baseball / MLB Pitch Smart arm-care guidelines. Bullpen notes these are guidance rather than tournament-policed pitching restrictions.',
+      reference: 'Bullpen Tournaments',
+    },
     'USSSA': {
-      label: 'Innings Limits',
-      short: 'Innings',
-      description: 'Tracks innings and outs pitched across game days.',
-      reference: 'USSSA',
+      label: 'USSSA',
+      short: 'Innings / outs',
+      description: 'Tracks innings and outs pitched across consecutive game days using USSSA youth pitching limits.',
+      reference: 'USSSA Baseball',
+    },
+    'Little League Baseball': {
+      label: 'Little League Baseball',
+      short: 'Pitch count',
+      description: 'Uses Little League game pitch-count and calendar-day rest rules for 12U and younger. Older divisions should verify division-specific rules.',
+      reference: 'Little League Baseball',
     },
   };
 
@@ -36,7 +48,7 @@
 
   function optionLabel(name) {
     const info = infoFor(name);
-    return `${info.label} — ${info.reference}`;
+    return `${info.label} — ${info.short}`;
   }
 
   function installStyles() {
@@ -108,12 +120,12 @@
       <div class="gpr-editor" id="game-pitch-rule-editor-v2" hidden>
         <div class="gpr-head">
           <div>
-            <div class="gpr-title">How are pitchers limited in this game?</div>
-            <div class="gpr-help">Choose what this tournament or league uses. You usually only need to change this when an event uses different rules than your team default.</div>
+            <div class="gpr-title">Which pitching rules apply to this game?</div>
+            <div class="gpr-help">Choose the tournament or league preset. You normally only change this when an event uses different rules than your team default.</div>
           </div>
           <span class="gpr-badge ${data.source === 'game' ? 'game' : 'team'}">${esc(source)}</span>
         </div>
-        <select class="form-select" id="game-pitch-rule-select-v2" ${isLive ? 'disabled' : ''} aria-label="Pitcher limit type for this game">
+        <select class="form-select" id="game-pitch-rule-select-v2" ${isLive ? 'disabled' : ''} aria-label="Pitching rules for this game">
           <option value="">Use Team Default — ${esc(defaultInfo.label)}</option>
           ${options.map(name => `<option value="${esc(name)}" ${data.override === name ? 'selected' : ''}>${esc(optionLabel(name))}</option>`).join('')}
         </select>
