@@ -4,6 +4,10 @@
   document.body.classList.add('cb-ui');
 
   const path = window.location.pathname;
+  if (path === '/' && !window.location.hash) {
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}#overview`);
+  }
+
   if (path === '/') document.body.classList.add('cb-home');
   if (path === '/pitching') document.body.classList.add('cb-pitching');
   if (path === '/rules') document.body.classList.add('cb-rules');
@@ -15,7 +19,7 @@
   if (/^\/rotation-template\//.test(path)) document.body.classList.add('cb-rotation-template');
 
   const HOME_SECTIONS = {
-    overview: ['Overview', 'Season snapshot and the items that need a coach’s attention.'],
+    overview: ['Home', 'Your coaching command center for the next game, arm care, practice, and items that need attention.'],
     roster: ['Roster', 'Manage player information, positions, notes, and persistent pitching traits.'],
     player_development: ['Player Development', 'Keep each player’s coaching focus, progress, and notes in one place.'],
     practice_plan: ['Practice', 'Build, reuse, and adjust practice plans without starting from scratch.'],
@@ -35,9 +39,33 @@
     favicon.href = '/static/coachboard-icon.svg?v=1';
   }
 
+  function ensureHomeNavigation() {
+    if (path !== '/') return;
+
+    const desktopTab = document.querySelector('a[data-bs-toggle="tab"][href="#overview"]');
+    if (desktopTab) {
+      desktopTab.innerHTML = '<i class="bi bi-house-door me-1"></i>Home';
+      desktopTab.setAttribute('aria-label', 'Home');
+      const item = desktopTab.closest('li');
+      const list = item?.parentElement;
+      if (item && list && list.firstElementChild !== item) list.prepend(item);
+    }
+
+    const primary = document.querySelector('.coach-primary-nav');
+    if (primary && !primary.querySelector('[data-cb-section="overview"]')) {
+      const home = document.createElement('a');
+      home.className = 'cb-nav-link';
+      home.dataset.cbSection = 'overview';
+      home.href = '/#overview';
+      home.innerHTML = '<i class="bi bi-house-door"></i>Home';
+      primary.prepend(home);
+    }
+  }
+
   function addHomeIntros() {
     if (path !== '/') return;
     Object.entries(HOME_SECTIONS).forEach(([id, [title, subtitle]]) => {
+      if (id === 'overview') return;
       const pane = document.getElementById(id);
       if (!pane || pane.querySelector(':scope > .cb-tab-intro') || pane.querySelector(':scope > .cb-page-head')) return;
       const intro = document.createElement('div');
@@ -93,7 +121,7 @@
   }
 
   function markDesktopNav() {
-    const activeHomeSection = window.location.hash.replace('#', '') || 'roster';
+    const activeHomeSection = window.location.hash.replace('#', '') || 'overview';
     const gameArea = path === '/game-day' || /^\/game\/\d+\/?$/.test(path) || /^\/game-day\/\d+\/report\/?$/.test(path);
     document.querySelectorAll('.coach-primary-nav [data-cb-section]').forEach((link) => {
       link.classList.remove('active');
@@ -106,7 +134,7 @@
 
   function applyHomeHash() {
     if (path !== '/') return;
-    const target = window.location.hash || '#roster';
+    const target = window.location.hash || '#overview';
     const link = document.querySelector(`a[data-bs-toggle="tab"][href="${target}"]`);
     if (link && typeof bootstrap !== 'undefined') bootstrap.Tab.getOrCreateInstance(link).show();
     markDesktopNav();
@@ -132,8 +160,28 @@
     document.body.appendChild(script);
   }
 
+  function loadHomeDashboard() {
+    if (path !== '/') return;
+
+    if (!document.querySelector('link[data-cb-home-dashboard]')) {
+      const style = document.createElement('link');
+      style.rel = 'stylesheet';
+      style.href = '/static/css/home_dashboard.css?v=20260820-1';
+      style.dataset.cbHomeDashboard = 'true';
+      document.head.appendChild(style);
+    }
+
+    if (!document.querySelector('script[data-cb-home-dashboard]')) {
+      const script = document.createElement('script');
+      script.src = '/static/js/home_dashboard.js?v=20260820-1';
+      script.dataset.cbHomeDashboard = 'true';
+      document.body.appendChild(script);
+    }
+  }
+
   function init() {
     useNeutralFaviconWhenTeamHasNoLogo();
+    ensureHomeNavigation();
     addHomeIntros();
     modernizeLegacyAdminHeader();
     enhancePitchingStructure();
@@ -141,6 +189,7 @@
     markDesktopNav();
     loadFairPlayEnhancement();
     loadPitchingPreferences();
+    loadHomeDashboard();
     window.setTimeout(applyHomeHash, 0);
   }
 
