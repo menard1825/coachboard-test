@@ -16,6 +16,7 @@ def _build_app(monkeypatch, role='Head Coach'):
     app.config.update(TESTING=True)
 
     with app.app_context():
+        db.create_all()
         team = Team(
             id=1,
             team_name='Role Test Team',
