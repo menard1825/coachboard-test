@@ -21,7 +21,7 @@ def login(page: Page, coachboard_url: str):
     page.get_by_label('Username or email').fill(TEST_USERNAME)
     page.locator('#password').fill(TEST_PASSWORD)
     page.get_by_role('button', name='Sign In').click()
-    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?#overview$'))
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?$'))
 
 
 def test_coach_lands_on_operational_home(page: Page, coachboard_url: str):
