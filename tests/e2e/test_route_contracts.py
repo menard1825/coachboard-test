@@ -19,7 +19,7 @@ def login(page: Page, coachboard_url: str):
     page.get_by_label('Username or email').fill('playwright-coach')
     page.locator('#password').fill('playwright-password')
     page.get_by_role('button', name='Sign In').click()
-    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#games)?$'))
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#(?:overview|games))?$'))
 
 
 def test_remaining_get_routes_fail_cleanly_for_missing_records(page: Page, coachboard_url: str):
