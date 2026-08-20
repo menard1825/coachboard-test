@@ -62,3 +62,25 @@ def test_home_is_first_mobile_destination(page: Page, coachboard_url: str):
     items.nth(4).click()
     expect(page).to_have_url(re.compile(r'#more$'))
     expect(page.locator('#more .cb-mobile-more-card')).to_contain_text('Development')
+
+
+def test_game_day_mobile_navigation_keeps_home(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+    page.goto(f'{coachboard_url}/game-day')
+
+    bottom_nav = page.locator('nav.bottom-nav-fixed ul')
+    expect(bottom_nav).to_be_visible()
+    items = bottom_nav.locator('a.nav-link')
+    expect(items).to_have_count(5)
+    expect(items.nth(0)).to_contain_text('Home')
+    expect(items.nth(0)).to_have_attribute('href', '/')
+    expect(items.nth(1)).to_contain_text('Game Day')
+    expect(items.nth(1)).to_have_class(re.compile(r'\bactive\b'))
+    expect(items.nth(2)).to_contain_text('Roster')
+    expect(items.nth(3)).to_contain_text('Practice')
+    expect(items.nth(4)).to_contain_text('More')
+
+    items.nth(0).click()
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?$'))
+    expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
