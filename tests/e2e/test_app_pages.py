@@ -30,7 +30,7 @@ def login(page: Page, coachboard_url: str, username=TEST_USERNAME, password=TEST
     identity.fill(username)
     page.locator('#password').fill(password)
     page.get_by_role('button', name='Sign In').click()
-    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#games)?$'))
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#(?:overview|games))?$'))
 
 
 def assert_healthy_document(page: Page, coachboard_url: str, path: str, expected_text: str):
@@ -192,28 +192,32 @@ def test_mobile_navigation_reaches_every_primary_area(page: Page, coachboard_url
 
     bottom_nav = page.locator('nav.bottom-nav-fixed')
     expect(bottom_nav).to_be_visible()
-    for label in ('Game Day', 'Roster', 'Development', 'Practice', 'More'):
+    for label in ('Home', 'Game Day', 'Roster', 'Practice', 'More'):
         expect(bottom_nav.get_by_text(label, exact=True)).to_be_visible()
+
+    bottom_nav.get_by_text('Home', exact=True).click()
+    expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
+    expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
 
     bottom_nav.get_by_text('Roster', exact=True).click()
     expect(page.locator('#roster')).to_have_class(re.compile(r'\bactive\b'))
     expect(page.locator('#roster-cards-container')).to_contain_text('Pitcher Pat', timeout=15_000)
-
-    bottom_nav.get_by_text('Development', exact=True).click()
-    expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
-    expect(page.locator('#player_development > .cb-tab-intro')).to_have_count(0)
-    expect(page.locator('#season-dev-summary-v2')).to_have_count(0)
-    expect(page.locator('.cb-dev-mobile-picker')).to_be_visible()
-    expect(page.locator('.cb-dev-player-card')).to_be_hidden()
-    expect(page.locator('#player-dev-content')).to_contain_text('Individual development plan', timeout=15_000)
 
     bottom_nav.get_by_text('Practice', exact=True).click()
     expect(page.locator('#practice_plan')).to_have_class(re.compile(r'\bactive\b'))
 
     bottom_nav.get_by_text('More', exact=True).click()
     expect(page.locator('#more')).to_have_class(re.compile(r'\bactive\b'))
-    for label in ('Pitching', 'Schedule', 'Lineup Templates', 'Defensive Templates', 'Stats', 'Scouting', 'Coach Notes'):
+    for label in ('Development', 'Pitching', 'Schedule', 'Lineup Templates', 'Defensive Templates', 'Stats', 'Scouting', 'Coach Notes'):
         expect(page.locator('#more').get_by_text(label, exact=True)).to_be_visible()
+
+    page.locator('#more').get_by_text('Development', exact=True).click()
+    expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
+    expect(page.locator('#player_development > .cb-tab-intro')).to_have_count(0)
+    expect(page.locator('#season-dev-summary-v2')).to_have_count(0)
+    expect(page.locator('.cb-dev-mobile-picker')).to_be_visible()
+    expect(page.locator('.cb-dev-player-card')).to_be_hidden()
+    expect(page.locator('#player-dev-content')).to_contain_text('Individual development plan', timeout=15_000)
 
 
 def test_coaching_workspaces_expose_new_primary_actions(page: Page, coachboard_url: str):
@@ -297,8 +301,8 @@ def test_role_and_team_boundaries_are_enforced(page: Page, coachboard_url: str):
     login(page, coachboard_url, ASSISTANT_USERNAME, ASSISTANT_PASSWORD)
 
     page.goto(f'{coachboard_url}/admin/settings')
-    expect(page).to_have_url(re.compile(r'/(?:#roster)?$'))
-    expect(page.get_by_role('heading', name='Roster')).to_be_visible()
+    expect(page).to_have_url(re.compile(r'/#overview$'))
+    expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
     expect(page.get_by_role('heading', name='Team Settings')).to_have_count(0)
 
     response = page.request.get(f'{coachboard_url}/api/game_data/2')
