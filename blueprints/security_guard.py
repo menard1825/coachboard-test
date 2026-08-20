@@ -1,13 +1,17 @@
 import secrets
+from datetime import datetime, timezone
 from urllib.parse import urlparse
+import zoneinfo
 
-from flask import Blueprint, flash, jsonify, redirect, request, session, url_for
+from flask import Blueprint, current_app, flash, has_request_context, jsonify, redirect, render_template, request, session, url_for
 
 from db import db
 from models import (
     CollaborationNote,
+    Game,
     GamePitchingPlan,
     GameRotationEvent,
+    Lineup,
     PitchingOuting,
     Player,
     PlayerDevelopmentFocus,
@@ -18,12 +22,40 @@ from models import (
     TeamMembership,
     User,
 )
+from permissions import (
+    ASSISTANT_COACH,
+    DELETE_GAME,
+    DELETE_PLAYER,
+    GAME_CHANGER,
+    HEAD_COACH,
+    SUPER_ADMIN,
+    has_permission,
+)
 
 security_guard_bp = Blueprint('security_guard', __name__)
 
-SUPER_ADMIN = 'Super Admin'
-HEAD_COACH = 'Head Coach'
-GAME_CHANGER = 'Game Changer'
+
+class ActivityLog(db.Model):
+    """Small, durable audit trail for account/session activity.
+
+    Snapshot fields intentionally preserve who/what the event referred to even
+    if a coach later changes their name, role, or loses team access.
+    """
+
+    __tablename__ = 'activity_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('teams.id', ondelete='SET NULL'), nullable=True, index=True)
+    username_snapshot = db.Column(db.String(120), nullable=False)
+    full_name_snapshot = db.Column(db.String(160), nullable=True)
+    role_snapshot = db.Column(db.String(64), nullable=True)
+    action = db.Column(db.String(64), nullable=False, index=True)
+    detail = db.Column(db.String(500), nullable=True)
+    ip_address = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(300), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
+
 
 LEGACY_LIVE_MUTATIONS = {
     'gameday.save_rotation_event',
@@ -51,14 +83,76 @@ DESTRUCTIVE_GET_ENDPOINTS = {
     'admin.delete_team',
 }
 
-GAME_CHANGER_BLOCKED_PREFIXES = (
-    'admin.',
-    'roster.',
-    'development.',
-    'scouting.',
-    'team_management.',
-    'rotation_templates.',
-)
+ASSISTANT_HEAD_COACH_ONLY_ENDPOINTS = {
+    'roster.delete_player': DELETE_PLAYER,
+    'gameday.delete_game': DELETE_GAME,
+    'game_day.delete_game': DELETE_GAME,
+}
+
+
+def record_activity(action, *, user=None, team_id=None, role=None, detail=None, username=None, full_name=None):
+    """Record account activity without allowing an audit failure to break login.
+
+    Callers should commit their business change first.  This helper uses a small
+    independent commit so a logging problem never rolls back a successful login,
+    password change, or team switch.
+    """
+    if user is not None:
+        username = user.username
+        full_name = user.full_name
+    username = str(username or session.get('username') or 'Unknown').strip() or 'Unknown'
+    full_name = full_name if full_name is not None else session.get('full_name')
+    role = role if role is not None else session.get('role')
+    if team_id is None:
+        team_id = session.get('team_id')
+
+    ip_address = None
+    user_agent = None
+    if has_request_context():
+        forwarded = str(request.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
+        ip_address = forwarded or request.remote_addr
+        user_agent = str(request.headers.get('User-Agent') or '')[:300] or None
+
+    try:
+        row = ActivityLog(
+            user_id=getattr(user, 'id', None),
+            team_id=team_id,
+            username_snapshot=username[:120],
+            full_name_snapshot=(str(full_name)[:160] if full_name else None),
+            role_snapshot=(str(role)[:64] if role else None),
+            action=str(action or 'activity')[:64],
+            detail=(str(detail)[:500] if detail else None),
+            ip_address=(str(ip_address)[:64] if ip_address else None),
+            user_agent=user_agent,
+        )
+        db.session.add(row)
+        db.session.commit()
+        return row
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Unable to write CoachBoard activity log entry for %s', username)
+        return None
+
+
+def _team_timezone_name():
+    team_id = session.get('team_id')
+    if not team_id:
+        return 'UTC'
+    team = db.session.get(Team, team_id)
+    return (team.timezone if team and team.timezone else 'UTC')
+
+
+@security_guard_bp.app_template_filter('format_audit_datetime')
+def format_audit_datetime(value):
+    """Display stored UTC audit/last-login values in the active team's timezone."""
+    if not value or not isinstance(value, datetime):
+        return 'Never' if not value else value
+    aware = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    try:
+        local = aware.astimezone(zoneinfo.ZoneInfo(_team_timezone_name()))
+    except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+        local = aware
+    return local.strftime('%a %m/%d/%y, %I:%M %p')
 
 
 def _cross_site_request():
@@ -157,6 +251,103 @@ def _new_registration_code():
     raise RuntimeError('Unable to generate a unique team registration code.')
 
 
+def _permission_denied(message):
+    if _api_request() or request.method != 'GET':
+        return jsonify({'status': 'error', 'message': message}), 403
+    flash(message, 'warning')
+    return redirect(url_for('game_day.game_day_home'))
+
+
+def _rotation_sort_key(value):
+    try:
+        return (0, float(value))
+    except (TypeError, ValueError):
+        return (1, str(value))
+
+
+def _game_changer_setup_response(game_id):
+    """Render the read-only pregame sheet used to enter data into GameChanger."""
+    team_id = session.get('team_id')
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
+    if not game:
+        flash('Game not found.', 'danger')
+        return redirect(url_for('game_day.game_day_home'))
+
+    # Once a game is complete, the actual report is more useful than the old
+    # pregame plan.
+    has_end_game = db.session.query(GameRotationEvent.id).filter_by(
+        game_id=game.id,
+        team_id=team_id,
+        event_type='End Game',
+        reverted=False,
+    ).first() is not None
+    if has_end_game:
+        return redirect(url_for('game_day.game_report', game_id=game.id))
+
+    roster = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
+    roster_by_id = {player.id: player for player in roster}
+    roster_by_name = {player.name: player for player in roster}
+    absence_rows = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
+    absent_ids = {row.player_id for row in absence_rows}
+    available_roster = [player for player in roster if player.id not in absent_ids]
+    absent_roster = [player for player in roster if player.id in absent_ids]
+
+    lineup = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team_id).first()
+    lineup_rows = []
+    if lineup:
+        if lineup.entries:
+            for entry in sorted(lineup.entries, key=lambda item: item.batting_order):
+                player = roster_by_id.get(entry.player_id)
+                lineup_rows.append({
+                    'order': entry.batting_order,
+                    'name': player.name if player else entry.player_name_snapshot,
+                    'number': player.number if player else None,
+                    'available': bool(player and player.id not in absent_ids),
+                })
+        else:
+            legacy_names = lineup.lineup_positions or []
+            if isinstance(legacy_names, list):
+                for index, name in enumerate(legacy_names, start=1):
+                    player = roster_by_name.get(name)
+                    lineup_rows.append({
+                        'order': index,
+                        'name': name,
+                        'number': player.number if player else None,
+                        'available': bool(player and player.id not in absent_ids),
+                    })
+
+    rotation = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team_id).first()
+    raw_innings = rotation.innings if rotation and isinstance(rotation.innings, dict) else {}
+    positions = ['P', 'C', '1B', '2B', '3B', 'SS']
+    if int(getattr(db.session.get(Team, team_id), 'outfielder_count', 3) or 3) == 4:
+        positions += ['LF', 'LCF', 'RCF', 'RF']
+    else:
+        positions += ['LF', 'CF', 'RF']
+
+    rotation_rows = []
+    available_names = {player.name for player in available_roster}
+    for inning in sorted(raw_innings.keys(), key=_rotation_sort_key):
+        assignments = raw_innings.get(inning) or {}
+        assigned_names = {name for name in assignments.values() if name}
+        rotation_rows.append({
+            'inning': inning,
+            'assignments': assignments,
+            'bench': [player for player in available_roster if player.name not in assigned_names],
+            'has_unavailable_assignment': any(name not in available_names for name in assigned_names),
+        })
+
+    return render_template(
+        'game_changer_setup.html',
+        current_team=db.session.get(Team, team_id),
+        game=game,
+        lineup_rows=lineup_rows,
+        rotation_rows=rotation_rows,
+        positions=positions,
+        available_roster=available_roster,
+        absent_roster=absent_roster,
+    )
+
+
 @security_guard_bp.route('/admin/settings/rotate-registration-code', methods=['POST'])
 def rotate_registration_code():
     if session.get('role') not in {HEAD_COACH, SUPER_ADMIN}:
@@ -172,6 +363,41 @@ def rotate_registration_code():
     db.session.commit()
     flash('Team join code rotated. The previous code no longer works.', 'success')
     return redirect(url_for('admin.admin_settings'))
+
+
+@security_guard_bp.route('/admin/activity')
+def activity_log():
+    if session.get('role') not in {HEAD_COACH, SUPER_ADMIN}:
+        return _permission_denied('Only a Head Coach or Super Admin can view coach activity.')
+
+    team_id = session.get('team_id')
+    team = db.session.get(Team, team_id)
+    logs = db.session.query(ActivityLog).filter_by(team_id=team_id).order_by(
+        ActivityLog.created_at.desc(), ActivityLog.id.desc()
+    ).limit(300).all()
+
+    memberships = db.session.query(TeamMembership).filter_by(team_id=team_id).all()
+    coaches = []
+    for membership in memberships:
+        user = membership.user
+        latest_login = next(
+            (row for row in logs if row.action == 'login' and row.user_id == user.id),
+            None,
+        )
+        coaches.append({
+            'user': user,
+            'role': membership.role,
+            'latest_login': latest_login,
+        })
+    coaches.sort(key=lambda item: ((item['user'].full_name or item['user'].username).lower()))
+
+    return render_template(
+        'activity_log.html',
+        current_team=team,
+        logs=logs,
+        coaches=coaches,
+        timezone_name=_team_timezone_name(),
+    )
 
 
 @security_guard_bp.before_app_request
@@ -216,10 +442,25 @@ def enforce_security_guards():
             flash('Only a Super Admin can assign the Super Admin role.', 'danger')
             return redirect(url_for('admin.user_management'))
 
-    if session.get('role') == GAME_CHANGER:
-        blocked_prefix = endpoint.startswith(GAME_CHANGER_BLOCKED_PREFIXES)
-        if blocked_prefix and (request.method != 'GET' or endpoint in DESTRUCTIVE_GET_ENDPOINTS):
-            return jsonify({'status': 'error', 'message': 'This account does not have permission to change team setup.'}), 403
+    role = session.get('role')
+
+    # Game Changer is a read-only pregame scorekeeper role.  Do not maintain a
+    # growing list of writable blueprints: deny CoachBoard mutations by default.
+    if role == GAME_CHANGER and not endpoint.startswith('auth.'):
+        if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'} or endpoint in DESTRUCTIVE_GET_ENDPOINTS:
+            return _permission_denied('Game Changer access is read-only. Use the pregame setup view to enter the lineup and defense into GameChanger.')
+        if endpoint == 'home':
+            return redirect(url_for('game_day.game_day_home'))
+        if endpoint == 'gameday.game_management':
+            game_id = (request.view_args or {}).get('game_id')
+            return _game_changer_setup_response(game_id)
+
+    # Assistant Coaches are full coaching collaborators but permanent player or
+    # game deletion stays with the Head Coach/Super Admin.
+    required_capability = ASSISTANT_HEAD_COACH_ONLY_ENDPOINTS.get(endpoint)
+    if role == ASSISTANT_COACH and required_capability and not has_permission(role, required_capability):
+        label = 'players' if required_capability == DELETE_PLAYER else 'games'
+        return _permission_denied(f'Only a Head Coach or Super Admin can permanently delete {label}.')
 
     # Current defensive history is still name-based. Until that schema is
     # migrated to stable player IDs, prevent renames/deletes that would orphan
