@@ -27,6 +27,14 @@
     games: ['Schedule', 'Add, review, and manage scheduled games. Game Day remains the fastest game-day view.'],
   };
 
+  function useNeutralFaviconWhenTeamHasNoLogo() {
+    if (document.querySelector('.navbar-logo')) return;
+    const favicon = document.querySelector('link[rel~="icon"]');
+    if (!favicon) return;
+    favicon.type = 'image/svg+xml';
+    favicon.href = '/static/coachboard-icon.svg?v=1';
+  }
+
   function addHomeIntros() {
     if (path !== '/') return;
     Object.entries(HOME_SECTIONS).forEach(([id, [title, subtitle]]) => {
@@ -115,6 +123,7 @@
   }
 
   function init() {
+    useNeutralFaviconWhenTeamHasNoLogo();
     addHomeIntros();
     modernizeLegacyAdminHeader();
     enhancePitchingStructure();
