@@ -173,7 +173,7 @@
 
     const infoAlert = root.querySelector('.alert.alert-primary');
     if (infoAlert) {
-      infoAlert.innerHTML = '<i class="bi bi-info-circle-fill mt-1"></i><div><strong>Competition rules and arm care are intentionally separate.</strong><br><span class="small">Event rules decide tournament eligibility. Your arm-care setting can still track Pitch Smart guidance and throwing workload regardless of the event format. Game-pitch targets remain optional coaching plans.</span></div>';
+      infoAlert.innerHTML = '<i class="bi bi-info-circle-fill mt-1"></i><div><strong>Competition rules and arm care are intentionally separate.</strong><br><span class="small">Event rules decide tournament eligibility. Your arm-care setting can still track Pitch Smart guidance and throwing workload regardless of the event format. Game-pitch targets are coaching plans, not rule limits.</span></div>';
     }
 
     const cards = [...root.querySelectorAll('.card')];
