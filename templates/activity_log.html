@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Coach Activity - {{ current_team.team_name }}{% endblock %}
+
+{% block bottom_nav %}{% endblock %}
+
+{% block head %}
+<style>
+  .activity-shell{max-width:1180px;margin:0 auto;padding-bottom:48px}
+  .activity-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin:8px 0 18px}
+  .activity-head h1{font-size:1.55rem;font-weight:850;margin:2px 0;color:#172033}
+  .activity-kicker{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}
+  .activity-sub{color:#667085;font-size:.82rem;margin:0}
+  .activity-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px}
+  .activity-coach{border:1px solid #e4e7ec;border-radius:12px;padding:12px;background:#fff}
+  .activity-name{font-size:.85rem;font-weight:850;color:#1d2939}.activity-role{font-size:.67rem;color:#667085;margin-top:2px}
+  .activity-last{font-size:.69rem;color:#475467;margin-top:8px}.activity-last strong{display:block;color:#344054}
+  .activity-card{border:1px solid #e4e7ec;border-radius:14px;background:#fff;overflow:hidden}
+  .activity-table{margin:0}.activity-table th{font-size:.61rem;text-transform:uppercase;letter-spacing:.06em;color:#667085;background:#f8fafc;white-space:nowrap}
+  .activity-table td{font-size:.72rem;vertical-align:top}.activity-action{font-weight:800;color:#344054}.activity-detail{color:#667085;margin-top:2px}
+  .activity-device{font-size:.62rem;color:#98a2b3;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .activity-empty{padding:28px;text-align:center;color:#667085}
+  @media(max-width:767.98px){.activity-head{display:block}.activity-head .btn{margin-top:10px}.activity-table thead{display:none}.activity-table tr{display:block;padding:10px 12px;border-top:1px solid #eef1f4}.activity-table tr:first-child{border-top:0}.activity-table td{display:block;border:0;padding:2px 0}.activity-table td[data-label]::before{content:attr(data-label) ': ';font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;font-weight:800;color:#98a2b3}.activity-device{max-width:100%}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="activity-shell">
+  <div class="activity-head">
+    <div>
+      <div class="activity-kicker">Team Administration</div>
+      <h1>Coach Activity</h1>
+      <p class="activity-sub">Login and account activity for {{ current_team.team_name }}. Times are shown in {{ timezone_name }}.</p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people me-1"></i>User Management</a>
+  </div>
+
+  <div class="activity-grid">
+    {% for item in coaches %}
+    <div class="activity-coach">
+      <div class="activity-name">{{ item.user.full_name or item.user.username }}</div>
+      <div class="activity-role">{{ item.role }} · @{{ item.user.username }}</div>
+      <div class="activity-last">
+        <strong>Last Login</strong>
+        {% if item.latest_login %}
+          {{ item.latest_login.created_at|format_audit_datetime }}
+        {% elif item.user.last_login %}
+          {{ item.user.last_login|format_audit_datetime }} <span class="text-muted">(legacy)</span>
+        {% else %}
+          Never recorded
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="activity-card">
+    {% if logs %}
+    <div class="table-responsive">
+      <table class="table table-hover activity-table align-middle">
+        <thead><tr><th>When</th><th>Coach</th><th>Role</th><th>Activity</th><th>Device / IP</th></tr></thead>
+        <tbody>
+          {% for row in logs %}
+          <tr>
+            <td data-label="When">{{ row.created_at|format_audit_datetime }}</td>
+            <td data-label="Coach"><strong>{{ row.full_name_snapshot or row.username_snapshot }}</strong><div class="text-muted">@{{ row.username_snapshot }}</div></td>
+            <td data-label="Role">{{ row.role_snapshot or '—' }}</td>
+            <td data-label="Activity"><div class="activity-action">{{ row.action|replace('_',' ')|title }}</div>{% if row.detail %}<div class="activity-detail">{{ row.detail }}</div>{% endif %}</td>
+            <td data-label="Device"><div>{{ row.ip_address or '—' }}</div>{% if row.user_agent %}<div class="activity-device" title="{{ row.user_agent }}">{{ row.user_agent }}</div>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="activity-empty"><strong>No activity has been recorded yet.</strong><div class="mt-1">This audit history begins with this CoachBoard update. New logins, logouts, team switches, and password/account changes will appear here.</div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
