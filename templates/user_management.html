@@ -81,10 +81,7 @@
     <div class="card">
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-0">Current Users</h5>
-                    <div class="small text-muted">Last Login is shown in the active team's saved time zone.</div>
-                </div>
+                <h5 class="mb-0">Current Users</h5>
                 <div class="d-flex align-items-center">
                     <input type="text" id="user-search" class="form-control form-control-sm me-2" placeholder="Search users...">
                     <select id="role-filter" class="form-select form-select-sm me-2">
@@ -116,6 +113,8 @@
                     {% for user in users %}
                         {% set ns = namespace(role='No Access', team_name='N/A') %}
                         {% if session.role == 'Super Admin' %}
+                            {# Displaying a composite or primary team role. For clarity we pick the first membership here, but ideally we'd show all if they belong to multiple.
+                               For simple UI matching, we'll just show all memberships explicitly or group them #}
                             {% for mem in user.memberships %}
                                 {% set ns.role = mem.role %}
                                 {% set ns.team_name = mem.team.team_name %}
@@ -140,6 +139,7 @@
                                 </tr>
                             {% endfor %}
                         {% else %}
+                            {# Non-super admins only see memberships matching the current team #}
                             {% for mem in user.memberships %}
                                 {% if mem.team_id == session.team_id %}
                                     {% set ns.role = mem.role %}
@@ -156,11 +156,11 @@
                                             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editUserModal-{{ user.username }}">
                                                 <i class="bi bi-pencil-square"></i> Edit
                                             </button>
-                                        {% else %}
+                                            {% else %}
                                             <small class="text-muted">N/A</small>
-                                        {% endif %}
-                                    </td>
-                                </tr>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
                                 {% endif %}
                             {% endfor %}
                         {% endif %}
@@ -170,7 +170,9 @@
         </div>
     </div>
 
+    <!-- Modals -->
     {% for user in users %}
+        <!-- Edit User Modal -->
         <div class="modal fade" id="editUserModal-{{ user.username }}" tabindex="-1" aria-labelledby="editUserModalLabel-{{ user.username }}" aria-hidden="true">
           <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -267,7 +269,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const role = row.dataset.role;
             const matchesSearch = username.includes(searchTerm);
             const matchesRole = selectedRole === '' || role === selectedRole;
-            row.style.display = matchesSearch && matchesRole ? '' : 'none';
+
+            if (matchesSearch && matchesRole) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
         });
     }
 
@@ -278,10 +285,15 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('submit', function(event) {
             event.preventDefault();
             const formData = new FormData(form);
-            fetch(form.action, { method: 'POST', body: formData }).then(response => response.json()).then(data => {
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json()).then(data => {
                 const button = form.querySelector('button');
                 button.innerHTML = '<i class="bi bi-check"></i>';
-                setTimeout(() => { button.innerHTML = '<i class="bi bi-save"></i>'; }, 2000);
+                setTimeout(() => {
+                    button.innerHTML = '<i class="bi bi-save"></i>';
+                }, 2000);
             });
         });
     });
@@ -290,7 +302,11 @@ document.addEventListener('DOMContentLoaded', function() {
         input.addEventListener('input', function() {
             const username = this.dataset.username;
             const deleteButton = this.closest('.modal-content').querySelector('.delete-user-button');
-            deleteButton.disabled = this.value !== username;
+            if (this.value === username) {
+                deleteButton.disabled = false;
+            } else {
+                deleteButton.disabled = true;
+            }
         });
     });
 });
