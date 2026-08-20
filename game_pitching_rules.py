@@ -78,7 +78,10 @@ def rule_name_context(team, rule_set_name):
             if had_context:
                 setattr(g, _CONTEXT_ATTR, previous_context)
             else:
-                g.pop(_CONTEXT_ATTR, None)
+                try:
+                    delattr(g, _CONTEXT_ATTR)
+                except AttributeError:
+                    pass
 
 
 @contextmanager
@@ -101,8 +104,40 @@ def _request_rule_name(team):
 
 
 def request_aware_team_rules(team):
-    """Return the effective competition rules, which may intentionally be unselected."""
+    """Return only the effective competition rules for eligibility displays."""
     return pitching_rules_for_name(team, _request_rule_name(team))
+
+
+def request_aware_gameplay_rules(team):
+    """Keep arm-care pitch guidance available even when competition rules are unset.
+
+    Game Planning and Live Game still need useful pitch-count context such as the
+    age-based Pitch Smart daily maximum. When a coach intentionally chooses no
+    competition default, use the team's arm-care preset for that context while
+    marking the rules as competition-unselected so it cannot masquerade as the
+    tournament eligibility rule.
+    """
+    competition_rule = _request_rule_name(team)
+    if competition_rule:
+        return pitching_rules_for_name(team, competition_rule)
+
+    preferences = pitching_preferences_for_team(team)
+    arm_care_rule = preferences['arm_care_rule_set']
+    if not arm_care_rule:
+        return pitching_rules_for_name(team, None)
+
+    rules = pitching_rules_for_name(team, arm_care_rule)
+    rules['competition_unselected'] = True
+    rules['competition_rule_set_name'] = None
+    rules['arm_care_rule_set'] = arm_care_rule
+    rules['rule_set_name'] = 'Rules Not Selected'
+    rules['configured_rule_set_name'] = None
+    rules['source_note'] = (
+        'No competition pitching rules are selected for this game. Pitch-count '
+        f'context below comes from the team arm-care setting ({arm_care_rule}) and '
+        'does not establish tournament eligibility.'
+    )
+    return rules
 
 
 def gameplay_pitch_summary(
@@ -132,16 +167,21 @@ def gameplay_pitch_summary(
             current_game_id=current_game_id,
         )
 
-    age_group = rules.get('age_group') or 'default'
-    pitch_smart = PITCHING_RULES['MLB Pitch Smart']
-    effective_age = '7U' if age_group in {'4U', '5U', '6U'} else age_group
-    proxy_rules = dict(pitch_smart.get(effective_age, pitch_smart['default']))
-    proxy_rules.update({
-        'rule_set_name': 'Rules Not Selected',
-        'configured_rule_set_name': None,
-        'age_group': age_group,
-        'source_note': rules.get('source_note'),
-    })
+    if rules.get('rule_type') == 'pitch_count' and rules.get('max_daily'):
+        proxy_rules = dict(rules)
+        proxy_rules['rule_set_name'] = rules.get('arm_care_rule_set') or 'MLB Pitch Smart'
+    else:
+        age_group = rules.get('age_group') or 'default'
+        pitch_smart = PITCHING_RULES['MLB Pitch Smart']
+        effective_age = '7U' if age_group in {'4U', '5U', '6U'} else age_group
+        proxy_rules = dict(pitch_smart.get(effective_age, pitch_smart['default']))
+        proxy_rules.update({
+            'rule_set_name': 'MLB Pitch Smart',
+            'configured_rule_set_name': 'MLB Pitch Smart',
+            'age_group': age_group,
+            'source_note': rules.get('source_note'),
+        })
+
     summary = _base_calculate_pitch_summary(
         roster,
         all_outings,
@@ -163,7 +203,7 @@ def gameplay_pitch_summary(
 
 
 def install_request_rule_adapters():
-    """Rebind legacy module imports to the new competition-rule preference layer."""
+    """Rebind legacy module imports to the new competition/arm-care preference layer."""
     gameplay_modules = (
         'blueprints.live_game_api',
         'blueprints.live_game_common',
@@ -175,15 +215,15 @@ def install_request_rule_adapters():
         try:
             module = __import__(module_name, fromlist=[module_name.rsplit('.', 1)[-1]])
             if hasattr(module, 'get_pitching_rules_for_team'):
-                module.get_pitching_rules_for_team = request_aware_team_rules
+                module.get_pitching_rules_for_team = request_aware_gameplay_rules
             if hasattr(module, 'calculate_pitch_count_summary'):
                 module.calculate_pitch_count_summary = gameplay_pitch_summary
         except Exception:
             pass
 
-    # The standalone Pitching dashboard should explicitly show that competition
-    # eligibility is unknown until rules are selected, rather than silently
-    # treating the team's arm-care preference as the tournament rule.
+    # The standalone Pitching dashboard explicitly treats competition eligibility
+    # as unknown until event rules are selected. Its separate Arm Care column is
+    # populated by the pitching-preferences API.
     try:
         pitching_module = __import__('blueprints.pitching', fromlist=['pitching'])
         if hasattr(pitching_module, 'get_pitching_rules_for_team'):
