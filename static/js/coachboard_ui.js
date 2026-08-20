@@ -141,14 +141,39 @@
     });
   }
 
+  function syncMobileNav(target) {
+    document.querySelectorAll('nav.bottom-nav-fixed a[href^="#"]').forEach((link) => {
+      link.classList.toggle('active', link.getAttribute('href') === target);
+    });
+  }
+
+  function activatePaneWithoutTrigger(pane) {
+    const root = document.getElementById('mainTabContent');
+    if (!root || !pane) return;
+    root.querySelectorAll(':scope > .tab-pane').forEach((item) => {
+      item.classList.remove('active', 'show');
+    });
+    pane.classList.add('active', 'show');
+  }
+
   function showHashPane(target = window.location.hash || '#overview') {
-    if (path !== '/' || typeof bootstrap === 'undefined') return false;
+    if (path !== '/') return false;
     if (!/^#[A-Za-z0-9_-]+$/.test(target)) return false;
     const pane = document.querySelector(target);
+    if (!pane) return false;
+
     const link = document.querySelector(`#mainTabsDesktop a[data-bs-toggle="tab"][href="${target}"]`)
       || document.querySelector(`a[data-bs-toggle="tab"][href="${target}"]`);
-    if (!link || !pane) return false;
-    if (!pane.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(link).show();
+
+    if (link && typeof bootstrap !== 'undefined') {
+      if (!pane.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(link).show();
+    } else {
+      // More is a mobile-only pane and has no desktop Bootstrap trigger. Keep
+      // it in the same canonical tab state as every other workspace pane.
+      activatePaneWithoutTrigger(pane);
+    }
+
+    syncMobileNav(target);
     markDesktopNav();
     return true;
   }
@@ -165,6 +190,7 @@
       history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
       initialHomeObserver?.disconnect();
       initialHomeObserver = null;
+      syncMobileNav('#overview');
       markDesktopNav();
       return true;
     };
@@ -197,7 +223,7 @@
         // Bootstrap also has a delegated handler for the same click. On the
         // rebuilt mobile nav that double handling can leave a pane with .show
         // but without .active. Mobile workspace links only need to change the
-        // hash; applyHomeHash then performs one canonical Bootstrap tab switch.
+        // hash; applyHomeHash then performs one canonical tab switch.
         link.removeAttribute('data-bs-toggle');
         link.removeAttribute('role');
       });
