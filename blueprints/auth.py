@@ -88,13 +88,31 @@ def _signed_in_destination(role):
 
 
 def _capture_submitted_client_context():
-    """Persist browser-reported timezone in the signed-in session."""
+    """Persist browser-reported timezone in the signed-in session.
+
+    When the first coach joins a brand-new team, that Head Coach's browser is
+    also the best initial signal for the team's home timezone. It remains
+    editable in Team Settings and later travel never changes it automatically.
+    """
     timezone_name = normalize_timezone_name(request.form.get('client_timezone'))
     offset_minutes = normalize_utc_offset_minutes(request.form.get('client_utc_offset_minutes'))
     if timezone_name:
         session['client_timezone'] = timezone_name
     if offset_minutes is not None:
         session['client_utc_offset_minutes'] = offset_minutes
+
+    if (
+        timezone_name
+        and request.endpoint == 'auth.register'
+        and session.get('role') == HEAD_COACH
+        and session.get('team_id')
+    ):
+        team_id = session['team_id']
+        if db.session.query(TeamMembership).filter_by(team_id=team_id).count() == 1:
+            team = db.session.get(Team, team_id)
+            if team and team.timezone != timezone_name:
+                team.timezone = timezone_name
+                db.session.commit()
 
 
 @auth_bp.before_app_request
