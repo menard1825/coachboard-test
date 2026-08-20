@@ -7,6 +7,8 @@
   const initialHomeRequested = path === '/' && !window.location.hash;
   let initialHomeObserver = null;
   let mobileTabObserver = null;
+  let mobileNavigationBound = false;
+  const mobileWorkspaceScroll = new Map();
 
   // main.js still owns the legacy workspace tabs and historically defaults an
   // un-hashed visit to Roster after its async data load. Seed the intended Home
@@ -38,6 +40,8 @@
     collaboration: ['Coach Notes', 'Keep team and player notes shared among the coaching staff.'],
     games: ['Schedule', 'Add, review, and manage scheduled games. Game Day remains the fastest game-day view.'],
   };
+
+  const MOBILE_PRIMARY_TARGETS = new Set(['#overview', '#roster', '#practice_plan', '#more']);
 
   function useNeutralFaviconWhenTeamHasNoLogo() {
     if (document.querySelector('.navbar-logo')) return;
@@ -128,6 +132,11 @@
     });
   }
 
+  function activeWorkspaceTarget() {
+    const activePane = document.querySelector('#mainTabContent > .tab-pane.active');
+    return activePane?.id ? `#${activePane.id}` : (window.location.hash || '#overview');
+  }
+
   function markDesktopNav() {
     const activePane = document.querySelector('#mainTabContent > .tab-pane.active');
     const activeHomeSection = activePane?.id || window.location.hash.replace('#', '') || 'overview';
@@ -142,8 +151,12 @@
   }
 
   function syncMobileNav(target) {
+    const navTarget = MOBILE_PRIMARY_TARGETS.has(target) ? target : '#more';
     document.querySelectorAll('nav.bottom-nav-fixed a[href^="#"]').forEach((link) => {
-      link.classList.toggle('active', link.getAttribute('href') === target);
+      const active = link.getAttribute('href') === navTarget;
+      link.classList.toggle('active', active);
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
     });
   }
 
@@ -153,6 +166,10 @@
     root.querySelectorAll(':scope > .tab-pane').forEach((item) => {
       item.classList.remove('active', 'show');
     });
+    document.querySelectorAll('#mainTabsDesktop a[data-bs-toggle="tab"]').forEach((link) => {
+      link.classList.remove('active');
+      link.setAttribute('aria-selected', 'false');
+    });
     pane.classList.add('active', 'show');
   }
 
@@ -160,7 +177,7 @@
     if (path !== '/') return false;
     if (!/^#[A-Za-z0-9_-]+$/.test(target)) return false;
     const pane = document.querySelector(target);
-    if (!pane) return false;
+    if (!pane || pane.parentElement?.id !== 'mainTabContent') return false;
 
     const link = document.querySelector(`#mainTabsDesktop a[data-bs-toggle="tab"][href="${target}"]`)
       || document.querySelector(`a[data-bs-toggle="tab"][href="${target}"]`);
@@ -176,6 +193,85 @@
     syncMobileNav(target);
     markDesktopNav();
     return true;
+  }
+
+  function mainScroller() {
+    return document.querySelector('main.container-fluid');
+  }
+
+  function rememberWorkspaceScroll(target = activeWorkspaceTarget()) {
+    if (!window.matchMedia('(max-width: 991.98px)').matches) return;
+    const scroller = mainScroller();
+    if (scroller && target) mobileWorkspaceScroll.set(target, scroller.scrollTop);
+  }
+
+  function restoreWorkspaceScroll(target) {
+    if (!window.matchMedia('(max-width: 991.98px)').matches) return;
+    const scroller = mainScroller();
+    if (!scroller) return;
+    const top = mobileWorkspaceScroll.get(target) || 0;
+    requestAnimationFrame(() => requestAnimationFrame(() => scroller.scrollTo({top, behavior: 'auto'})));
+  }
+
+  function workspaceUrl(target) {
+    const base = `${window.location.pathname}${window.location.search}`;
+    return target === '#overview' ? base : `${base}${target}`;
+  }
+
+  function navigateWorkspace(target, {push = true} = {}) {
+    if (path !== '/' || !/^#[A-Za-z0-9_-]+$/.test(target)) return false;
+    const pane = document.querySelector(target);
+    if (!pane || pane.parentElement?.id !== 'mainTabContent') return false;
+
+    const previous = activeWorkspaceTarget();
+    if (previous === target) {
+      syncMobileNav(target);
+      return true;
+    }
+
+    rememberWorkspaceScroll(previous);
+    if (!showHashPane(target)) return false;
+    if (push) history.pushState({cbWorkspace: target}, '', workspaceUrl(target));
+    restoreWorkspaceScroll(target);
+    return true;
+  }
+
+  function workspaceTargetFromLink(link) {
+    if (!link || path !== '/' || !window.matchMedia('(max-width: 991.98px)').matches) return null;
+    let url;
+    try {
+      url = new URL(link.href, window.location.href);
+    } catch (_) {
+      return null;
+    }
+    if (url.origin !== window.location.origin || url.pathname !== '/' || !url.hash) return null;
+    if (!/^#[A-Za-z0-9_-]+$/.test(url.hash)) return null;
+    const pane = document.querySelector(url.hash);
+    if (!pane || pane.parentElement?.id !== 'mainTabContent') return null;
+    return url.hash;
+  }
+
+  function installMobileWorkspaceNavigation() {
+    if (path !== '/' || mobileNavigationBound) return;
+    mobileNavigationBound = true;
+
+    // main.js and Bootstrap both historically reacted to the same tab click.
+    // Own mobile workspace clicks in capture phase so every tap results in one
+    // pane change, one history entry, and no browser anchor jump.
+    document.addEventListener('click', (event) => {
+      const link = event.target.closest('a[href]');
+      const target = workspaceTargetFromLink(link);
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      navigateWorkspace(target, {push: true});
+    }, true);
+
+    window.addEventListener('popstate', () => {
+      const target = window.location.hash || '#overview';
+      rememberWorkspaceScroll(activeWorkspaceTarget());
+      if (showHashPane(target)) restoreWorkspaceScroll(target);
+    });
   }
 
   function settleInitialHome() {
@@ -211,7 +307,10 @@
 
   function applyHomeHash() {
     if (path !== '/') return;
-    showHashPane(window.location.hash || '#overview');
+    const target = window.location.hash || '#overview';
+    const previous = activeWorkspaceTarget();
+    if (previous !== target) rememberWorkspaceScroll(previous);
+    if (showHashPane(target) && previous !== target) restoreWorkspaceScroll(target);
   }
 
   function makeMobileTabsHashDriven() {
@@ -219,21 +318,23 @@
 
     const normalize = () => {
       document.querySelectorAll('nav.bottom-nav-fixed a[data-bs-toggle="tab"][href^="#"], #more a[data-bs-toggle="tab"][href^="#"]').forEach((link) => {
-        // main.js installs its own click handler on data-bs-toggle=tab links.
-        // Bootstrap also has a delegated handler for the same click. On the
-        // rebuilt mobile nav that double handling can leave a pane with .show
-        // but without .active. Mobile workspace links only need to change the
-        // hash; applyHomeHash then performs one canonical tab switch.
+        // The legacy dashboard and Home enhancement can still rebuild these
+        // anchors. Strip Bootstrap ownership immediately; the capture-phase
+        // workspace navigator above is the single mobile tab owner.
         link.removeAttribute('data-bs-toggle');
         link.removeAttribute('role');
+        link.dataset.cbWorkspaceLink = 'true';
       });
+      syncMobileNav(activeWorkspaceTarget());
     };
 
     normalize();
-    const root = document.body;
     mobileTabObserver?.disconnect();
     mobileTabObserver = new MutationObserver(normalize);
-    mobileTabObserver.observe(root, {subtree: true, childList: true});
+    const navRoot = document.querySelector('nav.bottom-nav-fixed ul');
+    const moreRoot = document.getElementById('more');
+    if (navRoot) mobileTabObserver.observe(navRoot, {subtree: true, childList: true});
+    if (moreRoot) mobileTabObserver.observe(moreRoot, {subtree: true, childList: true});
   }
 
   function loadFairPlayEnhancement() {
@@ -283,6 +384,7 @@
     enhancePitchingStructure();
     markSimpleEmptyStates();
     markDesktopNav();
+    installMobileWorkspaceNavigation();
     makeMobileTabsHashDriven();
     loadFairPlayEnhancement();
     loadPitchingPreferences();
@@ -293,7 +395,9 @@
   }
 
   window.addEventListener('hashchange', applyHomeHash);
-  document.addEventListener('shown.bs.tab', () => {
+  document.addEventListener('shown.bs.tab', (event) => {
+    const target = event.target?.getAttribute?.('href');
+    if (path === '/' && target && /^#[A-Za-z0-9_-]+$/.test(target)) syncMobileNav(target);
     markDesktopNav();
     markSimpleEmptyStates();
   });
