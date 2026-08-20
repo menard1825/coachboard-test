@@ -4,11 +4,17 @@
   document.body.classList.add('cb-ui');
 
   const path = window.location.pathname;
-  // main.js historically defaulted an un-hashed visit to Roster. Capture the
-  // user's original destination before DOMContentLoaded so the newer Home
-  // experience can make the final landing decision without breaking explicit
-  // deep links such as /#roster or /#practice_plan.
   const initialHomeRequested = path === '/' && !window.location.hash;
+  let initialHomeObserver = null;
+  let mobileTabObserver = null;
+
+  // main.js still owns the legacy workspace tabs and historically defaults an
+  // un-hashed visit to Roster after its async data load. Seed the intended Home
+  // hash before DOMContentLoaded so that legacy initialization selects Home
+  // instead. The hash is cleaned again once Home is actually active.
+  if (initialHomeRequested) {
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}#overview`);
+  }
 
   if (path === '/') document.body.classList.add('cb-home');
   if (path === '/pitching') document.body.classList.add('cb-pitching');
@@ -135,38 +141,73 @@
     });
   }
 
-  function showHomePane({cleanUrl = false} = {}) {
-    if (path !== '/' || typeof bootstrap === 'undefined') return;
-    const link = document.querySelector('#mainTabsDesktop a[data-bs-toggle="tab"][href="#overview"]')
-      || document.querySelector('a[data-bs-toggle="tab"][href="#overview"]');
-    const pane = document.getElementById('overview');
-    if (!link || !pane) return;
-
-    if (!pane.classList.contains('active')) {
-      bootstrap.Tab.getOrCreateInstance(link).show();
-    }
-    if (cleanUrl) {
-      history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-    }
+  function showHashPane(target = window.location.hash || '#overview') {
+    if (path !== '/' || typeof bootstrap === 'undefined') return false;
+    if (!/^#[A-Za-z0-9_-]+$/.test(target)) return false;
+    const pane = document.querySelector(target);
+    const link = document.querySelector(`#mainTabsDesktop a[data-bs-toggle="tab"][href="${target}"]`)
+      || document.querySelector(`a[data-bs-toggle="tab"][href="${target}"]`);
+    if (!link || !pane) return false;
+    if (!pane.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(link).show();
     markDesktopNav();
+    return true;
+  }
+
+  function settleInitialHome() {
+    if (!initialHomeRequested || path !== '/') return;
+    const root = document.getElementById('mainTabContent');
+    const pane = document.getElementById('overview');
+    if (!root || !pane) return;
+
+    const finish = () => {
+      if (!pane.classList.contains('active')) return false;
+      document.documentElement.dataset.cbInitialHomeApplied = 'true';
+      history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      initialHomeObserver?.disconnect();
+      initialHomeObserver = null;
+      markDesktopNav();
+      return true;
+    };
+
+    if (finish()) return;
+    initialHomeObserver = new MutationObserver(() => finish());
+    initialHomeObserver.observe(root, {subtree: true, attributes: true, attributeFilter: ['class']});
+
+    // If a slow API response prevents the legacy initializer from reaching its
+    // tab step, keep Home usable rather than leaving the workspace blank.
+    window.setTimeout(() => {
+      if (!document.documentElement.dataset.cbInitialHomeApplied) {
+        showHashPane('#overview');
+        finish();
+      }
+    }, 15000);
   }
 
   function applyHomeHash() {
     if (path !== '/') return;
-    if (initialHomeRequested && !document.documentElement.dataset.cbInitialHomeApplied) {
-      document.documentElement.dataset.cbInitialHomeApplied = 'true';
-      showHomePane({cleanUrl: true});
-      return;
-    }
+    showHashPane(window.location.hash || '#overview');
+  }
 
-    const target = window.location.hash || '#overview';
-    const pane = document.querySelector(target);
-    const link = document.querySelector(`#mainTabsDesktop a[data-bs-toggle="tab"][href="${target}"]`)
-      || document.querySelector(`a[data-bs-toggle="tab"][href="${target}"]`);
-    if (link && pane && !pane.classList.contains('active') && typeof bootstrap !== 'undefined') {
-      bootstrap.Tab.getOrCreateInstance(link).show();
-    }
-    markDesktopNav();
+  function makeMobileTabsHashDriven() {
+    if (path !== '/') return;
+
+    const normalize = () => {
+      document.querySelectorAll('nav.bottom-nav-fixed a[data-bs-toggle="tab"][href^="#"], #more a[data-bs-toggle="tab"][href^="#"]').forEach((link) => {
+        // main.js installs its own click handler on data-bs-toggle=tab links.
+        // Bootstrap also has a delegated handler for the same click. On the
+        // rebuilt mobile nav that double handling can leave a pane with .show
+        // but without .active. Mobile workspace links only need to change the
+        // hash; applyHomeHash then performs one canonical Bootstrap tab switch.
+        link.removeAttribute('data-bs-toggle');
+        link.removeAttribute('role');
+      });
+    };
+
+    normalize();
+    const root = document.body;
+    mobileTabObserver?.disconnect();
+    mobileTabObserver = new MutationObserver(normalize);
+    mobileTabObserver.observe(root, {subtree: true, childList: true});
   }
 
   function loadFairPlayEnhancement() {
@@ -216,12 +257,13 @@
     enhancePitchingStructure();
     markSimpleEmptyStates();
     markDesktopNav();
+    makeMobileTabsHashDriven();
     loadFairPlayEnhancement();
     loadPitchingPreferences();
     loadHomeDashboard();
-    // main.js finishes its legacy tab bootstrap in the same DOMContentLoaded
-    // turn. Run after it so Home becomes the final, stable default.
-    window.setTimeout(applyHomeHash, 0);
+
+    if (initialHomeRequested) settleInitialHome();
+    else window.setTimeout(applyHomeHash, 0);
   }
 
   window.addEventListener('hashchange', applyHomeHash);
