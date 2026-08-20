@@ -34,6 +34,12 @@
     return dt ? dt.getTime() : Number.MAX_SAFE_INTEGER;
   }
 
+  function localStartOfTodayMs() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.getTime();
+  }
+
   function formatDate(value, startTime = '') {
     const dt = parseDate(value);
     if (!dt) return 'Date TBD';
@@ -216,7 +222,7 @@
 
   function teamCard(model) {
     const notes = (model.overview?.recent_notes || []).slice(0, 2);
-    const upcomingCount = model.games.filter(game => dateOnlyKey(game.date) >= Date.now() - 86400000).length;
+    const upcomingCount = model.games.filter(game => dateOnlyKey(game.date) >= localStartOfTodayMs()).length;
     return `<section class="cb-home-card cb-home-small-card">
       <div class="cb-home-card-head compact"><div><span class="cb-home-eyebrow">Team snapshot</span><h3>${model.roster.length} players</h3></div><i class="bi bi-people cb-home-card-icon"></i></div>
       <div class="cb-home-metrics"><span><strong>${model.pitcherCount}</strong><small>pitchers</small></span><span><strong>${upcomingCount}</strong><small>upcoming games</small></span><span><strong>${model.incompleteProfiles}</strong><small>profiles to finish</small></span></div>
@@ -304,7 +310,14 @@
       getJson('/api/pitching-preferences/arm-care-summary', {}),
     ]);
 
-    const nextGame = overview?.next_game || null;
+    const gameList = games || [];
+    const fallbackNextGame = [...gameList]
+      .filter(game => dateOnlyKey(game.date) >= localStartOfTodayMs())
+      .sort((a, b) => dateOnlyKey(a.date) - dateOnlyKey(b.date) || Number(a.id || 0) - Number(b.id || 0))[0] || null;
+    // The older overview endpoint compared date-only game records to the exact
+    // current clock time. Fall back to the schedule so a game today remains on
+    // Home throughout the day rather than disappearing after midnight/start time.
+    const nextGame = overview?.next_game || fallbackNextGame;
     let readiness = {};
     let rules = {};
     if (nextGame?.id) {
@@ -320,7 +333,7 @@
     const nextPractice = [...(practices || [])]
       .filter(plan => dateOnlyKey(plan.date) >= now - 86400000)
       .sort((a, b) => dateOnlyKey(a.date) - dateOnlyKey(b.date))[0] || null;
-    const liveGame = (games || []).find(game => Boolean(game.is_live)) || null;
+    const liveGame = gameList.find(game => Boolean(game.is_live)) || null;
     const pitcherCount = (roster || []).filter(player => player.pitcher_role && player.pitcher_role !== 'Not a Pitcher').length;
     const incompleteProfiles = (roster || []).filter(player => !(player.number && player.position1 && player.throws && player.bats)).length;
     const armPlayers = armCare?.players || {};
@@ -331,7 +344,7 @@
 
     return {
       overview: overview || {},
-      games: games || [],
+      games: gameList,
       practices: practices || [],
       roster: roster || [],
       session: sessionData || {},
