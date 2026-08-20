@@ -43,12 +43,13 @@
 {% endblock %}
 
 {% block content %}
+{% set is_game_changer = session.get('role') == 'Game Changer' %}
 <div class="gd-shell">
   <div class="gd-hero">
     <div>
       <div class="gd-kicker">CoachBoard</div>
-      <h1>Game Day</h1>
-      <p>Everything needed to get from arrival to first pitch without hunting through the app.</p>
+      <h1>{% if is_game_changer %}GameChanger Setup{% else %}Game Day{% endif %}</h1>
+      <p>{% if is_game_changer %}Open a game to copy the batting order, availability, and defensive rotation into GameChanger before first pitch.{% else %}Everything needed to get from arrival to first pitch without hunting through the app.{% endif %}</p>
     </div>
     <div class="gd-date">{{ local_now.strftime('%A, %B %-d') }}</div>
   </div>
@@ -73,41 +74,36 @@
         </div>
         <div class="gd-body">
           <div class="gd-readiness">
-            <div class="gd-ready-item {% if r.present_count > 0 %}good{% else %}need{% endif %}">
-              <span class="gd-ready-label">Availability</span>
-              <div class="gd-ready-value">{{ r.present_count }} present{% if r.absent_count %} · {{ r.absent_count }} out{% endif %}</div>
-            </div>
-            <div class="gd-ready-item {% if r.lineup_ready %}good{% else %}need{% endif %}">
-              <span class="gd-ready-label">Lineup</span>
-              <div class="gd-ready-value">{% if r.lineup_ready %}{{ r.lineup_count }} hitters set{% else %}Needs attention{% endif %}</div>
-            </div>
-            <div class="gd-ready-item {% if r.defense_ready %}good{% else %}need{% endif %}">
-              <span class="gd-ready-label">Defense</span>
-              <div class="gd-ready-value">{% if r.defense_ready %}{{ r.defense_innings }} innings ready{% else %}Needs attention{% endif %}</div>
-            </div>
+            <div class="gd-ready-item {% if r.present_count > 0 %}good{% else %}need{% endif %}"><span class="gd-ready-label">Availability</span><div class="gd-ready-value">{{ r.present_count }} present{% if r.absent_count %} · {{ r.absent_count }} out{% endif %}</div></div>
+            <div class="gd-ready-item {% if r.lineup_ready %}good{% else %}need{% endif %}"><span class="gd-ready-label">Lineup</span><div class="gd-ready-value">{% if r.lineup_ready %}{{ r.lineup_count }} hitters set{% else %}Needs attention{% endif %}</div></div>
+            <div class="gd-ready-item {% if r.defense_ready %}good{% else %}need{% endif %}"><span class="gd-ready-label">Defense</span><div class="gd-ready-value">{% if r.defense_ready %}{{ r.defense_innings }} innings ready{% else %}Needs attention{% endif %}</div></div>
             {% if r.has_end_game %}
-            <div class="gd-ready-item {% if r.pitching_stats_complete %}good{% else %}need{% endif %}">
-              <span class="gd-ready-label">GameChanger</span>
-              <div class="gd-ready-value">{% if r.pitching_stats_complete %}Pitching stats entered{% else %}Waiting on {{ r.pitching_missing|length }} pitcher{% if r.pitching_missing|length != 1 %}s{% endif %}{% endif %}</div>
-            </div>
+            <div class="gd-ready-item {% if r.pitching_stats_complete %}good{% else %}need{% endif %}"><span class="gd-ready-label">GameChanger</span><div class="gd-ready-value">{% if r.pitching_stats_complete %}Pitching stats entered{% else %}Waiting on {{ r.pitching_missing|length }} pitcher{% if r.pitching_missing|length != 1 %}s{% endif %}{% endif %}</div></div>
             {% else %}
-            <div class="gd-ready-item {% if r.pitching_plan_ready %}good{% else %}optional{% endif %}">
-              <span class="gd-ready-label">Pitching Plan</span>
-              <div class="gd-ready-value">{% if r.pitching_plan_ready %}{{ r.pitching_plan_count }} planned{% else %}Optional · not set{% endif %}</div>
-            </div>
+            <div class="gd-ready-item {% if r.pitching_plan_ready %}good{% else %}optional{% endif %}"><span class="gd-ready-label">Pitching Plan</span><div class="gd-ready-value">{% if r.pitching_plan_ready %}{{ r.pitching_plan_count }} planned{% else %}Optional · not set{% endif %}</div></div>
             {% endif %}
           </div>
 
-          {% if r.status == 'GC STATS PENDING' %}
-          <div class="gd-alerts"><strong>Game is saved — GameChanger stats can be added later</strong><div>Waiting for final pitching numbers for {{ r.pitching_missing|join(', ') }}.</div></div>
-          {% elif r.status not in ['COMPLETE'] and r.blockers %}
-          <div class="gd-alerts"><strong>{{ r.blockers|length }} setup item{% if r.blockers|length != 1 %}s{% endif %} to finish</strong>{% for blocker in r.blockers %}<div>{{ blocker }}</div>{% endfor %}</div>
-          {% elif r.status not in ['COMPLETE'] and r.pitching_alerts %}
-          <div class="gd-alerts"><strong>Pitching attention</strong>{% for alert in r.pitching_alerts[:3] %}<div>{{ alert.name }} — {{ alert.status }}{% if alert.detail %}: {{ alert.detail }}{% endif %}</div>{% endfor %}</div>
+          {% if not is_game_changer %}
+            {% if r.status == 'GC STATS PENDING' %}
+            <div class="gd-alerts"><strong>Game is saved — GameChanger stats can be added later</strong><div>Waiting for final pitching numbers for {{ r.pitching_missing|join(', ') }}.</div></div>
+            {% elif r.status not in ['COMPLETE'] and r.blockers %}
+            <div class="gd-alerts"><strong>{{ r.blockers|length }} setup item{% if r.blockers|length != 1 %}s{% endif %} to finish</strong>{% for blocker in r.blockers %}<div>{{ blocker }}</div>{% endfor %}</div>
+            {% elif r.status not in ['COMPLETE'] and r.pitching_alerts %}
+            <div class="gd-alerts"><strong>Pitching attention</strong>{% for alert in r.pitching_alerts[:3] %}<div>{{ alert.name }} — {{ alert.status }}{% if alert.detail %}: {{ alert.detail }}{% endif %}</div>{% endfor %}</div>
+            {% endif %}
+          {% elif not r.lineup_ready or not r.defense_ready %}
+            <div class="gd-alerts"><strong>Coaches are still finishing the plan</strong><div>You can open the setup view now; refresh later for the final lineup/defense.</div></div>
           {% endif %}
 
           <div class="gd-actions">
-            {% if r.status == 'COMPLETE' %}
+            {% if is_game_changer %}
+              {% if r.status == 'COMPLETE' %}
+                <a class="btn gd-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">View Game Report</a>
+              {% else %}
+                <a class="btn gd-primary" href="{{ url_for('gameday.game_management', game_id=g.id) }}"><i class="bi bi-card-checklist me-1"></i>Open GameChanger Setup</a>
+              {% endif %}
+            {% elif r.status == 'COMPLETE' %}
               <a class="btn gd-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">View Game Report</a>
               <a class="btn btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Open Game</a>
             {% elif r.status == 'GC STATS PENDING' %}
@@ -126,21 +122,17 @@
     {% endfor %}
   </div>
   {% else %}
-    <div class="gd-empty"><strong>No games are scheduled.</strong><div class="mt-1">Add the next game from Schedule when you have it.</div><a class="btn btn-outline-primary mt-3" href="{{ url_for('home') }}#games">Open Schedule</a></div>
+    <div class="gd-empty"><strong>No games are scheduled.</strong><div class="mt-1">{% if is_game_changer %}A coach will need to add the next game before a setup sheet is available.{% else %}Add the next game from Schedule when you have it.{% endif %}</div>{% if not is_game_changer %}<a class="btn btn-outline-primary mt-3" href="{{ url_for('home') }}#games">Open Schedule</a>{% endif %}</div>
   {% endif %}
 
-  {% if followup_cards %}
+  {% if followup_cards and not is_game_changer %}
   <div class="gd-section-title mt-4">Postgame Follow-Up</div>
   <div class="gd-upcoming">
     {% for item in followup_cards %}
-      {% set g = item.game %}
-      {% set r = item.readiness %}
+      {% set g = item.game %}{% set r = item.readiness %}
       <div class="gd-up-row">
         <div class="gd-up-date">{{ g.date.strftime('%a %m/%d') }}</div>
-        <div>
-          <div class="gd-up-name">vs {{ g.opponent }}</div>
-          {% if r.status == 'GC STATS PENDING' %}<div class="gd-up-loc">Waiting for GameChanger: {{ r.pitching_missing|join(', ') }}</div>{% else %}<div class="gd-up-loc">Live history exists, but this game still needs to be finalized.</div>{% endif %}
-        </div>
+        <div><div class="gd-up-name">vs {{ g.opponent }}</div>{% if r.status == 'GC STATS PENDING' %}<div class="gd-up-loc">Waiting for GameChanger: {{ r.pitching_missing|join(', ') }}</div>{% else %}<div class="gd-up-loc">Live history exists, but this game still needs to be finalized.</div>{% endif %}</div>
         {% if r.status == 'GC STATS PENDING' %}<a class="btn btn-sm btn-primary" href="{{ url_for('gameday.game_management', game_id=g.id, pitching=1) }}">Enter Stats</a>{% else %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('gameday.game_management', game_id=g.id, finalize=1) }}">Finish Game</a>{% endif %}
       </div>
     {% endfor %}
@@ -154,7 +146,7 @@
       <div class="gd-up-row">
         <div class="gd-up-date">{{ g.date.strftime('%a %m/%d') }}{% if g.start_time %}<br>{{ g.start_time }}{% endif %}</div>
         <div><div class="gd-up-name">vs {{ g.opponent }}</div>{% if g.location %}<div class="gd-up-loc">{{ g.location }}</div>{% endif %}</div>
-        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Prepare</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">{% if is_game_changer %}Setup View{% else %}Prepare{% endif %}</a>
       </div>
     {% endfor %}
   </div>
@@ -167,24 +159,13 @@
       <div class="gd-up-row">
         <div class="gd-up-date">{{ g.date.strftime('%a %m/%d/%y') }}{% if g.start_time %}<br>{{ g.start_time }}{% endif %}</div>
         <div><div class="gd-up-name">vs {{ g.opponent }}</div>{% if g.location %}<div class="gd-up-loc">{{ g.location }}</div>{% endif %}</div>
-        <div class="gd-up-actions">
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">Report</a>
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Open</a>
-        </div>
+        <div class="gd-up-actions"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">Report</a>{% if not is_game_changer %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Open</a>{% endif %}</div>
       </div>
     {% endfor %}
     {% if past_games|length > 8 %}
-      <details class="gd-history-more">
-        <summary>Show {{ past_games|length - 8 }} older game{% if past_games|length - 8 != 1 %}s{% endif %}</summary>
+      <details class="gd-history-more"><summary>Show {{ past_games|length - 8 }} older game{% if past_games|length - 8 != 1 %}s{% endif %}</summary>
         {% for g in past_games[8:] %}
-          <div class="gd-up-row">
-            <div class="gd-up-date">{{ g.date.strftime('%a %m/%d/%y') }}{% if g.start_time %}<br>{{ g.start_time }}{% endif %}</div>
-            <div><div class="gd-up-name">vs {{ g.opponent }}</div>{% if g.location %}<div class="gd-up-loc">{{ g.location }}</div>{% endif %}</div>
-            <div class="gd-up-actions">
-              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">Report</a>
-              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Open</a>
-            </div>
-          </div>
+          <div class="gd-up-row"><div class="gd-up-date">{{ g.date.strftime('%a %m/%d/%y') }}{% if g.start_time %}<br>{{ g.start_time }}{% endif %}</div><div><div class="gd-up-name">vs {{ g.opponent }}</div>{% if g.location %}<div class="gd-up-loc">{{ g.location }}</div>{% endif %}</div><div class="gd-up-actions"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">Report</a>{% if not is_game_changer %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Open</a>{% endif %}</div></div>
         {% endfor %}
       </details>
     {% endif %}
@@ -194,6 +175,7 @@
 {% endblock %}
 
 {% block bottom_nav %}
+{% if session.get('role') != 'Game Changer' %}
 <nav class="fixed-bottom d-lg-none bottom-nav-fixed shadow-lg bg-white">
   <ul class="nav nav-tabs w-100">
     <li class="nav-item flex-fill"><a class="nav-link active text-center" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-diamond d-block"></i><span>Game Day</span></a></li>
@@ -203,6 +185,7 @@
     <li class="nav-item flex-fill"><a class="nav-link text-center" href="{{ url_for('home') }}#more"><i class="bi bi-three-dots d-block"></i><span>More</span></a></li>
   </ul>
 </nav>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
