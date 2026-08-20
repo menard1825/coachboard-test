@@ -9,8 +9,10 @@
     helperQuery = '';
   }
 
-  function mobileItem(href, icon, label, active = false, isTab = false) {
-    return `<li class="nav-item flex-fill"><a class="nav-link text-center ${active ? 'active' : ''}" ${isTab ? 'data-bs-toggle="tab" role="tab"' : ''} href="${href}"><i class="bi bi-${icon} d-block"></i><span>${label}</span></a></li>`;
+  function mobileItem(href, icon, label, active = false, isWorkspace = false) {
+    const workspaceAttr = isWorkspace ? ' data-cb-workspace-link="true"' : '';
+    const currentAttr = active ? ' aria-current="page"' : '';
+    return `<li class="nav-item flex-fill"><a class="nav-link text-center ${active ? 'active' : ''}"${workspaceAttr}${currentAttr} href="${href}"><i class="bi bi-${icon} d-block"></i><span>${label}</span></a></li>`;
   }
 
   function versionedHelperSrc(src) {
@@ -56,6 +58,10 @@
       #userOffcanvas .cb-account-context{padding:3px 16px 10px;color:#667085;font-size:.72rem;border-bottom:1px solid #eef1f4;margin-bottom:4px}
       #userOffcanvas .list-group-item{min-height:44px;display:flex;align-items:center}
       #userOffcanvas h6{font-size:.64rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085!important;margin-top:12px!important}
+      @media(max-width:991.98px){
+        body.cb-home #mainTabContent>.tab-pane.fade{transition:none!important}
+        .bottom-nav-fixed .nav-link{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+      }
       @media(min-width:992px){#more .cb-mobile-more-shell{padding-bottom:0}}
     `;
     document.head.appendChild(style);
@@ -109,8 +115,9 @@
     list.before(context);
   }
 
-  function moreLink(href, icon, title, description, isTab = true) {
-    return `<a class="cb-mobile-more-link" href="${href}" ${isTab ? 'data-bs-toggle="tab" role="tab"' : ''}>
+  function moreLink(href, icon, title, description, isWorkspace = true) {
+    const workspaceAttr = isWorkspace ? ' data-cb-workspace-link="true"' : '';
+    return `<a class="cb-mobile-more-link" href="${href}"${workspaceAttr}>
       <span class="cb-mobile-more-icon"><i class="bi bi-${icon}"></i></span>
       <span class="cb-mobile-more-copy"><strong>${title}</strong><small>${description}</small></span>
       <span class="cb-mobile-more-arrow"><i class="bi bi-chevron-right"></i></span>
@@ -129,6 +136,7 @@
           <p>Planning, records, and coaching tools that do not need to live in the bottom bar.</p>
         </div>
         <div class="cb-mobile-more-card">
+          ${moreLink('#player_development', 'graph-up-arrow', 'Development', 'Player priorities, progress, and coaching focus.')}
           ${moreLink('/pitching', 'bullseye', 'Pitching', 'Eligibility, workload, targets, and pitching history.', false)}
           ${moreLink('/game-day', 'calendar3', 'Schedule', 'Add games and review the team schedule.', false)}
           ${moreLink('#lineups', 'card-list', 'Lineup Templates', 'Reusable batting orders for Game Day.')}
@@ -156,12 +164,14 @@
   function installHomeBottomNav() {
     const nav = document.querySelector('nav.bottom-nav-fixed ul');
     if (!nav) return;
+    const target = window.location.hash || '#overview';
+    const moreActive = !['#overview', '#roster', '#practice_plan'].includes(target);
     nav.innerHTML = [
-      mobileItem('#overview', 'house-door', 'Home', true, true),
+      mobileItem('#overview', 'house-door', 'Home', target === '#overview', true),
       mobileItem('/game-day', 'diamond', 'Game Day'),
-      mobileItem('#roster', 'people', 'Roster', false, true),
-      mobileItem('#practice_plan', 'clipboard-check', 'Practice', false, true),
-      mobileItem('#more', 'three-dots', 'More', false, true),
+      mobileItem('#roster', 'people', 'Roster', target === '#roster', true),
+      mobileItem('#practice_plan', 'clipboard-check', 'Practice', target === '#practice_plan', true),
+      mobileItem('#more', 'three-dots', 'More', moreActive, true),
     ].join('');
   }
 
