@@ -226,6 +226,10 @@ def test_coaching_workspaces_expose_new_primary_actions(page: Page, coachboard_u
 
     expect(page.locator('#rosterPlayerCount')).not_to_have_text('0', timeout=15_000)
     expect(page.locator('.cb-roster-player')).not_to_have_count(0)
+    page.locator('#mainTabsDesktop [href="#roster"]').evaluate(
+        "el => bootstrap.Tab.getOrCreateInstance(el).show()"
+    )
+    expect(page.locator('#roster')).to_have_class(re.compile(r'\bactive\b'))
     first_player = page.locator('.cb-roster-player').first
     first_player.locator('.cb-roster-player-summary').click()
     first_player.get_by_role('button', name='Player Development').click()
