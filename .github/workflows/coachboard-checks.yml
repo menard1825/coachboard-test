@@ -29,6 +29,9 @@ jobs:
             migrations/versions/d4f8b2a719ce_normalize_lineup_templates.py \
             migrations/versions/f9a2b6c4d1e7_add_team_fair_play_settings.py \
             migrations/versions/3d9c8b7a4f21_add_team_pitching_preferences.py \
+            migrations/versions/5a7c2d9e4b11_add_activity_log.py \
+            migrations/versions/8b1d4f6a2c90_add_activity_timezone_context.py \
+            blueprints/auth.py \
             blueprints/roster.py \
             blueprints/fair_play.py \
             season_stats.py \
@@ -45,6 +48,7 @@ jobs:
           node --check static/js/navigation_v2.js
           node --check static/js/main.js
           node --check static/js/coachboard_ui.js
+          node --check static/js/client_timezone.js
           node --check static/js/fair_play_assistant.js
           node --check static/js/pitching_preferences.js
           node --check static/js/game_logic.js
