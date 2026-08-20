@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash
 
 
-def _build_app(monkeypatch):
+def _build_app(monkeypatch, membership_role='Head Coach'):
     monkeypatch.setenv('SECRET_KEY', 'test-secret-key')
     monkeypatch.setenv('COACHBOARD_ENV', 'test')
     monkeypatch.setenv('DATABASE_URL', 'sqlite:///:memory:')
@@ -35,7 +35,7 @@ def _build_app(monkeypatch):
         db.session.add(TeamMembership(
             user_id=user.id,
             team_id=team.id,
-            role='Head Coach',
+            role=membership_role,
             player_order=[],
         ))
         db.session.commit()
@@ -82,7 +82,7 @@ def test_fair_play_defaults_off_and_persists_team_rules(monkeypatch):
 
 
 def test_assistant_coach_cannot_change_team_fair_play_settings(monkeypatch):
-    app = _build_app(monkeypatch)
+    app = _build_app(monkeypatch, membership_role='Assistant Coach')
     client = app.test_client()
     _login(client, role='Assistant Coach')
 
@@ -93,6 +93,11 @@ def test_assistant_coach_cannot_change_team_fair_play_settings(monkeypatch):
         'infield_positions': ['SS'],
     })
     assert response.status_code == 403
+
+    settings = client.get('/api/fair-play/settings')
+    assert settings.status_code == 200
+    assert settings.get_json()['can_edit'] is False
+    assert settings.get_json()['settings']['mode'] == 'off'
 
 
 def test_fair_play_rejects_invalid_position(monkeypatch):
