@@ -122,6 +122,16 @@
     document.body.appendChild(script);
   }
 
+  function loadPitchingPreferences() {
+    const shouldLoad = path === '/admin/settings' || path === '/pitching';
+    if (!shouldLoad || document.querySelector('script[data-cb-pitching-preferences]')) return;
+
+    const script = document.createElement('script');
+    script.src = '/static/js/pitching_preferences.js?v=20260820-1';
+    script.dataset.cbPitchingPreferences = 'true';
+    document.body.appendChild(script);
+  }
+
   function init() {
     useNeutralFaviconWhenTeamHasNoLogo();
     addHomeIntros();
@@ -130,6 +140,7 @@
     markSimpleEmptyStates();
     markDesktopNav();
     loadFairPlayEnhancement();
+    loadPitchingPreferences();
     window.setTimeout(applyHomeHash, 0);
   }
 
