@@ -21,7 +21,7 @@ def login(page: Page, coachboard_url: str):
     page.get_by_label('Username or email').fill(TEST_USERNAME)
     page.locator('#password').fill(TEST_PASSWORD)
     page.get_by_role('button', name='Sign In').click()
-    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?$'))
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#overview)?$'))
 
 
 def test_coach_lands_on_operational_home(page: Page, coachboard_url: str):
@@ -123,5 +123,5 @@ def test_game_day_mobile_navigation_keeps_home(page: Page, coachboard_url: str):
     expect(items.nth(4)).to_contain_text('More')
 
     items.nth(0).click()
-    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?$'))
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#overview)?$'))
     expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
