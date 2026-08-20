@@ -72,8 +72,8 @@
     const list = drawer.querySelector('.list-group');
     if (!list) return;
 
-    // The mobile bottom bar already owns Game Day / Roster / Development /
-    // Practice / More. Remove the old second copy from the account drawer.
+    // The mobile bottom bar already owns Home / Game Day / Roster / Practice /
+    // More. Remove the old second copy from the account drawer.
     const coachHeading = [...list.querySelectorAll('h6')]
       .find((heading) => heading.textContent.trim() === 'CoachBoard');
     if (coachHeading) {
@@ -153,6 +153,30 @@
     });
   }
 
+  function installHomeBottomNav() {
+    const nav = document.querySelector('nav.bottom-nav-fixed ul');
+    if (!nav) return;
+    nav.innerHTML = [
+      mobileItem('#overview', 'house-door', 'Home', true, true),
+      mobileItem('/game-day', 'diamond', 'Game Day'),
+      mobileItem('#roster', 'people', 'Roster', false, true),
+      mobileItem('#practice_plan', 'clipboard-check', 'Practice', false, true),
+      mobileItem('#more', 'three-dots', 'More', false, true),
+    ].join('');
+  }
+
+  function installGameDayBottomNav() {
+    const nav = document.querySelector('nav.bottom-nav-fixed ul');
+    if (!nav) return;
+    nav.innerHTML = [
+      mobileItem('/', 'house-door', 'Home'),
+      mobileItem('/game-day', 'diamond', 'Game Day', true),
+      mobileItem('/#roster', 'people', 'Roster'),
+      mobileItem('/#practice_plan', 'clipboard-check', 'Practice'),
+      mobileItem('/#more', 'three-dots', 'More'),
+    ].join('');
+  }
+
   window.addEventListener('hashchange', redirectLegacySchedule);
   if (redirectLegacySchedule()) return;
 
@@ -161,17 +185,7 @@
   renameAccountSecurityLinks();
 
   if (window.location.pathname === '/') {
-    const nav = document.querySelector('nav.bottom-nav-fixed ul');
-    if (nav) {
-      nav.innerHTML = [
-        mobileItem('/game-day', 'diamond', 'Game Day'),
-        mobileItem('#roster', 'people', 'Roster', false, true),
-        mobileItem('#player_development', 'graph-up-arrow', 'Development', false, true),
-        mobileItem('#practice_plan', 'clipboard-check', 'Practice', false, true),
-        mobileItem('#more', 'three-dots', 'More', false, true),
-      ].join('');
-    }
-
+    installHomeBottomNav();
     renderMobileMore();
 
     document.querySelectorAll('a[href="#pitching"]').forEach((link) => {
@@ -197,6 +211,7 @@
   }
 
   if (window.location.pathname === '/game-day') {
+    installGameDayBottomNav();
     loadScript('/static/js/game_day_actions.js', 'game-day-actions');
     loadScript('/static/js/game_day_pitching_rules.js', 'game-day-pitching-rules');
   }
@@ -215,7 +230,7 @@
     loadScript('/static/js/future_pitcher_tbd.js', 'future-pitcher-tbd');
     loadScript('/static/js/game_pitching_rule_picker.js', 'game-pitching-rules');
     loadScript('/static/js/live_game_sync_status.js', 'live-sync');
-    loadScript('/static/js/live_game_clock.js', 'live-game-clock');
+    loadScript('/static/js/live_game_clock.js', 'live-sync-clock');
     loadScript('/static/js/assignment_picker_availability.js', 'assignment-picker-availability');
   }
 
