@@ -104,12 +104,23 @@
     markDesktopNav();
   }
 
+  function loadFairPlayEnhancement() {
+    const shouldLoad = path === '/admin/settings' || /^\/game\/\d+\/?$/.test(path);
+    if (!shouldLoad || document.querySelector('script[data-cb-fair-play]')) return;
+
+    const script = document.createElement('script');
+    script.src = '/static/js/fair_play_assistant.js?v=20260819-1';
+    script.dataset.cbFairPlay = 'true';
+    document.body.appendChild(script);
+  }
+
   function init() {
     addHomeIntros();
     modernizeLegacyAdminHeader();
     enhancePitchingStructure();
     markSimpleEmptyStates();
     markDesktopNav();
+    loadFairPlayEnhancement();
     window.setTimeout(applyHomeHash, 0);
   }
 
