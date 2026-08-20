@@ -197,8 +197,9 @@ def gameplay_pitch_summary(
         item['status'] = 'Available'
         item['status_detail'] = ''
         item['next_available'] = 'Today'
-        item['max_daily'] = None
-        item['pitches_remaining_today'] = None
+        # Keep the arm-care daily max and remaining pitch context available to
+        # the Game Planning UI. These values are guidance only; official event
+        # eligibility remains unselected and therefore never blocks the coach.
     return summary
 
 
