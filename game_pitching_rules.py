@@ -4,9 +4,11 @@ from flask import g, has_request_context
 from sqlalchemy.orm.attributes import set_committed_value
 
 from db import db
+from pitching_rule_presets import install_additional_pitching_rules
 from utils import PITCHING_RULES, get_pitching_rules_for_team as _base_team_rules
 
 
+install_additional_pitching_rules(PITCHING_RULES)
 RULE_SET_OPTIONS = tuple(PITCHING_RULES.keys())
 
 
