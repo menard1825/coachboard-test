@@ -160,17 +160,22 @@
     });
   }
 
-  function activatePaneWithoutTrigger(pane) {
+  function enforceWorkspacePaneState(pane, target) {
     const root = document.getElementById('mainTabContent');
     if (!root || !pane) return;
+
     root.querySelectorAll(':scope > .tab-pane').forEach((item) => {
-      item.classList.remove('active', 'show');
+      const active = item === pane;
+      item.classList.toggle('active', active);
+      item.classList.toggle('show', active);
+      item.setAttribute('aria-hidden', active ? 'false' : 'true');
     });
+
     document.querySelectorAll('#mainTabsDesktop a[data-bs-toggle="tab"]').forEach((link) => {
-      link.classList.remove('active');
-      link.setAttribute('aria-selected', 'false');
+      const active = link.getAttribute('href') === target;
+      link.classList.toggle('active', active);
+      link.setAttribute('aria-selected', active ? 'true' : 'false');
     });
-    pane.classList.add('active', 'show');
   }
 
   function showHashPane(target = window.location.hash || '#overview') {
@@ -179,16 +184,17 @@
     const pane = document.querySelector(target);
     if (!pane || pane.parentElement?.id !== 'mainTabContent') return false;
 
-    const link = document.querySelector(`#mainTabsDesktop a[data-bs-toggle="tab"][href="${target}"]`)
-      || document.querySelector(`a[data-bs-toggle="tab"][href="${target}"]`);
+    const link = document.querySelector(`#mainTabsDesktop a[data-bs-toggle="tab"][href="${target}"]`);
+    const isMobile = window.matchMedia('(max-width: 991.98px)').matches;
 
-    if (link && typeof bootstrap !== 'undefined') {
-      if (!pane.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(link).show();
-    } else {
-      // More is a mobile-only pane and has no desktop Bootstrap trigger. Keep
-      // it in the same canonical tab state as every other workspace pane.
-      activatePaneWithoutTrigger(pane);
+    // Desktop keeps Bootstrap's normal tab lifecycle. Mobile intentionally uses
+    // one direct state transition so Bootstrap and legacy main.js cannot both
+    // react to the same tap. Enforce the final state either way so the mobile-
+    // only More pane can never remain active beside another workspace.
+    if (!isMobile && link && typeof bootstrap !== 'undefined' && !pane.classList.contains('active')) {
+      bootstrap.Tab.getOrCreateInstance(link).show();
     }
+    enforceWorkspacePaneState(pane, target);
 
     syncMobileNav(target);
     markDesktopNav();
@@ -225,6 +231,7 @@
 
     const previous = activeWorkspaceTarget();
     if (previous === target) {
+      enforceWorkspacePaneState(pane, target);
       syncMobileNav(target);
       return true;
     }
@@ -282,6 +289,7 @@
 
     const finish = () => {
       if (!pane.classList.contains('active')) return false;
+      enforceWorkspacePaneState(pane, '#overview');
       document.documentElement.dataset.cbInitialHomeApplied = 'true';
       history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
       initialHomeObserver?.disconnect();
@@ -325,7 +333,10 @@
         link.removeAttribute('role');
         link.dataset.cbWorkspaceLink = 'true';
       });
-      syncMobileNav(activeWorkspaceTarget());
+      const target = activeWorkspaceTarget();
+      const pane = document.querySelector(target);
+      if (pane && pane.parentElement?.id === 'mainTabContent') enforceWorkspacePaneState(pane, target);
+      syncMobileNav(target);
     };
 
     normalize();
