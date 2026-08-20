@@ -10,10 +10,10 @@
   let mobileNavigationBound = false;
   const mobileWorkspaceScroll = new Map();
 
-  // main.js still owns the legacy workspace tabs and historically defaults an
-  // un-hashed visit to Roster after its async data load. Seed the intended Home
-  // hash before DOMContentLoaded so that legacy initialization selects Home
-  // instead. The hash is cleaned again once Home is actually active.
+  // main.js historically defaults an un-hashed visit to Roster after its async
+  // startup work. Keep #overview in the URL for the initial page lifetime so
+  // every legacy startup path agrees that Home is the requested destination.
+  // Once the app is running, tapping Home uses the clean root URL normally.
   if (initialHomeRequested) {
     history.replaceState(null, '', `${window.location.pathname}${window.location.search}#overview`);
   }
@@ -168,7 +168,6 @@
       const active = item === pane;
       item.classList.toggle('active', active);
       item.classList.toggle('show', active);
-      item.setAttribute('aria-hidden', active ? 'false' : 'true');
     });
 
     document.querySelectorAll('#mainTabsDesktop a[data-bs-toggle="tab"]').forEach((link) => {
@@ -291,7 +290,6 @@
       if (!pane.classList.contains('active')) return false;
       enforceWorkspacePaneState(pane, '#overview');
       document.documentElement.dataset.cbInitialHomeApplied = 'true';
-      history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
       initialHomeObserver?.disconnect();
       initialHomeObserver = null;
       syncMobileNav('#overview');
