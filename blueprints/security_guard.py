@@ -54,6 +54,8 @@ class ActivityLog(db.Model):
     detail = db.Column(db.String(500), nullable=True)
     ip_address = db.Column(db.String(64), nullable=True)
     user_agent = db.Column(db.String(300), nullable=True)
+    client_timezone = db.Column(db.String(80), nullable=True)
+    client_utc_offset_minutes = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
 
 
@@ -90,10 +92,41 @@ ASSISTANT_HEAD_COACH_ONLY_ENDPOINTS = {
 }
 
 
-def record_activity(action, *, user=None, team_id=None, role=None, detail=None, username=None, full_name=None):
+def normalize_timezone_name(value):
+    """Return a valid IANA timezone name reported by a browser, or None."""
+    candidate = str(value or '').strip()
+    if not candidate or len(candidate) > 80:
+        return None
+    try:
+        zoneinfo.ZoneInfo(candidate)
+    except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+        return None
+    return candidate
+
+
+def normalize_utc_offset_minutes(value):
+    try:
+        offset = int(value)
+    except (TypeError, ValueError):
+        return None
+    return offset if -840 <= offset <= 840 else None
+
+
+def record_activity(
+    action,
+    *,
+    user=None,
+    team_id=None,
+    role=None,
+    detail=None,
+    username=None,
+    full_name=None,
+    client_timezone=None,
+    client_utc_offset_minutes=None,
+):
     """Record account activity without allowing an audit failure to break login.
 
-    Callers should commit their business change first.  This helper uses a small
+    Callers should commit their business change first. This helper uses a small
     independent commit so a logging problem never rolls back a successful login,
     password change, or team switch.
     """
@@ -105,6 +138,13 @@ def record_activity(action, *, user=None, team_id=None, role=None, detail=None, 
     role = role if role is not None else session.get('role')
     if team_id is None:
         team_id = session.get('team_id')
+
+    client_timezone = normalize_timezone_name(
+        client_timezone if client_timezone is not None else session.get('client_timezone')
+    )
+    client_utc_offset_minutes = normalize_utc_offset_minutes(
+        client_utc_offset_minutes if client_utc_offset_minutes is not None else session.get('client_utc_offset_minutes')
+    )
 
     ip_address = None
     user_agent = None
@@ -124,6 +164,8 @@ def record_activity(action, *, user=None, team_id=None, role=None, detail=None, 
             detail=(str(detail)[:500] if detail else None),
             ip_address=(str(ip_address)[:64] if ip_address else None),
             user_agent=user_agent,
+            client_timezone=client_timezone,
+            client_utc_offset_minutes=client_utc_offset_minutes,
         )
         db.session.add(row)
         db.session.commit()
@@ -142,17 +184,27 @@ def _team_timezone_name():
     return (team.timezone if team and team.timezone else 'UTC')
 
 
-@security_guard_bp.app_template_filter('format_audit_datetime')
-def format_audit_datetime(value):
-    """Display stored UTC audit/last-login values in the active team's timezone."""
+def _format_datetime_for_timezone(value, timezone_name):
     if not value or not isinstance(value, datetime):
         return 'Never' if not value else value
     aware = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
     try:
-        local = aware.astimezone(zoneinfo.ZoneInfo(_team_timezone_name()))
+        local = aware.astimezone(zoneinfo.ZoneInfo(timezone_name or 'UTC'))
     except (zoneinfo.ZoneInfoNotFoundError, ValueError):
         local = aware
-    return local.strftime('%a %m/%d/%y, %I:%M %p')
+    return local.strftime('%a %m/%d/%y, %I:%M %p %Z')
+
+
+@security_guard_bp.app_template_filter('format_audit_datetime')
+def format_audit_datetime(value):
+    """Display stored UTC audit/last-login values in the active team's timezone."""
+    return _format_datetime_for_timezone(value, _team_timezone_name())
+
+
+@security_guard_bp.app_template_filter('format_audit_datetime_in_timezone')
+def format_audit_datetime_in_timezone(value, timezone_name):
+    """Display the same UTC audit timestamp in the coach/browser timezone."""
+    return _format_datetime_for_timezone(value, normalize_timezone_name(timezone_name) or 'UTC')
 
 
 def _cross_site_request():
@@ -348,6 +400,27 @@ def _game_changer_setup_response(game_id):
     )
 
 
+@security_guard_bp.route('/api/client-context', methods=['POST'])
+def client_context():
+    """Keep the signed-in session aware of this browser's timezone.
+
+    Browsers expose an IANA timezone without requiring GPS/geolocation permission.
+    This endpoint does not change the team's official timezone.
+    """
+    payload = request.get_json(silent=True) or {}
+    timezone_name = normalize_timezone_name(payload.get('timezone'))
+    offset_minutes = normalize_utc_offset_minutes(payload.get('utc_offset_minutes'))
+    if timezone_name:
+        session['client_timezone'] = timezone_name
+    if offset_minutes is not None:
+        session['client_utc_offset_minutes'] = offset_minutes
+    return jsonify({
+        'status': 'ok',
+        'timezone': session.get('client_timezone'),
+        'utc_offset_minutes': session.get('client_utc_offset_minutes'),
+    })
+
+
 @security_guard_bp.route('/admin/settings/rotate-registration-code', methods=['POST'])
 def rotate_registration_code():
     if session.get('role') not in {HEAD_COACH, SUPER_ADMIN}:
@@ -444,9 +517,9 @@ def enforce_security_guards():
 
     role = session.get('role')
 
-    # Game Changer is a read-only pregame scorekeeper role.  Do not maintain a
+    # Game Changer is a read-only pregame scorekeeper role. Do not maintain a
     # growing list of writable blueprints: deny CoachBoard mutations by default.
-    if role == GAME_CHANGER and not endpoint.startswith('auth.'):
+    if role == GAME_CHANGER and not endpoint.startswith('auth.') and endpoint != 'security_guard.client_context':
         if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'} or endpoint in DESTRUCTIVE_GET_ENDPOINTS:
             return _permission_denied('Game Changer access is read-only. Use the pregame setup view to enter the lineup and defense into GameChanger.')
         if endpoint == 'home':
