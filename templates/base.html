@@ -29,7 +29,11 @@
 
     {% block head %}{% endblock %}
 </head>
-<body class="cb-ui" data-coach-role="{{ session.get('role','') }}">
+<body class="cb-ui"
+      data-coach-role="{{ session.get('role','') }}"
+      data-coachboard-authenticated="{{ '1' if session.get('logged_in') else '0' }}"
+      data-session-timezone="{{ session.get('client_timezone','') }}"
+      data-session-utc-offset="{{ session.get('client_utc_offset_minutes','') }}">
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm">
       <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center" href="{% if session.get('role') == 'Game Changer' %}{{ url_for('game_day.game_day_home') }}{% else %}{{ url_for('home', _t=current_year_timestamp) }}{% endif %}">
@@ -197,6 +201,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
     {% block scripts %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/client_timezone.js', v=css_version) }}"></script>
     <script src="{{ url_for('static', filename='js/coachboard_ui.js', v=css_version) }}"></script>
     <script src="{{ url_for('static', filename='js/navigation_v2.js', v=css_version) }}"></script>
 
