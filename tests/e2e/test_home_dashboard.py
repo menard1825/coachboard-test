@@ -64,6 +64,47 @@ def test_home_is_first_mobile_destination(page: Page, coachboard_url: str):
     expect(page.locator('#more .cb-mobile-more-card')).to_contain_text('Development')
 
 
+def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+    expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
+
+    # Allow the Home enhancement's delayed compatibility render to complete.
+    page.wait_for_timeout(400)
+    bottom_nav = page.locator('nav.bottom-nav-fixed ul')
+    same_page_items = bottom_nav.locator('a[href^="#"]')
+    expect(same_page_items).to_have_count(4)
+    for index in range(4):
+        expect(same_page_items.nth(index)).not_to_have_attribute('data-bs-toggle', 'tab')
+
+    expected = {
+        'Home': '#overview',
+        'Roster': '#roster',
+        'Practice': '#practice_plan',
+        'More': '#more',
+    }
+    for label in ('Roster', 'Practice', 'More', 'Home', 'Roster', 'More'):
+        bottom_nav.get_by_text(label, exact=True).click()
+        target = expected[label]
+        expect(page.locator(target)).to_have_class(re.compile(r'\bactive\b'))
+        expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
+        expect(bottom_nav.locator('a.nav-link.active span')).to_have_text(label)
+
+    page.locator('#more').get_by_text('Development', exact=True).click()
+    expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
+    expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
+    expect(bottom_nav.locator('a.nav-link.active span')).to_have_text('More')
+
+    bottom_nav.get_by_text('Home', exact=True).click()
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?$'))
+    expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
+    expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
+
+    page.go_back()
+    expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
+    expect(bottom_nav.locator('a.nav-link.active span')).to_have_text('More')
+
+
 def test_game_day_mobile_navigation_keeps_home(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
