@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from werkzeug.security import generate_password_hash
 
@@ -41,16 +41,15 @@ def _build_app(monkeypatch):
             player_order=[],
         ))
 
-        today = datetime.now().date()
         db.session.add_all([
             Game(
-                date=datetime.combine(today - timedelta(days=7), datetime.min.time()),
+                date=datetime(2025, 6, 1),
                 opponent='Past Opponent One',
                 location='Old Field',
                 team_id=team.id,
             ),
             Game(
-                date=datetime.combine(today - timedelta(days=14), datetime.min.time()),
+                date=datetime(2025, 5, 15),
                 opponent='Past Opponent Two',
                 team_id=team.id,
             ),
