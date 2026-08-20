@@ -25,7 +25,9 @@ jobs:
             models.py \
             lineup_service.py \
             migrations/versions/d4f8b2a719ce_normalize_lineup_templates.py \
+            migrations/versions/f9a2b6c4d1e7_add_team_fair_play_settings.py \
             blueprints/roster.py \
+            blueprints/fair_play.py \
             season_stats.py \
             blueprints/security_guard.py \
             blueprints/postgame_navigation.py \
@@ -39,6 +41,8 @@ jobs:
         run: |
           node --check static/js/navigation_v2.js
           node --check static/js/main.js
+          node --check static/js/coachboard_ui.js
+          node --check static/js/fair_play_assistant.js
           node --check static/js/game_logic.js
           node --check static/js/lineup_editor.js
           node --check static/js/assignment_picker_availability.js
