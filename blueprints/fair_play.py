@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request, session
 
 from db import db
-from models import Team
+from models import Team, TeamMembership, User
 
 
 fair_play_bp = Blueprint('fair_play', __name__)
@@ -38,6 +38,22 @@ def _current_team():
     if not team_id:
         return None
     return db.session.get(Team, team_id)
+
+
+def _current_membership():
+    username = session.get('username')
+    team_id = session.get('team_id')
+    if not username or not team_id:
+        return None
+    user = db.session.query(User).filter(db.func.lower(User.username) == str(username).lower()).first()
+    if not user:
+        return None
+    return db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=team_id).first()
+
+
+def _can_edit():
+    membership = _current_membership()
+    return bool(membership and membership.role in EDIT_ROLES)
 
 
 def _settings_row(team_id):
@@ -91,7 +107,7 @@ def get_fair_play_settings():
         'status': 'success',
         'team_id': team.id,
         'team_name': team.team_name,
-        'can_edit': session.get('role') in EDIT_ROLES,
+        'can_edit': _can_edit(),
         'settings': _serialize(_settings_row(team.id)),
     })
 
@@ -101,7 +117,7 @@ def update_fair_play_settings():
     team = _current_team()
     if not team:
         return jsonify({'status': 'error', 'message': 'Sign in and select a team first.'}), 401
-    if session.get('role') not in EDIT_ROLES:
+    if not _can_edit():
         return jsonify({'status': 'error', 'message': 'Only a Head Coach or Super Admin can change team playing-time settings.'}), 403
 
     payload = request.get_json(silent=True)
