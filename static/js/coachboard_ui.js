@@ -4,6 +4,12 @@
   document.body.classList.add('cb-ui');
 
   const path = window.location.pathname;
+  // main.js historically defaulted an un-hashed visit to Roster. Capture the
+  // user's original destination before DOMContentLoaded so the newer Home
+  // experience can make the final landing decision without breaking explicit
+  // deep links such as /#roster or /#practice_plan.
+  const initialHomeRequested = path === '/' && !window.location.hash;
+
   if (path === '/') document.body.classList.add('cb-home');
   if (path === '/pitching') document.body.classList.add('cb-pitching');
   if (path === '/rules') document.body.classList.add('cb-rules');
@@ -117,7 +123,8 @@
   }
 
   function markDesktopNav() {
-    const activeHomeSection = window.location.hash.replace('#', '') || 'overview';
+    const activePane = document.querySelector('#mainTabContent > .tab-pane.active');
+    const activeHomeSection = activePane?.id || window.location.hash.replace('#', '') || 'overview';
     const gameArea = path === '/game-day' || /^\/game\/\d+\/?$/.test(path) || /^\/game-day\/\d+\/report\/?$/.test(path);
     document.querySelectorAll('.coach-primary-nav [data-cb-section]').forEach((link) => {
       link.classList.remove('active');
@@ -128,11 +135,37 @@
     });
   }
 
+  function showHomePane({cleanUrl = false} = {}) {
+    if (path !== '/' || typeof bootstrap === 'undefined') return;
+    const link = document.querySelector('#mainTabsDesktop a[data-bs-toggle="tab"][href="#overview"]')
+      || document.querySelector('a[data-bs-toggle="tab"][href="#overview"]');
+    const pane = document.getElementById('overview');
+    if (!link || !pane) return;
+
+    if (!pane.classList.contains('active')) {
+      bootstrap.Tab.getOrCreateInstance(link).show();
+    }
+    if (cleanUrl) {
+      history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+    markDesktopNav();
+  }
+
   function applyHomeHash() {
     if (path !== '/') return;
+    if (initialHomeRequested && !document.documentElement.dataset.cbInitialHomeApplied) {
+      document.documentElement.dataset.cbInitialHomeApplied = 'true';
+      showHomePane({cleanUrl: true});
+      return;
+    }
+
     const target = window.location.hash || '#overview';
-    const link = document.querySelector(`a[data-bs-toggle="tab"][href="${target}"]`);
-    if (link && typeof bootstrap !== 'undefined') bootstrap.Tab.getOrCreateInstance(link).show();
+    const pane = document.querySelector(target);
+    const link = document.querySelector(`#mainTabsDesktop a[data-bs-toggle="tab"][href="${target}"]`)
+      || document.querySelector(`a[data-bs-toggle="tab"][href="${target}"]`);
+    if (link && pane && !pane.classList.contains('active') && typeof bootstrap !== 'undefined') {
+      bootstrap.Tab.getOrCreateInstance(link).show();
+    }
     markDesktopNav();
   }
 
@@ -162,14 +195,14 @@
     if (!document.querySelector('link[data-cb-home-dashboard]')) {
       const style = document.createElement('link');
       style.rel = 'stylesheet';
-      style.href = '/static/css/home_dashboard.css?v=20260820-1';
+      style.href = '/static/css/home_dashboard.css?v=20260820-2';
       style.dataset.cbHomeDashboard = 'true';
       document.head.appendChild(style);
     }
 
     if (!document.querySelector('script[data-cb-home-dashboard]')) {
       const script = document.createElement('script');
-      script.src = '/static/js/home_dashboard.js?v=20260820-1';
+      script.src = '/static/js/home_dashboard.js?v=20260820-2';
       script.dataset.cbHomeDashboard = 'true';
       document.body.appendChild(script);
     }
@@ -186,6 +219,8 @@
     loadFairPlayEnhancement();
     loadPitchingPreferences();
     loadHomeDashboard();
+    // main.js finishes its legacy tab bootstrap in the same DOMContentLoaded
+    // turn. Run after it so Home becomes the final, stable default.
     window.setTimeout(applyHomeHash, 0);
   }
 
