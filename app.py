@@ -1,8 +1,9 @@
 import os
 import json
 import sqlite3
+import zoneinfo
 from flask import Flask, render_template, session, jsonify, send_from_directory, redirect, url_for, flash, make_response
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from functools import wraps
 from sqlalchemy.orm import joinedload
 from sqlalchemy import event, func
@@ -186,7 +187,21 @@ def create_app():
         if not dt or not isinstance(dt, (datetime, date)):
             return dt
         if isinstance(dt, datetime):
-            return dt.strftime('%A, %m/%d/%y, %I:%M %p')
+            # Timestamp columns in CoachBoard are stored as naive UTC. Convert
+            # them to the active team's timezone so Last Login/activity-style
+            # timestamps do not appear several hours off on a UTC server.
+            aware = dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+            tz_name = 'UTC'
+            team_id = session.get('team_id')
+            if team_id:
+                team = db.session.get(Team, team_id)
+                if team and team.timezone:
+                    tz_name = team.timezone
+            try:
+                aware = aware.astimezone(zoneinfo.ZoneInfo(tz_name))
+            except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+                pass
+            return aware.strftime('%A, %m/%d/%y, %I:%M %p')
         if isinstance(dt, date):
             return dt.strftime('%A, %m/%d/%y')
         return dt
