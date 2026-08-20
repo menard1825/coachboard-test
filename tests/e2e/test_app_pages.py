@@ -301,7 +301,7 @@ def test_role_and_team_boundaries_are_enforced(page: Page, coachboard_url: str):
     login(page, coachboard_url, ASSISTANT_USERNAME, ASSISTANT_PASSWORD)
 
     page.goto(f'{coachboard_url}/admin/settings')
-    expect(page).to_have_url(re.compile(r'/#overview$'))
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?$'))
     expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
     expect(page.get_by_role('heading', name='Team Settings')).to_have_count(0)
 
