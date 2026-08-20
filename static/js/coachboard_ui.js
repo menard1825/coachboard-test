@@ -40,8 +40,18 @@
   }
 
   function ensureHomeNavigation() {
-    if (path !== '/') return;
+    const role = document.body.dataset.coachRole || '';
+    const primary = document.querySelector('.coach-primary-nav');
+    if (role !== 'Game Changer' && primary && !primary.querySelector('[data-cb-section="overview"]')) {
+      const home = document.createElement('a');
+      home.className = 'cb-nav-link';
+      home.dataset.cbSection = 'overview';
+      home.href = '/#overview';
+      home.innerHTML = '<i class="bi bi-house-door"></i>Home';
+      primary.prepend(home);
+    }
 
+    if (path !== '/') return;
     const desktopTab = document.querySelector('a[data-bs-toggle="tab"][href="#overview"]');
     if (desktopTab) {
       desktopTab.innerHTML = '<i class="bi bi-house-door me-1"></i>Home';
@@ -49,16 +59,6 @@
       const item = desktopTab.closest('li');
       const list = item?.parentElement;
       if (item && list && list.firstElementChild !== item) list.prepend(item);
-    }
-
-    const primary = document.querySelector('.coach-primary-nav');
-    if (primary && !primary.querySelector('[data-cb-section="overview"]')) {
-      const home = document.createElement('a');
-      home.className = 'cb-nav-link';
-      home.dataset.cbSection = 'overview';
-      home.href = '/#overview';
-      home.innerHTML = '<i class="bi bi-house-door"></i>Home';
-      primary.prepend(home);
     }
   }
 
