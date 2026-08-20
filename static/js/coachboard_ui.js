@@ -4,10 +4,6 @@
   document.body.classList.add('cb-ui');
 
   const path = window.location.pathname;
-  if (path === '/' && !window.location.hash) {
-    history.replaceState(null, '', `${window.location.pathname}${window.location.search}#overview`);
-  }
-
   if (path === '/') document.body.classList.add('cb-home');
   if (path === '/pitching') document.body.classList.add('cb-pitching');
   if (path === '/rules') document.body.classList.add('cb-rules');
