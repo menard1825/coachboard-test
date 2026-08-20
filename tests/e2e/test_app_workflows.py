@@ -29,7 +29,7 @@ def login(page: Page, coachboard_url: str, username=TEST_USERNAME, password=TEST
     identity.fill(username)
     page.locator('#password').fill(password)
     page.get_by_role('button', name='Sign In').click()
-    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#games)?$'))
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#(?:overview|games))?$'))
 
 
 def get_json(page: Page, coachboard_url: str, path: str):
@@ -519,7 +519,7 @@ def test_admin_settings_users_teams_registration_and_passwords(page: Page, coach
     page.locator('#new_password').fill('AutomationChanged123!')
     page.locator('#confirm_new_password').fill('AutomationChanged123!')
     page.get_by_role('button', name='Update Password').click()
-    expect(page).to_have_url(re.compile(r'/$'))
+    expect(page).to_have_url(re.compile(r'/(?:#overview)?$'))
     page.context.clear_cookies()
     login(page, coachboard_url, 'automation-register', 'AutomationChanged123!')
 
