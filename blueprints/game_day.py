@@ -119,6 +119,16 @@ def game_day_home():
         upcoming_query = upcoming_query.filter(~Game.id.in_(focus_ids))
     upcoming = upcoming_query.order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(12).all()
 
+    # Preserve schedule history too. The Game Day redesign originally only kept
+    # today's/next game, unfinished postgame work, and future games visible,
+    # which made completed past games appear to have disappeared. Historical
+    # games stay lightweight here: no readiness calculation is needed just to
+    # browse, open, or view their report.
+    past_games = db.session.query(Game).filter(
+        Game.team_id == team.id,
+        Game.date < day_start,
+    ).order_by(Game.date.desc(), Game.start_time.desc(), Game.id.desc()).all()
+
     return render_template(
         'game_day.html',
         current_team=team,
@@ -127,6 +137,7 @@ def game_day_home():
         focus_label=focus_label,
         local_now=now,
         upcoming=upcoming,
+        past_games=past_games,
     )
 
 
