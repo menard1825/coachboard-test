@@ -24,8 +24,11 @@ jobs:
             app.py \
             models.py \
             lineup_service.py \
+            game_pitching_rules.py \
+            pitching_rule_presets.py \
             migrations/versions/d4f8b2a719ce_normalize_lineup_templates.py \
             migrations/versions/f9a2b6c4d1e7_add_team_fair_play_settings.py \
+            migrations/versions/3d9c8b7a4f21_add_team_pitching_preferences.py \
             blueprints/roster.py \
             blueprints/fair_play.py \
             season_stats.py \
@@ -43,6 +46,7 @@ jobs:
           node --check static/js/main.js
           node --check static/js/coachboard_ui.js
           node --check static/js/fair_play_assistant.js
+          node --check static/js/pitching_preferences.js
           node --check static/js/game_logic.js
           node --check static/js/lineup_editor.js
           node --check static/js/assignment_picker_availability.js
