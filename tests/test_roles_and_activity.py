@@ -118,6 +118,14 @@ def test_game_changer_cannot_mutate_game_or_live_state(monkeypatch):
     })
     assert lineup.status_code == 403
 
+    # Session-only browser context is allowed for this otherwise read-only role.
+    timezone_response = client.post('/api/client-context', json={
+        'timezone': 'America/Chicago',
+        'utc_offset_minutes': -300,
+    })
+    assert timezone_response.status_code == 200
+    assert timezone_response.get_json()['timezone'] == 'America/Chicago'
+
     from db import db
     from models import Game
     with app.app_context():
@@ -140,13 +148,15 @@ def test_assistant_coach_cannot_permanently_delete_game(monkeypatch):
         assert db.session.get(Game, 10) is not None
 
 
-def test_successful_login_records_utc_activity(monkeypatch):
+def test_successful_login_records_utc_activity_and_browser_timezone(monkeypatch):
     app = _build_app(monkeypatch, role='Head Coach')
     client = app.test_client()
 
     response = client.post('/login', data={
         'identity': 'coach',
         'password': 'password123',
+        'client_timezone': 'America/Los_Angeles',
+        'client_utc_offset_minutes': '-420',
     }, follow_redirects=False)
     assert response.status_code == 302
 
@@ -160,6 +170,8 @@ def test_successful_login_records_utc_activity(monkeypatch):
         assert row is not None
         assert row.role_snapshot == 'Head Coach'
         assert row.username_snapshot == 'coach'
+        assert row.client_timezone == 'America/Los_Angeles'
+        assert row.client_utc_offset_minutes == -420
         assert row.created_at is not None
 
     activity = client.get('/admin/activity')
@@ -168,3 +180,36 @@ def test_successful_login_records_utc_activity(monkeypatch):
     assert 'Coach Activity' in html
     assert 'Role Test Coach' in html
     assert 'Signed in to Role Test Team' in html
+    assert 'America/Los_Angeles' in html
+    assert 'Coach local:' in html
+
+
+def test_first_head_coach_registration_initializes_team_timezone(monkeypatch):
+    app = _build_app(monkeypatch, role='Head Coach')
+    client = app.test_client()
+
+    from db import db
+    from models import Team
+    with app.app_context():
+        db.session.add(Team(
+            id=2,
+            team_name='New Team',
+            registration_code='new-team-code',
+            timezone='America/Indiana/Indianapolis',
+        ))
+        db.session.commit()
+
+    response = client.post('/register', data={
+        'username': 'newheadcoach',
+        'email': 'newheadcoach@example.com',
+        'full_name': 'New Head Coach',
+        'password': 'password123',
+        'registration_code': 'new-team-code',
+        'client_timezone': 'America/Denver',
+        'client_utc_offset_minutes': '-360',
+    }, follow_redirects=False)
+    assert response.status_code == 302
+
+    with app.app_context():
+        team = db.session.get(Team, 2)
+        assert team.timezone == 'America/Denver'
