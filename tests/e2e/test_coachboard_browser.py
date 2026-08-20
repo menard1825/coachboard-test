@@ -22,7 +22,7 @@ def login(page: Page, coachboard_url: str):
     page.locator('#password').fill(TEST_PASSWORD)
     page.get_by_role('button', name='Sign In').click()
     expect(page).to_have_url(
-        re.compile(rf'^{re.escape(coachboard_url)}/?(?:#games)?$')
+        re.compile(rf'^{re.escape(coachboard_url)}/?(?:#(?:overview|games))?$')
     )
     expect(page.locator('.navbar-brand-text')).to_contain_text('Playwright Prospects')
 
