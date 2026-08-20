@@ -34,8 +34,10 @@
   .gd-upcoming{margin-top:22px;border:1px solid #e4e7ec;border-radius:14px;background:#fff;overflow:hidden}
   .gd-up-row{display:grid;grid-template-columns:125px minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 13px;border-top:1px solid #eef1f4}.gd-up-row:first-child{border-top:0}
   .gd-up-date{font-size:.7rem;color:#667085;font-weight:750}.gd-up-name{font-size:.78rem;font-weight:750;color:#1d2939}.gd-up-loc{font-size:.65rem;color:#8a94a3;margin-top:2px}
+  .gd-up-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+  .gd-history-more{border-top:1px solid #eef1f4}.gd-history-more summary{cursor:pointer;list-style:none;padding:12px 13px;font-size:.72rem;font-weight:800;color:#475467;background:#fafbfc}.gd-history-more summary::-webkit-details-marker{display:none}.gd-history-more summary::before{content:'+';display:inline-block;width:18px;font-weight:900}.gd-history-more[open] summary::before{content:'−'}
   .gd-empty{border:1px dashed #ccd3db;border-radius:15px;padding:28px;text-align:center;background:#fafbfc;color:#667085}
-  @media(max-width:767.98px){.gd-shell{padding-bottom:90px}.gd-hero{align-items:flex-start}.gd-hero h1{font-size:1.45rem}.gd-date{display:none}.gd-readiness{grid-template-columns:1fr 1fr}.gd-top{padding:13px}.gd-body{padding:12px 13px 14px}.gd-opponent{font-size:1.08rem}.gd-actions .btn{flex:1 1 160px}.gd-up-row{grid-template-columns:92px minmax(0,1fr)}.gd-up-row .btn{grid-column:2}}
+  @media(max-width:767.98px){.gd-shell{padding-bottom:90px}.gd-hero{align-items:flex-start}.gd-hero h1{font-size:1.45rem}.gd-date{display:none}.gd-readiness{grid-template-columns:1fr 1fr}.gd-top{padding:13px}.gd-body{padding:12px 13px 14px}.gd-opponent{font-size:1.08rem}.gd-actions .btn{flex:1 1 160px}.gd-up-row{grid-template-columns:92px minmax(0,1fr)}.gd-up-row .btn{grid-column:auto}.gd-up-row>.btn,.gd-up-row>.gd-up-actions{grid-column:2}.gd-up-actions{justify-content:flex-start}}
   @media(orientation:landscape) and (max-height:900px){.gd-shell{max-width:1220px}.gd-games{grid-template-columns:repeat(2,minmax(0,1fr))}.gd-readiness{grid-template-columns:1fr 1fr}.gd-game{height:100%}}
 </style>
 {% endblock %}
@@ -155,6 +157,37 @@
         <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Prepare</a>
       </div>
     {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if past_games %}
+  <div class="gd-section-title mt-4">Past Games</div>
+  <div class="gd-upcoming">
+    {% for g in past_games[:8] %}
+      <div class="gd-up-row">
+        <div class="gd-up-date">{{ g.date.strftime('%a %m/%d/%y') }}{% if g.start_time %}<br>{{ g.start_time }}{% endif %}</div>
+        <div><div class="gd-up-name">vs {{ g.opponent }}</div>{% if g.location %}<div class="gd-up-loc">{{ g.location }}</div>{% endif %}</div>
+        <div class="gd-up-actions">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">Report</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Open</a>
+        </div>
+      </div>
+    {% endfor %}
+    {% if past_games|length > 8 %}
+      <details class="gd-history-more">
+        <summary>Show {{ past_games|length - 8 }} older game{% if past_games|length - 8 != 1 %}s{% endif %}</summary>
+        {% for g in past_games[8:] %}
+          <div class="gd-up-row">
+            <div class="gd-up-date">{{ g.date.strftime('%a %m/%d/%y') }}{% if g.start_time %}<br>{{ g.start_time }}{% endif %}</div>
+            <div><div class="gd-up-name">vs {{ g.opponent }}</div>{% if g.location %}<div class="gd-up-loc">{{ g.location }}</div>{% endif %}</div>
+            <div class="gd-up-actions">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('game_day.game_report', game_id=g.id) }}">Report</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=g.id) }}">Open</a>
+            </div>
+          </div>
+        {% endfor %}
+      </details>
+    {% endif %}
   </div>
   {% endif %}
 </div>
