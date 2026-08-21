@@ -34,13 +34,22 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     page.goto(f'{coachboard_url}/pitching', wait_until='domcontentloaded')
 
     expect(page.locator('h3').filter(has_text='Pitching')).to_be_visible()
-    expect(page.locator('#pitchingRuleStrip')).to_be_visible()
+    rule_strip = page.locator('#pitchingRuleStrip')
+    expect(rule_strip).to_be_visible()
     cards = page.locator('.cb-pitcher-card')
     expect(cards).not_to_have_count(0)
     expect(page.locator('.cb-pitch-counts')).to_be_visible()
     expect(cards.first).to_contain_text('Competition Eligibility')
     expect(cards.first).to_contain_text('Arm Care')
     expect(cards.first.locator('.pitch-arm-care-slot')).not_to_contain_text('Loading', timeout=15_000)
+
+    # Rules and arm care share one compact row on phones rather than consuming
+    # two full-width cards before the coach reaches pitcher availability.
+    rule_items = rule_strip.locator('.cb-pitch-rule-item')
+    expect(rule_items).to_have_count(2)
+    tops = rule_items.evaluate_all('items => items.map(item => Math.round(item.getBoundingClientRect().top))')
+    assert abs(tops[0] - tops[1]) <= 2
+    expect(rule_items.first.locator('small')).to_be_hidden()
 
     # The current dashboard is rendered as cards from first paint. The old
     # table->JavaScript-card replacement and injected duplicate summary are gone.
@@ -54,6 +63,35 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     expect(status_card).to_contain_text('Competition Rules Needed')
     expect(status_card).not_to_contain_text('Eligible Today\n1')
 
+    # Mobile starts scan-first: official decision / next date and arm care stay
+    # visible, while usage, workload, and target detail are collapsed.
+    first_card = cards.first
+    expect(first_card).to_have_attribute('data-mobile-expanded', 'false')
+    details_button = first_card.locator('.cb-pitcher-details-toggle')
+    expect(details_button).to_be_visible()
+    expect(details_button).to_have_attribute('aria-expanded', 'false')
+    expect(first_card.locator('.cb-pitch-metrics')).to_be_hidden()
+    details_button.click()
+    expect(details_button).to_have_attribute('aria-expanded', 'true')
+    expect(first_card.locator('.cb-pitch-metrics')).to_be_visible()
+    details_button.click()
+    expect(first_card.locator('.cb-pitch-metrics')).to_be_hidden()
+
+    # Availability summary cards are controls, not dead statistics. The seeded
+    # team has no default competition rule, so every pitcher belongs to Review.
+    summary_items = page.locator('.cb-pitch-summary-item[data-cb-pitch-filter]')
+    expect(summary_items).to_have_count(3)
+    review_filter = summary_items.filter(has_text='Needs Review')
+    expect(review_filter).to_have_attribute('role', 'button')
+    expect(review_filter).to_have_attribute('aria-disabled', None)
+    review_filter.click()
+    expect(review_filter).to_have_attribute('aria-pressed', 'true')
+    expect(page.locator('.cb-pitch-filter-state')).to_be_visible()
+    groups = page.locator('.cb-pitcher-card:not([hidden])').evaluate_all('items => items.map(item => item.dataset.availabilityGroup)')
+    assert groups and all(group == 'review' for group in groups)
+    review_filter.click()
+    expect(page.locator('.cb-pitch-filter-state')).to_be_hidden()
+
     bounds = cards.evaluate_all(
         """items => items.map(item => {
             const r = item.getBoundingClientRect();
@@ -63,7 +101,19 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     assert bounds
     assert all(b['left'] >= -1 and b['right'] <= b['viewport'] + 1 for b in bounds)
 
+    # Secondary work stays one tap away instead of adding several phone screens
+    # below availability. Desktop remains expanded by CSS / responsive mode.
+    targets = page.locator('#pitchTargetsCard')
+    record = page.locator('#newPitchingOutingForm').locator('xpath=ancestor::div[contains(@class,"cb-pitch-section-card")][1]')
     history = page.locator('#pitchHistoryCard')
+    expect(targets).to_have_attribute('data-mobile-collapsed', 'true')
+    expect(record).to_have_attribute('data-mobile-collapsed', 'true')
+    expect(history).to_have_attribute('data-mobile-collapsed', 'true')
+    expect(page.locator('#newPitchingOutingForm')).to_be_hidden()
+    expect(history.locator('#cbPitchHistoryPlayer')).to_be_hidden()
+
+    history.get_by_role('button', name='Expand Recent Throwing History').click()
+    expect(history).to_have_attribute('data-mobile-collapsed', 'false')
     expect(history.locator('#cbPitchHistoryPlayer')).to_be_visible()
     expect(history.locator('#cbPitchHistoryRange')).to_be_visible()
     expect(history.locator('#cbPitchHistoryCount')).to_be_visible()
@@ -91,6 +141,9 @@ def test_pitch_target_save_updates_without_full_page_reload(page: Page, coachboa
     pitcher_card = page.locator('.cb-pitcher-card').filter(has_text='Pitcher Pat').first
     expect(pitcher_card).to_contain_text('25', timeout=10_000)
 
+    details_button = pitcher_card.locator('.cb-pitcher-details-toggle')
+    if details_button.get_attribute('aria-expanded') == 'false':
+        details_button.click()
     pitcher_card.locator('.open-target-modal').click()
     expect(page.locator('#coachTargetModal')).to_be_visible()
     page.locator('#targetPitchesInput').fill('')
