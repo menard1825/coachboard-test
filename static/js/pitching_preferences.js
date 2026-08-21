@@ -33,6 +33,28 @@
     return data;
   }
 
+  function loadDashboardV2() {
+    if (path !== '/pitching' || window.CoachBoardPitchingDashboardV2?.initialized) return Promise.resolve();
+    const existing = document.querySelector('script[data-coach-pitching-dashboard-v2]');
+    if (existing) {
+      return new Promise(resolve => {
+        if (window.CoachBoardPitchingDashboardV2?.initialized) resolve();
+        else {
+          existing.addEventListener('load', resolve, {once:true});
+          existing.addEventListener('error', resolve, {once:true});
+        }
+      });
+    }
+    return new Promise(resolve => {
+      const script = document.createElement('script');
+      script.src = '/static/js/pitching_dashboard_v2.js?v=20260820-1';
+      script.dataset.coachPitchingDashboardV2 = 'true';
+      script.addEventListener('load', resolve, {once:true});
+      script.addEventListener('error', resolve, {once:true});
+      document.body.appendChild(script);
+    });
+  }
+
   function showPitchingSettingsTab() {
     if (path !== '/admin/settings' || window.location.hash !== '#pitching-rules-settings') return;
     const link = document.querySelector('a[data-bs-toggle="tab"][href="#pitching-rules-settings"]');
@@ -105,7 +127,7 @@
       try {
         const saved = await getJson(SETTINGS_URL, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             competition_default_rule: pane.querySelector('#competitionDefaultRule')?.value || '',
             arm_care_rule_set: pane.querySelector('#armCareRuleSet')?.value || '',
@@ -138,8 +160,29 @@
       ${badge(item.status)}
       <div class="small mt-1"><strong>${esc(today)}${esc(max)}</strong> game pitches today</div>
       <div class="small text-muted">${esc(workload)} total throws recorded today</div>
+      ${item.next_available && item.next_available !== 'Today' ? `<div class="small fw-semibold mt-1">Next: ${esc(item.next_available)}</div>` : ''}
       ${item.status_detail ? `<div class="small text-muted mt-1">${esc(item.status_detail)}</div>` : ''}
     `;
+  }
+
+  function armCard(item, enabled, ruleSet) {
+    if (!enabled) {
+      return '<div class="cb-pitch-arm-row"><span class="cb-pitch-arm-title">Arm care</span><span class="cb-pitch-arm-value">Off</span></div>';
+    }
+    if (!item) {
+      return `<div class="cb-pitch-arm-row"><span class="cb-pitch-arm-title">Arm care · ${esc(ruleSet || 'Pitch Smart')}</span><span class="cb-pitch-arm-value text-muted">No history</span></div>`;
+    }
+    const onTrack = item.status === 'Available';
+    const value = onTrack ? 'On track' : (item.status || 'Needs attention');
+    const next = !onTrack && item.next_available && item.next_available !== 'Today'
+      ? `<div class="cb-pitch-arm-next">Rest guidance: ${esc(item.next_available)}</div>` : '';
+    const detail = !onTrack && item.status_detail
+      ? `<div class="cb-pitch-arm-detail">${esc(item.status_detail)}</div>` : '';
+    return `
+      <div class="cb-pitch-arm-row">
+        <span class="cb-pitch-arm-title">Arm care · ${esc(ruleSet || 'Pitch Smart')}</span>
+        <span class="cb-pitch-arm-value">${esc(value)}</span>
+      </div>${next}${detail}`;
   }
 
   function renderPitchingDashboard(settingsData, armData) {
@@ -158,8 +201,8 @@
       summary.innerHTML = `
         <div class="card-body py-3">
           <div class="row g-3">
-            <div class="col-md-6"><div class="small text-uppercase fw-bold text-muted">Competition Eligibility</div><div class="fw-bold mt-1">${competition ? esc(competition) : 'Choose per event/game'}</div><div class="small text-muted">${competition ? 'Team default; individual games can override it.' : 'No team default is required.'}</div></div>
-            <div class="col-md-6"><div class="small text-uppercase fw-bold text-muted">Arm Care</div><div class="fw-bold mt-1">${armCare ? esc(armCare) : 'Off'}</div><div class="small text-muted">Tracked separately from tournament eligibility.</div></div>
+            <div class="col-md-6"><div class="small text-uppercase fw-bold text-muted">Competition Eligibility</div><div class="fw-bold mt-1">${competition ? esc(competition) : 'Choose per event/game'}</div><div class="small text-muted">${competition ? 'Team default; individual games can override it.' : 'No team default is required. Select the real rules on each game.'}</div></div>
+            <div class="col-md-6"><div class="small text-uppercase fw-bold text-muted">Arm Care</div><div class="fw-bold mt-1">${armCare ? esc(armCare) : 'Off'}</div><div class="small text-muted">Advisory workload/rest guidance; it never replaces competition rules.</div></div>
           </div>
         </div>`;
       head.insertAdjacentElement('afterend', summary);
@@ -173,9 +216,20 @@
 
     const infoAlert = root.querySelector('.alert.alert-primary');
     if (infoAlert) {
-      infoAlert.innerHTML = '<i class="bi bi-info-circle-fill mt-1"></i><div><strong>Competition rules and arm care are intentionally separate.</strong><br><span class="small">Event rules decide tournament eligibility. Your arm-care setting can still track Pitch Smart guidance and throwing workload regardless of the event format. Game-pitch targets are coaching plans, not rule limits.</span></div>';
+      infoAlert.innerHTML = '<i class="bi bi-info-circle-fill mt-1"></i><div><strong>Competition eligibility and arm care are intentionally separate.</strong><br><span class="small">Event rules decide whether a pitcher is officially eligible. Arm care can still recommend rest. Game-pitch targets are coaching plans, not rule limits.</span></div>';
     }
 
+    const pitcherCards = [...root.querySelectorAll('.cb-pitcher-card[data-player-name]')];
+    if (pitcherCards.length) {
+      pitcherCards.forEach(card => {
+        const name = card.dataset.playerName;
+        const slot = card.querySelector('.pitch-arm-care-slot');
+        if (slot) slot.innerHTML = armCard((armData.players || {})[name], armData.enabled, armData.rule_set || armCare);
+      });
+      return;
+    }
+
+    // Fallback for a stale/cached page that has not loaded pitching_dashboard_v2.js.
     const cards = [...root.querySelectorAll('.card')];
     const statusCard = cards.find(card => card.querySelector('h5')?.textContent.trim() === 'Who Can Pitch?');
     const table = statusCard?.querySelector('table');
@@ -223,6 +277,7 @@
 
   async function initPitching() {
     try {
+      await loadDashboardV2();
       const [settings, arm] = await Promise.all([
         getJson(SETTINGS_URL, {cache: 'no-store'}),
         getJson(ARM_CARE_URL, {cache: 'no-store'}),
