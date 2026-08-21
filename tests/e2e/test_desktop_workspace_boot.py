@@ -50,17 +50,26 @@ def test_game_day_to_roster_hides_unfinished_roster_first_paint(page: Page, coac
 
     expect(page).to_have_url(re.compile(r'/#roster$'))
 
+    # The pre-paint marker is created in <head>, before dashboard markup can be
+    # rendered. This is what prevents a human-visible old/unfinished frame.
+    expect(page.locator('html')).to_have_class(re.compile(r'\bcb-desktop-workspace-boot\b'))
+    expect(page.locator('html')).to_have_attribute('data-cb-workspace-boot', 'roster')
+
     for _ in range(20):
         if held_roster_requests:
             break
         page.wait_for_timeout(25)
     assert held_roster_requests, 'Roster API request was not intercepted'
 
-    expect(page.locator('html')).to_have_class(re.compile(r'\bcb-desktop-workspace-boot\b'))
     expect(page.locator('main.container-fluid')).to_have_attribute('data-cb-workspace-loading', 'Loading Roster…')
 
     visibility = page.locator('#mainTabContent').evaluate('el => getComputedStyle(el).visibility')
     assert visibility == 'hidden'
+
+    # The retired dashboard tab strip must never be the thing a coach sees while
+    # Roster is loading. It remains in the DOM only for legacy controller hooks.
+    legacy_tabs_display = page.locator('#mainTabsDesktop').evaluate('el => getComputedStyle(el).display')
+    assert legacy_tabs_display == 'none'
 
     held_roster_requests.pop(0).continue_()
 
@@ -71,3 +80,5 @@ def test_game_day_to_roster_hides_unfinished_roster_first_paint(page: Page, coac
 
     final_visibility = page.locator('#mainTabContent').evaluate('el => getComputedStyle(el).visibility')
     assert final_visibility == 'visible'
+    final_legacy_tabs_display = page.locator('#mainTabsDesktop').evaluate('el => getComputedStyle(el).display')
+    assert final_legacy_tabs_display == 'none'
