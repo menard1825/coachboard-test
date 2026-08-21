@@ -7,7 +7,7 @@
     <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
         <div>
             <h3 class="mb-1">Pitching Dashboard</h3>
-            <div class="text-muted">Official eligibility, total throwing workload, and optional game-pitch plans—kept separate on purpose.</div>
+            <div class="text-muted">Competition eligibility, arm-care guidance, workload, and pitch targets.</div>
         </div>
         <a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-outline-secondary">View {{ rules.rule_set_name }} Rules</a>
     </div>
@@ -18,13 +18,13 @@
 
     <div class="alert alert-primary d-flex gap-3 align-items-start" role="note">
         <i class="bi bi-info-circle-fill mt-1"></i>
-        <div><strong>Game-pitch targets are coaching plans, not rule limits.</strong><br><span class="small">Choose one scheduled game or the entire game day. Targets count official game pitches only; practice and lessons stay in throwing workload. Weekly and season totals remain informational, while official eligibility is always determined by {{ rules.rule_set_name }}.</span></div>
+        <div><strong>Pitch targets are optional coaching plans.</strong><br><span class="small">Targets count game pitches only and do not change official eligibility. Practice and lesson throwing remain part of workload tracking.</span></div>
     </div>
 
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h5 class="mb-0">Who Can Pitch?</h5>
+                <h5 class="mb-0">Pitcher Availability</h5>
                 <div class="small text-muted">
                     Official status uses {{ rules.rule_set_name }} {{ 'game-pitch counts' if rules.rule_type == 'pitch_count' else 'game innings/outs' }}.
                     Practice and lessons are shown separately as workload.
@@ -38,10 +38,10 @@
                     <thead class="table-light">
                         <tr>
                             <th class="ps-3">Pitcher</th>
-                            <th>Official Status</th>
+                            <th>Competition Eligibility</th>
                             <th>Official Today</th>
                             <th>Throwing Workload</th>
-                            <th>Today’s Game-Pitch Target</th>
+                            <th>Pitch Target</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -55,16 +55,16 @@
                             </td>
                             <td style="min-width:170px">
                                 {% if s.status == 'Available' %}
-                                    <span class="badge text-bg-success">Available</span>
+                                    <span class="badge text-bg-success">Eligible</span>
                                 {% elif s.status in ['Pitch Count Incomplete', 'Innings Incomplete'] %}
-                                    <span class="badge text-bg-warning">Verify Data</span>
+                                    <span class="badge text-bg-warning">Verify</span>
                                 {% elif s.status == 'Same-Day Game Restriction' %}
-                                    <span class="badge text-bg-warning">No 2nd Game Today</span>
+                                    <span class="badge text-bg-warning">Unavailable Today</span>
                                 {% else %}
                                     <span class="badge text-bg-danger">{{ s.status }}</span>
                                 {% endif %}
                                 {% if s.status_detail %}<div class="small text-muted mt-1">{{ s.status_detail }}</div>{% endif %}
-                                {% if s.next_available and s.next_available != 'Today' %}<div class="small mt-1"><strong>Next:</strong> {{ s.next_available }}</div>{% endif %}
+                                {% if s.next_available and s.next_available != 'Today' %}<div class="small mt-1"><strong>Next Available:</strong> {{ s.next_available }}</div>{% endif %}
                             </td>
                             <td style="min-width:155px">
                                 {% if s.rule_type == 'innings' %}
@@ -99,7 +99,7 @@
                                     data-player-id="{{ player.id }}" data-player-name="{{ player.name|e }}"
                                     data-target-pitches="{{ s.coach_target if s.coach_target is not none else '' }}"
                                     data-target-reason="{{ s.coach_target_reason|default('', true)|e }}"
-                                    data-target-date="{{ today_string }}" data-game-id="">Set / Edit Today</button>
+                                    data-target-date="{{ today_string }}" data-game-id="">Edit Target</button>
                             </td>
                         </tr>
                         {% endif %}
@@ -114,8 +114,8 @@
 
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
-            <div><h5 class="mb-0">Planned Game-Pitch Targets</h5><div class="small text-muted">Today and future plans. A game-day target covers all games on that date; a scheduled-game target covers only that game.</div></div>
-            <button type="button" class="btn btn-sm btn-primary open-target-modal" data-player-id="" data-player-name="Choose a pitcher" data-target-pitches="" data-target-reason="" data-target-date="{{ today_string }}" data-game-id=""><i class="bi bi-plus-circle me-1"></i>Plan a target</button>
+            <div><h5 class="mb-0">Pitch Targets</h5><div class="small text-muted">Optional game-pitch plans for one scheduled game or an entire game day.</div></div>
+            <button type="button" class="btn btn-sm btn-primary open-target-modal" data-player-id="" data-player-name="Choose a pitcher" data-target-pitches="" data-target-reason="" data-target-date="{{ today_string }}" data-game-id=""><i class="bi bi-plus-circle me-1"></i>Set Pitch Target</button>
         </div>
         <div class="list-group list-group-flush">
             {% for target in planned_targets %}
@@ -130,7 +130,7 @@
                     data-target-date="{{ target.local_date }}" data-game-id="{{ target.game_id or '' }}">Edit</button>
             </div>
             {% else %}
-            <div class="list-group-item text-center text-muted py-4">No game-pitch targets are planned. Add one only when it helps communicate pitcher usage.</div>
+            <div class="list-group-item text-center text-muted py-4">No pitch targets set.</div>
             {% endfor %}
         </div>
     </div>
@@ -140,13 +140,13 @@
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0">Record Throwing</h5>
-                    <div class="small text-muted">Choose the context first; CoachBoard only asks for fields that apply.</div>
+                    <div class="small text-muted">Record game, practice/bullpen, or lesson throwing.</div>
                 </div>
                 <div class="card-body">
                     <form action="{{ url_for('pitching.add_pitching') }}" method="POST" id="newPitchingOutingForm">
                         <div class="row g-3">
                             <div class="col-12">
-                                <label for="outing_type" class="form-label fw-semibold">What was this?</label>
+                                <label for="outing_type" class="form-label fw-semibold">Throwing Type</label>
                                 <select name="outing_type" id="outing_type" class="form-select">
                                     <option value="Game">Game</option>
                                     <option value="Practice">Practice / Bullpen</option>
@@ -237,9 +237,9 @@
 <div class="modal fade" id="coachTargetModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Game-Pitch Target</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Pitch Target</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <div class="alert alert-light border small"><strong>This is optional coaching guidance.</strong> It counts game pitches only and does not set a weekly or season limit, include practices/lessons, or override official eligibility.</div>
+                <div class="alert alert-light border small"><strong>Optional coaching plan.</strong> Game pitches only; does not change official eligibility or include practice/lesson throwing.</div>
                 <div class="mb-3"><label for="targetPlayerInput" class="form-label fw-semibold">Pitcher</label><select id="targetPlayerInput" class="form-select" required><option value="">Choose a pitcher…</option>{% for p in pitchers | sort(attribute='name') %}<option value="{{ p.id }}">{{ p.full_name }}</option>{% endfor %}</select></div>
                 <div class="mb-3"><label for="targetScopeInput" class="form-label fw-semibold">Target applies to</label><select id="targetScopeInput" class="form-select"><option value="day">Entire game day</option><option value="game">One scheduled game</option></select><div class="form-text" id="targetScopeHelp">Use this when the same pitcher may appear across a doubleheader or multiple games that day.</div></div>
                 <div class="mb-3" id="targetDateField"><label for="targetDateInput" class="form-label fw-semibold">Game date</label><input type="date" id="targetDateInput" class="form-control" value="{{ today_string }}"></div>
