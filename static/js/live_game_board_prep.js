@@ -269,7 +269,7 @@
         <div>
           <div class="pde-kicker">Pregame Defense</div>
           <div class="pde-title">Set Inning ${esc(inning)}</div>
-          <div class="pde-help">Tap a position and choose the player. Nothing auto-swaps or bounces back.</div>
+          <div class="pde-help">Tap a position to assign a player.</div>
         </div>
         <div class="pde-inning"><small>INNING</small><strong>${esc(inning)}</strong></div>
       </div>
@@ -333,8 +333,8 @@
     const occupant = source[pos] || '';
     modal.querySelector('.modal-title').textContent = `${pos} — Choose Player`;
     $('pde-help').textContent = occupant
-      ? `Currently ${occupant}. Choosing someone else puts ${occupant} on the bench unless you place him elsewhere.`
-      : 'Open position. Choose who should play here.';
+      ? `Current: ${occupant}. Replacing him moves him to the bench.`
+      : 'Choose a player for this position.';
 
     const choices = presentPlayers()
       .map((player) => ({player, position: playerPosition(player.name, source)}))
