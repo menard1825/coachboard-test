@@ -272,6 +272,25 @@
     rendering = false;
   }
 
+  function polishWorkspaceCopy() {
+    const set = (selector, text) => {
+      const node = document.querySelector(selector);
+      if (node) node.textContent = text;
+    };
+
+    set('#roster .cb-page-subtitle', 'Player details used for lineups, defense, pitching, and coach notes.');
+    set('#roster .card-header .small.text-muted', 'Select a player to edit.');
+    set('#player_development .cb-page-subtitle', 'Track active development priorities, progress notes, and completed work.');
+    set('#practice_plan .cb-page-subtitle', 'Practice priorities, work areas, attendance, and setup tasks.');
+    set('#practice_plan .cb-practice-create-card .card-header .small.text-muted', 'Set practice priorities and work areas.');
+
+    const priority = document.querySelector('#practice_plan textarea[name="emphasis"]');
+    if (priority) priority.placeholder = 'Key outcomes for this practice';
+
+    const lineupAlert = document.querySelector('#lineups > .alert.alert-info');
+    if (lineupAlert) lineupAlert.innerHTML = '<i class="bi bi-info-circle-fill"></i> Create reusable batting lineups for Game Day.';
+  }
+
   function installMobileNav() {
     // The shared server-rendered primary bar owns navigation markup. Keeping
     // Home from rewriting it immediately and again 250 ms later prevents the
@@ -379,6 +398,7 @@
   }
 
   async function init() {
+    polishWorkspaceCopy();
     installMobileNav();
     const container = document.getElementById('overview-content-container');
     if (container) {
