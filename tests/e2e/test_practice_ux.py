@@ -60,8 +60,10 @@ def test_practice_workspace_prioritizes_active_planning_on_desktop(page: Page, c
     expect(create_button).to_be_visible()
     expect(create_form).to_be_hidden()
     create_button.click()
+    expect(create_form).to_have_class(re.compile(r'\bshow\b'), timeout=5_000)
     expect(create_form).to_be_visible()
     create_button.click()
+    expect(create_form).not_to_have_class(re.compile(r'\bshow\b'), timeout=5_000)
     expect(create_form).to_be_hidden()
 
     upcoming = page.locator('.cb-practice-plan.is-upcoming')
