@@ -245,11 +245,22 @@
     });
   }
 
-  function loadDugoutMobileView() {
+  function loadDugoutMobileView(attempt = 0) {
     if (document.getElementById('cb-pitching-dugout-mobile-script')) return;
+
+    // The existing Pitching focus layer owns the authoritative classification
+    // of Eligible / Unavailable / Needs Review. Wait until it has attached its
+    // data attributes and filter behavior before replacing labels with the
+    // shorter dugout-language READY / OUT / CHECK presentation.
+    const root = document.querySelector('.cb-pitching-v3');
+    if (root && root.dataset.cbFocusUx !== '1') {
+      if (attempt < 80) window.setTimeout(() => loadDugoutMobileView(attempt + 1), 25);
+      return;
+    }
+
     const script = document.createElement('script');
     script.id = 'cb-pitching-dugout-mobile-script';
-    script.src = '/static/js/pitching_dugout_mobile.js?v=20260821-1';
+    script.src = '/static/js/pitching_dugout_mobile.js?v=20260821-2';
     script.async = false;
     document.head.appendChild(script);
   }
