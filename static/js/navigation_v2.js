@@ -211,9 +211,27 @@
       });
     };
 
+    const select = (selected) => {
+      nav.querySelectorAll('[data-cb-mobile-section]').forEach((link) => {
+        if (link === selected) link.setAttribute('aria-current', 'page');
+        else link.removeAttribute('aria-current');
+      });
+      enforce();
+    };
+
     // The legacy Home tab controller clears `.active` from every `.nav-tabs`
-    // link while activating content. The shared primary nav is not one of those
-    // Bootstrap tab controls, so preserve its visual state from aria-current.
+    // link while activating content and does not emit Bootstrap's shown.bs.tab.
+    // Treat same-document primary-nav taps as the source of truth so the
+    // selected item stays visually active without relying on that legacy event.
+    nav.addEventListener('click', (event) => {
+      const link = event.target.closest('[data-cb-mobile-section]');
+      if (!link || !nav.contains(link)) return;
+      const href = link.getAttribute('href') || '';
+      if (!href.startsWith('#')) return;
+      select(link);
+      window.requestAnimationFrame(enforce);
+    });
+
     const observer = new MutationObserver(enforce);
     observer.observe(nav, {subtree: true, attributes: true, attributeFilter: ['class', 'aria-current']});
     enforce();
