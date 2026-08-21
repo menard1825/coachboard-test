@@ -44,7 +44,7 @@
   </div>
 
   <div class="alert alert-light border small mb-3">
-    <strong>Your job:</strong> use this screen to enter CoachBoard's planned lineup and defense into GameChanger before first pitch. Nothing on this page changes CoachBoard.
+    Copy the planned lineup, availability, and defense into GameChanger. This page is read-only.
   </div>
 
   <div class="gc-grid">
@@ -62,11 +62,11 @@
           </div>
           {% endfor %}
         </div>
-        {% else %}<div class="gc-empty">The coaches have not set the batting order yet.</div>{% endif %}
+        {% else %}<div class="gc-empty">Batting order not set.</div>{% endif %}
       </section>
 
       <section class="gc-card">
-        <div class="gc-card-head"><div><div class="gc-card-title">Availability</div><div class="gc-card-sub">Who should be active in GameChanger</div></div><span class="badge text-bg-light border">{{ available_roster|length }} available</span></div>
+        <div class="gc-card-head"><div><div class="gc-card-title">Availability</div><div class="gc-card-sub">Available roster for GameChanger</div></div><span class="badge text-bg-light border">{{ available_roster|length }} available</span></div>
         <div class="gc-body">
           <div class="gc-roster">
             {% for player in available_roster %}<span class="gc-chip">{% if player.number %}#{{ player.number }} {% endif %}{{ player.name }}</span>{% endfor %}
@@ -96,7 +96,7 @@
           </tbody>
         </table>
       </div>
-      {% else %}<div class="gc-empty">The coaches have not built a defensive rotation yet.</div>{% endif %}
+      {% else %}<div class="gc-empty">Defensive rotation not set.</div>{% endif %}
     </section>
   </div>
 </div>
