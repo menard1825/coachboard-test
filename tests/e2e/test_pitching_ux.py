@@ -90,9 +90,13 @@ def test_game_planning_uses_same_pitcher_decision_cards(page: Page, coachboard_u
 
     availability = page.locator('#pitcher-availability-card')
     expect(availability).to_be_visible(timeout=15_000)
+    expect(availability).to_have_attribute('data-cb-pitching-owner', 'game-setup', timeout=15_000)
     cards = availability.locator('.gpa-card')
     expect(cards).not_to_have_count(0, timeout=15_000)
     expect(cards.first).to_contain_text('Competition eligibility')
     expect(cards.first).to_contain_text('Arm care')
+    expect(cards.first).to_contain_text('Game plan')
+    expect(availability).to_contain_text('Competition rules not selected')
+    expect(availability).not_to_contain_text('Eligible')
     expect(availability.locator('table')).to_be_hidden()
     assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
