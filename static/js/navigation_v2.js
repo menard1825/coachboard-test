@@ -9,6 +9,80 @@
     helperQuery = '';
   }
 
+  function installDesktopRosterBootGuard() {
+    if (
+      window.location.pathname !== '/' ||
+      window.location.hash.toLowerCase() !== '#roster' ||
+      !window.matchMedia('(min-width: 992px)').matches
+    ) return;
+
+    const root = document.documentElement;
+    const main = document.querySelector('main.container-fluid');
+    const roster = document.getElementById('roster-cards-container');
+    if (!main || !roster) return;
+
+    root.classList.add('cb-desktop-workspace-boot');
+    main.dataset.cbWorkspaceLoading = 'Loading Roster…';
+
+    if (!document.getElementById('cb-desktop-workspace-boot-styles')) {
+      const style = document.createElement('style');
+      style.id = 'cb-desktop-workspace-boot-styles';
+      style.textContent = `
+        @media(min-width:992px){
+          html.cb-desktop-workspace-boot body.cb-ui main.container-fluid{position:relative;min-height:240px}
+          html.cb-desktop-workspace-boot body.cb-ui #mainTabContent{visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+          html.cb-desktop-workspace-boot body.cb-ui main.container-fluid::before{
+            content:attr(data-cb-workspace-loading);
+            position:absolute;
+            z-index:3;
+            top:58px;
+            left:50%;
+            transform:translateX(-50%);
+            width:min(560px,calc(100% - 48px));
+            padding:18px 20px;
+            border:1px solid #dfe5ec;
+            border-radius:14px;
+            background:#fff;
+            box-shadow:0 2px 9px rgba(16,24,40,.055);
+            color:#667085;
+            font-size:.8rem;
+            font-weight:700;
+            text-align:center;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    let observer = null;
+    const finish = () => {
+      const currentRoster = document.getElementById('roster-cards-container');
+      const error = document.querySelector('#mainTabContent > .alert-danger, main > .alert-danger');
+      const rosterReady = currentRoster && !currentRoster.querySelector('.spinner-border') && currentRoster.children.length > 0;
+      if (!rosterReady && !error) return false;
+      observer?.disconnect();
+      observer = null;
+      root.classList.remove('cb-desktop-workspace-boot');
+      delete main.dataset.cbWorkspaceLoading;
+      return true;
+    };
+
+    if (finish()) return;
+    observer = new MutationObserver(finish);
+    observer.observe(document.getElementById('mainTabContent') || main, {subtree: true, childList: true});
+
+    // Never leave the workspace hidden if a future data/render change fails to
+    // produce the expected roster markup. The normal page/error state remains
+    // the final fallback after this guard interval.
+    window.setTimeout(() => {
+      if (!root.classList.contains('cb-desktop-workspace-boot')) return;
+      observer?.disconnect();
+      observer = null;
+      root.classList.remove('cb-desktop-workspace-boot');
+      delete main.dataset.cbWorkspaceLoading;
+    }, 10000);
+  }
+
   function mobileItem(href, icon, label, active = false, isWorkspace = false) {
     const workspaceAttr = isWorkspace ? ' data-cb-workspace-link="true"' : '';
     const currentAttr = active ? ' aria-current="page"' : '';
@@ -66,7 +140,7 @@
       #more .cb-mobile-more-card{border:1px solid #e2e6eb;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 1px 3px rgba(16,24,40,.05)}
       #more .cb-mobile-more-link{display:grid;grid-template-columns:38px minmax(0,1fr) 20px;gap:10px;align-items:center;padding:12px 13px;border:0;border-bottom:1px solid #edf0f3;text-decoration:none;color:#1d2939;background:#fff}
       #more .cb-mobile-more-link:last-child{border-bottom:0}
-      #more .cb-mobile-more-icon{width:36px;height:36px;border-radius:9px;background:#f1f4f8;display:flex;align-items:center;justify-content:center;color:var(--primary-color,#102a66);font-size:1rem}
+      #more .cb-mobile-more-icon{width:36px;height:36px;border-radius:9px;background:#f1f4f8;color:var(--primary-color,#102a66);display:flex;align-items:center;justify-content:center;font-size:1rem}
       #more .cb-mobile-more-copy strong{display:block;font-size:.79rem;font-weight:800;color:#1d2939}
       #more .cb-mobile-more-copy small{display:block;font-size:.65rem;color:#7b8492;margin-top:1px;line-height:1.2}
       #more .cb-mobile-more-arrow{color:#98a2b3;font-size:.8rem;text-align:right}
@@ -289,6 +363,7 @@
     ].join('');
   }
 
+  installDesktopRosterBootGuard();
   normalizeHomeEntry();
   window.addEventListener('hashchange', redirectLegacySchedule);
   if (redirectLegacySchedule()) return;
