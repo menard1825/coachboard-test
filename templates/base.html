@@ -182,7 +182,7 @@
             <h6 class="text-muted ps-3 mt-2 mb-1">Switch Team</h6>
             {% for team in available_teams %}
                 {% if team.id != current_team.id %}
-                <a class="list-group-item list-group-item-action" href="{{ url_for('auth.switch_team', team_id=team.id) }}"><i class="bi bi-arrow-left-right text-muted"></i> {{ team.team_name }}</a></li>
+                <a class="list-group-item list-group-item-action" href="{{ url_for('auth.switch_team', team_id=team.id) }}"><i class="bi bi-arrow-left-right text-muted"></i> {{ team.team_name }}</a>
                 {% endif %}
             {% endfor %}
             <hr class="my-2">
