@@ -28,28 +28,45 @@ def login(page: Page, coachboard_url: str):
     expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#(?:overview|games))?$'))
 
 
-def test_pitching_dashboard_is_fast_to_scan_on_mobile(page: Page, coachboard_url: str):
+def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/pitching', wait_until='domcontentloaded')
 
     expect(page.locator('h3').filter(has_text='Pitching')).to_be_visible()
+    expect(page.locator('#pitchingRuleStrip')).to_be_visible()
     cards = page.locator('.cb-pitcher-card')
-    expect(cards).not_to_have_count(0, timeout=15_000)
+    expect(cards).not_to_have_count(0)
     expect(page.locator('.cb-pitch-counts')).to_be_visible()
-    expect(cards.first).to_contain_text('Competition eligibility')
-    expect(cards.first).to_contain_text('Arm care')
+    expect(cards.first).to_contain_text('Competition Eligibility')
+    expect(cards.first).to_contain_text('Arm Care')
     expect(cards.first.locator('.pitch-arm-care-slot')).not_to_contain_text('Loading', timeout=15_000)
 
-    status_card = page.locator('.card').filter(has=page.locator('h5', has_text='Pitcher Availability')).first
-    expect(status_card.locator('table')).to_be_hidden()
+    # The current dashboard is rendered as cards from first paint. The old
+    # table->JavaScript-card replacement and injected duplicate summary are gone.
+    status_card = page.locator('#pitcherAvailabilityCard')
+    expect(status_card.locator('table')).to_have_count(0)
+    expect(page.locator('.cb-pitch-source')).to_have_count(0)
+    expect(page.locator('#pitchingDualRuleSummary')).to_have_count(0)
 
-    history = page.locator('.card').filter(has=page.locator('h5', has_text='Recent Throwing History')).first
-    if history.locator('.list-group-item [data-outing-id]').count():
-        expect(history.locator('#cbPitchHistoryPlayer')).to_be_visible()
-        expect(history.locator('#cbPitchHistoryRange')).to_be_visible()
-        expect(history.locator('#cbPitchHistoryCount')).to_be_visible()
+    # The seeded test team intentionally chooses competition rules per game.
+    # The generic Pitching dashboard must not present that as official eligibility.
+    expect(status_card).to_contain_text('Competition Rules Needed')
+    expect(status_card).not_to_contain_text('Eligible Today\n1')
 
+    bounds = cards.evaluate_all(
+        """items => items.map(item => {
+            const r = item.getBoundingClientRect();
+            return {left:r.left, right:r.right, viewport:innerWidth};
+        })"""
+    )
+    assert bounds
+    assert all(b['left'] >= -1 and b['right'] <= b['viewport'] + 1 for b in bounds)
+
+    history = page.locator('#pitchHistoryCard')
+    expect(history.locator('#cbPitchHistoryPlayer')).to_be_visible()
+    expect(history.locator('#cbPitchHistoryRange')).to_be_visible()
+    expect(history.locator('#cbPitchHistoryCount')).to_be_visible()
     assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
 
 
@@ -57,7 +74,7 @@ def test_pitch_target_save_updates_without_full_page_reload(page: Page, coachboa
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/pitching', wait_until='domcontentloaded')
-    expect(page.locator('.cb-pitcher-card')).not_to_have_count(0, timeout=15_000)
+    expect(page.locator('.cb-pitcher-card')).not_to_have_count(0)
 
     marker = 'pitching-target-no-reload-marker'
     page.evaluate('(value) => { window.__pitchingTargetMarker = value; }', marker)
