@@ -2,150 +2,215 @@
 
 {% block title %}Pitching - {{ current_team.team_name }}{% endblock %}
 
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pitching_dashboard_v3.css', v=css_version) }}">
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid pb-4">
-    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+{% set ns = namespace(eligible=0, unavailable=0, review=0) %}
+{% for player in pitchers | sort(attribute='name') %}
+    {% set s = pitch_count_summary.get(player.name) %}
+    {% if s %}
+        {% if rules.competition_unselected %}
+            {% set ns.review = ns.review + 1 %}
+        {% elif s.status == 'Available' %}
+            {% set ns.eligible = ns.eligible + 1 %}
+        {% elif s.status in ['Pitch Count Incomplete', 'Innings Incomplete'] %}
+            {% set ns.review = ns.review + 1 %}
+        {% else %}
+            {% set ns.unavailable = ns.unavailable + 1 %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+<div class="container-fluid pb-4 cb-pitching-v3" data-competition-unselected="{{ '1' if rules.competition_unselected else '0' }}">
+    <div class="cb-pitch-page-head">
         <div>
-            <h3 class="mb-1">Pitching Dashboard</h3>
-            <div class="text-muted">Competition eligibility, arm-care guidance, workload, and pitch targets.</div>
+            <div class="cb-kicker">Pitching</div>
+            <h3>Pitching</h3>
+            <p>Eligibility, arm-care guidance, workload, targets, and throwing history.</p>
         </div>
-        <a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-outline-secondary">View {{ rules.rule_set_name }} Rules</a>
+        <div class="cb-pitch-page-actions">
+            {% if not rules.competition_unselected %}
+            <a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-outline-secondary btn-sm">View Rules</a>
+            {% endif %}
+            <a href="{{ url_for('admin.admin_settings') }}#pitching-rules-settings" class="btn btn-outline-primary btn-sm">Pitching Settings</a>
+        </div>
     </div>
 
-    {% if rules.source_note %}
-    <div class="alert alert-warning py-2">{{ rules.source_note }}</div>
+    <div class="cb-pitch-rule-strip" id="pitchingRuleStrip" aria-label="Pitching rule settings">
+        <div class="cb-pitch-rule-item">
+            <span class="cb-pitch-rule-icon"><i class="bi bi-trophy"></i></span>
+            <div>
+                <span>Competition Rules</span>
+                <strong id="pitchingCompetitionName">{{ rules.rule_set_name if not rules.competition_unselected else 'Select per game' }}</strong>
+                <small id="pitchingCompetitionNote">{% if rules.competition_unselected %}No team default. Select event rules on each game.{% else %}Team default; individual games can use different rules.{% endif %}</small>
+            </div>
+        </div>
+        <div class="cb-pitch-rule-item">
+            <span class="cb-pitch-rule-icon"><i class="bi bi-heart-pulse"></i></span>
+            <div>
+                <span>Arm Care</span>
+                <strong id="pitchingArmCareName">Loading…</strong>
+                <small id="pitchingArmCareNote">Advisory workload and rest guidance.</small>
+            </div>
+        </div>
+    </div>
+
+    {% if rules.source_note and not rules.competition_unselected %}
+    <div class="alert alert-warning py-2 small">{{ rules.source_note }}</div>
     {% endif %}
 
-    <div class="alert alert-primary d-flex gap-3 align-items-start" role="note">
-        <i class="bi bi-info-circle-fill mt-1"></i>
-        <div><strong>Pitch targets are optional coaching plans.</strong><br><span class="small">Targets count game pitches only and do not change official eligibility. Practice and lesson throwing remain part of workload tracking.</span></div>
-    </div>
-
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="card cb-pitch-section-card mb-3" id="pitcherAvailabilityCard">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h5 class="mb-0">Pitcher Availability</h5>
-                <div class="small text-muted">
-                    Official status uses {{ rules.rule_set_name }} {{ 'game-pitch counts' if rules.rule_type == 'pitch_count' else 'game innings/outs' }}.
-                    Practice and lessons are shown separately as workload.
-                </div>
+                <div class="small text-muted">Competition eligibility and arm-care guidance are shown separately.</div>
             </div>
-            <span class="badge text-bg-light border">{{ current_team.age_group }} • {{ rules.rule_set_name }}</span>
+            <span class="badge text-bg-light border">{{ current_team.age_group }}{% if not rules.competition_unselected %} · {{ rules.rule_set_name }}{% endif %}</span>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-3">Pitcher</th>
-                            <th>Competition Eligibility</th>
-                            <th>Official Today</th>
-                            <th>Throwing Workload</th>
-                            <th>Pitch Target</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for player in pitchers | sort(attribute='name') %}
-                        {% set s = pitch_count_summary.get(player.name) %}
-                        {% if s %}
-                        <tr>
-                            <td class="ps-3">
-                                <div class="fw-bold">{{ player.name }}</div>
-                                <div class="small text-muted">Last game outing: {{ s.last_outing_display }}</div>
-                            </td>
-                            <td style="min-width:170px">
-                                {% if s.status == 'Available' %}
-                                    <span class="badge text-bg-success">Eligible</span>
-                                {% elif s.status in ['Pitch Count Incomplete', 'Innings Incomplete'] %}
-                                    <span class="badge text-bg-warning">Verify</span>
-                                {% elif s.status == 'Same-Day Game Restriction' %}
-                                    <span class="badge text-bg-warning">Unavailable Today</span>
-                                {% else %}
-                                    <span class="badge text-bg-danger">{{ s.status }}</span>
-                                {% endif %}
-                                {% if s.status_detail %}<div class="small text-muted mt-1">{{ s.status_detail }}</div>{% endif %}
-                                {% if s.next_available and s.next_available != 'Today' %}<div class="small mt-1"><strong>Next Available:</strong> {{ s.next_available }}</div>{% endif %}
-                            </td>
-                            <td style="min-width:155px">
-                                {% if s.rule_type == 'innings' %}
+            <div class="cb-pitch-summary cb-pitch-counts" aria-label="Pitcher availability summary">
+                <div class="cb-pitch-summary-item"><span>Eligible Today</span><strong>{{ ns.eligible }}</strong></div>
+                <div class="cb-pitch-summary-item"><span>Unavailable</span><strong>{{ ns.unavailable }}</strong></div>
+                <div class="cb-pitch-summary-item"><span>Needs Review</span><strong>{{ ns.review }}</strong></div>
+            </div>
+            <div class="cb-pitch-card-grid">
+                {% for player in pitchers | sort(attribute='name') %}
+                    {% set s = pitch_count_summary.get(player.name) %}
+                    {% if s %}
+                    {% set incomplete = s.status in ['Pitch Count Incomplete', 'Innings Incomplete'] %}
+                    {% set available = (not rules.competition_unselected) and s.status == 'Available' %}
+                    <article class="cb-pitcher-card" data-player-name="{{ player.name|e }}" data-player-id="{{ player.id }}" data-state="{% if rules.competition_unselected %}rules{% elif available %}available{% else %}attention{% endif %}">
+                        <div class="cb-pitcher-top">
+                            <div>
+                                <div class="cb-pitcher-name">{{ player.name }}</div>
+                                <div class="cb-pitcher-last">Last game outing: {{ s.last_outing_display }}</div>
+                            </div>
+                            {% if rules.competition_unselected %}
+                                <span class="cb-pitch-status neutral">Rules Needed</span>
+                            {% elif available %}
+                                <span class="cb-pitch-status available">Eligible</span>
+                            {% elif incomplete %}
+                                <span class="cb-pitch-status warning">Verify</span>
+                            {% elif s.status == 'Same-Day Game Restriction' %}
+                                <span class="cb-pitch-status warning">Unavailable Today</span>
+                            {% else %}
+                                <span class="cb-pitch-status danger">Rest Required</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="cb-pitch-decision">
+                            <span class="cb-pitch-kicker">Competition Eligibility</span>
+                            {% if rules.competition_unselected %}
+                                <strong>Competition Rules Needed</strong>
+                                <div class="cb-pitch-detail">Select rules for the event or game.</div>
+                            {% elif available %}
+                                <strong>Eligible Today</strong>
+                                {% if s.status_detail %}<div class="cb-pitch-detail">{{ s.status_detail }}</div>{% endif %}
+                            {% elif incomplete %}
+                                <strong>Verify Pitching History</strong>
+                                {% if s.status_detail %}<div class="cb-pitch-detail">{{ s.status_detail }}</div>{% endif %}
+                            {% elif s.next_available and s.next_available != 'Today' and not s.next_available.lower().startswith('verify') %}
+                                <strong class="cb-pitch-next-date">Next Available: {{ s.next_available }}</strong>
+                                {% if s.status_detail %}<div class="cb-pitch-detail">{{ s.status_detail }}</div>{% endif %}
+                            {% else %}
+                                <strong>{{ s.status }}</strong>
+                                {% if s.status_detail %}<div class="cb-pitch-detail">{{ s.status_detail }}</div>{% endif %}
+                            {% endif %}
+                        </div>
+
+                        <div class="pitch-arm-care-slot" data-player-name="{{ player.name|e }}">
+                            <div class="cb-pitch-arm-row"><span class="cb-pitch-arm-title">Arm Care</span><span class="cb-pitch-arm-value text-muted">Loading…</span></div>
+                        </div>
+
+                        <div class="cb-pitch-metrics">
+                            <div class="cb-pitch-metric">
+                                <span class="cb-pitch-kicker">Official Usage</span>
+                                {% if rules.competition_unselected %}
+                                    <div class="fw-bold">—</div>
+                                    <div class="small text-muted">Competition rules not selected.</div>
+                                {% elif s.rule_type == 'innings' %}
                                     <div class="fw-bold">{{ s.daily_innings or '—' }} IP today</div>
                                     <div class="small text-muted">{{ s.rolling_3_day_innings or '—' }} IP over 3 days</div>
-                                    {% if s.innings_remaining_today is not none %}<div class="small">Up to {{ s.innings_remaining_today }} IP remaining by rule</div>{% endif %}
+                                    {% if s.innings_remaining_today is not none %}<div class="small">{{ s.innings_remaining_today }} IP remaining by rule</div>{% endif %}
                                 {% else %}
-                                    <div class="fw-bold">
-                                        {{ s.official_daily_pitches if s.official_daily_pitches is not none else '—' }}
-                                        {% if s.max_daily %}/ {{ s.max_daily }} pitches{% endif %}
-                                    </div>
+                                    <div class="fw-bold">{{ s.official_daily_pitches if s.official_daily_pitches is not none else '—' }}{% if s.max_daily %} / {{ s.max_daily }} pitches{% endif %}</div>
                                     {% if s.pitches_remaining_today is not none %}<div class="small text-muted">{{ s.pitches_remaining_today }} under daily max</div>{% endif %}
                                     <div class="small text-muted">7-day game pitches: {{ s.official_7_day_pitches if s.official_7_day_pitches is not none else '—' }}</div>
                                 {% endif %}
-                            </td>
-                            <td style="min-width:170px">
+                            </div>
+                            <div class="cb-pitch-metric">
+                                <span class="cb-pitch-kicker">Throwing Workload</span>
                                 <div class="fw-bold">{{ s.workload_daily_pitches if s.workload_daily_pitches is not none else '—' }} pitches today</div>
-                                <div class="small text-muted">Games + practice + lessons</div>
                                 <div class="small text-muted">7-day workload: {{ s.workload_7_day_pitches if s.workload_7_day_pitches is not none else '—' }}</div>
-                                {% if not s.workload_history_complete %}<div class="small text-warning fw-semibold">Some workload counts are missing</div>{% endif %}
-                            </td>
-                            <td style="min-width:155px">
+                                {% if not s.workload_history_complete %}<div class="small text-warning fw-semibold">Some counts are missing</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="cb-pitch-target" data-target-slot="true" data-player-id="{{ player.id }}">
+                            <div class="cb-pitch-target-copy">
+                                <span class="cb-pitch-kicker">Pitch Target</span>
                                 {% if s.coach_target is not none %}
                                     <div class="fw-bold">Today · {{ s.coach_target }} game pitches</div>
                                     {% if s.coach_target_reason %}<div class="small text-muted">{{ s.coach_target_reason }}</div>{% endif %}
-                                    {% if s.coach_target_reached %}<span class="badge text-bg-warning mt-1">Target Reached</span>{% elif s.coach_target_remaining is not none %}<div class="small">{{ s.coach_target_remaining }} target pitches left</div>{% endif %}
+                                    {% if s.coach_target_reached %}<div class="small text-warning fw-semibold">Target reached</div>{% elif s.coach_target_remaining is not none %}<div class="small text-muted">{{ s.coach_target_remaining }} remaining</div>{% endif %}
                                 {% else %}
-                                    <span class="text-muted small">No target set</span>
+                                    <div class="small text-muted">No target set</div>
                                 {% endif %}
-                                <br>
-                                <button type="button" class="btn btn-sm btn-link px-0 open-target-modal"
-                                    data-player-id="{{ player.id }}" data-player-name="{{ player.name|e }}"
-                                    data-target-pitches="{{ s.coach_target if s.coach_target is not none else '' }}"
-                                    data-target-reason="{{ s.coach_target_reason|default('', true)|e }}"
-                                    data-target-date="{{ today_string }}" data-game-id="">Edit Target</button>
-                            </td>
-                        </tr>
-                        {% endif %}
-                    {% else %}
-                        <tr><td colspan="5" class="text-center text-muted py-4">No pitchers found.</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary open-target-modal"
+                                data-player-id="{{ player.id }}" data-player-name="{{ player.name|e }}"
+                                data-target-pitches="{{ s.coach_target if s.coach_target is not none else '' }}"
+                                data-target-reason="{{ s.coach_target_reason|default('', true)|e }}"
+                                data-target-date="{{ today_string }}" data-game-id="">Edit Target</button>
+                        </div>
+                    </article>
+                    {% endif %}
+                {% else %}
+                    <div class="cb-empty-state"><i class="bi bi-bullseye"></i><h5>No pitchers found</h5><p>Set a pitcher role on the roster to begin tracking pitching.</p></div>
+                {% endfor %}
             </div>
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
-            <div><h5 class="mb-0">Pitch Targets</h5><div class="small text-muted">Optional game-pitch plans for one scheduled game or an entire game day.</div></div>
-            <button type="button" class="btn btn-sm btn-primary open-target-modal" data-player-id="" data-player-name="Choose a pitcher" data-target-pitches="" data-target-reason="" data-target-date="{{ today_string }}" data-game-id=""><i class="bi bi-plus-circle me-1"></i>Set Pitch Target</button>
-        </div>
-        <div class="list-group list-group-flush">
-            {% for target in planned_targets %}
-            <div class="list-group-item d-flex justify-content-between align-items-center gap-3 py-3 flex-wrap">
-                <div>
-                    <div><strong>{{ target.player_name }}</strong> <span class="badge text-bg-light border">{{ target.game_label }}</span></div>
-                    <div class="small text-muted mt-1">{{ target.local_date }} · <strong>{{ target.target_pitches }} game pitches</strong>{% if target.reason %} · {{ target.reason }}{% endif %}</div>
-                </div>
-                <button type="button" class="btn btn-sm btn-outline-secondary open-target-modal"
-                    data-player-id="{{ target.player_id }}" data-player-name="{{ target.player_name|e }}"
-                    data-target-pitches="{{ target.target_pitches }}" data-target-reason="{{ target.reason|e }}"
-                    data-target-date="{{ target.local_date }}" data-game-id="{{ target.game_id or '' }}">Edit</button>
-            </div>
-            {% else %}
-            <div class="list-group-item text-center text-muted py-4">No pitch targets set.</div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <div class="row g-3">
+    <div class="row g-3 cb-pitch-work-row mb-3">
         <div class="col-lg-5">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3">
+            <div class="card cb-pitch-section-card" id="pitchTargetsCard">
+                <div class="card-header d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div><h5 class="mb-0">Pitch Targets</h5><div class="small text-muted">Optional plans for one game or an entire game day.</div></div>
+                    <button type="button" class="btn btn-sm btn-primary open-target-modal" data-player-id="" data-player-name="Choose a pitcher" data-target-pitches="" data-target-reason="" data-target-date="{{ today_string }}" data-game-id=""><i class="bi bi-plus-circle me-1"></i>Set Pitch Target</button>
+                </div>
+                <div class="list-group list-group-flush cb-pitch-target-list">
+                    {% for target in planned_targets %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                        <div>
+                            <div><strong>{{ target.player_name }}</strong> <span class="badge text-bg-light border">{{ target.game_label }}</span></div>
+                            <div class="small text-muted mt-1">{{ target.local_date }} · <strong>{{ target.target_pitches }} game pitches</strong>{% if target.reason %} · {{ target.reason }}{% endif %}</div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary open-target-modal"
+                            data-player-id="{{ target.player_id }}" data-player-name="{{ target.player_name|e }}"
+                            data-target-pitches="{{ target.target_pitches }}" data-target-reason="{{ target.reason|e }}"
+                            data-target-date="{{ target.local_date }}" data-game-id="{{ target.game_id or '' }}">Edit</button>
+                    </div>
+                    {% else %}
+                    <div class="list-group-item text-center text-muted py-4">No pitch targets set.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card cb-pitch-section-card">
+                <div class="card-header">
                     <h5 class="mb-0">Record Throwing</h5>
-                    <div class="small text-muted">Record game, practice/bullpen, or lesson throwing.</div>
+                    <div class="small text-muted">Game, practice/bullpen, or lesson throwing.</div>
                 </div>
                 <div class="card-body">
                     <form action="{{ url_for('pitching.add_pitching') }}" method="POST" id="newPitchingOutingForm">
                         <div class="row g-3">
-                            <div class="col-12">
+                            <div class="col-12 col-md-5">
                                 <label for="outing_type" class="form-label fw-semibold">Throwing Type</label>
                                 <select name="outing_type" id="outing_type" class="form-select">
                                     <option value="Game">Game</option>
@@ -153,11 +218,11 @@
                                     <option value="External/Lesson">Pitching Lesson / External Throwing</option>
                                 </select>
                             </div>
-                            <div class="col-6">
+                            <div class="col-6 col-md-3">
                                 <label for="pitch_date" class="form-label fw-semibold">Date</label>
                                 <input type="date" id="pitch_date" name="pitch_date" class="form-control" required>
                             </div>
-                            <div class="col-6">
+                            <div class="col-6 col-md-4">
                                 <label for="player_id_select" class="form-label fw-semibold">Pitcher</label>
                                 <select name="player_id" id="player_id_select" class="form-select" required>
                                     <option value="">Select…</option>
@@ -171,7 +236,7 @@
                             <div class="col-12 col-sm-6">
                                 <label for="pitches" class="form-label fw-semibold">Pitches Thrown</label>
                                 <input type="number" min="0" step="1" inputmode="numeric" id="pitches" name="pitches" class="form-control" required>
-                                <div class="form-text">Used for overall arm workload. Game pitches also feed Pitch Smart when selected.</div>
+                                <div class="form-text">Used for throwing workload. Game pitches also feed arm-care guidance.</div>
                             </div>
                             <div class="col-12 col-sm-6 game-only-field">
                                 <label for="pitcher_type" class="form-label fw-semibold">Game Role</label>
@@ -191,61 +256,69 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="small text-muted mt-2 game-only-field">Baseball innings are counted by outs: 2 innings + 1 out = 2.1 IP.</div>
+                        <div class="small text-muted mt-2 game-only-field">2 innings + 1 out = 2.1 IP.</div>
                         <button type="submit" class="btn btn-primary w-100 mt-3">Save Throwing Record</button>
                     </form>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="col-lg-7">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-white py-3"><h5 class="mb-0">Recent Throwing History</h5></div>
-                <div class="list-group list-group-flush">
-                    {% for o in recent_outings %}
-                    <div class="list-group-item d-flex justify-content-between align-items-center gap-3 py-3">
-                        <div>
-                            <div><strong>{{ o.player.full_name if o.player else 'Unknown' }}</strong> <span class="badge text-bg-light border">{{ o.outing_type or 'Game' }}</span></div>
-                            <div class="small text-muted">
-                                {{ o.date | format_datetime }}
-                                {% if o.opponent %} • {{ o.opponent }}{% endif %}
-                            </div>
-                            <div class="small mt-1">
-                                <strong>{{ o.pitches if o.pitches is not none else 'Unknown' }}</strong> pitches
-                                {% if (o.outing_type or 'Game') == 'Game' and o.innings is not none %} • {{ o.innings }} IP{% endif %}
-                                {% if (o.outing_type or 'Game') == 'Game' and o.pitcher_type %} • {{ o.pitcher_type }}{% endif %}
-                            </div>
-                        </div>
-                        <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
-                                data-outing-id="{{ o.id }}" data-date="{{ o.date.strftime('%Y-%m-%d') }}" data-player-id="{{ o.player_id }}"
-                                data-opponent="{{ o.opponent or '' }}" data-pitches="{{ o.pitches if o.pitches is not none else '' }}"
-                                data-innings="{{ o.innings if o.innings is not none else '' }}" data-outing-type="{{ o.outing_type or 'Game' }}"
-                                data-pitcher-type="{{ o.pitcher_type or '' }}"><i class="bi bi-pencil"></i></button>
-                            <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-outline-danger" onclick="return confirm('Delete this throwing record?')"><i class="bi bi-trash"></i></a>
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="list-group-item text-muted text-center py-4">No throwing records yet.</div>
-                    {% endfor %}
-                </div>
+    <div class="card cb-pitch-section-card" id="pitchHistoryCard">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div><h5 class="mb-0">Recent Throwing History</h5><div class="small text-muted">Game and non-game throwing records.</div></div>
+            </div>
+            <div class="cb-pitch-history-tools">
+                <select class="form-select form-select-sm" id="cbPitchHistoryPlayer" aria-label="Filter throwing history by pitcher">
+                    <option value="">All pitchers</option>
+                    {% for p in pitchers | sort(attribute='name') %}<option value="{{ p.id }}">{{ p.full_name }}</option>{% endfor %}
+                </select>
+                <select class="form-select form-select-sm" id="cbPitchHistoryRange" aria-label="Filter throwing history by date">
+                    <option value="7">Last 7 days</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="all">All recent</option>
+                </select>
+                <span class="cb-pitch-history-count" id="cbPitchHistoryCount"></span>
             </div>
         </div>
+        <div class="list-group list-group-flush cb-pitch-history-list" id="pitchHistoryList">
+            {% for o in recent_outings %}
+            <div class="list-group-item d-flex justify-content-between align-items-center gap-3" data-pitch-history-player="{{ o.player_id }}" data-pitch-history-date="{{ o.date.strftime('%Y-%m-%d') }}">
+                <div>
+                    <div><strong>{{ o.player.full_name if o.player else 'Unknown' }}</strong> <span class="badge text-bg-light border">{{ o.outing_type or 'Game' }}</span></div>
+                    <div class="small text-muted">{{ o.date | format_datetime }}{% if o.opponent %} · {{ o.opponent }}{% endif %}</div>
+                    <div class="small mt-1"><strong>{{ o.pitches if o.pitches is not none else 'Unknown' }}</strong> pitches{% if (o.outing_type or 'Game') == 'Game' and o.innings is not none %} · {{ o.innings }} IP{% endif %}{% if (o.outing_type or 'Game') == 'Game' and o.pitcher_type %} · {{ o.pitcher_type }}{% endif %}</div>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
+                        data-outing-id="{{ o.id }}" data-date="{{ o.date.strftime('%Y-%m-%d') }}" data-player-id="{{ o.player_id }}"
+                        data-opponent="{{ o.opponent or '' }}" data-pitches="{{ o.pitches if o.pitches is not none else '' }}"
+                        data-innings="{{ o.innings if o.innings is not none else '' }}" data-outing-type="{{ o.outing_type or 'Game' }}"
+                        data-pitcher-type="{{ o.pitcher_type or '' }}" aria-label="Edit throwing record"><i class="bi bi-pencil"></i></button>
+                    <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-outline-danger" onclick="return confirm('Delete this throwing record?')" aria-label="Delete throwing record"><i class="bi bi-trash"></i></a>
+                </div>
+            </div>
+            {% else %}
+            <div class="list-group-item text-muted text-center py-4">No throwing records yet.</div>
+            {% endfor %}
+        </div>
+        <div class="cb-pitch-history-empty d-none" id="cbPitchHistoryEmpty">No throwing records match these filters.</div>
     </div>
 </div>
 
 <div class="modal fade" id="coachTargetModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title">Pitch Target</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <div class="alert alert-light border small"><strong>Optional coaching plan.</strong> Game pitches only; does not change official eligibility or include practice/lesson throwing.</div>
+                <div class="alert alert-light border small"><strong>Optional coaching plan.</strong> Game pitches only; targets do not change official eligibility.</div>
                 <div class="mb-3"><label for="targetPlayerInput" class="form-label fw-semibold">Pitcher</label><select id="targetPlayerInput" class="form-select" required><option value="">Choose a pitcher…</option>{% for p in pitchers | sort(attribute='name') %}<option value="{{ p.id }}">{{ p.full_name }}</option>{% endfor %}</select></div>
-                <div class="mb-3"><label for="targetScopeInput" class="form-label fw-semibold">Target applies to</label><select id="targetScopeInput" class="form-select"><option value="day">Entire game day</option><option value="game">One scheduled game</option></select><div class="form-text" id="targetScopeHelp">Use this when the same pitcher may appear across a doubleheader or multiple games that day.</div></div>
-                <div class="mb-3" id="targetDateField"><label for="targetDateInput" class="form-label fw-semibold">Game date</label><input type="date" id="targetDateInput" class="form-control" value="{{ today_string }}"></div>
-                <div class="mb-3 d-none" id="targetGameField"><label for="targetGameInput" class="form-label fw-semibold">Scheduled game</label><select id="targetGameInput" class="form-select"><option value="">Choose a game…</option>{% for game in scheduled_games %}<option value="{{ game.id }}" data-date="{{ game.date.strftime('%Y-%m-%d') }}">{{ game.date.strftime('%a, %b %-d') }} · vs {{ game.opponent }}</option>{% endfor %}</select>{% if not scheduled_games %}<div class="form-text text-warning">Add the game to Schedule first, or use an entire game-day target.</div>{% endif %}</div>
-                <div class="mb-3"><label for="targetPitchesInput" class="form-label fw-semibold">Planned game pitches</label><input type="number" min="0" step="1" class="form-control" id="targetPitchesInput"><div class="form-text">Leave blank and save to clear this exact target.</div></div>
-                <div class="mb-0"><label for="targetReasonInput" class="form-label fw-semibold">Reason or coaching note</label><input type="text" class="form-control" id="targetReasonInput" placeholder="e.g. Short start; available again Sunday"></div>
+                <div class="mb-3"><label for="targetScopeInput" class="form-label fw-semibold">Target Applies To</label><select id="targetScopeInput" class="form-select"><option value="day">Entire game day</option><option value="game">One scheduled game</option></select><div class="form-text" id="targetScopeHelp">Applies across all games on the selected date.</div></div>
+                <div class="mb-3" id="targetDateField"><label for="targetDateInput" class="form-label fw-semibold">Game Date</label><input type="date" id="targetDateInput" class="form-control" value="{{ today_string }}"></div>
+                <div class="mb-3 d-none" id="targetGameField"><label for="targetGameInput" class="form-label fw-semibold">Scheduled Game</label><select id="targetGameInput" class="form-select"><option value="">Choose a game…</option>{% for game in scheduled_games %}<option value="{{ game.id }}" data-date="{{ game.date.strftime('%Y-%m-%d') }}">{{ game.date.strftime('%a, %b %-d') }} · vs {{ game.opponent }}</option>{% endfor %}</select>{% if not scheduled_games %}<div class="form-text text-warning">Add the game to Schedule first, or use an entire game-day target.</div>{% endif %}</div>
+                <div class="mb-3"><label for="targetPitchesInput" class="form-label fw-semibold">Planned Game Pitches</label><input type="number" min="0" step="1" class="form-control" id="targetPitchesInput"><div class="form-text">Leave blank and save to clear this target.</div></div>
+                <div class="mb-0"><label for="targetReasonInput" class="form-label fw-semibold">Coaching Note</label><input type="text" class="form-control" id="targetReasonInput" placeholder="Short start; available again Sunday"></div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" id="saveTargetBtn">Save Target</button></div>
         </div>
@@ -259,12 +332,7 @@
             <form id="editPitchingOutingForm" method="POST">
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label">Type</label>
-                            <select name="outing_type" id="edit_outing_type" class="form-select">
-                                <option value="Game">Game</option><option value="Practice">Practice / Bullpen</option><option value="External/Lesson">Pitching Lesson / External</option>
-                            </select>
-                        </div>
+                        <div class="col-12"><label class="form-label">Type</label><select name="outing_type" id="edit_outing_type" class="form-select"><option value="Game">Game</option><option value="Practice">Practice / Bullpen</option><option value="External/Lesson">Pitching Lesson / External</option></select></div>
                         <div class="col-6"><label class="form-label">Date</label><input type="date" id="edit_pitch_date" name="pitch_date" class="form-control" required></div>
                         <div class="col-6"><label class="form-label">Pitcher</label><select name="player_id" class="form-select" required id="edit_pitcher">{% for p in pitchers %}<option value="{{ p.id }}">{{ p.full_name }}</option>{% endfor %}</select></div>
                         <div class="col-12"><label class="form-label" id="editContextLabel">Opponent</label><input type="text" id="edit_opponent" name="opponent" class="form-control"></div>
@@ -283,129 +351,5 @@
 
 {% block scripts %}
 {{ super() }}
-<script>
-function localDateString() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-}
-
-function applyTargetScopeUI() {
-    const scope = document.getElementById('targetScopeInput').value;
-    const isGame = scope === 'game';
-    document.getElementById('targetDateField').classList.toggle('d-none', isGame);
-    document.getElementById('targetGameField').classList.toggle('d-none', !isGame);
-    document.getElementById('targetScopeHelp').textContent = isGame
-        ? 'This target is counted only against the selected scheduled game.'
-        : 'This target is counted across all games on the selected date.';
-}
-
-function openTargetModal(button) {
-    const gameId = button.dataset.gameId || '';
-    document.getElementById('targetPlayerInput').value = button.dataset.playerId || '';
-    document.getElementById('targetPitchesInput').value = button.dataset.targetPitches || '';
-    document.getElementById('targetReasonInput').value = button.dataset.targetReason || '';
-    document.getElementById('targetDateInput').value = button.dataset.targetDate || localDateString();
-    document.getElementById('targetGameInput').value = gameId;
-    document.getElementById('targetScopeInput').value = gameId ? 'game' : 'day';
-    applyTargetScopeUI();
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('coachTargetModal')).show();
-}
-
-function applyOutingTypeUI(prefix = '') {
-    const isEdit = prefix === 'edit_';
-    const select = document.getElementById(`${prefix}outing_type`);
-    if (!select) return;
-    const isGame = select.value === 'Game';
-    const fields = document.querySelectorAll(isEdit ? '.edit-game-only' : '.game-only-field');
-    fields.forEach(el => el.classList.toggle('d-none', !isGame));
-
-    const inningsWhole = document.getElementById(`${prefix}innings_whole`);
-    if (inningsWhole) inningsWhole.required = isGame;
-
-    const contextLabel = document.getElementById(isEdit ? 'editContextLabel' : 'contextLabel');
-    const contextInput = document.getElementById(`${prefix}opponent`);
-    if (contextLabel) contextLabel.textContent = isGame ? 'Opponent' : 'Context / Notes (optional)';
-    if (contextInput) {
-        contextInput.required = isGame;
-        contextInput.placeholder = isGame ? 'Opponent name' : (select.value === 'Practice' ? 'e.g. Team bullpen' : 'e.g. Lesson with pitching coach');
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const pitchDate = document.getElementById('pitch_date');
-    if (pitchDate && !pitchDate.value) pitchDate.value = localDateString();
-
-    document.getElementById('outing_type')?.addEventListener('change', () => applyOutingTypeUI());
-    document.getElementById('edit_outing_type')?.addEventListener('change', () => applyOutingTypeUI('edit_'));
-    document.getElementById('targetScopeInput')?.addEventListener('change', applyTargetScopeUI);
-    document.querySelectorAll('.open-target-modal').forEach(button => button.addEventListener('click', () => openTargetModal(button)));
-    applyOutingTypeUI();
-    applyTargetScopeUI();
-
-    document.getElementById('saveTargetBtn')?.addEventListener('click', async () => {
-        const playerId = document.getElementById('targetPlayerInput').value;
-        const scope = document.getElementById('targetScopeInput').value;
-        const gameSelect = document.getElementById('targetGameInput');
-        const gameId = scope === 'game' ? gameSelect.value : null;
-        if (!playerId) {
-            document.getElementById('targetPlayerInput').focus();
-            return;
-        }
-        if (scope === 'game' && !gameId) {
-            gameSelect.focus();
-            return;
-        }
-        const selectedGame = gameSelect.selectedOptions[0];
-        const targetDate = scope === 'game'
-            ? selectedGame?.dataset.date
-            : document.getElementById('targetDateInput').value;
-        if (!targetDate) {
-            document.getElementById('targetDateInput').focus();
-            return;
-        }
-        const raw = document.getElementById('targetPitchesInput').value.trim();
-        const response = await fetch('/save_player_target', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({
-                player_id: playerId,
-                target_pitches: raw === '' ? null : Number(raw),
-                local_date: targetDate,
-                game_id: gameId,
-                reason: document.getElementById('targetReasonInput').value.trim() || null,
-            }),
-        });
-        const data = await response.json();
-        if (response.ok && data.status === 'success') window.location.reload();
-        else alert(data.message || 'Unable to save target.');
-    });
-
-    const editModal = document.getElementById('editPitchingOutingModal');
-    editModal?.addEventListener('show.bs.modal', event => {
-        const button = event.relatedTarget;
-        const form = document.getElementById('editPitchingOutingForm');
-        form.action = `/edit_pitching/${button.dataset.outingId}`;
-        document.getElementById('edit_pitch_date').value = button.dataset.date;
-        document.getElementById('edit_pitcher').value = button.dataset.playerId;
-        document.getElementById('edit_opponent').value = button.dataset.opponent || '';
-        document.getElementById('edit_pitches').value = button.dataset.pitches || '';
-        document.getElementById('edit_outing_type').value = button.dataset.outingType || 'Game';
-        document.getElementById('edit_pitcher_type').value = button.dataset.pitcherType || 'Starter';
-
-        const innings = String(button.dataset.innings || '');
-        if (innings) {
-            const [whole, outs = '0'] = innings.split('.');
-            document.getElementById('edit_innings_whole').value = whole;
-            document.getElementById('edit_innings_outs').value = ['0','1','2'].includes(outs) ? outs : '0';
-        } else {
-            document.getElementById('edit_innings_whole').value = '';
-            document.getElementById('edit_innings_outs').value = '0';
-        }
-        applyOutingTypeUI('edit_');
-    });
-});
-</script>
+<script src="{{ url_for('static', filename='js/pitching_dashboard_v3.js', v=css_version) }}"></script>
 {% endblock %}
