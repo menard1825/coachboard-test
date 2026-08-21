@@ -54,7 +54,7 @@
 
     const help = document.createElement('div');
     help.className = 'small text-muted mb-2';
-    help.textContent = 'Toggle OFF = Present today. Toggle ON = marked OUT for this game.';
+    help.textContent = 'Mark players OUT for this game.';
     form.prepend(help);
   }
 
@@ -91,7 +91,7 @@
 
     if (!hardBlockers.length && readiness.ready) {
       box.className = 'alert alert-success border-0 shadow-sm mb-3';
-      box.innerHTML = '<strong>Ready to start.</strong> Pregame setup is complete. Tap Start Live Game when you are ready for first pitch.';
+      box.innerHTML = '<strong>Pregame setup complete.</strong>';
       btn.disabled = false;
       btn.classList.remove('disabled');
       return;
@@ -99,7 +99,7 @@
 
     if (hardBlockers.length) {
       box.className = 'alert alert-warning border-0 shadow-sm mb-3';
-      box.innerHTML = `<strong>Finish setup before first pitch</strong><div class="small mt-1">${hardBlockers.map((t) => esc(t)).join('<br>')}</div><div class="small text-muted mt-2">The server will still block Live Game if Inning 1 is incomplete.</div>`;
+      box.innerHTML = `<strong>Finish setup before first pitch</strong><div class="small mt-1">${hardBlockers.map((t) => esc(t)).join('<br>')}</div><div class="small text-muted mt-2">Inning 1 defense must be complete.</div>`;
     } else if (blockers.length) {
       box.className = 'alert alert-light border shadow-sm mb-3';
       box.innerHTML = `<strong>Optional items still open</strong><div class="small mt-1">${blockers.map((t) => esc(t)).join('<br>')}</div>`;
@@ -180,26 +180,26 @@
     const practiceLesson = practiceLessonPitches(summary);
 
     if (!hasCompetitionRules()) {
-      return { label: 'Rules?', tone: 'text-bg-warning', row: 'attention', rank: 1, practiceLesson, officialAvailable: false, needsRules: true };
+      return { label: 'Rules Needed', tone: 'text-bg-warning', row: 'attention', rank: 1, practiceLesson, officialAvailable: false, needsRules: true };
     }
     if (normalized.includes('incomplete') || normalized.includes('verify')) {
       return { label: 'Verify', tone: 'text-bg-warning', row: 'attention', rank: 0, practiceLesson, officialAvailable: false };
     }
     if (status !== 'Available') {
-      return { label: 'Resting', tone: 'text-bg-danger', row: 'resting', rank: 0, practiceLesson, officialAvailable: false };
+      return { label: 'Rest Required', tone: 'text-bg-danger', row: 'resting', rank: 0, practiceLesson, officialAvailable: false };
     }
     if (practiceLesson !== null && practiceLesson >= 30) {
       return { label: 'Caution', tone: 'text-bg-warning', row: 'attention', rank: 2, practiceLesson, officialAvailable: true };
     }
-    return { label: 'Available', tone: 'text-bg-success', row: '', rank: 3, practiceLesson, officialAvailable: true };
+    return { label: 'Eligible', tone: 'text-bg-success', row: '', rank: 3, practiceLesson, officialAvailable: true };
   }
 
   function competitionDecision(summary, classification) {
-    if (classification.needsRules) return 'Select competition rules for this game';
-    if (classification.officialAvailable) return 'Available by competition rule';
-    if (summary?.next_available && summary.next_available !== 'Today') return `Can pitch again: ${summary.next_available}`;
-    if (classification.label === 'Verify') return 'Verify pitching history before using this pitcher';
-    return summary?.status_detail || 'Not available to pitch right now';
+    if (classification.needsRules) return 'Competition rules needed';
+    if (classification.officialAvailable) return 'Eligible by competition rules';
+    if (summary?.next_available && summary.next_available !== 'Today') return `Next Available: ${summary.next_available}`;
+    if (classification.label === 'Verify') return 'Verify pitching history';
+    return summary?.status_detail || 'Not eligible to pitch';
   }
 
   function officialToday(summary) {
@@ -245,7 +245,7 @@
     const onTrack = item.status === 'Available';
     return `
       <span class="gpa-label">Arm care · ${esc(ruleSet)}</span>
-      <strong>${esc(onTrack ? 'On track' : (item.status || 'Needs attention'))}</strong>
+      <strong>${esc(onTrack ? 'No Rest Required' : 'Rest Recommended')}</strong>
       ${!onTrack && item.next_available && item.next_available !== 'Today' ? `<span class="gpa-next">Rest guidance: ${esc(item.next_available)}</span>` : ''}
       ${!onTrack && item.status_detail ? `<span class="gpa-detail">${esc(item.status_detail)}</span>` : ''}`;
   }
@@ -269,15 +269,15 @@
     card.innerHTML = `
       <div class="card-header bg-white py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
         <div>
-          <strong>Who Can Pitch Today?</strong>
-          <div class="cb-pitch-rule-note mt-1">Competition eligibility answers whether a player can pitch. Arm-care guidance is separate and advisory.</div>
+          <strong>Pitcher Availability</strong>
+          <div class="cb-pitch-rule-note mt-1">Competition eligibility and arm-care guidance are shown separately.</div>
         </div>
         <a href="${esc(rulesHref)}" class="btn btn-sm btn-outline-secondary">View Rules</a>
       </div>
       <div class="gpa-shell">
         <div class="gpa-summary">
-          <strong>${hasCompetitionRules() ? `${availableCount} available` : 'Competition rules not selected'}</strong>
-          ${hasCompetitionRules() ? `<span>•</span><strong>${attentionCount} need attention</strong>` : ''}
+          <strong>${hasCompetitionRules() ? `${availableCount} eligible` : 'Competition rules needed'}</strong>
+          ${hasCompetitionRules() ? `<span>•</span><strong>${attentionCount} unavailable / verify</strong>` : ''}
           <span>${esc(ruleLabel)}</span>
         </div>
         <div class="gpa-grid">
@@ -291,7 +291,7 @@
                 <span class="gpa-label">Competition eligibility</span>
                 <strong>${esc(competitionDecision(summary, classification))}</strong>
                 ${!classification.officialAvailable && summary?.status_detail && !classification.needsRules ? `<span class="gpa-detail">${esc(summary.status_detail)}</span>` : ''}
-                ${classification.officialAvailable && classification.label === 'Caution' ? `<span class="gpa-detail">${esc(`${classification.practiceLesson} practice/lesson pitches today. Officially eligible; use coaching judgment.`)}</span>` : ''}
+                ${classification.officialAvailable && classification.label === 'Caution' ? `<span class="gpa-detail">${esc(`${classification.practiceLesson} practice/lesson pitches today. Competition eligible; elevated throwing workload.`)}</span>` : ''}
               </div>
               <div class="gpa-arm">${armCareMarkup(player.name)}</div>
               <div class="gpa-metrics">
@@ -315,14 +315,14 @@
     const unavailable = entries.length - canPitch;
     const value = body.querySelector('.h4');
     const detail = body.querySelector('p.small.text-muted');
-    if (value) value.innerHTML = `${canPitch} <span class="fs-6 text-muted fw-normal">Can Pitch</span>`;
+    if (value) value.innerHTML = `${canPitch} <span class="fs-6 text-muted fw-normal">Eligible</span>`;
     if (detail) {
       detail.textContent = !hasCompetitionRules()
-        ? 'Select competition rules for this game'
-        : ([caution ? `${caution} caution` : null, unavailable ? `${unavailable} unavailable/check` : null].filter(Boolean).join(' · ') || 'Everyone clear today');
+        ? 'Competition rules needed'
+        : ([caution ? `${caution} caution` : null, unavailable ? `${unavailable} unavailable / verify` : null].filter(Boolean).join(' · ') || 'All pitchers eligible');
     }
     const btn = document.getElementById('viewPitchingBtn');
-    if (btn) btn.textContent = 'See Pitchers';
+    if (btn) btn.textContent = 'View Availability';
   }
 
   function hidePregamePostgameEntry() {
@@ -348,7 +348,7 @@
     const title = header?.querySelector('h5');
     const subtitle = header?.querySelector('.small.text-muted');
     if (title) title.textContent = 'Pitching Plan (Optional)';
-    if (subtitle) subtitle.textContent = planCount ? `${planCount} pitcher${planCount === 1 ? '' : 's'} planned. Use this only if it helps you think ahead.` : 'No plan required. Add a starter or relief idea only if it helps.';
+    if (subtitle) subtitle.textContent = planCount ? `${planCount} pitcher${planCount === 1 ? '' : 's'} planned.` : 'No pitching plan set.';
 
     body?.querySelectorAll('.small.text-muted').forEach((node) => {
       node.textContent = node.textContent.replace(/\s*•\s*Target\s+[^•]+/gi, '').trim();
@@ -407,7 +407,7 @@
       const info = button.querySelector('.small.text-muted.mt-1');
       if (info) info.textContent = info.textContent.replace(/\s*•\s*Coach target:\s*[^•]+/gi, '').trim();
       if (classification.label === 'Caution' && !button.querySelector('.cb-workload-note')) {
-        button.insertAdjacentHTML('beforeend', `<div class="cb-workload-note">${classification.practiceLesson} practice/lesson pitches today — officially eligible, but use caution.</div>`);
+        button.insertAdjacentHTML('beforeend', `<div class="cb-workload-note">${classification.practiceLesson} practice/lesson pitches today · Competition eligible; elevated workload.</div>`);
       }
       if (!classification.officialAvailable) {
         button.disabled = true;
@@ -425,7 +425,7 @@
       title.textContent = title.textContent.replace(/^Up Next/i, 'Next Inning Board');
     }
     if (title && !card.querySelector('.cb-board-help')) {
-      title.insertAdjacentHTML('afterend', '<div class="cb-board-help mb-2">Use this to update the physical dugout board for the next inning.</div>');
+      title.insertAdjacentHTML('afterend', '<div class="cb-board-help mb-2">Review next-inning changes.</div>');
     }
     const actionNote = document.querySelector('#liveEndInningBtn .coach-action-note');
     if (actionNote && actionNote.textContent !== 'Show next board') actionNote.textContent = 'Show next board';
