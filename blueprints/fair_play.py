@@ -192,6 +192,78 @@ def redirect_rules_page_when_no_default():
     return None
 
 
+@fair_play_bp.before_app_request
+def guard_live_pitcher_change():
+    """Do not let a Live Game pitcher change bypass official competition eligibility.
+
+    Arm-care guidance remains advisory. If a game has no competition rules selected,
+    the gameplay rules adapter intentionally leaves the coach unblocked while the UI
+    clearly asks them to select the event rules.
+    """
+    if request.endpoint != 'live_game_api.change_pitcher' or request.method != 'POST':
+        return None
+
+    team = _current_team()
+    if not team:
+        return None
+    game_id = (request.view_args or {}).get('game_id')
+    try:
+        game_id = int(game_id)
+    except (TypeError, ValueError):
+        return None
+
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
+    if not game:
+        return None
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        player_id = int(payload.get('new_pitcher_id'))
+    except (TypeError, ValueError):
+        return None
+    player = db.session.query(Player).filter_by(id=player_id, team_id=team.id).first()
+    if not player:
+        return None
+
+    # Import locally to avoid the intentional game_pitching_rules <-> fair_play
+    # module dependency during app startup.
+    from game_pitching_rules import gameplay_pitch_summary, pitching_rules_for_game
+
+    roster = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
+    outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all()
+    targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team.id).all()
+    rules = pitching_rules_for_game(team, game)
+    summary = gameplay_pitch_summary(
+        roster,
+        outings,
+        rules,
+        target_date=game.date,
+        all_targets=targets,
+        team_timezone=team.timezone,
+        current_game_id=game.id,
+    )
+    item = summary.get(player.name) or {}
+    status = str(item.get('status') or 'Eligibility unknown')
+    if status == 'Available':
+        return None
+
+    message = f'{player.full_name} cannot be selected to pitch: {status}.'
+    next_available = item.get('next_available')
+    if next_available and next_available != 'Today':
+        if str(next_available).lower().startswith('verify'):
+            message += f' {next_available}.'
+        else:
+            message += f' Can pitch again {next_available}.'
+    elif item.get('status_detail'):
+        message += f" {item['status_detail']}"
+    return jsonify({
+        'status': 'error',
+        'message': message,
+        'pitching_status': status,
+        'next_available': next_available,
+    }), 409
+
+
 @fair_play_bp.route('/api/fair-play/settings', methods=['GET'])
 def get_fair_play_settings():
     team = _current_team()
