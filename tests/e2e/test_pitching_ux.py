@@ -41,7 +41,7 @@ def test_pitching_dashboard_is_fast_to_scan_on_mobile(page: Page, coachboard_url
     expect(cards.first).to_contain_text('Arm care')
     expect(cards.first.locator('.pitch-arm-care-slot')).not_to_contain_text('Loading', timeout=15_000)
 
-    status_card = page.locator('.card').filter(has=page.locator('h5', has_text='Who Can Pitch?')).first
+    status_card = page.locator('.card').filter(has=page.locator('h5', has_text='Pitcher Availability')).first
     expect(status_card.locator('table')).to_be_hidden()
 
     history = page.locator('.card').filter(has=page.locator('h5', has_text='Recent Throwing History')).first
@@ -61,7 +61,7 @@ def test_pitch_target_save_updates_without_full_page_reload(page: Page, coachboa
 
     marker = 'pitching-target-no-reload-marker'
     page.evaluate('(value) => { window.__pitchingTargetMarker = value; }', marker)
-    page.get_by_role('button', name='Plan a target').click()
+    page.get_by_role('button', name='Set Pitch Target').click()
     expect(page.locator('#coachTargetModal')).to_be_visible()
     page.locator('#targetPlayerInput').select_option(label='Pitcher Pat')
     page.locator('#targetScopeInput').select_option('day')
@@ -96,7 +96,7 @@ def test_game_planning_uses_same_pitcher_decision_cards(page: Page, coachboard_u
     expect(cards.first).to_contain_text('Competition eligibility')
     expect(cards.first).to_contain_text('Arm care')
     expect(cards.first).to_contain_text('Game plan')
-    expect(availability).to_contain_text('Competition rules not selected')
+    expect(availability).to_contain_text('Competition rules needed')
     expect(availability).not_to_contain_text('Eligible')
     expect(availability.locator('table')).to_be_hidden()
     assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
