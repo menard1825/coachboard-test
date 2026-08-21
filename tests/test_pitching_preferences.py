@@ -76,6 +76,25 @@ def _login(client, role='Head Coach'):
         session['role'] = role
 
 
+def _add_heavy_previous_day_outing(app):
+    from db import db
+    from models import Game, PitchingOuting
+
+    with app.app_context():
+        game = db.session.get(Game, 1)
+        db.session.add(PitchingOuting(
+            date=game.date - timedelta(days=1),
+            opponent='Heavy Previous Day',
+            pitches=60,
+            innings=3.0,
+            pitcher_type='Starter',
+            outing_type='Game',
+            team_id=1,
+            player_id=1,
+        ))
+        db.session.commit()
+
+
 def test_new_team_does_not_require_competition_default(monkeypatch):
     app = _build_app(monkeypatch)
     client = app.test_client()
@@ -161,3 +180,48 @@ def test_assistant_coach_cannot_change_pitching_preferences(monkeypatch):
         'arm_care_rule_set': 'MLB Pitch Smart',
     })
     assert response.status_code == 403
+
+
+def test_live_pitcher_change_blocks_officially_ineligible_pitcher(monkeypatch):
+    app = _build_app(monkeypatch)
+    _add_heavy_previous_day_outing(app)
+    client = app.test_client()
+    _login(client)
+
+    settings = client.post('/api/pitching-preferences/settings', json={
+        'competition_default_rule': 'MLB Pitch Smart',
+        'arm_care_rule_set': 'MLB Pitch Smart',
+    })
+    assert settings.status_code == 200
+
+    response = client.post('/api/live-game/1/change-pitcher', json={
+        'new_pitcher_id': 1,
+        'old_pitcher_destination': 'BENCH',
+    })
+    assert response.status_code == 409
+    payload = response.get_json()
+    assert payload['status'] == 'error'
+    assert payload['pitching_status'] != 'Available'
+    assert payload['next_available']
+    assert 'cannot be selected to pitch' in payload['message']
+    assert 'Can pitch again' in payload['message']
+
+
+def test_arm_care_rest_does_not_become_competition_block_without_rules(monkeypatch):
+    app = _build_app(monkeypatch)
+    _add_heavy_previous_day_outing(app)
+    client = app.test_client()
+    _login(client)
+
+    # No competition default is configured, while the default arm-care setting is
+    # still MLB Pitch Smart. The advisory rest flag must not masquerade as an
+    # official competition restriction.
+    arm = client.get('/api/pitching-preferences/arm-care-summary?game_id=1').get_json()
+    assert arm['players']['Test Pitcher']['status'] != 'Available'
+
+    response = client.post('/api/live-game/1/change-pitcher', json={
+        'new_pitcher_id': 1,
+        'old_pitcher_destination': 'BENCH',
+    })
+    assert response.status_code == 409
+    assert response.get_json()['message'] == 'Game is not live.'
