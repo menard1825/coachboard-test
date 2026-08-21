@@ -20,7 +20,7 @@
     </div>
     <div class="agr-actions">
       {% if report.pitching_stats_pending %}<a class="btn btn-primary btn-sm" href="{{ url_for('gameday.game_management', game_id=game.id, pitching=1) }}"><i class="bi bi-pencil-square me-1"></i>Enter GameChanger Stats</a>{% endif %}
-      <a class="btn {% if report.pitching_stats_pending %}btn-outline-primary{% else %}btn-primary{% endif %} btn-sm" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-check2-circle me-1"></i>Done — Back to Game Day</a>
+      <a class="btn {% if report.pitching_stats_pending %}btn-outline-primary{% else %}btn-primary{% endif %} btn-sm" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-check2-circle me-1"></i>Back to Game Day</a>
       <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('gameday.game_management', game_id=game.id, edit=1) }}"><i class="bi bi-pencil me-1"></i>Review / Edit Setup</a>
     </div>
   </div>
@@ -28,7 +28,7 @@
   <section class="agr-card">
     <div class="agr-card-head"><strong>Actual Defense by Inning</strong><span class="agr-badge">Live history, not pregame plan</span></div>
     <div class="agr-card-body">
-      {% if report.unreliable_innings %}<div class="agr-warning">Bench time is not calculated from incomplete historical snapshots: inning{% if report.unreliable_innings|length != 1 %}s{% endif %} {{ report.unreliable_innings|join(', ') }}. CoachBoard will not guess.</div>{% endif %}
+      {% if report.unreliable_innings %}<div class="agr-warning">Incomplete snapshots are excluded from bench totals: inning{% if report.unreliable_innings|length != 1 %}s{% endif %} {{ report.unreliable_innings|join(', ') }}.</div>{% endif %}
       {% if report.innings %}<div class="agr-innings">
       {% for inn in report.innings %}
         <div class="agr-inning {% if not inn.reliable %}unreliable{% endif %}"><div class="agr-inning-title"><span>Inning {{ inn.inning }}</span>{% if not inn.reliable %}<span class="agr-mini-badge">INCOMPLETE HISTORY</span>{% endif %}</div>
@@ -41,7 +41,7 @@
 
   <section class="agr-card">
     <div class="agr-card-head"><strong>Actual Bench Usage</strong><span class="agr-badge">Confirmed complete snapshots only</span></div>
-    {% if report.unreliable_innings %}<div class="agr-warning mx-3 mt-3 mb-1">These totals exclude incomplete inning snapshots, so they are the confirmed minimum rather than a guessed total.</div>{% endif %}
+    {% if report.unreliable_innings %}<div class="agr-warning mx-3 mt-3 mb-1">These totals exclude incomplete inning snapshots, so they are the confirmed minimum.</div>{% endif %}
     <div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Player</th><th>Confirmed Bench Innings</th><th class="pe-3">Which Innings</th></tr></thead><tbody>
       {% for row in report.bench_rows %}<tr><td class="ps-3 fw-semibold">{{ row.name }}</td><td>{{ row.count }}</td><td class="pe-3">{{ row.innings|join(', ') if row.innings else '—' }}</td></tr>{% endfor %}
     </tbody></table></div>
@@ -55,7 +55,7 @@
     <div class="agr-card-body">
       {% if report.pitching_stats_pending %}
       <div class="agr-gc-pending">
-        <div><strong>The game is already saved. Pitching stats can wait.</strong><span>When GameChanger is updated, enter the final pitches and innings for {{ report.pitching_missing|join(', ') }}.</span></div>
+        <div><strong>Game saved. GameChanger pitching is still pending.</strong><span>Enter the final pitches and innings for {{ report.pitching_missing|join(', ') }} when available.</span></div>
         <a class="btn btn-primary btn-sm" href="{{ url_for('gameday.game_management', game_id=game.id, pitching=1) }}">Enter GameChanger Stats</a>
       </div>
       {% endif %}
@@ -92,15 +92,15 @@
     <div class="agr-card-head"><strong>Game Notes</strong><span class="agr-badge">Pregame + postgame context</span></div>
     <div class="agr-card-body">
       <form method="POST" action="{{ url_for('game_day.save_game_notes', game_id=game.id) }}">
-        <textarea class="form-control" name="game_notes" placeholder="What should the coaches remember from this game?">{{ game.game_notes or '' }}</textarea>
+        <textarea class="form-control" name="game_notes" placeholder="Coaching observations, follow-up, tournament notes…">{{ game.game_notes or '' }}</textarea>
         <div class="d-flex justify-content-between align-items-center gap-2 mt-2 flex-wrap"><div class="form-text">Useful for coaching observations, follow-up work, or tournament context.</div><button type="submit" class="btn btn-sm btn-primary">Save Game Notes</button></div>
       </form>
     </div>
   </section>
 
   <div class="agr-finish">
-    <div><strong>Finished with this game?</strong><span>The actual game is saved. You can return here anytime from Game Day.</span></div>
-    <a class="btn btn-primary" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-check2-circle me-1"></i>Done — Back to Game Day</a>
+    <div><strong>Game report saved</strong></div>
+    <a class="btn btn-primary" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-check2-circle me-1"></i>Back to Game Day</a>
   </div>
 </div>
 {% endblock %}
