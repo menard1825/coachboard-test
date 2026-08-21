@@ -245,6 +245,15 @@
     });
   }
 
+  function loadDugoutMobileView() {
+    if (document.getElementById('cb-pitching-dugout-mobile-script')) return;
+    const script = document.createElement('script');
+    script.id = 'cb-pitching-dugout-mobile-script';
+    script.src = '/static/js/pitching_dugout_mobile.js?v=20260821-1';
+    script.async = false;
+    document.head.appendChild(script);
+  }
+
   function init() {
     const pitchDate = document.getElementById('pitch_date');
     if (pitchDate && !pitchDate.value) pitchDate.value = localDateString();
@@ -258,6 +267,7 @@
     document.getElementById('edit_outing_type')?.addEventListener('change', () => applyOutingTypeUI('edit_'));
     applyTargetScopeUI();
     applyOutingTypeUI();
+    loadDugoutMobileView();
 
     window.openTargetModal = openTargetModal;
     window.CoachBoardPitchingDashboardV3 = {
