@@ -6,7 +6,9 @@
 
   const gameId = Number(match[1]);
   let state = null;
+  let armState = null;
   let loading = false;
+  let armLoading = false;
   let applying = false;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -21,6 +23,10 @@
 
   function summaryForPlayer(player) {
     return state?.pitch_count_summary?.[player?.name] || {};
+  }
+
+  function armForPlayer(player) {
+    return armState?.players?.[player?.name] || null;
   }
 
   function playerById(playerId) {
@@ -42,23 +48,41 @@
     return {officialDay, workloadDay, workload7, nonGameDay};
   }
 
-  function workloadText(summary, compact = false) {
+  function workloadText(summary) {
     const values = workloadNumbers(summary);
     const official = values.officialDay === null ? 'Game pitches: unknown' : `Game pitches: ${values.officialDay}`;
     const day = values.workloadDay === null ? 'Today workload: unknown' : `Today workload: ${values.workloadDay}`;
     const seven = values.workload7 === null ? '7-day workload: unknown' : `7-day workload: ${values.workload7}`;
     const extra = values.nonGameDay > 0 ? ` • ${values.nonGameDay} practice/lesson throws today` : '';
-
-    if (compact) return `${official} • ${day} • ${seven}${extra}`;
     return `${official} • ${day} • ${seven}${extra}`;
+  }
+
+  function officialText(summary) {
+    const status = summary.status || 'Eligibility unknown';
+    if (status !== 'Available' && summary.next_available && summary.next_available !== 'Today') {
+      return `Competition: ${status} · can pitch again ${summary.next_available}`;
+    }
+    return `Competition: ${status}`;
+  }
+
+  function armText(player) {
+    if (!armState) return null;
+    if (!armState.enabled) return 'Arm care: off';
+    const item = armForPlayer(player);
+    if (!item) return 'Arm care: no history';
+    if (item.status === 'Available') return 'Arm care: on track';
+    const next = item.next_available && item.next_available !== 'Today'
+      ? ` · rest guidance ${item.next_available}` : '';
+    return `Arm care: ${item.status || 'needs attention'}${next}`;
   }
 
   function decisionDetail(player, includeRole = true) {
     const summary = summaryForPlayer(player);
     const plan = planFor(player.id);
     const pieces = [
-      summary.status || 'Eligibility unknown',
-      workloadText(summary, true),
+      officialText(summary),
+      armText(player),
+      workloadText(summary),
       summary.coach_target != null ? `Coach target: ${summary.coach_target}` : null,
       includeRole ? plan?.role || null : null,
     ].filter(Boolean);
@@ -74,6 +98,7 @@
       .pitch-workload-line strong{color:#344054}
       .pitch-workload-extra{color:#8a5a13;font-weight:750}
       .pitch-workload-add{display:block;font-size:.69rem;color:#667085;margin-top:3px;line-height:1.3}
+      .pitcher-choice-v2[disabled] .small{color:#8a5a13!important}
       @media(max-width:575.98px){.pitch-workload-line,.pitch-workload-add{font-size:.66rem}}
     `;
     document.head.appendChild(style);
@@ -92,6 +117,17 @@
     document.querySelectorAll('.pitcher-choice-v2[data-player-id]').forEach(button => {
       const player = playerById(button.dataset.playerId);
       if (!player) return;
+      const summary = summaryForPlayer(player);
+      const officiallyAvailable = summary.status === 'Available';
+      button.disabled = !officiallyAvailable;
+      button.classList.toggle('opacity-50', !officiallyAvailable);
+      if (!officiallyAvailable) {
+        const next = summary.next_available && summary.next_available !== 'Today'
+          ? ` Can pitch again ${summary.next_available}.` : '';
+        button.title = `${summary.status || 'Eligibility unknown'}.${next}`.trim();
+      } else {
+        button.removeAttribute('title');
+      }
       const detail = button.querySelector('.small.text-muted.mt-1');
       if (detail) detail.textContent = decisionDetail(player);
     });
@@ -149,6 +185,23 @@
     }
   }
 
+  async function loadArmCare() {
+    if (armLoading) return;
+    armLoading = true;
+    try {
+      const response = await fetch(`/api/pitching-preferences/arm-care-summary?game_id=${gameId}`, {cache:'no-store'});
+      if (!response.ok) return;
+      const data = await response.json().catch(() => ({}));
+      if (data.status === 'error') return;
+      armState = data;
+      patchVisiblePitcherViews();
+    } catch (_) {
+      // Arm-care guidance is advisory; failure here must not interrupt Live Game.
+    } finally {
+      armLoading = false;
+    }
+  }
+
   installStyles();
 
   const observer = new MutationObserver(() => {
@@ -158,7 +211,9 @@
   const start = () => {
     observer.observe(document.body, {childList:true, subtree:true});
     loadState();
+    loadArmCare();
     window.setInterval(loadState, 5000);
+    window.setInterval(loadArmCare, 15000);
   };
 
   if (document.readyState === 'loading') {
