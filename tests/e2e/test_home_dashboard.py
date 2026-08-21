@@ -91,7 +91,10 @@ def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page
         expect(page.locator(target)).to_have_class(re.compile(r'\bactive\b'))
         expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
         expect(bottom_nav.locator('a.nav-link.active span')).to_have_text(label)
-        expect(page).to_have_url(re.compile(re.escape(target) + r'$'))
+        if label == 'Home':
+            expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?$'))
+        else:
+            expect(page).to_have_url(re.compile(re.escape(target) + r'$'))
 
     page.locator('#more').get_by_text('Development', exact=True).click()
     expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
@@ -99,7 +102,7 @@ def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page
     expect(bottom_nav.locator('a.nav-link.active span')).to_have_text('More')
 
     bottom_nav.get_by_text('Home', exact=True).click()
-    expect(page).to_have_url(re.compile(r'#overview$'))
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?$'))
     expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
     expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
 
