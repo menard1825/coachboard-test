@@ -86,7 +86,7 @@
           <div class="modal-header">
             <div>
               <h5 class="modal-title mb-0">Add Game</h5>
-              <div class="small text-muted">Add it to the schedule, then go straight into game setup.</div>
+              <div class="small text-muted">Create the game and open pregame setup.</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
@@ -237,7 +237,7 @@
 
       list = document.createElement('div');
       list.className = 'gd-schedule-empty';
-      list.innerHTML = '<strong>No additional games scheduled.</strong><div class="mt-1">Add your next game here whenever the schedule is released.</div>';
+      list.innerHTML = '<strong>No additional games scheduled.</strong>';
       shell.appendChild(list);
     }
 
@@ -258,7 +258,7 @@
       openAddGame();
     });
     const detail = empty.querySelector('div.mt-1');
-    if (detail) detail.textContent = 'Add the next game here whenever you have the schedule.';
+    if (detail) detail.textContent = 'No games scheduled.';
   }
 
   async function deleteGame(button) {
