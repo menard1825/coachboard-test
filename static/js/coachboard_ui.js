@@ -38,10 +38,10 @@
     stats: ['Team Stats', 'Review actual playing history and season-level usage.'],
     scouting_list: ['Scouting', 'Track prospects, committed players, and roster possibilities.'],
     collaboration: ['Coach Notes', 'Keep team and player notes shared among the coaching staff.'],
-    games: ['Schedule', 'Add, review, and manage scheduled games. Game Day remains the fastest game-day view.'],
+    games: ['Game Day', 'Add, review, and manage scheduled games without leaving the primary mobile workspace.'],
   };
 
-  const MOBILE_PRIMARY_TARGETS = new Set(['#overview', '#roster', '#practice_plan', '#more']);
+  const MOBILE_PRIMARY_TARGETS = new Set(['#overview', '#games', '#roster', '#practice_plan', '#more']);
 
   function useNeutralFaviconWhenTeamHasNoLogo() {
     if (document.querySelector('.navbar-logo')) return;
