@@ -89,7 +89,7 @@
       @media(max-width:390px){
         .cb-pitch-counts{grid-template-columns:1fr}
         .cb-pitch-count{display:flex;align-items:center;justify-content:space-between;gap:10px}
-        .cb-pitch-count strong{margin-top:0}
+        .cb-pitch-count strong{font-size:1rem;margin-top:0}
       }
     `;
     document.head.appendChild(style);
@@ -104,10 +104,10 @@
 
   function decisionCopy(status, nextAvailable) {
     const normalized = String(status || '').toLowerCase();
-    if (normalized === 'available') return 'Available today';
-    if (normalized.includes('verify') || normalized.includes('incomplete')) return 'Eligibility needs verification';
-    if (normalized.includes('rules not selected') || normalized.includes('verify rules')) return 'Select or verify competition rules';
-    if (nextAvailable && !/^verify/i.test(nextAvailable)) return `Can pitch again: ${nextAvailable}`;
+    if (normalized === 'available') return 'Eligible today';
+    if (normalized.includes('verify') || normalized.includes('incomplete')) return 'Verify pitching history';
+    if (normalized.includes('rules not selected') || normalized.includes('verify rules')) return 'Competition rules needed';
+    if (nextAvailable && !/^verify/i.test(nextAvailable)) return `Next Available: ${nextAvailable}`;
     return status || 'Eligibility needs attention';
   }
 
@@ -158,7 +158,7 @@
         <div class="cb-pitch-metric"><span class="cb-pitch-kicker">Official today</span>${cells[2].innerHTML}</div>
         <div class="cb-pitch-metric"><span class="cb-pitch-kicker">Throwing workload</span>${cells[3].innerHTML}</div>
       </div>
-      <div class="cb-pitch-target" data-target-slot="true"><span class="cb-pitch-kicker">Today's game-pitch plan</span>${cells[4].innerHTML}</div>`;
+      <div class="cb-pitch-target" data-target-slot="true"><span class="cb-pitch-kicker">Pitch target</span>${cells[4].innerHTML}</div>`;
 
     card.querySelectorAll('.open-target-modal').forEach(bindFreshTargetButton);
     return card;
@@ -167,7 +167,7 @@
   function groupMarkup(title, note, cards) {
     const group = document.createElement('section');
     group.className = 'cb-pitch-group';
-    group.innerHTML = `<div class="cb-pitch-group-head"><strong>${esc(title)}</strong><span>${esc(note)}</span></div><div class="cb-pitch-card-grid"></div>`;
+    group.innerHTML = `<div class="cb-pitch-group-head"><strong>${esc(title)}</strong>${note ? `<span>${esc(note)}</span>` : ''}</div><div class="cb-pitch-card-grid"></div>`;
     const grid = group.querySelector('.cb-pitch-card-grid');
     cards.forEach(card => grid.appendChild(card));
     return group;
@@ -188,19 +188,21 @@
 
     statusCard.dataset.cbPitchingV2 = '1';
     tableWrap.classList.add('cb-pitch-source');
+    const heading = statusCard.querySelector('.card-header h5');
+    if (heading) heading.textContent = 'Pitcher Availability';
     const subtitle = statusCard.querySelector('.card-header .small.text-muted');
-    if (subtitle) subtitle.textContent = 'Answer the decision first: who can pitch, who is resting, and when they can go again. Workload and targets stay secondary.';
+    if (subtitle) subtitle.textContent = '';
 
     const shell = document.createElement('div');
     shell.className = 'cb-pitch-status-shell';
     shell.innerHTML = `
       <div class="cb-pitch-counts" aria-label="Pitcher availability summary">
-        <div class="cb-pitch-count"><span>Available today</span><strong>${available.length}</strong></div>
-        <div class="cb-pitch-count"><span>Rest / attention</span><strong>${attention.length}</strong></div>
-        <div class="cb-pitch-count"><span>Verify data</span><strong>${verify.length}</strong></div>
+        <div class="cb-pitch-count"><span>Eligible Today</span><strong>${available.length}</strong></div>
+        <div class="cb-pitch-count"><span>Unavailable / Verify</span><strong>${attention.length}</strong></div>
+        <div class="cb-pitch-count"><span>Verify Data</span><strong>${verify.length}</strong></div>
       </div>`;
-    if (available.length) shell.appendChild(groupMarkup('Available today', 'Ready by current competition rules', available));
-    if (attention.length) shell.appendChild(groupMarkup('Resting / needs attention', 'Next available date is shown prominently', attention));
+    if (available.length) shell.appendChild(groupMarkup('Eligible Today', '', available));
+    if (attention.length) shell.appendChild(groupMarkup('Unavailable / Verify', '', attention));
     tableWrap.insertAdjacentElement('beforebegin', shell);
   }
 
@@ -308,7 +310,7 @@
     const card = document.querySelector(`.cb-pitcher-card[data-player-id="${CSS.escape(String(playerId))}"]`);
     const slot = card?.querySelector('[data-target-slot]');
     if (slot && freshCell) {
-      slot.innerHTML = `<span class="cb-pitch-kicker">Today's game-pitch plan</span>${freshCell.innerHTML}`;
+      slot.innerHTML = `<span class="cb-pitch-kicker">Pitch target</span>${freshCell.innerHTML}`;
       slot.querySelectorAll('.open-target-modal').forEach(bindFreshTargetButton);
     }
   }
@@ -394,7 +396,7 @@
     const title = head?.querySelector('h3');
     const subtitle = title?.nextElementSibling;
     if (title) title.textContent = 'Pitching';
-    if (subtitle) subtitle.textContent = 'Can he pitch? If not, when? Then check workload and the plan.';
+    if (subtitle) subtitle.textContent = 'Competition eligibility, arm-care guidance, workload, and pitch targets.';
   }
 
   function init() {
