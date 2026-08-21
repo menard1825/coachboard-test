@@ -18,7 +18,7 @@
   }
 
   function badge(status) {
-    if (status === 'Available') return '<span class="badge text-bg-success">On Track</span>';
+    if (status === 'Available') return '<span class="badge text-bg-success">No Rest Required</span>';
     if (status === 'Pitch Count Incomplete') return '<span class="badge text-bg-warning">Verify Pitch Count</span>';
     if (!status) return '<span class="badge text-bg-light border">No Data</span>';
     return `<span class="badge text-bg-warning">${esc(status)}</span>`;
@@ -79,20 +79,20 @@
     pane.innerHTML = `
       <div class="mb-4">
         <h5 class="mb-1">Pitching Settings</h5>
-        <p class="text-muted small mb-0">Tournament eligibility and arm-care guidance are separate. A team default is optional because many teams play under different rules from event to event.</p>
+        <p class="text-muted small mb-0">Competition rules determine official eligibility. Arm-care guidance is separate.</p>
       </div>
 
       <div class="card border-0 bg-light mb-3">
         <div class="card-body">
           <div class="d-flex gap-2 align-items-start mb-2">
             <i class="bi bi-trophy mt-1"></i>
-            <div><strong>Default Competition Rules</strong><div class="small text-muted">Used only as a shortcut. Any game can override this with the tournament or league rules that actually apply.</div></div>
+            <div><strong>Default Competition Rules</strong><div class="small text-muted">Used as a team default. Any game can use different tournament or league rules.</div></div>
           </div>
           <select class="form-select" id="competitionDefaultRule" ${disabled}>
             <option value="" ${competition ? '' : 'selected'}>No default — choose by event/game</option>
             ${competitionOptions}
           </select>
-          <div class="form-text">For teams that play many tournament formats, “No default” is usually the cleanest choice.</div>
+          <div class="form-text">Use No Default when competition rules vary by event.</div>
         </div>
       </div>
 
@@ -100,18 +100,18 @@
         <div class="card-body">
           <div class="d-flex gap-2 align-items-start mb-2">
             <i class="bi bi-heart-pulse mt-1"></i>
-            <div><strong>Arm Care Guidance</strong><div class="small text-muted">Independent of tournament eligibility. CoachBoard can keep tracking pitch-count/rest guidance even when the event uses innings or another rule system.</div></div>
+            <div><strong>Arm Care Guidance</strong><div class="small text-muted">Independent workload and rest guidance.</div></div>
           </div>
           <select class="form-select" id="armCareRuleSet" ${disabled}>
             <option value="" ${armCare ? '' : 'selected'}>Off</option>
             ${armOptions}
           </select>
-          <div class="form-text">Pitch Smart uses game pitches for its rest guidance. Practice and lesson throws remain visible as workload context rather than being silently treated as official game pitches.</div>
+          <div class="form-text">Pitch Smart uses game pitches for rest guidance. Practice and lesson throwing remains visible as workload.</div>
         </div>
       </div>
 
       <div class="alert alert-light border small">
-        <strong>Example:</strong> a USSSA tournament can show a pitcher as <em>USSSA eligible</em> while the separate Pitch Smart arm-care view recommends rest. CoachBoard will show both instead of pretending they are the same rule.
+        Competition rules determine official eligibility. Arm-care guidance is separate.
       </div>
 
       <div id="pitchingPreferencesFeedback" class="small mb-2"></div>
@@ -173,7 +173,7 @@
       return `<div class="cb-pitch-arm-row"><span class="cb-pitch-arm-title">Arm care · ${esc(ruleSet || 'Pitch Smart')}</span><span class="cb-pitch-arm-value text-muted">No history</span></div>`;
     }
     const onTrack = item.status === 'Available';
-    const value = onTrack ? 'On track' : (item.status || 'Needs attention');
+    const value = onTrack ? 'No Rest Required' : 'Rest Recommended';
     const next = !onTrack && item.next_available && item.next_available !== 'Today'
       ? `<div class="cb-pitch-arm-next">Rest guidance: ${esc(item.next_available)}</div>` : '';
     const detail = !onTrack && item.status_detail
@@ -201,8 +201,8 @@
       summary.innerHTML = `
         <div class="card-body py-3">
           <div class="row g-3">
-            <div class="col-md-6"><div class="small text-uppercase fw-bold text-muted">Competition Eligibility</div><div class="fw-bold mt-1">${competition ? esc(competition) : 'Choose per event/game'}</div><div class="small text-muted">${competition ? 'Team default; individual games can override it.' : 'No team default is required. Select the real rules on each game.'}</div></div>
-            <div class="col-md-6"><div class="small text-uppercase fw-bold text-muted">Arm Care</div><div class="fw-bold mt-1">${armCare ? esc(armCare) : 'Off'}</div><div class="small text-muted">Advisory workload/rest guidance; it never replaces competition rules.</div></div>
+            <div class="col-md-6"><div class="small text-uppercase fw-bold text-muted">Competition Eligibility</div><div class="fw-bold mt-1">${competition ? esc(competition) : 'Choose per event/game'}</div><div class="small text-muted">${competition ? 'Team default; individual games can override it.' : 'Select competition rules on each game.'}</div></div>
+            <div class="col-md-6"><div class="small text-uppercase fw-bold text-muted">Arm Care</div><div class="fw-bold mt-1">${armCare ? esc(armCare) : 'Off'}</div><div class="small text-muted">Advisory workload and rest guidance.</div></div>
           </div>
         </div>`;
       head.insertAdjacentElement('afterend', summary);
@@ -216,7 +216,7 @@
 
     const infoAlert = root.querySelector('.alert.alert-primary');
     if (infoAlert) {
-      infoAlert.innerHTML = '<i class="bi bi-info-circle-fill mt-1"></i><div><strong>Competition eligibility and arm care are intentionally separate.</strong><br><span class="small">Event rules decide whether a pitcher is officially eligible. Arm care can still recommend rest. Game-pitch targets are coaching plans, not rule limits.</span></div>';
+      infoAlert.innerHTML = '<i class="bi bi-info-circle-fill mt-1"></i><div><strong>Competition rules determine official eligibility. Arm-care guidance is separate.</strong><br><span class="small">Pitch targets are optional coaching plans and do not change eligibility.</span></div>';
     }
 
     const pitcherCards = [...root.querySelectorAll('.cb-pitcher-card[data-player-name]')];
@@ -231,13 +231,13 @@
 
     // Fallback for a stale/cached page that has not loaded pitching_dashboard_v2.js.
     const cards = [...root.querySelectorAll('.card')];
-    const statusCard = cards.find(card => card.querySelector('h5')?.textContent.trim() === 'Who Can Pitch?');
+    const statusCard = cards.find(card => ['Pitcher Availability', 'Who Can Pitch?'].includes(card.querySelector('h5')?.textContent.trim()));
     const table = statusCard?.querySelector('table');
     if (!table || table.dataset.dualRules === 'true') return;
     table.dataset.dualRules = 'true';
 
     const subtitle = statusCard.querySelector('.card-header .small.text-muted');
-    if (subtitle) subtitle.textContent = 'Competition eligibility and team arm-care guidance are shown separately.';
+    if (subtitle) subtitle.textContent = 'Competition eligibility and arm-care guidance are shown separately.';
 
     const headerRow = table.querySelector('thead tr');
     if (headerRow?.children[1]) {
@@ -256,7 +256,7 @@
 
       const officialCell = row.children[1];
       if (!competition && officialCell) {
-        officialCell.innerHTML = '<span class="badge text-bg-secondary">Rules Not Selected</span><div class="small text-muted mt-1">Choose the tournament or league rules on the game.</div>';
+        officialCell.innerHTML = '<span class="badge text-bg-secondary">Rules Needed</span><div class="small text-muted mt-1">Choose the tournament or league rules on the game.</div>';
       }
 
       const td = document.createElement('td');
