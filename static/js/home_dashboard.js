@@ -98,7 +98,7 @@
     if (!game) return '';
     return `<a class="cb-home-live" href="/game/${game.id}">
       <span class="cb-live-dot"></span>
-      <span><strong>Game in progress</strong><small>vs ${esc(game.opponent)} · Resume CoachBoard Live Game</small></span>
+      <span><strong>Game in progress</strong><small>vs ${esc(game.opponent)} · Resume live game</small></span>
       <span class="cb-home-live-action">Resume <i class="bi bi-arrow-right"></i></span>
     </a>`;
   }
@@ -108,7 +108,7 @@
     if (!game) {
       return `<section class="cb-home-card cb-home-next-game">
         <div class="cb-home-card-head"><div><span class="cb-home-eyebrow">Next up</span><h2>No upcoming game</h2></div><i class="bi bi-calendar-plus cb-home-card-icon"></i></div>
-        <p class="cb-home-muted">Add the next game when the schedule is available. CoachBoard will bring lineup, defense, pitching rules, and availability together here.</p>
+        <p class="cb-home-muted">No upcoming games scheduled.</p>
         <a class="btn btn-primary" href="/game-day">Open Game Day & Schedule</a>
       </section>`;
     }
@@ -139,7 +139,7 @@
         ${statusItem(rulesSelected ? 'check-circle-fill' : 'exclamation-circle', 'Competition rules', rulesSelected ? `${esc(rules.effective)}${rules.source === 'game' ? ' · game override' : ' · team default'}` : 'Select tournament / league rules', rulesSelected, !rulesSelected)}
       </div>
 
-      ${Array.isArray(r.blockers) && r.blockers.length ? `<div class="cb-home-prep-note"><strong>${r.blockers.length} preparation item${r.blockers.length === 1 ? '' : 's'} remaining</strong><span>${esc(r.blockers[0])}</span></div>` : '<div class="cb-home-ready-note"><i class="bi bi-check2-circle"></i><span>Game plan is ready. Review it before first pitch.</span></div>'}
+      ${Array.isArray(r.blockers) && r.blockers.length ? `<div class="cb-home-prep-note"><strong>${r.blockers.length} preparation item${r.blockers.length === 1 ? '' : 's'} remaining</strong><span>${esc(r.blockers[0])}</span></div>` : '<div class="cb-home-ready-note"><i class="bi bi-check2-circle"></i><span>Pregame setup complete.</span></div>'}
 
       <div class="cb-home-card-actions">
         <a class="btn btn-primary" href="/game/${game.id}">${game.is_live ? 'Resume Live Game' : 'Manage Game'}</a>
@@ -172,7 +172,7 @@
 
     const body = rows.length
       ? rows.slice(0, 6).join('')
-      : `<div class="cb-home-all-clear"><i class="bi bi-check2-circle"></i><strong>Nothing urgent right now</strong><span>Your next-game plan and tracked team items look caught up.</span></div>`;
+      : `<div class="cb-home-all-clear"><i class="bi bi-check2-circle"></i><strong>No items need attention</strong></div>`;
 
     return `<section class="cb-home-card cb-home-attention">
       <div class="cb-home-card-head compact"><div><span class="cb-home-eyebrow">Coach checklist</span><h3>Needs Attention</h3></div><i class="bi bi-lightning-charge cb-home-card-icon"></i></div>
@@ -194,7 +194,7 @@
     const absentCount = Array.isArray(plan.absent_player_ids) ? plan.absent_player_ids.length : 0;
     return `<section class="cb-home-card cb-home-small-card">
       <div class="cb-home-card-head compact"><div><span class="cb-home-eyebrow">Next practice</span><h3>${formatDate(plan.date)}</h3></div><i class="bi bi-clipboard-check cb-home-card-icon"></i></div>
-      <div class="cb-home-small-copy">${plan.emphasis ? `<strong>${esc(plan.emphasis)}</strong>` : '<strong>Plan ready for details</strong>'}<span>${taskCount} setup task${taskCount === 1 ? '' : 's'}${absentCount ? ` · ${absentCount} out` : ''}</span></div>
+      <div class="cb-home-small-copy">${plan.emphasis ? `<strong>${esc(plan.emphasis)}</strong>` : '<strong>No priorities entered</strong>'}<span>${taskCount} setup task${taskCount === 1 ? '' : 's'}${absentCount ? ` · ${absentCount} out` : ''}</span></div>
       <a class="cb-home-text-link" href="/#practice_plan">View Practice Plan <i class="bi bi-arrow-right"></i></a>
     </section>`;
   }
@@ -215,7 +215,7 @@
       <div class="cb-home-card-head compact"><div><span class="cb-home-eyebrow">Arm care</span><h3>${esc(setting)}</h3></div><i class="bi bi-heart-pulse cb-home-card-icon"></i></div>
       ${concerns.length
         ? `<div class="cb-home-arm-list">${concerns.slice(0, 3).map(([name, item]) => `<div><strong>${esc(name)}</strong><span>${esc(item.status || 'Review')} ${item.game_pitches_today != null ? `· ${item.game_pitches_today}${item.max_daily ? `/${item.max_daily}` : ''} game pitches` : ''}</span></div>`).join('')}</div>`
-        : '<div class="cb-home-all-clear small"><i class="bi bi-check2-circle"></i><strong>Tracked pitchers are on track</strong><span>No current arm-care warnings.</span></div>'}
+        : '<div class="cb-home-all-clear small"><i class="bi bi-check2-circle"></i><strong>No arm-care alerts</strong></div>'}
       <a class="cb-home-text-link" href="/pitching">Open Pitching <i class="bi bi-arrow-right"></i></a>
     </section>`;
   }
@@ -242,7 +242,7 @@
 
     container.innerHTML = `<div class="cb-home-dashboard">
       <header class="cb-home-welcome">
-        <div><span class="cb-home-eyebrow">CoachBoard Home</span><h1>${greeting()}${firstName ? `, ${esc(firstName)}` : ''}</h1><p>Everything that needs a coach's attention, without digging through the app.</p></div>
+        <div><span class="cb-home-eyebrow">CoachBoard Home</span><h1>${greeting()}${firstName ? `, ${esc(firstName)}` : ''}</h1><p>Next game, practice, pitching, and team status.</p></div>
         <div class="cb-home-context"><span>${esc(role || 'Coach')}</span>${competitionDefault ? `<small>Default rules: ${esc(competitionDefault)}</small>` : '<small>Competition rules: choose by game/event</small>'}</div>
       </header>
 
@@ -295,7 +295,7 @@
         link.href = '#player_development';
         link.setAttribute('data-bs-toggle', 'tab');
         link.setAttribute('role', 'tab');
-        link.innerHTML = '<span class="cb-mobile-more-icon"><i class="bi bi-graph-up-arrow"></i></span><span class="cb-mobile-more-copy"><strong>Development</strong><small>Player priorities, progress, and coaching focus.</small></span><span class="cb-mobile-more-arrow"><i class="bi bi-chevron-right"></i></span>';
+        link.innerHTML = '<span class="cb-mobile-more-icon"><i class="bi bi-graph-up-arrow"></i></span><span class="cb-mobile-more-copy"><strong>Development</strong><small>Player priorities and progress.</small></span><span class="cb-mobile-more-arrow"><i class="bi bi-chevron-right"></i></span>';
         moreCard.prepend(link);
       }
     };
@@ -382,7 +382,7 @@
     installMobileNav();
     const container = document.getElementById('overview-content-container');
     if (container) {
-      container.innerHTML = '<div class="cb-home-loading"><div class="spinner-border spinner-border-sm" role="status"></div><span>Building your coaching home...</span></div>';
+      container.innerHTML = '<div class="cb-home-loading"><div class="spinner-border spinner-border-sm" role="status"></div><span>Loading dashboard…</span></div>';
     }
 
     cachedModel = await buildModel();
