@@ -59,6 +59,16 @@
       #userOffcanvas .list-group-item{min-height:44px;display:flex;align-items:center}
       #userOffcanvas h6{font-size:.64rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085!important;margin-top:12px!important}
       @media(max-width:991.98px){
+        html{scroll-padding-top:70px}
+        body[data-coachboard-authenticated="1"]{--cb-mobile-topbar-height:58px;padding-top:var(--cb-mobile-topbar-height)!important}
+        body[data-coachboard-authenticated="1"]>nav.navbar.sticky-top{position:fixed!important;top:0;left:0;right:0;width:100%;height:var(--cb-mobile-topbar-height);min-height:var(--cb-mobile-topbar-height);max-height:var(--cb-mobile-topbar-height);z-index:1040;margin:0!important;padding:.35rem 0!important;overflow:hidden}
+        body[data-coachboard-authenticated="1"]>nav.navbar.sticky-top>.container-fluid{height:100%;min-height:0;flex-wrap:nowrap}
+        body[data-coachboard-authenticated="1"]>nav.navbar.sticky-top .navbar-brand{min-width:0;max-width:calc(100% - 46px);margin-right:0;overflow:hidden}
+        body[data-coachboard-authenticated="1"]>nav.navbar.sticky-top .navbar-logo{height:34px!important;width:auto;max-width:44px;flex:0 0 auto;margin-right:8px!important;object-fit:contain}
+        body[data-coachboard-authenticated="1"]>nav.navbar.sticky-top .navbar-brand-text{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.96rem!important;line-height:1.1}
+        body[data-coachboard-authenticated="1"]>nav.navbar.sticky-top .navbar-nav{flex:0 0 38px;justify-content:flex-end}
+        body[data-coachboard-authenticated="1"]>nav.navbar.sticky-top .nav-item.d-lg-none .nav-link{display:flex;align-items:center;justify-content:center;height:44px;width:38px;padding:0}
+        body[data-coachboard-authenticated="1"] main.container-fluid{margin-top:0!important;padding-top:12px}
         body.cb-home #mainTabContent>.tab-pane.fade{transition:none!important}
         .bottom-nav-fixed .nav-link{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
       }
@@ -194,6 +204,26 @@
     enforce();
   }
 
+  function keepPrimaryMobileWorkspaceAtTop() {
+    const nav = sharedMobileNav();
+    if (!nav || nav.dataset.cbScrollStabilized === '1') return;
+    nav.dataset.cbScrollStabilized = '1';
+
+    const reset = () => window.scrollTo({top: 0, left: 0, behavior: 'auto'});
+    nav.addEventListener('click', (event) => {
+      const link = event.target.closest('[data-cb-mobile-section]');
+      if (!link) return;
+      const href = link.getAttribute('href') || '';
+      if (href.startsWith('#')) {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(reset));
+      }
+    });
+
+    if (window.location.pathname === '/' && ['#overview', '#roster', '#practice_plan', '#more'].includes(window.location.hash || '#overview')) {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(reset));
+    }
+  }
+
   function installHomeBottomNav() {
     // The shared server-rendered bar is stable from first paint and owns its
     // markup. Older page-specific bars are only a fallback for legacy pages.
@@ -234,6 +264,7 @@
   renameAccountSecurityLinks();
   normalizeSharedMobileNav();
   protectSharedMobileNavActiveState();
+  keepPrimaryMobileWorkspaceAtTop();
 
   if (window.location.pathname === '/') {
     installHomeBottomNav();
