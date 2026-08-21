@@ -70,6 +70,17 @@
     return items + more;
   }
 
+  function armCardMarkup(item, armData) {
+    if (!armData?.enabled) return '<span class="gpa-label">Arm care</span><strong>Off</strong>';
+    if (!item) return `<span class="gpa-label">Arm care · ${esc(armData.rule_set || 'Pitch Smart')}</span><strong class="text-muted">No history</strong>`;
+    const onTrack = item.status === 'Available';
+    return `
+      <span class="gpa-label">Arm care · ${esc(armData.rule_set || 'Pitch Smart')}</span>
+      <strong>${esc(onTrack ? 'On track' : (item.status || 'Needs attention'))}</strong>
+      ${!onTrack && item.next_available && item.next_available !== 'Today' ? `<span class="gpa-next">Rest guidance: ${esc(item.next_available)}</span>` : ''}
+      ${!onTrack && item.status_detail ? `<span class="gpa-detail">${esc(item.status_detail)}</span>` : ''}`;
+  }
+
   function installStyles() {
     if (document.getElementById('game-pitching-rule-picker-styles')) return;
     const style = document.createElement('style');
@@ -99,7 +110,34 @@
       #game-pitching-rules-v2 .gpr-arm-box{margin-top:9px;padding:9px 10px;border:1px solid #e4e7ec;border-radius:10px;background:#fff}
       #game-pitching-rules-v2 .gpr-arm-box-title{font-size:.67rem;text-transform:uppercase;letter-spacing:.05em;font-weight:850;color:#667085;margin-bottom:4px}
       #game-pitching-rules-v2 .gpr-arm-note,#game-pitching-rules-v2 .gpr-arm-player{font-size:.68rem;color:#475467;line-height:1.4}
-      @media(max-width:575.98px){#game-pitching-rules-v2 .gpr-summary{align-items:flex-start}#game-pitching-rules-v2 .gpr-label{min-width:72px}#game-pitching-rules-v2 .gpr-badge{display:none}}
+      #pitcher-availability-card .gpa-source{display:none!important}
+      #pitcher-availability-card .gpa-shell{padding:10px;background:#f8f9fb}
+      #pitcher-availability-card .gpa-summary{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:9px;font-size:.67rem;color:#667085}
+      #pitcher-availability-card .gpa-summary strong{font-size:.74rem;color:#344054}
+      #pitcher-availability-card .gpa-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+      #pitcher-availability-card .gpa-card{border:1px solid #dfe4ea;border-radius:12px;background:#fff;overflow:hidden;min-width:0}
+      #pitcher-availability-card .gpa-card.attention{border-color:#ead7b5}
+      #pitcher-availability-card .gpa-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;padding:10px 11px 7px}
+      #pitcher-availability-card .gpa-name{font-weight:850;color:#172033;font-size:.86rem}
+      #pitcher-availability-card .gpa-status{font-size:.57rem;font-weight:850;border-radius:999px;padding:4px 7px;white-space:nowrap;background:#e9f7ee;color:#176b38}
+      #pitcher-availability-card .gpa-card.attention .gpa-status{background:#fff3d8;color:#8a5800}
+      #pitcher-availability-card .gpa-decision{margin:0 10px 8px;padding:8px 9px;border-radius:9px;background:#f7f9fb;border:1px solid #e5e8ed}
+      #pitcher-availability-card .gpa-card.attention .gpa-decision{background:#fffaf1;border-color:#ecd9b4}
+      #pitcher-availability-card .gpa-label{display:block;font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;font-weight:850;color:#667085}
+      #pitcher-availability-card .gpa-decision strong{display:block;font-size:.75rem;color:#1d2939;margin-top:2px}
+      #pitcher-availability-card .gpa-metrics{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #edf0f3}
+      #pitcher-availability-card .gpa-metric{padding:8px 10px;font-size:.68rem;min-width:0}
+      #pitcher-availability-card .gpa-metric+.gpa-metric{border-left:1px solid #edf0f3}
+      #pitcher-availability-card .gpa-metric .pitch-limit-progress{max-width:100%}
+      #pitcher-availability-card .gpa-arm{padding:8px 10px;border-top:1px solid #edf0f3;background:#fcfcfd}
+      #pitcher-availability-card .gpa-arm strong{display:block;font-size:.68rem;color:#344054;margin-top:1px}
+      #pitcher-availability-card .gpa-next{display:block;font-size:.61rem;color:#8a5a13;margin-top:2px}
+      #pitcher-availability-card .gpa-detail{display:block;font-size:.59rem;color:#7b8492;line-height:1.3;margin-top:3px}
+      @media(max-width:575.98px){
+        #game-pitching-rules-v2 .gpr-summary{align-items:flex-start}#game-pitching-rules-v2 .gpr-label{min-width:72px}#game-pitching-rules-v2 .gpr-badge{display:none}
+        #pitcher-availability-card .gpa-grid{grid-template-columns:1fr}
+        #pitcher-availability-card .gpa-shell{padding:8px}
+      }
     `;
     document.head.appendChild(style);
   }
@@ -117,6 +155,63 @@
     else if (overlay) overlay.prepend(card);
     else document.querySelector('main, .container, .container-fluid')?.prepend(card);
     return card;
+  }
+
+  function pregameStatus(row, competitionSelected) {
+    if (!competitionSelected) return {label:'Rules not selected', available:false, next:'Select rules for this game'};
+    const statusCell = row.children[1];
+    const available = Boolean(statusCell?.querySelector('.pitch-status-available'));
+    const label = available ? 'Available' : (statusCell?.querySelector('.badge')?.textContent.trim() || statusCell?.textContent.trim() || 'Needs attention');
+    const next = row.children[4]?.textContent.trim() || '';
+    return {label, available, next};
+  }
+
+  function upgradePitcherAvailabilityTable(data, armData) {
+    const card = document.getElementById('pitcher-availability-card');
+    const wrap = card?.querySelector('.table-responsive');
+    const table = wrap?.querySelector('table');
+    if (!card || !wrap || !table || card.dataset.gpaV2 === '1') return;
+    const competitionSelected = Boolean(data?.effective);
+    const rows = [...table.querySelectorAll('tbody tr')].filter(row => row.children.length >= 5);
+    if (!rows.length) return;
+
+    const cards = rows.map(row => {
+      const name = row.children[0]?.textContent.trim();
+      if (!name) return null;
+      const status = pregameStatus(row, competitionSelected);
+      const official = row.children[2]?.innerHTML || '—';
+      const workload = row.children[3]?.innerHTML || '—';
+      const armItem = (armData?.players || {})[name];
+      const decision = status.available
+        ? 'Available by competition rule'
+        : (!competitionSelected ? 'Select competition rules for this game' : (status.next && status.next !== 'Today' ? `Can pitch again: ${status.next}` : status.label));
+      const article = document.createElement('article');
+      article.className = `gpa-card ${status.available ? '' : 'attention'}`;
+      article.dataset.playerName = name;
+      article.dataset.available = status.available ? 'true' : 'false';
+      article.innerHTML = `
+        <div class="gpa-top"><div class="gpa-name">${esc(name)}</div><span class="gpa-status">${esc(status.label)}</span></div>
+        <div class="gpa-decision"><span class="gpa-label">Competition eligibility</span><strong>${esc(decision)}</strong></div>
+        <div class="gpa-arm">${armCardMarkup(armItem, armData)}</div>
+        <div class="gpa-metrics">
+          <div class="gpa-metric"><span class="gpa-label">Official today</span>${official}</div>
+          <div class="gpa-metric"><span class="gpa-label">Throwing workload</span>${workload}</div>
+        </div>`;
+      return article;
+    }).filter(Boolean);
+
+    const availableCount = cards.filter(item => item.dataset.available === 'true').length;
+    const attentionCount = cards.length - availableCount;
+    const shell = document.createElement('div');
+    shell.className = 'gpa-shell';
+    shell.innerHTML = `<div class="gpa-summary"><strong>${availableCount} available</strong><span>•</span><strong>${attentionCount} need attention</strong><span>Competition and arm-care guidance remain separate.</span></div><div class="gpa-grid"></div>`;
+    const grid = shell.querySelector('.gpa-grid');
+    cards.sort((a,b) => Number(b.dataset.available === 'true') - Number(a.dataset.available === 'true')).forEach(item => grid.appendChild(item));
+    wrap.classList.add('gpa-source');
+    wrap.insertAdjacentElement('beforebegin', shell);
+    card.dataset.gpaV2 = '1';
+    const subtitle = card.querySelector('.card-header .small.text-muted');
+    if (subtitle) subtitle.textContent = 'Can he pitch? If not, the next available day is called out first. Arm-care guidance stays advisory.';
   }
 
   function render(data, armData) {
@@ -188,6 +283,8 @@
         : `<i class="bi bi-pencil me-1"></i>${effective ? 'Edit' : 'Select Rules'}`;
       if (opening) card.querySelector('#game-pitch-rule-select-v2')?.focus();
     });
+
+    upgradePitcherAvailabilityTable(data, armData);
   }
 
   async function load() {
