@@ -61,6 +61,14 @@
     if (link && typeof bootstrap !== 'undefined') bootstrap.Tab.getOrCreateInstance(link).show();
   }
 
+  function polishAdminSaveButtons() {
+    if (path !== '/admin/settings') return;
+    const general = document.querySelector('#general-settings form button[type="submit"]');
+    const appearance = document.querySelector('#appearance-settings form button[type="submit"]');
+    if (general) general.textContent = 'Save General Settings';
+    if (appearance) appearance.textContent = 'Save Team Colors';
+  }
+
   function renderAdmin(data) {
     const pane = document.getElementById('pitching-rules-settings');
     if (!pane) return;
@@ -289,7 +297,10 @@
   }
 
   function init() {
-    if (path === '/admin/settings') initAdmin();
+    if (path === '/admin/settings') {
+      polishAdminSaveButtons();
+      initAdmin();
+    }
     if (path === '/pitching') initPitching();
   }
 
