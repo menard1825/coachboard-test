@@ -83,7 +83,7 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     expect(summary_items).to_have_count(3)
     review_filter = summary_items.filter(has_text='Needs Review')
     expect(review_filter).to_have_attribute('role', 'button')
-    expect(review_filter).to_have_attribute('aria-disabled', None)
+    assert review_filter.get_attribute('aria-disabled') is None
     review_filter.click()
     expect(review_filter).to_have_attribute('aria-pressed', 'true')
     expect(page.locator('.cb-pitch-filter-state')).to_be_visible()
