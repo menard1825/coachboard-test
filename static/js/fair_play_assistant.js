@@ -76,7 +76,7 @@
           <div>
             <h6 class="text-muted mb-1">Playing Time Assistance</h6>
             <p class="small text-muted mb-0">
-              Choose how much help CoachBoard should provide. This is a team setting and follows the team on every device.
+              Team-level playing-time tracking and Fair Play checks.
             </p>
           </div>
           <span class="badge text-bg-light border" id="fairPlayModeBadge">Loading…</span>
@@ -88,21 +88,21 @@
           <input class="form-check-input mt-1" type="radio" name="fair_play_mode" value="off">
           <span>
             <span class="fw-semibold d-block">Off</span>
-            <span class="small text-muted">Best for older or competitive teams. No Fair Play card or warnings appear on Game Day.</span>
+            <span class="small text-muted">No Fair Play checks or Game Day warnings.</span>
           </span>
         </label>
         <label class="border rounded p-3 d-flex gap-3 align-items-start" style="cursor:pointer;">
           <input class="form-check-input mt-1" type="radio" name="fair_play_mode" value="track">
           <span>
             <span class="fw-semibold d-block">Track Only</span>
-            <span class="small text-muted">Keep using CoachBoard's normal playing-time and bench summaries without Fair Play warnings.</span>
+            <span class="small text-muted">Show playing-time and bench summaries without rule warnings.</span>
           </span>
         </label>
         <label class="border rounded p-3 d-flex gap-3 align-items-start" style="cursor:pointer;">
           <input class="form-check-input mt-1" type="radio" name="fair_play_mode" value="rules">
           <span>
             <span class="fw-semibold d-block">Fair Play Rules</span>
-            <span class="small text-muted">For rec and younger teams that need help meeting playing-time requirements.</span>
+            <span class="small text-muted">Check the rotation against the settings below.</span>
           </span>
         </label>
       </div>
@@ -112,7 +112,7 @@
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div>
               <div class="fw-semibold">Fair Play Rules</div>
-              <div class="small text-muted">These rules only create guidance. They never move a player or block a save.</div>
+              <div class="small text-muted">Guidance only. Fair Play never changes or blocks a rotation.</div>
             </div>
             <span class="badge text-bg-secondary" id="fairPlayRulesState">Inactive</span>
           </div>
@@ -402,7 +402,7 @@
     if (!hasIssues) {
       details.innerHTML = `
         <div class="text-success">
-          <i class="bi bi-check-circle-fill me-1"></i>Everyone meets the Fair Play rules in the current rotation.
+          <i class="bi bi-check-circle-fill me-1"></i>Current rotation meets Fair Play settings.
         </div>
       `;
       return;
