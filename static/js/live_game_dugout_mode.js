@@ -6,7 +6,7 @@
   const $ = id => document.getElementById(id);
   const setText = (el, v) => { if (el && el.textContent !== v) el.textContent = v; };
   const setHtml = (el, v) => { if (el && el.innerHTML !== v) el.innerHTML = v; };
-  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   let state = null, clock = null, clockAt = 0, stateBusy = false, clockBusy = false, queued = false, endInningFrom = null;
 
   function styles() {
@@ -60,7 +60,7 @@
     [['liveChangePitcherBtn','Change Pitcher','Choose the next pitcher'],['liveDefensiveChangeBtn','Defensive Change','Move or swap a player'],['liveEndInningBtn','End Inning','Advance to the next board'],['liveUndoBtn','Undo','Reverse the last live change']].forEach(([id,a,b])=>setHtml($(id),`<span class="coach-action-title">${a}</span><span class="coach-action-note">${b}</span>`));
     const whole=$('liveSetDefenseBtnCoach'),card=defenseCard(shell);if(whole&&card){let tools=card.querySelector('.cb-defense-tools');if(!tools){tools=document.createElement('div');tools.className='cb-defense-tools';card.prepend(tools);}if(whole.parentElement!==tools)tools.appendChild(whole);setHtml(whole,'<span class="coach-action-title">Set Whole Defense</span><span class="coach-action-note">Replace multiple positions at once</span>');}
     const end=$('liveEndGameBtn');if(end){let z=shell.querySelector('.cb-end-zone');if(!z){z=document.createElement('div');z.className='cb-end-zone';z.innerHTML='<small>Finish game</small>';shell.appendChild(z);}if(end.parentElement!==z)z.appendChild(end);setHtml(end,'<i class="bi bi-stop-circle me-1"></i> End Game');}
-    const board=$('live-board-prep-v3');if(board){setText(board.querySelector('.bp-kicker'),'Next Inning Board');setText(board.querySelector('.bp-help'),'Use this to update the physical dugout board before the next inning. Review or adjust only if needed.');}
+    const board=$('live-board-prep-v3');if(board){setText(board.querySelector('.bp-kicker'),'Next Inning Board');setText(board.querySelector('.bp-help'),'Review next-inning changes.');}
   }
   function focusBoard(){const b=$('live-board-prep-v3');if(!b)return;b.scrollIntoView({behavior:'smooth',block:'start'});b.classList.remove('cb-board-flash');void b.offsetWidth;b.classList.add('cb-board-flash');setTimeout(()=>b.classList.remove('cb-board-flash'),1700);}
   function patch(){queued=false;styles();const live=Boolean(state?.game?.is_live||!$('live-game-overlay')?.classList.contains('d-none'));document.body.classList.toggle('cb-dugout',live);if(!live){$('cbDugoutHeader')?.remove();return;}const shell=document.querySelector('#live-game-overlay .coach-live-shell');if(!shell)return;renderHeader(shell);arrange(shell);addNumbers();}
