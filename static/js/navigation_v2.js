@@ -31,8 +31,23 @@
     document.head.appendChild(script);
   }
 
+  function normalizeHomeEntry() {
+    if (window.location.pathname !== '/' || window.location.hash) return;
+    // Home is now the default primary workspace. Set the hash before the legacy
+    // tab controller initializes so it does not briefly activate Roster first.
+    if (window.history?.replaceState) window.history.replaceState(null, '', '#overview');
+    else window.location.hash = '#overview';
+  }
+
   function redirectLegacySchedule() {
-    if (window.location.pathname === '/' && window.location.hash.toLowerCase() === '#games') {
+    // Desktop navigation owns the dedicated Game Day page. On mobile, #games is
+    // intentionally kept as a same-document primary workspace so the bottom bar
+    // never mixes full document loads with tab swaps.
+    if (
+      window.location.pathname === '/' &&
+      window.location.hash.toLowerCase() === '#games' &&
+      window.matchMedia('(min-width: 992px)').matches
+    ) {
       window.location.replace('/game-day');
       return true;
     }
@@ -148,7 +163,7 @@
         <div class="cb-mobile-more-card">
           ${moreLink('#player_development', 'graph-up-arrow', 'Development', 'Player priorities, progress, and coaching focus.')}
           ${moreLink('/pitching', 'bullseye', 'Pitching', 'Eligibility, workload, targets, and pitching history.', false)}
-          ${moreLink('/game-day', 'calendar3', 'Schedule', 'Add games and review the team schedule.', false)}
+          ${moreLink('/game-day', 'calendar3', 'Schedule', 'Add games and review the full Game Day dashboard.', false)}
           ${moreLink('#lineups', 'card-list', 'Lineup Templates', 'Reusable batting orders for Game Day.')}
           ${moreLink('#rotations', 'diagram-3', 'Defensive Templates', 'Starting Defense and full-game rotations.')}
           ${moreLink('#stats', 'bar-chart', 'Stats', 'Actual season usage and playing history.')}
@@ -219,7 +234,7 @@
       }
     });
 
-    if (window.location.pathname === '/' && ['#overview', '#roster', '#practice_plan', '#more'].includes(window.location.hash || '#overview')) {
+    if (window.location.pathname === '/' && ['#overview', '#games', '#roster', '#practice_plan', '#more'].includes(window.location.hash || '#overview')) {
       window.requestAnimationFrame(() => window.requestAnimationFrame(reset));
     }
   }
@@ -234,7 +249,7 @@
     const moreActive = !['#overview', '#roster', '#practice_plan'].includes(target);
     nav.innerHTML = [
       mobileItem('#overview', 'house-door', 'Home', target === '#overview', true),
-      mobileItem('/game-day', 'diamond', 'Game Day'),
+      mobileItem('#games', 'diamond', 'Game Day', target === '#games', true),
       mobileItem('#roster', 'people', 'Roster', target === '#roster', true),
       mobileItem('#practice_plan', 'clipboard-check', 'Practice', target === '#practice_plan', true),
       mobileItem('#more', 'three-dots', 'More', moreActive, true),
@@ -256,6 +271,7 @@
     ].join('');
   }
 
+  normalizeHomeEntry();
   window.addEventListener('hashchange', redirectLegacySchedule);
   if (redirectLegacySchedule()) return;
 
