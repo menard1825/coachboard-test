@@ -161,7 +161,23 @@
     });
   }
 
+  function sharedMobileNav() {
+    return document.getElementById('cb-global-mobile-nav');
+  }
+
+  function normalizeSharedMobileNav() {
+    const nav = sharedMobileNav();
+    if (!nav) return;
+    if (window.location.pathname === '/game-day' || window.location.pathname === '/game-day/') {
+      const home = nav.querySelector('[data-cb-mobile-section="overview"]');
+      if (home) home.setAttribute('href', '/');
+    }
+  }
+
   function installHomeBottomNav() {
+    // The shared server-rendered bar is stable from first paint and owns its
+    // markup. Older page-specific bars are only a fallback for legacy pages.
+    if (sharedMobileNav()) return;
     const nav = document.querySelector('nav.bottom-nav-fixed ul');
     if (!nav) return;
     const target = window.location.hash || '#overview';
@@ -176,6 +192,9 @@
   }
 
   function installGameDayBottomNav() {
+    // Do not replace the shared nav after paint; only retain this for legacy
+    // templates that have not moved to the shared shell yet.
+    if (sharedMobileNav()) return;
     const nav = document.querySelector('nav.bottom-nav-fixed ul');
     if (!nav) return;
     nav.innerHTML = [
@@ -193,6 +212,7 @@
   installMobileNavigationStyles();
   cleanAccountDrawer();
   renameAccountSecurityLinks();
+  normalizeSharedMobileNav();
 
   if (window.location.pathname === '/') {
     installHomeBottomNav();
