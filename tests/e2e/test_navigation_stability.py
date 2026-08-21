@@ -59,6 +59,32 @@ def nav_snapshot(page: Page, selector: str):
     )
 
 
+def mobile_shell_snapshot(page: Page):
+    return page.evaluate(
+        """() => {
+            const header = document.querySelector('body > nav.navbar');
+            const main = document.querySelector('body > main.container-fluid');
+            const headerRect = header?.getBoundingClientRect();
+            const mainRect = main?.getBoundingClientRect();
+            return {
+                scrollY: window.scrollY,
+                header: headerRect ? {
+                    top: headerRect.top,
+                    left: headerRect.left,
+                    width: headerRect.width,
+                    height: headerRect.height,
+                    position: getComputedStyle(header).position,
+                } : null,
+                main: mainRect ? {
+                    top: mainRect.top,
+                    left: mainRect.left,
+                    width: mainRect.width,
+                } : null,
+            };
+        }"""
+    )
+
+
 def assert_geometry_close(before, after, tolerance=2):
     for key in ('top', 'left', 'width', 'height'):
         assert abs(before[key] - after[key]) <= tolerance, (
@@ -73,10 +99,33 @@ def assert_geometry_close(before, after, tolerance=2):
             )
 
 
+def assert_mobile_shell_stable(before, after, tolerance=2):
+    assert before['header'] and after['header']
+    assert before['main'] and after['main']
+    assert after['header']['position'] == 'fixed'
+    assert abs(after['header']['top']) <= tolerance
+    for section in ('header', 'main'):
+        for key in ('top', 'left', 'width'):
+            assert abs(before[section][key] - after[section][key]) <= tolerance, (
+                f'mobile {section} {key} moved from {before[section][key]} to {after[section][key]}'
+            )
+    assert abs(before['header']['height'] - after['header']['height']) <= tolerance
+    assert after['scrollY'] <= tolerance, f"primary workspace restored at scrollY={after['scrollY']}"
+
+
+def settle_mobile_shell(page: Page):
+    page.wait_for_timeout(120)
+    for _ in range(10):
+        if page.evaluate('window.scrollY') <= 2:
+            return
+        page.wait_for_timeout(50)
+
+
 def test_mobile_primary_navigation_does_not_jump_between_workspaces(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     page.goto(coachboard_url, wait_until='domcontentloaded')
+    settle_mobile_shell(page)
 
     nav = page.locator('#cb-global-mobile-nav')
     expect(nav).to_be_visible()
@@ -86,33 +135,52 @@ def test_mobile_primary_navigation_does_not_jump_between_workspaces(page: Page, 
     assert [label.strip() for label in nav.locator('a').all_text_contents()] == expected_labels
 
     home_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
+    home_shell = mobile_shell_snapshot(page)
+    assert home_shell['header']['position'] == 'fixed'
+    assert abs(home_shell['header']['top']) <= 2
 
+    # Reproduce the real phone behavior: a coach can be partway down Home and
+    # then switch workspaces. The app shell should return to a stable top anchor
+    # instead of letting Safari's restored/hash scroll move the header/content.
+    page.evaluate('window.scrollTo(0, 320)')
     nav.get_by_text('Roster', exact=True).click()
     expect(page.locator('#roster')).to_have_class(re.compile(r'\bactive\b'))
     expect(nav.locator('[data-cb-mobile-section="roster"]')).to_have_class(re.compile(r'\bactive\b'))
+    settle_mobile_shell(page)
     roster_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
+    roster_shell = mobile_shell_snapshot(page)
     assert_geometry_close(home_geometry, roster_geometry)
+    assert_mobile_shell_stable(home_shell, roster_shell)
 
     nav.get_by_text('Practice', exact=True).click()
     expect(page.locator('#practice_plan')).to_have_class(re.compile(r'\bactive\b'))
+    settle_mobile_shell(page)
     practice_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
+    practice_shell = mobile_shell_snapshot(page)
     assert_geometry_close(home_geometry, practice_geometry)
+    assert_mobile_shell_stable(home_shell, practice_shell)
 
     with page.expect_navigation(wait_until='domcontentloaded'):
         nav.get_by_text('Game Day', exact=True).click()
+    settle_mobile_shell(page)
     nav = page.locator('#cb-global-mobile-nav')
     expect(nav).to_be_visible()
     expect(nav.locator('[data-cb-mobile-section="game-day"]')).to_have_class(re.compile(r'\bactive\b'))
     game_day_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
+    game_day_shell = mobile_shell_snapshot(page)
     assert_geometry_close(home_geometry, game_day_geometry)
+    assert_mobile_shell_stable(home_shell, game_day_shell)
 
     with page.expect_navigation(wait_until='domcontentloaded'):
         nav.get_by_text('Roster', exact=True).click()
+    settle_mobile_shell(page)
     nav = page.locator('#cb-global-mobile-nav')
     expect(page.locator('#roster')).to_have_class(re.compile(r'\bactive\b'))
     expect(nav.locator('[data-cb-mobile-section="roster"]')).to_have_class(re.compile(r'\bactive\b'))
     return_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
+    return_shell = mobile_shell_snapshot(page)
     assert_geometry_close(home_geometry, return_geometry)
+    assert_mobile_shell_stable(home_shell, return_shell)
 
 
 def test_desktop_primary_navigation_keeps_geometry_and_active_state(page: Page, coachboard_url: str):
