@@ -273,6 +273,11 @@
   }
 
   function installMobileNav() {
+    // The shared server-rendered primary bar owns navigation markup. Keeping
+    // Home from rewriting it immediately and again 250 ms later prevents the
+    // visible mobile jump between first paint and dashboard initialization.
+    if (document.getElementById('cb-global-mobile-nav')) return;
+
     const update = () => {
       const nav = document.querySelector('nav.bottom-nav-fixed ul');
       if (!nav) return;
