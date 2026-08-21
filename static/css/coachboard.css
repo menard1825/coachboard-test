@@ -601,3 +601,45 @@ body.cb-ui .gd-hero h1 {
     padding: 12px;
   }
 }
+
+/* Shared mobile viewport/bottom-nav spacing.
+   main.css owns the legacy mobile shell, but several newer workspaces also
+   added their own 84-96px bottom spacers. Keep exactly one clearance owner so
+   the fixed bar does not leave a second scrollable buffer. */
+@media (max-width: 991.98px) {
+  html {
+    height: 100dvh;
+    min-height: 100dvh;
+    background: #fff;
+  }
+
+  body.cb-ui {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+
+  /* Pages without the shared five-button bar should not reserve nav space. */
+  body.cb-ui main.container-fluid {
+    min-height: 0;
+    padding-bottom: 16px !important;
+  }
+
+  /* Home and Game Day use the shared fixed bar. Reserve its height once here. */
+  body.cb-ui.cb-primary-nav-route main.container-fluid {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  }
+
+  body.cb-ui.cb-home #overview,
+  body.cb-ui #collaboration {
+    padding-bottom: 0 !important;
+  }
+
+  body.cb-ui #more .cb-mobile-more-shell {
+    padding-bottom: 8px !important;
+  }
+
+  body.cb-ui .bottom-nav-fixed {
+    bottom: 0;
+    background: #fff !important;
+  }
+}
