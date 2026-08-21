@@ -74,7 +74,7 @@ def test_pitch_target_save_updates_without_full_page_reload(page: Page, coachboa
     pitcher_card = page.locator('.cb-pitcher-card').filter(has_text='Pitcher Pat').first
     expect(pitcher_card).to_contain_text('25', timeout=10_000)
 
-    pitcher_card.get_by_role('button', name=re.compile(r'Set / Edit Today')).click()
+    pitcher_card.locator('.open-target-modal').click()
     expect(page.locator('#coachTargetModal')).to_be_visible()
     page.locator('#targetPitchesInput').fill('')
     page.locator('#targetReasonInput').fill('')
