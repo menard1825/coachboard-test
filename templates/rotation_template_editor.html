@@ -35,7 +35,7 @@
     <div>
       <div class="rte-kicker">{% if starting_defense %}Game Day Planning Template{% else %}Full-Game Rotation Template{% endif %}</div>
       <h1 id="rtePageTitle">{% if starting_defense %}{% if editor_data.rotation.id %}Edit Starting Defense{% else %}New Starting Defense{% endif %}{% else %}{% if editor_data.rotation.id %}Edit Rotation Template{% else %}New Rotation Template{% endif %}{% endif %}</h1>
-      <p>{% if starting_defense %}Choose the regular starting defense once, leave pitcher open if it changes by game, and apply it from the Game Day planning screen.{% else %}Build the reusable {{ editor_data.regulation_innings }}-inning regulation defense here, inning by inning. Extra innings are handled during the live game if needed.{% endif %}</p>
+      <p>{% if starting_defense %}Reusable starting defense for Game Day. Pitcher can remain open.{% else %}Build the reusable {{ editor_data.regulation_innings }}-inning regulation defense here, inning by inning. Extra innings are handled during the live game if needed.{% endif %}</p>
     </div>
     <div class="rte-head-actions">
       <a class="btn btn-outline-secondary" href="{{ url_for('home') }}#rotations">Back to Templates</a>
@@ -93,7 +93,7 @@
   <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <div><h5 class="modal-title mb-0" id="rtePlayerTitle">Choose Player</h5><div class="small text-muted" id="rtePlayerHelp">Selecting a player already on the field opens his old position. Nothing auto-swaps.</div></div>
+        <div><h5 class="modal-title mb-0" id="rtePlayerTitle">Choose Player</h5><div class="small text-muted" id="rtePlayerHelp">Moving an assigned player opens his previous position.</div></div>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body p-0"><div class="list-group list-group-flush" id="rtePlayerChoices"></div></div>
