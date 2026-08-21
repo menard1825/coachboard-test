@@ -55,6 +55,7 @@ def test_home_is_first_mobile_destination(page: Page, coachboard_url: str):
     expect(items.nth(0)).to_contain_text('Home')
     expect(items.nth(0)).to_have_attribute('href', '#overview')
     expect(items.nth(1)).to_contain_text('Game Day')
+    expect(items.nth(1)).to_have_attribute('href', '#games')
     expect(items.nth(2)).to_contain_text('Roster')
     expect(items.nth(3)).to_contain_text('Practice')
     expect(items.nth(4)).to_contain_text('More')
@@ -73,22 +74,24 @@ def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page
     page.wait_for_timeout(400)
     bottom_nav = page.locator('nav.bottom-nav-fixed ul')
     same_page_items = bottom_nav.locator('a[href^="#"]')
-    expect(same_page_items).to_have_count(4)
-    for index in range(4):
+    expect(same_page_items).to_have_count(5)
+    for index in range(5):
         expect(same_page_items.nth(index)).not_to_have_attribute('data-bs-toggle', 'tab')
 
     expected = {
         'Home': '#overview',
+        'Game Day': '#games',
         'Roster': '#roster',
         'Practice': '#practice_plan',
         'More': '#more',
     }
-    for label in ('Roster', 'Practice', 'More', 'Home', 'Roster', 'More'):
+    for label in ('Roster', 'Practice', 'Game Day', 'More', 'Home', 'Roster', 'More'):
         bottom_nav.get_by_text(label, exact=True).click()
         target = expected[label]
         expect(page.locator(target)).to_have_class(re.compile(r'\bactive\b'))
         expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
         expect(bottom_nav.locator('a.nav-link.active span')).to_have_text(label)
+        expect(page).to_have_url(re.compile(re.escape(target) + r'$'))
 
     page.locator('#more').get_by_text('Development', exact=True).click()
     expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
@@ -96,7 +99,7 @@ def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page
     expect(bottom_nav.locator('a.nav-link.active span')).to_have_text('More')
 
     bottom_nav.get_by_text('Home', exact=True).click()
-    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?$'))
+    expect(page).to_have_url(re.compile(r'#overview$'))
     expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
     expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
 
