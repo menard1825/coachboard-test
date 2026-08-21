@@ -76,7 +76,7 @@ def test_mobile_bottom_nav_has_one_clearance_owner(page: Page, coachboard_url: s
     expect(page.locator('#more .cb-mobile-more-shell')).to_be_visible()
     assert css_px(page, '#more .cb-mobile-more-shell', 'paddingBottom') <= 8
 
-    page.get_by_role('link', name=re.compile(r'^Coach Notes')).click()
+    page.locator('#more a[href="#collaboration"]').click()
     expect(page.locator('#collaboration')).to_have_class(re.compile(r'\bactive\b'))
     # Coach Notes used to add its own 96px mobile buffer too.
     assert css_px(page, '#collaboration', 'paddingBottom') == 0
