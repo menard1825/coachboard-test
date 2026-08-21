@@ -30,7 +30,10 @@ def login(page: Page, coachboard_url: str):
 
 
 def open_practice_workspace(page: Page, coachboard_url: str):
-    page.goto(f'{coachboard_url}/#practice_plan', wait_until='domcontentloaded')
+    # Use a query value so this is always a new document navigation. A hash-only
+    # move from Home can legitimately keep the already-fetched practice model,
+    # which is not what these tests want after creating fresh fixture data.
+    page.goto(f'{coachboard_url}/?_e2e_practice=1#practice_plan', wait_until='domcontentloaded')
     expect(page.locator('#practice_plan')).to_have_class(re.compile(r'\bactive\b'), timeout=15_000)
     expect(page.locator('.cb-practice-plan')).not_to_have_count(0, timeout=15_000)
 
