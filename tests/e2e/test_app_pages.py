@@ -246,8 +246,8 @@ def test_coaching_workspaces_expose_new_primary_actions(page: Page, coachboard_u
     expect(page.get_by_role('button', name='Reuse on another date').first).to_be_visible()
 
     page.goto(f'{coachboard_url}/pitching')
-    expect(page.get_by_text('Game-pitch targets are coaching plans, not rule limits.')).to_be_visible()
-    page.get_by_role('button', name='Plan a target').click()
+    expect(page.get_by_text('Pitch targets are optional coaching plans and do not change eligibility.')).to_be_visible()
+    page.get_by_role('button', name='Set Pitch Target').click()
     expect(page.locator('#coachTargetModal')).to_be_visible()
     expect(page.locator('#targetScopeInput')).to_have_value('day')
     page.locator('#targetScopeInput').select_option('game')
