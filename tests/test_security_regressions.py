@@ -671,7 +671,9 @@ def test_pitching_page_explains_target_scope(monkeypatch):
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert 'Game-pitch targets are coaching plans, not rule limits.' in html
-    assert 'does not set a weekly or season limit' in html
+    assert 'Pitch targets are optional coaching plans.' in html
+    assert 'Targets count game pitches only and do not change official eligibility.' in html
+    assert 'Entire game day' in html
+    assert 'One scheduled game' in html
     assert 'id="targetScopeInput"' in html
     assert 'id="targetGameInput"' in html
