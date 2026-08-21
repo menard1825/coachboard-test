@@ -89,7 +89,7 @@
       @media(max-width:390px){
         .cb-pitch-counts{grid-template-columns:1fr}
         .cb-pitch-count{display:flex;align-items:center;justify-content:space-between;gap:10px}
-        .cb-pitch-count strong{font-size:1rem;margin-top:0}
+        .cb-pitch-count strong{margin-top:0}
       }
     `;
     document.head.appendChild(style);
@@ -97,14 +97,14 @@
 
   function statusKind(status) {
     const normalized = String(status || '').toLowerCase();
-    if (normalized === 'available') return 'available';
+    if (normalized === 'available' || normalized === 'eligible') return 'available';
     if (normalized.includes('verify') || normalized.includes('incomplete') || normalized.includes('restriction')) return 'warning';
     return 'danger';
   }
 
   function decisionCopy(status, nextAvailable) {
     const normalized = String(status || '').toLowerCase();
-    if (normalized === 'available') return 'Eligible today';
+    if (normalized === 'available' || normalized === 'eligible') return 'Eligible today';
     if (normalized.includes('verify') || normalized.includes('incomplete')) return 'Verify pitching history';
     if (normalized.includes('rules not selected') || normalized.includes('verify rules')) return 'Competition rules needed';
     if (nextAvailable && !/^verify/i.test(nextAvailable)) return `Next Available: ${nextAvailable}`;
@@ -113,8 +113,8 @@
 
   function nextFromCell(cell) {
     const line = [...cell.querySelectorAll('div')]
-      .find(node => /^Next\s*:/i.test(node.textContent.trim()));
-    return line ? line.textContent.replace(/^Next\s*:\s*/i, '').trim() : '';
+      .find(node => /^Next(?: Available)?\s*:/i.test(node.textContent.trim()));
+    return line ? line.textContent.replace(/^Next(?: Available)?\s*:\s*/i, '').trim() : '';
   }
 
   function statusDetailFromCell(cell) {
@@ -129,8 +129,8 @@
     if (!name) return null;
     const targetButton = cells[4].querySelector('.open-target-modal');
     const playerId = targetButton?.dataset.playerId || '';
-    const status = cells[1].querySelector('.badge')?.textContent.trim() || 'Available';
-    const available = status === 'Available';
+    const status = cells[1].querySelector('.badge')?.textContent.trim() || 'Eligible';
+    const available = status === 'Available' || status === 'Eligible';
     const nextAvailable = nextFromCell(cells[1]);
     const detail = statusDetailFromCell(cells[1]);
     const last = cells[0].querySelector('.small')?.textContent.trim() || '';
@@ -174,7 +174,7 @@
   }
 
   function upgradeStatusBoard() {
-    const statusCard = cardByHeading('Who Can Pitch?');
+    const statusCard = cardByHeading('Pitcher Availability') || cardByHeading('Who Can Pitch?');
     if (!statusCard || statusCard.dataset.cbPitchingV2 === '1') return;
     const tableWrap = statusCard.querySelector('.table-responsive');
     const table = tableWrap?.querySelector('table');
@@ -287,7 +287,7 @@
 
   function plannedTargetsCard(root = document) {
     return [...root.querySelectorAll('.card')]
-      .find(card => card.querySelector('h5')?.textContent.trim() === 'Planned Game-Pitch Targets') || null;
+      .find(card => ['Pitch Targets', 'Planned Game-Pitch Targets'].includes(card.querySelector('h5')?.textContent.trim())) || null;
   }
 
   async function refreshTargetUi(playerId) {
