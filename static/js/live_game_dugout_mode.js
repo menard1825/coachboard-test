@@ -6,7 +6,7 @@
   const $ = id => document.getElementById(id);
   const setText = (el, v) => { if (el && el.textContent !== v) el.textContent = v; };
   const setHtml = (el, v) => { if (el && el.innerHTML !== v) el.innerHTML = v; };
-  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let state = null, clock = null, clockAt = 0, stateBusy = false, clockBusy = false, queued = false, endInningFrom = null;
 
   function styles() {
