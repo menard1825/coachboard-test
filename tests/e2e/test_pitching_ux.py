@@ -34,13 +34,14 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     page.goto(f'{coachboard_url}/pitching', wait_until='domcontentloaded')
 
     expect(page.locator('h3').filter(has_text='Pitching')).to_be_visible()
+    expect(page.locator('.cb-pitch-page-head p')).to_have_text('Fast game-day pitching decisions.', timeout=15_000)
     rule_strip = page.locator('#pitchingRuleStrip')
     expect(rule_strip).to_be_visible()
     cards = page.locator('.cb-pitcher-card')
     expect(cards).not_to_have_count(0)
     expect(page.locator('.cb-pitch-counts')).to_be_visible()
     expect(cards.first).to_contain_text('Competition Eligibility')
-    expect(cards.first).to_contain_text('Arm Care')
+    expect(cards.first).to_contain_text('Arm care')
     expect(cards.first.locator('.pitch-arm-care-slot')).not_to_contain_text('Loading', timeout=15_000)
 
     # Rules and arm care share one compact row on phones rather than consuming
@@ -50,6 +51,7 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     tops = rule_items.evaluate_all('items => items.map(item => Math.round(item.getBoundingClientRect().top))')
     assert abs(tops[0] - tops[1]) <= 2
     expect(rule_items.first.locator('small')).to_be_hidden()
+    expect(page.locator('#pitcherAvailabilityCard > .card-header h5')).to_have_text('Who can pitch today?')
 
     # The current dashboard is rendered as cards from first paint. The old
     # table->JavaScript-card replacement and injected duplicate summary are gone.
@@ -63,6 +65,18 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     expect(status_card).to_contain_text('Competition Rules Needed')
     expect(status_card).not_to_contain_text('Eligible Today\n1')
 
+    # Mobile uses short, high-signal labels and puts attention groups before ready pitchers.
+    summary_items = page.locator('.cb-pitch-summary-item[data-cb-pitch-filter]')
+    expect(summary_items).to_have_count(3)
+    expect(summary_items.nth(0)).to_have_attribute('data-cb-pitch-filter', 'unavailable')
+    expect(summary_items.nth(1)).to_have_attribute('data-cb-pitch-filter', 'review')
+    expect(summary_items.nth(2)).to_have_attribute('data-cb-pitch-filter', 'eligible')
+    expect(summary_items.nth(0).locator('span')).to_have_text('OUT')
+    expect(summary_items.nth(1).locator('span')).to_have_text('CHECK')
+    expect(summary_items.nth(2).locator('span')).to_have_text('READY')
+    expect(cards.first).to_have_attribute('data-availability-group', 'review')
+    expect(cards.first.locator('.cb-pitch-status')).to_have_text('CHECK')
+
     # Mobile starts scan-first: official decision / next date and arm care stay
     # visible, while usage, workload, and target detail are collapsed.
     first_card = cards.first
@@ -70,18 +84,30 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     details_button = first_card.locator('.cb-pitcher-details-toggle')
     expect(details_button).to_be_visible()
     expect(details_button).to_have_attribute('aria-expanded', 'false')
+    expect(details_button).to_contain_text('More details')
     expect(first_card.locator('.cb-pitch-metrics')).to_be_hidden()
+
+    # The top control can always open and close details.
     details_button.click()
     expect(details_button).to_have_attribute('aria-expanded', 'true')
     expect(first_card.locator('.cb-pitch-metrics')).to_be_visible()
+    expect(first_card.locator('.cb-pitcher-collapse-bottom')).to_be_visible()
     details_button.click()
+    expect(details_button).to_have_attribute('aria-expanded', 'false')
+    expect(first_card.locator('.cb-pitch-metrics')).to_be_hidden()
+
+    # There is also a collapse control at the bottom so a coach never has to
+    # scroll back to the top of a long expanded pitcher card.
+    details_button.click()
+    bottom_collapse = first_card.locator('.cb-pitcher-collapse-bottom')
+    expect(bottom_collapse).to_be_visible()
+    bottom_collapse.click()
+    expect(first_card).to_have_attribute('data-mobile-expanded', 'false')
     expect(first_card.locator('.cb-pitch-metrics')).to_be_hidden()
 
     # Availability summary cards are controls, not dead statistics. The seeded
-    # team has no default competition rule, so every pitcher belongs to Review.
-    summary_items = page.locator('.cb-pitch-summary-item[data-cb-pitch-filter]')
-    expect(summary_items).to_have_count(3)
-    review_filter = summary_items.filter(has_text='Needs Review')
+    # team has no default competition rule, so every pitcher belongs to CHECK.
+    review_filter = summary_items.filter(has_text='CHECK')
     expect(review_filter).to_have_attribute('role', 'button')
     assert review_filter.get_attribute('aria-disabled') is None
     review_filter.click()
