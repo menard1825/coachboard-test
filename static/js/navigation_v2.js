@@ -174,6 +174,26 @@
     }
   }
 
+  function protectSharedMobileNavActiveState() {
+    const nav = sharedMobileNav();
+    if (!nav || nav.dataset.cbActiveStateProtected === '1') return;
+    nav.dataset.cbActiveStateProtected = '1';
+
+    const enforce = () => {
+      nav.querySelectorAll('[data-cb-mobile-section]').forEach((link) => {
+        const current = link.getAttribute('aria-current') === 'page';
+        link.classList.toggle('active', current);
+      });
+    };
+
+    // The legacy Home tab controller clears `.active` from every `.nav-tabs`
+    // link while activating content. The shared primary nav is not one of those
+    // Bootstrap tab controls, so preserve its visual state from aria-current.
+    const observer = new MutationObserver(enforce);
+    observer.observe(nav, {subtree: true, attributes: true, attributeFilter: ['class', 'aria-current']});
+    enforce();
+  }
+
   function installHomeBottomNav() {
     // The shared server-rendered bar is stable from first paint and owns its
     // markup. Older page-specific bars are only a fallback for legacy pages.
@@ -213,6 +233,7 @@
   cleanAccountDrawer();
   renameAccountSecurityLinks();
   normalizeSharedMobileNav();
+  protectSharedMobileNavActiveState();
 
   if (window.location.pathname === '/') {
     installHomeBottomNav();
