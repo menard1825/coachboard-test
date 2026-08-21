@@ -56,3 +56,113 @@
 .cb-home-loading{min-height:220px;display:flex;align-items:center;justify-content:center;gap:9px;color:#667085;font-size:.75rem}
 @media(max-width:991.98px){.cb-home-grid-top,.cb-home-grid-three{grid-template-columns:1fr}.cb-home-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cb-home-welcome{align-items:flex-start}.cb-home-context{display:none}}
 @media(max-width:575.98px){.cb-home-dashboard{padding-top:0}.cb-home-welcome{margin-top:0}.cb-home-welcome h1{font-size:1.5rem}.cb-home-welcome p{font-size:.74rem}.cb-home-card{padding:13px;border-radius:14px}.cb-home-card-head h2{font-size:1.18rem}.cb-home-readiness{grid-template-columns:1fr}.cb-home-game-meta{display:grid;gap:4px}.cb-home-quick-grid{grid-template-columns:1fr 1fr}.cb-home-quick{grid-template-columns:31px minmax(0,1fr);padding:9px}.cb-home-quick>.bi{display:none}.cb-home-quick small{display:none}.cb-home-live{grid-template-columns:auto minmax(0,1fr)}.cb-home-live-action{display:none}.cb-home-metrics{gap:4px}.cb-home-metrics span{padding:7px 4px}}
+
+/* Practice workspace v2: keep planning focused on the next practice and make
+   field-use controls easier to scan and tap without changing practice data. */
+#practice_plan > button[data-bs-target="#createPracticePlanForm"]{
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:center;
+  width:auto!important;
+  min-height:42px;
+  padding:.55rem .85rem;
+  border-radius:10px;
+  font-size:.76rem;
+  font-weight:800;
+}
+#practice_plan #createPracticePlanForm.collapse:not(.show){display:none!important}
+#practice_plan #createPracticePlanForm{margin-bottom:14px}
+#practice_plan .cb-practice-create-card{
+  overflow:hidden;
+  border:1px solid #dfe4ea;
+  border-radius:14px;
+  box-shadow:0 1px 3px rgba(16,24,40,.05);
+}
+#practice_plan .cb-practice-create-card .card-header{padding:13px 15px;background:#f8fafc}
+#practice_plan .cb-practice-create-card .card-body{padding:15px}
+#practice_plan .cb-practice-create-card .form-control,
+#practice_plan .cb-practice-create-card .form-select,
+#practice_plan .cb-practice-edit .form-control,
+#practice_plan .cb-practice-edit .form-select{min-height:44px;border-radius:9px}
+#practice_plan textarea.form-control{min-height:82px}
+#practice_plan .cb-practice-create-card button[type="submit"],
+#practice_plan .cb-practice-edit button[type="submit"]{min-height:42px;font-weight:800}
+#practice_plan > .card{
+  overflow:visible;
+  border:1px solid #e1e6ec;
+  border-radius:14px;
+  box-shadow:0 1px 3px rgba(16,24,40,.05);
+}
+#practice_plan > .card > .card-header{padding:13px 15px;border-bottom:1px solid #edf0f3;background:#fff}
+#practice_plan .cb-practice-plan{border-color:#e4e7ec;background:#fff}
+#practice_plan .cb-practice-plan.is-upcoming{border-left:3px solid var(--primary-color,#102a66)}
+#practice_plan .cb-practice-plan.is-upcoming:first-child .cb-practice-plan-button{background:#f8faff}
+#practice_plan .cb-practice-plan.is-past .cb-practice-plan-button{background:#fafbfc;color:#475467}
+#practice_plan .cb-practice-plan.is-past .cb-practice-date small{color:#8a94a3}
+#practice_plan .cb-practice-plan.is-upcoming + .cb-practice-plan.is-past,
+#practice_plan .cb-practice-plan.is-past:first-child{position:relative;margin-top:34px;border-top:1px solid #e4e7ec}
+#practice_plan .cb-practice-plan.is-upcoming + .cb-practice-plan.is-past::before,
+#practice_plan .cb-practice-plan.is-past:first-child::before{
+  content:'Past practices';
+  position:absolute;
+  top:-27px;
+  left:4px;
+  color:#667085;
+  font-size:.62rem;
+  font-weight:850;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+#practice_plan .cb-practice-plan-button{min-height:66px}
+#practice_plan .cb-practice-meta span{background:#fff}
+#practice_plan .accordion-body{padding:14px 16px 17px;background:#fff}
+#practice_plan .cb-practice-purpose{border-left:3px solid var(--primary-color,#102a66);background:#f8faff}
+#practice_plan .cb-practice-work{min-height:76px}
+#practice_plan .cb-practice-operations h5{margin-bottom:2px;font-size:.9rem;font-weight:850;color:#344054}
+#practice_plan .cb-attendance-grid{gap:7px}
+#practice_plan .cb-attendance-check{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:44px;
+  margin:0;
+  padding:8px 10px;
+  border:1px solid #e4e7ec;
+  border-radius:9px;
+  background:#fff;
+}
+#practice_plan .cb-attendance-check .form-check-input{flex:0 0 auto;width:1.05rem;height:1.05rem;margin:0}
+#practice_plan .cb-attendance-check .form-check-label{font-size:.74rem;font-weight:650;color:#344054}
+#practice_plan .cb-practice-operations form > .btn{min-height:42px;font-weight:750}
+#practice_plan .add-task-form .form-control,
+#practice_plan .add-task-form .btn{min-height:44px}
+#practice_plan .task-list{display:grid;gap:7px}
+#practice_plan .task-list .list-group-item{
+  min-height:48px;
+  border:1px solid #e4e7ec!important;
+  border-radius:9px!important;
+  padding:8px 9px;
+}
+#practice_plan .task-list .list-group-item.complete{background:#f5faf7;color:#667085}
+#practice_plan .task-list .form-check{display:flex;gap:8px;align-items:flex-start;margin:0}
+#practice_plan .task-list .form-check-input{flex:0 0 auto;margin-top:3px}
+#practice_plan .task-list .form-check-label{font-size:.74rem;line-height:1.3}
+#practice_plan .task-list .form-check-label .small{font-size:.6rem}
+#practice_plan .task-list .btn{min-width:38px;min-height:38px}
+#practice_plan .reuse-practice-btn,
+#practice_plan button[data-bs-target^="#edit-plan-"]{min-height:42px;font-weight:750}
+
+@media(min-width:768px){
+  #practice_plan > button[data-bs-target="#createPracticePlanForm"]{margin-left:auto;margin-bottom:14px!important}
+}
+@media(max-width:767.98px){
+  #practice_plan > button[data-bs-target="#createPracticePlanForm"]{width:100%!important;min-height:46px}
+  #practice_plan .cb-practice-plan-button{padding:13px 14px;min-height:0}
+  #practice_plan .cb-practice-title strong{font-size:.86rem}
+  #practice_plan .cb-practice-meta{flex-wrap:wrap}
+  #practice_plan .accordion-body{padding:12px}
+  #practice_plan .cb-practice-work{min-height:0}
+  #practice_plan .cb-attendance-grid{grid-template-columns:1fr}
+  #practice_plan .cb-practice-operations{gap:18px!important}
+  #practice_plan .cb-practice-operations .col-lg-6 + .col-lg-6{padding-top:4px;border-top:1px solid #edf0f3}
+}
