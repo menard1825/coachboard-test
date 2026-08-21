@@ -272,7 +272,7 @@
     if (menuToggle && menuToggle.dataset.coachSimplified !== '1') {
       menuToggle.dataset.coachSimplified = '1';
       setHtml(menuToggle, '<i class="bi bi-sliders me-1"></i> Defense Options');
-      menuToggle.title = 'Less-used defense tools';
+      menuToggle.title = 'Defense tools';
     }
 
     const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');
@@ -406,7 +406,7 @@
     const toolsMenu = toolsToggle?.nextElementSibling;
     if (toolsToggle) {
       setHtml(toolsToggle, '<i class="bi bi-three-dots me-1"></i> Inning Options');
-      toolsToggle.title = 'Less-used inning tools';
+      toolsToggle.title = 'Inning tools';
     }
 
     if (toolsMenu && toolsMenu.dataset.coachSimplified !== '1') {
@@ -435,7 +435,7 @@
     if (planner && !planner.querySelector('.gm-coach-help')) {
       const help = document.createElement('div');
       help.className = 'gm-coach-help';
-      help.innerHTML = '<i class="bi bi-info-circle me-1"></i>Pick an inning, then tap a position on the field to assign a player. Changes save automatically.';
+      help.innerHTML = '<i class="bi bi-info-circle me-1"></i>Select an inning, then tap a position to assign a player. Saves automatically.';
       pickerRow.insertAdjacentElement('afterend', help);
     }
   }
@@ -451,8 +451,8 @@
     setText(
       help,
       isSubInning(inning)
-        ? `Set the defense after this planned change during Inning ${Math.floor(Number.parseFloat(inning))}. Changes save automatically.`
-        : 'Tap a position to assign or change a player. Changes save automatically.'
+        ? `Set the defense after this planned change during Inning ${Math.floor(Number.parseFloat(inning))}. Saves automatically.`
+        : 'Tap a position to assign or change a player. Saves automatically.'
     );
 
     const tools = panel.querySelector('.pde-tools');
@@ -478,7 +478,7 @@
 
     const status = panel.querySelector('.pde-status');
     if (status) {
-      setText(status.querySelector('.pde-status-note'), 'Changes save automatically.');
+      setText(status.querySelector('.pde-status-note'), 'Saves automatically.');
     }
   }
 
