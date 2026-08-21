@@ -677,3 +677,325 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
     font-size: 1.22rem;
   }
 }
+
+/* Coach Notes workspace. The legacy markup is intentionally preserved for
+   data/permission compatibility, while this adapter makes it read like the
+   newer CoachBoard workspaces on desktop and mobile. */
+#collaboration {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-bottom: 84px;
+}
+
+#collaboration::before {
+  content: 'Coach Notes';
+  display: block;
+  margin: 2px 0 2px;
+  color: var(--cb-ink);
+  font-size: 1.55rem;
+  font-weight: 850;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+}
+
+#collaboration > .row {
+  row-gap: 14px;
+}
+
+#collaboration > .row::before {
+  content: 'Shared team context and player-specific notes for the coaching staff.';
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 4px;
+  padding: 0 12px;
+  color: var(--cb-muted);
+  font-size: .78rem;
+  line-height: 1.4;
+}
+
+#collaboration > .row > [class*='col-'] {
+  display: flex;
+}
+
+#collaboration > .row > [class*='col-'] > .card {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--cb-border) !important;
+  border-radius: 14px !important;
+  background: #fff;
+  box-shadow: var(--cb-shadow) !important;
+}
+
+#collaboration > .row > [class*='col-']:first-of-type > .card {
+  border-top: 4px solid var(--cb-primary) !important;
+}
+
+#collaboration > .row > [class*='col-']:last-of-type > .card {
+  border-top: 4px solid #6377a8 !important;
+}
+
+#collaboration .card > .card-header {
+  min-height: 64px;
+  padding: 14px 15px 12px;
+  border-bottom: 1px solid #edf0f3;
+  background: #fff;
+}
+
+#collaboration .card > .card-header h5 {
+  position: relative;
+  margin: 0;
+  padding-left: 34px;
+  color: var(--cb-ink);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+#collaboration .card > .card-header h5::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  transform: translateY(-50%);
+  background: #eef3ff;
+  color: var(--cb-primary);
+  font-family: 'bootstrap-icons';
+  font-size: .82rem;
+  font-weight: 400;
+}
+
+#collaboration > .row > [class*='col-']:first-of-type .card-header h5::before {
+  content: '\f4cb';
+}
+
+#collaboration > .row > [class*='col-']:last-of-type .card-header h5::before {
+  content: '\f4d0';
+}
+
+#collaboration .card > .card-body {
+  padding: 13px;
+  background: #fbfcfd;
+}
+
+#collaboration .card-body > form {
+  margin-bottom: 14px !important;
+  padding: 12px;
+  border: 1px solid #dfe5ec;
+  border-radius: 11px;
+  background: #fff;
+}
+
+#collaboration .card-body > form::before {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--cb-muted);
+  font-size: .62rem;
+  font-weight: 850;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+#collaboration > .row > [class*='col-']:first-of-type form::before {
+  content: 'New team note';
+}
+
+#collaboration > .row > [class*='col-']:last-of-type form::before {
+  content: 'New player note';
+}
+
+#collaboration .card-body > form .form-control,
+#collaboration .card-body > form .form-select {
+  min-height: 44px;
+  border-color: #d8dee7;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: none;
+  font-size: .8rem;
+}
+
+#collaboration .card-body > form textarea.form-control {
+  min-height: 94px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+#collaboration .card-body > form .form-control:focus,
+#collaboration .card-body > form .form-select:focus {
+  border-color: color-mix(in srgb, var(--cb-primary) 55%, #d8dee7);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cb-primary) 10%, transparent);
+}
+
+#collaboration .card-body > form .btn-primary {
+  min-height: 40px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: .74rem;
+  font-weight: 800;
+}
+
+#team-notes-container,
+#player-notes-container {
+  display: grid;
+  gap: 9px;
+}
+
+#team-notes-container > .card,
+#player-notes-container > .card {
+  margin-bottom: 0 !important;
+  overflow: hidden;
+  border: 1px solid #dfe5ec !important;
+  border-left: 4px solid #c8d4ef !important;
+  border-radius: 11px !important;
+  background: #fff;
+  box-shadow: none !important;
+}
+
+#player-notes-container > .card {
+  border-left-color: #c9d0df !important;
+}
+
+#team-notes-container > .card .card-body,
+#player-notes-container > .card .card-body {
+  padding: 11px 12px !important;
+  background: #fff;
+}
+
+#team-notes-container .card-text,
+#player-notes-container .card-text {
+  margin-bottom: 7px !important;
+  color: #263247;
+  font-size: .8rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+#player-notes-container .card-text strong {
+  color: var(--cb-primary);
+  font-size: .74rem;
+  font-weight: 850;
+}
+
+#team-notes-container .card-body > small,
+#player-notes-container .card-body > small {
+  color: #7d8796 !important;
+  font-size: .64rem;
+  line-height: 1.35;
+}
+
+#team-notes-container .card-body > .mt-1,
+#player-notes-container .card-body > .mt-1 {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px !important;
+  padding-top: 7px;
+  border-top: 1px solid #eef1f4;
+}
+
+#team-notes-container .btn-link,
+#player-notes-container .btn-link {
+  min-height: 34px;
+  padding: 5px 9px !important;
+  border: 1px solid #e0e5eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #596579 !important;
+  font-size: .66rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+#team-notes-container .btn-link.text-danger,
+#player-notes-container .btn-link.text-danger {
+  margin-left: auto;
+  border-color: #f0d3d3;
+  color: #a33b3b !important;
+}
+
+#team-notes-container > .text-center,
+#player-notes-container > .text-center {
+  padding: 22px 16px !important;
+  border: 1px dashed #cfd6df !important;
+  border-radius: 11px !important;
+  background: #fff;
+  color: var(--cb-muted) !important;
+  font-size: .76rem;
+}
+
+@media (max-width: 767.98px) {
+  #collaboration {
+    padding-bottom: 96px;
+  }
+
+  #collaboration::before {
+    margin-top: 0;
+    font-size: 1.35rem;
+  }
+
+  #collaboration > .row {
+    --bs-gutter-x: 0;
+    row-gap: 10px;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  #collaboration > .row::before {
+    margin-bottom: 2px;
+    padding: 0;
+    font-size: .72rem;
+  }
+
+  #collaboration > .row > [class*='col-'] {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  #collaboration > .row > [class*='col-'] > .card {
+    border-radius: 12px !important;
+  }
+
+  #collaboration .card > .card-header {
+    min-height: 56px;
+    padding: 12px;
+  }
+
+  #collaboration .card > .card-body {
+    padding: 10px;
+  }
+
+  #collaboration .card-body > form {
+    padding: 10px;
+  }
+
+  #collaboration .card-body > form .form-control,
+  #collaboration .card-body > form .form-select,
+  #collaboration .card-body > form textarea.form-control {
+    font-size: 16px;
+  }
+
+  #collaboration .card-body > form textarea.form-control {
+    min-height: 88px;
+  }
+
+  #collaboration .card-body > form .btn-primary {
+    width: 100%;
+    min-height: 46px;
+    font-size: .78rem;
+  }
+
+  #team-notes-container .card-text,
+  #player-notes-container .card-text {
+    font-size: .82rem;
+  }
+
+  #team-notes-container .btn-link,
+  #player-notes-container .btn-link {
+    min-height: 40px;
+    padding: 7px 10px !important;
+    font-size: .7rem;
+  }
+}
