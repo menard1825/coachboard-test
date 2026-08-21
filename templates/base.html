@@ -58,6 +58,7 @@
             {% if session.get('role') == 'Game Changer' %}
               <a class="cb-nav-link active" data-cb-section="game-day" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-card-checklist"></i>GameChanger Setup</a>
             {% else %}
+              <a class="cb-nav-link{% if request.path == '/' %} active{% endif %}" data-cb-section="overview" href="{{ url_for('home') }}#overview"><i class="bi bi-house-door"></i>Home</a>
               <a class="cb-nav-link{% if request.path in ['/game-day', '/game-day/'] %} active{% endif %}" data-cb-section="game-day" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-diamond"></i>Game Day</a>
               <a class="cb-nav-link" data-cb-section="roster" href="{{ url_for('home') }}#roster"><i class="bi bi-people"></i>Roster</a>
               <a class="cb-nav-link d-none d-xl-inline-flex" data-cb-section="player_development" href="{{ url_for('home') }}#player_development"><i class="bi bi-graph-up-arrow"></i>Development</a>
@@ -145,11 +146,11 @@
     {% if cb_primary_nav_route and session.get('logged_in') and current_team and session.get('role') != 'Game Changer' %}
     <nav id="cb-global-mobile-nav" class="fixed-bottom d-lg-none bottom-nav-fixed shadow-lg" aria-label="Primary mobile navigation">
       <ul class="nav nav-tabs w-100">
-        <li class="nav-item flex-fill"><a class="nav-link text-center{% if request.path == '/' %} active{% endif %}" data-cb-mobile-section="overview" href="{{ url_for('home') }}#overview"{% if request.path == '/' %} aria-current="page"{% endif %}><i class="bi bi-house-door d-block"></i><span>Home</span></a></li>
+        <li class="nav-item flex-fill"><a class="nav-link text-center{% if request.path == '/' %} active{% endif %}" data-cb-mobile-section="overview" href="{% if request.path == '/' %}#overview{% else %}{{ url_for('home') }}#overview{% endif %}"{% if request.path == '/' %} aria-current="page"{% endif %}><i class="bi bi-house-door d-block"></i><span>Home</span></a></li>
         <li class="nav-item flex-fill"><a class="nav-link text-center{% if request.path in ['/game-day', '/game-day/'] %} active{% endif %}" data-cb-mobile-section="game-day" href="{{ url_for('game_day.game_day_home') }}"{% if request.path in ['/game-day', '/game-day/'] %} aria-current="page"{% endif %}><i class="bi bi-diamond d-block"></i><span>Game Day</span></a></li>
-        <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="roster" href="{{ url_for('home') }}#roster"><i class="bi bi-people d-block"></i><span>Roster</span></a></li>
-        <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="practice_plan" href="{{ url_for('home') }}#practice_plan"><i class="bi bi-clipboard-check d-block"></i><span>Practice</span></a></li>
-        <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="more" href="{{ url_for('home') }}#more"><i class="bi bi-three-dots d-block"></i><span>More</span></a></li>
+        <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="roster" href="{% if request.path == '/' %}#roster{% else %}{{ url_for('home') }}#roster{% endif %}"><i class="bi bi-people d-block"></i><span>Roster</span></a></li>
+        <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="practice_plan" href="{% if request.path == '/' %}#practice_plan{% else %}{{ url_for('home') }}#practice_plan{% endif %}"><i class="bi bi-clipboard-check d-block"></i><span>Practice</span></a></li>
+        <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="more" href="{% if request.path == '/' %}#more{% else %}{{ url_for('home') }}#more{% endif %}"><i class="bi bi-three-dots d-block"></i><span>More</span></a></li>
       </ul>
     </nav>
     {% endif %}
@@ -226,20 +227,23 @@
     (() => {
       'use strict';
 
-      function homeSectionFromHash() {
-        const section = (window.location.hash || '#overview').slice(1);
-        if (section === 'overview' || section === '') return 'overview';
+      document.querySelectorAll('nav.bottom-nav-fixed:not(#cb-global-mobile-nav)').forEach((nav) => nav.remove());
+
+      function activeHomePane() {
+        const pane = document.querySelector('#mainTabContent > .tab-pane.active');
+        if (pane && pane.id) return pane.id;
+        return (window.location.hash || '#overview').slice(1) || 'overview';
+      }
+
+      function mobileSection() {
+        const path = window.location.pathname.replace(/\/$/, '') || '/';
+        if (path === '/game-day') return 'game-day';
+        if (path !== '/') return null;
+        const section = activeHomePane();
+        if (section === 'overview') return 'overview';
         if (section === 'roster') return 'roster';
         if (section === 'practice_plan') return 'practice_plan';
         return 'more';
-      }
-
-      function currentSection() {
-        const path = window.location.pathname.replace(/\/$/, '') || '/';
-        if (path === '/game-day') return 'game-day';
-        if (path === '/pitching') return 'pitching';
-        if (path === '/') return homeSectionFromHash();
-        return null;
       }
 
       function desktopSection() {
@@ -247,14 +251,14 @@
         if (path === '/game-day') return 'game-day';
         if (path === '/pitching') return 'pitching';
         if (path !== '/') return null;
-        const section = (window.location.hash || '').slice(1);
-        return ['roster', 'player_development', 'practice_plan'].includes(section) ? section : null;
+        const section = activeHomePane();
+        return ['overview', 'roster', 'player_development', 'practice_plan'].includes(section) ? section : null;
       }
 
       function syncPrimaryNavigationState() {
-        const mobileSection = currentSection();
+        const activeMobileSection = mobileSection();
         document.querySelectorAll('#cb-global-mobile-nav [data-cb-mobile-section]').forEach((link) => {
-          const active = link.dataset.cbMobileSection === mobileSection;
+          const active = link.dataset.cbMobileSection === activeMobileSection;
           link.classList.toggle('active', active);
           if (active) link.setAttribute('aria-current', 'page');
           else link.removeAttribute('aria-current');
@@ -271,7 +275,7 @@
 
       window.addEventListener('hashchange', syncPrimaryNavigationState);
       window.addEventListener('pageshow', syncPrimaryNavigationState);
-      document.addEventListener('shown.bs.tab', syncPrimaryNavigationState);
+      document.addEventListener('shown.bs.tab', () => window.requestAnimationFrame(syncPrimaryNavigationState));
       syncPrimaryNavigationState();
     })();
     </script>
