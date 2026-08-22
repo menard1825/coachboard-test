@@ -9,6 +9,10 @@
     }[ch]));
   }
 
+  function canDeleteGames() {
+    return ['Head Coach', 'Super Admin'].includes(document.body?.dataset?.coachRole || '');
+  }
+
   function installStyles() {
     if (document.getElementById('game-day-actions-styles')) return;
     const style = document.createElement('style');
@@ -23,7 +27,7 @@
       .gd-add-game{min-height:40px;border-radius:10px;font-weight:800;white-space:nowrap}
       .gd-schedule-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:24px;margin-bottom:9px}
       .gd-schedule-head .gd-section-title{margin:0}
-      .gd-schedule-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+      .gd-schedule-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
       .gd-schedule-actions>.btn{white-space:nowrap}
       .gd-schedule-empty{border:1px dashed #ccd3db;border-radius:14px;padding:20px;text-align:center;background:#fafbfc;color:#667085;font-size:.78rem}
       #game-day-add-modal .modal-content{border:0;border-radius:16px;overflow:hidden}
@@ -156,12 +160,15 @@
   }
 
   function menuMarkup(gameId, isLive = false) {
+    const deleteItems = canDeleteGames()
+      ? `<li><hr class="dropdown-divider"></li>
+         <li><button type="button" class="dropdown-item text-danger gd-delete-game" ${isLive ? 'disabled' : ''}><i class="bi bi-trash me-2"></i>${isLive ? 'End Live Game First' : 'Delete Game'}</button></li>`
+      : '';
     return `
       <button type="button" class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Game options" title="Game options">•••</button>
       <ul class="dropdown-menu dropdown-menu-end">
         <li><a class="dropdown-item" href="/game/${gameId}"><i class="bi bi-pencil-square me-2"></i>Open / Edit Game</a></li>
-        <li><hr class="dropdown-divider"></li>
-        <li><button type="button" class="dropdown-item text-danger gd-delete-game" ${isLive ? 'disabled' : ''}><i class="bi bi-trash me-2"></i>${isLive ? 'End Live Game First' : 'Delete Game'}</button></li>
+        ${deleteItems}
       </ul>`;
   }
 
@@ -190,6 +197,16 @@
     const gameId = inferScheduleGameId(row);
     if (!gameId) return;
     row.dataset.gameId = String(gameId);
+
+    const existingActions = row.querySelector(':scope > .gd-up-actions, :scope > .gd-schedule-actions');
+    if (existingActions) {
+      existingActions.classList.add('gd-schedule-actions');
+      const menu = document.createElement('div');
+      menu.className = 'dropdown gd-game-menu';
+      menu.innerHTML = menuMarkup(gameId, false);
+      existingActions.appendChild(menu);
+      return;
+    }
 
     const existingAction = [...row.children].find(child => child.matches?.('a.btn'));
     const actions = document.createElement('div');
@@ -244,6 +261,16 @@
     list?.querySelectorAll('.gd-up-row').forEach(addScheduleRowMenu);
   }
 
+  function pastGameSection() {
+    if (!canDeleteGames()) return;
+    const shell = document.querySelector('.gd-shell');
+    if (!shell) return;
+    const title = [...shell.querySelectorAll('.gd-section-title')]
+      .find(item => item.textContent.trim().toLowerCase() === 'past games');
+    const list = title?.nextElementSibling?.classList.contains('gd-upcoming') ? title.nextElementSibling : null;
+    list?.querySelectorAll('.gd-up-row').forEach(addScheduleRowMenu);
+  }
+
   function fixEmptyState() {
     const empty = document.querySelector('.gd-empty');
     if (!empty) return;
@@ -264,7 +291,7 @@
   async function deleteGame(button) {
     const container = button.closest('.gd-game, .gd-up-row[data-game-id]');
     const gameId = Number(container?.dataset.gameId || 0);
-    if (!container || !gameId || button.disabled) return;
+    if (!container || !gameId || button.disabled || !canDeleteGames()) return;
 
     const opponent = opponentFor(container);
     const okay = window.confirm(
@@ -300,6 +327,7 @@
     addHeroButton();
     document.querySelectorAll('.gd-game[data-game-id]').forEach(addCardMenu);
     scheduleSection();
+    pastGameSection();
     fixEmptyState();
 
     document.addEventListener('click', event => {
