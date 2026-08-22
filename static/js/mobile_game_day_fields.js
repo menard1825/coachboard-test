@@ -17,62 +17,20 @@
     style.id = 'cb-mobile-game-day-fields-styles';
     style.textContent = `
       @media(max-width:991.98px){
-        #games .cb-game-datetime-fields{
-          display:grid;
-          grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-          gap:10px;
-          width:100%;
-        }
+        #games .cb-game-datetime-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;width:100%}
         #games .cb-game-native-field{min-width:0}
-        #games .cb-game-native-field>label{
-          display:flex;
-          align-items:center;
-          justify-content:space-between;
-          gap:8px;
-          margin:0 0 6px;
-          color:#475467;
-          font-size:.72rem;
-          font-weight:800;
-          letter-spacing:.01em;
-        }
-        #games .cb-game-native-field>label small{
-          color:#98a2b3;
-          font-size:.62rem;
-          font-weight:700;
-        }
-        #games .cb-game-native-input{
-          position:relative;
-          min-width:0;
-        }
-        #games .cb-game-native-input .form-control{
-          width:100%;
-          min-width:0;
-          min-height:50px;
-          font-size:16px;
-          padding:.7rem .75rem;
-          background:#fff;
-        }
-        #games .cb-game-native-empty{
-          position:absolute;
-          left:13px;
-          top:50%;
-          transform:translateY(-50%);
-          color:#667085;
-          font-size:.82rem;
-          font-weight:650;
-          line-height:1;
-          pointer-events:none;
-          background:#fff;
-          padding-right:4px;
-        }
+        #games .cb-game-native-field>label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;color:#475467;font-size:.72rem;font-weight:800;letter-spacing:.01em}
+        #games .cb-game-native-field>label small{color:#98a2b3;font-size:.62rem;font-weight:700}
+        #games .cb-game-native-input{position:relative;min-width:0}
+        #games .cb-game-native-input .form-control{width:100%;min-width:0;min-height:50px;font-size:16px;padding:.7rem .75rem;background:#fff}
+        #games .cb-game-native-empty{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#667085;font-size:.82rem;font-weight:650;line-height:1;pointer-events:none;background:#fff;padding-right:4px}
         #games .cb-game-native-input.has-value .cb-game-native-empty{display:none}
         #games .cb-mobile-past-games-card[hidden]{display:none!important}
         #games .cb-mobile-past-games-card .card-header h5{margin:0}
         #games .cb-schedule-empty{padding:18px 16px;color:#667085;text-align:center}
+        #games .cb-api-game-row .btn{min-height:40px;display:inline-flex;align-items:center}
       }
-      @media(max-width:430px){
-        #games .cb-game-datetime-fields{grid-template-columns:1fr}
-      }
+      @media(max-width:430px){#games .cb-game-datetime-fields{grid-template-columns:1fr}}
     `;
     document.head.appendChild(style);
   }
@@ -147,9 +105,7 @@
     const parts = dateOnly(value);
     if (!parts) return String(value || 'Date TBD');
     const local = new Date(parts.year, parts.month - 1, parts.day, 12, 0, 0);
-    return local.toLocaleDateString('en-US', {
-      weekday:'long', year:'2-digit', month:'2-digit', day:'2-digit'
-    });
+    return local.toLocaleDateString('en-US', {weekday:'long', year:'2-digit', month:'2-digit', day:'2-digit'});
   }
 
   function formatStartTime(value) {
@@ -165,6 +121,8 @@
   }
 
   function gameIdForItem(item) {
+    const explicit = Number(item?.dataset?.cbGameId);
+    if (Number.isInteger(explicit) && explicit > 0) return explicit;
     const manage = item?.querySelector('a[href^="/game/"]');
     const match = manage?.getAttribute('href')?.match(/^\/game\/(\d+)/);
     return match ? Number(match[1]) : null;
@@ -187,18 +145,38 @@
     return {card, list:card.querySelector('#games-past-list-container')};
   }
 
+  function buildApiGameItem(game) {
+    const item = document.createElement('li');
+    item.className = 'list-group-item cb-api-game-row';
+    item.dataset.cbGameId = String(game.id);
+    item.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="me-auto">
+          <h5 class="mb-1">vs ${escapeHTML(game.opponent || 'Opponent TBD')}</h5>
+          <p class="mb-1"></p>
+        </div>
+        <a href="/game/${Number(game.id)}" class="btn btn-primary btn-sm"><i class="bi bi-tools me-1"></i>Manage</a>
+      </div>`;
+    patchGameMeta(item, game);
+    return item;
+  }
+
+  function gameSortKey(game) {
+    return `${dateKey(game?.date)}|${game?.start_time || '99:99'}|${String(game?.id || '').padStart(8, '0')}`;
+  }
+
   function sortGameItems(container, direction = 'asc') {
     if (!container) return;
     const items = [...container.querySelectorAll(':scope > li.list-group-item')]
       .filter(item => gameIdForItem(item) !== null);
-    items.sort((a, b) => {
-      const gameA = gamesById.get(gameIdForItem(a)) || {};
-      const gameB = gamesById.get(gameIdForItem(b)) || {};
-      const keyA = `${dateKey(gameA.date)}|${gameA.start_time || '99:99'}|${String(gameA.id || '').padStart(8, '0')}`;
-      const keyB = `${dateKey(gameB.date)}|${gameB.start_time || '99:99'}|${String(gameB.id || '').padStart(8, '0')}`;
+    const sorted = [...items].sort((a, b) => {
+      const keyA = gameSortKey(gamesById.get(gameIdForItem(a)) || {});
+      const keyB = gameSortKey(gamesById.get(gameIdForItem(b)) || {});
       return direction === 'desc' ? keyB.localeCompare(keyA) : keyA.localeCompare(keyB);
     });
-    items.forEach(item => container.appendChild(item));
+    const currentIds = items.map(gameIdForItem).join(',');
+    const sortedIds = sorted.map(gameIdForItem).join(',');
+    if (currentIds !== sortedIds) sorted.forEach(item => container.appendChild(item));
   }
 
   function patchGameMeta(item, game) {
@@ -214,6 +192,33 @@
     meta.innerHTML = `<i class="bi bi-calendar-event"></i> ${escapeHTML(dateLabel)} · ${escapeHTML(timeLabel)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${locationLabel}`;
   }
 
+  function collectUniqueRows(schedule, pastList) {
+    const combined = new Map();
+    const candidates = [
+      ...pastList.querySelectorAll(':scope > li.list-group-item'),
+      ...schedule.querySelectorAll(':scope > li.list-group-item'),
+    ];
+
+    candidates.forEach(item => {
+      const id = gameIdForItem(item);
+      if (id === null) return;
+      const existing = combined.get(id);
+      if (!existing) {
+        combined.set(id, item);
+        return;
+      }
+
+      // Prefer main.js's richer row over our API fallback if both exist.
+      if (existing.classList.contains('cb-api-game-row') && !item.classList.contains('cb-api-game-row')) {
+        existing.remove();
+        combined.set(id, item);
+      } else {
+        item.remove();
+      }
+    });
+    return combined;
+  }
+
   function patchSchedule() {
     patchQueued = false;
     const schedule = document.getElementById('games-list-container');
@@ -224,31 +229,32 @@
 
     schedule.querySelectorAll('.cb-schedule-empty').forEach(node => node.remove());
 
-    const mainItems = [...schedule.querySelectorAll(':scope > li.list-group-item')]
-      .filter(item => gameIdForItem(item) !== null);
-    const mainIds = new Set(mainItems.map(gameIdForItem));
+    const legacyMainRows = [...schedule.querySelectorAll(':scope > li.list-group-item')]
+      .filter(item => gameIdForItem(item) !== null && !item.classList.contains('cb-api-game-row'));
+    const legacyMainIds = new Set(legacyMainRows.map(gameIdForItem));
 
-    // main.js periodically rebuilds the legacy schedule with every game. When
-    // that happens, treat the fresh main list as authoritative and discard the
-    // previously moved history nodes before splitting again.
-    if (mainIds.size === gamesById.size) pastList.replaceChildren();
+    // When main.js has just rebuilt all rows, discard our old moved/fallback
+    // nodes so the richer legacy rows can be split cleanly again.
+    if (legacyMainIds.size === gamesById.size) pastList.replaceChildren();
 
-    const combined = new Map();
-    pastList.querySelectorAll(':scope > li.list-group-item').forEach(item => {
-      const id = gameIdForItem(item);
-      if (id !== null) combined.set(id, item);
-    });
-    schedule.querySelectorAll(':scope > li.list-group-item').forEach(item => {
-      const id = gameIdForItem(item);
-      if (id !== null) combined.set(id, item);
+    const combined = collectUniqueRows(schedule, pastList);
+
+    // /api/games is the source of truth. If the legacy renderer is late or
+    // omitted a game, create a clean row so schedule/history never loses it.
+    gamesById.forEach((game, gameId) => {
+      if (!combined.has(gameId)) combined.set(gameId, buildApiGameItem(game));
     });
 
     const today = todayKey();
     combined.forEach((item, gameId) => {
       const game = gamesById.get(gameId);
-      if (!game) return;
+      if (!game) {
+        item.remove();
+        return;
+      }
       patchGameMeta(item, game);
-      const isPast = Boolean(dateKey(game.date) && dateKey(game.date) < today);
+      const key = dateKey(game.date);
+      const isPast = Boolean(key && key < today);
       const target = isPast ? pastList : schedule;
       if (item.parentElement !== target) target.appendChild(item);
     });
@@ -256,8 +262,10 @@
     sortGameItems(schedule, 'asc');
     sortGameItems(pastList, 'desc');
 
-    const scheduleCount = schedule.querySelectorAll(':scope > li.list-group-item a[href^="/game/"]').length;
-    const pastCount = pastList.querySelectorAll(':scope > li.list-group-item a[href^="/game/"]').length;
+    const scheduleCount = [...schedule.querySelectorAll(':scope > li.list-group-item')]
+      .filter(item => gameIdForItem(item) !== null).length;
+    const pastCount = [...pastList.querySelectorAll(':scope > li.list-group-item')]
+      .filter(item => gameIdForItem(item) !== null).length;
 
     if (scheduleCount === 0) {
       const empty = document.createElement('li');
