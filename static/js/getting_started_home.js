@@ -43,7 +43,10 @@
     document.head.appendChild(style);
   }
 
-  function addGettingStartedLinks() {
+  function addGettingStartedLink() {
+    // Mobile More is a Home workspace and is safe to extend here. Do not mutate
+    // the desktop top-nav dropdown from a Home-only script; doing that made the
+    // desktop navigation contents change between Home and Game Day.
     const mobileMore = document.querySelector('#more .cb-mobile-more-card');
     if (mobileMore && !mobileMore.querySelector('[data-cb-getting-started-link]')) {
       const link = document.createElement('a');
@@ -52,15 +55,6 @@
       link.dataset.cbGettingStartedLink = 'true';
       link.innerHTML = '<span class="cb-mobile-more-icon"><i class="bi bi-compass"></i></span><span class="cb-mobile-more-copy"><strong>Getting Started</strong><small>Team and season setup checklist.</small></span><span class="cb-mobile-more-arrow"><i class="bi bi-chevron-right"></i></span>';
       mobileMore.appendChild(link);
-    }
-
-    const desktopMenu = document.querySelector('.coach-primary-nav .dropdown-menu');
-    if (desktopMenu && !desktopMenu.querySelector('[data-cb-getting-started-link]')) {
-      const divider = document.createElement('li');
-      divider.innerHTML = '<hr class="dropdown-divider">';
-      const item = document.createElement('li');
-      item.innerHTML = '<a class="dropdown-item" data-cb-getting-started-link="true" href="/getting-started"><i class="bi bi-compass me-2"></i>Getting Started</a>';
-      desktopMenu.append(divider, item);
     }
   }
 
@@ -119,7 +113,7 @@
     const container = document.getElementById('overview-content-container');
     if (!container || observer) return;
     observer = new MutationObserver(() => {
-      addGettingStartedLinks();
+      addGettingStartedLink();
       if (setup?.show_home && !container.querySelector('.cb-home-setup-card')) queueRender();
     });
     observer.observe(container, {childList: true, subtree: true});
@@ -127,10 +121,10 @@
 
   function start() {
     installStyles();
-    addGettingStartedLinks();
+    addGettingStartedLink();
     observeHome();
     loadSetup();
-    window.setTimeout(addGettingStartedLinks, 300);
+    window.setTimeout(addGettingStartedLink, 300);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
