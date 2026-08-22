@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Getting Started - CoachBoard{% endblock %}
+
+{% block head %}
+<style>
+  .cb-setup-shell{max-width:980px;margin:0 auto 48px}
+  .cb-setup-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin:24px 0 22px}
+  .cb-setup-kicker{color:#667085;font-size:.72rem;font-weight:850;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px}
+  .cb-setup-head h1{font-size:clamp(1.8rem,4vw,2.45rem);font-weight:850;letter-spacing:-.035em;margin:0;color:#172033}
+  .cb-setup-head p{color:#667085;font-size:1rem;margin:7px 0 0;max-width:690px}
+  .cb-setup-back{white-space:nowrap}
+  .cb-setup-progress-card,.cb-setup-legacy{border:1px solid #dfe5ec;border-radius:18px;background:#fff;box-shadow:0 2px 9px rgba(16,24,40,.05);padding:20px;margin-bottom:18px}
+  .cb-setup-progress-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px}
+  .cb-setup-progress-top strong{font-size:1.05rem;color:#172033}
+  .cb-setup-progress-top span{color:#667085;font-weight:750}
+  .cb-setup-progress{height:9px;border-radius:999px;background:#eef2f6;overflow:hidden}
+  .cb-setup-progress>span{display:block;height:100%;background:var(--primary-color,#1d4ed8);border-radius:inherit}
+  .cb-setup-list{display:grid;gap:12px}
+  .cb-setup-item{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:14px;align-items:center;border:1px solid #dfe5ec;border-radius:16px;background:#fff;padding:16px 17px}
+  .cb-setup-item.is-complete{border-color:#cce8d5;background:#fbfffc}
+  .cb-setup-item.is-optional{background:#fbfcfe}
+  .cb-setup-status{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:#f2f4f7;color:#667085;font-size:1.15rem}
+  .cb-setup-item.is-complete .cb-setup-status{background:#e9f7ee;color:#16743b}
+  .cb-setup-copy{min-width:0}
+  .cb-setup-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .cb-setup-copy strong{display:block;color:#172033;font-size:1rem}
+  .cb-setup-copy p{margin:3px 0 0;color:#667085;font-size:.9rem;line-height:1.4}
+  .cb-setup-optional{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#667085;background:#eef2f6;border-radius:999px;padding:4px 7px}
+  .cb-setup-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+  .cb-setup-actions .btn{min-height:42px}
+  .cb-setup-done{font-weight:800;color:#16743b;font-size:.84rem;white-space:nowrap}
+  .cb-setup-footer{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:20px;padding:18px 0 4px}
+  .cb-setup-footer p{margin:0;color:#667085;font-size:.88rem}
+  .cb-setup-legacy h2{font-weight:820;color:#172033;margin:0 0 8px}
+  .cb-setup-legacy p{color:#667085;margin:0 0 18px}
+  .cb-setup-review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .cb-setup-review-link{border:1px solid #dfe5ec;border-radius:13px;padding:14px;text-decoration:none;color:#172033;background:#fff;font-weight:750}
+  .cb-setup-review-link i{display:block;color:var(--primary-color,#1d4ed8);font-size:1.15rem;margin-bottom:5px}
+  @media(max-width:767.98px){
+    .cb-setup-shell{margin-bottom:28px}
+    .cb-setup-head{display:block;margin-top:14px}
+    .cb-setup-head p{font-size:.94rem}
+    .cb-setup-back{margin-top:14px;width:100%}
+    .cb-setup-progress-card,.cb-setup-legacy{padding:16px;border-radius:15px}
+    .cb-setup-item{grid-template-columns:38px minmax(0,1fr);padding:14px;gap:12px}
+    .cb-setup-status{width:38px;height:38px;border-radius:11px}
+    .cb-setup-actions{grid-column:1/-1;justify-content:stretch;margin-top:2px}
+    .cb-setup-actions .btn,.cb-setup-actions form{flex:1 1 auto}
+    .cb-setup-actions form .btn{width:100%}
+    .cb-setup-done{grid-column:1/-1;padding-left:50px}
+    .cb-setup-footer{align-items:stretch;flex-direction:column}
+    .cb-setup-footer form .btn{width:100%}
+    .cb-setup-review-grid{grid-template-columns:1fr 1fr}
+  }
+  @media(max-width:430px){.cb-setup-review-grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cb-setup-shell">
+  <header class="cb-setup-head">
+    <div>
+      <div class="cb-setup-kicker">CoachBoard</div>
+      <h1>{{ setup.title }}</h1>
+      <p>{{ setup.subtitle }}</p>
+    </div>
+    <a class="btn btn-outline-secondary cb-setup-back" href="{{ url_for('home') }}#overview"><i class="bi bi-arrow-left me-1"></i>Back to Home</a>
+  </header>
+
+  {% if setup.legacy %}
+    <section class="cb-setup-legacy">
+      <div class="cb-setup-kicker">Existing team</div>
+      <h2>No setup required</h2>
+      <p>This team was already in CoachBoard when guided setup was added. Nothing has been reset or marked incomplete. Use these shortcuts anytime you want to review the team.</p>
+      <div class="cb-setup-review-grid">
+        <a class="cb-setup-review-link" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear"></i>Team Settings</a>
+        <a class="cb-setup-review-link" href="{{ url_for('home') }}#roster"><i class="bi bi-people"></i>Roster</a>
+        <a class="cb-setup-review-link" href="{{ url_for('pitching.pitching_page') }}"><i class="bi bi-bullseye"></i>Pitching</a>
+        <a class="cb-setup-review-link" href="{{ url_for('admin.user_management') }}"><i class="bi bi-person-gear"></i>Coaches & Roles</a>
+        <a class="cb-setup-review-link" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-diamond"></i>Game Day</a>
+        <a class="cb-setup-review-link" href="{{ url_for('home') }}#practice_plan"><i class="bi bi-clipboard-check"></i>Practice</a>
+      </div>
+    </section>
+  {% else %}
+    <section class="cb-setup-progress-card">
+      <div class="cb-setup-progress-top">
+        <strong>{% if setup.complete %}Setup complete{% else %}{{ setup.completed }} of {{ setup.total }} complete{% endif %}</strong>
+        <span>{{ setup.percent }}%</span>
+      </div>
+      <div class="cb-setup-progress" role="progressbar" aria-valuenow="{{ setup.percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width:{{ setup.percent }}%"></span></div>
+    </section>
+
+    <div class="cb-setup-list">
+      {% for step in setup.steps %}
+      <section class="cb-setup-item{% if step.complete %} is-complete{% endif %}{% if not step.required %} is-optional{% endif %}">
+        <div class="cb-setup-status"><i class="bi bi-{% if step.complete %}check2{% else %}{{ 'stars' if not step.required else 'circle' }}{% endif %}"></i></div>
+        <div class="cb-setup-copy">
+          <div class="cb-setup-title-row">
+            <strong>{{ step.title }}</strong>
+            {% if not step.required %}<span class="cb-setup-optional">Optional</span>{% endif %}
+          </div>
+          <p>{{ step.detail }}</p>
+        </div>
+        <div class="cb-setup-actions">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ step.href }}">{{ step.action }}</a>
+          {% if step.manual %}
+            <form method="post" action="{{ url_for('team_management.update_getting_started_step', step_key=step.key) }}">
+              <input type="hidden" name="complete" value="{{ '0' if step.complete else '1' }}">
+              <button type="submit" class="btn btn-sm {% if step.complete %}btn-outline-secondary{% else %}btn-primary{% endif %}">
+                {% if step.complete %}Mark not reviewed{% else %}Mark reviewed{% endif %}
+              </button>
+            </form>
+          {% elif step.complete %}
+            <span class="cb-setup-done"><i class="bi bi-check-circle-fill me-1"></i>Complete</span>
+          {% endif %}
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+
+    <div class="cb-setup-footer">
+      {% if setup.complete %}
+        <p><i class="bi bi-check-circle-fill text-success me-1"></i>This checklist is complete and will stay out of the way.</p>
+      {% elif setup.dismissed %}
+        <p>Setup is hidden from Home. You can continue working normally and return here anytime.</p>
+        <form method="post" action="{{ url_for('team_management.show_getting_started_on_home') }}"><button class="btn btn-outline-primary" type="submit">Show on Home</button></form>
+      {% else %}
+        <p>You can use CoachBoard before this checklist is finished.</p>
+        <form method="post" action="{{ url_for('team_management.dismiss_getting_started') }}"><button class="btn btn-outline-secondary" type="submit">Skip for now</button></form>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
