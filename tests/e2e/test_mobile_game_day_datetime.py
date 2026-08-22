@@ -1,7 +1,8 @@
-"""Mobile Game Day date/time regression coverage."""
+"""Mobile Game Day date/time and schedule-grouping regression coverage."""
 
 import os
 import re
+from datetime import date, timedelta
 
 import pytest
 
@@ -60,3 +61,58 @@ def test_mobile_game_day_labels_native_date_time_and_uses_saved_start_time(page:
     expect(browser_bears).to_be_visible()
     expect(browser_bears.locator('p.mb-1')).to_contain_text('9:00 AM')
     expect(browser_bears.locator('p.mb-1')).not_to_contain_text('12:00 AM')
+
+
+def test_mobile_game_day_moves_past_games_out_of_game_schedule(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+
+    stamp = date.today().strftime('%Y%m%d')
+    past_opponent = f'Past Panthers {stamp}'
+    future_opponent = f'Future Falcons {stamp}'
+    past_date = (date.today() - timedelta(days=10)).isoformat()
+    future_date = (date.today() + timedelta(days=10)).isoformat()
+
+    created_ids = []
+    try:
+        for game_date, opponent, start_time in (
+            (past_date, past_opponent, '16:30'),
+            (future_date, future_opponent, '18:00'),
+        ):
+            response = page.request.post(
+                f'{coachboard_url}/add_game',
+                form={
+                    'game_date': game_date,
+                    'game_start_time': start_time,
+                    'game_opponent': opponent,
+                    'game_location': 'Browser Test Field',
+                    'game_notes': '',
+                },
+            )
+            assert response.ok
+
+        all_games = page.request.get(f'{coachboard_url}/api/games').json()
+        created_ids = [
+            int(game['id'])
+            for game in all_games
+            if game.get('opponent') in {past_opponent, future_opponent}
+        ]
+        assert len(created_ids) == 2
+
+        page.goto(f'{coachboard_url}/#games', wait_until='domcontentloaded')
+        games = page.locator('#games')
+        expect(games).to_have_class(re.compile(r'\bactive\b'))
+
+        schedule = games.locator('#games-list-container')
+        past_list = games.locator('#games-past-list-container')
+        past_card = games.locator('#cb-mobile-past-games-card')
+
+        expect(past_card).to_be_visible()
+        expect(past_card.locator('.card-header h5')).to_have_text('Past Games')
+        expect(schedule).to_contain_text(future_opponent)
+        expect(schedule).not_to_contain_text(past_opponent)
+        expect(past_list).to_contain_text(past_opponent)
+        expect(past_list).not_to_contain_text(future_opponent)
+    finally:
+        for game_id in created_ids:
+            page.request.get(f'{coachboard_url}/delete_game/{game_id}')
