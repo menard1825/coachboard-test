@@ -15,7 +15,7 @@
   function loadGettingStartedHome() {
     if (document.querySelector('script[data-cb-getting-started-home]')) return;
     const script = document.createElement('script');
-    script.src = '/static/js/getting_started_home.js?v=20260822-1';
+    script.src = '/static/js/getting_started_home.js?v=20260822-2';
     script.dataset.cbGettingStartedHome = 'true';
     document.head.appendChild(script);
   }
