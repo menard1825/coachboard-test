@@ -66,8 +66,10 @@ def test_existing_team_is_grandfathered_without_setup_prompt(monkeypatch):
 
     page = client.get('/getting-started')
     assert page.status_code == 200
-    assert b'No setup required' in page.data
-    assert b'already in CoachBoard when guided setup was added' in page.data
+    assert b'Your Team Is Ready' in page.data
+    assert b'Review or update your team setup at any time.' in page.data
+    assert b'guided setup was added' not in page.data
+    assert b'already in CoachBoard' not in page.data
 
 
 def test_new_team_state_shows_full_checklist_and_can_be_dismissed(monkeypatch):
