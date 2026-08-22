@@ -63,7 +63,7 @@
     <div>
       <div class="cb-setup-kicker">CoachBoard</div>
       <h1>{{ setup.title }}</h1>
-      <p>{{ setup.subtitle }}</p>
+      <p>{% if setup.legacy %}Review or update your team setup at any time.{% else %}{{ setup.subtitle }}{% endif %}</p>
     </div>
     <a class="btn btn-outline-secondary cb-setup-back" href="{{ url_for('home') }}#overview"><i class="bi bi-arrow-left me-1"></i>Back to Home</a>
   </header>
@@ -72,7 +72,7 @@
     <section class="cb-setup-legacy">
       <div class="cb-setup-kicker">Team setup</div>
       <h2>Your Team Is Ready</h2>
-      <p>Your team is ready to use. Use the shortcuts below anytime to review or update team settings, roster, coaches, pitching, games, or practices.</p>
+      <p>Use the shortcuts below anytime to review or update your team settings and coaching setup.</p>
       <div class="cb-setup-review-grid">
         <a class="cb-setup-review-link" href="{{ url_for('admin.admin_settings') }}"><i class="bi bi-gear"></i>Team Settings</a>
         <a class="cb-setup-review-link" href="{{ url_for('home') }}#roster"><i class="bi bi-people"></i>Roster</a>
