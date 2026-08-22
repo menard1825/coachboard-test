@@ -18,9 +18,10 @@
     const style = document.createElement('style');
     style.id = 'game-day-actions-styles';
     style.textContent = `
+      .gd-upcoming{overflow:visible!important}
       .gd-game-menu{margin-left:auto;flex:0 0 auto}
       .gd-game-menu>.btn{min-width:44px!important;width:44px!important;padding:0!important;flex:0 0 44px!important;font-size:1.2rem;line-height:1}
-      .gd-game-menu .dropdown-menu{min-width:190px;border-radius:11px;padding:6px;box-shadow:0 8px 24px rgba(16,24,40,.14)}
+      .gd-game-menu .dropdown-menu{min-width:190px;border-radius:11px;padding:6px;box-shadow:0 8px 24px rgba(16,24,40,.14);z-index:1080}
       .gd-game-menu .dropdown-item{border-radius:7px;padding:9px 10px;font-size:.82rem;font-weight:650}
       .gd-game-menu .dropdown-item.text-danger{color:#b42318!important}
       .gd-hero-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
