@@ -64,10 +64,28 @@
     });
   }
 
+  function installGettingStartedDesktopLink() {
+    const body = document.body;
+    if (!body || body.dataset.coachboardAuthenticated !== '1') return;
+    if (!['Head Coach', 'Super Admin'].includes(body.dataset.coachRole || '')) return;
+
+    const menu = document.querySelector('.coach-primary-nav .dropdown-menu');
+    if (!menu || menu.querySelector('[data-cb-getting-started-link]')) return;
+
+    const divider = document.createElement('li');
+    divider.dataset.cbGettingStartedDivider = 'true';
+    divider.innerHTML = '<hr class="dropdown-divider">';
+
+    const item = document.createElement('li');
+    item.innerHTML = '<a class="dropdown-item" data-cb-getting-started-link="true" href="/getting-started"><i class="bi bi-compass me-2"></i>Getting Started</a>';
+    menu.append(divider, item);
+  }
+
   function init() {
     const context = detectClientContext();
     fillContextFields(context);
     bindUseDeviceTimezone(context);
+    installGettingStartedDesktopLink();
     syncSignedInSession(context);
   }
 
