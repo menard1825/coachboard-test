@@ -3,6 +3,17 @@
 
   if (window.location.pathname !== '/') return;
 
+  function loadMobileGameDayFields() {
+    if (!window.matchMedia('(max-width: 991.98px)').matches) return;
+    if (document.querySelector('script[data-cb-mobile-game-day-fields]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/mobile_game_day_fields.js?v=20260822-1';
+    script.dataset.cbMobileGameDayFields = 'true';
+    document.head.appendChild(script);
+  }
+
+  loadMobileGameDayFields();
+
   const touchDevice = window.matchMedia?.('(pointer: coarse)').matches || Number(navigator.maxTouchPoints || 0) > 0;
   if (!touchDevice) return;
 
