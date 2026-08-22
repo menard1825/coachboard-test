@@ -37,8 +37,8 @@ def test_existing_team_is_not_prompted_but_can_open_getting_started(page: Page, 
     page.goto(f'{coachboard_url}/#overview', wait_until='domcontentloaded')
 
     expect(page.locator('.cb-home-dashboard')).to_be_visible()
-    # The seeded Playwright team predates guided setup and intentionally has no
-    # TeamSetupState row. It must never receive an automatic onboarding card.
+    # The seeded Playwright team intentionally has no TeamSetupState row. It is
+    # treated as ready and must never receive an automatic onboarding card.
     expect(page.locator('.cb-home-setup-card')).to_have_count(0)
 
     page.goto(f'{coachboard_url}/#more', wait_until='domcontentloaded')
@@ -48,8 +48,11 @@ def test_existing_team_is_not_prompted_but_can_open_getting_started(page: Page, 
     getting_started.click()
 
     expect(page).to_have_url(re.compile(r'/getting-started$'))
-    expect(page.get_by_role('heading', name='No setup required')).to_be_visible()
-    expect(page.get_by_text('already in CoachBoard when guided setup was added')).to_be_visible()
+    expect(page.get_by_role('heading', name='Your Team Is Ready')).to_be_visible()
+    expect(page.get_by_text('Review or update your team setup at any time.')).to_be_visible()
+    expect(page.get_by_text('Use the shortcuts below anytime to review or update your team settings and coaching setup.')).to_be_visible()
+    expect(page.get_by_text(re.compile(r'guided setup was added', re.I))).to_have_count(0)
+    expect(page.get_by_text(re.compile(r'already in CoachBoard', re.I))).to_have_count(0)
 
     overflow = page.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
     assert overflow <= 1
