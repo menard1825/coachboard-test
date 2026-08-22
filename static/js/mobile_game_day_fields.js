@@ -66,6 +66,9 @@
           padding-right:4px;
         }
         #games .cb-game-native-input.has-value .cb-game-native-empty{display:none}
+        #games .cb-mobile-past-games-card[hidden]{display:none!important}
+        #games .cb-mobile-past-games-card .card-header h5{margin:0}
+        #games .cb-schedule-empty{padding:18px 16px;color:#667085;text-align:center}
       }
       @media(max-width:430px){
         #games .cb-game-datetime-fields{grid-template-columns:1fr}
@@ -128,6 +131,18 @@
     return match ? {year:Number(match[1]), month:Number(match[2]), day:Number(match[3])} : null;
   }
 
+  function dateKey(value) {
+    const parts = dateOnly(value);
+    return parts
+      ? `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+      : '';
+  }
+
+  function todayKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
+
   function formatGameDate(value) {
     const parts = dateOnly(value);
     if (!parts) return String(value || 'Date TBD');
@@ -149,29 +164,108 @@
     return `${hours}:${String(minutes).padStart(2, '0')} ${suffix}`;
   }
 
+  function gameIdForItem(item) {
+    const manage = item?.querySelector('a[href^="/game/"]');
+    const match = manage?.getAttribute('href')?.match(/^\/game\/(\d+)/);
+    return match ? Number(match[1]) : null;
+  }
+
+  function ensurePastGamesSection(scheduleContainer) {
+    const scheduleCard = scheduleContainer?.closest('.card');
+    if (!scheduleCard) return {card:null, list:null};
+
+    let card = document.getElementById('cb-mobile-past-games-card');
+    if (!card) {
+      card = document.createElement('div');
+      card.id = 'cb-mobile-past-games-card';
+      card.className = 'card mt-4 cb-mobile-past-games-card';
+      card.innerHTML = `
+        <div class="card-header"><h5 class="mb-0">Past Games</h5></div>
+        <ul class="list-group list-group-flush" id="games-past-list-container"></ul>`;
+      scheduleCard.insertAdjacentElement('afterend', card);
+    }
+    return {card, list:card.querySelector('#games-past-list-container')};
+  }
+
+  function sortGameItems(container, direction = 'asc') {
+    if (!container) return;
+    const items = [...container.querySelectorAll(':scope > li.list-group-item')]
+      .filter(item => gameIdForItem(item) !== null);
+    items.sort((a, b) => {
+      const gameA = gamesById.get(gameIdForItem(a)) || {};
+      const gameB = gamesById.get(gameIdForItem(b)) || {};
+      const keyA = `${dateKey(gameA.date)}|${gameA.start_time || '99:99'}|${String(gameA.id || '').padStart(8, '0')}`;
+      const keyB = `${dateKey(gameB.date)}|${gameB.start_time || '99:99'}|${String(gameB.id || '').padStart(8, '0')}`;
+      return direction === 'desc' ? keyB.localeCompare(keyA) : keyA.localeCompare(keyB);
+    });
+    items.forEach(item => container.appendChild(item));
+  }
+
+  function patchGameMeta(item, game) {
+    const meta = item.querySelector('p.mb-1');
+    if (!meta) return;
+    const signature = `${game.date || ''}|${game.start_time || ''}|${game.location || ''}`;
+    if (meta.dataset.cbGameMetaSignature === signature) return;
+    meta.dataset.cbGameMetaSignature = signature;
+
+    const dateLabel = formatGameDate(game.date);
+    const timeLabel = formatStartTime(game.start_time);
+    const locationLabel = escapeHTML(game.location || 'TBD');
+    meta.innerHTML = `<i class="bi bi-calendar-event"></i> ${escapeHTML(dateLabel)} · ${escapeHTML(timeLabel)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${locationLabel}`;
+  }
+
   function patchSchedule() {
     patchQueued = false;
-    const container = document.getElementById('games-list-container');
-    if (!container || gamesById.size === 0) return;
+    const schedule = document.getElementById('games-list-container');
+    if (!schedule || gamesById.size === 0) return;
 
-    container.querySelectorAll('li.list-group-item').forEach(item => {
-      const manage = item.querySelector('a[href^="/game/"]');
-      const match = manage?.getAttribute('href')?.match(/^\/game\/(\d+)/);
-      if (!match) return;
-      const gameId = Number(match[1]);
-      const game = gamesById.get(gameId);
-      const meta = item.querySelector('p.mb-1');
-      if (!game || !meta) return;
+    const {card:pastCard, list:pastList} = ensurePastGamesSection(schedule);
+    if (!pastCard || !pastList) return;
 
-      const signature = `${game.date || ''}|${game.start_time || ''}|${game.location || ''}`;
-      if (meta.dataset.cbGameMetaSignature === signature) return;
-      meta.dataset.cbGameMetaSignature = signature;
+    schedule.querySelectorAll('.cb-schedule-empty').forEach(node => node.remove());
 
-      const dateLabel = formatGameDate(game.date);
-      const timeLabel = formatStartTime(game.start_time);
-      const locationLabel = escapeHTML(game.location || 'TBD');
-      meta.innerHTML = `<i class="bi bi-calendar-event"></i> ${escapeHTML(dateLabel)} · ${escapeHTML(timeLabel)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${locationLabel}`;
+    const mainItems = [...schedule.querySelectorAll(':scope > li.list-group-item')]
+      .filter(item => gameIdForItem(item) !== null);
+    const mainIds = new Set(mainItems.map(gameIdForItem));
+
+    // main.js periodically rebuilds the legacy schedule with every game. When
+    // that happens, treat the fresh main list as authoritative and discard the
+    // previously moved history nodes before splitting again.
+    if (mainIds.size === gamesById.size) pastList.replaceChildren();
+
+    const combined = new Map();
+    pastList.querySelectorAll(':scope > li.list-group-item').forEach(item => {
+      const id = gameIdForItem(item);
+      if (id !== null) combined.set(id, item);
     });
+    schedule.querySelectorAll(':scope > li.list-group-item').forEach(item => {
+      const id = gameIdForItem(item);
+      if (id !== null) combined.set(id, item);
+    });
+
+    const today = todayKey();
+    combined.forEach((item, gameId) => {
+      const game = gamesById.get(gameId);
+      if (!game) return;
+      patchGameMeta(item, game);
+      const isPast = Boolean(dateKey(game.date) && dateKey(game.date) < today);
+      const target = isPast ? pastList : schedule;
+      if (item.parentElement !== target) target.appendChild(item);
+    });
+
+    sortGameItems(schedule, 'asc');
+    sortGameItems(pastList, 'desc');
+
+    const scheduleCount = schedule.querySelectorAll(':scope > li.list-group-item a[href^="/game/"]').length;
+    const pastCount = pastList.querySelectorAll(':scope > li.list-group-item a[href^="/game/"]').length;
+
+    if (scheduleCount === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'list-group-item cb-schedule-empty';
+      empty.textContent = 'No upcoming games scheduled.';
+      schedule.appendChild(empty);
+    }
+    pastCard.hidden = pastCount === 0;
   }
 
   function queueSchedulePatch() {
@@ -191,7 +285,7 @@
       gamesById = new Map((Array.isArray(games) ? games : []).map(game => [Number(game.id), game]));
       queueSchedulePatch();
     } catch (error) {
-      console.warn('Unable to refresh Game Day date/time labels:', error);
+      console.warn('Unable to refresh Game Day schedule:', error);
     }
   }
 
