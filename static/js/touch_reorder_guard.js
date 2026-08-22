@@ -7,7 +7,7 @@
     if (!window.matchMedia('(max-width: 991.98px)').matches) return;
     if (document.querySelector('script[data-cb-mobile-game-day-fields]')) return;
     const script = document.createElement('script');
-    script.src = '/static/js/mobile_game_day_fields.js?v=20260822-1';
+    script.src = '/static/js/mobile_game_day_fields.js?v=20260822-2';
     script.dataset.cbMobileGameDayFields = 'true';
     document.head.appendChild(script);
   }
