@@ -11,6 +11,10 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[ch]));
 
+  function canDeleteGames() {
+    return ['Head Coach', 'Super Admin'].includes(document.body?.dataset?.coachRole || '');
+  }
+
   function installStyles() {
     if (document.getElementById('cb-mobile-game-day-fields-styles')) return;
     const style = document.createElement('style');
@@ -29,6 +33,7 @@
         #games .cb-mobile-past-games-card .card-header h5{margin:0}
         #games .cb-schedule-empty{padding:18px 16px;color:#667085;text-align:center}
         #games .cb-api-game-row .btn{min-height:40px;display:inline-flex;align-items:center}
+        #games .cb-mobile-delete-game{min-width:42px;justify-content:center}
       }
       @media(max-width:430px){#games .cb-game-datetime-fields{grid-template-columns:1fr}}
     `;
@@ -192,6 +197,60 @@
     meta.innerHTML = `<i class="bi bi-calendar-event"></i> ${escapeHTML(dateLabel)} · ${escapeHTML(timeLabel)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${locationLabel}`;
   }
 
+  function ensurePastDeleteAction(item, game) {
+    item.dataset.cbGameId = String(game.id);
+    item.querySelectorAll('[data-delete-url^="/delete_game/"]').forEach(button => button.remove());
+    if (!canDeleteGames()) {
+      item.querySelectorAll('.cb-mobile-delete-game').forEach(button => button.remove());
+      return;
+    }
+    if (item.querySelector('.cb-mobile-delete-game')) return;
+
+    const manage = item.querySelector('a[href^="/game/"]');
+    if (!manage) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-sm btn-outline-danger cb-mobile-delete-game';
+    button.dataset.gameId = String(game.id);
+    button.setAttribute('aria-label', `Delete game vs ${game.opponent || 'opponent'}`);
+    button.title = 'Delete Game';
+    button.innerHTML = '<i class="bi bi-trash"></i>';
+    manage.insertAdjacentElement('afterend', button);
+  }
+
+  function removePastDeleteAction(item) {
+    item.querySelectorAll('.cb-mobile-delete-game').forEach(button => button.remove());
+  }
+
+  async function deletePastGame(button) {
+    if (!canDeleteGames() || button.disabled) return;
+    const gameId = Number(button.dataset.gameId || button.closest('[data-cb-game-id]')?.dataset?.cbGameId || 0);
+    const game = gamesById.get(gameId);
+    if (!gameId || !game) return;
+
+    const okay = window.confirm(
+      `Delete the game vs ${game.opponent || 'this opponent'}?\n\nThis permanently removes the game and its attached planning, pitching, and live-game data. This cannot be undone.`
+    );
+    if (!okay) return;
+
+    button.disabled = true;
+    try {
+      const response = await fetch(`/game-day/${gameId}/delete`, {
+        method:'POST',
+        headers:{'Accept':'application/json'},
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.status === 'error') {
+        throw new Error(data.message || `Unable to delete game (${response.status}).`);
+      }
+      gamesById.delete(gameId);
+      window.location.reload();
+    } catch (error) {
+      window.alert(error.message || 'Unable to delete game.');
+      button.disabled = false;
+    }
+  }
+
   function collectUniqueRows(schedule, pastList) {
     const combined = new Map();
     const candidates = [
@@ -257,6 +316,8 @@
       const isPast = Boolean(key && key < today);
       const target = isPast ? pastList : schedule;
       if (item.parentElement !== target) target.appendChild(item);
+      if (isPast) ensurePastDeleteAction(item, game);
+      else removePastDeleteAction(item);
     });
 
     sortGameItems(schedule, 'asc');
@@ -310,6 +371,11 @@
     enhanceAddGameForm();
     observeSchedule();
     loadGames();
+
+    document.addEventListener('click', event => {
+      const button = event.target.closest('.cb-mobile-delete-game');
+      if (button) deletePastGame(button);
+    });
 
     window.addEventListener('pageshow', loadGames);
     window.addEventListener('hashchange', () => {
