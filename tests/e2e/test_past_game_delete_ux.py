@@ -69,12 +69,8 @@ def test_head_coach_can_delete_past_game_from_mobile_history(page: Page, coachbo
     expect(delete_button).to_be_visible()
 
     page.once('dialog', lambda dialog: dialog.accept())
-    delete_button.click()
-    page.wait_for_function(
-        "gameId => !document.querySelector(`[data-cb-game-id=\"${gameId}\"]`)",
-        game_id,
-        timeout=10000,
-    )
+    with page.expect_navigation(wait_until='domcontentloaded', timeout=10000):
+        delete_button.click()
 
     games_after = page.context.request.get(f'{coachboard_url}/api/games')
     assert games_after.ok
