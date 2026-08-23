@@ -86,7 +86,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
 
         defense = page.locator('#pregame-defense-editor-v3')
         expect(defense).to_be_visible(timeout=15_000)
-        expect(defense.locator('.pde-title')).to_have_text('Defense — Inning 1')
+        expect(defense.locator('.pde-title')).to_have_text('Set Defense — Inning 1')
         expect(defense.locator('.gm-preset-label')).to_have_text('Defense Preset (Optional)')
         expect(defense.locator('#pde-preset option').first).to_have_text('Choose a defense preset…')
 
