@@ -30,7 +30,7 @@
       body.cb-dugout #liveChangePitcherBtn .coach-action-note::after{content:'Mid-inning pitching change';font-size:.7rem;font-weight:550}
       .cb-mid-inning-help{border:1px solid #b9cbe8;background:#f4f8ff;color:#253858;border-radius:10px;padding:9px 10px;margin-bottom:12px;font-size:.78rem;line-height:1.35}
       .cb-mid-inning-help strong{font-weight:850}
-      #cbClockControlsModal .modal-content{border:0;border-radius:15px;overflow:hidden}
+      #cbClockControlsModal .modal-content,#cbCoachBoardNavModal .modal-content{border:0;border-radius:15px;overflow:hidden}
       #cbClockControlsModal .cb-clock-state{border-radius:11px;padding:11px 12px;margin-bottom:12px;background:#f8fafc;border:1px solid #dfe4ea}
       #cbClockControlsModal .cb-clock-state.paused{background:#fff8e8;border-color:#e5c66f}
       #cbClockControlsModal .cb-clock-state strong{display:block;font-size:.9rem;color:#172033}
@@ -38,9 +38,90 @@
       #cbClockControlsModal .cb-clock-action{min-height:56px;border-radius:11px;font-weight:800;text-align:left;padding:9px 12px}
       #cbClockControlsModal .cb-clock-action small{display:block;font-weight:550;opacity:.78;margin-top:2px}
       #cbClockControlsModal .cb-delay-help{font-size:.72rem;color:#667085;line-height:1.4;margin-top:10px}
-      @media(max-width:575.98px){#cbDugoutHeader [data-cb-clock]::after{content:'Clock';font-size:.7rem}}
+      #cbClockControlsModal .cb-clock-exit-actions{border-top:1px solid #e8ebef;margin-top:13px;padding-top:13px}
+      #cbClockControlsModal .cb-clock-exit-actions .btn{min-height:44px;border-radius:10px;font-weight:750}
+      #cbCoachBoardNavBtn{border:1px solid rgba(255,255,255,.28)!important;color:#fff!important;background:rgba(255,255,255,.08)!important;border-radius:9px!important;font-weight:750!important;white-space:nowrap}
+      #cbCoachBoardNavModal .cb-nav-safe{border:1px solid #b9dcc4;background:#f4fbf6;color:#22543d;border-radius:10px;padding:9px 10px;font-size:.75rem;line-height:1.4;margin-bottom:12px}
+      #cbCoachBoardNavModal .cb-app-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+      #cbCoachBoardNavModal .cb-app-link{min-height:58px;border:1px solid #dfe4ea;border-radius:11px;background:#fff;color:#253047;text-decoration:none;display:flex;align-items:center;gap:9px;padding:10px 11px;font-size:.8rem;font-weight:780}
+      #cbCoachBoardNavModal .cb-app-link i{font-size:1.05rem;color:var(--primary-color,#102a66)}
+      #cbCoachBoardNavModal .cb-return-game{grid-column:1/-1;background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66);color:#fff}
+      #cbCoachBoardNavModal .cb-return-game i{color:#fff}
+      @media(min-width:992px){#cbCoachBoardNavBtn{display:none!important}}
+      @media(max-width:575.98px){
+        #cbDugoutHeader [data-cb-clock]::after{content:'Clock';font-size:.7rem}
+        #cbCoachBoardNavBtn{font-size:.68rem!important;padding:.35rem .5rem!important}
+        #cbCoachBoardNavModal .cb-app-grid{grid-template-columns:1fr 1fr}
+      }
     `;
     document.head.appendChild(style);
+  }
+
+  function ensureAppNavModal() {
+    let modal = $('cbCoachBoardNavModal');
+    if (modal) return modal;
+
+    const role = String(document.body.dataset.coachRole || '');
+    const gameChanger = role === 'Game Changer';
+    modal = document.createElement('div');
+    modal.id = 'cbCoachBoardNavModal';
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title mb-0">CoachBoard Menu</h5>
+              <div class="small text-muted">Leave this screen without ending the game.</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="cb-nav-safe">
+              <strong>The game stays live.</strong> Leaving this screen does not end the game, change the inning, or change the clock. If the clock is paused, it stays paused until you resume it.
+            </div>
+            <div class="cb-app-grid">
+              <a class="cb-app-link cb-return-game" href="/game/${gameId}"><i class="bi bi-diamond-fill"></i><span>Back to Live Game</span></a>
+              ${gameChanger ? '' : '<a class="cb-app-link" href="/#overview"><i class="bi bi-house-door"></i><span>Home</span></a>'}
+              <a class="cb-app-link" href="/game-day"><i class="bi bi-calendar3"></i><span>Game Day</span></a>
+              ${gameChanger ? '' : '<a class="cb-app-link" href="/#roster"><i class="bi bi-people"></i><span>Roster</span></a>'}
+              ${gameChanger ? '' : '<a class="cb-app-link" href="/#practice_plan"><i class="bi bi-clipboard-check"></i><span>Practice</span></a>'}
+              ${gameChanger ? '' : '<a class="cb-app-link" href="/pitching"><i class="bi bi-bullseye"></i><span>Pitching</span></a>'}
+              ${gameChanger ? '' : '<a class="cb-app-link" href="/#more"><i class="bi bi-three-dots"></i><span>More</span></a>'}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function openAppNav() {
+    const clockModal = $('cbClockControlsModal');
+    const navModal = ensureAppNavModal();
+    const show = () => bootstrap.Modal.getOrCreateInstance(navModal).show();
+    if (clockModal?.classList.contains('show')) {
+      bootstrap.Modal.getOrCreateInstance(clockModal).hide();
+      clockModal.addEventListener('hidden.bs.modal', show, {once: true});
+    } else {
+      show();
+    }
+  }
+
+  function ensureDugoutNavButton() {
+    const header = $('cbDugoutHeader');
+    if (!header || $('cbCoachBoardNavBtn')) return;
+    const clockButton = header.querySelector('[data-cb-clock]');
+    if (!clockButton) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'cbCoachBoardNavBtn';
+    button.className = 'btn btn-sm';
+    button.setAttribute('aria-label', 'Open CoachBoard menu without ending the live game');
+    button.innerHTML = '<i class="bi bi-grid me-1"></i> CoachBoard';
+    button.addEventListener('click', openAppNav);
+    clockButton.insertAdjacentElement('beforebegin', button);
   }
 
   function ensureModal() {
@@ -73,6 +154,11 @@
             <div class="cb-delay-help">
               <strong>For delays:</strong> pause CoachBoard only when the official game/tournament clock is also stopped — for example for rain, lightning, an injury, or a field delay. Pausing CoachBoard does not change the inning, pitcher, defense, or live-game state.
             </div>
+            <div class="cb-clock-exit-actions d-grid gap-2">
+              <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="cbClockDoneBtn"><i class="bi bi-arrow-left me-1"></i> Done — Back to Live Game</button>
+              <button type="button" class="btn btn-outline-secondary" id="cbClockCoachBoardMenuBtn"><i class="bi bi-grid me-1"></i> CoachBoard Menu</button>
+              <div class="small text-muted text-center">Neither option ends the game.</div>
+            </div>
           </div>
         </div>
       </div>`;
@@ -94,6 +180,8 @@
       }, 180);
     });
 
+    modal.querySelector('#cbClockCoachBoardMenuBtn')?.addEventListener('click', openAppNav);
+
     return modal;
   }
 
@@ -106,8 +194,8 @@
     if (state) {
       state.classList.toggle('paused', paused);
       state.innerHTML = paused
-        ? '<strong><i class="bi bi-pause-circle me-1"></i> Clock is paused</strong><span>Game time is frozen until you resume it. The current inning and defensive state stay exactly where they are.</span>'
-        : '<strong><i class="bi bi-clock me-1"></i> Clock is running</strong><span>Use Pause only when the official game clock has also stopped for a delay.</span>';
+        ? '<strong><i class="bi bi-pause-circle me-1"></i> Clock is paused</strong><span>Game time is frozen until you resume it. You can close this window or go somewhere else in CoachBoard; the game stays live and the clock stays paused.</span>'
+        : '<strong><i class="bi bi-clock me-1"></i> Clock is running</strong><span>You can leave the Live Game screen and keep using CoachBoard. The game and clock continue until you explicitly pause or end them.</span>';
     }
     if (button) {
       button.className = `btn ${paused ? 'btn-success' : 'btn-outline-warning'} cb-clock-action`;
@@ -145,6 +233,7 @@
     patchQueued = false;
     installStyles();
     document.body.classList.toggle('cb-clock-paused', Boolean(clock?.is_paused));
+    ensureDugoutNavButton();
     patchPitcherUI();
     updateModal();
   }
