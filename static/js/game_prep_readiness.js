@@ -21,6 +21,39 @@
       .cgr-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.06)}
       .cgr-head strong{font-size:.82rem;color:#172033}.cgr-head small{display:block;font-size:.65rem;color:#667085;margin-top:1px}.cgr-badge{border-radius:999px;padding:4px 8px;font-size:.59rem;font-weight:900;letter-spacing:.06em;white-space:nowrap}.ready .cgr-badge{background:#176b38;color:#fff}.needs .cgr-badge{background:#8b5c00;color:#fff}
       .cgr-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding:10px 12px}.cgr-item{appearance:none;-webkit-appearance:none;width:100%;border:1px solid #e2e6eb;border-radius:9px;padding:7px 8px;background:#fff;text-align:left;cursor:pointer}.cgr-item.good{border-color:#cce7d4;background:#f8fcf9}.cgr-item.need{border-color:#efd8ac;background:#fffaf0}.cgr-item.optional{background:#f8f9fb;border-color:#e4e7ec}.cgr-item:focus-visible{outline:3px solid rgba(18,56,123,.16);outline-offset:1px}.cgr-l{display:flex;justify-content:space-between;gap:5px;align-items:center;font-size:.54rem;text-transform:uppercase;letter-spacing:.07em;font-weight:850;color:#667085}.cgr-l i{font-size:.64rem}.cgr-v{font-size:.72rem;font-weight:800;color:#1d2939;margin-top:2px;line-height:1.2}.cgr-blockers{padding:0 12px 10px;font-size:.68rem;color:#8b5c00}.cgr-blockers div{display:flex;gap:6px;align-items:flex-start}.cgr-blockers div+div{margin-top:3px}.cgr-blockers i{margin-top:1px;flex:0 0 auto}
+      @media(max-width:767.98px){
+        html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot{
+          width:64px!important;min-height:38px!important;padding:3px 2px!important;
+        }
+        html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot .pde-pos{
+          font-size:.4rem!important;line-height:1!important;margin-bottom:1px!important;
+        }
+        html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot .pde-name{
+          display:-webkit-box!important;
+          -webkit-box-orient:vertical;
+          -webkit-line-clamp:2;
+          max-width:100%;
+          overflow:hidden!important;
+          white-space:normal!important;
+          overflow-wrap:anywhere;
+          word-break:normal;
+          font-size:clamp(.56rem,2.35vw,.62rem)!important;
+          line-height:1.05!important;
+          text-align:center;
+        }
+        html body.coach-game-page #diamond-parent-mobile .position-dropzone .player-tag{
+          white-space:normal!important;
+          overflow-wrap:anywhere;
+          word-break:normal;
+          font-size:.7rem!important;
+          line-height:1.05!important;
+          padding:3px 4px!important;
+        }
+      }
+      @media(max-width:379.98px){
+        html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot{width:60px!important}
+        html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot .pde-name{font-size:.54rem!important}
+      }
       @media(max-width:575.98px){
         #${ID}{margin-bottom:9px;border-radius:12px}
         .cgr-grid{grid-template-columns:1fr 1fr;gap:6px;padding:8px 9px}
