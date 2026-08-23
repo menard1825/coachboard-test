@@ -99,7 +99,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
                 const outer = field.getBoundingClientRect();
                 const spots = [...field.querySelectorAll('.pde-spot')].map(spot => {
                     const r = spot.getBoundingClientRect();
-                    return {left:r.left, right:r.right, top:r.top, bottom:r.bottom};
+                    return {left:r.left, right:r.right, top:r.top, bottom:r.bottom, width:r.width};
                 });
                 return {outer:{left:outer.left,right:outer.right,top:outer.top,bottom:outer.bottom,height:outer.height},spots};
             }"""
@@ -113,6 +113,28 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             and spot['bottom'] <= geometry['outer']['bottom'] + 1
             for spot in geometry['spots']
         )
+        assert all(60 <= spot['width'] <= 66 for spot in geometry['spots'])
+
+        # Player names on the phone diamond should be readable instead of being
+        # forced onto one tiny line. Keep two-line wrapping inside each position.
+        diamond_names = field.locator('.pde-name')
+        expect(diamond_names).not_to_have_count(0)
+        name_style = diamond_names.first.evaluate(
+            """el => {
+                const s = getComputedStyle(el);
+                return {
+                    whiteSpace:s.whiteSpace,
+                    fontSize:parseFloat(s.fontSize),
+                    lineClamp:s.webkitLineClamp,
+                    width:el.getBoundingClientRect().width,
+                    parentWidth:el.parentElement.getBoundingClientRect().width,
+                };
+            }"""
+        )
+        assert name_style['whiteSpace'] == 'normal'
+        assert name_style['fontSize'] >= 8.5
+        assert name_style['lineClamp'] == '2'
+        assert name_style['width'] <= name_style['parentWidth'] + 1
 
         # Game-planning pitching uses coach language and keeps secondary pitch
         # metrics collapsed until the coach asks for them.
