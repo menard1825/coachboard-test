@@ -115,8 +115,8 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         )
         assert all(60 <= spot['width'] <= 66 for spot in geometry['spots'])
 
-        # Player names on the phone diamond should be readable instead of being
-        # forced onto one tiny line. Keep two-line wrapping inside each position.
+        # A player's complete name is game-critical information. The phone diamond
+        # may wrap a name, but it must never clamp it or replace it with ellipsis.
         diamond_names = field.locator('.pde-name')
         expect(diamond_names).not_to_have_count(0)
         name_style = diamond_names.first.evaluate(
@@ -124,17 +124,27 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
                 const s = getComputedStyle(el);
                 return {
                     whiteSpace:s.whiteSpace,
+                    overflow:s.overflow,
+                    textOverflow:s.textOverflow,
                     fontSize:parseFloat(s.fontSize),
                     lineClamp:s.webkitLineClamp,
                     width:el.getBoundingClientRect().width,
                     parentWidth:el.parentElement.getBoundingClientRect().width,
+                    scrollWidth:el.scrollWidth,
+                    clientWidth:el.clientWidth,
+                    scrollHeight:el.scrollHeight,
+                    clientHeight:el.clientHeight,
                 };
             }"""
         )
         assert name_style['whiteSpace'] == 'normal'
+        assert name_style['overflow'] == 'visible'
+        assert name_style['textOverflow'] == 'clip'
         assert name_style['fontSize'] >= 8.5
-        assert name_style['lineClamp'] == '2'
+        assert name_style['lineClamp'] in {'none', 'unset', ''}
         assert name_style['width'] <= name_style['parentWidth'] + 1
+        assert name_style['scrollWidth'] <= name_style['clientWidth'] + 1
+        assert name_style['scrollHeight'] <= name_style['clientHeight'] + 1
 
         # Game-planning pitching uses coach language and keeps secondary pitch
         # metrics collapsed until the coach asks for them.
