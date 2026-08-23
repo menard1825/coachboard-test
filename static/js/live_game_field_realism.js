@@ -5,6 +5,7 @@
   const FIELD_SELECTOR = '#coach-current-defense .coach-field';
   let decorateQueued = false;
   let fieldObserver = null;
+  let dugoutObserver = null;
 
   function loadPitcherChangeWizard() {
     if (document.querySelector('script[data-live-pitcher-change-complete]')) return;
@@ -34,11 +35,12 @@
         height: 100dvh !important;
         min-height: 0 !important;
         margin: 0 !important;
+        padding-top: 0 !important;
+        box-sizing: border-box !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
         overscroll-behavior-y: contain;
         -webkit-overflow-scrolling: touch;
-        contain: layout paint style;
       }
       body.cb-dugout .coach-live-shell {
         min-height: 100% !important;
@@ -156,7 +158,7 @@
 
       @media (min-width: 1441px) {
         .coach-live-shell { max-width: 1120px !important; }
-        .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
+        .coach-actions { grid-template-columns: repeat(5,minmax(0,1fr)) !important; gap:10px !important; }
         #liveSetDefenseBtnCoach { grid-column:auto !important; }
         .coach-card:has(#coach-current-defense) { padding: 14px 18px 16px !important; }
         .coach-field.coach-real-field {
@@ -287,10 +289,34 @@
     fieldObserver.observe(host, { childList: true, subtree: true });
   }
 
+  function mountDugoutOverlay() {
+    const overlay = document.getElementById('live-game-overlay');
+    if (!overlay || !document.body.classList.contains('cb-dugout')) return;
+
+    /* iOS treats fixed descendants inconsistently when they remain nested
+       inside the Bootstrap card/planner hierarchy. Portal the live workspace
+       directly under <body> so inset:0 is relative to the real viewport. */
+    if (overlay.parentElement !== document.body) {
+      document.body.appendChild(overlay);
+      overlay.scrollTop = 0;
+      requestAnimationFrame(() => { overlay.scrollTop = 0; });
+    }
+  }
+
+  function watchDugoutMode() {
+    if (dugoutObserver) return;
+    dugoutObserver = new MutationObserver(() => {
+      if (document.body.classList.contains('cb-dugout')) mountDugoutOverlay();
+    });
+    dugoutObserver.observe(document.body, { attributes:true, attributeFilter:['class'] });
+    mountDugoutOverlay();
+  }
+
   loadPitcherChangeWizard();
 
   document.addEventListener('DOMContentLoaded', () => {
     installStyles();
+    watchDugoutMode();
     watchFieldChanges();
     scheduleDecorate();
     document.addEventListener('click', event => {
