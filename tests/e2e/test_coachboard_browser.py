@@ -143,14 +143,14 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/game/1')
 
-    availability_toggle = page.locator('#availabilityToggleBtn')
+    readiness = page.locator('#coach-game-readiness-v2')
+    expect(readiness).to_be_visible(timeout=15_000)
+    availability_shortcut = readiness.get_by_role('button', name=re.compile("Who's Out"))
     availability_panel = page.locator('#availabilityCollapse')
-    expect(availability_toggle).to_have_text("Set Who's Out", timeout=15_000)
-    expect(availability_toggle).to_have_attribute('aria-expanded', 'false')
+    expect(availability_shortcut).to_be_visible()
 
-    availability_toggle.click()
+    availability_shortcut.click()
     expect(availability_panel).to_have_class(re.compile(r'\bshow\b'))
-    expect(availability_toggle).to_have_attribute('aria-expanded', 'true')
     expect(page.locator('#availability-out-count-v2-value')).to_have_text('0')
     page.wait_for_function(
         """() => {
@@ -170,9 +170,8 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     expect(page).to_have_url(re.compile(r'/game/1#availabilityCollapse$'))
     expect(availability_panel).to_have_class(re.compile(r'\bshow\b'), timeout=15_000)
     expect(absent_player).to_be_checked()
-    availability_card = page.locator('#availabilitySummaryCard')
-    expect(availability_card).to_contain_text('8 Available')
-    expect(availability_card).to_contain_text('1 out')
+    readiness = page.locator('#coach-game-readiness-v2')
+    expect(readiness.get_by_role('button', name=re.compile("Who's Out"))).to_contain_text('1 out', timeout=15_000)
 
     page.goto(f'{coachboard_url}/game-day')
     expect(page.locator('[data-game-id="1"]')).to_contain_text('8 present · 1 out')
@@ -190,12 +189,14 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     page.locator('#editGameModal .btn-close').click()
     expect(page.locator('#editGameModal')).to_be_hidden()
 
-    page.get_by_role('button', name='Edit Lineup').click()
+    readiness = page.locator('#coach-game-readiness-v2')
+    expect(readiness).to_be_visible(timeout=15_000)
+    readiness.get_by_role('button', name=re.compile('Batting Order')).click()
     expect(page.locator('#lineupEditorModal')).to_be_visible()
     page.locator('#lineupEditorModal').get_by_role('button', name='Cancel').click()
     expect(page.locator('#lineupEditorModal')).to_be_hidden()
 
-    page.locator('#editDefenseBtn').click()
+    readiness.get_by_role('button', name=re.compile('Defense')).click()
     expect(page.locator('#pde-preset')).to_be_visible(timeout=15_000)
-    page.locator('#viewPitchingBtn').click()
-    expect(page.locator('#pitching-log-container')).to_be_visible()
+    readiness.get_by_role('button', name=re.compile('Pitch Plan')).click()
+    expect(page.locator('#pitcher-availability-card')).to_be_visible()
