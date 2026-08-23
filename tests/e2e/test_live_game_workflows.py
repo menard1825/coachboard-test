@@ -54,6 +54,39 @@ def post_form(page: Page, coachboard_url: str, path: str, form):
     return response
 
 
+def assert_player_names_are_fully_visible(locator):
+    """Player labels may wrap, but they may never be ellipsized or clipped."""
+    expect(locator).not_to_have_count(0)
+    samples = locator.evaluate_all(
+        """items => items.map(el => {
+            const s = getComputedStyle(el);
+            const before = getComputedStyle(el, '::before');
+            return {
+                text: (el.textContent || '').trim(),
+                whiteSpace: s.whiteSpace,
+                overflow: s.overflow,
+                textOverflow: s.textOverflow,
+                scrollWidth: el.scrollWidth,
+                clientWidth: el.clientWidth,
+                scrollHeight: el.scrollHeight,
+                clientHeight: el.clientHeight,
+                hasNumber: el.hasAttribute('data-cb-number'),
+                numberDisplay: before.display,
+            };
+        })"""
+    )
+    for sample in samples:
+        if not sample['text'] or sample['text'].lower() in {'open', 'tbd'}:
+            continue
+        assert sample['whiteSpace'] == 'normal', sample
+        assert sample['overflow'] == 'visible', sample
+        assert sample['textOverflow'] == 'clip', sample
+        assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
+        assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
+        if sample['hasNumber']:
+            assert sample['numberDisplay'] == 'block', sample
+
+
 def alignment(pitcher='Pitcher Pat'):
     return {
         'P': pitcher,
@@ -102,6 +135,8 @@ def create_game_with_plan(page: Page, coachboard_url: str):
 def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboard_url: str):
     login(page, coachboard_url)
     game_id, _, _ = create_game_with_plan(page, coachboard_url)
+    page_errors = []
+    page.on('pageerror', lambda error: page_errors.append(str(error)))
 
     rules = get_json(page, coachboard_url, f'/api/game-day/{game_id}/pitching-rules')
     assert rules['override'] == 'USSSA' and rules['source'] == 'game'
@@ -149,6 +184,34 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     assert state['game']['is_live'] is True
     assert state['current_alignment']['P'] == 'Pitcher Pat'
 
+    # Next Inning and Current Defense are the two live diamond/board surfaces a
+    # coach sees in the dugout. Names must remain complete at phone, iPad, the
+    # exact iPad Air landscape size reported by the coach, and normal desktop.
+    next_board = page.locator('#live-board-prep-v3')
+    expect(next_board).to_be_visible(timeout=15_000)
+    expect(next_board).to_contain_text('Shortstop Shawn')
+
+    field_toggle = page.locator('[data-coach-defense-view="field"]')
+    if field_toggle.count():
+        field_toggle.first.click()
+        expect(page.locator('#coach-current-defense .coach-field')).to_be_visible(timeout=10_000)
+
+    viewports = (
+        {'width': 390, 'height': 844},
+        {'width': 820, 'height': 1180},
+        {'width': 1180, 'height': 820},
+        {'width': 1440, 'height': 900},
+    )
+    for viewport in viewports:
+        page.set_viewport_size(viewport)
+        page.wait_for_timeout(180)
+        expect(next_board).to_be_visible()
+        assert_player_names_are_fully_visible(next_board.locator('.bp-field-spot .name'))
+        current_field_names = page.locator('#coach-current-defense .coach-field-spot span')
+        if current_field_names.count():
+            assert_player_names_are_fully_visible(current_field_names)
+        assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
+
     clock = get_json(page, coachboard_url, f'/api/live-game/{game_id}/clock')
     assert clock['clock']['is_live'] is True
     assert clock['clock']['started_at_utc']
@@ -192,6 +255,12 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     assert inning['state']['current_inning'] == '2'
     undone = post_json(page, coachboard_url, f'/api/live-game/{game_id}/undo', {})
     assert undone['state']['current_inning'] == '1'
+
+    # Socket state broadcasts used to call a removed renderBenchReport() helper.
+    # Give the browser time to receive the broadcasts above, then make that exact
+    # regression a hard browser-test failure.
+    page.wait_for_timeout(500)
+    assert not [error for error in page_errors if 'renderBenchReport' in error], page_errors
 
     finalized = post_json(page, coachboard_url, f'/api/live-game/{game_id}/end-with-pitching', {
         'defer_pitching': True,
