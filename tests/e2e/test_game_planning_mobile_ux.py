@@ -88,7 +88,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(defense).to_be_visible(timeout=15_000)
         expect(defense.locator('.pde-title')).to_have_text('Set Defense — Inning 1')
         expect(defense.locator('.gm-preset-label')).to_have_text('Defense Preset (Optional)')
-        expect(defense.locator('#pde-preset option').first).to_have_text('Choose a defense preset…')
+        expect(defense.locator('#pde-preset option').first).to_have_text('Choose a starting defense…')
 
         # The whole field, including every position button, must fit inside the
         # mobile field instead of being cropped above or below the browser chrome.
