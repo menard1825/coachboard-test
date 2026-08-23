@@ -3,6 +3,8 @@
 
   const STYLE_ID = 'coach-real-field-styles';
   const FIELD_SELECTOR = '#coach-current-defense .coach-field';
+  let decorateQueued = false;
+  let fieldObserver = null;
 
   function loadPitcherChangeWizard() {
     if (document.querySelector('script[data-live-pitcher-change-complete]')) return;
@@ -17,6 +19,34 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
+      /* Dugout mode is a full-screen workspace. Keeping the live overlay in
+         normal page flow allowed hidden planner content to reserve space above
+         it on iOS. A dedicated scroll container also gives Safari much less
+         layout work to do while the coach is scrolling. */
+      body.cb-dugout {
+        overflow: hidden !important;
+      }
+      body.cb-dugout #live-game-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 1030 !important;
+        width: 100% !important;
+        height: 100dvh !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+        contain: layout paint style;
+      }
+      body.cb-dugout .coach-live-shell {
+        min-height: 100% !important;
+      }
+      body.cb-dugout #cbDugoutHeader {
+        top: 0 !important;
+      }
+
       .coach-field.coach-real-field {
         position: relative;
         overflow: hidden;
@@ -226,12 +256,15 @@
       const pos = spot.querySelector('strong')?.textContent?.trim();
       const xy = coordinates[pos];
       if (!xy) return;
-      spot.style.left = `${xy[0]}%`;
-      spot.style.top = `${xy[1]}%`;
+      const left = `${xy[0]}%`;
+      const top = `${xy[1]}%`;
+      if (spot.style.left !== left) spot.style.left = left;
+      if (spot.style.top !== top) spot.style.top = top;
     });
   }
 
   function decorateField() {
+    decorateQueued = false;
     const field = document.querySelector(FIELD_SELECTOR);
     if (!field) return;
     if (!field.classList.contains('coach-real-field')) {
@@ -242,19 +275,32 @@
   }
 
   function scheduleDecorate() {
+    if (decorateQueued) return;
+    decorateQueued = true;
     requestAnimationFrame(() => requestAnimationFrame(decorateField));
+  }
+
+  function watchFieldChanges() {
+    const host = document.getElementById('coach-current-defense');
+    if (!host || fieldObserver) return;
+    fieldObserver = new MutationObserver(() => scheduleDecorate());
+    fieldObserver.observe(host, { childList: true, subtree: true });
   }
 
   loadPitcherChangeWizard();
 
   document.addEventListener('DOMContentLoaded', () => {
     installStyles();
+    watchFieldChanges();
     scheduleDecorate();
     document.addEventListener('click', event => {
       if (event.target.closest('[data-coach-defense-view="field"]')) scheduleDecorate();
     });
     window.addEventListener('resize', scheduleDecorate, {passive:true});
     window.addEventListener('orientationchange', scheduleDecorate, {passive:true});
-    setInterval(decorateField, 1200);
+
+    /* Do not poll and rewrite field geometry while the user is scrolling.
+       Live-game DOM changes are observed above, so the field still updates
+       immediately when a defensive change actually occurs. */
   });
 })();
