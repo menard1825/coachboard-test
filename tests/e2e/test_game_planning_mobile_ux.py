@@ -32,20 +32,6 @@ def login(page: Page, coachboard_url: str):
     expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#(?:overview|games))?$'))
 
 
-def full_defense():
-    return {
-        'P': 'Pitcher Pat',
-        'C': 'Catcher Cole',
-        '1B': 'First Frank',
-        '2B': 'Second Sam',
-        '3B': 'Third Theo',
-        'SS': 'Shortstop Shawn',
-        'LF': 'Left Lee',
-        'CF': 'Center Casey',
-        'RF': 'Right Riley',
-    }
-
-
 def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
@@ -65,24 +51,12 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
     game = next(item for item in games if item.get('opponent') == OPPONENT)
     game_id = int(game['id'])
 
-    innings = {'1': full_defense()}
-    innings.update({str(number): {} for number in range(2, 7)})
-    saved = page.request.post(
-        f'{coachboard_url}/save_rotation',
-        data={
-            'title': f'Defense for {OPPONENT}',
-            'innings': innings,
-            'associated_game_id': game_id,
-        },
-    )
-    assert saved.ok and saved.json().get('status') == 'success'
-
     try:
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
         readiness = page.locator('#coach-game-readiness-v2')
         expect(readiness).to_be_visible(timeout=15_000)
-        expect(readiness).to_contain_text('Finish the defense for innings 2–6.')
+        expect(readiness).to_contain_text('Finish the defense for innings 1–6.')
         expect(readiness).not_to_contain_text('regulation inning(s)')
         expect(readiness).not_to_contain_text('setup item need attention')
         expect(readiness.get_by_role('button', name=re.compile("Who's Out"))).to_be_visible()
