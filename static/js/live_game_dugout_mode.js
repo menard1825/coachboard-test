@@ -62,10 +62,21 @@
   window.openCoachBoardLiveMenu=openAppMenu;
 
   function renderHeader(shell) {
-    let h=$('cbDugoutHeader'); if(!h){h=document.createElement('div');h.id='cbDugoutHeader';shell.prepend(h);h.addEventListener('click',e=>{if(e.target.closest('[data-cb-clock]'))document.querySelector('#cbLiveGameClock .cb-clock-config')?.click();if(e.target.closest('[data-cb-menu]'))openAppMenu();});}
+    let h=$('cbDugoutHeader');
+    if(!h){
+      h=document.createElement('div');h.id='cbDugoutHeader';
+      h.innerHTML='<div class="cb-dh-main"><div class="cb-dh-live"><span class="cb-dh-dot"></span><span data-cb-live-label>Live Game</span></div><div class="cb-dh-inning"><small>Inning</small><strong data-cb-inning>1</strong></div><div class="cb-dh-clock"><small data-cb-clock-label>Elapsed</small><div class="cb-dh-time" data-cb-clock-time>—</div></div><div class="cb-dh-pitcher"><small>Pitcher</small><div class="cb-dh-name" data-cb-pitcher>None</div></div><button class="btn btn-outline-light btn-sm cb-dh-btn" data-cb-clock><i class="bi bi-clock me-1"></i>Clock</button><button class="btn btn-outline-light btn-sm cb-dh-btn" data-cb-menu aria-label="Open CoachBoard menu without ending the game"><i class="bi bi-grid me-1"></i>Menu</button></div><div class="cb-dh-title" data-cb-title></div>';
+      shell.prepend(h);
+      h.addEventListener('click',e=>{if(e.target.closest('[data-cb-clock]'))document.querySelector('#cbLiveGameClock .cb-clock-config')?.click();if(e.target.closest('[data-cb-menu]'))openAppMenu();});
+    }
     const c=clockInfo(),inning=state?.current_inning||clock?.current_inning||'1',pitcher=state?.current_pitcher||state?.current_alignment?.P||'None';
     const sync=$('live-sync-status-v2')?.textContent||'',synced=/synced/i.test(sync)&&!/not synced|reconnecting/i.test(sync);
-    setHtml(h,`<div class="cb-dh-main"><div class="cb-dh-live"><span class="cb-dh-dot"></span><span>${synced?'Live · Synced':'Live Game'}</span></div><div class="cb-dh-inning"><small>Inning</small><strong>${esc(inning)}</strong></div><div class="cb-dh-clock"><small>${esc(c.label)}</small><div class="cb-dh-time ${c.tone}">${esc(c.value)}</div></div><div class="cb-dh-pitcher"><small>Pitcher</small><div class="cb-dh-name">${esc(displayName(pitcher))}</div></div><button class="btn btn-outline-light btn-sm cb-dh-btn" data-cb-clock><i class="bi bi-clock me-1"></i>Clock</button><button class="btn btn-outline-light btn-sm cb-dh-btn" data-cb-menu aria-label="Open CoachBoard menu without ending the game"><i class="bi bi-grid me-1"></i>Menu</button></div><div class="cb-dh-title">${esc(title())}</div>`);
+    setText(h.querySelector('[data-cb-live-label]'),synced?'Live · Synced':'Live Game');
+    setText(h.querySelector('[data-cb-inning]'),String(inning));
+    setText(h.querySelector('[data-cb-clock-label]'),c.label);
+    const time=h.querySelector('[data-cb-clock-time]');setText(time,c.value);time?.classList.toggle('warn',c.tone==='warn');time?.classList.toggle('danger',c.tone==='danger');
+    setText(h.querySelector('[data-cb-pitcher]'),displayName(pitcher));
+    setText(h.querySelector('[data-cb-title]'),title());
   }
   function defenseCard(shell){return[...shell.querySelectorAll('.coach-card')].find(x=>x.querySelector('.coach-defense-row,.coach-field,.coach-view-toggle'))||null;}
   function arrange(shell){
