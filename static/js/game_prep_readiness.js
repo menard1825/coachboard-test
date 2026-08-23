@@ -11,6 +11,13 @@
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[ch]));
 
+  // Older live-game socket handling still calls this retired helper after the
+  // modern rotation renderer has already refreshed both bench reports. Keep a
+  // harmless compatibility binding so a live state broadcast cannot throw.
+  if (typeof window.renderBenchReport !== 'function') {
+    window.renderBenchReport = () => {};
+  }
+
   function styles() {
     if (document.getElementById(`${ID}-styles`)) return;
     const style = document.createElement('style');
@@ -21,6 +28,49 @@
       .cgr-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.06)}
       .cgr-head strong{font-size:.82rem;color:#172033}.cgr-head small{display:block;font-size:.65rem;color:#667085;margin-top:1px}.cgr-badge{border-radius:999px;padding:4px 8px;font-size:.59rem;font-weight:900;letter-spacing:.06em;white-space:nowrap}.ready .cgr-badge{background:#176b38;color:#fff}.needs .cgr-badge{background:#8b5c00;color:#fff}
       .cgr-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding:10px 12px}.cgr-item{appearance:none;-webkit-appearance:none;width:100%;border:1px solid #e2e6eb;border-radius:9px;padding:7px 8px;background:#fff;text-align:left;cursor:pointer}.cgr-item.good{border-color:#cce7d4;background:#f8fcf9}.cgr-item.need{border-color:#efd8ac;background:#fffaf0}.cgr-item.optional{background:#f8f9fb;border-color:#e4e7ec}.cgr-item:focus-visible{outline:3px solid rgba(18,56,123,.16);outline-offset:1px}.cgr-l{display:flex;justify-content:space-between;gap:5px;align-items:center;font-size:.54rem;text-transform:uppercase;letter-spacing:.07em;font-weight:850;color:#667085}.cgr-l i{font-size:.64rem}.cgr-v{font-size:.72rem;font-weight:800;color:#1d2939;margin-top:2px;line-height:1.2}.cgr-blockers{padding:0 12px 10px;font-size:.68rem;color:#8b5c00}.cgr-blockers div{display:flex;gap:6px;align-items:flex-start}.cgr-blockers div+div{margin-top:3px}.cgr-blockers i{margin-top:1px;flex:0 0 auto}
+
+      /* Player names are operational information. Never replace part of a name
+         with an ellipsis on a field or board; wrap it inside the existing spot. */
+      html body #pregame-defense-editor-v3 .pde-field .pde-spot .pde-name,
+      html body #live-board-prep-v3 .bp-field-spot .name,
+      html body .coach-field .coach-field-spot span,
+      html body .coach-player-name,
+      html body #live-board-prep-v3 .bp-move strong,
+      html body #cbDugoutHeader .cb-dh-name{
+        white-space:normal!important;
+        overflow:visible!important;
+        text-overflow:clip!important;
+        overflow-wrap:anywhere!important;
+        word-break:normal!important;
+        max-height:none!important;
+      }
+      html body #pregame-defense-editor-v3 .pde-field .pde-spot .pde-name{
+        display:block!important;
+        -webkit-line-clamp:unset!important;
+        -webkit-box-orient:initial!important;
+        max-width:100%;
+        text-align:center;
+      }
+      html body #live-board-prep-v3 .bp-field-spot .name,
+      html body .coach-field .coach-field-spot span{
+        height:auto!important;
+        min-height:0!important;
+        line-height:1.08!important;
+      }
+      html body #cbDugoutHeader .cb-dh-name{max-width:none!important;line-height:1.12!important}
+
+      /* Jersey number stays useful in Live Game, but gets its own line so it
+         never steals horizontal space from the player's actual name. */
+      html body .coach-field .coach-field-spot span[data-cb-number]::before,
+      html body #live-board-prep-v3 .bp-field-spot .name[data-cb-number]::before{
+        content:'#' attr(data-cb-number)!important;
+        display:block!important;
+        margin:0 0 2px!important;
+        font-size:.78em!important;
+        line-height:1!important;
+        font-weight:900!important;
+      }
+
       @media(max-width:767.98px){
         html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot{
           width:64px!important;min-height:38px!important;padding:3px 2px!important;
@@ -29,22 +79,15 @@
           font-size:.4rem!important;line-height:1!important;margin-bottom:1px!important;
         }
         html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot .pde-name{
-          display:-webkit-box!important;
-          -webkit-box-orient:vertical;
-          -webkit-line-clamp:2;
-          max-width:100%;
-          overflow:hidden!important;
-          white-space:normal!important;
-          overflow-wrap:anywhere;
-          word-break:normal;
           font-size:clamp(.56rem,2.35vw,.62rem)!important;
           line-height:1.05!important;
-          text-align:center;
         }
         html body.coach-game-page #diamond-parent-mobile .position-dropzone .player-tag{
           white-space:normal!important;
-          overflow-wrap:anywhere;
-          word-break:normal;
+          overflow:visible!important;
+          text-overflow:clip!important;
+          overflow-wrap:anywhere!important;
+          word-break:normal!important;
           font-size:.7rem!important;
           line-height:1.05!important;
           padding:3px 4px!important;
