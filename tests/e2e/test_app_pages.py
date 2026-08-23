@@ -109,7 +109,9 @@ def test_lineup_editor_is_unique_and_cancel_discards_mobile_draft(page: Page, co
 
     page.goto(f'{coachboard_url}/game/1')
     expect(page.locator('#lineupEditorModal')).to_have_count(1)
-    page.get_by_role('button', name='Edit Lineup').click()
+    readiness = page.locator('#coach-game-readiness-v2')
+    expect(readiness).to_be_visible(timeout=15_000)
+    readiness.get_by_role('button', name=re.compile('Batting Order')).click()
     expect(page.locator('#lineupEditorModal')).to_be_visible()
     page.locator('#lineupTemplateSelect').select_option('template:1')
     page.locator('#applyLineupSourceBtn').click()
