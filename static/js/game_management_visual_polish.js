@@ -209,7 +209,6 @@
         }
         body.coach-game-page #pregame-defense-editor-v3 .gm-preset-wrap{min-width:0!important}
         body.coach-game-page #pregame-defense-editor-v3 .gm-preset-label{margin-bottom:3px!important}
-        body.coach-game-page #pregame-defense-editor-v3 .gm-preset-label::after{content:'Defense Preset (Optional)'!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-tools .form-select,
         body.coach-game-page #pregame-defense-editor-v3 .pde-tools .btn{min-height:38px!important;font-size:.68rem!important}
         body.coach-game-page #pregame-defense-editor-v3 #pde-apply{width:auto!important;padding-left:7px!important;padding-right:7px!important}
@@ -331,16 +330,16 @@
 
     const panel = document.getElementById('pregame-defense-editor-v3');
     if (!panel) return;
-    setText(panel.querySelector('.pde-title'), `Defense — Inning ${inning}`);
-    setText(panel.querySelector('.pde-help'), 'Tap a position to make a change. Saves automatically.');
+    setText(panel.querySelector('.pde-title'), `Set Defense — Inning ${inning}`);
+    setText(panel.querySelector('.pde-help'), 'Tap a position to assign or change a player. Saves automatically.');
 
     const label = panel.querySelector('.gm-preset-label');
     setText(label, 'Defense Preset (Optional)');
     const select = document.getElementById('pde-preset');
-    if (select?.options?.length) setText(select.options[0], 'Choose a defense preset…');
+    if (select?.options?.length) setText(select.options[0], 'Choose a starting defense…');
     setText(document.getElementById('pde-apply'), 'Apply');
 
-    setText(panel.querySelector('.pde-field-caption strong'), `Inning ${inning} Defense`);
+    setText(panel.querySelector('.pde-field-caption strong'), 'Current Defense');
     setText(panel.querySelector('.pde-field-caption span'), 'Tap a position to change it');
     setText(panel.querySelector('.pde-label'), 'Bench');
 
@@ -350,7 +349,7 @@
       const count = Number(statusMatch[1]);
       setText(statusStrong, `${count} position${count === 1 ? '' : 's'} open`);
     }
-    setText(panel.querySelector('.pde-status-note'), 'Applies to this inning and saves automatically.');
+    setText(panel.querySelector('.pde-status-note'), 'Saves automatically.');
   }
 
   function polishPitcherCard(card) {
