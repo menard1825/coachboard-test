@@ -27,6 +27,7 @@
   let lastFailedMove = null;
   let saveMode = 'saved';
   let saveMessage = 'Saved';
+  let quickDefenseSignature = '';
 
   function styles() {
     if ($('dugout-mode-styles')) return;
@@ -362,6 +363,18 @@
     return `<div class="cb-qd-head"><div><div class="cb-qd-kicker">Current Defense</div><div class="cb-qd-title">Field + bench at a glance</div><div class="cb-qd-help">Tap any fielder or bench player to move them. Pitcher changes stay in Change Pitcher.</div></div>${saveStateMarkup()}</div><div class="cb-qd-body"><div class="cb-qd-field"><svg class="cb-qd-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true"><path d="M7 57 Q9 13 50 6 Q91 13 93 57" fill="none" stroke="rgba(245,245,220,.38)" stroke-width="1.2"/><path d="M50 84 L8 38 M50 84 L92 38" fill="none" stroke="rgba(255,255,255,.88)" stroke-width=".7"/><polygon points="50,75 27,54 50,32 73,54" fill="#cfa56c" opacity=".95"/><polygon points="50,68 34,54 50,40 66,54" fill="#438f58"/><circle cx="50" cy="61" r="4.8" fill="#cfa56c"/><circle cx="50" cy="81" r="6.2" fill="#cfa56c"/><rect x="49" y="31" width="2" height="2" fill="#fff" transform="rotate(45 50 32)"/><rect x="72" y="53" width="2" height="2" fill="#fff" transform="rotate(45 73 54)"/><rect x="26" y="53" width="2" height="2" fill="#fff" transform="rotate(45 27 54)"/><path d="M48.8 81.5 L50 80.4 L51.2 81.5 L50.8 83 L49.2 83 Z" fill="#fff"/></svg>${positionSpots().map(([pos, left, top]) => fieldSpot(pos, left, top)).join('')}</div><div class="cb-qd-bench-wrap"><div class="cb-qd-bench-head"><strong>Bench now · ${bench.length}</strong><span>${bench.length ? 'Players sitting longest are shown first' : 'Everyone is in the field'}</span></div><div class="cb-qd-bench">${benchMarkup}</div></div><div class="cb-qd-actions"><div class="cb-qd-tip">For a substitution, tap the bench player first, then tap the field position. The outgoing player moves to the bench automatically.</div><button type="button" class="btn btn-outline-secondary" data-cb-full-defense><i class="bi bi-sliders me-1"></i>Full editor</button></div></div>`;
   }
 
+  function quickDefenseStateSignature() {
+    return JSON.stringify({
+      inning: state?.current_inning || null,
+      alignment: currentAlignment(),
+      bench: benchPlayers().map(player => [player.id, player.name, player.number, player.benchStreak]),
+      outfielderCount: state?.outfielder_count || 3,
+      saveMode,
+      saveMessage,
+      retry: lastFailedMove ? [lastFailedMove.playerId, lastFailedMove.destination] : null,
+    });
+  }
+
   function ensureQuickDefense(shell) {
     let card = $('cbQuickDefense');
     if (!card) {
@@ -407,6 +420,9 @@
   function renderQuickDefense(shell) {
     const card = ensureQuickDefense(shell);
     if (!card || !state?.game?.is_live) return;
+    const signature = quickDefenseStateSignature();
+    if (signature === quickDefenseSignature && card.childElementCount) return;
+    quickDefenseSignature = signature;
     card.innerHTML = quickDefenseMarkup();
   }
 
@@ -451,6 +467,7 @@
     saveMode = 'saving';
     saveMessage = 'Saving…';
     lastFailedMove = null;
+    quickDefenseSignature = '';
     const shell = document.querySelector('#live-game-overlay .coach-live-shell');
     if (shell) renderQuickDefense(shell);
     try {
@@ -464,6 +481,7 @@
       if (data.state) state = data.state;
       saveMode = 'saved';
       saveMessage = 'Saved ✓';
+      quickDefenseSignature = '';
       bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
       queue();
       setTimeout(getState, 250);
@@ -471,6 +489,7 @@
       saveMode = 'error';
       saveMessage = 'Not saved — Retry';
       lastFailedMove = { playerId, destination, name };
+      quickDefenseSignature = '';
       if (shell) renderQuickDefense(shell);
       const modal = ensureMoveModal();
       const body = modal.querySelector('.modal-body');
@@ -496,7 +515,10 @@
 
     const whole = $('liveSetDefenseBtnCoach');
     const legacyCard = defenseCard(shell);
-    if (legacyCard) legacyCard.classList.add('cb-legacy-defense-card');
+    if (legacyCard) {
+      legacyCard.classList.add('cb-legacy-defense-card');
+      legacyCard.querySelector('.coach-view-toggle')?.remove();
+    }
     if (whole && legacyCard) {
       let tools = legacyCard.querySelector('.cb-defense-tools');
       if (!tools) {
@@ -549,6 +571,7 @@
     if (!live) {
       $('cbDugoutHeader')?.remove();
       $('cbQuickDefense')?.remove();
+      quickDefenseSignature = '';
       return;
     }
     const shell = document.querySelector('#live-game-overlay .coach-live-shell');
