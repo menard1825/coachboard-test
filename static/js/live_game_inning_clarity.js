@@ -50,7 +50,6 @@
         font-weight:850;
         letter-spacing:.05em;
       }
-
       body.cb-dugout #liveDefensiveChangeBtn {
         border-color:#365d96!important;
         background:#f5f8ff!important;
@@ -61,7 +60,6 @@
         opacity:1!important;
         color:#53657d!important;
       }
-
       body.cb-dugout #live-board-prep-v3 {
         border-color:#91a6c3!important;
       }
@@ -81,7 +79,6 @@
       body.cb-dugout #live-board-prep-v3 [data-bp-action="adjust"] {
         min-height:46px!important;
       }
-
       .cb-next-inning-note {
         margin:0 0 10px;
         padding:8px 10px;
@@ -95,7 +92,6 @@
       .cb-next-inning-note strong {
         color:#17355f;
       }
-
       #next-inning-adjust-modal .cb-next-modal-note {
         margin:0 0 12px;
         padding:9px 10px;
@@ -106,7 +102,6 @@
         font-size:.74rem;
         line-height:1.35;
       }
-
       #${END_MODAL_ID} .modal-content {
         border:0;
         border-radius:15px;
@@ -140,7 +135,6 @@
         font-weight:550;
         opacity:.78;
       }
-
       @media (max-width:599.98px) {
         .cb-current-inning-strip {
           align-items:flex-start;
@@ -178,33 +172,33 @@
       strip.className = 'cb-current-inning-strip';
       strip.innerHTML = `
         <div>
-          <strong>Current inning changes</strong>
-          <span>These controls change the defense on the field immediately.</span>
+          <strong>On-Field Changes</strong>
+          <span>Moves made during the current inning.</span>
         </div>
-        <div class="cb-now-badge">HAPPENS NOW</div>`;
+        <div class="cb-now-badge">LIVE NOW</div>`;
       actionSlot.insertAdjacentElement('beforebegin', strip);
     }
 
     setAction(
       document.getElementById('liveDefensiveChangeBtn'),
-      'Change Defense Now',
-      'Current inning · takes effect immediately'
+      'Make Defensive Change',
+      'Current inning · updates the field now'
     );
 
     setAction(
       document.getElementById('liveSetDefenseBtnCoach'),
       'Set Current Defense',
-      'Current inning · takes effect immediately'
+      'Current inning · updates the field now'
     );
 
     const pitcher = document.getElementById('liveChangePitcherBtn');
     if (pitcher) {
       const titleEl = pitcher.querySelector('.coach-action-title');
       const noteEl = pitcher.querySelector('.coach-action-note');
-      if (titleEl && !/Now/i.test(titleEl.textContent || '')) titleEl.textContent = 'Change Pitcher Now';
-      if (noteEl) noteEl.textContent = 'Current inning · takes effect immediately';
-      pitcher.setAttribute('title', 'Change Pitcher Now — current inning, takes effect immediately');
-      pitcher.setAttribute('aria-label', 'Change Pitcher Now. Current inning; takes effect immediately.');
+      if (titleEl) titleEl.textContent = 'Make Pitching Change';
+      if (noteEl) noteEl.textContent = 'Current inning · updates the mound now';
+      pitcher.setAttribute('title', 'Make Pitching Change — current inning');
+      pitcher.setAttribute('aria-label', 'Make Pitching Change. Current inning.');
     }
 
     const end = document.getElementById('liveEndInningBtn');
@@ -212,7 +206,7 @@
       const titleEl = end.querySelector('.coach-action-title');
       const noteEl = end.querySelector('.coach-action-note');
       if (titleEl) titleEl.textContent = 'End Inning';
-      if (noteEl) noteEl.textContent = 'Loads the confirmed next-inning defense';
+      if (noteEl) noteEl.textContent = 'Sends the next defense onto the field';
     }
   }
 
@@ -229,17 +223,15 @@
     const title = card.querySelector('.bp-title');
     const help = card.querySelector('.bp-help');
 
-    if (kicker) kicker.textContent = 'NEXT INNING · PLAN AHEAD';
-    if (title) title.textContent = next ? `Plan Defense for Inning ${next}` : 'Plan the Next Inning Defense';
-    if (help) {
-      help.textContent = 'You do not have to preplan every inning. Decide this any time during the current inning. Nothing here changes the field until you tap End Inning.';
-    }
+    if (kicker) kicker.textContent = 'NEXT INNING DEFENSE';
+    if (title) title.textContent = next ? `Set Defense for Inning ${next}` : 'Set Next Inning Defense';
+    if (help) help.textContent = 'Choose the defense that takes the field when the current inning ends.';
 
     const body = card.querySelector('.bp-body');
     if (body && !body.querySelector('.cb-next-inning-note')) {
       const note = document.createElement('div');
       note.className = 'cb-next-inning-note';
-      note.innerHTML = '<strong>Planning only:</strong> use this section for the following inning. For a change that should happen right now, use <strong>Change Defense Now</strong> above.';
+      note.innerHTML = '<strong>Next inning:</strong> use this section for the defense that takes the field after the third out. Use <strong>Make Defensive Change</strong> above for a move during the current inning.';
       body.prepend(note);
     }
 
@@ -248,38 +240,46 @@
       const strong = waiting.querySelector('strong');
       const small = waiting.querySelector('small');
       const badge = waiting.querySelector('.bp-status-badge');
-      if (strong) strong.textContent = next ? `Inning ${next} is not planned yet — that's okay` : 'Next inning is not planned yet — that\'s okay';
-      if (small) small.textContent = 'When you are ready, keep the current defense or build the next one.';
-      if (badge) badge.textContent = 'DECIDE WHEN READY';
+      if (strong) strong.textContent = next ? `Inning ${next} defense not set` : 'Next inning defense not set';
+      if (small) small.textContent = 'Set the next defense before ending the inning.';
+      if (badge) badge.textContent = 'NOT SET';
     }
 
     const decisionLabel = card.querySelector('.bp-decision .bp-label');
     const decisionTitle = card.querySelector('.bp-decision h6');
     const decisionText = card.querySelector('.bp-decision p');
-    if (decisionLabel) decisionLabel.textContent = 'For the following inning';
-    if (decisionTitle) decisionTitle.textContent = next ? `What should the defense be for Inning ${next}?` : 'What should the next defense be?';
-    if (decisionText) decisionText.textContent = 'This is planning only. It will not change the current inning.';
+    if (decisionLabel) decisionLabel.textContent = 'Next inning';
+    if (decisionTitle) decisionTitle.textContent = next ? `Who takes the field for Inning ${next}?` : 'Who takes the field next inning?';
+    if (decisionText) decisionText.textContent = 'Keep the same defense, use the pregame defense, or set a new one.';
 
     const noPlan = card.querySelector('.bp-none');
     if (noPlan && /No pregame plan/i.test(noPlan.textContent || '')) {
-      noPlan.textContent = 'No pregame plan was saved. That is fine — start from the current defense and adjust only what you know.';
+      noPlan.textContent = next ? `No pregame defense saved for Inning ${next}.` : 'No pregame defense saved.';
     }
 
     const current = card.querySelector('[data-bp-action="current"]');
     const planned = card.querySelector('[data-bp-action="planned"]');
     const adjust = card.querySelector('[data-bp-action="adjust"]');
-    if (current) current.textContent = 'Use Current Defense';
-    if (planned) planned.textContent = 'Use Pregame Plan';
-    if (adjust) adjust.textContent = 'Set Next Inning Defense';
+    if (current) current.textContent = 'Keep Same Defense';
+    if (planned) planned.textContent = 'Use Pregame Defense';
+    if (adjust) adjust.textContent = 'Set New Defense';
 
     const ready = card.querySelector('.bp-status.ready');
     if (ready) {
+      const strong = ready.querySelector('strong');
       const small = ready.querySelector('small');
       const badge = ready.querySelector('.bp-status-badge');
-      if (small && !/current inning/i.test(small.textContent || '')) {
-        small.textContent = `${small.textContent} Current inning stays unchanged until you end it.`;
+      if (strong) {
+        const text = strong.textContent || '';
+        if (/Current defense is staying/i.test(text)) strong.textContent = 'Same defense set';
+        else if (/Pregame defense confirmed/i.test(text)) strong.textContent = 'Pregame defense set';
+        else if (/Custom defense confirmed/i.test(text)) strong.textContent = 'New defense set';
       }
-      if (badge) badge.textContent = 'NEXT INNING READY';
+      if (small) {
+        const coach = (small.textContent || '').match(/Confirmed by ([^.]+)/i)?.[1];
+        small.textContent = coach ? `Set by ${coach}. Takes the field after the third out.` : 'Takes the field after the third out.';
+      }
+      if (badge) badge.textContent = 'DEFENSE SET';
     }
   }
 
@@ -294,7 +294,7 @@
     if (body && !body.querySelector('.cb-next-modal-note')) {
       const note = document.createElement('div');
       note.className = 'cb-next-modal-note';
-      note.innerHTML = '<strong>This is for the following inning.</strong> Saving here does not move anyone in the current inning. The defense becomes active when the inning ends.';
+      note.innerHTML = '<strong>Next inning defense.</strong> This lineup takes the field after the current inning ends.';
       body.prepend(note);
     }
   }
@@ -312,23 +312,23 @@
         <div class="modal-content">
           <div class="modal-header">
             <div>
-              <h5 class="modal-title mb-0">Set the Next Inning First</h5>
-              <div class="small text-muted">The current inning is still active.</div>
+              <h5 class="modal-title mb-0">Set the Next Defense</h5>
+              <div class="small text-muted">Choose who takes the field next inning.</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <div class="cb-end-plan-explain">
-              You do not need a pregame plan for every inning. Before ending this inning, just tell CoachBoard what should happen next.
+              The next-inning defense must be set before the inning can advance.
             </div>
             <div class="cb-end-plan-actions">
               <button type="button" class="btn btn-outline-dark" data-cb-end-use-current>
-                Keep Current Defense for Next Inning
-                <small>Fastest option — everyone stays where they are.</small>
+                Keep Same Defense
+                <small>Send the current defense back out next inning.</small>
               </button>
               <button type="button" class="btn btn-primary" data-cb-end-build-next>
-                Set Next Inning Defense
-                <small>Choose positions and bench players for the following inning.</small>
+                Set New Defense
+                <small>Set positions and bench players for the next inning.</small>
               </button>
             </div>
           </div>
@@ -346,11 +346,8 @@
     modal.querySelector('[data-cb-end-build-next]')?.addEventListener('click', () => {
       bootstrap.Modal.getOrCreateInstance(modal).hide();
       const adjust = document.querySelector('#live-board-prep-v3 [data-bp-action="adjust"]');
-      if (adjust && !adjust.disabled) {
-        setTimeout(() => adjust.click(), 180);
-      } else {
-        document.getElementById('live-board-prep-v3')?.scrollIntoView({ behavior:'smooth', block:'center' });
-      }
+      if (adjust && !adjust.disabled) setTimeout(() => adjust.click(), 180);
+      else document.getElementById('live-board-prep-v3')?.scrollIntoView({ behavior:'smooth', block:'center' });
     });
 
     return modal;
@@ -386,13 +383,10 @@
     installStyles();
     queuePatch();
     document.addEventListener('click', guardEndInning, true);
-    new MutationObserver(queuePatch).observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    new MutationObserver(queuePatch).observe(document.body, { childList:true, subtree:true });
   }
 
   document.readyState === 'loading'
-    ? document.addEventListener('DOMContentLoaded', start, { once: true })
+    ? document.addEventListener('DOMContentLoaded', start, { once:true })
     : start();
 })();
