@@ -159,9 +159,18 @@
     document.head.appendChild(style);
   }
 
-  installResponsiveStyles();
+  function loadBenchReport() {
+    if (document.querySelector('script[data-live-bench-report]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/live_game_bench_report.js';
+    script.dataset.liveBenchReport = 'true';
+    document.head.appendChild(script);
+  }
 
-  /* The responsive layout must still work even if Socket.IO is unavailable. */
+  installResponsiveStyles();
+  loadBenchReport();
+
+  /* The responsive layout and bench report must still work even if Socket.IO is unavailable. */
   if (typeof io !== 'function') return;
 
   function ensure() {
