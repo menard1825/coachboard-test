@@ -114,13 +114,12 @@
   }
 
   function redirectLegacySchedule() {
-    // Desktop navigation owns the dedicated Game Day page. On mobile, #games is
-    // intentionally kept as a same-document primary workspace so the bottom bar
-    // never mixes full document loads with tab swaps.
+    // Game Day now has one dedicated route on every screen size. Old #games
+    // bookmarks and links are redirected so phones/tablets cannot land on the
+    // retired dashboard Games tab while desktop shows the newer Game Day page.
     if (
       window.location.pathname === '/' &&
-      window.location.hash.toLowerCase() === '#games' &&
-      window.matchMedia('(min-width: 992px)').matches
+      window.location.hash.toLowerCase() === '#games'
     ) {
       window.location.replace('/game-day');
       return true;
@@ -267,6 +266,10 @@
   function normalizeSharedMobileNav() {
     const nav = sharedMobileNav();
     if (!nav) return;
+    if (window.location.pathname === '/') {
+      const gameDay = nav.querySelector('[data-cb-mobile-section="game-day"]');
+      if (gameDay) gameDay.setAttribute('href', '/game-day');
+    }
     if (window.location.pathname === '/game-day' || window.location.pathname === '/game-day/') {
       const home = nav.querySelector('[data-cb-mobile-section="overview"]');
       if (home) home.setAttribute('href', '/');
@@ -326,7 +329,7 @@
       }
     });
 
-    if (window.location.pathname === '/' && ['#overview', '#games', '#roster', '#practice_plan', '#more'].includes(window.location.hash || '#overview')) {
+    if (window.location.pathname === '/' && ['#overview', '#roster', '#practice_plan', '#more'].includes(window.location.hash || '#overview')) {
       window.requestAnimationFrame(() => window.requestAnimationFrame(reset));
     }
   }
@@ -341,7 +344,7 @@
     const moreActive = !['#overview', '#roster', '#practice_plan'].includes(target);
     nav.innerHTML = [
       mobileItem('#overview', 'house-door', 'Home', target === '#overview', true),
-      mobileItem('#games', 'diamond', 'Game Day', target === '#games', true),
+      mobileItem('/game-day', 'diamond', 'Game Day'),
       mobileItem('#roster', 'people', 'Roster', target === '#roster', true),
       mobileItem('#practice_plan', 'clipboard-check', 'Practice', target === '#practice_plan', true),
       mobileItem('#more', 'three-dots', 'More', moreActive, true),
@@ -429,7 +432,12 @@
     loadScript('/static/js/assignment_picker_availability.js', 'assignment-picker-availability');
   }
 
-  document.querySelectorAll('a[href="#games"] span, a[href="#games"], [data-nav-games]').forEach((el) => {
-    if (el.childElementCount === 0 && el.textContent.trim() === 'Games') el.textContent = 'Schedule';
+  document.querySelectorAll('a[href="#games"]').forEach((link) => {
+    link.removeAttribute('data-bs-toggle');
+    link.removeAttribute('role');
+    link.setAttribute('href', '/game-day');
+    const label = link.querySelector('span');
+    if (label && /games|schedule|game day/i.test(label.textContent || '')) label.textContent = 'Game Day';
+    else if (!label && /games|schedule/i.test(link.textContent || '')) link.textContent = 'Game Day';
   });
 })();
