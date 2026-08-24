@@ -5,55 +5,33 @@
   if (!match) return;
 
   const gameId = Number(match[1]);
-  const $ = (id) => document.getElementById(id);
-  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({
+  const MODAL_ID = 'live-pitcher-finish-v3';
+  let state = null;
+  let incoming = null;
+  let before = null;
+  let oldPitcher = '';
+  let incomingPosition = null;
+  let busy = false;
+
+  const $ = id => document.getElementById(id);
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[ch]));
 
-  let state = null;
-  let before = null;
-  let draft = null;
-  let incoming = null;
-  let oldPitcher = '';
-  let incomingPosition = null;
-  let requiredPositions = [];
-  let busy = false;
-
-  function loadBoardPrep() {
-    if (document.querySelector('script[data-live-board-prep]')) return;
-    const script = document.createElement('script');
-    script.src = '/static/js/live_game_board_prep.js';
-    script.dataset.liveBoardPrep = 'true';
-    document.head.appendChild(script);
-  }
-
-  function positions() {
-    return Number(state?.outfielder_count) === 4
-      ? ['P','C','1B','2B','3B','SS','LF','LCF','RCF','RF']
-      : ['P','C','1B','2B','3B','SS','LF','CF','RF'];
-  }
-
   function installStyles() {
-    if ($('pitcher-change-complete-styles')) return;
+    if ($('pitcher-change-simple-styles')) return;
     const style = document.createElement('style');
-    style.id = 'pitcher-change-complete-styles';
+    style.id = 'pitcher-change-simple-styles';
     style.textContent = `
-      #live-pitcher-finish-v3 .modal-content{border:0;border-radius:16px;overflow:hidden}
-      #live-pitcher-finish-v3 .modal-header{padding:16px 18px 12px;border-bottom:1px solid #eceff3}
-      #live-pitcher-finish-v3 .pitch-summary{background:#f6f8fb;border:1px solid #e2e7ee;border-radius:12px;padding:12px;margin-bottom:14px}
-      #live-pitcher-finish-v3 .pitch-row{display:grid;grid-template-columns:48px minmax(0,1fr);gap:10px;align-items:center;margin-bottom:9px}
-      #live-pitcher-finish-v3 .pitch-pos{width:44px;height:34px;border-radius:8px;background:#eef1f5;color:#344054;display:flex;align-items:center;justify-content:center;font-size:.74rem;font-weight:800}
-      #live-pitcher-finish-v3 .pitch-row.pitcher .pitch-pos{background:#172033;color:#fff}
-      #live-pitcher-finish-v3 .pitch-row.needs-player .pitch-pos{background:#fff1f1;color:#a32929}
-      #live-pitcher-finish-v3 .pitch-row .form-select,#live-pitcher-finish-v3 .pitch-row .form-control{min-height:48px;border-radius:10px;font-weight:650}
-      #live-pitcher-finish-v3 .pitch-row.needs-player .form-select{border-color:#d88b8b;background:#fffafa}
-      #live-pitcher-finish-v3 .pitch-bench{display:flex;flex-wrap:wrap;gap:6px}
-      #live-pitcher-finish-v3 .pitch-bench span{border:1px solid #dfe3e8;background:#f8f9fb;border-radius:999px;padding:5px 9px;font-size:.74rem;color:#475467}
-      #live-pitcher-finish-v3 .pitch-warning{color:#a32929;font-size:.8rem;font-weight:650}
-      #live-pitcher-finish-v3 .pitch-footer{position:sticky;bottom:0;background:rgba(255,255,255,.98);border-top:1px solid #e7eaf0;padding:12px 16px;margin:14px -16px -16px;display:flex;gap:8px;align-items:center}
-      #live-pitcher-finish-v3 .pitch-footer .btn{min-height:46px;border-radius:10px;font-weight:700}
-      @media(max-width:575.98px){#live-pitcher-finish-v3 .modal-dialog{margin:.5rem}#live-pitcher-finish-v3 .modal-header{padding:14px 14px 10px}#live-pitcher-finish-v3 .modal-body{padding:14px}#live-pitcher-finish-v3 .pitch-footer{margin:14px -14px -14px;padding:11px 14px}}
-      @media(min-width:576px){#live-pitcher-finish-v3 .modal-dialog{max-width:720px;width:calc(100% - 40px);margin:1.75rem auto}}
+      #${MODAL_ID} .modal-content{border:0;border-radius:15px;overflow:hidden}
+      #${MODAL_ID} .pc-summary{border:1px solid #dfe4ea;background:#f8fafc;border-radius:10px;padding:10px 11px;margin-bottom:12px;color:#344054;font-size:.8rem}
+      #${MODAL_ID} .pc-actions{display:grid;gap:9px}
+      #${MODAL_ID} .pc-action{min-height:58px;border-radius:11px;font-weight:850;text-align:left;padding:9px 11px}
+      #${MODAL_ID} .pc-action small{display:block;margin-top:2px;font-size:.67rem;font-weight:550;opacity:.78}
+      #${MODAL_ID} .pc-replacements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+      #${MODAL_ID} .pc-replacements .btn{min-height:48px;border-radius:9px;font-weight:750}
+      #${MODAL_ID} .pc-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin:12px 0 6px}
+      @media(max-width:575.98px){#${MODAL_ID} .modal-dialog{margin:.5rem}}
     `;
     document.head.appendChild(style);
   }
@@ -64,14 +42,14 @@
       host = document.createElement('div');
       host.id = 'pitcher-change-toast-v3';
       host.className = 'toast-container position-fixed top-0 end-0 p-3';
-      host.style.zIndex = '4000';
+      host.style.zIndex = '5000';
       document.body.appendChild(host);
     }
     const el = document.createElement('div');
     el.className = `toast text-bg-${kind} border-0`;
     el.innerHTML = `<div class="d-flex"><div class="toast-body fw-semibold">${esc(message)}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
     host.appendChild(el);
-    const instance = bootstrap.Toast.getOrCreateInstance(el,{delay:3000});
+    const instance = bootstrap.Toast.getOrCreateInstance(el,{delay:2400});
     el.addEventListener('hidden.bs.toast',()=>el.remove(),{once:true});
     instance.show();
   }
@@ -79,135 +57,127 @@
   async function loadState() {
     const response = await fetch(`/api/live-game/${gameId}/state`,{cache:'no-store'});
     const data = await response.json().catch(()=>({}));
-    if (!response.ok) throw new Error(data.message || `Unable to load live game state (${response.status}).`);
+    if (!response.ok) throw new Error(data.message || `Unable to load game (${response.status}).`);
     return data;
   }
 
   function ensureModal() {
-    let modal = $('live-pitcher-finish-v3');
+    let modal = $(MODAL_ID);
     if (modal) return modal;
     modal = document.createElement('div');
-    modal.id = 'live-pitcher-finish-v3';
+    modal.id = MODAL_ID;
     modal.className = 'modal fade';
     modal.tabIndex = -1;
-    modal.setAttribute('data-bs-backdrop','static');
-    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Finish Pitching Change</h5><div class="small text-muted">Choose every defensive move yourself before saving.</div></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="pitch-finish-body-v3"></div></div></div>`;
+    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Pitching Change</h5><div class="small text-muted">Who’s coming in, and where does the old pitcher go?</div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body" data-pc-body></div></div></div>`;
     document.body.appendChild(modal);
     return modal;
   }
 
-  function missing() {
-    return requiredPositions.filter(pos => !draft?.[pos]);
+  function benchPlayers() {
+    const assigned = new Set(Object.values(before || {}).filter(Boolean));
+    return (state?.roster || []).filter(player => !assigned.has(player.name) && player.name !== incoming?.name);
   }
 
-  function bench() {
-    const assigned = new Set(Object.values(draft || {}).filter(Boolean));
-    return (state?.roster || []).map(p=>p.name).filter(name=>!assigned.has(name));
+  function baseDraft() {
+    const draft = {...(before || {})};
+    if (incomingPosition) delete draft[incomingPosition];
+    draft.P = incoming.name;
+    return draft;
   }
 
   function render() {
-    const body = $('pitch-finish-body-v3');
-    if (!body || !state || !draft || !incoming) return;
+    const modal = ensureModal();
+    const body = modal.querySelector('[data-pc-body]');
+    if (!body || !incoming) return;
 
-    const fieldPositions = positions();
-    const roster = [...(state.roster || [])].sort((a,b)=>a.name.localeCompare(b.name));
-    const holes = missing();
-    const benchNames = bench();
+    const oldName = oldPitcher || 'Current pitcher';
+    let actions = '';
 
-    let summary = `<strong>${esc(incoming.name)}</strong> will pitch. No other defensive spots will be filled automatically.`;
     if (incomingPosition && oldPitcher) {
-      summary = `<strong>${esc(incoming.name)}</strong> moves from <strong>${esc(incomingPosition)}</strong> to <strong>P</strong>. <strong>${esc(incomingPosition)}</strong> is now open and <strong>${esc(oldPitcher)}</strong> goes to the bench by default. Choose the replacement yourself below.`;
-    } else if (oldPitcher) {
-      summary = `<strong>${esc(incoming.name)}</strong> comes in from the bench to pitch. <strong>${esc(oldPitcher)}</strong> goes to the bench by default. If he stays in the field, assign him to a position below.`;
+      actions = `
+        <div class="pc-actions">
+          <button type="button" class="btn btn-primary pc-action" data-pc-swap>
+            ${esc(oldPitcher)} → ${esc(incomingPosition)}
+            <small>Straight swap. Everyone else stays put.</small>
+          </button>
+          <button type="button" class="btn btn-outline-secondary pc-action" data-pc-bench-old>
+            ${esc(oldPitcher)} → Bench
+            <small>Choose who fills ${esc(incomingPosition)}.</small>
+          </button>
+        </div>
+        <div data-pc-replacement-wrap class="d-none">
+          <div class="pc-label">Who takes ${esc(incomingPosition)}?</div>
+          <div class="pc-replacements">${benchPlayers().map(player => `<button type="button" class="btn btn-outline-primary" data-pc-replacement="${esc(player.name)}">${esc(player.name)}</button>`).join('') || '<div class="small text-muted">No bench player is available.</div>'}</div>
+        </div>`;
+    } else {
+      actions = `
+        <div class="pc-actions">
+          <button type="button" class="btn btn-primary pc-action" data-pc-bench-old>
+            ${oldPitcher ? `${esc(oldPitcher)} → Bench` : 'Make Pitching Change'}
+            <small>Everyone else stays put.</small>
+          </button>
+        </div>`;
     }
 
-    const rows = fieldPositions.map(pos => {
-      if (pos === 'P') {
-        return `<div class="pitch-row pitcher"><div class="pitch-pos">P</div><div class="form-control bg-light d-flex justify-content-between align-items-center"><strong>${esc(incoming.name)}</strong><span class="badge text-bg-dark">Locked</span></div></div>`;
-      }
-      const selected = draft[pos] || '';
-      const needsPlayer = requiredPositions.includes(pos) && !selected;
-      const options = ['<option value="">Open position</option>'].concat(
-        roster.filter(p=>p.name!==incoming.name).map(p=>`<option value="${esc(p.name)}" ${p.name===selected?'selected':''}>${esc(p.name)}</option>`)
-      ).join('');
-      return `<div class="pitch-row ${needsPlayer?'needs-player':''}"><div class="pitch-pos">${esc(pos)}</div><select class="form-select pitch-select-v3" data-pos="${esc(pos)}">${options}</select></div>`;
-    }).join('');
+    body.innerHTML = `<div class="pc-summary"><strong>${esc(incoming.name)}</strong> → P<br><span class="text-muted">Where does ${esc(oldName)} go?</span></div>${actions}`;
 
-    body.innerHTML = `<div class="pitch-summary">${summary}</div><div class="small text-uppercase text-muted fw-bold mb-2">Defense after change</div>${rows}<div class="small text-uppercase text-muted fw-bold mt-3 mb-2">Bench after change</div><div class="pitch-bench">${benchNames.length?benchNames.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>No players on bench</span>'}</div><div class="pitch-footer"><div class="me-auto">${holes.length?`<div class="pitch-warning">Choose a player for ${esc(holes.join(', '))} before saving.</div>`:'<div class="small text-muted">Nothing is auto-filled. One Undo restores the entire previous defense.</div>'}</div><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-dark" id="save-pitch-finish-v3" ${holes.length?'disabled':''}>Save Pitching Change</button></div>`;
-
-    body.querySelectorAll('.pitch-select-v3').forEach(select=>{
-      select.addEventListener('change',()=>{
-        const pos = select.dataset.pos;
-        const newName = select.value || '';
-        if ((draft[pos] || '') === newName) return;
-
-        // Never swap or backfill automatically. If the coach chooses a player
-        // who is currently at another position, that old position becomes open
-        // and must be explicitly filled before the pitching change can be saved.
-        if (newName) {
-          const other = fieldPositions.find(otherPos=>otherPos!==pos && otherPos!=='P' && draft[otherPos]===newName);
-          if (other) draft[other] = '';
-        }
-
-        draft[pos] = newName;
-        render();
-      });
+    body.querySelector('[data-pc-swap]')?.addEventListener('click', () => {
+      const draft = baseDraft();
+      draft[incomingPosition] = oldPitcher;
+      save(draft, `${incoming.name} in at P · ${oldPitcher} to ${incomingPosition}`);
     });
 
-    $('save-pitch-finish-v3')?.addEventListener('click',save);
+    body.querySelector('[data-pc-bench-old]')?.addEventListener('click', () => {
+      if (incomingPosition && oldPitcher) {
+        body.querySelector('[data-pc-replacement-wrap]')?.classList.remove('d-none');
+        return;
+      }
+      save(baseDraft(), `${incoming.name} in at P`);
+    });
+
+    body.querySelectorAll('[data-pc-replacement]').forEach(button => {
+      button.addEventListener('click', () => {
+        const draft = baseDraft();
+        draft[incomingPosition] = button.dataset.pcReplacement;
+        save(draft, `${incoming.name} in at P · ${button.dataset.pcReplacement} to ${incomingPosition}`);
+      });
+    });
   }
 
-  async function save() {
-    if (busy || !incoming || !draft) return;
-    const holes = missing();
-    if (holes.length) return toast(`Choose a player for ${holes.join(', ')} before saving.`,'danger');
-
+  async function save(alignment, successMessage) {
+    if (busy) return;
     busy = true;
-    const button = $('save-pitch-finish-v3');
-    if (button) { button.disabled = true; button.textContent = 'Saving...'; }
-
+    const modal = ensureModal();
+    modal.querySelectorAll('button').forEach(button => { if (!button.classList.contains('btn-close')) button.disabled = true; });
     try {
       const response = await fetch(`/api/live-game/${gameId}/complete-pitcher-change`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({new_pitcher_id:Number(incoming.id),alignment:draft})
+        body:JSON.stringify({new_pitcher_id:Number(incoming.id), alignment})
       });
       const data = await response.json().catch(()=>({}));
-      if (!response.ok || data.status==='error') throw new Error(data.message || `Unable to save pitching change (${response.status}).`);
-      bootstrap.Modal.getOrCreateInstance($('live-pitcher-finish-v3')).hide();
-      toast(`${incoming.name} → P • Full defense saved & synced`);
+      if (!response.ok || data.status === 'error') throw new Error(data.message || `Unable to change pitcher (${response.status}).`);
+      bootstrap.Modal.getOrCreateInstance(modal).hide();
+      toast(successMessage);
     } catch (err) {
       toast(err.message,'danger');
-      if (button) { button.disabled = false; button.textContent = 'Save Pitching Change'; }
+      modal.querySelectorAll('button').forEach(button => { button.disabled = false; });
     } finally {
       busy = false;
     }
   }
 
-  async function openWizard(playerId) {
+  async function open(playerId) {
     try {
       state = await loadState();
-      if (!state?.game?.is_live) throw new Error('This game is not live.');
-      incoming = (state.roster || []).find(p=>Number(p.id)===Number(playerId));
-      if (!incoming) throw new Error('Incoming pitcher is not available for this game.');
-
-      const fieldPositions = positions();
+      if (!state?.game?.is_live) throw new Error('Game is not live.');
+      incoming = (state.roster || []).find(player => Number(player.id) === Number(playerId));
+      if (!incoming) throw new Error('Pitcher is not available.');
       before = {...(state.current_alignment || {})};
       oldPitcher = before.P || '';
-      incomingPosition = fieldPositions.find(pos=>pos!=='P' && before[pos]===incoming.name) || null;
-      requiredPositions = fieldPositions.filter(pos=>Boolean(before[pos]));
-
-      draft = {};
-      fieldPositions.forEach(pos=>{ if (before[pos]) draft[pos] = before[pos]; });
-
-      // Only make the requested pitching move. The outgoing pitcher goes to the
-      // bench by default and the incoming pitcher's old position stays open.
-      if (incomingPosition) delete draft[incomingPosition];
-      draft.P = incoming.name;
-
-      ensureModal();
+      incomingPosition = Object.entries(before).find(([pos,name]) => pos !== 'P' && name === incoming.name)?.[0] || null;
       render();
-      bootstrap.Modal.getOrCreateInstance($('live-pitcher-finish-v3')).show();
+      bootstrap.Modal.getOrCreateInstance(ensureModal()).show();
     } catch (err) {
       toast(err.message,'danger');
     }
@@ -216,25 +186,21 @@
   function intercept(event) {
     const choice = event.target.closest?.('.pitcher-choice-v2');
     if (!choice || choice.disabled) return;
-
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
-
     const playerId = Number(choice.dataset.playerId);
     if (!Number.isFinite(playerId)) return;
-
     const picker = $('live-pitcher-picker-v2');
     if (picker?.classList.contains('show')) {
-      const modal = bootstrap.Modal.getOrCreateInstance(picker);
-      picker.addEventListener('hidden.bs.modal',()=>openWizard(playerId),{once:true});
-      modal.hide();
+      const instance = bootstrap.Modal.getOrCreateInstance(picker);
+      picker.addEventListener('hidden.bs.modal',()=>open(playerId),{once:true});
+      instance.hide();
     } else {
-      openWizard(playerId);
+      open(playerId);
     }
   }
 
   installStyles();
-  loadBoardPrep();
   document.addEventListener('click',intercept,true);
 })();
