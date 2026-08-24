@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Actual Game Report - vs {{ game.opponent }}{% endblock %}
+{% block title %}Game Report - vs {{ game.opponent }}{% endblock %}
 
 {% block head %}
 <style>
-  .agr-shell{max-width:1180px;margin:0 auto;padding-bottom:28px}.agr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin:4px 0 17px}.agr-k{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}.agr-head h1{font-size:1.45rem;font-weight:850;color:#172033;margin:2px 0}.agr-meta{font-size:.76rem;color:#667085}.agr-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.agr-actions .btn{font-weight:750}.agr-card{border:1px solid #e2e6eb;border-radius:14px;background:#fff;overflow:hidden;margin-bottom:14px}.agr-card-head{padding:11px 13px;border-bottom:1px solid #edf0f3;display:flex;justify-content:space-between;align-items:center;gap:8px}.agr-card-head strong{font-size:.82rem;color:#1d2939}.agr-card-body{padding:12px 13px}.agr-innings{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:9px}.agr-inning{border:1px solid #e4e7ec;border-radius:10px;padding:9px 10px;background:#fafbfc}.agr-inning.unreliable{border-color:#efd8ac;background:#fffaf0}.agr-inning-title{font-size:.68rem;font-weight:850;color:#344054;margin-bottom:7px;display:flex;justify-content:space-between;gap:6px}.agr-pos{display:grid;grid-template-columns:38px minmax(0,1fr);gap:6px;font-size:.7rem;margin:3px 0}.agr-pos b{color:#667085}.agr-bench{font-size:.64rem;color:#667085;border-top:1px solid #e7e9ed;margin-top:7px;padding-top:6px}.agr-warning{font-size:.65rem;color:#8b5c00;background:#fff8eb;border:1px solid #efd8ac;border-radius:9px;padding:8px 9px;margin-bottom:10px}.agr-table{font-size:.72rem;margin:0}.agr-table th{font-size:.59rem;text-transform:uppercase;letter-spacing:.06em;color:#667085}.agr-empty{color:#8a94a3;font-size:.76rem;padding:9px}.agr-badge{font-size:.61rem;border-radius:999px;padding:4px 7px;background:#eef1f5;color:#475467;font-weight:750}.agr-badge.pending{background:#fff1d7;color:#8b5c00}.agr-badge.complete{background:#e9f7ee;color:#176b38}.agr-mini-badge{font-size:.52rem;border-radius:999px;padding:3px 6px;background:#fff1d7;color:#8b5c00;font-weight:850;white-space:nowrap}.agr-absent{font-size:.68rem;color:#667085;margin-top:6px}.agr-notes textarea{min-height:110px;resize:vertical}.agr-notes .form-text{font-size:.65rem}.agr-gc-pending{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid #efd8ac;background:#fffaf0;border-radius:11px;padding:11px 12px;margin-bottom:10px}.agr-gc-pending strong{display:block;font-size:.78rem;color:#7a4d00}.agr-gc-pending span{display:block;font-size:.68rem;color:#7b6241;margin-top:2px}.agr-gc-pending .btn{white-space:nowrap}.agr-pitch-actions{display:flex;justify-content:flex-end;padding:10px 13px;border-top:1px solid #edf0f3}.agr-finish{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid #d7e0ec;background:#f8fafc;border-radius:14px;padding:14px 15px;margin-top:16px}.agr-finish strong{display:block;color:#172033;font-size:.84rem}.agr-finish span{display:block;color:#667085;font-size:.69rem;margin-top:2px}.agr-finish .btn{font-weight:800;white-space:nowrap}
-  @media(max-width:575.98px){.agr-head{display:block}.agr-actions{margin-top:10px;justify-content:stretch}.agr-actions .btn{flex:1 1 auto}.agr-innings{grid-template-columns:1fr}.agr-card-body{padding:10px}.agr-shell{padding-bottom:70px}.agr-card-head{align-items:flex-start}.agr-gc-pending{display:block}.agr-gc-pending .btn{width:100%;margin-top:9px}.agr-finish{display:block}.agr-finish .btn{width:100%;margin-top:10px}}
+  .agr-shell{max-width:1180px;margin:0 auto;padding-bottom:28px}.agr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin:4px 0 17px}.agr-k{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}.agr-head h1{font-size:1.45rem;font-weight:850;color:#172033;margin:2px 0}.agr-meta{font-size:.76rem;color:#667085}.agr-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.agr-actions .btn{font-weight:750}.agr-card{border:1px solid #e2e6eb;border-radius:14px;background:#fff;overflow:hidden;margin-bottom:14px}.agr-card-head{padding:11px 13px;border-bottom:1px solid #edf0f3;display:flex;justify-content:space-between;align-items:center;gap:8px}.agr-card-head strong{font-size:.82rem;color:#1d2939}.agr-card-body{padding:12px 13px}.agr-innings{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:9px}.agr-inning{border:1px solid #e4e7ec;border-radius:10px;padding:9px 10px;background:#fafbfc}.agr-inning.unreliable{border-color:#efd8ac;background:#fffaf0}.agr-inning-title{font-size:.68rem;font-weight:850;color:#344054;margin-bottom:7px;display:flex;justify-content:space-between;gap:6px}.agr-pos{display:grid;grid-template-columns:38px minmax(0,1fr);gap:6px;font-size:.7rem;margin:3px 0}.agr-pos b{color:#667085}.agr-bench{font-size:.64rem;color:#667085;border-top:1px solid #e7e9ed;margin-top:7px;padding-top:6px}.agr-warning{font-size:.65rem;color:#8b5c00;background:#fff8eb;border:1px solid #efd8ac;border-radius:9px;padding:8px 9px;margin-bottom:10px}.agr-table{font-size:.72rem;margin:0}.agr-table th{font-size:.59rem;text-transform:uppercase;letter-spacing:.06em;color:#667085}.agr-empty{color:#8a94a3;font-size:.76rem;padding:9px}.agr-badge{font-size:.61rem;border-radius:999px;padding:4px 7px;background:#eef1f5;color:#475467;font-weight:750}.agr-badge.pending{background:#fff1d7;color:#8b5c00}.agr-badge.complete{background:#e9f7ee;color:#176b38}.agr-mini-badge{font-size:.52rem;border-radius:999px;padding:3px 6px;background:#fff1d7;color:#8b5c00;font-weight:850;white-space:nowrap}.agr-absent{font-size:.68rem;color:#667085;margin-top:6px}.agr-notes textarea{min-height:110px;resize:vertical}.agr-notes .form-text{font-size:.65rem}.agr-gc-pending{display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid #efd8ac;background:#fffaf0;border-radius:11px;padding:11px 12px;margin-bottom:10px}.agr-gc-pending strong{display:block;font-size:.78rem;color:#7a4d00}.agr-gc-pending span{display:block;font-size:.68rem;color:#7b6241;margin-top:2px}.agr-gc-pending .btn{white-space:nowrap}.agr-pitch-actions{display:flex;justify-content:flex-end;padding:10px 13px;border-top:1px solid #edf0f3}.agr-finish{display:flex;justify-content:flex-end;align-items:center;margin-top:16px}.agr-finish .btn{font-weight:800;white-space:nowrap}.agr-lineup{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px}.agr-lineup-row{display:grid;grid-template-columns:32px minmax(0,1fr);gap:7px;align-items:center;border:1px solid #e7eaf0;border-radius:9px;background:#fafbfc;padding:7px 9px;font-size:.72rem}.agr-lineup-order{font-weight:900;color:#667085;text-align:center}.agr-lineup-name{font-weight:750;color:#1d2939}
+  @media(max-width:575.98px){.agr-head{display:block}.agr-actions{margin-top:10px;justify-content:stretch}.agr-actions .btn{flex:1 1 auto}.agr-innings{grid-template-columns:1fr}.agr-card-body{padding:10px}.agr-shell{padding-bottom:70px}.agr-card-head{align-items:flex-start}.agr-gc-pending{display:block}.agr-gc-pending .btn{width:100%;margin-top:9px}.agr-finish .btn{width:100%}.agr-lineup{grid-template-columns:1fr 1fr}.agr-lineup-row{grid-template-columns:26px minmax(0,1fr);padding:7px}}
+  @media(max-width:390px){.agr-lineup{grid-template-columns:1fr}}
   @media(orientation:landscape) and (max-height:900px){.agr-innings{grid-template-columns:repeat(3,minmax(0,1fr))}.agr-notes textarea{min-height:82px}}
 </style>
 {% endblock %}
@@ -13,94 +14,96 @@
 <div class="agr-shell">
   <div class="agr-head">
     <div>
-      <div class="agr-k">Actual Game Report</div>
+      <div class="agr-k">Game Report</div>
       <h1>{{ current_team.team_name }} vs {{ game.opponent }}</h1>
       <div class="agr-meta">{{ game.date.strftime('%A, %m/%d/%Y') }}{% if game.start_time %} · {{ game.start_time }}{% endif %}{% if game.location %} · {{ game.location }}{% endif %}</div>
-      {% if report.absent_names %}<div class="agr-absent"><strong>Absent:</strong> {{ report.absent_names|join(', ') }} — excluded from bench totals.</div>{% endif %}
+      {% if report.absent_labels %}<div class="agr-absent"><strong>Out:</strong> {{ report.absent_labels|join(', ') }}</div>{% endif %}
     </div>
+    {% if report.pitching_stats_pending %}
     <div class="agr-actions">
-      {% if report.pitching_stats_pending %}<a class="btn btn-primary btn-sm" href="{{ url_for('gameday.game_management', game_id=game.id, pitching=1) }}"><i class="bi bi-pencil-square me-1"></i>Enter GameChanger Stats</a>{% endif %}
-      <a class="btn {% if report.pitching_stats_pending %}btn-outline-primary{% else %}btn-primary{% endif %} btn-sm" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-check2-circle me-1"></i>Back to Game Day</a>
-      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('gameday.game_management', game_id=game.id, edit=1) }}"><i class="bi bi-pencil me-1"></i>Review / Edit Setup</a>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('gameday.game_management', game_id=game.id, pitching=1) }}"><i class="bi bi-pencil-square me-1"></i>Enter GameChanger Stats</a>
     </div>
+    {% endif %}
   </div>
 
   <section class="agr-card">
-    <div class="agr-card-head"><strong>Actual Defense by Inning</strong><span class="agr-badge">Live history, not pregame plan</span></div>
-    <div class="agr-card-body">
-      {% if report.unreliable_innings %}<div class="agr-warning">Incomplete snapshots are excluded from bench totals: inning{% if report.unreliable_innings|length != 1 %}s{% endif %} {{ report.unreliable_innings|join(', ') }}.</div>{% endif %}
-      {% if report.innings %}<div class="agr-innings">
-      {% for inn in report.innings %}
-        <div class="agr-inning {% if not inn.reliable %}unreliable{% endif %}"><div class="agr-inning-title"><span>Inning {{ inn.inning }}</span>{% if not inn.reliable %}<span class="agr-mini-badge">INCOMPLETE HISTORY</span>{% endif %}</div>
-        {% for pos in ['P','C','1B','2B','3B','SS','LF','LCF','CF','RCF','RF'] %}{% if inn.alignment.get(pos) %}<div class="agr-pos"><b>{{ pos }}</b><span>{{ inn.alignment.get(pos) }}</span></div>{% endif %}{% endfor %}
-        <div class="agr-bench"><strong>Bench:</strong> {% if inn.reliable %}{{ inn.bench|join(', ') if inn.bench else 'None' }}{% else %}Unavailable — defensive snapshot was incomplete{% endif %}</div></div>
-      {% endfor %}
-      </div>{% else %}<div class="agr-empty">No live defensive history was recorded for this game.</div>{% endif %}
-    </div>
+    <div class="agr-card-head"><strong>Who sat</strong></div>
+    {% if report.unreliable_innings %}<div class="agr-warning mx-3 mt-3 mb-1">Bench totals skip innings we didn't finish recording: {{ report.unreliable_innings|join(', ') }}.</div>{% endif %}
+    <div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Player</th><th>Innings sat</th><th class="pe-3">Sat in</th></tr></thead><tbody>
+      {% for row in report.bench_rows %}<tr><td class="ps-3 fw-semibold">{{ row.display_name }}</td><td>{{ row.count }}</td><td class="pe-3">{{ row.innings|join(', ') if row.innings else '—' }}</td></tr>{% endfor %}
+    </tbody></table></div>
   </section>
 
   <section class="agr-card">
-    <div class="agr-card-head"><strong>Actual Bench Usage</strong><span class="agr-badge">Confirmed complete snapshots only</span></div>
-    {% if report.unreliable_innings %}<div class="agr-warning mx-3 mt-3 mb-1">These totals exclude incomplete inning snapshots, so they are the confirmed minimum.</div>{% endif %}
-    <div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Player</th><th>Confirmed Bench Innings</th><th class="pe-3">Which Innings</th></tr></thead><tbody>
-      {% for row in report.bench_rows %}<tr><td class="ps-3 fw-semibold">{{ row.name }}</td><td>{{ row.count }}</td><td class="pe-3">{{ row.innings|join(', ') if row.innings else '—' }}</td></tr>{% endfor %}
-    </tbody></table></div>
+    <div class="agr-card-head"><strong>Batting Order</strong></div>
+    <div class="agr-card-body">
+      {% if report.batting_order %}
+      <div class="agr-lineup">
+        {% for batter in report.batting_order %}<div class="agr-lineup-row"><span class="agr-lineup-order">{{ batter.order }}</span><span class="agr-lineup-name">{{ batter.display_name }}</span></div>{% endfor %}
+      </div>
+      {% else %}<div class="agr-empty px-0">Batting order wasn't recorded for this game.</div>{% endif %}
+    </div>
   </section>
 
   <section class="agr-card">
     <div class="agr-card-head">
       <strong>GameChanger Pitching</strong>
-      {% if report.pitching_stats_pending %}<span class="agr-badge pending">WAITING FOR GAMECHANGER</span>{% else %}<span class="agr-badge complete">STATS ENTERED</span>{% endif %}
+      {% if report.pitching_stats_pending %}<span class="agr-badge pending">Need pitch counts</span>{% else %}<span class="agr-badge complete">Pitch counts entered</span>{% endif %}
     </div>
     <div class="agr-card-body">
       {% if report.pitching_stats_pending %}
       <div class="agr-gc-pending">
-        <div><strong>Game saved. GameChanger pitching is still pending.</strong><span>Enter the final pitches and innings for {{ report.pitching_missing|join(', ') }} when available.</span></div>
+        <div><strong>Game's over. Still need GameChanger numbers for {{ report.pitching_missing_labels|join(', ') }}.</strong><span>Enter final pitches and innings pitched when available.</span></div>
         <a class="btn btn-primary btn-sm" href="{{ url_for('gameday.game_management', game_id=game.id, pitching=1) }}">Enter GameChanger Stats</a>
       </div>
       {% endif %}
 
       {% if report.pitching %}
-      <div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th>Pitcher</th><th>Role</th><th>Pitches</th><th>IP</th></tr></thead><tbody>
-        {% for outing in report.pitching %}<tr><td class="fw-semibold">{{ outing.player.name if outing.player else 'Unknown' }}</td><td>{{ outing.pitcher_type or '—' }}</td><td>{{ outing.pitches if outing.pitches is not none else 'Waiting' }}</td><td>{{ outing.innings if outing.innings is not none else 'Waiting' }}</td></tr>{% endfor %}
+      <div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th>Pitcher</th><th>Pitches</th><th>IP</th></tr></thead><tbody>
+        {% for outing in report.pitching %}<tr><td class="fw-semibold">{{ report.player_labels.get(outing.player.name, outing.player.name) if outing.player else 'Unknown' }}</td><td>{{ outing.pitches if outing.pitches is not none else 'Need' }}</td><td>{{ outing.innings if outing.innings is not none else 'Need' }}</td></tr>{% endfor %}
       </tbody></table></div>
-      {% elif report.expected_pitchers %}
-      <div class="agr-empty px-0">Expected pitcher{% if report.expected_pitchers|length != 1 %}s{% endif %}: {{ report.expected_pitchers|join(', ') }}. No GameChanger pitching numbers have been entered yet.</div>
+      {% elif report.expected_pitcher_labels %}
+      <div class="agr-empty px-0">Pitchers recorded: {{ report.expected_pitcher_labels|join(', ') }}. Need GameChanger numbers.</div>
       {% else %}
-      <div class="agr-empty px-0">No pitchers were found in the recorded live-game history.</div>
+      <div class="agr-empty px-0">No pitchers were found in the recorded game history.</div>
       {% endif %}
     </div>
     {% if report.pitching_stats_complete and report.expected_pitchers %}<div class="agr-pitch-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('gameday.game_management', game_id=game.id, pitching=1) }}">Update GameChanger Stats</a></div>{% endif %}
   </section>
 
   <section class="agr-card">
-    <div class="agr-card-head"><strong>Live Changes</strong><span class="agr-badge">Audit trail</span></div>
-    {% if report.changes %}<div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Inning</th><th>Change</th><th class="pe-3">Coach</th></tr></thead><tbody>
-      {% for change in report.changes %}
-      {% set coach = namespace(name=change.changed_by or '—') %}
-      {% for membership in current_team.memberships %}
-        {% if change.changed_by and membership.user and membership.user.username|lower == change.changed_by|lower %}
-          {% set coach.name = membership.user.full_name or membership.user.username %}
-        {% endif %}
+    <div class="agr-card-head"><strong>Defense by inning</strong></div>
+    <div class="agr-card-body">
+      {% if report.unreliable_innings %}<div class="agr-warning">Bench totals skip innings we didn't finish recording: {{ report.unreliable_innings|join(', ') }}.</div>{% endif %}
+      {% if report.innings %}<div class="agr-innings">
+      {% for inn in report.innings %}
+        <div class="agr-inning {% if not inn.reliable %}unreliable{% endif %}"><div class="agr-inning-title"><span>Inning {{ inn.inning }}</span>{% if not inn.reliable %}<span class="agr-mini-badge">Not recorded</span>{% endif %}</div>
+        {% for pos in ['P','C','1B','2B','3B','SS','LF','LCF','CF','RCF','RF'] %}{% if inn.display_alignment.get(pos) %}<div class="agr-pos"><b>{{ pos }}</b><span>{{ inn.display_alignment.get(pos) }}</span></div>{% endif %}{% endfor %}
+        <div class="agr-bench"><strong>Bench:</strong> {% if inn.reliable %}{{ inn.display_bench|join(', ') if inn.display_bench else 'None' }}{% else %}This inning wasn't recorded{% endif %}</div></div>
       {% endfor %}
-      <tr><td class="ps-3">{{ change.inning }}</td><td>{{ change.type }}</td><td class="pe-3">{{ coach.name }}</td></tr>
-      {% endfor %}
-    </tbody></table></div>{% else %}<div class="agr-empty">No live changes were recorded.</div>{% endif %}
+      </div>{% else %}<div class="agr-empty">No defensive history was recorded for this game.</div>{% endif %}
+    </div>
+  </section>
+
+  <section class="agr-card">
+    <div class="agr-card-head"><strong>What we changed</strong></div>
+    {% if report.changes %}<div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Inning</th><th>What changed</th><th class="pe-3">Coach</th></tr></thead><tbody>
+      {% for change in report.changes %}<tr><td class="ps-3">{{ change.inning }}</td><td>{{ change.description }}</td><td class="pe-3">{{ change.coach or '—' }}</td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<div class="agr-empty">No changes were recorded.</div>{% endif %}
   </section>
 
   <section class="agr-card agr-notes">
-    <div class="agr-card-head"><strong>Game Notes</strong><span class="agr-badge">Pregame + postgame context</span></div>
+    <div class="agr-card-head"><strong>Game Notes</strong></div>
     <div class="agr-card-body">
       <form method="POST" action="{{ url_for('game_day.save_game_notes', game_id=game.id) }}">
         <textarea class="form-control" name="game_notes" placeholder="Coaching observations, follow-up, tournament notes…">{{ game.game_notes or '' }}</textarea>
-        <div class="d-flex justify-content-between align-items-center gap-2 mt-2 flex-wrap"><div class="form-text">Useful for coaching observations, follow-up work, or tournament context.</div><button type="submit" class="btn btn-sm btn-primary">Save Game Notes</button></div>
+        <div class="d-flex justify-content-end align-items-center gap-2 mt-2"><button type="submit" class="btn btn-sm btn-primary">Save Notes</button></div>
       </form>
     </div>
   </section>
 
   <div class="agr-finish">
-    <div><strong>Game report saved</strong></div>
-    <a class="btn btn-primary" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-check2-circle me-1"></i>Back to Game Day</a>
+    <a class="btn btn-primary" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-arrow-left me-1"></i>Back to Game Day</a>
   </div>
 </div>
 {% endblock %}
