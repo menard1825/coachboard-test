@@ -125,9 +125,8 @@ def game_day_home():
     upcoming = upcoming_query.order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(12).all()
 
     # Preserve schedule history. Include games from earlier dates plus games from
-    # today that have actually reached postgame/completion. This keeps Past Games
-    # useful immediately after a game instead of waiting until the calendar date
-    # rolls over at midnight.
+    # today that have actually reached postgame/completion. A game already shown
+    # in the primary Today/Next card is excluded so the page never repeats it.
     historical_games = db.session.query(Game).filter(
         Game.team_id == team.id,
         Game.date < day_start,
@@ -141,7 +140,10 @@ def game_day_home():
         }:
             same_day_history.append(item['game'])
 
-    past_games = same_day_history + historical_games
+    past_games = [
+        game for game in [*same_day_history, *historical_games]
+        if game.id not in focus_ids
+    ]
 
     return render_template(
         'game_day.html',
