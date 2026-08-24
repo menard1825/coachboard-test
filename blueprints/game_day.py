@@ -75,21 +75,26 @@ def game_day_home():
         Game.date < next_day,
     ).order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).all()
 
-    focus_games = todays_games
+    # Calculate today's readiness once so the same-day history section can tell
+    # the difference between an upcoming/current game and one that has actually
+    # been played. Previously a completed game stayed only under "Today's Games"
+    # until midnight, which made Past Games appear to disappear on game day.
+    todays_cards = [
+        {'game': game, 'readiness': _readiness_for_game(game, team)}
+        for game in todays_games
+    ]
+
+    game_cards = todays_cards
     focus_label = "Today's Games"
-    if not focus_games:
+    if not game_cards:
         next_game = db.session.query(Game).filter(
             Game.team_id == team.id,
             Game.date >= next_day,
         ).order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).first()
-        focus_games = [next_game] if next_game else []
+        game_cards = [
+            {'game': next_game, 'readiness': _readiness_for_game(next_game, team)}
+        ] if next_game else []
         focus_label = 'Next Game'
-
-    game_cards = [
-        {'game': game, 'readiness': _readiness_for_game(game, team)}
-        for game in focus_games
-        if game is not None
-    ]
 
     focus_ids = {item['game'].id for item in game_cards}
 
@@ -119,15 +124,24 @@ def game_day_home():
         upcoming_query = upcoming_query.filter(~Game.id.in_(focus_ids))
     upcoming = upcoming_query.order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(12).all()
 
-    # Preserve schedule history too. The Game Day redesign originally only kept
-    # today's/next game, unfinished postgame work, and future games visible,
-    # which made completed past games appear to have disappeared. Historical
-    # games stay lightweight here: no readiness calculation is needed just to
-    # browse, open, or view their report.
-    past_games = db.session.query(Game).filter(
+    # Preserve schedule history. Include games from earlier dates plus games from
+    # today that have actually reached postgame/completion. This keeps Past Games
+    # useful immediately after a game instead of waiting until the calendar date
+    # rolls over at midnight.
+    historical_games = db.session.query(Game).filter(
         Game.team_id == team.id,
         Game.date < day_start,
     ).order_by(Game.date.desc(), Game.start_time.desc(), Game.id.desc()).all()
+
+    same_day_history = []
+    for item in todays_cards:
+        readiness = item['readiness']
+        if readiness.get('has_end_game') or readiness.get('status') in {
+            'COMPLETE', 'GC STATS PENDING', 'NEEDS POSTGAME'
+        }:
+            same_day_history.append(item['game'])
+
+    past_games = same_day_history + historical_games
 
     return render_template(
         'game_day.html',
