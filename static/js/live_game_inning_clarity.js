@@ -16,6 +16,12 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[ch]));
+  const setText = (el, value) => {
+    if (el && el.textContent !== value) el.textContent = value;
+  };
+  const setHtml = (el, value) => {
+    if (el && el.innerHTML !== value) el.innerHTML = value;
+  };
 
   function installStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -89,10 +95,12 @@
     if (!button) return;
     const titleEl = button.querySelector('.coach-action-title');
     const noteEl = button.querySelector('.coach-action-note');
-    if (titleEl) titleEl.textContent = title;
-    if (noteEl) noteEl.textContent = note;
-    button.title = note ? `${title} — ${note}` : title;
-    button.setAttribute('aria-label', note ? `${title}. ${note}.` : title);
+    setText(titleEl,title);
+    setText(noteEl,note);
+    const titleText = note ? `${title} — ${note}` : title;
+    const ariaText = note ? `${title}. ${note}.` : title;
+    if (button.title !== titleText) button.title = titleText;
+    if (button.getAttribute('aria-label') !== ariaText) button.setAttribute('aria-label',ariaText);
   }
 
   function patchActions() {
@@ -111,14 +119,16 @@
     const benchTitle = card.querySelector('.cb-qd-bench-head strong');
     const tip = card.querySelector('.cb-qd-tip');
     const full = card.querySelector('[data-cb-full-defense]');
-    if (kicker) kicker.textContent = 'ON THE FIELD';
-    if (title) title.textContent = 'Defense Now';
-    if (help) help.textContent = 'Tap a fielder or bench player to move him.';
-    if (benchTitle) benchTitle.textContent = benchTitle.textContent.replace(/^Bench now/i, 'On the Bench');
-    if (tip) tip.textContent = 'Tap a bench player, then the position. The player coming out goes to the bench.';
-    if (full) full.innerHTML = '<i class="bi bi-sliders me-1"></i>Change Several Positions';
+    setText(kicker,'ON THE FIELD');
+    setText(title,'Defense Now');
+    setText(help,'Tap a fielder or bench player to move him.');
+    if (benchTitle && /^Bench now/i.test(benchTitle.textContent || '')) {
+      setText(benchTitle,benchTitle.textContent.replace(/^Bench now/i,'On the Bench'));
+    }
+    setText(tip,'Tap a bench player, then the position. The player coming out goes to the bench.');
+    setHtml(full,'<i class="bi bi-sliders me-1"></i>Change Several Positions');
     card.querySelectorAll('.cb-bench-note').forEach(note => {
-      if ((note.textContent || '').trim() === 'Bench now') note.textContent = 'On the bench';
+      if ((note.textContent || '').trim() === 'Bench now') setText(note,'On the bench');
     });
   }
 
