@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const match = window.location.pathname.match(/^\/game\/(\d+)\/?$/);
-  if (!match || typeof io !== 'function') return;
+  if (!match) return;
   const gameId = Number(match[1]);
   const ID = 'coach-live-sync-status';
   const RESPONSIVE_STYLE_ID = 'coach-live-responsive-layout';
@@ -159,6 +159,11 @@
     document.head.appendChild(style);
   }
 
+  installResponsiveStyles();
+
+  /* The responsive layout must still work even if Socket.IO is unavailable. */
+  if (typeof io !== 'function') return;
+
   function ensure() {
     let badge = document.getElementById(ID);
     if (badge) return badge;
@@ -198,8 +203,6 @@
       badge.style.border = '1px solid #e9a7a7';
     }
   }
-
-  installResponsiveStyles();
 
   const socket = io();
   socket.on('connect', () => {
