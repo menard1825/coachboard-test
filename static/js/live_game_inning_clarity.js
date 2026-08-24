@@ -28,7 +28,11 @@
     style.id = STYLE_ID;
     style.textContent = `
       body.cb-dugout #liveDefensiveChangeBtn,
-      body.cb-dugout #liveSetDefenseBtnCoach {
+      body.cb-dugout #liveSetDefenseBtnCoach,
+      body.cb-dugout [data-cb-full-defense] {
+        display:none!important;
+      }
+      body.cb-dugout #cbQuickDefense .cb-qd-actions {
         display:none!important;
       }
       body.cb-dugout #coach-action-slot.coach-actions {
@@ -37,16 +41,23 @@
       }
       body.cb-dugout #liveChangePitcherBtn,
       body.cb-dugout #liveEndInningBtn {
-        min-height:64px!important;
+        min-height:62px!important;
       }
       body.cb-dugout #liveUndoBtn {
         grid-column:1/-1!important;
-        min-height:40px!important;
-        border-width:1px!important;
-        padding:6px 10px!important;
+        width:auto!important;
+        min-height:28px!important;
+        justify-self:center!important;
+        border:0!important;
+        background:transparent!important;
+        color:#667085!important;
+        padding:3px 10px!important;
+        box-shadow:none!important;
       }
       body.cb-dugout #liveUndoBtn .coach-action-title {
-        font-size:.78rem!important;
+        font-size:.74rem!important;
+        text-decoration:underline;
+        text-underline-offset:2px;
       }
       body.cb-dugout #liveUndoBtn .coach-action-note {
         display:none!important;
@@ -63,6 +74,10 @@
       body.cb-dugout #liveEndInningBtn .coach-action-note::after {
         content:'Send next defense out';
         font-size:.67rem;
+      }
+      body.cb-dugout #cbQuickDefense .cb-qd-bench {
+        display:flex!important;
+        visibility:visible!important;
       }
       #${END_MODAL_ID} .modal-content {
         border:0;
@@ -88,27 +103,92 @@
         opacity:.78;
       }
       @media(max-width:575.98px){
+        html body.cb-dugout #cbQuickDefense .cb-qd-head{
+          padding:8px 9px 7px!important;
+        }
+        html body.cb-dugout #cbQuickDefense .cb-qd-title{
+          font-size:.9rem!important;
+        }
+        html body.cb-dugout #cbQuickDefense .cb-qd-help{
+          font-size:.64rem!important;
+        }
+        html body.cb-dugout #cbQuickDefense .cb-qd-body{
+          padding:6px 7px 8px!important;
+        }
+        html body.cb-dugout #cbQuickDefense .cb-qd-field{
+          min-height:0!important;
+          max-height:228px!important;
+          aspect-ratio:1.58/1!important;
+        }
+        html body.cb-dugout #cbQuickDefense .cb-qd-spot{
+          width:61px!important;
+        }
+        html body.cb-dugout #cbQuickDefense .cb-qd-name{
+          font-size:.55rem!important;
+          padding:3px 4px!important;
+        }
+        html body.cb-dugout #cbQuickDefense .cb-qd-bench-wrap{
+          margin-top:6px!important;
+          padding:7px!important;
+        }
+        html body.cb-dugout #cbQuickDefense .cb-qd-bench-player{
+          padding:6px 7px!important;
+          font-size:.66rem!important;
+        }
+        body.cb-dugout #coach-action-slot.coach-actions{
+          position:sticky;
+          bottom:0;
+          z-index:1030;
+          background:#eef1f4;
+          padding:7px 0 calc(7px + env(safe-area-inset-bottom));
+          margin-bottom:8px!important;
+        }
+        body.cb-dugout #liveChangePitcherBtn,
+        body.cb-dugout #liveEndInningBtn{
+          min-height:56px!important;
+        }
         #${END_MODAL_ID} .modal-dialog{margin:.5rem}
+      }
+      @media(orientation:landscape) and (max-height:599.98px){
+        html body.cb-dugout #cbQuickDefense .cb-qd-field{
+          max-height:205px!important;
+          width:min(62vw,480px)!important;
+        }
       }
     `;
     document.head.appendChild(style);
   }
 
+  function removeBulkDefense() {
+    document.getElementById('liveSetDefenseBtnCoach')?.remove();
+    document.getElementById('live-bulk-defense-coach')?.remove();
+    document.querySelectorAll('[data-cb-full-defense]').forEach(button => button.remove());
+  }
+
   function patchQuickDefense() {
+    removeBulkDefense();
     const card = document.getElementById('cbQuickDefense');
     if (!card) return;
+
     setText(card.querySelector('.cb-qd-kicker'),'ON THE FIELD');
     setText(card.querySelector('.cb-qd-title'),'Defense Now');
-    setText(card.querySelector('.cb-qd-help'),'Tap a fielder or bench player to move him.');
+    setText(card.querySelector('.cb-qd-help'),'Tap a fielder or bench player to make one sub.');
+
     const benchTitle = card.querySelector('.cb-qd-bench-head strong');
     if (benchTitle && /^Bench now/i.test(benchTitle.textContent || '')) {
       setText(benchTitle,benchTitle.textContent.replace(/^Bench now/i,'On the Bench'));
     }
-    setText(card.querySelector('.cb-qd-tip'),'Tap a bench player, then the position. The player coming out goes to the bench.');
-    setHtml(card.querySelector('[data-cb-full-defense]'),'<i class="bi bi-sliders me-1"></i>Change Several Positions');
+
     card.querySelectorAll('.cb-bench-note').forEach(note => {
-      if ((note.textContent || '').trim() === 'Bench now') setText(note,'On the bench');
+      const text = (note.textContent || '').trim();
+      if (text === 'Bench now' || text === 'On the bench') {
+        note.textContent = '';
+        note.style.display = 'none';
+      }
     });
+
+    const tools = card.querySelector('.cb-qd-actions');
+    if (tools) tools.remove();
     setText(document.querySelector('.cb-end-zone small'),'After the last out');
   }
 
@@ -117,13 +197,6 @@
     if (!modal) return;
     setText(modal.querySelector('.modal-header .small.text-muted'),'Game stays live.');
     setHtml(modal.querySelector('.cb-nav-safe'),'<strong>Game stays live.</strong> Clock stays as-is.');
-  }
-
-  function patchBulkDefenseModal() {
-    const modal = document.getElementById('live-bulk-defense-coach');
-    if (!modal) return;
-    setText(modal.querySelector('.modal-title'),'Change Several Positions');
-    setText(modal.querySelector('.modal-header .small.text-muted'),'This inning');
   }
 
   function toast(message, kind='success') {
@@ -150,6 +223,9 @@
     const button = document.getElementById('liveEndInningBtn');
     if (button) button.disabled = true;
     try {
+      const synced = await window.CBNextDefense?.syncSamePointer?.();
+      if (synced === null) throw new Error('Could not refresh the next defense.');
+
       const response = await fetch(`/api/live-game/${gameId}/end-inning`, {
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -253,11 +329,12 @@
   function start() {
     installStyles();
     document.getElementById('cbCurrentInningStrip')?.remove();
+    removeBulkDefense();
     document.addEventListener('click',guardEndInning,true);
     document.addEventListener('click',event => {
       if (event.target.closest?.('[data-cb-menu], #cbCoachBoardNavBtn')) window.setTimeout(patchMenu,0);
-      if (event.target.closest?.('[data-cb-full-defense]')) window.setTimeout(patchBulkDefenseModal,0);
     },true);
+
     document.addEventListener('coachboard:next-defense-set', () => {
       if (!endAfterNextDefense) return;
       endAfterNextDefense = false;
@@ -266,6 +343,7 @@
 
     if (!attachQuickDefenseObserver()) {
       rootObserver = new MutationObserver(() => {
+        removeBulkDefense();
         if (!attachQuickDefenseObserver()) return;
         rootObserver?.disconnect();
         rootObserver = null;
