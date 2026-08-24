@@ -167,10 +167,19 @@
     document.head.appendChild(script);
   }
 
+  function loadInningClarity() {
+    if (document.querySelector('script[data-live-inning-clarity]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/live_game_inning_clarity.js';
+    script.dataset.liveInningClarity = 'true';
+    document.head.appendChild(script);
+  }
+
   installResponsiveStyles();
   loadBenchReport();
+  loadInningClarity();
 
-  /* The responsive layout and bench report must still work even if Socket.IO is unavailable. */
+  /* Responsive layout, bench report and inning guidance work even if Socket.IO is unavailable. */
   if (typeof io !== 'function') return;
 
   function ensure() {
