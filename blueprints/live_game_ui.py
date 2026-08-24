@@ -78,7 +78,7 @@ def _clean_complete_alignment(candidate, game, team):
 
     missing = [pos for pos in allowed if not cleaned.get(pos)]
     if missing:
-        return None, f"Choose a player for {', '.join(missing)} before confirming the next inning."
+        return None, f"Fill {', '.join(missing)} before setting the next-inning defense."
 
     valid, message = _validate_alignment(cleaned, present_names)
     if not valid:
@@ -146,7 +146,7 @@ def _end_inning_with_confirmed_prep():
     if not prep or prep.inning != next_inning:
         return jsonify({
             'status': 'error',
-            'message': f'Confirm the Inning {next_inning} setup in Physical Board Prep before ending the inning.'
+            'message': f'Set the Inning {next_inning} defense before ending the inning.'
         }), 409
 
     after, message = _clean_complete_alignment(prep.alignment, game, team)
@@ -237,7 +237,7 @@ def next_inning_prep(game_id):
                 if not current_pitcher:
                     return jsonify({
                         'status': 'error',
-                        'message': 'The pregame pitcher is TBD and there is no current pitcher to carry forward. Choose the next pitcher in Adjust Defense.'
+                        'message': 'The pregame pitcher is TBD. Set the next-inning pitcher before using the pregame defense.'
                     }), 409
                 planned_position = next((
                     pos for pos, name in candidate.items()
@@ -246,7 +246,7 @@ def next_inning_prep(game_id):
                 if planned_position:
                     return jsonify({
                         'status': 'error',
-                        'message': f'{current_pitcher} is the current pitcher but is planned at {planned_position} next inning. Use Choose Pitcher / Adjust to resolve that move.'
+                        'message': f'{current_pitcher} is pitching now but is slated for {planned_position} next inning. Set the next-inning defense to resolve the move.'
                     }), 409
                 candidate['P'] = current_pitcher
                 source = 'planned_current_pitcher'
@@ -254,7 +254,7 @@ def next_inning_prep(game_id):
             candidate = data.get('alignment')
             source = 'custom'
         else:
-            return jsonify({'status': 'error', 'message': 'Choose Current Defense, Pregame Plan, or a custom setup.'}), 400
+            return jsonify({'status': 'error', 'message': 'Choose Keep Same Defense, Pregame Defense, or Set New Defense.'}), 400
 
         cleaned, message = _clean_complete_alignment(candidate, game, team)
         if not cleaned:
@@ -264,7 +264,7 @@ def next_inning_prep(game_id):
         prep.inning = next_inning
         prep.alignment = cleaned
         prep.source = source
-        prep.updated_by = session.get('username')
+        prep.updated_by = session.get('full_name') or user.full_name or user.username
         prep.updated_at = datetime.utcnow()
         db.session.add(prep)
         db.session.commit()
@@ -363,7 +363,7 @@ def protect_live_game_workflows():
     if game and game.is_live:
         return jsonify({
             'status': 'error',
-            'message': 'The planned defensive rotation is locked while this game is live. Use Live Game changes instead.'
+            'message': 'Pregame defense is locked while the game is live. Use Live Game controls.'
         }), 409
 
     return None
