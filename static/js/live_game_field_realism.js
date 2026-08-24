@@ -49,6 +49,13 @@
         top: 0 !important;
       }
 
+      /* live_game_clock_controls.js used to add a second CoachBoard navigation
+         button beside the newer Dugout Menu button. They open the same menu,
+         so keep one clear navigation control in the live header. */
+      body.cb-dugout #cbCoachBoardNavBtn {
+        display: none !important;
+      }
+
       .coach-field.coach-real-field {
         position: relative;
         overflow: hidden;
@@ -147,6 +154,56 @@
         #liveSetDefenseBtnCoach { grid-column:auto !important; }
         .coach-actions .btn { min-height:64px !important; }
         .coach-field.coach-real-field { max-width: 720px; }
+      }
+
+      /* Tablet landscape needs a real tablet layout, not a stretched phone
+         layout. Keep the field readable while putting bench/substitution tools
+         beside it so an iPad Air does not spend nearly the whole screen on the
+         diamond alone. */
+      @media (min-width: 900px) and (max-width: 1180px) and (orientation: landscape) {
+        body.cb-dugout .coach-live-shell {
+          max-width: 1080px !important;
+          padding: 0 14px 24px !important;
+        }
+        body.cb-dugout #cbDugoutHeader {
+          margin-bottom: 10px !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-body {
+          display: grid !important;
+          grid-template-columns: minmax(0,1.55fr) minmax(280px,.75fr) !important;
+          grid-template-areas: "field bench" "field tools";
+          gap: 12px 14px !important;
+          align-items: start !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-field {
+          grid-area: field;
+          width: min(100%,665px) !important;
+          min-height: 0 !important;
+          aspect-ratio: 1.28 / 1 !important;
+          margin: 0 auto !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-bench-wrap {
+          grid-area: bench;
+          margin-top: 0 !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-actions {
+          grid-area: tools;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 10px !important;
+          margin-top: 0 !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-actions .btn {
+          width: 100% !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-tip {
+          font-size: .72rem !important;
+          line-height: 1.35 !important;
+        }
+        body.cb-dugout .coach-actions {
+          grid-template-columns: repeat(4,minmax(0,1fr)) !important;
+        }
       }
 
       @media (min-width: 1181px) and (max-width: 1440px) {
