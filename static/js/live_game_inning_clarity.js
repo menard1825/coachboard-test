@@ -132,6 +132,15 @@
     });
   }
 
+  function patchMenu() {
+    const modal = document.getElementById('cbCoachBoardNavModal');
+    if (!modal) return;
+    const sub = modal.querySelector('.modal-header .small.text-muted');
+    const safe = modal.querySelector('.cb-nav-safe');
+    setText(sub,'Game stays live.');
+    setHtml(safe,'<strong>Game stays live.</strong> Clock stays as-is.');
+  }
+
   function toast(message, kind='success') {
     let host = document.getElementById('cb-live-workflow-toast');
     if (!host) {
@@ -269,6 +278,11 @@
   function start() {
     installStyles();
     document.addEventListener('click',guardEndInning,true);
+    document.addEventListener('click',event => {
+      if (event.target.closest?.('[data-cb-menu], #cbCoachBoardNavBtn')) {
+        window.setTimeout(patchMenu,0);
+      }
+    },true);
     document.addEventListener('coachboard:next-defense-set', () => {
       if (!endAfterNextDefense) return;
       endAfterNextDefense = false;
