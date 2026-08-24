@@ -10,7 +10,6 @@
   let ending = false;
   let endAfterNextDefense = false;
   let quickDefenseObserver = null;
-  let actionObserver = null;
   let rootObserver = null;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -52,14 +51,18 @@
       body.cb-dugout #liveUndoBtn .coach-action-note {
         display:none!important;
       }
-      body.cb-dugout #liveChangePitcherBtn .coach-action-title,
-      body.cb-dugout #liveEndInningBtn .coach-action-title {
-        font-size:1rem!important;
-      }
       body.cb-dugout #liveChangePitcherBtn .coach-action-note,
       body.cb-dugout #liveEndInningBtn .coach-action-note {
-        font-size:.67rem!important;
+        font-size:0!important;
         opacity:.78!important;
+      }
+      body.cb-dugout #liveChangePitcherBtn .coach-action-note::after {
+        content:'This inning';
+        font-size:.67rem;
+      }
+      body.cb-dugout #liveEndInningBtn .coach-action-note::after {
+        content:'Send next defense out';
+        font-size:.67rem;
       }
       #${END_MODAL_ID} .modal-content {
         border:0;
@@ -91,54 +94,29 @@
     document.head.appendChild(style);
   }
 
-  function setAction(button, title, note='') {
-    if (!button) return;
-    const titleEl = button.querySelector('.coach-action-title');
-    const noteEl = button.querySelector('.coach-action-note');
-    setText(titleEl,title);
-    setText(noteEl,note);
-    const titleText = note ? `${title} — ${note}` : title;
-    const ariaText = note ? `${title}. ${note}.` : title;
-    if (button.title !== titleText) button.title = titleText;
-    if (button.getAttribute('aria-label') !== ariaText) button.setAttribute('aria-label',ariaText);
-  }
-
-  function patchActions() {
-    document.getElementById('cbCurrentInningStrip')?.remove();
-    setAction(document.getElementById('liveChangePitcherBtn'), 'Change Pitcher', 'This inning');
-    setAction(document.getElementById('liveEndInningBtn'), 'End Inning', 'Send next defense out');
-    setAction(document.getElementById('liveUndoBtn'), 'Undo');
-  }
-
   function patchQuickDefense() {
     const card = document.getElementById('cbQuickDefense');
     if (!card) return;
-    const kicker = card.querySelector('.cb-qd-kicker');
-    const title = card.querySelector('.cb-qd-title');
-    const help = card.querySelector('.cb-qd-help');
+    setText(card.querySelector('.cb-qd-kicker'),'ON THE FIELD');
+    setText(card.querySelector('.cb-qd-title'),'Defense Now');
+    setText(card.querySelector('.cb-qd-help'),'Tap a fielder or bench player to move him.');
     const benchTitle = card.querySelector('.cb-qd-bench-head strong');
-    const tip = card.querySelector('.cb-qd-tip');
-    const full = card.querySelector('[data-cb-full-defense]');
-    setText(kicker,'ON THE FIELD');
-    setText(title,'Defense Now');
-    setText(help,'Tap a fielder or bench player to move him.');
     if (benchTitle && /^Bench now/i.test(benchTitle.textContent || '')) {
       setText(benchTitle,benchTitle.textContent.replace(/^Bench now/i,'On the Bench'));
     }
-    setText(tip,'Tap a bench player, then the position. The player coming out goes to the bench.');
-    setHtml(full,'<i class="bi bi-sliders me-1"></i>Change Several Positions');
+    setText(card.querySelector('.cb-qd-tip'),'Tap a bench player, then the position. The player coming out goes to the bench.');
+    setHtml(card.querySelector('[data-cb-full-defense]'),'<i class="bi bi-sliders me-1"></i>Change Several Positions');
     card.querySelectorAll('.cb-bench-note').forEach(note => {
       if ((note.textContent || '').trim() === 'Bench now') setText(note,'On the bench');
     });
+    setText(document.querySelector('.cb-end-zone small'),'After the last out');
   }
 
   function patchMenu() {
     const modal = document.getElementById('cbCoachBoardNavModal');
     if (!modal) return;
-    const sub = modal.querySelector('.modal-header .small.text-muted');
-    const safe = modal.querySelector('.cb-nav-safe');
-    setText(sub,'Game stays live.');
-    setHtml(safe,'<strong>Game stays live.</strong> Clock stays as-is.');
+    setText(modal.querySelector('.modal-header .small.text-muted'),'Game stays live.');
+    setHtml(modal.querySelector('.cb-nav-safe'),'<strong>Game stays live.</strong> Clock stays as-is.');
   }
 
   function toast(message, kind='success') {
@@ -236,7 +214,7 @@
         adjust.addEventListener('hidden.bs.modal', () => {
           if (endAfterNextDefense) endAfterNextDefense = false;
         }, {once:true});
-      }, 50);
+      },50);
     });
     return modal;
   }
@@ -254,43 +232,36 @@
     bootstrap.Modal.getOrCreateInstance(ensureEndModal()).show();
   }
 
-  function attachObservers() {
-    const actions = document.getElementById('coach-action-slot');
-    if (actions && !actionObserver) {
-      patchActions();
-      actionObserver = new MutationObserver(() => requestAnimationFrame(patchActions));
-      actionObserver.observe(actions,{childList:true,subtree:true});
-    }
-
-    const quick = document.getElementById('cbQuickDefense');
-    if (quick && !quickDefenseObserver) {
-      patchQuickDefense();
+  function attachQuickDefenseObserver() {
+    const card = document.getElementById('cbQuickDefense');
+    if (!card) return false;
+    patchQuickDefense();
+    if (!quickDefenseObserver) {
       quickDefenseObserver = new MutationObserver(() => requestAnimationFrame(patchQuickDefense));
-      quickDefenseObserver.observe(quick,{childList:true,subtree:true});
+      quickDefenseObserver.observe(card,{childList:true,subtree:true});
     }
-
-    if (actions && quick && rootObserver) {
-      rootObserver.disconnect();
-      rootObserver = null;
-    }
+    return true;
   }
 
   function start() {
     installStyles();
+    document.getElementById('cbCurrentInningStrip')?.remove();
     document.addEventListener('click',guardEndInning,true);
     document.addEventListener('click',event => {
-      if (event.target.closest?.('[data-cb-menu], #cbCoachBoardNavBtn')) {
-        window.setTimeout(patchMenu,0);
-      }
+      if (event.target.closest?.('[data-cb-menu], #cbCoachBoardNavBtn')) window.setTimeout(patchMenu,0);
     },true);
     document.addEventListener('coachboard:next-defense-set', () => {
       if (!endAfterNextDefense) return;
       endAfterNextDefense = false;
       window.setTimeout(endInningNow,80);
     });
-    attachObservers();
-    if (!document.getElementById('coach-action-slot') || !document.getElementById('cbQuickDefense')) {
-      rootObserver = new MutationObserver(attachObservers);
+
+    if (!attachQuickDefenseObserver()) {
+      rootObserver = new MutationObserver(() => {
+        if (!attachQuickDefenseObserver()) return;
+        rootObserver?.disconnect();
+        rootObserver = null;
+      });
       rootObserver.observe(document.body,{childList:true,subtree:true});
     }
   }
