@@ -44,6 +44,7 @@ def _build_app(monkeypatch):
         db.session.add_all([
             Game(
                 date=datetime(2025, 6, 1),
+                start_time='14:00',
                 opponent='Past Opponent One',
                 location='Old Field',
                 team_id=team.id,
@@ -67,7 +68,7 @@ def _login(client):
         session['role'] = 'Head Coach'
 
 
-def test_game_day_schedule_shows_past_games(monkeypatch):
+def test_game_day_schedule_shows_past_games_with_coach_friendly_time(monkeypatch):
     app = _build_app(monkeypatch)
     client = app.test_client()
     _login(client)
@@ -80,3 +81,48 @@ def test_game_day_schedule_shows_past_games(monkeypatch):
     assert 'Past Opponent One' in html
     assert 'Past Opponent Two' in html
     assert '/game-day/1/report' in html
+    assert '2:00 PM' in html
+    assert '>14:00<' not in html
+
+
+def test_same_day_game_is_not_repeated_in_past_games(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    # Keep the route deterministic and create a completed game on the same date.
+    monkeypatch.setattr(
+        'blueprints.game_day.team_now',
+        lambda team: datetime(2026, 8, 24, 16, 42),
+    )
+
+    from db import db
+    from models import Game, GameRotationEvent
+
+    with app.app_context():
+        game = Game(
+            date=datetime(2026, 8, 24),
+            start_time='14:00',
+            opponent='Same Day Opponent',
+            team_id=1,
+        )
+        db.session.add(game)
+        db.session.flush()
+        db.session.add(GameRotationEvent(
+            inning='1',
+            sequence=1,
+            event_type='End Game',
+            before_alignment={},
+            after_alignment={},
+            changed_by_user='coach',
+            team_id=1,
+            game_id=game.id,
+        ))
+        db.session.commit()
+
+    client = app.test_client()
+    _login(client)
+    response = client.get('/game-day')
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert html.count('vs Same Day Opponent') == 1
+    assert '2:00 PM' in html
