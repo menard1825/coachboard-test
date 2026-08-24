@@ -119,6 +119,13 @@
     setHtml(modal.querySelector('.cb-nav-safe'),'<strong>Game stays live.</strong> Clock stays as-is.');
   }
 
+  function patchBulkDefenseModal() {
+    const modal = document.getElementById('live-bulk-defense-coach');
+    if (!modal) return;
+    setText(modal.querySelector('.modal-title'),'Change Several Positions');
+    setText(modal.querySelector('.modal-header .small.text-muted'),'This inning');
+  }
+
   function toast(message, kind='success') {
     let host = document.getElementById('cb-live-workflow-toast');
     if (!host) {
@@ -249,6 +256,7 @@
     document.addEventListener('click',guardEndInning,true);
     document.addEventListener('click',event => {
       if (event.target.closest?.('[data-cb-menu], #cbCoachBoardNavBtn')) window.setTimeout(patchMenu,0);
+      if (event.target.closest?.('[data-cb-full-defense]')) window.setTimeout(patchBulkDefenseModal,0);
     },true);
     document.addEventListener('coachboard:next-defense-set', () => {
       if (!endAfterNextDefense) return;
