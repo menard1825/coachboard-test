@@ -5,6 +5,7 @@
   if (!match) return;
 
   const STYLE_ID = 'cb-inning-clarity-style';
+  const END_MODAL_ID = 'cbNextInningRequiredModal';
   let queued = false;
 
   function installStyles() {
@@ -106,6 +107,40 @@
         line-height:1.35;
       }
 
+      #${END_MODAL_ID} .modal-content {
+        border:0;
+        border-radius:15px;
+        overflow:hidden;
+      }
+      #${END_MODAL_ID} .cb-end-plan-explain {
+        border:1px solid #d6dde8;
+        border-radius:10px;
+        background:#f7f9fc;
+        color:#475467;
+        padding:10px 11px;
+        font-size:.76rem;
+        line-height:1.4;
+        margin-bottom:12px;
+      }
+      #${END_MODAL_ID} .cb-end-plan-actions {
+        display:grid;
+        gap:9px;
+      }
+      #${END_MODAL_ID} .cb-end-plan-actions .btn {
+        min-height:55px;
+        border-radius:10px;
+        font-weight:800;
+        text-align:left;
+        padding:9px 11px;
+      }
+      #${END_MODAL_ID} .cb-end-plan-actions small {
+        display:block;
+        margin-top:2px;
+        font-size:.66rem;
+        font-weight:550;
+        opacity:.78;
+      }
+
       @media (max-width:599.98px) {
         .cb-current-inning-strip {
           align-items:flex-start;
@@ -114,6 +149,9 @@
         .cb-current-inning-strip .cb-now-badge {
           padding:4px 7px;
           font-size:.56rem;
+        }
+        #${END_MODAL_ID} .modal-dialog {
+          margin:.5rem;
         }
       }
     `;
@@ -261,6 +299,75 @@
     }
   }
 
+  function ensureEndPlanModal() {
+    let modal = document.getElementById(END_MODAL_ID);
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = END_MODAL_ID;
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title mb-0">Set the Next Inning First</h5>
+              <div class="small text-muted">The current inning is still active.</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="cb-end-plan-explain">
+              You do not need a pregame plan for every inning. Before ending this inning, just tell CoachBoard what should happen next.
+            </div>
+            <div class="cb-end-plan-actions">
+              <button type="button" class="btn btn-outline-dark" data-cb-end-use-current>
+                Keep Current Defense for Next Inning
+                <small>Fastest option — everyone stays where they are.</small>
+              </button>
+              <button type="button" class="btn btn-primary" data-cb-end-build-next>
+                Set Next Inning Defense
+                <small>Choose positions and bench players for the following inning.</small>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    modal.querySelector('[data-cb-end-use-current]')?.addEventListener('click', () => {
+      bootstrap.Modal.getOrCreateInstance(modal).hide();
+      const useCurrent = document.querySelector('#live-board-prep-v3 [data-bp-action="current"]');
+      if (useCurrent && !useCurrent.disabled) useCurrent.click();
+      setTimeout(() => document.getElementById('live-board-prep-v3')?.scrollIntoView({ behavior:'smooth', block:'center' }), 180);
+    });
+
+    modal.querySelector('[data-cb-end-build-next]')?.addEventListener('click', () => {
+      bootstrap.Modal.getOrCreateInstance(modal).hide();
+      const adjust = document.querySelector('#live-board-prep-v3 [data-bp-action="adjust"]');
+      if (adjust && !adjust.disabled) {
+        setTimeout(() => adjust.click(), 180);
+      } else {
+        document.getElementById('live-board-prep-v3')?.scrollIntoView({ behavior:'smooth', block:'center' });
+      }
+    });
+
+    return modal;
+  }
+
+  function guardEndInning(event) {
+    const button = event.target.closest?.('#liveEndInningBtn');
+    if (!button || button.disabled) return;
+    const card = document.getElementById('live-board-prep-v3');
+    if (!card || card.querySelector('.bp-status.ready')) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    bootstrap.Modal.getOrCreateInstance(ensureEndPlanModal()).show();
+  }
+
   function patch() {
     queued = false;
     installStyles();
@@ -278,6 +385,7 @@
   function start() {
     installStyles();
     queuePatch();
+    document.addEventListener('click', guardEndInning, true);
     new MutationObserver(queuePatch).observe(document.body, {
       childList: true,
       subtree: true,
