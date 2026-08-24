@@ -5,131 +5,48 @@
   if (!match) return;
 
   const gameId = Number(match[1]);
+  const MODAL_ID = 'cbClockControlsModal';
   let clock = null;
   let busy = false;
-  let patchQueued = false;
+  let headerObserver = null;
+  let rootObserver = null;
 
   const $ = id => document.getElementById(id);
 
   function installStyles() {
-    if ($('cb-live-clock-controls-style')) return;
+    if ($('cb-live-time-limit-style')) return;
     const style = document.createElement('style');
-    style.id = 'cb-live-clock-controls-style';
+    style.id = 'cb-live-time-limit-style';
     style.textContent = `
-      #cbDugoutHeader [data-cb-clock]{font-size:0!important}
       #cbDugoutHeader [data-cb-clock] i{display:none!important}
-      #cbDugoutHeader [data-cb-clock]::after{content:'Clock Controls';font-size:.72rem;font-weight:750}
+      #${MODAL_ID} .modal-content{border:0;border-radius:15px;overflow:hidden}
+      #${MODAL_ID} .tl-state{border:1px solid #dfe4ea;background:#f8fafc;border-radius:10px;padding:10px 11px;margin-bottom:11px}
+      #${MODAL_ID} .tl-state.paused{background:#fff8e8;border-color:#e5c66f}
+      #${MODAL_ID} .tl-state strong{display:block;font-size:.88rem;color:#172033}
+      #${MODAL_ID} .tl-state span{display:block;font-size:.72rem;color:#667085;margin-top:2px}
+      #${MODAL_ID} .tl-action{min-height:54px;border-radius:11px;font-weight:820;text-align:left;padding:9px 11px}
+      #${MODAL_ID} .tl-action small{display:block;font-size:.66rem;font-weight:550;opacity:.78;margin-top:2px}
       body.cb-clock-paused #cbDugoutHeader{border-bottom-color:#f5b942!important}
       body.cb-clock-paused #cbDugoutHeader .cb-dh-dot{background:#f5b942!important}
-      body.cb-clock-paused #cbDugoutHeader .cb-dh-clock small{font-size:0!important}
-      body.cb-clock-paused #cbDugoutHeader .cb-dh-clock small::after{content:'Time left · Paused';font-size:.55rem;color:#ffd166;font-weight:900}
       body.cb-clock-paused #cbDugoutHeader .cb-dh-time{color:#ffd166!important}
-      body.cb-dugout #liveChangePitcherBtn .coach-action-title,
-      body.cb-dugout #liveChangePitcherBtn .coach-action-note{font-size:0!important}
-      body.cb-dugout #liveChangePitcherBtn .coach-action-title::after{content:'Change Pitcher Now';font-size:1.02rem;font-weight:850}
-      body.cb-dugout #liveChangePitcherBtn .coach-action-note::after{content:'Mid-inning pitching change';font-size:.7rem;font-weight:550}
-      .cb-mid-inning-help{border:1px solid #b9cbe8;background:#f4f8ff;color:#253858;border-radius:10px;padding:9px 10px;margin-bottom:12px;font-size:.78rem;line-height:1.35}
-      .cb-mid-inning-help strong{font-weight:850}
-      #cbClockControlsModal .modal-content,#cbCoachBoardNavModal .modal-content{border:0;border-radius:15px;overflow:hidden}
-      #cbClockControlsModal .cb-clock-state{border-radius:11px;padding:11px 12px;margin-bottom:12px;background:#f8fafc;border:1px solid #dfe4ea}
-      #cbClockControlsModal .cb-clock-state.paused{background:#fff8e8;border-color:#e5c66f}
-      #cbClockControlsModal .cb-clock-state strong{display:block;font-size:.9rem;color:#172033}
-      #cbClockControlsModal .cb-clock-state span{display:block;font-size:.74rem;color:#667085;margin-top:3px;line-height:1.35}
-      #cbClockControlsModal .cb-clock-action{min-height:56px;border-radius:11px;font-weight:800;text-align:left;padding:9px 12px}
-      #cbClockControlsModal .cb-clock-action small{display:block;font-weight:550;opacity:.78;margin-top:2px}
-      #cbClockControlsModal .cb-delay-help{font-size:.72rem;color:#667085;line-height:1.4;margin-top:10px}
-      #cbClockControlsModal .cb-clock-exit-actions{border-top:1px solid #e8ebef;margin-top:13px;padding-top:13px}
-      #cbClockControlsModal .cb-clock-exit-actions .btn{min-height:44px;border-radius:10px;font-weight:750}
-      #cbCoachBoardNavBtn{border:1px solid rgba(255,255,255,.28)!important;color:#fff!important;background:rgba(255,255,255,.08)!important;border-radius:9px!important;font-weight:750!important;white-space:nowrap}
-      #cbCoachBoardNavModal .cb-nav-safe{border:1px solid #b9dcc4;background:#f4fbf6;color:#22543d;border-radius:10px;padding:9px 10px;font-size:.75rem;line-height:1.4;margin-bottom:12px}
-      #cbCoachBoardNavModal .cb-app-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-      #cbCoachBoardNavModal .cb-app-link{min-height:58px;border:1px solid #dfe4ea;border-radius:11px;background:#fff;color:#253047;text-decoration:none;display:flex;align-items:center;gap:9px;padding:10px 11px;font-size:.8rem;font-weight:780}
-      #cbCoachBoardNavModal .cb-app-link i{font-size:1.05rem;color:var(--primary-color,#102a66)}
-      #cbCoachBoardNavModal .cb-return-game{grid-column:1/-1;background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66);color:#fff}
-      #cbCoachBoardNavModal .cb-return-game i{color:#fff}
-      @media(min-width:992px){#cbCoachBoardNavBtn{display:none!important}}
-      @media(max-width:575.98px){
-        #cbDugoutHeader [data-cb-clock]::after{content:'Clock';font-size:.7rem}
-        #cbCoachBoardNavBtn{font-size:.68rem!important;padding:.35rem .5rem!important}
-        #cbCoachBoardNavModal .cb-app-grid{grid-template-columns:1fr 1fr}
-      }
+      @media(max-width:575.98px){#cbDugoutHeader [data-cb-clock]{font-size:.68rem!important;padding:.35rem .5rem!important}}
     `;
     document.head.appendChild(style);
   }
 
-  function ensureAppNavModal() {
-    let modal = $('cbCoachBoardNavModal');
-    if (modal) return modal;
-
-    const role = String(document.body.dataset.coachRole || '');
-    const gameChanger = role === 'Game Changer';
-    modal = document.createElement('div');
-    modal.id = 'cbCoachBoardNavModal';
-    modal.className = 'modal fade';
-    modal.tabIndex = -1;
-    modal.innerHTML = `
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <div>
-              <h5 class="modal-title mb-0">CoachBoard Menu</h5>
-              <div class="small text-muted">Leave this screen without ending the game.</div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="cb-nav-safe">
-              <strong>The game stays live.</strong> Leaving this screen does not end the game, change the inning, or change the clock. If the clock is paused, it stays paused until you resume it.
-            </div>
-            <div class="cb-app-grid">
-              <a class="cb-app-link cb-return-game" href="/game/${gameId}"><i class="bi bi-diamond-fill"></i><span>Back to Live Game</span></a>
-              ${gameChanger ? '' : '<a class="cb-app-link" href="/#overview"><i class="bi bi-house-door"></i><span>Home</span></a>'}
-              <a class="cb-app-link" href="/game-day"><i class="bi bi-calendar3"></i><span>Game Day</span></a>
-              ${gameChanger ? '' : '<a class="cb-app-link" href="/#roster"><i class="bi bi-people"></i><span>Roster</span></a>'}
-              ${gameChanger ? '' : '<a class="cb-app-link" href="/#practice_plan"><i class="bi bi-clipboard-check"></i><span>Practice</span></a>'}
-              ${gameChanger ? '' : '<a class="cb-app-link" href="/pitching"><i class="bi bi-bullseye"></i><span>Pitching</span></a>'}
-              ${gameChanger ? '' : '<a class="cb-app-link" href="/#more"><i class="bi bi-three-dots"></i><span>More</span></a>'}
-            </div>
-          </div>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-    return modal;
-  }
-
-  function openAppNav() {
-    const clockModal = $('cbClockControlsModal');
-    const navModal = ensureAppNavModal();
-    const show = () => bootstrap.Modal.getOrCreateInstance(navModal).show();
-    if (clockModal?.classList.contains('show')) {
-      bootstrap.Modal.getOrCreateInstance(clockModal).hide();
-      clockModal.addEventListener('hidden.bs.modal', show, {once: true});
-    } else {
-      show();
-    }
-  }
-
-  function ensureDugoutNavButton() {
-    const header = $('cbDugoutHeader');
-    if (!header || $('cbCoachBoardNavBtn')) return;
-    const clockButton = header.querySelector('[data-cb-clock]');
-    if (!clockButton) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.id = 'cbCoachBoardNavBtn';
-    button.className = 'btn btn-sm';
-    button.setAttribute('aria-label', 'Open CoachBoard menu without ending the live game');
-    button.innerHTML = '<i class="bi bi-grid me-1"></i> CoachBoard';
-    button.addEventListener('click', openAppNav);
-    clockButton.insertAdjacentElement('beforebegin', button);
+  function patchHeaderButton() {
+    const button = document.querySelector('#cbDugoutHeader [data-cb-clock]');
+    if (!button) return false;
+    if (button.textContent.trim() !== 'Time Limit') button.textContent = 'Time Limit';
+    button.setAttribute('aria-label','Time Limit');
+    return true;
   }
 
   function ensureModal() {
-    let modal = $('cbClockControlsModal');
+    let modal = $(MODAL_ID);
     if (modal) return modal;
-
     modal = document.createElement('div');
-    modal.id = 'cbClockControlsModal';
+    modal.id = MODAL_ID;
     modal.className = 'modal fade';
     modal.tabIndex = -1;
     modal.innerHTML = `
@@ -137,120 +54,74 @@
         <div class="modal-content">
           <div class="modal-header">
             <div>
-              <h5 class="modal-title mb-0">Clock Controls</h5>
-              <div class="small text-muted">Manage delays or correct the tournament clock.</div>
+              <h5 class="modal-title mb-0">Time Limit</h5>
+              <div class="small text-muted">Game clock</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
-            <div class="cb-clock-state" id="cbClockControlState"></div>
+            <div class="tl-state" data-tl-state></div>
             <div class="d-grid gap-2">
-              <button type="button" class="btn btn-outline-warning cb-clock-action" id="cbPauseResumeClockBtn"></button>
-              <button type="button" class="btn btn-outline-secondary cb-clock-action" id="cbAdjustClockBtn">
-                <i class="bi bi-sliders me-1"></i> Adjust Clock Settings
-                <small>Change the time limit or restart the clock if it was started at the wrong time.</small>
+              <button type="button" class="btn btn-outline-warning tl-action" data-tl-pause></button>
+              <button type="button" class="btn btn-outline-secondary tl-action" data-tl-adjust>
+                Adjust Time Limit
+                <small>Change or correct the game time.</small>
               </button>
             </div>
-            <div class="cb-delay-help">
-              <strong>For delays:</strong> pause CoachBoard only when the official game/tournament clock is also stopped — for example for rain, lightning, an injury, or a field delay. Pausing CoachBoard does not change the inning, pitcher, defense, or live-game state.
-            </div>
-            <div class="cb-clock-exit-actions d-grid gap-2">
-              <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="cbClockDoneBtn"><i class="bi bi-arrow-left me-1"></i> Done — Back to Live Game</button>
-              <button type="button" class="btn btn-outline-secondary" id="cbClockCoachBoardMenuBtn"><i class="bi bi-grid me-1"></i> CoachBoard Menu</button>
-              <div class="small text-muted text-center">Neither option ends the game.</div>
-            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Back to Game</button>
           </div>
         </div>
       </div>`;
     document.body.appendChild(modal);
 
-    modal.querySelector('#cbPauseResumeClockBtn')?.addEventListener('click', async () => {
+    modal.querySelector('[data-tl-pause]')?.addEventListener('click', async () => {
       await postClock(clock?.is_paused ? 'resume' : 'pause');
     });
-
-    modal.querySelector('#cbAdjustClockBtn')?.addEventListener('click', () => {
+    modal.querySelector('[data-tl-adjust]')?.addEventListener('click', () => {
       bootstrap.Modal.getOrCreateInstance(modal).hide();
-      setTimeout(() => {
+      window.setTimeout(() => {
         const config = document.querySelector('#cbLiveGameClock .cb-clock-config');
         if (config) config.click();
         else {
           const configModal = $('cbGameClockConfigModal');
           if (configModal) bootstrap.Modal.getOrCreateInstance(configModal).show();
         }
-      }, 180);
+      },160);
     });
-
-    modal.querySelector('#cbClockCoachBoardMenuBtn')?.addEventListener('click', openAppNav);
-
     return modal;
   }
 
   function updateModal() {
-    const modal = $('cbClockControlsModal');
+    const modal = $(MODAL_ID);
     if (!modal) return;
     const paused = Boolean(clock?.is_paused);
-    const state = modal.querySelector('#cbClockControlState');
-    const button = modal.querySelector('#cbPauseResumeClockBtn');
+    const state = modal.querySelector('[data-tl-state]');
+    const button = modal.querySelector('[data-tl-pause]');
     if (state) {
-      state.classList.toggle('paused', paused);
+      state.classList.toggle('paused',paused);
       state.innerHTML = paused
-        ? '<strong><i class="bi bi-pause-circle me-1"></i> Clock is paused</strong><span>Game time is frozen until you resume it. You can close this window or go somewhere else in CoachBoard; the game stays live and the clock stays paused.</span>'
-        : '<strong><i class="bi bi-clock me-1"></i> Clock is running</strong><span>You can leave the Live Game screen and keep using CoachBoard. The game and clock continue until you explicitly pause or end them.</span>';
+        ? '<strong>Paused</strong><span>Time limit is stopped.</span>'
+        : '<strong>Running</strong><span>Time limit is running.</span>';
     }
     if (button) {
-      button.className = `btn ${paused ? 'btn-success' : 'btn-outline-warning'} cb-clock-action`;
+      button.className = `btn ${paused ? 'btn-success' : 'btn-outline-warning'} tl-action`;
       button.innerHTML = paused
-        ? '<i class="bi bi-play-fill me-1"></i> Resume Clock<small>Continue from the exact time where the delay started.</small>'
-        : '<i class="bi bi-pause-fill me-1"></i> Pause for Delay<small>Freeze CoachBoard time for rain, lightning, injury, or another official stoppage.</small>';
+        ? 'Resume Time<small>Continue the game clock.</small>'
+        : 'Pause for Delay<small>Rain, injury, or another official stoppage.</small>';
       button.disabled = busy;
     }
-  }
-
-  function patchPitcherUI() {
-    const button = $('liveChangePitcherBtn');
-    if (button) {
-      button.title = 'Changes the pitcher immediately during the current inning. Use the Next Inning Board for the following inning.';
-      button.setAttribute('aria-label', 'Change Pitcher Now — mid-inning pitching change');
-    }
-
-    const modal = $('live-pitcher-picker-v2');
-    if (!modal) return;
-    const title = modal.querySelector('.modal-title');
-    if (title && title.textContent !== 'Mid-Inning Pitching Change') {
-      title.textContent = 'Mid-Inning Pitching Change';
-    }
-    const body = modal.querySelector('.modal-body');
-    if (body && !body.querySelector('.cb-mid-inning-help')) {
-      body.insertAdjacentHTML('afterbegin', `
-        <div class="cb-mid-inning-help">
-          <strong>This changes the pitcher immediately in the current inning.</strong><br>
-          For the pitcher who will start the following inning, use the <strong>Next Inning Board</strong> instead.
-        </div>`);
-    }
-  }
-
-  function patch() {
-    patchQueued = false;
-    installStyles();
-    document.body.classList.toggle('cb-clock-paused', Boolean(clock?.is_paused));
-    ensureDugoutNavButton();
-    patchPitcherUI();
-    updateModal();
-  }
-
-  function queuePatch() {
-    if (patchQueued) return;
-    patchQueued = true;
-    requestAnimationFrame(patch);
+    document.body.classList.toggle('cb-clock-paused',paused);
   }
 
   async function fetchClock() {
     try {
-      const response = await fetch(`/api/live-game/${gameId}/clock`, {cache: 'no-store'});
+      const response = await fetch(`/api/live-game/${gameId}/clock`,{cache:'no-store'});
       if (!response.ok) return;
       const data = await response.json();
       clock = data.clock || null;
-      queuePatch();
+      updateModal();
     } catch (_) {}
   }
 
@@ -259,22 +130,18 @@
     busy = true;
     updateModal();
     try {
-      const response = await fetch(`/api/live-game/${gameId}/clock`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action}),
+      const response = await fetch(`/api/live-game/${gameId}/clock`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action})
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.status === 'error') {
-        throw new Error(data.message || 'Unable to update the game clock.');
-      }
+      const data = await response.json().catch(()=>({}));
+      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to change the time limit.');
       clock = data.clock || clock;
-      queuePatch();
-      // The dugout header has its own clock poller. Trigger its existing refresh
-      // path immediately so Pause/Resume is reflected without waiting for polling.
+      updateModal();
       document.dispatchEvent(new Event('visibilitychange'));
     } catch (err) {
-      window.alert(err.message || 'Unable to update the game clock.');
+      window.alert(err.message || 'Unable to change the time limit.');
     } finally {
       busy = false;
       updateModal();
@@ -288,33 +155,44 @@
     fetchClock();
   }
 
+  function attachHeaderObserver() {
+    const header = $('cbDugoutHeader');
+    if (!header) return false;
+    patchHeaderButton();
+    if (!headerObserver) {
+      headerObserver = new MutationObserver(() => requestAnimationFrame(patchHeaderButton));
+      headerObserver.observe(header,{childList:true,subtree:true});
+    }
+    return true;
+  }
+
   function start() {
     installStyles();
     fetchClock();
-    setInterval(fetchClock, 5000);
+    window.setInterval(fetchClock,5000);
 
-    document.addEventListener('click', event => {
-      const clockButton = event.target.closest('#cbDugoutHeader [data-cb-clock]');
-      if (!clockButton) return;
+    document.addEventListener('click',event => {
+      const button = event.target.closest('#cbDugoutHeader [data-cb-clock]');
+      if (!button) return;
       event.preventDefault();
       event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+      event.stopImmediatePropagation?.();
       openControls();
-    }, true);
+    },true);
 
-    new MutationObserver(queuePatch).observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    if (!attachHeaderObserver()) {
+      rootObserver = new MutationObserver(() => {
+        if (!attachHeaderObserver()) return;
+        rootObserver?.disconnect();
+        rootObserver = null;
+      });
+      rootObserver.observe(document.body,{childList:true,subtree:true});
+    }
 
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) fetchClock();
-    });
-
-    queuePatch();
+    document.addEventListener('visibilitychange',()=>{ if (!document.hidden) fetchClock(); });
   }
 
   document.readyState === 'loading'
-    ? document.addEventListener('DOMContentLoaded', start, {once: true})
+    ? document.addEventListener('DOMContentLoaded',start,{once:true})
     : start();
 })();
