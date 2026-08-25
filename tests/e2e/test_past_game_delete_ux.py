@@ -55,7 +55,7 @@ def test_head_coach_can_delete_past_game_from_history(page: Page, coachboard_url
     game = next(item for item in games_response.json() if item.get('opponent') == PAST_OPPONENT)
     game_id = int(game['id'])
 
-    # The full Game Day history should expose the protected options menu and the
+    # The dedicated Game Day history exposes the protected options menu and the
     # dropdown must not be clipped by the rounded Past Games container.
     page.goto(f'{coachboard_url}/game-day', wait_until='domcontentloaded')
     past_row = page.locator(f'.gd-up-row[data-game-id="{game_id}"]')
@@ -74,13 +74,14 @@ def test_head_coach_can_delete_past_game_from_history(page: Page, coachboard_url
     )
     assert hit_test_visible is True
 
-    # Mobile's same-document Game Day workspace must also support deletion even
-    # when its row was created by the API-authoritative fallback renderer.
+    # Mobile uses the same authoritative /game-day history instead of falling
+    # back to the retired #games dashboard workspace.
     page.set_viewport_size({'width': 390, 'height': 844})
-    page.goto(f'{coachboard_url}/#games', wait_until='domcontentloaded')
-    mobile_row = page.locator(f'#games-past-list-container [data-cb-game-id="{game_id}"]')
+    page.goto(f'{coachboard_url}/game-day', wait_until='domcontentloaded')
+    mobile_row = page.locator(f'.gd-up-row[data-game-id="{game_id}"]')
     expect(mobile_row).to_be_visible()
-    delete_button = mobile_row.locator('.cb-mobile-delete-game')
+    mobile_row.locator('.gd-game-menu > button').click()
+    delete_button = mobile_row.get_by_role('button', name='Delete Game')
     expect(delete_button).to_be_visible()
 
     page.once('dialog', lambda dialog: dialog.accept())
