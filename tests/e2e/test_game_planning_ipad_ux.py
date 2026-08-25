@@ -72,8 +72,7 @@ def test_ipad_game_planning_keeps_tablet_layout(
         expect(readiness).to_be_visible(timeout=15_000)
 
         # The phone redesign intentionally hides these four prep cards below
-        # 768px. At the exact iPad boundary and above, the tablet layout must
-        # retain them.
+        # 768px. At the exact iPad boundary and above, the tablet layout retains them.
         prep_cards = page.locator('#pregame-checklist-container > .row.g-3.mb-4')
         expect(prep_cards).to_be_visible(timeout=15_000)
 
@@ -86,9 +85,7 @@ def test_ipad_game_planning_keeps_tablet_layout(
         )
         expect(phone_slot_start).to_have_count(0)
 
-        # All regulation inning controls must stay inside the viewport. Tablet
-        # layout may choose its own spacing; this intentionally does not force
-        # the phone-only six-column geometry.
+        # All regulation inning controls stay inside the viewport.
         inning_labels = page.locator('#inning-btn-group label.btn')
         expect(inning_labels).to_have_count(6, timeout=15_000)
         inning_bounds = inning_labels.evaluate_all(
@@ -99,17 +96,28 @@ def test_ipad_game_planning_keeps_tablet_layout(
         )
         assert all(item['left'] >= -1 and item['right'] <= item['viewport'] + 1 for item in inning_bounds)
 
-        # The complete defense field and every position button must remain
-        # inside its field at tablet sizes.
-        defense = page.locator('#pregame-defense-editor-v3')
-        expect(defense).to_be_visible(timeout=15_000)
-        expect(defense.locator('.pde-title')).to_have_text('Set Defense — Inning 1')
-        field = defense.locator('.pde-field')
-        expect(field).to_be_visible()
-        geometry = field.evaluate(
+        # Apply the real starting-defense preset, then verify the active current
+        # editor rather than the retired PDE overlay. Bootstrap's lg breakpoint
+        # means portrait uses the touch editor while 1024 landscape uses desktop.
+        expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
+        template_select = page.locator('#rotationTemplateSelect')
+        expect(template_select).to_be_attached(timeout=15_000)
+        everyday = template_select.locator('option').filter(has_text='Everyday Defense')
+        expect(everyday).to_have_count(1)
+        template_id = everyday.get_attribute('value')
+        assert template_id
+        page.once('dialog', lambda dialog: dialog.accept())
+        template_select.select_option(value=template_id)
+
+        parent = '#diamond-parent-desktop' if width >= 992 else '#diamond-parent-mobile'
+        diamond = page.locator(f'{parent} .diamond-container-interactive')
+        expect(diamond).to_be_visible(timeout=15_000)
+        spots = diamond.locator('.position-dropzone')
+        expect(spots).to_have_count(9)
+        geometry = diamond.evaluate(
             """field => {
                 const outer = field.getBoundingClientRect();
-                const spots = [...field.querySelectorAll('.pde-spot')].map(spot => {
+                const spots = [...field.querySelectorAll('.position-dropzone')].map(spot => {
                     const r = spot.getBoundingClientRect();
                     return {left:r.left, right:r.right, top:r.top, bottom:r.bottom};
                 });
@@ -125,6 +133,24 @@ def test_ipad_game_planning_keeps_tablet_layout(
             for spot in geometry['spots']
         )
 
+        names = diamond.locator('.player-tag')
+        expect(names).not_to_have_count(0)
+        samples = names.evaluate_all(
+            """items => items.map(el => ({
+                text:(el.textContent || '').trim(),
+                textOverflow:getComputedStyle(el).textOverflow,
+                scrollWidth:el.scrollWidth,
+                clientWidth:el.clientWidth,
+                scrollHeight:el.scrollHeight,
+                clientHeight:el.clientHeight,
+            }))"""
+        )
+        for sample in samples:
+            assert sample['text']
+            assert sample['textOverflow'] != 'ellipsis', sample
+            assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
+            assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
+
         # Pitching details are only collapsed into a phone toggle below the
         # tablet breakpoint. iPad keeps the richer at-a-glance card.
         pitching = page.locator('#pitcher-availability-card')
@@ -134,8 +160,7 @@ def test_ipad_game_planning_keeps_tablet_layout(
         expect(pitcher_cards.first.locator('.gpa-metrics')).to_be_visible()
         expect(pitcher_cards.first.locator('.gm-pitch-card-more')).to_be_hidden()
 
-        # Nothing on Game Planning may make the entire iPad page scroll
-        # sideways in either orientation.
+        # Nothing on Game Planning may make the entire iPad page scroll sideways.
         assert page.evaluate(
             'document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2'
         )
