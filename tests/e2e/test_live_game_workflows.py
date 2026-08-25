@@ -184,12 +184,13 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     assert state['game']['is_live'] is True
     assert state['current_alignment']['P'] == 'Pitcher Pat'
 
-    # Next Inning and Current Defense are the two live diamond/board surfaces a
-    # coach sees in the dugout. Names must remain complete at phone, iPad, the
-    # exact iPad Air landscape size reported by the coach, and normal desktop.
+    # The next-defense board is now an explicit coaching decision instead of
+    # silently loading a pregame inning. Current Defense remains authoritative;
+    # the coach can choose Same Defense, Pregame Defense, or New Defense.
     next_board = page.locator('#live-board-prep-v3')
     expect(next_board).to_be_visible(timeout=15_000)
-    expect(next_board).to_contain_text('Shortstop Shawn')
+    expect(next_board).to_contain_text("Who's Going Out Next?")
+    expect(next_board).to_contain_text('Pregame Defense')
 
     field_toggle = page.locator('[data-coach-defense-view="field"]')
     if field_toggle.count():
@@ -206,7 +207,9 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
         page.set_viewport_size(viewport)
         page.wait_for_timeout(180)
         expect(next_board).to_be_visible()
-        assert_player_names_are_fully_visible(next_board.locator('.bp-field-spot .name'))
+        next_field_names = next_board.locator('.bp-field-spot .name')
+        if next_field_names.count():
+            assert_player_names_are_fully_visible(next_field_names)
         current_field_names = page.locator('#coach-current-defense .coach-field-spot span')
         if current_field_names.count():
             assert_player_names_are_fully_visible(current_field_names)
@@ -257,8 +260,6 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     assert undone['state']['current_inning'] == '1'
 
     # Socket state broadcasts used to call a removed renderBenchReport() helper.
-    # Give the browser time to receive the broadcasts above, then make that exact
-    # regression a hard browser-test failure.
     page.wait_for_timeout(500)
     assert not [error for error in page_errors if 'renderBenchReport' in error], page_errors
 
