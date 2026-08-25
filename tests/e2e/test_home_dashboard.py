@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -41,6 +42,64 @@ def test_coach_lands_on_operational_home(page: Page, coachboard_url: str):
     expect(home_nav).to_be_visible()
     expect(home_nav).to_have_text(re.compile(r'Home'))
     expect(home_nav).to_have_class(re.compile(r'\bactive\b'))
+
+
+def test_home_skips_ended_same_day_game_for_next_game(page: Page, coachboard_url: str):
+    """A finished game may stay on Game Day, but it must never remain Home's next game."""
+    today = datetime.now().replace(hour=9, minute=0, second=0, microsecond=0)
+    tomorrow = today + timedelta(days=1)
+    ended = {
+        'id': 91,
+        'date': today.isoformat(sep=' '),
+        'start_time': '09:00',
+        'opponent': 'Completed Cubs',
+        'location': 'Finished Field',
+        'is_live': False,
+    }
+    upcoming = {
+        'id': 92,
+        'date': tomorrow.isoformat(sep=' '),
+        'start_time': '18:00',
+        'opponent': 'Future Foxes',
+        'location': 'Tomorrow Field',
+        'is_live': False,
+    }
+
+    page.route('**/api/overview_data', lambda route: route.fulfill(json={
+        'next_game': ended,
+        'pitchers_on_rest': {},
+        'recent_notes': [],
+    }))
+    page.route('**/api/games', lambda route: route.fulfill(json=[ended, upcoming]))
+    page.route('**/api/game-day/91/readiness', lambda route: route.fulfill(json={
+        'status': 'success',
+        'readiness': {'status': 'COMPLETE', 'has_end_game': True},
+    }))
+    page.route('**/api/game-day/92/readiness', lambda route: route.fulfill(json={
+        'status': 'success',
+        'readiness': {
+            'status': 'PREP',
+            'has_end_game': False,
+            'lineup_ready': False,
+            'defense_ready': False,
+            'present_count': 9,
+            'absent_count': 0,
+            'blockers': ['Batting lineup is not set.'],
+        },
+    }))
+    page.route('**/api/game-day/92/pitching-rules', lambda route: route.fulfill(json={
+        'status': 'success',
+        'effective': 'MLB Pitch Smart',
+        'source': 'team',
+    }))
+
+    login(page, coachboard_url)
+    dashboard = page.locator('.cb-home-dashboard')
+    expect(dashboard).to_be_visible(timeout=15_000)
+    next_card = dashboard.locator('.cb-home-next-game')
+    expect(next_card).to_contain_text('Future Foxes')
+    expect(next_card).not_to_contain_text('Completed Cubs')
+    expect(next_card).not_to_contain_text('COMPLETE')
 
 
 def test_home_is_first_mobile_destination(page: Page, coachboard_url: str):
