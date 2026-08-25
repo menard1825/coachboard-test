@@ -1,26 +1,7 @@
 {% extends "base.html" %}
+{% from '_coachboard_formatters.html' import game_time %}
 
 {% block title %}Game Day - {{ current_team.team_name }}{% endblock %}
-
-{% macro game_time(value) -%}
-  {% set raw = (value or '')|string|trim %}
-  {% if raw %}
-    {% set upper = raw|upper %}
-    {% if 'AM' in upper or 'PM' in upper %}
-      {{ raw }}
-    {% else %}
-      {% set parts = raw.split(':') %}
-      {% if parts|length >= 2 %}
-        {% set hour24 = parts[0]|int %}
-        {% set minute = parts[1][0:2] %}
-        {% set hour12 = hour24 % 12 %}
-        {{ 12 if hour12 == 0 else hour12 }}:{{ minute }} {{ 'PM' if hour24 >= 12 else 'AM' }}
-      {% else %}
-        {{ raw }}
-      {% endif %}
-    {% endif %}
-  {% endif %}
-{%- endmacro %}
 
 {% block head %}
 <style>
@@ -155,7 +136,7 @@
     {% endfor %}
   </div>
   {% else %}
-    <div class="gd-empty"><strong>No games are scheduled.</strong><div class="mt-1">{% if is_game_changer %}No GameChanger setup is available until a game is scheduled.{% else %}No games scheduled.{% endif %}</div>{% if not is_game_changer %}<a class="btn btn-outline-primary mt-3" href="{{ url_for('home') }}#games">Open Schedule</a>{% endif %}</div>
+    <div class="gd-empty"><strong>No games are scheduled.</strong><div class="mt-1">{% if is_game_changer %}No GameChanger setup is available until a game is scheduled.{% else %}No games scheduled.{% endif %}</div>{% if not is_game_changer %}<a class="btn btn-outline-primary mt-3" href="#">Add Game</a>{% endif %}</div>
   {% endif %}
 
   {% if followup_cards and not is_game_changer %}
@@ -205,20 +186,6 @@
   </div>
   {% endif %}
 </div>
-{% endblock %}
-
-{% block bottom_nav %}
-{% if session.get('role') != 'Game Changer' %}
-<nav class="fixed-bottom d-lg-none bottom-nav-fixed shadow-lg bg-white">
-  <ul class="nav nav-tabs w-100">
-    <li class="nav-item flex-fill"><a class="nav-link active text-center" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-diamond d-block"></i><span>Game Day</span></a></li>
-    <li class="nav-item flex-fill"><a class="nav-link text-center" href="{{ url_for('home') }}#roster"><i class="bi bi-people d-block"></i><span>Roster</span></a></li>
-    <li class="nav-item flex-fill"><a class="nav-link text-center" href="{{ url_for('home') }}#player_development"><i class="bi bi-graph-up-arrow d-block"></i><span>Development</span></a></li>
-    <li class="nav-item flex-fill"><a class="nav-link text-center" href="{{ url_for('home') }}#practice_plan"><i class="bi bi-clipboard-check d-block"></i><span>Practice</span></a></li>
-    <li class="nav-item flex-fill"><a class="nav-link text-center" href="{{ url_for('home') }}#more"><i class="bi bi-three-dots d-block"></i><span>More</span></a></li>
-  </ul>
-</nav>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
