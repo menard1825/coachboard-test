@@ -11,6 +11,7 @@
   let endAfterNextDefense = false;
   let quickDefenseObserver = null;
   let rootObserver = null;
+  let started = false;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -327,6 +328,12 @@
   }
 
   function start() {
+    if (started) return;
+    if (!document.body) {
+      document.addEventListener('DOMContentLoaded', start, {once:true});
+      return;
+    }
+    started = true;
     installStyles();
     document.getElementById('cbCurrentInningStrip')?.remove();
     removeBulkDefense();
@@ -352,7 +359,7 @@
     }
   }
 
-  document.readyState === 'loading'
-    ? document.addEventListener('DOMContentLoaded',start,{once:true})
-    : start();
+  // Game Management loads this before the legacy live action dispatcher so
+  // End Inning has one authoritative capture-phase owner from the first tap.
+  start();
 })();
