@@ -85,11 +85,23 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         assert max(item['top'] for item in inning_bounds) - min(item['top'] for item in inning_bounds) <= 3
 
         # The visible defense editor is the coach-facing source of truth on phone.
+        # A saved defense is explicitly one inning; a full-game plan is explicitly
+        # every inning so coaches do not have to infer the difference.
         expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
         defense = page.locator('#pregame-defense-editor-v3')
         expect(defense).to_be_visible(timeout=15_000)
         expect(defense.locator('.pde-title')).to_have_text('Set Defense — Inning 1')
-        expect(defense.locator('.gm-preset-label')).to_have_text('Defense Preset (Optional)')
+        expect(defense.locator('.gm-preset-label')).to_have_text('Saved Defense · This Inning Only')
+        expect(defense.locator('.gm-preset-help')).to_contain_text('Full-game plans are under Defense Options.')
+        expect(defense.locator('#pde-apply')).to_have_text('Use for Inning 1')
+
+        defense_options = page.get_by_role('button', name=re.compile('Defense Options'))
+        defense_options.click()
+        expect(page.locator('#gmFullGamePlanHeader')).to_contain_text('Full-game defense plan · all innings')
+        rotation_template = page.locator('#rotationTemplateSelect')
+        expect(rotation_template).to_be_visible()
+        expect(rotation_template.locator('option').first).to_have_text('Load full-game defense plan (all innings)…')
+        defense_options.click()
 
         preset = defense.locator('#pde-preset')
         expect(preset).to_be_visible()
