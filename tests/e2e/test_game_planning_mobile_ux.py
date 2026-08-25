@@ -84,33 +84,41 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         assert all(item['left'] >= -1 and item['right'] <= item['viewport'] + 1 for item in inning_bounds)
         assert max(item['top'] for item in inning_bounds) - min(item['top'] for item in inning_bounds) <= 3
 
-        # The current editor is the rotation-board diamond, not the retired PDE
-        # overlay. It must remain directly usable on a phone.
+        # The visible defense editor is the coach-facing source of truth on phone.
         expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
-        expect(page.locator('#rotation-board')).to_be_visible(timeout=15_000)
-        template_select = page.locator('#rotationTemplateSelect')
-        expect(template_select).to_be_attached()
-        everyday = template_select.locator('option').filter(has_text='Everyday Defense')
-        expect(everyday).to_have_count(1)
-        template_id = everyday.get_attribute('value')
-        assert template_id
-        page.once('dialog', lambda dialog: dialog.accept())
-        template_select.select_option(value=template_id)
+        defense = page.locator('#pregame-defense-editor-v3')
+        expect(defense).to_be_visible(timeout=15_000)
+        expect(defense.locator('.pde-title')).to_have_text('Set Defense — Inning 1')
+        expect(defense.locator('.gm-preset-label')).to_have_text('Defense Preset (Optional)')
 
-        diamond = page.locator('#diamond-parent-mobile .diamond-container-interactive')
-        expect(diamond).to_be_visible()
-        spots = diamond.locator('.position-dropzone')
+        preset = defense.locator('#pde-preset')
+        expect(preset).to_be_visible()
+        everyday = preset.locator('option').filter(has_text='Everyday Defense')
+        expect(everyday).to_have_count(1)
+        preset_id = everyday.get_attribute('value')
+        assert preset_id
+        preset.select_option(value=preset_id)
+        page.once('dialog', lambda dialog: dialog.accept())
+        defense.locator('#pde-apply').click()
+        expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
+        expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
+
+        # The whole baseball field and all position targets must fit on screen.
+        field = defense.locator('.pde-field')
+        expect(field).to_be_visible()
+        spots = field.locator('.pde-spot')
         expect(spots).to_have_count(9)
-        geometry = diamond.evaluate(
+        geometry = field.evaluate(
             """field => {
                 const outer = field.getBoundingClientRect();
-                const spots = [...field.querySelectorAll('.position-dropzone')].map(spot => {
+                const spots = [...field.querySelectorAll('.pde-spot')].map(spot => {
                     const r = spot.getBoundingClientRect();
                     return {left:r.left, right:r.right, top:r.top, bottom:r.bottom, width:r.width, height:r.height};
                 });
-                return {outer:{left:outer.left,right:outer.right,top:outer.top,bottom:outer.bottom},spots};
+                return {outer:{left:outer.left,right:outer.right,top:outer.top,bottom:outer.bottom,height:outer.height},spots};
             }"""
         )
+        assert geometry['outer']['height'] <= 270
         assert geometry['spots']
         assert all(
             spot['left'] >= geometry['outer']['left'] - 1
@@ -121,16 +129,19 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         )
         assert all(spot['width'] >= 44 and spot['height'] >= 36 for spot in geometry['spots'])
 
-        # A player's complete name is game-critical information. Applied preset
-        # names may wrap, but they must not be ellipsized or clipped.
-        diamond_names = diamond.locator('.player-tag')
+        # A player's complete name is game-critical information. Names may wrap,
+        # but they may not be ellipsized or clipped inside a position target.
+        diamond_names = field.locator('.pde-name')
         expect(diamond_names).not_to_have_count(0)
         samples = diamond_names.evaluate_all(
             """items => items.map(el => {
                 const s = getComputedStyle(el);
                 return {
                     text:(el.textContent || '').trim(),
+                    whiteSpace:s.whiteSpace,
+                    overflow:s.overflow,
                     textOverflow:s.textOverflow,
+                    fontSize:parseFloat(s.fontSize),
                     scrollWidth:el.scrollWidth,
                     clientWidth:el.clientWidth,
                     scrollHeight:el.scrollHeight,
@@ -139,8 +150,12 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             })"""
         )
         for sample in samples:
-            assert sample['text']
-            assert sample['textOverflow'] != 'ellipsis', sample
+            if sample['text'] == 'OPEN':
+                continue
+            assert sample['whiteSpace'] == 'normal', sample
+            assert sample['overflow'] == 'visible', sample
+            assert sample['textOverflow'] == 'clip', sample
+            assert sample['fontSize'] >= 8.0, sample
             assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
             assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
 
