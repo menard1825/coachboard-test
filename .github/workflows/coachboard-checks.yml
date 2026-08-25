@@ -45,28 +45,11 @@ jobs:
 
       - name: JavaScript syntax checks
         run: |
-          node --check static/js/navigation_v2.js
-          node --check static/js/main.js
-          node --check static/js/coachboard_ui.js
-          node --check static/js/home_dashboard.js
-          node --check static/js/client_timezone.js
-          node --check static/js/fair_play_assistant.js
-          node --check static/js/pitching_preferences.js
-          node --check static/js/game_logic.js
-          node --check static/js/lineup_editor.js
-          node --check static/js/assignment_picker_availability.js
-          node --check static/js/postgame_game_management_cleanup.js
-          node --check static/js/user_management_password_help.js
-          node --check static/js/user_management_cleanup.js
-          node --check static/js/live_game_pitching_finalize.js
-          node --check static/js/live_game_clock.js
-          node --check static/js/game_pitching_rule_picker.js
-          node --check static/js/live_game_board_prep.js
-          node --check static/js/game_management_coach_simplify.js
-          node --check static/js/gameday_pitching_steppers.js
-          node --check static/js/stats_dashboard_integrity.js
-          node --check static/js/stats_dashboard_render.js
-          node --check static/js/stats_dashboard_v2.js
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "Checking ${file}"
+            node --check "$file"
+          done < <(find static/js -type f -name '*.js' -print0 | sort -z)
 
       - name: Migration chain check
         env:
