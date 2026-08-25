@@ -116,7 +116,7 @@ def test_paused_live_game_survives_navigation_away_and_back(page: Page, coachboa
         page.locator('#cbDugoutHeader [data-cb-menu]').click()
         menu = page.locator('#cbCoachBoardNavModal')
         expect(menu).to_be_visible()
-        expect(menu).to_contain_text('The game stays live.')
+        expect(menu).to_contain_text('Game stays live.')
         game_day_link = menu.get_by_role('link', name='Game Day')
         expect(game_day_link).to_be_visible()
         game_day_link.click()
