@@ -125,7 +125,10 @@ def test_phone_live_game_keeps_field_and_bench_visible_and_saves_tap_moves(page:
         expect(quick.locator('.cb-qd-field')).to_be_visible()
         bench_button = quick.locator(f'[data-cb-move-player="{BENCH_NAME}"]')
         expect(bench_button).to_be_visible()
-        expect(bench_button).to_contain_text('Bench now')
+        expect(bench_button).to_contain_text(BENCH_NAME)
+        # Redundant "Bench now" helper copy was intentionally removed; the
+        # On the Bench section itself communicates the player's state.
+        expect(bench_button).not_to_contain_text('Bench now')
         expect(page.locator('#cbDugoutHeader .cb-dh-pitcher')).to_be_visible()
         expect(page.locator('#coach-pitcher-slot')).not_to_be_visible()
         assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
