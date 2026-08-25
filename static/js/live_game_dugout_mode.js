@@ -484,7 +484,6 @@
       quickDefenseSignature = '';
       bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
       queue();
-      setTimeout(getState, 250);
     } catch (error) {
       saveMode = 'error';
       saveMessage = 'Not saved — Retry';
@@ -632,20 +631,28 @@
       const button = event.target.closest('#liveEndInningBtn');
       if (!button || button.disabled) return;
       endInningFrom = String(state?.current_inning || $('live-inning-display')?.textContent || '');
-      setTimeout(getState, 550);
-      setTimeout(getState, 1200);
-      setTimeout(getState, 2200);
+      // The End Inning request and Socket.IO broadcast normally update the page.
+      // One delayed state read is enough as a network fallback; the old three-read
+      // sequence made the dugout feel busier on phones and tablets.
+      setTimeout(getState, 700);
     }, true);
-    new MutationObserver(queue).observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: ['class'],
-    });
+    const liveOverlay = $('live-game-overlay');
+    if (liveOverlay) {
+      // Watch only the live-game surface. Observing the entire document — including
+      // clock text, menus, toasts, and unrelated Bootstrap changes — caused needless
+      // redraw scheduling during every live inning.
+      new MutationObserver(queue).observe(liveOverlay, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class'],
+      });
+    }
     getState();
     getClock();
-    setInterval(getState, 5000);
+    // Socket/API responses are the primary source of live changes. Periodic reads
+    // remain only as recovery in case a browser misses an update.
+    setInterval(getState, 12000);
     setInterval(getClock, 15000);
     setInterval(() => {
       if (document.body.classList.contains('cb-dugout')) queue();
