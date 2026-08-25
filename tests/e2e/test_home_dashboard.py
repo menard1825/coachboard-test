@@ -48,14 +48,14 @@ def test_home_is_first_mobile_destination(page: Page, coachboard_url: str):
     login(page, coachboard_url)
 
     expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
-    bottom_nav = page.locator('nav.bottom-nav-fixed ul')
+    bottom_nav = page.locator('#cb-global-mobile-nav ul')
     expect(bottom_nav).to_be_visible()
     items = bottom_nav.locator('a.nav-link')
     expect(items).to_have_count(5)
     expect(items.nth(0)).to_contain_text('Home')
     expect(items.nth(0)).to_have_attribute('href', '#overview')
     expect(items.nth(1)).to_contain_text('Game Day')
-    expect(items.nth(1)).to_have_attribute('href', '#games')
+    expect(items.nth(1)).to_have_attribute('href', '/game-day')
     expect(items.nth(2)).to_contain_text('Roster')
     expect(items.nth(3)).to_contain_text('Practice')
     expect(items.nth(4)).to_contain_text('More')
@@ -70,22 +70,22 @@ def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page
     login(page, coachboard_url)
     expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
 
-    # Allow the Home enhancement's delayed compatibility render to complete.
+    # Home, Roster, Practice and More are same-document workspaces. Game Day is
+    # intentionally a dedicated route so it can own its game-focused shell.
     page.wait_for_timeout(400)
-    bottom_nav = page.locator('nav.bottom-nav-fixed ul')
+    bottom_nav = page.locator('#cb-global-mobile-nav ul')
     same_page_items = bottom_nav.locator('a[href^="#"]')
-    expect(same_page_items).to_have_count(5)
-    for index in range(5):
+    expect(same_page_items).to_have_count(4)
+    for index in range(4):
         expect(same_page_items.nth(index)).not_to_have_attribute('data-bs-toggle', 'tab')
 
     expected = {
         'Home': '#overview',
-        'Game Day': '#games',
         'Roster': '#roster',
         'Practice': '#practice_plan',
         'More': '#more',
     }
-    for label in ('Roster', 'Practice', 'Game Day', 'More', 'Home', 'Roster', 'More'):
+    for label in ('Roster', 'Practice', 'More', 'Home', 'Roster', 'More'):
         bottom_nav.get_by_text(label, exact=True).click()
         target = expected[label]
         expect(page.locator(target)).to_have_class(re.compile(r'\bactive\b'))
@@ -106,9 +106,15 @@ def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page
     expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
     expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
 
+    # Game Day intentionally performs a real route transition rather than
+    # activating the retired #games dashboard pane.
+    bottom_nav.get_by_text('Game Day', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/game-day$'))
+    expect(page.get_by_role('heading', name='Game Day')).to_be_visible()
+
     page.go_back()
-    expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
-    expect(bottom_nav.locator('a.nav-link.active span')).to_have_text('More')
+    expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
+    expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
 
 
 def test_game_day_mobile_navigation_keeps_home(page: Page, coachboard_url: str):
@@ -116,12 +122,12 @@ def test_game_day_mobile_navigation_keeps_home(page: Page, coachboard_url: str):
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/game-day')
 
-    bottom_nav = page.locator('nav.bottom-nav-fixed ul')
+    bottom_nav = page.locator('#cb-global-mobile-nav ul')
     expect(bottom_nav).to_be_visible()
     items = bottom_nav.locator('a.nav-link')
     expect(items).to_have_count(5)
     expect(items.nth(0)).to_contain_text('Home')
-    expect(items.nth(0)).to_have_attribute('href', '/')
+    expect(items.nth(0)).to_have_attribute('href', '/#overview')
     expect(items.nth(1)).to_contain_text('Game Day')
     expect(items.nth(1)).to_have_class(re.compile(r'\bactive\b'))
     expect(items.nth(2)).to_contain_text('Roster')
