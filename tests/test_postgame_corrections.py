@@ -3,7 +3,7 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash
 
 
-def _build_app(monkeypatch, *, ended=True):
+def _build_app(monkeypatch, *, ended=True, role='Head Coach'):
     monkeypatch.setenv('SECRET_KEY', 'test-secret-key')
     monkeypatch.setenv('COACHBOARD_ENV', 'test')
     monkeypatch.setenv('DATABASE_URL', 'sqlite:///:memory:')
@@ -39,7 +39,7 @@ def _build_app(monkeypatch, *, ended=True):
         db.session.add(TeamMembership(
             user_id=user.id,
             team_id=team.id,
-            role='Head Coach',
+            role=role,
             player_order=[],
         ))
 
@@ -180,9 +180,8 @@ def test_postgame_lineup_correction_changes_report_order(monkeypatch):
         assert names[-1] == 'Ace'
 
     report = client.get('/game-day/1/report').get_data(as_text=True)
-    first = report.index('#9 Liam')
-    last = report.index('#1 Ace')
-    assert first < last
+    batting_section = report.split('<strong>Batting Order</strong>', 1)[1].split('<strong>GameChanger Pitching</strong>', 1)[0]
+    assert batting_section.index('#9 Liam') < batting_section.index('#1 Ace')
 
 
 def test_postgame_corrections_reject_unended_games_and_gamechanger_role(monkeypatch):
@@ -193,7 +192,7 @@ def test_postgame_corrections_reject_unended_games_and_gamechanger_role(monkeypa
     response = client.post('/api/game-day/1/corrections/lineup', json={'player_ids':[1]})
     assert response.status_code == 409
 
-    ended_app = _build_app(monkeypatch, ended=True)
+    ended_app = _build_app(monkeypatch, ended=True, role='Game Changer')
     gc_client = ended_app.test_client()
     _login(gc_client, role='Game Changer')
     response = gc_client.post('/api/game-day/1/corrections/lineup', json={'player_ids':[1]})
