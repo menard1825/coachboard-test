@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_coachboard_formatters.html' import game_time %}
 {% block title %}Game Report - vs {{ game.opponent }}{% endblock %}
 
 {% block head %}
@@ -16,7 +17,7 @@
     <div>
       <div class="agr-k">Game Report</div>
       <h1>{{ current_team.team_name }} vs {{ game.opponent }}</h1>
-      <div class="agr-meta">{{ game.date.strftime('%A, %m/%d/%Y') }}{% if game.start_time %} · {{ game.start_time }}{% endif %}{% if game.location %} · {{ game.location }}{% endif %}</div>
+      <div class="agr-meta">{{ game.date.strftime('%A, %m/%d/%Y') }}{% if game.start_time %} · {{ game_time(game.start_time) }}{% endif %}{% if game.location %} · {{ game.location }}{% endif %}</div>
       {% if report.absent_labels %}<div class="agr-absent"><strong>Out:</strong> {{ report.absent_labels|join(', ') }}</div>{% endif %}
     </div>
     {% if report.pitching_stats_pending %}
