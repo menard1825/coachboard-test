@@ -127,7 +127,7 @@ def test_game_day_mobile_navigation_keeps_home(page: Page, coachboard_url: str):
     items = bottom_nav.locator('a.nav-link')
     expect(items).to_have_count(5)
     expect(items.nth(0)).to_contain_text('Home')
-    expect(items.nth(0)).to_have_attribute('href', '/#overview')
+    expect(items.nth(0)).to_have_attribute('href', '/')
     expect(items.nth(1)).to_contain_text('Game Day')
     expect(items.nth(1)).to_have_class(re.compile(r'\bactive\b'))
     expect(items.nth(2)).to_contain_text('Roster')
