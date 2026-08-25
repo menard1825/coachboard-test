@@ -113,6 +113,7 @@ def game_day_home():
             followup_cards.append({'game': game, 'readiness': readiness})
         if len(followup_cards) >= 6:
             break
+    followup_ids = {item['game'].id for item in followup_cards}
 
     # Game Day doubles as the schedule manager. Keep a useful upcoming window
     # here instead of forcing coaches back to the legacy home-page Games tab.
@@ -125,8 +126,9 @@ def game_day_home():
     upcoming = upcoming_query.order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(12).all()
 
     # Preserve schedule history. Include games from earlier dates plus games from
-    # today that have actually reached postgame/completion. A game already shown
-    # in the primary Today/Next card is excluded so the page never repeats it.
+    # today that have actually reached postgame/completion. A game that still has
+    # postgame work stays only in Postgame Follow-Up until that work is complete,
+    # so the same game is never rendered twice on Game Day.
     historical_games = db.session.query(Game).filter(
         Game.team_id == team.id,
         Game.date < day_start,
@@ -142,7 +144,7 @@ def game_day_home():
 
     past_games = [
         game for game in [*same_day_history, *historical_games]
-        if game.id not in focus_ids
+        if game.id not in focus_ids and game.id not in followup_ids
     ]
 
     return render_template(
