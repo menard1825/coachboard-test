@@ -245,8 +245,20 @@
     });
   }
 
+  function loadPitchingScanView() {
+    if (document.getElementById('cb-pitching-scan-compact-script')) return;
+    const script = document.createElement('script');
+    script.id = 'cb-pitching-scan-compact-script';
+    script.src = '/static/js/pitching_scan_compact.js?v=20260825-1';
+    script.async = false;
+    document.head.appendChild(script);
+  }
+
   function loadDugoutMobileView(attempt = 0) {
-    if (document.getElementById('cb-pitching-dugout-mobile-script')) return;
+    if (document.getElementById('cb-pitching-dugout-mobile-script')) {
+      loadPitchingScanView();
+      return;
+    }
 
     // The existing Pitching focus layer owns the authoritative classification
     // of Eligible / Unavailable / Needs Review. Wait until it has attached its
@@ -262,6 +274,7 @@
     script.id = 'cb-pitching-dugout-mobile-script';
     script.src = '/static/js/pitching_dugout_mobile.js?v=20260821-2';
     script.async = false;
+    script.addEventListener('load', loadPitchingScanView, {once:true});
     document.head.appendChild(script);
   }
 
