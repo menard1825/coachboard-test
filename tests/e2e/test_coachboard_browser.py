@@ -46,19 +46,21 @@ def test_coach_can_sign_in_and_open_game_day(page: Page, coachboard_url: str):
 
 
 def test_starting_defense_applies_and_survives_reload(page: Page, coachboard_url: str):
+    """Apply the seeded defense preset through the editor coaches actually use."""
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/game/1')
 
-    preset = page.locator('#pde-preset')
-    expect(preset).to_be_visible(timeout=15_000)
-    preset.select_option(label='Everyday Defense')
+    template_select = page.locator('#rotationTemplateSelect')
+    expect(template_select).to_be_attached(timeout=15_000)
+    option = template_select.locator('option').filter(has_text='Everyday Defense')
+    expect(option).to_have_count(1)
+    template_id = option.get_attribute('value')
+    assert template_id
 
     page.once('dialog', lambda dialog: dialog.accept())
-    page.locator('#pde-apply').click()
-    expect(page.locator('.toast-body')).to_contain_text('Everyday Defense applied', timeout=15_000)
+    template_select.select_option(value=template_id)
 
     expected_positions = {
-        'P': 'OPEN',
         'C': 'Catcher Cole',
         '1B': 'First Frank',
         '2B': 'Second Sam',
@@ -68,17 +70,33 @@ def test_starting_defense_applies_and_survives_reload(page: Page, coachboard_url
         'CF': 'Center Casey',
         'RF': 'Right Riley',
     }
+    # Starting Defense presets intentionally leave pitcher open because the
+    # pitcher changes game to game.
+    expect(page.locator('#pos-desktop-P .player-tag')).to_have_count(0)
     for position, player_name in expected_positions.items():
-        expect(
-            page.locator(f'[data-pde-pos="{position}"] .pde-name')
-        ).to_have_text(player_name)
+        expect(page.locator(f'#pos-desktop-{position} .player-tag')).to_have_text(player_name)
+
+    # The template load autosaves; wait for the API-authoritative game data to
+    # contain the applied defense before reloading the browser.
+    page.wait_for_function(
+        """async () => {
+          const response = await fetch('/api/game_data/1', {cache:'no-store'});
+          if (!response.ok) return false;
+          const data = await response.json();
+          let innings = data?.rotation?.innings || {};
+          if (typeof innings === 'string') {
+            try { innings = JSON.parse(innings); } catch (_) { return false; }
+          }
+          return innings?.['1']?.SS === 'Shortstop Shawn' && !innings?.['1']?.P;
+        }""",
+        timeout=15_000,
+    )
 
     page.reload()
-    expect(page.locator('#pde-preset')).to_be_visible(timeout=15_000)
+    expect(page.locator('#rotation-board')).to_be_visible(timeout=15_000)
+    expect(page.locator('#pos-desktop-P .player-tag')).to_have_count(0)
     for position, player_name in expected_positions.items():
-        expect(
-            page.locator(f'[data-pde-pos="{position}"] .pde-name')
-        ).to_have_text(player_name)
+        expect(page.locator(f'#pos-desktop-{position} .player-tag')).to_have_text(player_name)
 
 
 def test_other_team_game_is_not_exposed(page: Page, coachboard_url: str):
@@ -130,12 +148,12 @@ def test_game_day_core_flow_works_on_phone_size(page: Page, coachboard_url: str)
 
     page.goto(f'{coachboard_url}/game-day')
     game_card = page.locator('[data-game-id="1"]')
-
     game_card.locator('.gd-actions a').first.click()
 
     expect(page).to_have_url(re.compile(r'/game/1$'))
     expect(page.locator('#pregame-checklist-container')).to_be_visible()
-    expect(page.locator('#pde-preset')).to_be_visible(timeout=15_000)
+    expect(page.locator('#rotation-board')).to_be_visible(timeout=15_000)
+    expect(page.locator('#inning-btn-group label.btn')).not_to_have_count(0)
 
 
 def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachboard_url: str):
@@ -197,6 +215,7 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     expect(page.locator('#lineupEditorModal')).to_be_hidden()
 
     readiness.get_by_role('button', name=re.compile('Defense')).click()
-    expect(page.locator('#pde-preset')).to_be_visible(timeout=15_000)
+    expect(page.locator('#rotation-board')).to_be_visible(timeout=15_000)
+    expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
     readiness.get_by_role('button', name=re.compile('Pitch Plan')).click()
     expect(page.locator('#pitcher-availability-card')).to_be_visible()
