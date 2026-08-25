@@ -12,6 +12,8 @@ from models import (
     Player,
     PlayerGameAbsence,
     Team,
+    TeamMembership,
+    User,
 )
 
 
@@ -40,8 +42,16 @@ def _has_end_game(game, team_id):
     ).first() is not None
 
 
-def _correction_role_allowed():
-    return str(session.get('role') or '').strip() != 'Game Changer'
+def _correction_role_allowed(team_id):
+    username = str(session.get('username') or '').strip()
+    if not username:
+        return False
+    user = db.session.query(User).filter(db.func.lower(User.username) == username.lower()).first()
+    if not user:
+        return False
+    membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=team_id).first()
+    role = str(membership.role if membership else session.get('role') or '').strip()
+    return role != 'Game Changer'
 
 
 def _present_players(game, team_id):
@@ -173,7 +183,7 @@ def correct_game(game_id):
     if not _has_end_game(game, team.id):
         flash('Only ended games can be corrected from the Game Report.', 'warning')
         return redirect(url_for('game_day.game_report', game_id=game.id))
-    if not _correction_role_allowed():
+    if not _correction_role_allowed(team.id):
         flash('GameChanger users can update pitching stats, but game-record corrections require a coach.', 'warning')
         return redirect(url_for('game_day.game_report', game_id=game.id))
 
@@ -190,7 +200,7 @@ def correct_defense(game_id):
     team, game = _authorized_game(game_id)
     if not team or not game:
         return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
-    if not _correction_role_allowed():
+    if not _correction_role_allowed(team.id):
         return jsonify({'status': 'error', 'message': 'A coach is required to correct the game record.'}), 403
     if not _has_end_game(game, team.id):
         return jsonify({'status': 'error', 'message': 'Only ended games can be corrected.'}), 409
@@ -226,7 +236,12 @@ def correct_defense(game_id):
     if invalid:
         return jsonify({'status': 'error', 'message': f'{invalid[0]} is not available for this game.'}), 409
 
-    _, actual, _, _ = actual_game_rotation(game, team.id)
+    _, actual, _, reached = actual_game_rotation(game, team.id)
+    regulation = int(build_game_readiness(game, team).get('regulation_innings') or 6)
+    allowed_innings = {str(number) for number in range(1, regulation + 1)} | {str(value) for value in reached}
+    if inning not in allowed_innings:
+        return jsonify({'status': 'error', 'message': 'That inning is outside this game record.'}), 409
+
     before = deepcopy(actual.get(inning) or {})
     comparable_before = {pos: before.get(pos) or '' for pos in positions}
     if comparable_before == cleaned:
@@ -266,7 +281,7 @@ def correct_lineup(game_id):
     team, game = _authorized_game(game_id)
     if not team or not game:
         return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
-    if not _correction_role_allowed():
+    if not _correction_role_allowed(team.id):
         return jsonify({'status': 'error', 'message': 'A coach is required to correct the game record.'}), 403
     if not _has_end_game(game, team.id):
         return jsonify({'status': 'error', 'message': 'Only ended games can be corrected.'}), 409
