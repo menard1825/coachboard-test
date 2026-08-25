@@ -16,6 +16,7 @@
   let busy = false;
   let lastSignature = '';
   let bodyObserver = null;
+  let skipHiddenRefresh = false;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -296,6 +297,17 @@
     card.querySelector('[data-bp-action="adjust"]')?.addEventListener('click',openAdjust);
   }
 
+  function syncAdjustHeader(modal = document.getElementById(MODAL_ID)) {
+    if (!modal) return;
+    const inning = String(latest?.next_inning || '').trim();
+    const title = modal.querySelector('.modal-title');
+    const subtitle = title?.parentElement?.querySelector('.small.text-muted');
+    if (title) title.textContent = inning ? `Set Defense — Inning ${inning}` : 'Set Defense';
+    if (subtitle) subtitle.textContent = inning
+      ? `Choose who takes the field for Inning ${inning}.`
+      : 'Choose who takes the field next inning.';
+  }
+
   function ensureAdjustModal() {
     let modal = document.getElementById(MODAL_ID);
     if (!modal) {
@@ -304,13 +316,22 @@
       modal.className = 'modal fade';
       modal.tabIndex = -1;
       modal.setAttribute('data-bs-backdrop','static');
-      modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Set New Defense</h5><div class="small text-muted">Who takes the field next inning?</div></div><button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body" id="${BODY_ID}"></div></div></div>`;
+      modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Set Defense</h5><div class="small text-muted">Choose who takes the field next inning.</div></div><button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body" id="${BODY_ID}"></div></div></div>`;
       document.body.appendChild(modal);
+      modal.addEventListener('hide.bs.modal', () => {
+        const active = document.activeElement;
+        if (modal.contains(active) && typeof active?.blur === 'function') active.blur();
+      });
       modal.addEventListener('hidden.bs.modal', () => {
         selectedName = '';
+        if (skipHiddenRefresh) {
+          skipHiddenRefresh = false;
+          return;
+        }
         window.setTimeout(refresh,80);
       });
     }
+    syncAdjustHeader(modal);
     guardModalOwnership();
     return modal;
   }
@@ -408,6 +429,7 @@
   function renderAdjust() {
     const body = document.getElementById(BODY_ID);
     if (!body || !latest || !draft) return;
+    syncAdjustHeader();
 
     const pitcher = latest.current_alignment?.P || draft.P || '';
     if (pitcher) draft.P = pitcher;
@@ -416,8 +438,10 @@
     const holes = posList.filter(pos => !draft[pos]);
     const bench = draftBenchPlayers();
     const selected = selectedName ? playerLabel(selectedName) : '';
+    const inning = String(latest.next_inning || '').trim();
+    const saveLabel = inning ? `Set Inning ${inning} Defense` : 'Set Defense';
 
-    body.innerHTML = `<div id="${OWNED_ID}"><div class="ni-label">Who’s sitting</div><div class="ni-bench">${bench.length ? bench.map(player => `<button type="button" class="ni-bench-player ${selectedName === player.name ? 'selected' : ''}" data-ni-bench="${esc(player.name)}">${esc(playerLabel(player.name))}</button>`).join('') : '<span class="small text-muted">Nobody</span>'}</div><div class="ni-selected">${selected ? `<strong>${esc(selected)}</strong> — tap a position.` : 'Tap a bench player or fielder, then tap the spot.'}</div><div class="ni-field-wrap" data-ni-field></div><div class="ni-pitcher-note">${pitcher ? `${esc(playerLabel(pitcher))} stays at P.` : 'Pitcher stays the same.'}</div><div class="ni-footer"><div class="me-auto">${holes.length ? `<div class="ni-warning">Fill ${esc(holes.join(', '))}.</div>` : ''}</div><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-dark" id="save-next-inning-adjust" ${holes.length ? 'disabled' : ''}>Set Defense</button></div></div>`;
+    body.innerHTML = `<div id="${OWNED_ID}"><div class="ni-label">Who’s sitting</div><div class="ni-bench">${bench.length ? bench.map(player => `<button type="button" class="ni-bench-player ${selectedName === player.name ? 'selected' : ''}" data-ni-bench="${esc(player.name)}">${esc(playerLabel(player.name))}</button>`).join('') : '<span class="small text-muted">Nobody</span>'}</div><div class="ni-selected">${selected ? `<strong>${esc(selected)}</strong> — tap a position.` : 'Tap a bench player or fielder, then tap the spot.'}</div><div class="ni-field-wrap" data-ni-field></div><div class="ni-pitcher-note">${pitcher ? `${esc(playerLabel(pitcher))} stays at P.` : 'Pitcher stays the same.'}</div><div class="ni-footer"><div class="me-auto">${holes.length ? `<div class="ni-warning">Fill ${esc(holes.join(', '))}.</div>` : ''}</div><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-dark" id="save-next-inning-adjust" ${holes.length ? 'disabled' : ''}>${esc(saveLabel)}</button></div></div>`;
 
     body.querySelector('[data-ni-field]')?.appendChild(nextField());
 
@@ -452,14 +476,19 @@
     if (button) { button.disabled = true; button.textContent = 'Saving…'; }
     try {
       const data = await api('POST',{mode:'custom', alignment:draft});
-      bootstrap.Modal.getOrCreateInstance(document.getElementById(MODAL_ID)).hide();
+      skipHiddenRefresh = true;
+      const modal = document.getElementById(MODAL_ID);
+      const active = document.activeElement;
+      if (modal?.contains(active) && typeof active?.blur === 'function') active.blur();
+      bootstrap.Modal.getOrCreateInstance(modal).hide();
       lastSignature = '';
       render(data);
       announce(data);
       toast(`Inning ${data.next_inning} defense set.`);
     } catch (err) {
       toast(err.message,'danger');
-      if (button) { button.disabled = false; button.textContent = 'Set Defense'; }
+      const inning = String(latest?.next_inning || '').trim();
+      if (button) { button.disabled = false; button.textContent = inning ? `Set Inning ${inning} Defense` : 'Set Defense'; }
     } finally {
       busy = false;
     }
