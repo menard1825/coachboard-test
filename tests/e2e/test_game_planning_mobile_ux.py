@@ -84,27 +84,33 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         assert all(item['left'] >= -1 and item['right'] <= item['viewport'] + 1 for item in inning_bounds)
         assert max(item['top'] for item in inning_bounds) - min(item['top'] for item in inning_bounds) <= 3
 
-        defense = page.locator('#pregame-defense-editor-v3')
-        expect(defense).to_be_visible(timeout=15_000)
-        expect(defense.locator('.pde-title')).to_have_text('Set Defense — Inning 1')
-        expect(defense.locator('.gm-preset-label')).to_have_text('Defense Preset (Optional)')
-        expect(defense.locator('#pde-preset option').first).to_have_text('Choose a starting defense…')
+        # The current editor is the rotation-board diamond, not the retired PDE
+        # overlay. It must remain directly usable on a phone.
+        expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
+        expect(page.locator('#rotation-board')).to_be_visible(timeout=15_000)
+        template_select = page.locator('#rotationTemplateSelect')
+        expect(template_select).to_be_attached()
+        everyday = template_select.locator('option').filter(has_text='Everyday Defense')
+        expect(everyday).to_have_count(1)
+        template_id = everyday.get_attribute('value')
+        assert template_id
+        page.once('dialog', lambda dialog: dialog.accept())
+        template_select.select_option(value=template_id)
 
-        # The whole field, including every position button, must fit inside the
-        # mobile field instead of being cropped above or below the browser chrome.
-        field = defense.locator('.pde-field')
-        expect(field).to_be_visible()
-        geometry = field.evaluate(
+        diamond = page.locator('#diamond-parent-mobile .diamond-container-interactive')
+        expect(diamond).to_be_visible()
+        spots = diamond.locator('.position-dropzone')
+        expect(spots).to_have_count(9)
+        geometry = diamond.evaluate(
             """field => {
                 const outer = field.getBoundingClientRect();
-                const spots = [...field.querySelectorAll('.pde-spot')].map(spot => {
+                const spots = [...field.querySelectorAll('.position-dropzone')].map(spot => {
                     const r = spot.getBoundingClientRect();
-                    return {left:r.left, right:r.right, top:r.top, bottom:r.bottom, width:r.width};
+                    return {left:r.left, right:r.right, top:r.top, bottom:r.bottom, width:r.width, height:r.height};
                 });
-                return {outer:{left:outer.left,right:outer.right,top:outer.top,bottom:outer.bottom,height:outer.height},spots};
+                return {outer:{left:outer.left,right:outer.right,top:outer.top,bottom:outer.bottom},spots};
             }"""
         )
-        assert geometry['outer']['height'] <= 270
         assert geometry['spots']
         assert all(
             spot['left'] >= geometry['outer']['left'] - 1
@@ -113,38 +119,30 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             and spot['bottom'] <= geometry['outer']['bottom'] + 1
             for spot in geometry['spots']
         )
-        assert all(60 <= spot['width'] <= 66 for spot in geometry['spots'])
+        assert all(spot['width'] >= 44 and spot['height'] >= 36 for spot in geometry['spots'])
 
-        # A player's complete name is game-critical information. The phone diamond
-        # may wrap a name, but it must never clamp it or replace it with ellipsis.
-        diamond_names = field.locator('.pde-name')
+        # A player's complete name is game-critical information. Applied preset
+        # names may wrap, but they must not be ellipsized or clipped.
+        diamond_names = diamond.locator('.player-tag')
         expect(diamond_names).not_to_have_count(0)
-        name_style = diamond_names.first.evaluate(
-            """el => {
+        samples = diamond_names.evaluate_all(
+            """items => items.map(el => {
                 const s = getComputedStyle(el);
                 return {
-                    whiteSpace:s.whiteSpace,
-                    overflow:s.overflow,
+                    text:(el.textContent || '').trim(),
                     textOverflow:s.textOverflow,
-                    fontSize:parseFloat(s.fontSize),
-                    lineClamp:s.webkitLineClamp,
-                    width:el.getBoundingClientRect().width,
-                    parentWidth:el.parentElement.getBoundingClientRect().width,
                     scrollWidth:el.scrollWidth,
                     clientWidth:el.clientWidth,
                     scrollHeight:el.scrollHeight,
                     clientHeight:el.clientHeight,
                 };
-            }"""
+            })"""
         )
-        assert name_style['whiteSpace'] == 'normal'
-        assert name_style['overflow'] == 'visible'
-        assert name_style['textOverflow'] == 'clip'
-        assert name_style['fontSize'] >= 8.5
-        assert name_style['lineClamp'] in {'none', 'unset', ''}
-        assert name_style['width'] <= name_style['parentWidth'] + 1
-        assert name_style['scrollWidth'] <= name_style['clientWidth'] + 1
-        assert name_style['scrollHeight'] <= name_style['clientHeight'] + 1
+        for sample in samples:
+            assert sample['text']
+            assert sample['textOverflow'] != 'ellipsis', sample
+            assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
+            assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
 
         # Game-planning pitching uses coach language and keeps secondary pitch
         # metrics collapsed until the coach asks for them.
