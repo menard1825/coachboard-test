@@ -96,28 +96,30 @@ def test_ipad_game_planning_keeps_tablet_layout(
         )
         assert all(item['left'] >= -1 and item['right'] <= item['viewport'] + 1 for item in inning_bounds)
 
-        # Apply the real starting-defense preset, then verify the active current
-        # editor rather than the retired PDE overlay. Bootstrap's lg breakpoint
-        # means portrait uses the touch editor while 1024 landscape uses desktop.
+        # Use the visible defense editor and the same preset workflow a coach taps.
         expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
-        template_select = page.locator('#rotationTemplateSelect')
-        expect(template_select).to_be_attached(timeout=15_000)
-        everyday = template_select.locator('option').filter(has_text='Everyday Defense')
+        defense = page.locator('#pregame-defense-editor-v3')
+        expect(defense).to_be_visible(timeout=15_000)
+        preset = defense.locator('#pde-preset')
+        expect(preset).to_be_visible()
+        everyday = preset.locator('option').filter(has_text='Everyday Defense')
         expect(everyday).to_have_count(1)
-        template_id = everyday.get_attribute('value')
-        assert template_id
+        preset_id = everyday.get_attribute('value')
+        assert preset_id
+        preset.select_option(value=preset_id)
         page.once('dialog', lambda dialog: dialog.accept())
-        template_select.select_option(value=template_id)
+        defense.locator('#pde-apply').click()
+        expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
+        expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
 
-        parent = '#diamond-parent-desktop' if width >= 992 else '#diamond-parent-mobile'
-        diamond = page.locator(f'{parent} .diamond-container-interactive')
-        expect(diamond).to_be_visible(timeout=15_000)
-        spots = diamond.locator('.position-dropzone')
+        field = defense.locator('.pde-field')
+        expect(field).to_be_visible()
+        spots = field.locator('.pde-spot')
         expect(spots).to_have_count(9)
-        geometry = diamond.evaluate(
+        geometry = field.evaluate(
             """field => {
                 const outer = field.getBoundingClientRect();
-                const spots = [...field.querySelectorAll('.position-dropzone')].map(spot => {
+                const spots = [...field.querySelectorAll('.pde-spot')].map(spot => {
                     const r = spot.getBoundingClientRect();
                     return {left:r.left, right:r.right, top:r.top, bottom:r.bottom};
                 });
@@ -133,11 +135,13 @@ def test_ipad_game_planning_keeps_tablet_layout(
             for spot in geometry['spots']
         )
 
-        names = diamond.locator('.player-tag')
+        names = field.locator('.pde-name')
         expect(names).not_to_have_count(0)
         samples = names.evaluate_all(
             """items => items.map(el => ({
                 text:(el.textContent || '').trim(),
+                whiteSpace:getComputedStyle(el).whiteSpace,
+                overflow:getComputedStyle(el).overflow,
                 textOverflow:getComputedStyle(el).textOverflow,
                 scrollWidth:el.scrollWidth,
                 clientWidth:el.clientWidth,
@@ -146,8 +150,11 @@ def test_ipad_game_planning_keeps_tablet_layout(
             }))"""
         )
         for sample in samples:
-            assert sample['text']
-            assert sample['textOverflow'] != 'ellipsis', sample
+            if sample['text'] == 'OPEN':
+                continue
+            assert sample['whiteSpace'] == 'normal', sample
+            assert sample['overflow'] == 'visible', sample
+            assert sample['textOverflow'] == 'clip', sample
             assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
             assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
 
