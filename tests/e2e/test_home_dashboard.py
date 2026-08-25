@@ -100,6 +100,8 @@ def test_home_skips_ended_same_day_game_for_next_game(page: Page, coachboard_url
     expect(next_card).to_contain_text('Future Foxes')
     expect(next_card).not_to_contain_text('Completed Cubs')
     expect(next_card).not_to_contain_text('COMPLETE')
+    expect(next_card).to_contain_text('6:00 PM')
+    expect(next_card).not_to_contain_text('18:00')
 
 
 def test_home_is_first_mobile_destination(page: Page, coachboard_url: str):
