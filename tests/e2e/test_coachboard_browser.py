@@ -50,15 +50,18 @@ def test_starting_defense_applies_and_survives_reload(page: Page, coachboard_url
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/game/1')
 
-    template_select = page.locator('#rotationTemplateSelect')
-    expect(template_select).to_be_attached(timeout=15_000)
-    option = template_select.locator('option').filter(has_text='Everyday Defense')
+    defense = page.locator('#pregame-defense-editor-v3')
+    expect(defense).to_be_visible(timeout=15_000)
+    preset_select = defense.locator('#pde-preset')
+    expect(preset_select).to_be_visible()
+    option = preset_select.locator('option').filter(has_text='Everyday Defense')
     expect(option).to_have_count(1)
-    template_id = option.get_attribute('value')
-    assert template_id
+    preset_id = option.get_attribute('value')
+    assert preset_id
 
+    preset_select.select_option(value=preset_id)
     page.once('dialog', lambda dialog: dialog.accept())
-    template_select.select_option(value=template_id)
+    defense.locator('#pde-apply').click()
 
     expected_positions = {
         'C': 'Catcher Cole',
@@ -72,12 +75,12 @@ def test_starting_defense_applies_and_survives_reload(page: Page, coachboard_url
     }
     # Starting Defense presets intentionally leave pitcher open because the
     # pitcher changes game to game.
-    expect(page.locator('#pos-desktop-P .player-tag')).to_have_count(0)
+    expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
     for position, player_name in expected_positions.items():
-        expect(page.locator(f'#pos-desktop-{position} .player-tag')).to_have_text(player_name)
+        expect(defense.locator(f'[data-pde-pos="{position}"] .pde-name')).to_have_text(player_name)
 
-    # The template load autosaves; wait for the API-authoritative game data to
-    # contain the applied defense before reloading the browser.
+    # Applying the visible preset autosaves; wait for API-authoritative game data
+    # to contain the defense before reloading the browser.
     page.wait_for_function(
         """async () => {
           const response = await fetch('/api/game_data/1', {cache:'no-store'});
@@ -93,10 +96,11 @@ def test_starting_defense_applies_and_survives_reload(page: Page, coachboard_url
     )
 
     page.reload()
-    expect(page.locator('#rotation-board')).to_be_visible(timeout=15_000)
-    expect(page.locator('#pos-desktop-P .player-tag')).to_have_count(0)
+    defense = page.locator('#pregame-defense-editor-v3')
+    expect(defense).to_be_visible(timeout=15_000)
+    expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
     for position, player_name in expected_positions.items():
-        expect(page.locator(f'#pos-desktop-{position} .player-tag')).to_have_text(player_name)
+        expect(defense.locator(f'[data-pde-pos="{position}"] .pde-name')).to_have_text(player_name)
 
 
 def test_other_team_game_is_not_exposed(page: Page, coachboard_url: str):
