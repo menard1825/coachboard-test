@@ -29,7 +29,11 @@
     document.body.classList.toggle('cb-pitch-dugout-tablet', tablet);
     if (!isCompactMode()) return;
     document.querySelectorAll('.cb-pitcher-card').forEach(card => {
-      if (!card.dataset.mobileExpanded) card.dataset.mobileExpanded = 'false';
+      // pitching_dugout_mobile creates the shared disclosure control on every
+      // viewport and may leave its desktop state expanded. A touch-tablet starts
+      // scan-first just like the phone; the existing disclosure click handler can
+      // still set this back to true when a coach asks for details.
+      if (tablet || !card.dataset.mobileExpanded) card.dataset.mobileExpanded = 'false';
     });
   }
 
