@@ -335,22 +335,35 @@
     ]);
 
     const gameList = games || [];
-    const fallbackNextGame = [...gameList]
-      .filter(game => dateOnlyKey(game.date) >= localStartOfTodayMs())
-      .sort((a, b) => dateOnlyKey(a.date) - dateOnlyKey(b.date) || Number(a.id || 0) - Number(b.id || 0))[0] || null;
-    // The older overview endpoint compared date-only game records to the exact
-    // current clock time. Fall back to the schedule so a game today remains on
-    // Home throughout the day rather than disappearing after midnight/start time.
-    const nextGame = overview?.next_game || fallbackNextGame;
+    const todayStart = localStartOfTodayMs();
+    const candidateMap = new Map();
+    [overview?.next_game, ...gameList].forEach(game => {
+      if (!game?.id) return;
+      if (!game.is_live && dateOnlyKey(game.date) < todayStart) return;
+      candidateMap.set(Number(game.id), game);
+    });
+    const candidates = [...candidateMap.values()].sort((a, b) =>
+      dateOnlyKey(a.date) - dateOnlyKey(b.date) || Number(a.id || 0) - Number(b.id || 0)
+    );
+    const endedStatuses = new Set(['COMPLETE', 'GC STATS PENDING', 'NEEDS POSTGAME', 'PAST']);
+    let nextGame = null;
     let readiness = {};
     let rules = {};
-    if (nextGame?.id) {
-      const [readyPayload, rulesPayload] = await Promise.all([
-        getJson(`/api/game-day/${nextGame.id}/readiness`, {}),
-        getJson(`/api/game-day/${nextGame.id}/pitching-rules`, {}),
-      ]);
-      readiness = readyPayload?.readiness || {};
-      rules = rulesPayload || {};
+
+    // Home is for the next coaching decision, not the last game's report. Check
+    // readiness in schedule order and skip games that have already reached
+    // postgame. This also fixes same-day ended games lingering as “Next game”.
+    for (const candidate of candidates) {
+      const readyPayload = await getJson(`/api/game-day/${candidate.id}/readiness`, {});
+      const candidateReadiness = readyPayload?.readiness || {};
+      const status = String(candidateReadiness.status || '').trim().toUpperCase();
+      const ended = !candidate.is_live && (candidateReadiness.has_end_game || endedStatuses.has(status));
+      if (ended) continue;
+
+      nextGame = candidate;
+      readiness = candidateReadiness;
+      rules = await getJson(`/api/game-day/${candidate.id}/pitching-rules`, {}) || {};
+      break;
     }
 
     const now = Date.now();
