@@ -85,13 +85,6 @@
     </div>
   </section>
 
-  <section class="agr-card">
-    <div class="agr-card-head"><strong>What we changed</strong></div>
-    {% if report.changes %}<div class="table-responsive"><table class="table table-sm agr-table align-middle"><thead class="table-light"><tr><th class="ps-3">Inning</th><th>What changed</th><th class="pe-3">Coach</th></tr></thead><tbody>
-      {% for change in report.changes %}<tr><td class="ps-3">{{ change.inning }}</td><td>{{ change.description }}</td><td class="pe-3">{{ change.coach or '—' }}</td></tr>{% endfor %}
-    </tbody></table></div>{% else %}<div class="agr-empty">No changes were recorded.</div>{% endif %}
-  </section>
-
   <section class="agr-card agr-notes">
     <div class="agr-card-head"><strong>Game Notes</strong></div>
     <div class="agr-card-body">
