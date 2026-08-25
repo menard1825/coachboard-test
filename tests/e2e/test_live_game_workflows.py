@@ -189,7 +189,7 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     # the coach can choose Same Defense, Pregame Defense, or New Defense.
     next_board = page.locator('#live-board-prep-v3')
     expect(next_board).to_be_visible(timeout=15_000)
-    expect(next_board).to_contain_text("Who's Going Out Next?")
+    expect(next_board).to_contain_text(re.compile(r"Who['’]s Going Out Next\?"))
     expect(next_board).to_contain_text('Pregame Defense')
 
     field_toggle = page.locator('[data-coach-defense-view="field"]')
