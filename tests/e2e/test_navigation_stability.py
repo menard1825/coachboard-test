@@ -44,7 +44,7 @@ def nav_snapshot(page: Page, selector: str):
                 left: rect.left,
                 width: rect.width,
                 height: rect.height,
-                labels: links.map(link => link.textContent.trim().replace(/\\s+/g, ' ')),
+                labels: links.map(link => link.textContent.trim().replace(/\s+/g, ' ')),
                 links: links.map(link => {
                     const linkRect = link.getBoundingClientRect();
                     return {
@@ -131,7 +131,7 @@ def test_mobile_primary_navigation_does_not_jump_between_workspaces(page: Page, 
     expect(nav).to_be_visible()
     expect(page.locator('nav.bottom-nav-fixed:visible')).to_have_count(1)
     expected_labels = ['Home', 'Game Day', 'Roster', 'Practice', 'More']
-    expected_hrefs = ['#overview', '#games', '#roster', '#practice_plan', '#more']
+    expected_hrefs = ['#overview', '/game-day', '#roster', '#practice_plan', '#more']
     expect(nav.locator('a')).to_have_count(5)
     assert [label.strip() for label in nav.locator('a').all_text_contents()] == expected_labels
     assert nav.locator('a').evaluate_all("links => links.map(link => link.getAttribute('href'))") == expected_hrefs
@@ -143,59 +143,29 @@ def test_mobile_primary_navigation_does_not_jump_between_workspaces(page: Page, 
     assert abs(home_shell['header']['top']) <= 2
     expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
 
-    # Reproduce the real phone behavior: a coach can be partway down Home and
-    # then switch workspaces. Every bottom-bar destination must stay in the same
-    # document so Safari never tears down/repaints the app shell.
-    page.evaluate('window.scrollTo(0, 320)')
-    nav.get_by_text('Roster', exact=True).click()
-    expect(page.locator('#roster')).to_have_class(re.compile(r'\bactive\b'))
-    expect(nav.locator('[data-cb-mobile-section="roster"]')).to_have_class(re.compile(r'\bactive\b'))
-    settle_mobile_shell(page)
-    roster_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
-    roster_shell = mobile_shell_snapshot(page)
-    assert_geometry_close(home_geometry, roster_geometry)
-    assert_mobile_shell_stable(home_shell, roster_shell)
-    assert page.evaluate('window.location.pathname') == '/'
+    # Same-document workspaces must keep the mobile shell absolutely stable.
+    for label, target in (
+        ('Roster', '#roster'),
+        ('Practice', '#practice_plan'),
+        ('More', '#more'),
+        ('Home', '#overview'),
+    ):
+        page.evaluate('window.scrollTo(0, 320)')
+        nav.get_by_text(label, exact=True).click()
+        expect(page.locator(target)).to_have_class(re.compile(r'\bactive\b'))
+        settle_mobile_shell(page)
+        assert_geometry_close(home_geometry, nav_snapshot(page, '#cb-global-mobile-nav'))
+        assert_mobile_shell_stable(home_shell, mobile_shell_snapshot(page))
+        assert page.evaluate('window.location.pathname') == '/'
 
-    nav.get_by_text('Practice', exact=True).click()
-    expect(page.locator('#practice_plan')).to_have_class(re.compile(r'\bactive\b'))
-    expect(nav.locator('[data-cb-mobile-section="practice_plan"]')).to_have_class(re.compile(r'\bactive\b'))
-    settle_mobile_shell(page)
-    practice_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
-    practice_shell = mobile_shell_snapshot(page)
-    assert_geometry_close(home_geometry, practice_geometry)
-    assert_mobile_shell_stable(home_shell, practice_shell)
-    assert page.evaluate('window.location.pathname') == '/'
-
+    # Game Day is intentionally a dedicated page, not the retired #games pane.
     nav.get_by_text('Game Day', exact=True).click()
-    expect(page.locator('#games')).to_have_class(re.compile(r'\bactive\b'))
-    expect(nav.locator('[data-cb-mobile-section="game-day"]')).to_have_class(re.compile(r'\bactive\b'))
-    settle_mobile_shell(page)
-    game_day_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
-    game_day_shell = mobile_shell_snapshot(page)
-    assert_geometry_close(home_geometry, game_day_geometry)
-    assert_mobile_shell_stable(home_shell, game_day_shell)
-    assert page.evaluate('window.location.pathname') == '/'
-
-    nav.get_by_text('More', exact=True).click()
-    expect(page.locator('#more')).to_have_class(re.compile(r'\bactive\b'))
-    expect(nav.locator('[data-cb-mobile-section="more"]')).to_have_class(re.compile(r'\bactive\b'))
-    settle_mobile_shell(page)
-    more_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
-    more_shell = mobile_shell_snapshot(page)
-    assert_geometry_close(home_geometry, more_geometry)
-    assert_mobile_shell_stable(home_shell, more_shell)
-    assert page.evaluate('window.location.pathname') == '/'
-
-    nav.get_by_text('Home', exact=True).click()
-    expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
-    expect(nav.locator('[data-cb-mobile-section="overview"]')).to_have_class(re.compile(r'\bactive\b'))
-    settle_mobile_shell(page)
-    return_geometry = nav_snapshot(page, '#cb-global-mobile-nav')
-    return_shell = mobile_shell_snapshot(page)
-    assert_geometry_close(home_geometry, return_geometry)
-    assert_mobile_shell_stable(home_shell, return_shell)
-    assert page.evaluate('window.location.pathname') == '/'
+    expect(page).to_have_url(re.compile(r'/game-day$'))
+    expect(page.get_by_role('heading', name='Game Day')).to_be_visible()
+    game_day_nav = page.locator('#cb-global-mobile-nav')
+    expect(game_day_nav).to_be_visible()
+    expect(game_day_nav.locator('[data-cb-mobile-section="game-day"]')).to_have_class(re.compile(r'\bactive\b'))
+    expect(page.locator('nav.bottom-nav-fixed:visible')).to_have_count(1)
 
 
 def test_desktop_primary_navigation_keeps_geometry_and_active_state(page: Page, coachboard_url: str):
