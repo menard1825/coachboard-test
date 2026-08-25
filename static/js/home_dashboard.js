@@ -40,13 +40,29 @@
     return today.getTime();
   }
 
+  function formatClockTime(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (/\b(?:AM|PM)\b/i.test(raw)) return raw;
+
+    const match = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (!match) return raw;
+
+    const hour24 = Number(match[1]);
+    const minute = Number(match[2]);
+    if (!Number.isInteger(hour24) || hour24 < 0 || hour24 > 23 || minute < 0 || minute > 59) return raw;
+
+    const hour12 = hour24 % 12 || 12;
+    return `${hour12}:${match[2]} ${hour24 >= 12 ? 'PM' : 'AM'}`;
+  }
+
   function formatDate(value, startTime = '') {
     const dt = parseDate(value);
     if (!dt) return 'Date TBD';
     const dateText = dt.toLocaleDateString('en-US', {
       weekday: 'short', month: 'short', day: 'numeric'
     });
-    return startTime ? `${dateText} · ${esc(startTime)}` : dateText;
+    return startTime ? `${dateText} · ${esc(formatClockTime(startTime))}` : dateText;
   }
 
   function coachName() {
