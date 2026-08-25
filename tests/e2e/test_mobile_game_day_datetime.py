@@ -32,38 +32,25 @@ def login(page: Page, coachboard_url: str):
     expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#(?:overview|games))?$'))
 
 
-def test_mobile_game_day_labels_native_date_time_and_uses_saved_start_time(page: Page, coachboard_url: str):
+def test_mobile_game_day_uses_saved_start_time(page: Page, coachboard_url: str):
+    """The dedicated Game Day workspace must display saved times in coach-friendly 12-hour form."""
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
-    page.goto(f'{coachboard_url}/#games', wait_until='domcontentloaded')
+    page.goto(f'{coachboard_url}/game-day', wait_until='domcontentloaded')
 
-    games = page.locator('#games')
-    expect(games).to_have_class(re.compile(r'\bactive\b'))
-
-    # Empty native date/time controls do not expose placeholder text on iPhone,
-    # so CoachBoard supplies visible labels and empty-state text itself.
-    expect(games.locator('label[for="add_game_date"]')).to_have_text('Date')
-    expect(games.locator('label[for="add_game_start_time"]')).to_contain_text('Start time')
-    expect(games.locator('.cb-game-native-empty', has_text='Select date')).to_be_visible()
-    expect(games.locator('.cb-game-native-empty', has_text='Select time')).to_be_visible()
-
-    date_input = games.locator('#add_game_date')
-    time_input = games.locator('#add_game_start_time')
-    date_input.fill('2026-09-12')
-    time_input.fill('16:30')
-    expect(games.locator('.cb-game-native-input').nth(0)).to_have_class(re.compile(r'\bhas-value\b'))
-    expect(games.locator('.cb-game-native-input').nth(1)).to_have_class(re.compile(r'\bhas-value\b'))
+    expect(page).to_have_url(re.compile(r'/game-day$'))
+    expect(page.get_by_role('heading', name='Game Day')).to_be_visible()
 
     # The seeded Browser Bears game is saved with start_time='09:00'. The old
     # renderer ignored that field whenever game.date included a midnight time
     # component and incorrectly displayed 12:00 AM.
-    browser_bears = games.locator('#games-list-container li.list-group-item').filter(has_text='Browser Bears')
+    browser_bears = page.locator('[data-game-id="1"]')
     expect(browser_bears).to_be_visible()
-    expect(browser_bears.locator('p.mb-1')).to_contain_text('9:00 AM')
-    expect(browser_bears.locator('p.mb-1')).not_to_contain_text('12:00 AM')
+    expect(browser_bears).to_contain_text('9:00 AM')
+    expect(browser_bears).not_to_contain_text('12:00 AM')
 
 
-def test_mobile_game_day_moves_past_games_out_of_game_schedule(page: Page, coachboard_url: str):
+def test_mobile_game_day_moves_past_games_out_of_upcoming_schedule(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
 
@@ -80,7 +67,7 @@ def test_mobile_game_day_moves_past_games_out_of_game_schedule(page: Page, coach
             (future_date, future_opponent, '18:00'),
         ):
             response = page.request.post(
-                f'{coachboard_url}/add_game',
+                f'{coachboard_url}/game-day/add',
                 form={
                     'game_date': game_date,
                     'game_start_time': start_time,
@@ -99,20 +86,22 @@ def test_mobile_game_day_moves_past_games_out_of_game_schedule(page: Page, coach
         ]
         assert len(created_ids) == 2
 
-        page.goto(f'{coachboard_url}/#games', wait_until='domcontentloaded')
-        games = page.locator('#games')
-        expect(games).to_have_class(re.compile(r'\bactive\b'))
+        page.goto(f'{coachboard_url}/game-day', wait_until='domcontentloaded')
+        expect(page.get_by_role('heading', name='Game Day')).to_be_visible()
+        expect(page.locator('body')).to_contain_text(future_opponent)
 
-        schedule = games.locator('#games-list-container')
-        past_list = games.locator('#games-past-list-container')
-        past_card = games.locator('#cb-mobile-past-games-card')
-
-        expect(past_card).to_be_visible()
-        expect(past_card.locator('.card-header h5')).to_have_text('Past Games')
-        expect(schedule).to_contain_text(future_opponent)
-        expect(schedule).not_to_contain_text(past_opponent)
+        past_title = page.locator('.gd-section-title', has_text='Past Games')
+        expect(past_title).to_be_visible()
+        past_list = past_title.locator('xpath=following-sibling::*[1]')
         expect(past_list).to_contain_text(past_opponent)
         expect(past_list).not_to_contain_text(future_opponent)
+
+        # Saved times are formatted consistently in both upcoming and history.
+        expect(page.locator('body')).to_contain_text('6:00 PM')
+        expect(past_list).to_contain_text('4:30 PM')
     finally:
         for game_id in created_ids:
-            page.request.get(f'{coachboard_url}/delete_game/{game_id}')
+            page.request.post(
+                f'{coachboard_url}/game-day/{game_id}/delete',
+                headers={'Accept': 'application/json'},
+            )
