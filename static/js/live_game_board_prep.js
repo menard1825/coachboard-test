@@ -92,7 +92,7 @@
       #${PANEL_ID} .pde-spot:hover,#${PANEL_ID} .pde-spot:focus-visible{border-color:#667f9e;box-shadow:0 0 0 3px rgba(55,91,135,.14);outline:0}
       #${PANEL_ID} .pde-spot.open{background:#fff5f5;border-color:#d99a9a}
       #${PANEL_ID} .pde-pos{display:block;font-size:.52rem;line-height:1;font-weight:900;letter-spacing:.04em;color:#667085;margin-bottom:3px}
-      #${PANEL_ID} .pde-name{display:block;font-size:.68rem;line-height:1.08;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${PANEL_ID} .pde-name{display:block;font-size:.68rem;line-height:1.08;font-weight:800;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
       #${PANEL_ID} .pde-spot.open .pde-name{color:#a63d3d}
       #${PANEL_ID} .pde-bench{padding:9px 10px 10px;background:#fff;border-top:1px solid #e4e9e4}
       #${PANEL_ID} .pde-label{font-size:.61rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin-bottom:6px}
@@ -586,7 +586,12 @@
 
     window.addEventListener('orientationchange', () => setTimeout(syncLegacyVisibility, 150));
     window.addEventListener('resize', () => syncLegacyVisibility(), {passive: true});
-    setInterval(syncLegacyVisibility, 1200);
+
+    const liveOverlay = $('live-game-overlay');
+    if (liveOverlay) {
+      const liveObserver = new MutationObserver(syncLegacyVisibility);
+      liveObserver.observe(liveOverlay, {attributes:true, attributeFilter:['class']});
+    }
   }
 
   async function init() {
