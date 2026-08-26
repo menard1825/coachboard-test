@@ -28,7 +28,6 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      body.cb-dugout #liveDefensiveChangeBtn,
       body.cb-dugout #liveSetDefenseBtnCoach,
       body.cb-dugout [data-cb-full-defense] {
         display:none!important;
