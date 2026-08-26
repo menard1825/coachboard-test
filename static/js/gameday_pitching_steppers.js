@@ -41,5 +41,6 @@
     loadOnce('/static/js/live_game_dugout_mode.js', 'live-dugout-mode');
     loadOnce('/static/js/live_game_clock_controls.js', 'live-clock-controls');
     loadOnce('/static/js/live_game_command_center.js', 'live-command-center');
+    loadOnce('/static/js/live_game_connection_status.js', 'live-connection-status');
   }, {once: true});
 })();
