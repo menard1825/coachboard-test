@@ -125,6 +125,9 @@
           width:100%!important;
           max-width:none!important;
         }
+        #${PANEL_ID} .gm-preset-wrap{grid-row:1!important}
+        #${PANEL_ID} #pde-apply{grid-row:2!important}
+        #${PANEL_ID} #pde-primary-fill{grid-row:3!important}
         #${PANEL_ID} #pde-apply{
           display:block!important;
           min-height:42px;
