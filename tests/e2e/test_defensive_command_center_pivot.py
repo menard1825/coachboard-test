@@ -81,19 +81,42 @@ def test_inning_one_quick_start_launches_defensive_command_center(page: Page, co
         roster_names = {player['name'] for player in roster}
         assert set(complete_alignment().values()).issubset(roster_names)
 
-        lineup = post_json(page, coachboard_url, '/add_lineup', {
+        existing = page.request.get(f'{coachboard_url}/api/game_data/{game_id}')
+        assert existing.ok
+        existing_data = existing.json()
+
+        existing_lineup = existing_data.get('lineup') or {}
+        lineup_payload = {
             'title': 'Command Center Game Lineup',
             'lineup_player_ids': roster_ids,
             'associated_game_id': game_id,
-        })
+        }
+        if existing_lineup.get('id'):
+            lineup = post_json(
+                page,
+                coachboard_url,
+                f'/edit_lineup/{int(existing_lineup["id"])}',
+                lineup_payload,
+            )
+        else:
+            lineup = post_json(page, coachboard_url, '/add_lineup', lineup_payload)
         assert lineup['lineup']['associated_game_id'] == game_id
 
-        rotation = post_json(page, coachboard_url, '/save_rotation', {
+        existing_rotation = existing_data.get('rotation') or {}
+        rotation_payload = {
             'title': 'Command Center Inning 1',
             'innings': {'1': complete_alignment()},
             'associated_game_id': game_id,
-        })
+        }
+        if existing_rotation.get('id'):
+            rotation_payload['id'] = int(existing_rotation['id'])
+        rotation = post_json(page, coachboard_url, '/save_rotation', rotation_payload)
         assert rotation['new_id']
+
+        saved = page.request.get(f'{coachboard_url}/api/game_data/{game_id}')
+        assert saved.ok
+        saved_rotation = saved.json().get('rotation') or {}
+        assert saved_rotation.get('innings', {}).get('1') == complete_alignment()
 
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
