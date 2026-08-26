@@ -95,6 +95,25 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(defense.locator('.gm-preset-help')).to_contain_text('Full-game plans are under Defense Options.')
         expect(defense.locator('#pde-apply')).to_have_text('Use for Inning 1')
 
+        # On a phone the saved-defense action belongs beneath the selector, full
+        # width. Do not squeeze it beside the dropdown where it becomes clipped or
+        # visually off-center.
+        preset_layout = defense.locator('.pde-tools').evaluate(
+            """tools => {
+                const wrap = tools.querySelector('.gm-preset-wrap').getBoundingClientRect();
+                const apply = tools.querySelector('#pde-apply').getBoundingClientRect();
+                return {
+                    display:getComputedStyle(tools).display,
+                    wrap:{left:wrap.left,right:wrap.right,bottom:wrap.bottom},
+                    apply:{left:apply.left,right:apply.right,top:apply.top},
+                };
+            }"""
+        )
+        assert preset_layout['display'] == 'grid'
+        assert preset_layout['apply']['top'] >= preset_layout['wrap']['bottom'] - 1
+        assert abs(preset_layout['apply']['left'] - preset_layout['wrap']['left']) <= 2
+        assert abs(preset_layout['apply']['right'] - preset_layout['wrap']['right']) <= 2
+
         defense_options = page.get_by_role('button', name=re.compile('Defense Options'))
         defense_options.click()
         expect(page.locator('#gmFullGamePlanHeader')).to_contain_text('Full-game defense plan · all innings')
