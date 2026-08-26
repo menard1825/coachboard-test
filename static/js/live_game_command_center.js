@@ -214,10 +214,17 @@
     const shell = document.querySelector('.coach-live-shell');
     const head = shell?.querySelector('.coach-live-head');
     const slot = shell?.querySelector('#coach-action-slot');
-    const defense = byId('liveDefensiveChangeBtn');
+    let defense = byId('liveDefensiveChangeBtn');
     const pitcher = byId('liveChangePitcherBtn');
     const endInning = byId('liveEndInningBtn');
     const undo = byId('liveUndoBtn');
+
+    if (slot && !defense) {
+      defense = document.createElement('button');
+      defense.type = 'button';
+      defense.id = 'liveDefensiveChangeBtn';
+      defense.className = 'btn';
+    }
 
     if (head) {
       head.classList.add('cb-command-head');
