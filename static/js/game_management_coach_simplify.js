@@ -112,8 +112,25 @@
         #rotation-card-container .gm-coach-inning-label{width:100%;margin-bottom:2px}
         #rotation-card-container .gm-coach-actions{display:grid!important;grid-template-columns:1fr auto;width:100%}
         #rotation-card-container .gm-coach-actions #copyPreviousInningBtn{width:100%}
-        #${PANEL_ID} .pde-tools{grid-template-columns:1fr!important}
-        #${PANEL_ID} #pde-apply,#${PANEL_ID} #pde-primary-fill{width:100%}
+        #${PANEL_ID} .pde-tools{
+          display:grid!important;
+          grid-template-columns:minmax(0,1fr)!important;
+          gap:8px!important;
+          align-items:stretch!important;
+        }
+        #${PANEL_ID} .gm-preset-wrap,
+        #${PANEL_ID} #pde-preset,
+        #${PANEL_ID} #pde-apply,
+        #${PANEL_ID} #pde-primary-fill{
+          width:100%!important;
+          max-width:none!important;
+        }
+        #${PANEL_ID} #pde-apply{
+          display:block!important;
+          min-height:42px;
+          text-align:center;
+          justify-self:stretch;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -209,9 +226,6 @@
     }
 
     try {
-      // Force the original editor to persist the newly-created sub-inning before
-      // we remove it. This matters if the coach adds it and immediately changes
-      // their mind before the normal autosave timer fires.
       document.getElementById('saveRotationBtn')?.click();
       const data = await fetchLatestRotationUntil(raw);
       if (!data?.rotation) throw new Error('Could not find the current defense plan.');
@@ -222,9 +236,6 @@
         throw new Error('That planned change was not found. Refresh the page and try again.');
       }
 
-      // Move the original game editor back to the base inning before the server
-      // broadcasts the updated rotation, so its private currentInning state never
-      // points at a key that is about to disappear.
       document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`)?.click();
 
       delete innings[raw];
@@ -444,8 +455,6 @@
       toolsMenu.appendChild(divider);
       addInningOption(toolsMenu, 'gmAddInningAction', 'plus-circle', 'Add Another Inning', 'addInningBtn');
       addInningOption(toolsMenu, 'gmRemoveInningAction', 'dash-circle', 'Remove Last Inning', 'removeInningBtn', true);
-      // Mid-inning planning intentionally lives under Defense Options now. It is
-      // a rare/advanced workflow and should not compete with normal inning setup.
       document.getElementById('gmAddSubInningAction')?.closest('li')?.remove();
     }
     syncRemoveCurrentSubAction(toolsMenu);
