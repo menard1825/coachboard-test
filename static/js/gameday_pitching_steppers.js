@@ -37,10 +37,26 @@
     document.head.appendChild(script);
   }
 
+  function ensureDefenseAction() {
+    const slot = document.querySelector('.coach-live-shell #coach-action-slot');
+    if (!slot || document.getElementById('liveDefensiveChangeBtn')) return;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'liveDefensiveChangeBtn';
+    button.className = 'btn';
+    button.innerHTML = '<span class="coach-action-title">Defense Change</span><span class="coach-action-note">Move field / bench</span>';
+    slot.prepend(button);
+  }
+
   window.addEventListener('load', () => {
     loadOnce('/static/js/live_game_dugout_mode.js', 'live-dugout-mode');
     loadOnce('/static/js/live_game_clock_controls.js', 'live-clock-controls');
     loadOnce('/static/js/live_game_command_center.js', 'live-command-center');
     loadOnce('/static/js/live_game_connection_status.js', 'live-connection-status');
+
+    const observer = new MutationObserver(ensureDefenseAction);
+    observer.observe(document.body, {childList: true, subtree: true});
+    ensureDefenseAction();
   }, {once: true});
 })();
