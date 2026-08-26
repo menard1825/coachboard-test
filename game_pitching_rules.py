@@ -149,12 +149,12 @@ def gameplay_pitch_summary(
     team_timezone=None,
     current_game_id=None,
 ):
-    """Keep gameplay usable when a coach intentionally chooses rules per event.
+    """Return gameplay pitching context without inventing eligibility.
 
-    With no competition rules selected, CoachBoard still tracks pitch totals and
-    workload but does not invent tournament eligibility restrictions. The game
-    planning rule picker is responsible for prompting the coach to select the
-    event rules when they matter.
+    If no competition rules are selected, CoachBoard may still calculate arm-care
+    pitch-count context, but official eligibility must fail closed. A coach must
+    select or verify the event rules before Live Game can present a pitcher as
+    available.
     """
     if not rules.get('competition_unselected'):
         return _base_calculate_pitch_summary(
@@ -192,14 +192,22 @@ def gameplay_pitch_summary(
         current_game_id=current_game_id,
     )
     for item in summary.values():
+        # Preserve the advisory result separately so Game Planning can still show
+        # useful arm-care context without presenting it as tournament eligibility.
+        item['arm_care_status'] = item.get('status') or 'Unknown'
+        item['arm_care_status_detail'] = item.get('status_detail') or ''
+        item['arm_care_next_available'] = item.get('next_available')
+
         item['rule_type'] = 'none'
         item['rule_set_name'] = 'Rules Not Selected'
-        item['status'] = 'Available'
-        item['status_detail'] = ''
-        item['next_available'] = 'Today'
+        item['status'] = 'Unavailable — Select Game Rules'
+        item['status_detail'] = (
+            'Competition pitching rules are not selected for this game. '
+            'Select or verify the event rules before using this pitcher.'
+        )
+        item['next_available'] = 'Verify event rules'
         # Keep the arm-care daily max and remaining pitch context available to
-        # the Game Planning UI. These values are guidance only; official event
-        # eligibility remains unselected and therefore never blocks the coach.
+        # the Game Planning UI. Those values remain guidance only.
     return summary
 
 
