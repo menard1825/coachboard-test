@@ -103,3 +103,62 @@ def test_unselected_rules_never_report_available_even_when_arm_care_is_clear():
     assert item['arm_care_status'] == 'Available'
     assert item['status'] != 'Available'
     assert 'Unavailable' in item['status']
+
+
+def test_calculator_error_returns_fail_closed_gameplay_row():
+    target_date = date(2026, 8, 26)
+    roster = [_player()]
+    outings = [_outing(1, target_date, 'not-a-number')]
+
+    summary = gameplay_pitch_summary(
+        roster,
+        outings,
+        dict(PITCH_SMART_12U),
+        target_date=target_date,
+        team_timezone='America/Indiana/Indianapolis',
+    )
+
+    item = summary['Test Pitcher']
+    assert item['status'] == 'Unavailable — Eligibility Error'
+    assert item['pitch_history_complete'] is False
+    assert item['next_available'] == 'Verify pitching history'
+    assert item['pitches_remaining_today'] is None
+
+
+def test_missing_pitch_count_is_visibly_unavailable_in_gameplay():
+    target_date = date(2026, 8, 26)
+    roster = [_player()]
+    outings = [_outing(1, target_date - timedelta(days=1), None)]
+
+    summary = gameplay_pitch_summary(
+        roster,
+        outings,
+        dict(PITCH_SMART_12U),
+        target_date=target_date,
+        team_timezone='America/Indiana/Indianapolis',
+    )
+
+    item = summary['Test Pitcher']
+    assert item['status'] == 'Unavailable — Pitch Count Incomplete'
+    assert item['pitch_history_complete'] is False
+    assert item['next_available'] == 'Verify game pitch counts'
+
+
+def test_same_day_game_restriction_is_visibly_unavailable_in_gameplay():
+    target_date = date(2026, 8, 26)
+    roster = [_player()]
+    outings = [_outing(1, target_date, 15, game_id=100)]
+
+    summary = gameplay_pitch_summary(
+        roster,
+        outings,
+        dict(PITCH_SMART_12U),
+        target_date=target_date,
+        team_timezone='America/Indiana/Indianapolis',
+        current_game_id=200,
+    )
+
+    item = summary['Test Pitcher']
+    assert item['status'] == 'Unavailable — Same-Day Game Restriction'
+    assert 'multiple games on the same day' in item['status_detail']
+    assert item['next_available'] != 'Today'
