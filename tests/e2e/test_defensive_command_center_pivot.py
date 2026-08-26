@@ -149,13 +149,33 @@ def test_inning_one_quick_start_launches_defensive_command_center(page: Page, co
         expect(pitcher_status).not_to_contain_text('7-day')
         expect(pitcher_status).not_to_contain_text('Coach target')
 
+        sync_status = page.locator('#live-sync-status-v2')
+        expect(sync_status).to_be_visible(timeout=10_000)
+        expect(sync_status).to_contain_text('SYNCED')
+
+        page.context.set_offline(True)
+        expect(sync_status).to_contain_text(re.compile(r'RECONNECTING|NOT SYNCED'), timeout=10_000)
+        page.context.set_offline(False)
+        expect(sync_status).to_contain_text('SYNCED', timeout=15_000)
+
         end_game = page.locator('#liveEndGameBtn')
         expect(end_game).to_have_text(re.compile(r'^\s*End Game\s*$'))
+        page.once('dialog', lambda dialog: dialog.accept())
+        end_game.click()
+
+        expect(page).to_have_url(re.compile(rf'/game-day/{game_id}/report$'), timeout=15_000)
+        expect(page.get_by_text('GameChanger Pitching', exact=True)).to_be_visible()
+        expect(page.get_by_role('link', name='Enter GameChanger Stats')).to_be_visible()
     finally:
-        # A live game cannot be deleted. End it without guessing pitching stats,
-        # then remove the disposable game.
-        page.request.post(
-            f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
-            data={'defer_pitching': True},
-        )
+        page.context.set_offline(False)
+        # A live game cannot be deleted. End it without guessing pitching stats
+        # only when an earlier assertion stopped the test before End Game.
+        state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
+        if state_response.ok:
+            state = state_response.json()
+            if state.get('game', {}).get('is_live'):
+                page.request.post(
+                    f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
+                    data={'defer_pitching': True},
+                )
         page.request.post(f'{coachboard_url}/game-day/{game_id}/delete', headers={'Accept': 'application/json'})
