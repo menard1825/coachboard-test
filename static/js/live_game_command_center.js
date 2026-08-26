@@ -280,10 +280,20 @@
     }
   }
 
+  function refreshImmediatelyAfterStart() {
+    [80, 220, 500].forEach(delay => window.setTimeout(refresh, delay));
+  }
+
   document.addEventListener('click', event => {
     const button = event.target.closest?.('#startLiveGameBtnAction');
     if (!button || liveState?.game?.is_live) return;
-    if (button.dataset.cbStartAllowed === '1') return;
+    if (button.dataset.cbStartAllowed === '1') {
+      // The authoritative Live Game controller starts the game on this same
+      // click. Refresh promptly so the command center replaces the pregame
+      // layout immediately instead of waiting for the 4-second poll.
+      refreshImmediatelyAfterStart();
+      return;
+    }
 
     event.preventDefault();
     event.stopPropagation();
