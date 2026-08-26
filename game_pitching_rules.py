@@ -140,6 +140,77 @@ def request_aware_gameplay_rules(team):
     return rules
 
 
+def _missing_gameplay_summary(player, rules):
+    """Return a fail-closed row when the base calculator cannot return one player."""
+    max_daily = None
+    if rules.get('rule_type') == 'pitch_count':
+        try:
+            max_daily = int(rules.get('max_daily', 85))
+        except (TypeError, ValueError):
+            max_daily = None
+    return {
+        'id': player.id,
+        'name': player.name,
+        'rule_type': rules.get('rule_type', 'unsupported'),
+        'rule_set_name': rules.get('rule_set_name', 'Unknown'),
+        'daily': None,
+        'weekly': None,
+        'daily_known_pitches': 0,
+        'weekly_known_pitches': 0,
+        'pitch_history_complete': False,
+        'official_daily_pitches': None,
+        'official_7_day_pitches': None,
+        'workload_daily_pitches': None,
+        'workload_7_day_pitches': None,
+        'workload_history_complete': False,
+        'status': 'Unavailable — Eligibility Error',
+        'status_detail': (
+            'CoachBoard could not calculate pitching eligibility for this player. '
+            'Verify the pitching history before using this player to pitch.'
+        ),
+        'next_available': 'Verify pitching history',
+        'max_daily': max_daily,
+        'pitches_remaining_today': None,
+        'last_outing_display': 'Unknown',
+        'daily_outs': None,
+        'daily_innings': None,
+        'rolling_3_day_outs': None,
+        'rolling_3_day_innings': None,
+        'innings_remaining_today_outs': None,
+        'innings_remaining_today': None,
+        'coach_target': None,
+        'coach_target_reason': None,
+        'coach_target_reached': False,
+        'coach_target_remaining': None,
+    }
+
+
+def _ensure_gameplay_summary_rows(roster, summary, rules):
+    """Never let a calculator exception make a rostered player look available."""
+    summary = summary if isinstance(summary, dict) else {}
+    for player in roster:
+        if not isinstance(summary.get(player.name), dict):
+            summary[player.name] = _missing_gameplay_summary(player, rules)
+    return summary
+
+
+def _fail_closed_unknown_statuses(summary):
+    """Make every non-Available eligibility state visibly non-selectable in Live Game."""
+    for item in summary.values():
+        status = str(item.get('status') or '').strip()
+        lowered = status.lower()
+        if status == 'Available':
+            continue
+        if lowered.startswith('unavailable') or 'rest' in lowered or 'ineligible' in lowered:
+            continue
+        item['status'] = f"Unavailable — {status or 'Eligibility Unknown'}"
+        if not item.get('status_detail'):
+            item['status_detail'] = 'Verify pitching eligibility before using this player to pitch.'
+        if not item.get('next_available') or item.get('next_available') == 'Today':
+            item['next_available'] = 'Verify pitching eligibility'
+    return summary
+
+
 def gameplay_pitch_summary(
     roster,
     all_outings,
@@ -157,7 +228,7 @@ def gameplay_pitch_summary(
     available.
     """
     if not rules.get('competition_unselected'):
-        return _base_calculate_pitch_summary(
+        summary = _base_calculate_pitch_summary(
             roster,
             all_outings,
             rules,
@@ -166,6 +237,8 @@ def gameplay_pitch_summary(
             team_timezone=team_timezone,
             current_game_id=current_game_id,
         )
+        summary = _ensure_gameplay_summary_rows(roster, summary, rules)
+        return _fail_closed_unknown_statuses(summary)
 
     if rules.get('rule_type') == 'pitch_count' and rules.get('max_daily'):
         proxy_rules = dict(rules)
@@ -191,6 +264,7 @@ def gameplay_pitch_summary(
         team_timezone=team_timezone,
         current_game_id=current_game_id,
     )
+    summary = _ensure_gameplay_summary_rows(roster, summary, proxy_rules)
     for item in summary.values():
         # Preserve the advisory result separately so Game Planning can still show
         # useful arm-care context without presenting it as tournament eligibility.
