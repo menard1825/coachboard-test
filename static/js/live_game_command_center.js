@@ -208,8 +208,17 @@
     if (button.innerHTML !== wanted) button.innerHTML = wanted;
   }
 
+  function liveShellVisible() {
+    const overlay = byId('live-game-overlay');
+    return Boolean(
+      overlay &&
+      !overlay.classList.contains('d-none') &&
+      overlay.querySelector('.coach-live-shell')
+    );
+  }
+
   function configureLiveCommandCenter() {
-    if (!liveState?.game?.is_live) return;
+    if (!liveState?.game?.is_live && !liveShellVisible()) return;
 
     const shell = document.querySelector('.coach-live-shell');
     const head = shell?.querySelector('.coach-live-head');
@@ -280,7 +289,7 @@
       if (rulesData) ruleState = rulesData;
 
       polishSavedDefenseLanguage();
-      if (liveState?.game?.is_live) configureLiveCommandCenter();
+      if (liveState?.game?.is_live || liveShellVisible()) configureLiveCommandCenter();
       else applyStartMode();
     } finally {
       refreshBusy = false;
@@ -316,7 +325,7 @@
         polishSavedDefenseLanguage();
         const oldFeedback = byId('start-live-blockers');
         if (oldFeedback && !liveState?.game?.is_live) oldFeedback.classList.add('d-none');
-        if (liveState?.game?.is_live) configureLiveCommandCenter();
+        if (liveState?.game?.is_live || liveShellVisible()) configureLiveCommandCenter();
       } finally {
         observerBusy = false;
       }
