@@ -36,9 +36,13 @@ def test_mobile_roster_metrics_show_overlapping_counts_clearly(page: Page, coach
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/#roster', wait_until='domcontentloaded')
 
+    # The home app activates hash-targeted workspaces after its API-backed
+    # initialization finishes. Give CI enough time for that deterministic boot
+    # instead of treating a slow shared runner as a hidden roster regression.
+    expect(page.locator('#roster')).to_be_visible(timeout=15_000)
     metrics = page.locator('#roster .cb-roster-metrics-v2')
-    expect(metrics).to_be_visible()
-    expect(page.locator('#roster-cards-container .cb-roster-player').first).to_be_visible()
+    expect(metrics).to_be_visible(timeout=15_000)
+    expect(page.locator('#roster-cards-container .cb-roster-player').first).to_be_visible(timeout=15_000)
 
     total = int(page.locator('#rosterPlayerCount').inner_text())
     pitchers = int(page.locator('#rosterPitcherCount').inner_text())
