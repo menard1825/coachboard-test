@@ -15,6 +15,10 @@
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[ch]));
 
+  function commandCenterActive() {
+    return Boolean(document.querySelector('script[data-live-command-center]'));
+  }
+
   function numberOrNull(value) {
     if (value === null || value === undefined || value === '') return null;
     const parsed = Number(value);
@@ -161,7 +165,10 @@
     if (!state || applying) return;
     applying = true;
     try {
-      patchCurrentPitcher();
+      // The Defensive Command Center owns the always-visible current-pitcher
+      // summary. Keep this module focused on detailed picker/planning context so
+      // the two UI layers never fight over the same live card.
+      if (!commandCenterActive()) patchCurrentPitcher();
       patchChangePitcherChoices();
       patchPitchingBoard();
       patchAddPitcherChoices();
