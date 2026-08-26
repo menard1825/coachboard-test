@@ -39,14 +39,18 @@
 
   function ensureDefenseAction() {
     const slot = document.querySelector('.coach-live-shell #coach-action-slot');
-    if (!slot || document.getElementById('liveDefensiveChangeBtn')) return;
+    if (!slot) return;
 
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.id = 'liveDefensiveChangeBtn';
-    button.className = 'btn';
-    button.innerHTML = '<span class="coach-action-title">Defense Change</span><span class="coach-action-note">Move field / bench</span>';
-    slot.prepend(button);
+    let button = document.getElementById('liveDefensiveChangeBtn');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.id = 'liveDefensiveChangeBtn';
+      button.className = 'btn';
+      button.innerHTML = '<span class="coach-action-title">Defense Change</span><span class="coach-action-note">Move field / bench</span>';
+    }
+
+    if (button.parentElement !== slot) slot.prepend(button);
   }
 
   window.addEventListener('load', () => {
