@@ -275,6 +275,15 @@
     concisePitcherStatus();
   }
 
+  function configureWhenShellReady(attempt = 0) {
+    if (liveShellVisible() && document.querySelector('.coach-live-shell #coach-action-slot')) {
+      configureLiveCommandCenter();
+      return;
+    }
+    if (attempt >= 100) return;
+    window.setTimeout(() => configureWhenShellReady(attempt + 1), 50);
+  }
+
   async function refresh() {
     if (refreshBusy) return;
     refreshBusy = true;
@@ -305,8 +314,9 @@
     if (!button || liveState?.game?.is_live) return;
     if (button.dataset.cbStartAllowed === '1') {
       // The authoritative Live Game controller starts the game on this same
-      // click. Refresh promptly so the command center replaces the pregame
-      // layout immediately instead of waiting for the 4-second poll.
+      // click. Watch for the shell directly so the command center is ready as
+      // soon as the live UI exists, independent of API polling or observer timing.
+      configureWhenShellReady();
       refreshImmediatelyAfterStart();
       return;
     }
