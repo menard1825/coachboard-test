@@ -95,13 +95,33 @@ def _add_heavy_previous_day_outing(app):
         db.session.commit()
 
 
-def _set_game_live(app):
+def _set_complete_live_defense(app):
     from db import db
-    from models import Game
+    from models import Game, Player, Rotation
+
+    alignment = {
+        'P': 'Current Pitcher',
+        'C': 'Catcher',
+        '1B': 'First Base',
+        '2B': 'Second Base',
+        '3B': 'Third Base',
+        'SS': 'Shortstop',
+        'LF': 'Left Field',
+        'CF': 'Center Field',
+        'RF': 'Right Field',
+    }
 
     with app.app_context():
         game = db.session.get(Game, 1)
         game.is_live = True
+        for index, name in enumerate(alignment.values(), start=2):
+            db.session.add(Player(id=index, name=name, team_id=1, pitcher_role='Not a Pitcher'))
+        db.session.add(Rotation(
+            title='Live defense',
+            innings={'1': alignment},
+            associated_game_id=1,
+            team_id=1,
+        ))
         db.session.commit()
 
 
@@ -195,6 +215,7 @@ def test_assistant_coach_cannot_change_pitching_preferences(monkeypatch):
 def test_live_pitcher_change_blocks_officially_ineligible_pitcher(monkeypatch):
     app = _build_app(monkeypatch)
     _add_heavy_previous_day_outing(app)
+    _set_complete_live_defense(app)
     client = app.test_client()
     _login(client)
 
@@ -206,7 +227,7 @@ def test_live_pitcher_change_blocks_officially_ineligible_pitcher(monkeypatch):
 
     response = client.post('/api/live-game/1/change-pitcher', json={
         'new_pitcher_id': 1,
-        'old_pitcher_destination': 'BENCH',
+        'outgoing_destination': 'BENCH',
     })
     assert response.status_code == 409
     payload = response.get_json()
@@ -231,7 +252,7 @@ def test_arm_care_rest_does_not_become_competition_block_without_rules(monkeypat
 
     response = client.post('/api/live-game/1/change-pitcher', json={
         'new_pitcher_id': 1,
-        'old_pitcher_destination': 'BENCH',
+        'outgoing_destination': 'BENCH',
     })
     assert response.status_code == 409
     assert response.get_json()['message'] == 'Game is not live.'
@@ -239,13 +260,13 @@ def test_arm_care_rest_does_not_become_competition_block_without_rules(monkeypat
 
 def test_live_game_requires_competition_rules_before_pitcher_change(monkeypatch):
     app = _build_app(monkeypatch)
-    _set_game_live(app)
+    _set_complete_live_defense(app)
     client = app.test_client()
     _login(client)
 
     response = client.post('/api/live-game/1/change-pitcher', json={
         'new_pitcher_id': 1,
-        'old_pitcher_destination': 'BENCH',
+        'outgoing_destination': 'BENCH',
     })
 
     assert response.status_code == 409
