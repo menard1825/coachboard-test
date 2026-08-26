@@ -233,6 +233,13 @@
     const changePitcher = $('liveChangePitcherBtn');
     const endInning = $('liveEndInningBtn');
     const undo = $('liveUndoBtn');
+    let defense = $('liveDefensiveChangeBtn');
+    if (!defense) {
+      defense = document.createElement('button');
+      defense.type = 'button';
+      defense.id = 'liveDefensiveChangeBtn';
+      defense.className = 'btn';
+    }
 
     const shell = document.createElement('div');
     shell.className = 'coach-live-shell';
@@ -252,12 +259,13 @@
       shell.querySelector('#coach-pitcher-slot')?.appendChild(pitcherCard);
     }
 
+    setActionContent(defense, 'Defense Change', 'Move field / bench', 'coach-action-primary');
     setActionContent(changePitcher, 'Change Pitcher', 'Mound change', 'coach-action-primary');
     setActionContent(endInning, 'End Inning', 'Load next plan', 'coach-action-end');
     setActionContent(undo, 'Undo', 'Revert last change', 'coach-action-undo');
 
     const actionSlot = shell.querySelector('#coach-action-slot');
-    [changePitcher, endInning, undo].filter(Boolean).forEach(btn => actionSlot?.appendChild(btn));
+    [defense, changePitcher, endInning, undo].filter(Boolean).forEach(btn => actionSlot?.appendChild(btn));
 
     const extra = shell.querySelector('#coach-existing-extra');
     const upNext = $('live-up-next-v2');
