@@ -194,11 +194,11 @@ def redirect_rules_page_when_no_default():
 
 @fair_play_bp.before_app_request
 def guard_live_pitcher_change():
-    """Do not let a Live Game pitcher change bypass official competition eligibility.
+    """Do not let a live pitcher change bypass official competition eligibility.
 
-    Arm-care guidance remains advisory. If a game has no competition rules selected,
-    the gameplay rules adapter intentionally leaves the coach unblocked while the UI
-    clearly asks them to select the event rules.
+    Arm-care guidance remains advisory. During an active game, missing competition
+    rules or unknown/incomplete eligibility fail closed until the coach selects or
+    verifies the event rules and pitching history.
     """
     if request.endpoint != 'live_game_api.change_pitcher' or request.method != 'POST':
         return None
@@ -214,6 +214,10 @@ def guard_live_pitcher_change():
 
     game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
     if not game:
+        return None
+    if not game.is_live:
+        # Let the canonical live-game route return its normal "Game is not live"
+        # response instead of running an eligibility check for an inactive game.
         return None
 
     payload = request.get_json(silent=True) or {}
