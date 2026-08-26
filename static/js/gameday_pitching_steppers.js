@@ -37,6 +37,57 @@
     document.head.appendChild(script);
   }
 
+  function installCommandCenterCompatibilityStyles() {
+    if (document.getElementById('cb-command-center-dugout-compat')) return;
+    const style = document.createElement('style');
+    style.id = 'cb-command-center-dugout-compat';
+    style.textContent = `
+      body.cb-dugout .coach-live-head.cb-command-head {
+        display:flex!important;
+        justify-content:flex-end!important;
+        align-items:center!important;
+        min-height:46px!important;
+        margin:0 0 8px!important;
+      }
+      body.cb-dugout .coach-live-head.cb-command-head > :first-child,
+      body.cb-dugout .coach-live-head.cb-command-head .coach-inning-pill {
+        display:none!important;
+      }
+      body.cb-dugout .coach-live-head.cb-command-head .cb-command-head-tools {
+        display:flex!important;
+        align-items:center!important;
+        justify-content:flex-end!important;
+        width:100%!important;
+      }
+      body.cb-dugout .coach-live-head.cb-command-head #liveUndoBtn.cb-command-undo {
+        display:inline-flex!important;
+        width:46px!important;
+        height:46px!important;
+        min-width:46px!important;
+        min-height:46px!important;
+        padding:0!important;
+        border:1px solid #d6dae1!important;
+        border-radius:10px!important;
+        background:#fff!important;
+        color:#475467!important;
+        align-items:center!important;
+        justify-content:center!important;
+      }
+      @media(max-width:575.98px) {
+        body.cb-dugout .coach-live-head.cb-command-head {
+          min-height:44px!important;
+        }
+        body.cb-dugout .coach-live-head.cb-command-head #liveUndoBtn.cb-command-undo {
+          width:44px!important;
+          height:44px!important;
+          min-width:44px!important;
+          min-height:44px!important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function ensureDefenseAction() {
     const slot = document.querySelector('.coach-live-shell #coach-action-slot');
     if (!slot) return;
@@ -54,6 +105,7 @@
   }
 
   window.addEventListener('load', () => {
+    installCommandCenterCompatibilityStyles();
     loadOnce('/static/js/live_game_dugout_mode.js', 'live-dugout-mode');
     loadOnce('/static/js/live_game_clock_controls.js', 'live-clock-controls');
     loadOnce('/static/js/live_game_command_center.js', 'live-command-center');
