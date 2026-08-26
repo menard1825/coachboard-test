@@ -201,7 +201,7 @@ def _fail_closed_unknown_statuses(summary):
         lowered = status.lower()
         if status == 'Available':
             continue
-        if lowered.startswith('unavailable') or 'rest' in lowered or 'ineligible' in lowered:
+        if lowered.startswith(('unavailable', 'resting', 'ineligible')):
             continue
         item['status'] = f"Unavailable — {status or 'Eligibility Unknown'}"
         if not item.get('status_detail'):
