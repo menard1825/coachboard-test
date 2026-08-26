@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from game_pitching_rules import gameplay_pitch_summary
+from utils import calculate_pitch_count_summary
 
 
 PITCH_SMART_12U = {
@@ -204,6 +205,26 @@ def test_unselected_rules_never_report_available_even_when_arm_care_is_clear():
     assert item['arm_care_status'] == 'Available'
     assert item['status'] != 'Available'
     assert 'Unavailable' in item['status']
+
+
+def test_base_calculator_error_returns_explicit_fail_closed_row():
+    target_date = date(2026, 8, 26)
+    roster = [_player()]
+    outings = [_outing(1, target_date, 'not-a-number')]
+
+    summary = calculate_pitch_count_summary(
+        roster,
+        outings,
+        dict(PITCH_SMART_12U),
+        target_date=target_date,
+        team_timezone='America/Indiana/Indianapolis',
+    )
+
+    item = summary['Test Pitcher']
+    assert item['status'] == 'Eligibility Error'
+    assert item['pitch_history_complete'] is False
+    assert item['next_available'] == 'Verify pitching history'
+    assert item['official_daily_pitches'] is None
 
 
 def test_calculator_error_returns_fail_closed_gameplay_row():
