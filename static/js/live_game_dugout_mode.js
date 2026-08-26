@@ -507,7 +507,7 @@
   function arrange(shell) {
     [
       ['liveChangePitcherBtn', 'Change Pitcher', 'Mound change'],
-      ['liveDefensiveChangeBtn', 'Change Defense', 'Tap a player or choose manually'],
+      ['liveDefensiveChangeBtn', 'Defense Change', 'Tap a player or choose manually'],
       ['liveEndInningBtn', 'End Inning', 'Load the saved next defense'],
       ['liveUndoBtn', 'Undo', 'Reverse the last live change'],
     ].forEach(([id, titleText, note]) => setHtml($(id), `<span class="coach-action-title">${titleText}</span><span class="coach-action-note">${note}</span>`));
