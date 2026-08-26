@@ -121,6 +121,26 @@
     if (button.innerHTML !== wanted) button.innerHTML = wanted;
   }
 
+  function polishSavedDefenseLanguage() {
+    const panel = byId('pregame-defense-editor-v3');
+    if (!panel) return;
+
+    const label = panel.querySelector('.gm-preset-label');
+    if (label && label.textContent !== 'Saved Defense · This Inning Only') {
+      label.textContent = 'Saved Defense · This Inning Only';
+    }
+
+    const help = panel.querySelector('.gm-preset-help');
+    if (help && !help.textContent.includes('Full-game plans are under Defense Options.')) {
+      help.textContent = 'Applies only to this inning. Full-game plans are under Defense Options.';
+    }
+
+    const select = byId('pde-preset');
+    if (select?.options?.length && select.options[0].textContent !== 'Choose a saved defense…') {
+      select.options[0].textContent = 'Choose a saved defense…';
+    }
+  }
+
   function applyStartMode() {
     const button = byId('startLiveGameBtnAction');
     if (!button || liveState?.game?.is_live) return;
@@ -252,6 +272,7 @@
       if (readinessData?.readiness) readiness = readinessData.readiness;
       if (rulesData) ruleState = rulesData;
 
+      polishSavedDefenseLanguage();
       if (liveState?.game?.is_live) configureLiveCommandCenter();
       else applyStartMode();
     } finally {
@@ -275,6 +296,7 @@
     observerBusy = true;
     window.requestAnimationFrame(() => {
       try {
+        polishSavedDefenseLanguage();
         const oldFeedback = byId('start-live-blockers');
         if (oldFeedback && !liveState?.game?.is_live) oldFeedback.classList.add('d-none');
         if (liveState?.game?.is_live) configureLiveCommandCenter();
@@ -291,6 +313,7 @@
       startButton.disabled = true;
       startButton.dataset.cbStartAllowed = '0';
     }
+    polishSavedDefenseLanguage();
     observer.observe(document.body, {childList: true, subtree: true, characterData: true});
     refresh();
     window.setInterval(refresh, 4000);
