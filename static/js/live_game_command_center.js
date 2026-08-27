@@ -94,7 +94,7 @@
 
     if (!readiness || !liveState || !ruleState) reasons.push('Checking game setup…');
     else {
-      if (!(Number(readiness.present_count || 0) > 0)) reasons.push("Set Who's Out");
+      if (!(Number(readiness.present_count || 0) > 0)) reasons.push('Set Player Availability');
       if (!readiness.lineup_ready) reasons.push('Set the batting order');
       if (!inningOneComplete()) reasons.push('Finish the 1st-inning defense');
       if (!pitcher.name) reasons.push('Choose the starting pitcher');
@@ -145,12 +145,14 @@
     }
 
     if (status.coreReady) {
+      // Quick Start is now a dedicated setup flow. The normal footer action stays
+      // labeled Start Game so it never flickers between two meanings.
       button.dataset.cbStartMode = 'quick';
       button.disabled = false;
       button.classList.remove('disabled');
-      setStartButtonText(button, 'QUICK START GAME', 'bi-lightning-charge-fill');
+      setStartButtonText(button, 'START GAME');
       note.className = 'quick';
-      note.innerHTML = '<strong>Quick Start is ready.</strong>Only the first-pitch essentials are required. Plan later innings during the game; CoachBoard keeps the current defense until you change it.';
+      note.innerHTML = '<strong>First-pitch essentials are ready.</strong>Later innings can be planned during the game.';
       return;
     }
 
@@ -160,7 +162,7 @@
     setStartButtonText(button, 'START GAME');
     note.className = 'blocked';
     const detail = status.reasons.length ? status.reasons.map(esc).join(' · ') : 'Finish the first-pitch setup.';
-    note.innerHTML = `<strong>Quick Start checklist</strong>${detail}`;
+    note.innerHTML = `<strong>First-pitch setup</strong>${detail}`;
   }
 
   function concisePitcherStatus() {
