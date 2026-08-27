@@ -31,9 +31,11 @@
       #${MODAL_ID} .cb-br-row.current .cb-br-count{background:#fff0c7;color:#7a5200}
       #${MODAL_ID} .cb-br-history{grid-column:1/-1;color:#667085;font-size:.72rem;line-height:1.35}
       #${MODAL_ID} .cb-br-now{color:#8b5c00;font-weight:800}
+      #${MODAL_ID} .cb-br-plan{grid-column:1/-1;color:#526176;font-size:.7rem;line-height:1.35}
+      #${MODAL_ID} .cb-br-plan strong{color:#294a84}
       #${MODAL_ID} .cb-br-empty{border:1px dashed #d0d5dd;border-radius:11px;color:#667085;padding:16px;text-align:center;font-size:.78rem}
       #${MODAL_ID} .cb-br-loading{min-height:140px;display:flex;align-items:center;justify-content:center;color:#667085;font-size:.8rem}
-      @media(max-width:575.98px){#${MODAL_ID} .modal-dialog{margin:.5rem}#${MODAL_ID} .modal-body{padding:12px}}
+      @media(max-width:575.98px){#${MODAL_ID} .modal-dialog{margin:.5rem}#${MODAL_ID} .modal-body{padding:12px}#${MODAL_ID} .cb-br-count{font-size:.61rem}}
     `;
     document.head.appendChild(style);
   }
@@ -49,7 +51,7 @@
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <div><h5 class="modal-title mb-0">Bench Report</h5><div class="small text-muted">Who sat when</div></div>
+            <div><h5 class="modal-title mb-0">Bench Report</h5><div class="small text-muted">Actual + planned bench innings</div></div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body" data-cb-bench-report-body><div class="cb-br-loading">Loading…</div></div>
@@ -81,6 +83,30 @@
     return number ? `#${number} ${name}` : name;
   }
 
+  function parseInnings(value) {
+    if (value && typeof value === 'object') return value;
+    if (typeof value !== 'string') return {};
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function requiredFieldPositions(state) {
+    return Number(state?.outfielder_count) === 4
+      ? ['C','1B','2B','3B','SS','LF','LCF','RCF','RF']
+      : ['C','1B','2B','3B','SS','LF','CF','RF'];
+  }
+
+  function hasCompletePlannedDefense(alignment, state) {
+    if (!alignment || typeof alignment !== 'object') return false;
+    // A planned defense may intentionally leave P open. Do not treat an empty
+    // Quick Start inning slot as a plan that has the whole roster sitting.
+    return requiredFieldPositions(state).every(position => String(alignment[position] || '').trim());
+  }
+
   function buildReport(state) {
     const roster = Array.isArray(state?.roster) ? state.roster.filter(player => player?.name) : [];
     const currentValue = inningValue(state?.current_inning);
@@ -90,6 +116,17 @@
       .map(([inning,alignment]) => ({inning,value:inningValue(inning),alignment:alignment || {}}))
       .filter(item => item.value !== null && (currentValue === null || item.value < currentValue))
       .sort((a,b)=>a.value-b.value);
+
+    const plannedInnings = parseInnings(state?.rotation?.innings);
+    const futurePlanned = Object.entries(plannedInnings)
+      .map(([inning,alignment]) => ({inning,value:inningValue(inning),alignment:alignment || {}}))
+      .filter(item =>
+        item.value !== null &&
+        (currentValue === null || item.value > currentValue) &&
+        hasCompletePlannedDefense(item.alignment,state)
+      )
+      .sort((a,b)=>a.value-b.value);
+
     const currentAssigned = new Set(Object.values(state?.current_alignment || {}).filter(Boolean));
     const history = roster.map(player => {
       const name = String(player.name).trim();
@@ -98,13 +135,27 @@
         if (!Object.values(item.alignment || {}).includes(name)) sat.push(inningLabel(item.inning));
       });
       const currentBench = !currentAssigned.has(name);
-      return {player,name,display:rosterName(player),sat,currentBench,total:sat.length + (currentBench ? 1 : 0)};
+      const plannedSat = futurePlanned
+        .filter(item => !Object.values(item.alignment || {}).includes(name))
+        .map(item => inningLabel(item.inning));
+      const total = sat.length + (currentBench ? 1 : 0);
+      return {player,name,display:rosterName(player),sat,currentBench,plannedSat,total};
     }).sort((a,b) => {
       if (a.currentBench !== b.currentBench) return a.currentBench ? -1 : 1;
       if (a.total !== b.total) return b.total - a.total;
+      if (a.plannedSat.length !== b.plannedSat.length) return b.plannedSat.length - a.plannedSat.length;
       return a.name.localeCompare(b.name);
     });
-    return {history,currentLabel};
+    return {history,currentLabel,futurePlanned};
+  }
+
+  function countLabel(row) {
+    const actual = row.total;
+    const planned = row.plannedSat.length;
+    if (actual && planned) return `${actual} so far · ${planned} planned`;
+    if (actual) return `${actual} ${actual === 1 ? 'inning' : 'innings'}`;
+    if (planned) return `${planned} planned`;
+    return '0 innings';
   }
 
   function renderReport(state) {
@@ -116,10 +167,15 @@
     const rows = report.history.length ? report.history.map(row => {
       const completedText = row.sat.length ? row.sat.join(', ') : 'None';
       const current = row.currentBench ? `<span class="cb-br-now"> · Inning ${esc(report.currentLabel)} now</span>` : '';
-      const count = `${row.total} ${row.total === 1 ? 'inning' : 'innings'}`;
-      return `<div class="cb-br-row ${row.currentBench ? 'current' : ''}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-count">${esc(count)}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(completedText)}${current}</div></div>`;
+      const planned = row.plannedSat.length
+        ? `<div class="cb-br-plan"><strong>Planned to sit:</strong> ${esc(row.plannedSat.join(', '))}</div>`
+        : '';
+      return `<div class="cb-br-row ${row.currentBench ? 'current' : ''}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-count">${esc(countLabel(row))}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(completedText)}${current}</div>${planned}</div>`;
     }).join('') : '<div class="cb-br-empty">No bench history yet.</div>';
-    body.innerHTML = `<div class="cb-br-summary"><span class="cb-br-chip">Inning ${esc(report.currentLabel)}</span><span class="cb-br-chip">On bench: ${onBench}</span></div><div class="cb-br-list">${rows}</div>`;
+    const planChip = report.futurePlanned.length
+      ? `<span class="cb-br-chip">Planned innings ahead: ${report.futurePlanned.length}</span>`
+      : '';
+    body.innerHTML = `<div class="cb-br-summary"><span class="cb-br-chip">Inning ${esc(report.currentLabel)}</span><span class="cb-br-chip">On bench: ${onBench}</span>${planChip}</div><div class="cb-br-list">${rows}</div>`;
   }
 
   async function loadReport() {
