@@ -122,12 +122,12 @@ def test_inning_one_quick_start_launches_defensive_command_center(page: Page, co
 
         quick_note = page.locator('#cb-quick-start-note')
         expect(quick_note).to_be_visible(timeout=15_000)
-        expect(quick_note).to_contain_text('Inning 1 is ready')
-        expect(quick_note).to_contain_text('set later innings between innings')
+        expect(quick_note).to_contain_text('Quick Start is ready')
+        expect(quick_note).to_contain_text('Plan later innings during the game')
 
         start = page.locator('#startLiveGameBtnAction')
         expect(start).to_be_enabled()
-        expect(start).to_contain_text('START WITH INNING 1')
+        expect(start).to_contain_text('QUICK START GAME')
         assert start.get_attribute('data-cb-start-mode') == 'quick'
 
         start.click()
