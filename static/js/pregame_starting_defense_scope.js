@@ -172,7 +172,7 @@
     } finally {
       applying = false;
       if (button?.isConnected) {
-        button.innerHTML = original;
+        if (button.innerHTML !== original) button.innerHTML = original;
         button.disabled = !select?.value;
       }
     }
@@ -186,12 +186,16 @@
     if (!tools || !select || !inningButton || !saveButton) return;
 
     tools.classList.add('cb-starting-defense-tools');
-    select.setAttribute('aria-label', 'Choose Starting Defense');
-    if (select.options.length) select.options[0].textContent = 'Choose Starting Defense…';
+    if (select.getAttribute('aria-label') !== 'Choose Starting Defense') {
+      select.setAttribute('aria-label', 'Choose Starting Defense');
+    }
+    if (select.options.length && select.options[0].textContent !== 'Choose Starting Defense…') {
+      select.options[0].textContent = 'Choose Starting Defense…';
+    }
 
-    inningButton.textContent = 'This Inning';
+    if (inningButton.textContent !== 'This Inning') inningButton.textContent = 'This Inning';
     inningButton.title = 'Apply this Starting Defense only to the inning currently shown.';
-    saveButton.textContent = 'Save Current';
+    if (saveButton.textContent !== 'Save Current') saveButton.textContent = 'Save Current';
     saveButton.title = 'Save the current field as a reusable Starting Defense.';
 
     let gameButton = panel.querySelector('#pde-apply-game');
@@ -210,8 +214,8 @@
     if (select.dataset.cbStartingDefenseScope !== '1') {
       select.dataset.cbStartingDefenseScope = '1';
       select.addEventListener('change', () => {
-        const button = panel.querySelector('#pde-apply-game');
-        if (button) button.disabled = !select.value || applying;
+        const currentButton = panel.querySelector('#pde-apply-game');
+        if (currentButton) currentButton.disabled = !select.value || applying;
       });
     }
 
@@ -221,7 +225,8 @@
       help.className = 'cb-starting-defense-help';
       tools.insertAdjacentElement('afterend', help);
     }
-    help.innerHTML = '<strong>Starting Defense:</strong> Use for Game fills the non-pitcher positions across every planned inning. Pitchers stay as you already assigned them. Use This Inning for a one-inning variation.';
+    const helpMarkup = '<strong>Starting Defense:</strong> Use for Game fills the non-pitcher positions across every planned inning. Pitchers stay as you already assigned them. Use This Inning for a one-inning variation.';
+    if (help.innerHTML !== helpMarkup) help.innerHTML = helpMarkup;
   }
 
   function attachPanelObserver(panel) {
@@ -229,7 +234,10 @@
     enhancePanel(panel);
     panelObserver?.disconnect();
     panelObserver = new MutationObserver(() => enhancePanel(panel));
-    panelObserver.observe(panel, {childList: true, subtree: true});
+    // The base pregame editor replaces the panel's direct children when it
+    // re-renders. Watching descendants caused our own label updates to retrigger
+    // this helper, so observe only those top-level replacements.
+    panelObserver.observe(panel, {childList: true});
     findingObserver?.disconnect();
     findingObserver = null;
     return true;
