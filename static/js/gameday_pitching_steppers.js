@@ -126,6 +126,57 @@
     }
   }
 
+  function installPitcherStatusStabilizer() {
+    let stats = null;
+    let statsObserver = null;
+    let hostObserver = null;
+    let queued = false;
+
+    const normalize = () => {
+      if (!stats?.isConnected) return;
+      const raw = String(stats.textContent || '').trim();
+      if (!raw) return;
+
+      const status = raw.split('•')[0].trim();
+      const normalized = status === 'Available' || status === 'Eligible to pitch'
+        ? '<span class="ok"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>Eligible to pitch</span>'
+        : `<span class="stop"><i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>${status}</span>`;
+
+      if (stats.innerHTML === normalized) return;
+      statsObserver?.disconnect();
+      stats.classList.add('cb-command-pitcher-status');
+      stats.innerHTML = normalized;
+      statsObserver?.observe(stats, {childList:true, subtree:true, characterData:true});
+    };
+
+    const attach = () => {
+      const current = document.getElementById('live-pitcher-stats');
+      if (!current || current === stats) return Boolean(current);
+      statsObserver?.disconnect();
+      stats = current;
+      statsObserver = new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        window.requestAnimationFrame(() => {
+          queued = false;
+          normalize();
+        });
+      });
+      statsObserver.observe(stats, {childList:true, subtree:true, characterData:true});
+      normalize();
+      return true;
+    };
+
+    if (attach()) return;
+    hostObserver = new MutationObserver(() => {
+      if (!attach()) return;
+      hostObserver.disconnect();
+      hostObserver = null;
+    });
+    const overlay = document.getElementById('live-game-overlay') || document.body;
+    hostObserver.observe(overlay, {childList:true, subtree:true});
+  }
+
   window.addEventListener('load', () => {
     installCommandCenterCompatibilityStyles();
     loadOnce('/static/js/pregame_starting_defense_scope.js', 'starting-defense-scope');
@@ -133,6 +184,7 @@
     loadOnce('/static/js/live_game_clock_controls.js', 'live-clock-controls');
     loadOnce('/static/js/live_game_command_center.js', 'live-command-center');
     loadOnce('/static/js/live_game_connection_status.js', 'live-connection-status');
+    installPitcherStatusStabilizer();
 
     // Legacy live helpers can rewrite action labels after the command center first
     // appears. Watch only the live overlay and restore the coach-facing actions
