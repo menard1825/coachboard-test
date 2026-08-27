@@ -56,21 +56,52 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
 
         readiness = page.locator('#coach-game-readiness-v2')
         expect(readiness).to_be_visible(timeout=15_000)
-        expect(readiness).to_contain_text('Finish the defense for innings 1–6.')
+        expect(readiness).not_to_contain_text('Finish the defense for innings 1–6.')
         expect(readiness).not_to_contain_text('regulation inning(s)')
         expect(readiness).not_to_contain_text('setup item need attention')
-        expect(readiness.get_by_role('button', name=re.compile("Who's Out"))).to_be_visible()
+        expect(readiness.get_by_role('button', name=re.compile('Player Availability'))).to_be_visible()
         expect(readiness.get_by_role('button', name=re.compile('Batting Order'))).to_be_visible()
         expect(readiness.get_by_role('button', name=re.compile('Defense'))).to_be_visible()
         expect(readiness.get_by_role('button', name=re.compile('Pitch Plan'))).to_be_visible()
 
-        # The old four-card checklist is redundant on phones and must stay out of
-        # the way. The start action should sit directly below the compact status.
-        expect(page.locator('#pregame-checklist-container > .row.g-3.mb-4')).to_be_hidden()
-        start_after_readiness = readiness.locator('xpath=following-sibling::*[1]//button[@id="startLiveGameBtnAction"]')
-        expect(start_after_readiness).to_be_visible()
-        expect(start_after_readiness).to_have_text(re.compile('START GAME'))
+        # Quick Start is a visible, explicit first-pitch workflow. The prior
+        # checklist below Start Game is intentionally hidden as duplicate copy.
+        quick_launch = page.locator('#cb-quick-start-launch')
+        expect(quick_launch).to_be_visible(timeout=15_000)
+        expect(quick_launch).to_contain_text('Get ready for first pitch without planning the whole game')
+        expect(quick_launch.get_by_role('button', name='Open Quick Start')).to_be_visible()
+        expect(page.locator('#cb-quick-start-note')).to_be_hidden()
+        quick_launch.get_by_role('button', name='Open Quick Start').click()
+        quick_modal = page.locator('#cb-quick-start-modal')
+        expect(quick_modal).to_be_visible()
+        expect(quick_modal).to_contain_text('Player Availability')
+        expect(quick_modal).to_contain_text('Batting Order')
+        expect(quick_modal).to_contain_text('Starting Defense')
+        expect(quick_modal).to_contain_text('Starting Pitcher')
+        expect(quick_modal).to_contain_text('Pitching Tracking')
+        expect(quick_modal).to_contain_text('Game Clock')
+        expect(quick_modal.get_by_role('button', name='Start Live Game')).to_be_disabled()
+        quick_modal.get_by_role('button', name='Full Game Plan').click()
+
+        # The normal Start Game action is kept out of the middle of the workflow
+        # on phones and stays available as a sticky footer action.
+        start = page.locator('#startLiveGameBtnAction')
+        expect(start).to_be_visible()
+        expect(start).to_have_text(re.compile('START GAME'))
+        start_style = start.evaluate(
+            """button => ({position:getComputedStyle(button).position,bottom:button.getBoundingClientRect().bottom,viewport:innerHeight})"""
+        )
+        assert start_style['position'] == 'fixed'
+        assert start_style['bottom'] <= start_style['viewport'] + 1
+        assert start_style['bottom'] >= start_style['viewport'] - 90
         expect(page.locator('#start-live-blockers')).to_be_hidden()
+
+        # Pitching language leads with what the coach actually tracks during the
+        # game, while the tournament/league rule remains visible as the source.
+        rules = page.locator('#game-pitching-rules-v2')
+        expect(rules).to_be_visible(timeout=15_000)
+        expect(rules.locator('.gpr-label').first).to_have_text('Game Tracking')
+        expect(rules.locator('.gpr-rule')).to_have_text(re.compile(r'Track Pitches|Track Innings / Outs|Track Pitching|Choose tracking'))
 
         # All six regulation innings fit across the phone without being clipped.
         inning_labels = page.locator('#inning-btn-group label.btn')
@@ -85,34 +116,38 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         assert max(item['top'] for item in inning_bounds) - min(item['top'] for item in inning_bounds) <= 3
 
         # The visible defense editor is the coach-facing source of truth on phone.
-        # A saved defense is explicitly one inning; a full-game plan is explicitly
-        # every inning so coaches do not have to infer the difference.
+        # Starting Defense presents two explicit scopes instead of a paragraph the
+        # coach has to decode in the dugout.
         expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
         defense = page.locator('#pregame-defense-editor-v3')
         expect(defense).to_be_visible(timeout=15_000)
         expect(defense.locator('.pde-title')).to_have_text('Set Defense — Inning 1')
-        expect(defense.locator('.gm-preset-label')).to_have_text('Saved Defense · This Inning Only')
-        expect(defense.locator('.gm-preset-help')).to_contain_text('Full-game plans are under Defense Options.')
-        expect(defense.locator('#pde-apply')).to_have_text('Use for Inning 1')
+        expect(defense.locator('.gm-preset-label')).to_have_text('Starting Defense Preset (Optional)')
+        expect(defense.locator('.gm-preset-help')).to_be_hidden()
+        expect(defense.locator('#pde-apply')).to_have_text('Apply to Inning 1')
+        expect(defense.locator('#pde-apply-game')).to_have_text('Apply to Entire Game')
+        expect(defense.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as assigned')
 
-        # On a phone the saved-defense action belongs beneath the selector, full
-        # width. Do not squeeze it beside the dropdown where it becomes clipped or
-        # visually off-center.
+        # On a phone the saved-defense selector and whole-game action share the
+        # first row, while the one-inning action stays full width below them.
         preset_layout = defense.locator('.pde-tools').evaluate(
             """tools => {
                 const wrap = tools.querySelector('.gm-preset-wrap').getBoundingClientRect();
+                const game = tools.querySelector('#pde-apply-game').getBoundingClientRect();
                 const apply = tools.querySelector('#pde-apply').getBoundingClientRect();
                 return {
                     display:getComputedStyle(tools).display,
-                    wrap:{left:wrap.left,right:wrap.right,bottom:wrap.bottom},
+                    wrap:{left:wrap.left,right:wrap.right,top:wrap.top,bottom:wrap.bottom},
+                    game:{left:game.left,right:game.right,top:game.top,bottom:game.bottom},
                     apply:{left:apply.left,right:apply.right,top:apply.top},
                 };
             }"""
         )
         assert preset_layout['display'] == 'grid'
-        assert preset_layout['apply']['top'] >= preset_layout['wrap']['bottom'] - 1
-        assert abs(preset_layout['apply']['left'] - preset_layout['wrap']['left']) <= 2
-        assert abs(preset_layout['apply']['right'] - preset_layout['wrap']['right']) <= 2
+        assert abs(preset_layout['game']['top'] - preset_layout['wrap']['top']) <= 4
+        assert preset_layout['apply']['top'] >= max(preset_layout['wrap']['bottom'], preset_layout['game']['bottom']) - 1
+        assert abs(preset_layout['apply']['left'] - min(preset_layout['wrap']['left'], preset_layout['game']['left'])) <= 2
+        assert abs(preset_layout['apply']['right'] - max(preset_layout['wrap']['right'], preset_layout['game']['right'])) <= 2
 
         defense_options = page.get_by_role('button', name=re.compile('Defense Options'))
         defense_options.click()
