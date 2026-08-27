@@ -106,13 +106,20 @@
 
   window.addEventListener('load', () => {
     installCommandCenterCompatibilityStyles();
+    loadOnce('/static/js/pregame_starting_defense_scope.js', 'starting-defense-scope');
     loadOnce('/static/js/live_game_dugout_mode.js', 'live-dugout-mode');
     loadOnce('/static/js/live_game_clock_controls.js', 'live-clock-controls');
     loadOnce('/static/js/live_game_command_center.js', 'live-command-center');
     loadOnce('/static/js/live_game_connection_status.js', 'live-connection-status');
 
-    const observer = new MutationObserver(ensureDefenseAction);
-    observer.observe(document.body, {childList: true, subtree: true});
+    // Only the live overlay can create/move the command-center action slot.
+    // Watching the entire document made this helper run for unrelated UI and
+    // clock mutations during every inning.
+    const liveOverlay = document.getElementById('live-game-overlay');
+    if (liveOverlay) {
+      const observer = new MutationObserver(ensureDefenseAction);
+      observer.observe(liveOverlay, {childList: true, subtree: true});
+    }
     ensureDefenseAction();
   }, {once: true});
 })();
