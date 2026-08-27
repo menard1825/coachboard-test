@@ -22,26 +22,26 @@
       }
       #${PANEL_ID} #pde-apply-game{
         font-weight:800;
-        white-space:nowrap;
-        min-width:118px!important;
+        white-space:normal;
+        min-width:132px!important;
         padding-left:10px!important;
         padding-right:10px!important;
       }
       #${PANEL_ID} .gm-preset-help{display:none!important}
       #${PANEL_ID} .cb-starting-defense-help{
         margin:-4px 0 11px;
-        padding:8px 10px;
+        padding:7px 9px;
         border:1px solid #d9e2f2;
         border-radius:9px;
         background:#f7f9fd;
         color:#526176;
-        font-size:.67rem;
-        line-height:1.35;
+        font-size:.66rem;
+        line-height:1.3;
       }
       #${PANEL_ID} .cb-starting-defense-help strong{color:#294a84}
       @media(max-width:767.98px){
         #${PANEL_ID} .pde-tools.cb-starting-defense-tools{
-          grid-template-columns:minmax(0,1fr) minmax(118px,auto)!important;
+          grid-template-columns:minmax(0,1fr) minmax(132px,auto)!important;
           align-items:end!important;
         }
         #${PANEL_ID} .pde-tools.cb-starting-defense-tools .gm-preset-wrap{
@@ -118,6 +118,29 @@
     return (data?.rotation_templates || []).find(template =>
       String(template.id) === String(selectedId) && presetLabel(template)
     );
+  }
+
+  function currentInningLabel(panel) {
+    const checked = document.querySelector('#inning-btn-group input[name="inning-radio"]:checked');
+    if (checked?.value) return String(checked.value);
+    const title = String(panel?.querySelector('.pde-title')?.textContent || '');
+    const found = title.match(/Inning\s+([0-9.]+)/i);
+    return found?.[1] || '1';
+  }
+
+  function syncInningButtonLabel(button, panel) {
+    if (!button) return;
+    const label = `Apply to Inning ${currentInningLabel(panel)}`;
+    if (button.textContent.trim() !== label) button.textContent = label;
+    button.title = 'Apply this saved Starting Defense only to the inning currently shown.';
+  }
+
+  function stabilizeInningButtonLabel(button, panel) {
+    syncInningButtonLabel(button, panel);
+    if (button.dataset.cbScopeLabelObserver === '1') return;
+    button.dataset.cbScopeLabelObserver = '1';
+    const observer = new MutationObserver(() => syncInningButtonLabel(button, panel));
+    observer.observe(button, {childList:true, subtree:true, characterData:true});
   }
 
   async function fetchGameData() {
@@ -198,7 +221,7 @@
         ? `\n\n${[...unavailable].join(', ')} is unavailable, so those positions will remain open.`
         : '';
       const confirmed = window.confirm(
-        `Use “${label}” as the base defense for ${inningRange}?\n\n` +
+        `Apply “${label}” to ${inningRange}?\n\n` +
         'Non-pitcher positions in those innings will be replaced. Existing pitcher assignments will stay unchanged.' +
         warning
       );
@@ -242,8 +265,7 @@
       presetLabelElement.textContent = 'Starting Defense Preset (Optional)';
     }
 
-    if (inningButton.textContent !== 'This Inning') inningButton.textContent = 'This Inning';
-    inningButton.title = 'Apply this Starting Defense only to the inning currently shown.';
+    stabilizeInningButtonLabel(inningButton, panel);
     if (saveButton.textContent !== 'Save Current') saveButton.textContent = 'Save Current';
     saveButton.title = 'Save the current field as a reusable Starting Defense.';
 
@@ -253,11 +275,11 @@
       gameButton.type = 'button';
       gameButton.id = 'pde-apply-game';
       gameButton.className = 'btn btn-primary';
-      gameButton.textContent = 'Use for Game';
-      gameButton.title = 'Use this Starting Defense as the base for all planned innings.';
       inningButton.insertAdjacentElement('beforebegin', gameButton);
       gameButton.addEventListener('click', applyStartingDefenseToGame);
     }
+    if (!applying && gameButton.textContent.trim() !== 'Apply to Entire Game') gameButton.textContent = 'Apply to Entire Game';
+    gameButton.title = 'Apply this Starting Defense to the non-pitcher positions in every planned inning.';
 
     gameButton.disabled = !select.value || applying;
     if (select.dataset.cbStartingDefenseScope !== '1') {
@@ -274,7 +296,7 @@
       help.className = 'cb-starting-defense-help';
       tools.insertAdjacentElement('afterend', help);
     }
-    const helpMarkup = '<strong>Starting Defense:</strong> Use for Game fills the non-pitcher positions across every planned inning. Pitchers stay as you already assigned them. Use This Inning for a one-inning variation.';
+    const helpMarkup = '<strong>Pitchers stay as assigned.</strong> Choose whether to apply the saved defense to this inning or the entire game.';
     if (help.innerHTML !== helpMarkup) help.innerHTML = helpMarkup;
   }
 
