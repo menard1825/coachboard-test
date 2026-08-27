@@ -118,7 +118,7 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
 
         use_for_game = page.get_by_role('button', name='Use for Game')
         expect(use_for_game).to_be_enabled()
-        expect(page.get_by_role('button', name='This Inning')).to_be_visible()
+        expect(page.get_by_role('button', name='Use for Inning 1')).to_be_visible()
         expect(page.get_by_text('Pitchers stay as you already assigned them')).to_be_visible()
 
         page.once('dialog', lambda dialog: dialog.accept())
