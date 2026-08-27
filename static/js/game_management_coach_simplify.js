@@ -93,15 +93,9 @@
         letter-spacing:.06em;
         margin:0 0 5px 2px;
       }
-      #${PANEL_ID} .gm-preset-help{
-        display:block;
-        color:#667085;
-        font-size:.62rem;
-        line-height:1.25;
-        margin:5px 2px 0;
-      }
+      #${PANEL_ID} .gm-preset-help{display:none!important}
       #${PANEL_ID} #pde-save{display:none!important}
-      #${PANEL_ID} #pde-apply{white-space:nowrap}
+      #${PANEL_ID} #pde-apply{white-space:normal}
       #${PANEL_ID} #pde-primary-fill{white-space:nowrap}
       #${PANEL_ID} .pde-status{font-size:.7rem!important}
       #${PANEL_ID} .pde-field-caption strong{font-size:.72rem!important}
@@ -324,7 +318,7 @@
       const divider = document.createElement('li');
       divider.innerHTML = '<hr class="dropdown-divider">';
       const item = document.createElement('li');
-      item.innerHTML = '<button type="button" class="dropdown-item" id="gmSaveCurrentDefensePreset"><i class="bi bi-bookmark-plus me-1"></i> Save This Inning as a Saved Defense</button>';
+      item.innerHTML = '<button type="button" class="dropdown-item" id="gmSaveCurrentDefensePreset"><i class="bi bi-bookmark-plus me-1"></i> Save This Inning as a Starting Defense</button>';
       const deleteItem = deleteRotation?.closest('li');
       if (deleteItem) {
         menu.insertBefore(divider, deleteItem);
@@ -489,8 +483,8 @@
     const tools = panel.querySelector('.pde-tools');
     const select = document.getElementById('pde-preset');
     const apply = document.getElementById('pde-apply');
-    if (select?.options?.length) setText(select.options[0], 'Choose a saved defense…');
-    setText(apply, `Use for Inning ${shortInningLabel(inning)}`);
+    if (select?.options?.length) setText(select.options[0], 'Choose Starting Defense…');
+    setText(apply, `Apply to Inning ${shortInningLabel(inning)}`);
 
     let wrap = tools?.querySelector('.gm-preset-wrap');
     if (tools && select && !wrap) {
@@ -508,15 +502,8 @@
         label.htmlFor = 'pde-preset';
         wrap.insertBefore(label, select);
       }
-      setText(label, 'Saved Defense · This Inning Only');
-
-      let note = wrap.querySelector('.gm-preset-help');
-      if (!note) {
-        note = document.createElement('small');
-        note.className = 'gm-preset-help';
-        wrap.appendChild(note);
-      }
-      setText(note, `Applies only to ${fullInningLabel(inning)}. Full-game plans are under Defense Options.`);
+      setText(label, 'Starting Defense Preset (Optional)');
+      wrap.querySelector('.gm-preset-help')?.remove();
     }
 
     setText(panel.querySelector('.pde-field-caption strong'), 'Current Defense');
