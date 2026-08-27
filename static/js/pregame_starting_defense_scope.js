@@ -20,7 +20,14 @@
       #${PANEL_ID} .pde-tools.cb-starting-defense-tools{
         grid-template-columns:minmax(190px,1fr) auto auto auto;
       }
-      #${PANEL_ID} #pde-apply-game{font-weight:800;white-space:nowrap}
+      #${PANEL_ID} #pde-apply-game{
+        font-weight:800;
+        white-space:nowrap;
+        min-width:118px!important;
+        padding-left:10px!important;
+        padding-right:10px!important;
+      }
+      #${PANEL_ID} .gm-preset-help{display:none!important}
       #${PANEL_ID} .cb-starting-defense-help{
         margin:-4px 0 11px;
         padding:8px 10px;
@@ -33,9 +40,45 @@
       }
       #${PANEL_ID} .cb-starting-defense-help strong{color:#294a84}
       @media(max-width:767.98px){
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools{grid-template-columns:1fr 1fr}
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools select{grid-column:1/-1}
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-save{grid-column:1/-1}
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools{
+          grid-template-columns:minmax(0,1fr) minmax(118px,auto)!important;
+          align-items:end!important;
+        }
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools .gm-preset-wrap{
+          grid-column:1!important;
+          grid-row:1!important;
+          min-width:0!important;
+        }
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply-game{
+          grid-column:2!important;
+          grid-row:1!important;
+          width:100%!important;
+          max-width:none!important;
+        }
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply{
+          grid-column:1/-1!important;
+          grid-row:2!important;
+          width:100%!important;
+          max-width:none!important;
+        }
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-save{
+          grid-column:1/-1!important;
+        }
+      }
+      @media(max-width:374.98px){
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools{
+          grid-template-columns:1fr!important;
+        }
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools .gm-preset-wrap,
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply-game,
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply,
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-save{
+          grid-column:1!important;
+          width:100%!important;
+        }
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools .gm-preset-wrap{grid-row:1!important}
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply-game{grid-row:2!important}
+        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply{grid-row:3!important}
       }
     `;
     document.head.appendChild(style);
@@ -191,6 +234,12 @@
     }
     if (select.options.length && select.options[0].textContent !== 'Choose Starting Defense…') {
       select.options[0].textContent = 'Choose Starting Defense…';
+    }
+
+    const presetWrap = select.closest('.gm-preset-wrap');
+    const presetLabelElement = presetWrap?.querySelector('.gm-preset-label');
+    if (presetLabelElement && presetLabelElement.textContent !== 'Starting Defense Preset (Optional)') {
+      presetLabelElement.textContent = 'Starting Defense Preset (Optional)';
     }
 
     if (inningButton.textContent !== 'This Inning') inningButton.textContent = 'This Inning';
