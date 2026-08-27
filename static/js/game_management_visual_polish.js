@@ -205,7 +205,7 @@
         body.coach-game-page #pregame-defense-editor-v3 .pde-help{font-size:.64rem!important;line-height:1.25!important;margin-top:3px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-body{padding:8px 9px 9px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-tools{
-          display:grid!important;grid-template-columns:minmax(0,1fr) 76px!important;gap:6px!important;padding:7px!important;margin-bottom:7px!important;
+          display:grid!important;grid-template-columns:minmax(0,1fr) minmax(132px,auto)!important;gap:6px!important;padding:7px!important;margin-bottom:7px!important;align-items:end!important;
         }
         body.coach-game-page #pregame-defense-editor-v3 .gm-preset-wrap{min-width:0!important}
         body.coach-game-page #pregame-defense-editor-v3 .gm-preset-label{margin-bottom:3px!important}
@@ -260,6 +260,7 @@
       }
       @media (max-width:380px){
         body.coach-game-page #rotation-card-container #inning-btn-group{gap:3px}
+        body.coach-game-page #pregame-defense-editor-v3 .pde-tools{grid-template-columns:1fr!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-field{height:232px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-spot{width:54px!important}
       }
@@ -282,7 +283,7 @@
 
     document.querySelectorAll('#game-pitching-rules-v2 .gpr-label').forEach((label, index) => {
       const text = label.textContent.trim().toLowerCase();
-      if (index === 0 || text === 'competition') setText(label, 'Game Rules');
+      if (index === 0 || text === 'competition' || text === 'game rules') setText(label, 'Game Tracking');
       if (text === 'arm care') setText(label, 'Arm Care');
     });
 
@@ -334,10 +335,10 @@
     setText(panel.querySelector('.pde-help'), 'Tap a position to assign or change a player. Saves automatically.');
 
     const label = panel.querySelector('.gm-preset-label');
-    setText(label, 'Defense Preset (Optional)');
+    setText(label, 'Starting Defense Preset (Optional)');
     const select = document.getElementById('pde-preset');
-    if (select?.options?.length) setText(select.options[0], 'Choose a starting defense…');
-    setText(document.getElementById('pde-apply'), 'Apply');
+    if (select?.options?.length) setText(select.options[0], 'Choose Starting Defense…');
+    setText(document.getElementById('pde-apply'), `Apply to Inning ${inning}`);
 
     setText(panel.querySelector('.pde-field-caption strong'), 'Current Defense');
     setText(panel.querySelector('.pde-field-caption span'), 'Tap a position to change it');
