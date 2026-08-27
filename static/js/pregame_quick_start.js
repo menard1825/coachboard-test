@@ -10,8 +10,6 @@
   const STYLE_ID = 'cb-pregame-quick-start-styles';
   let latest = {state:null, readiness:null, rules:null};
   let refreshBusy = false;
-  let rulesObserver = null;
-  let passQueued = false;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -93,6 +91,12 @@
       return {label:'Track Innings / Outs', detail:name};
     }
     return {label:'Track Pitching', detail:name};
+  }
+
+  function trackingOptionLabel(ruleName) {
+    const mode = trackingMode(ruleName);
+    if (!ruleName) return '';
+    return `${mode.label} — ${ruleName === 'MLB Pitch Smart' ? 'Pitch Smart' : ruleName}`;
   }
 
   function inningOneComplete(readiness = latest.readiness) {
@@ -263,16 +267,20 @@
     const blockers = modal.querySelector('[data-cb-qs-blockers]');
     if (!list || !start || !blockers) return;
     const status = setupStatus();
-    list.innerHTML = status.steps.map(step => `
+    const markup = status.steps.map(step => `
       <div class="cb-qs-step ${step.ready ? 'ready' : 'warn'}" data-cb-qs-step="${esc(step.key)}">
         <div class="cb-qs-icon"><i class="bi ${esc(step.icon)}" aria-hidden="true"></i></div>
         <div><div class="cb-qs-name">${esc(step.name)}${step.optional ? ' <span class="text-muted fw-normal">· optional</span>' : ''}</div><div class="cb-qs-status">${esc(step.status)}</div></div>
         <button type="button" class="btn ${step.ready ? 'btn-outline-secondary' : 'btn-outline-primary'} cb-qs-action" data-cb-qs-go="${esc(step.key)}">${step.ready ? 'Review' : 'Set'}</button>
       </div>`).join('');
-    list.querySelectorAll('[data-cb-qs-go]').forEach(button => button.addEventListener('click', () => scrollToStep(button.dataset.cbQsGo)));
+    if (list.innerHTML !== markup) {
+      list.innerHTML = markup;
+      list.querySelectorAll('[data-cb-qs-go]').forEach(button => button.addEventListener('click', () => scrollToStep(button.dataset.cbQsGo)));
+    }
     start.disabled = !status.coreReady;
     const missing = status.steps.filter(step => !step.optional && !step.ready).map(step => step.name);
-    blockers.textContent = missing.length ? `Still needed: ${missing.join(' · ')}` : 'Ready for first pitch. Later innings can be planned during Live Game.';
+    const blockerText = missing.length ? `Still needed: ${missing.join(' · ')}` : 'Ready for first pitch. Later innings can be planned during Live Game.';
+    if (blockers.textContent !== blockerText) blockers.textContent = blockerText;
   }
 
   function openQuickStart() {
@@ -310,21 +318,33 @@
     const mode = trackingMode(latest.rules.effective);
     const labels = card.querySelectorAll('.gpr-label');
     const rule = card.querySelector('.gpr-rule');
-    if (labels[0]) labels[0].textContent = 'Game Tracking';
+    if (labels[0] && labels[0].textContent.trim() !== 'Game Tracking') labels[0].textContent = 'Game Tracking';
     if (rule) {
-      rule.textContent = mode.label;
+      if (rule.textContent.trim() !== mode.label) rule.textContent = mode.label;
       let source = rule.parentElement?.querySelector('.cb-pitch-source');
       if (!source && latest.rules.effective) {
         source = document.createElement('span');
         source.className = 'cb-pitch-source';
         rule.insertAdjacentElement('afterend', source);
       }
-      if (source) source.textContent = latest.rules.effective ? `· ${latest.rules.effective === 'MLB Pitch Smart' ? 'Pitch Smart' : latest.rules.effective}` : '';
+      const sourceText = latest.rules.effective ? `· ${latest.rules.effective === 'MLB Pitch Smart' ? 'Pitch Smart' : latest.rules.effective}` : '';
+      if (source && source.textContent.trim() !== sourceText) source.textContent = sourceText;
     }
     const title = card.querySelector('.gpr-title');
-    if (title) title.textContent = 'How is pitching tracked for this game?';
+    const titleText = 'How is pitching tracked for this game?';
+    if (title && title.textContent.trim() !== titleText) title.textContent = titleText;
     const help = card.querySelector('.gpr-help');
-    if (help) help.textContent = 'Choose the tournament or league rules. CoachBoard will tell you whether to track pitches or innings / outs for official eligibility.';
+    const helpText = 'Choose the tournament or league rules. CoachBoard will tell you whether to track pitches or innings / outs for official eligibility.';
+    if (help && help.textContent.trim() !== helpText) help.textContent = helpText;
+
+    const select = card.querySelector('#game-pitch-rule-select-v2');
+    if (select) {
+      [...select.options].forEach(option => {
+        if (!option.value) return;
+        const wanted = trackingOptionLabel(option.value);
+        if (wanted && option.textContent.trim() !== wanted) option.textContent = wanted;
+      });
+    }
 
     const usesPitchSmart = latest.rules.effective === 'MLB Pitch Smart' || latest.rules.arm_care_rule_set === 'MLB Pitch Smart';
     let info = card.querySelector('.cb-pitch-smart-help');
@@ -354,25 +374,11 @@
   }
 
   function runPass() {
-    passQueued = false;
     ensureLaunch();
     simplifyReadiness();
     decorateRules();
     normalizeNormalStartButton();
     if (document.getElementById(MODAL_ID)?.classList.contains('show')) renderModal();
-  }
-
-  function queuePass() {
-    if (passQueued) return;
-    passQueued = true;
-    window.requestAnimationFrame(runPass);
-  }
-
-  function attachRulesObserver() {
-    const card = document.getElementById('game-pitching-rules-v2');
-    if (!card || rulesObserver) return;
-    rulesObserver = new MutationObserver(queuePass);
-    rulesObserver.observe(card, {childList:true, subtree:true});
   }
 
   async function refresh(forceModal = false) {
@@ -392,7 +398,6 @@
         bootstrap.Modal.getInstance(document.getElementById(MODAL_ID))?.hide();
         return;
       }
-      attachRulesObserver();
       runPass();
       if (forceModal) renderModal();
     } finally {
@@ -417,7 +422,7 @@
       if (/Player Availability|Who['’]s Out/i.test(text)) window.setTimeout(() => scrollToStep('availability'), 0);
       else if (/Batting Order/i.test(text)) window.setTimeout(() => scrollToStep('batting'), 0);
       else if (/Defense/i.test(text)) window.setTimeout(() => scrollToStep('defense'), 0);
-      else if (/Game Rules|Pitch/i.test(text)) window.setTimeout(() => scrollToStep('rules'), 0);
+      else if (/Game Tracking|Game Rules|Pitch/i.test(text)) window.setTimeout(() => scrollToStep('rules'), 0);
     });
   }
 
