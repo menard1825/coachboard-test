@@ -175,7 +175,7 @@
     const pregame = pregameCandidate(data);
     return `<div class="nxd-actions">
       <button type="button" class="btn btn-outline-dark" data-bp-action="current">Same Defense</button>
-      <button type="button" class="btn btn-outline-primary" data-bp-action="planned" ${pregame ? '' : 'disabled'}>Pregame Defense</button>
+      <button type="button" class="btn btn-outline-primary" data-bp-action="planned" ${pregame ? '' : 'disabled'}>Use Planned Defense</button>
       <button type="button" class="btn btn-primary" data-bp-action="adjust">New Defense</button>
     </div>`;
   }
@@ -197,8 +197,8 @@
 
     if (!confirmed) {
       const pregame = Object.values(data.planned_alignment || {}).some(Boolean)
-        ? '<div class="nxd-none">Pregame defense available.</div>'
-        : '<div class="nxd-none">No pregame defense saved.</div>';
+        ? `<div class="nxd-none">Your planned Inning ${esc(next)} defense is ready. <strong>Pregame Defense</strong> means the plan you saved before the game.</div>`
+        : `<div class="nxd-none">No planned defense for Inning ${esc(next)}.</div>`;
       card.innerHTML = `${head}<div class="nxd-body"><div class="nxd-status waiting"><div><strong>Defense not set</strong><small>Choose who goes out after the third out.</small></div><span class="nxd-badge">NOT SET</span></div>${pregame}${actionButtons(data)}</div>`;
       wireActions(card);
       return true;
@@ -258,7 +258,7 @@
       lastSignature = '';
       render(data);
       announce(data);
-      if (!quiet) toast(mode === 'current' ? 'Same defense set.' : 'Pregame defense set.');
+      if (!quiet) toast(mode === 'current' ? 'Same defense set.' : 'Planned defense set.');
       return data;
     } catch (err) {
       toast(err.message,'danger');
@@ -281,7 +281,7 @@
       lastSignature = '';
       render(data);
       announce(data);
-      if (!quiet) toast('Pregame defense set.');
+      if (!quiet) toast('Planned defense set.');
       return data;
     } catch (err) {
       toast(err.message,'danger');
