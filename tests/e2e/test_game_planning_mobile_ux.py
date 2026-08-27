@@ -65,11 +65,11 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(readiness.get_by_role('button', name=re.compile('Pitch Plan'))).to_be_visible()
 
         # The old four-card checklist is redundant on phones and must stay out of
-        # the way. Start Live Game should sit directly below the compact status.
+        # the way. The start action should sit directly below the compact status.
         expect(page.locator('#pregame-checklist-container > .row.g-3.mb-4')).to_be_hidden()
         start_after_readiness = readiness.locator('xpath=following-sibling::*[1]//button[@id="startLiveGameBtnAction"]')
         expect(start_after_readiness).to_be_visible()
-        expect(start_after_readiness).to_have_text(re.compile('Start Live Game'))
+        expect(start_after_readiness).to_have_text(re.compile('START GAME'))
         expect(page.locator('#start-live-blockers')).to_be_hidden()
 
         # All six regulation innings fit across the phone without being clipped.
