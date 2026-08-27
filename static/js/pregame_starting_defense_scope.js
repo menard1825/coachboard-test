@@ -135,14 +135,6 @@
     button.title = 'Apply this saved Starting Defense only to the inning currently shown.';
   }
 
-  function stabilizeInningButtonLabel(button, panel) {
-    syncInningButtonLabel(button, panel);
-    if (button.dataset.cbScopeLabelObserver === '1') return;
-    button.dataset.cbScopeLabelObserver = '1';
-    const observer = new MutationObserver(() => syncInningButtonLabel(button, panel));
-    observer.observe(button, {childList:true, subtree:true, characterData:true});
-  }
-
   async function fetchGameData() {
     const response = await fetch(`/api/game_data/${gameId}`, {cache: 'no-store'});
     if (!response.ok) throw new Error(`Unable to load game defense (${response.status}).`);
@@ -265,7 +257,7 @@
       presetLabelElement.textContent = 'Starting Defense Preset (Optional)';
     }
 
-    stabilizeInningButtonLabel(inningButton, panel);
+    syncInningButtonLabel(inningButton, panel);
     if (saveButton.textContent !== 'Save Current') saveButton.textContent = 'Save Current';
     saveButton.title = 'Save the current field as a reusable Starting Defense.';
 
