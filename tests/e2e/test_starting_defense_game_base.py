@@ -122,8 +122,11 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
         expect(page.get_by_text('Pitchers stay as you already assigned them')).to_be_visible()
 
         page.once('dialog', lambda dialog: dialog.accept())
-        use_for_game.click()
-        page.wait_for_load_state('domcontentloaded')
+        # Use for Game saves asynchronously and then reloads the current game page.
+        # Wait for that navigation instead of checking the database while the save
+        # request may still be in flight.
+        with page.expect_navigation(wait_until='domcontentloaded'):
+            use_for_game.click()
 
         updated_response = page.request.get(f'{coachboard_url}/api/game_data/{game_id}')
         assert updated_response.ok
