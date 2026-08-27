@@ -9,7 +9,9 @@
   let readiness = null;
   let ruleState = null;
   let refreshBusy = false;
-  let observerBusy = false;
+  let pitcherObserver = null;
+  let observedPitcherStats = null;
+  let pitcherObserverBusy = false;
 
   const byId = id => document.getElementById(id);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -121,26 +123,6 @@
     if (button.innerHTML !== wanted) button.innerHTML = wanted;
   }
 
-  function polishSavedDefenseLanguage() {
-    const panel = byId('pregame-defense-editor-v3');
-    if (!panel) return;
-
-    const label = panel.querySelector('.gm-preset-label');
-    if (label && label.textContent !== 'Saved Defense · This Inning Only') {
-      label.textContent = 'Saved Defense · This Inning Only';
-    }
-
-    const help = panel.querySelector('.gm-preset-help');
-    if (help && !help.textContent.includes('Full-game plans are under Defense Options.')) {
-      help.textContent = 'Applies only to this inning. Full-game plans are under Defense Options.';
-    }
-
-    const select = byId('pde-preset');
-    if (select?.options?.length && select.options[0].textContent !== 'Choose a saved defense…') {
-      select.options[0].textContent = 'Choose a saved defense…';
-    }
-  }
-
   function applyStartMode() {
     const button = byId('startLiveGameBtnAction');
     if (!button || liveState?.game?.is_live) return;
@@ -156,9 +138,9 @@
       button.dataset.cbStartMode = 'full';
       button.disabled = false;
       button.classList.remove('disabled');
-      setStartButtonText(button, 'START LIVE GAME');
+      setStartButtonText(button, 'START GAME');
       note.className = 'ready';
-      note.innerHTML = '<strong>Ready for first pitch.</strong>Your full defensive plan is set. You can still make changes live.';
+      note.innerHTML = '<strong>Ready for first pitch.</strong>Your full game plan is set. You can still make changes during the game.';
       return;
     }
 
@@ -166,19 +148,19 @@
       button.dataset.cbStartMode = 'quick';
       button.disabled = false;
       button.classList.remove('disabled');
-      setStartButtonText(button, 'START WITH INNING 1', 'bi-lightning-charge-fill');
+      setStartButtonText(button, 'QUICK START GAME', 'bi-lightning-charge-fill');
       note.className = 'quick';
-      note.innerHTML = '<strong>Inning 1 is ready.</strong>Start now and set later innings between innings. CoachBoard will keep the current defense unless you choose a new one.';
+      note.innerHTML = '<strong>Quick Start is ready.</strong>Only the first-pitch essentials are required. Plan later innings during the game; CoachBoard keeps the current defense until you change it.';
       return;
     }
 
     button.dataset.cbStartMode = 'blocked';
     button.disabled = true;
     button.classList.add('disabled');
-    setStartButtonText(button, 'START LIVE GAME');
+    setStartButtonText(button, 'START GAME');
     note.className = 'blocked';
-    const detail = status.reasons.length ? status.reasons.map(esc).join(' · ') : 'Finish the 1st-inning setup.';
-    note.innerHTML = `<strong>Before first pitch</strong>${detail}`;
+    const detail = status.reasons.length ? status.reasons.map(esc).join(' · ') : 'Finish the first-pitch setup.';
+    note.innerHTML = `<strong>Quick Start checklist</strong>${detail}`;
   }
 
   function concisePitcherStatus() {
@@ -200,6 +182,23 @@
 
     stats.classList.add('cb-command-pitcher-status');
     if (stats.innerHTML !== html) stats.innerHTML = html;
+  }
+
+  function observePitcherStatus() {
+    const stats = byId('live-pitcher-stats');
+    if (!stats || stats === observedPitcherStats) return;
+
+    pitcherObserver?.disconnect();
+    observedPitcherStats = stats;
+    pitcherObserver = new MutationObserver(() => {
+      if (pitcherObserverBusy) return;
+      pitcherObserverBusy = true;
+      window.requestAnimationFrame(() => {
+        try { concisePitcherStatus(); }
+        finally { pitcherObserverBusy = false; }
+      });
+    });
+    pitcherObserver.observe(stats, {childList: true, subtree: true, characterData: true});
   }
 
   function actionMarkup(button, title, note) {
@@ -250,11 +249,12 @@
         }
       }
       if (undo) {
-        undo.className = 'btn cb-command-undo';
-        undo.title = 'Undo the last live-game change';
-        undo.setAttribute('aria-label', 'Undo last change');
-        undo.innerHTML = '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="cb-undo-text">Undo last change</span>';
-        tools.appendChild(undo);
+        const undoMarkup = '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="cb-undo-text">Undo last change</span>';
+        if (undo.className !== 'btn cb-command-undo') undo.className = 'btn cb-command-undo';
+        if (undo.title !== 'Undo the last live-game change') undo.title = 'Undo the last live-game change';
+        if (undo.getAttribute('aria-label') !== 'Undo last change') undo.setAttribute('aria-label', 'Undo last change');
+        if (undo.innerHTML !== undoMarkup) undo.innerHTML = undoMarkup;
+        if (undo.parentElement !== tools) tools.appendChild(undo);
       }
     }
 
@@ -263,16 +263,20 @@
       actionMarkup(defense, 'Defense Change', 'Move field / bench');
       actionMarkup(pitcher, 'Change Pitcher', 'Make a mound change');
       actionMarkup(endInning, 'End Inning', 'Keep or change defense');
-      [defense, pitcher, endInning].filter(Boolean).forEach(button => slot.appendChild(button));
+      [defense, pitcher, endInning].filter(Boolean).forEach(button => {
+        if (button.parentElement !== slot) slot.appendChild(button);
+      });
     }
 
     const endGame = byId('liveEndGameBtn');
     if (endGame) {
-      endGame.innerHTML = '<i class="bi bi-stop-circle-fill me-1"></i> End Game';
+      const endMarkup = '<i class="bi bi-stop-circle-fill me-1"></i> End Game';
+      if (endGame.innerHTML !== endMarkup) endGame.innerHTML = endMarkup;
       endGame.title = 'Save the defensive history and go to the Game Report. Enter GameChanger pitching stats when ready.';
     }
 
     concisePitcherStatus();
+    observePitcherStatus();
   }
 
   function configureWhenShellReady(attempt = 0) {
@@ -284,7 +288,7 @@
     window.setTimeout(() => configureWhenShellReady(attempt + 1), 50);
   }
 
-  async function refresh() {
+  async function refreshPregame() {
     if (refreshBusy) return;
     refreshBusy = true;
     try {
@@ -297,16 +301,27 @@
       if (readinessData?.readiness) readiness = readinessData.readiness;
       if (rulesData) ruleState = rulesData;
 
-      polishSavedDefenseLanguage();
-      if (liveState?.game?.is_live || liveShellVisible()) configureLiveCommandCenter();
+      if (liveState?.game?.is_live || liveShellVisible()) configureWhenShellReady();
       else applyStartMode();
     } finally {
       refreshBusy = false;
     }
   }
 
+  async function refreshLiveState() {
+    if (refreshBusy) return;
+    refreshBusy = true;
+    try {
+      const stateData = await getJson(`/api/live-game/${gameId}/state`);
+      if (stateData) liveState = stateData;
+      if (liveState?.game?.is_live || liveShellVisible()) configureWhenShellReady();
+    } finally {
+      refreshBusy = false;
+    }
+  }
+
   function refreshImmediatelyAfterStart() {
-    [80, 220, 500].forEach(delay => window.setTimeout(refresh, delay));
+    [80, 250, 700].forEach(delay => window.setTimeout(refreshLiveState, delay));
   }
 
   document.addEventListener('click', event => {
@@ -315,7 +330,7 @@
     if (button.dataset.cbStartAllowed === '1') {
       // The authoritative Live Game controller starts the game on this same
       // click. Watch for the shell directly so the command center is ready as
-      // soon as the live UI exists, independent of API polling or observer timing.
+      // soon as the live UI exists.
       configureWhenShellReady();
       refreshImmediatelyAfterStart();
       return;
@@ -327,21 +342,6 @@
     applyStartMode();
   }, true);
 
-  const observer = new MutationObserver(() => {
-    if (observerBusy) return;
-    observerBusy = true;
-    window.requestAnimationFrame(() => {
-      try {
-        polishSavedDefenseLanguage();
-        const oldFeedback = byId('start-live-blockers');
-        if (oldFeedback && !liveState?.game?.is_live) oldFeedback.classList.add('d-none');
-        if (liveState?.game?.is_live || liveShellVisible()) configureLiveCommandCenter();
-      } finally {
-        observerBusy = false;
-      }
-    });
-  });
-
   function start() {
     installStyles();
     const startButton = byId('startLiveGameBtnAction');
@@ -349,10 +349,30 @@
       startButton.disabled = true;
       startButton.dataset.cbStartAllowed = '0';
     }
-    polishSavedDefenseLanguage();
-    observer.observe(document.body, {childList: true, subtree: true, characterData: true});
-    refresh();
-    window.setInterval(refresh, 4000);
+
+    refreshPregame();
+
+    // Pregame readiness can change while a coach is planning, so keep the short
+    // refresh there. Once the game is live, Socket.IO/live scripts own immediate
+    // updates and this helper falls back to one state-only recovery read every
+    // 15 seconds instead of three API reads every four seconds.
+    window.setInterval(() => {
+      if (document.hidden) return;
+      if (liveState?.game?.is_live || liveShellVisible()) return;
+      refreshPregame();
+    }, 4000);
+
+    window.setInterval(() => {
+      if (document.hidden) return;
+      if (!(liveState?.game?.is_live || liveShellVisible())) return;
+      refreshLiveState();
+    }, 15000);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      if (liveState?.game?.is_live || liveShellVisible()) refreshLiveState();
+      else refreshPregame();
+    });
   }
 
   if (document.readyState === 'loading') {
