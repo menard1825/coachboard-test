@@ -180,6 +180,7 @@
   window.addEventListener('load', () => {
     installCommandCenterCompatibilityStyles();
     loadOnce('/static/js/pregame_starting_defense_scope.js', 'starting-defense-scope');
+    loadOnce('/static/js/pregame_quick_start.js', 'pregame-quick-start');
     loadOnce('/static/js/live_game_dugout_mode.js', 'live-dugout-mode');
     loadOnce('/static/js/live_game_clock_controls.js', 'live-clock-controls');
     loadOnce('/static/js/live_game_command_center.js', 'live-command-center');
