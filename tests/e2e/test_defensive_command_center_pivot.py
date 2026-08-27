@@ -120,17 +120,34 @@ def test_inning_one_quick_start_launches_defensive_command_center(page: Page, co
 
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
-        quick_note = page.locator('#cb-quick-start-note')
-        expect(quick_note).to_be_visible(timeout=15_000)
-        expect(quick_note).to_contain_text('Quick Start is ready')
-        expect(quick_note).to_contain_text('Plan later innings during the game')
+        # Quick Start is now a real, discoverable workflow rather than a hidden
+        # alternate label on the normal Start Game button.
+        launch = page.locator('#cb-quick-start-launch')
+        expect(launch).to_be_visible(timeout=15_000)
+        expect(launch).to_contain_text('Quick Start')
+        expect(launch.get_by_role('button', name='Open Quick Start')).to_be_visible()
+        expect(page.locator('#cb-quick-start-note')).to_be_hidden()
 
         start = page.locator('#startLiveGameBtnAction')
         expect(start).to_be_enabled()
-        expect(start).to_contain_text('QUICK START GAME')
+        expect(start).to_contain_text('START GAME')
         assert start.get_attribute('data-cb-start-mode') == 'quick'
 
-        start.click()
+        launch.get_by_role('button', name='Open Quick Start').click()
+        quick = page.locator('#cb-quick-start-modal')
+        expect(quick).to_be_visible()
+        expect(quick).to_contain_text('Get ready for first pitch')
+        expect(quick).to_contain_text('Player Availability')
+        expect(quick).to_contain_text('Batting Order')
+        expect(quick).to_contain_text('Starting Defense')
+        expect(quick).to_contain_text('Starting Pitcher')
+        expect(quick).to_contain_text('Pitching Tracking')
+        expect(quick).to_contain_text('Track Pitches')
+        expect(quick).to_contain_text('Game Clock')
+        quick_start = quick.get_by_role('button', name='Start Live Game')
+        expect(quick_start).to_be_enabled()
+        quick_start.click()
+
         shell = page.locator('.coach-live-shell')
         expect(shell).to_be_visible(timeout=15_000)
 
