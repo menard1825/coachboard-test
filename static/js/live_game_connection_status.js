@@ -3,6 +3,8 @@
 
   if (!/^\/game\/\d+\/?$/.test(window.location.pathname)) return;
 
+  let placementQueued = false;
+
   function installStyles() {
     if (document.getElementById('cb-live-connection-styles')) return;
     const style = document.createElement('style');
@@ -39,8 +41,27 @@
     if (status.parentElement !== context) context.appendChild(status);
   }
 
+  function queuePlacement() {
+    if (placementQueued) return;
+    placementQueued = true;
+    window.requestAnimationFrame(() => {
+      placementQueued = false;
+      placeStatus();
+    });
+  }
+
   installStyles();
-  const observer = new MutationObserver(() => window.requestAnimationFrame(placeStatus));
-  observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
+
+  // Only two things can affect placement: the live overlay being rebuilt and
+  // entering/leaving dugout mode on the body. Avoid observing class changes on
+  // every descendant in the document while the game clock and modals update.
+  const liveOverlay = document.getElementById('live-game-overlay');
+  if (liveOverlay) {
+    const overlayObserver = new MutationObserver(queuePlacement);
+    overlayObserver.observe(liveOverlay, {childList:true, subtree:true});
+  }
+
+  const bodyObserver = new MutationObserver(queuePlacement);
+  bodyObserver.observe(document.body, {attributes:true, attributeFilter:['class']});
   placeStatus();
 })();
