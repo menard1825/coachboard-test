@@ -116,17 +116,16 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
         expect(select).to_be_visible(timeout=15_000)
         select.select_option(label=template_title)
 
-        use_for_game = page.get_by_role('button', name='Use for Game')
-        expect(use_for_game).to_be_enabled()
-        expect(page.get_by_role('button', name='Use for Inning 1')).to_be_visible()
-        expect(page.get_by_text('Pitchers stay as you already assigned them')).to_be_visible()
+        apply_to_game = page.get_by_role('button', name='Apply to Entire Game')
+        expect(apply_to_game).to_be_enabled()
+        expect(page.get_by_role('button', name='Apply to Inning 1')).to_be_visible()
+        expect(page.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as assigned')
 
         page.once('dialog', lambda dialog: dialog.accept())
-        # Use for Game saves asynchronously and then reloads the current game page.
-        # Wait for that navigation instead of checking the database while the save
-        # request may still be in flight.
+        # Applying to the entire game saves asynchronously and then reloads the
+        # current game page. Wait for that navigation before checking the DB.
         with page.expect_navigation(wait_until='domcontentloaded'):
-            use_for_game.click()
+            apply_to_game.click()
 
         updated_response = page.request.get(f'{coachboard_url}/api/game_data/{game_id}')
         assert updated_response.ok
