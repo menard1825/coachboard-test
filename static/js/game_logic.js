@@ -37,6 +37,13 @@ function initializeGameManagement(gameData) {
     let lineupEditorModal;
     let saveTemplateModal;
 
+    // iPads and other touch-first devices are more reliable with tap-to-assign
+    // than SortableJS drag/drop. This also prevents Safari's synthetic click
+    // after a touch drag from accidentally undoing the move.
+    const useTapDefenseEditor =
+        ((window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+         (navigator.maxTouchPoints || 0) > 0);
+
     // --- Rotation Editor Functions ---
     function renderRotationEditor() {
         if (!state.rotation) return;
@@ -306,31 +313,53 @@ function initializeGameManagement(gameData) {
     }
 
     function initializeRotationSortables() {
-        Object.values(state.sortableInstances).forEach(s => { if (s.destroy) s.destroy(); });
+        Object.values(state.sortableInstances).forEach(s => {
+            if (s.destroy) s.destroy();
+        });
         state.sortableInstances = {};
+
+        // Touch devices use the existing tap-to-assign workflow instead.
+        if (useTapDefenseEditor) {
+            return;
+        }
+
         const onEndHandler = () => {
             const inningData = state.rotation.innings[state.currentInning] = {};
-            document.querySelectorAll('#diamond-parent-desktop .position-dropzone').forEach(dz => {
+
+            document.querySelectorAll(
+                '#diamond-parent-desktop .position-dropzone'
+            ).forEach(dz => {
                 const playerTag = dz.querySelector('.player-tag');
                 if (playerTag) {
-                    inningData[dz.dataset.position] = playerTag.dataset.playerName;
+                    inningData[dz.dataset.position] =
+                        playerTag.dataset.playerName;
                 }
             });
+
             renderRotationEditor();
             triggerAutosave();
         };
-        const allContainers = [...document.querySelectorAll('#bench-list-desktop, #diamond-parent-desktop .position-dropzone')];
+
+        const allContainers = [
+            ...document.querySelectorAll(
+                '#bench-list-desktop, #diamond-parent-desktop .position-dropzone'
+            )
+        ];
+
         allContainers.forEach(container => {
             state.sortableInstances[container.id] = new Sortable(container, {
                 group: 'rotation',
                 animation: 150,
-                delay: 150,
-                delayOnTouchOnly: true,
-                touchStartThreshold: 5,
                 onEnd: onEndHandler,
                 onMove: (evt) => {
-                    if (evt.to.classList.contains('position-dropzone') && evt.to.children.length > 1 && evt.to !== evt.from) {
-                        evt.from.appendChild(evt.to.querySelector('.player-tag'));
+                    if (
+                        evt.to.classList.contains('position-dropzone') &&
+                        evt.to.children.length > 1 &&
+                        evt.to !== evt.from
+                    ) {
+                        evt.from.appendChild(
+                            evt.to.querySelector('.player-tag')
+                        );
                     }
                 }
             });
@@ -472,60 +501,218 @@ function applyOutOfPositionIndicators() {
         }
     }
     
-    let autosaveTimer = null;
-    function triggerAutosave() {
-        if (autosaveTimer) clearTimeout(autosaveTimer);
-        const btnDesktop = document.getElementById('saveRotationBtn');
-        const btnMobile = document.getElementById('saveRotationBtnMobile');
+    let rotationSaveInProgress = false;
+    let pendingRotationPayload = null;
+    let rotationSaveStatusResetTimer = null;
+    let lastRotationSaveError = null;
 
-        const indicatingHtml = '<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>';
-        if (btnDesktop && !btnDesktop.disabled) btnDesktop.innerHTML = indicatingHtml + ' Saving...';
-        if (btnMobile && !btnMobile.disabled) btnMobile.innerHTML = indicatingHtml;
-
-        autosaveTimer = setTimeout(() => {
-            saveRotation(true);
-        }, 2000);
-    }
-
-    async function saveRotation(isAutosave = false) {
-        const btnDesktop = document.getElementById('saveRotationBtn');
-        const btnMobile = document.getElementById('saveRotationBtnMobile');
-
-        if (!isAutosave) {
-            if (btnDesktop) { btnDesktop.disabled = true; btnDesktop.textContent = 'Saving...'; }
-            if (btnMobile) { btnMobile.disabled = true; btnMobile.textContent = 'Saving...'; }
-        }
-
-        const payload = {
+    function buildRotationPayload() {
+        return {
             id: state.rotation.id,
-            title: state.rotation.title || `Rotation for vs ${state.game.opponent}`,
-            innings: state.rotation.innings,
+            title:
+                state.rotation.title ||
+                `Rotation for vs ${state.game.opponent}`,
+            // Snapshot the innings now so later UI changes cannot mutate
+            // an already-running request.
+            innings: JSON.parse(
+                JSON.stringify(state.rotation.innings || {})
+            ),
             associated_game_id: state.game.id
         };
-        try {
-            const response = await fetch('/save_rotation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error('Failed to save rotation.');
-            const result = await response.json();
-            if (result.status === 'success') {
-                if (result.new_id) state.rotation.id = result.new_id;
+    }
 
-                if (btnDesktop) btnDesktop.innerHTML = '<i class="bi bi-check"></i> Saved!';
-                if (btnMobile) btnMobile.innerHTML = '<i class="bi bi-check"></i>';
+    function setRotationSaveStatus(status) {
+        const btnDesktop = document.getElementById('saveRotationBtn');
+        const btnMobile = document.getElementById('saveRotationBtnMobile');
 
-                if (!isAutosave || !state.rotation.id) {
-                     renderRotationEditor();
-                }
-            } else { throw new Error(result.message); }
-        } catch (error) {
-            if (!isAutosave) alert('Error saving rotation: ' + error.message);
-            if (btnDesktop) btnDesktop.textContent = 'Save Failed';
-            if (btnMobile) btnMobile.textContent = 'Error';
-        } finally {
-            setTimeout(() => {
-                if (btnDesktop) { btnDesktop.disabled = false; btnDesktop.innerHTML = '<i class="bi bi-save me-1"></i> Save Rotation'; }
-                if (btnMobile) { btnMobile.disabled = false; btnMobile.innerHTML = '<i class="bi bi-save"></i> Save'; }
-            }, 2000);
+        if (rotationSaveStatusResetTimer) {
+            clearTimeout(rotationSaveStatusResetTimer);
+            rotationSaveStatusResetTimer = null;
         }
+
+        const setDisabled = (btn, disabled) => {
+            if (!btn) return;
+
+            if ('disabled' in btn) {
+                btn.disabled = disabled;
+            }
+
+            btn.classList.toggle('disabled', disabled);
+            btn.setAttribute(
+                'aria-disabled',
+                disabled ? 'true' : 'false'
+            );
+        };
+
+        if (status === 'saving') {
+            setDisabled(btnDesktop, true);
+            setDisabled(btnMobile, true);
+
+            if (btnDesktop) {
+                btnDesktop.innerHTML =
+                    '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+            }
+
+            if (btnMobile) {
+                btnMobile.innerHTML =
+                    '<span class="spinner-border spinner-border-sm me-1"></span> Saving';
+            }
+
+            return;
+        }
+
+        setDisabled(btnDesktop, false);
+        setDisabled(btnMobile, false);
+
+        if (status === 'failed') {
+            if (btnDesktop) {
+                btnDesktop.innerHTML =
+                    '<i class="bi bi-exclamation-triangle me-1"></i> Save Failed — Retry';
+            }
+
+            if (btnMobile) {
+                btnMobile.innerHTML =
+                    '<i class="bi bi-exclamation-triangle me-1"></i> Retry';
+            }
+
+            return;
+        }
+
+        if (status === 'saved') {
+            if (btnDesktop) {
+                btnDesktop.innerHTML =
+                    '<i class="bi bi-check-circle me-1"></i> Saved';
+            }
+
+            if (btnMobile) {
+                btnMobile.innerHTML =
+                    '<i class="bi bi-check-circle me-1"></i> Saved';
+            }
+
+            rotationSaveStatusResetTimer = setTimeout(() => {
+                if (
+                    !rotationSaveInProgress &&
+                    !pendingRotationPayload &&
+                    !lastRotationSaveError
+                ) {
+                    setRotationSaveStatus('idle');
+                }
+            }, 1500);
+
+            return;
+        }
+
+        if (btnDesktop) {
+            btnDesktop.innerHTML =
+                '<i class="bi bi-save me-1"></i> Save Rotation';
+        }
+
+        if (btnMobile) {
+            btnMobile.innerHTML =
+                '<i class="bi bi-save"></i> Save';
+        }
+    }
+
+    function triggerAutosave() {
+        // Always keep only the newest unsaved snapshot.
+        pendingRotationPayload = buildRotationPayload();
+        lastRotationSaveError = null;
+
+        // Save immediately. If another save is already running,
+        // flushRotationSaveQueue will process this snapshot next.
+        void flushRotationSaveQueue(true);
+    }
+
+    async function flushRotationSaveQueue(isAutosave = true) {
+        if (rotationSaveInProgress || !pendingRotationPayload) {
+            return;
+        }
+
+        const payload = pendingRotationPayload;
+        pendingRotationPayload = null;
+        rotationSaveInProgress = true;
+
+        let succeeded = false;
+
+        setRotationSaveStatus('saving');
+
+        try {
+            const response = await fetch('/save_rotation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload),
+
+                // Help Safari finish the request even if the coach
+                // navigates away immediately after making a change.
+                keepalive: true
+            });
+
+            let result = {};
+
+            try {
+                result = await response.json();
+            } catch (parseError) {
+                throw new Error(
+                    `Save returned an invalid response (${response.status}).`
+                );
+            }
+
+            if (!response.ok || result.status !== 'success') {
+                throw new Error(
+                    result.message || 'Failed to save rotation.'
+                );
+            }
+
+            if (result.new_id) {
+                state.rotation.id = result.new_id;
+
+                // If another edit occurred while the first-ever rotation
+                // save was running, make sure the queued request updates
+                // the newly created rotation instead of creating a duplicate.
+                if (pendingRotationPayload) {
+                    pendingRotationPayload.id = result.new_id;
+                }
+            }
+
+            succeeded = true;
+            lastRotationSaveError = null;
+
+        } catch (error) {
+            console.error('Error saving rotation:', error);
+            lastRotationSaveError = error;
+
+        } finally {
+            rotationSaveInProgress = false;
+
+            if (pendingRotationPayload) {
+                // Another defensive change happened during the request.
+                // Save the newest snapshot next.
+                void flushRotationSaveQueue(true);
+
+            } else if (succeeded) {
+                setRotationSaveStatus('saved');
+
+            } else {
+                // Unlike the old autosave, do not hide this failure.
+                setRotationSaveStatus('failed');
+
+                if (!isAutosave) {
+                    alert(
+                        'Error saving rotation: ' +
+                        (lastRotationSaveError?.message || 'Unknown error')
+                    );
+                }
+            }
+        }
+    }
+
+    function saveRotation(isAutosave = false) {
+        pendingRotationPayload = buildRotationPayload();
+        lastRotationSaveError = null;
+
+        return flushRotationSaveQueue(Boolean(isAutosave));
     }
 
     async function fetchLatestGameData() {
@@ -605,7 +792,12 @@ function applyOutOfPositionIndicators() {
         socket.on('data_updated', fetchLatestGameData);
         socket.on('lineup_add', fetchLatestGameData);
         socket.on('lineup_update', fetchLatestGameData);
-        socket.on('rotation_save', fetchLatestGameData);
+        socket.on('rotation_save', () => {
+            if (rotationSaveInProgress || pendingRotationPayload) {
+                return;
+            }
+            fetchLatestGameData();
+        });
         socket.on('roster_update', fetchLatestGameData);
 
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
@@ -614,8 +806,14 @@ function applyOutOfPositionIndicators() {
         saveTemplateModal = new bootstrap.Modal(document.getElementById('saveRotationTemplateModal'));
 
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
-        document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
-        document.getElementById('saveRotationBtnMobile')?.addEventListener('click', saveRotation); // Add mobile listener
+        document.getElementById('saveRotationBtn')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            void saveRotation(false);
+        });
+        document.getElementById('saveRotationBtnMobile')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            void saveRotation(false);
+        });
         document.getElementById('printCardBtn')?.addEventListener('click', printLineupCard);
 
         // NEW: Populate and handle the rotation template dropdown
@@ -747,6 +945,14 @@ function applyOutOfPositionIndicators() {
         document.body.addEventListener('click', function(event){
             const dropzone = event.target.closest('.position-dropzone');
             if (dropzone) {
+                const isMobileDiamond = Boolean(
+                    dropzone.closest('#diamond-parent-mobile')
+                );
+
+                if (!isMobileDiamond && !useTapDefenseEditor) {
+                    return;
+                }
+
                 const position = dropzone.dataset.position;
                 if (dropzone.querySelector('.player-tag')) {
                     delete state.rotation.innings[state.currentInning][position];
