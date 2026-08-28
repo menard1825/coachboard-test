@@ -132,22 +132,26 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(defense.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as assigned')
 
         # On a phone the saved-defense selector and whole-game action share the
-        # first row, while the one-inning action stays full width below them.
+        # first control row, while the label stays above the saved-defense selector.
+        # Measure the button against the selector itself, not the wrapper that also
+        # includes the label.
         preset_layout = defense.locator('.pde-tools').evaluate(
             """tools => {
                 const wrap = tools.querySelector('.gm-preset-wrap').getBoundingClientRect();
+                const select = tools.querySelector('#pde-preset').getBoundingClientRect();
                 const game = tools.querySelector('#pde-apply-game').getBoundingClientRect();
                 const apply = tools.querySelector('#pde-apply').getBoundingClientRect();
                 return {
                     display:getComputedStyle(tools).display,
                     wrap:{left:wrap.left,right:wrap.right,top:wrap.top,bottom:wrap.bottom},
+                    select:{left:select.left,right:select.right,top:select.top,bottom:select.bottom},
                     game:{left:game.left,right:game.right,top:game.top,bottom:game.bottom},
                     apply:{left:apply.left,right:apply.right,top:apply.top},
                 };
             }"""
         )
         assert preset_layout['display'] == 'grid'
-        assert abs(preset_layout['game']['top'] - preset_layout['wrap']['top']) <= 4
+        assert abs(preset_layout['game']['top'] - preset_layout['select']['top']) <= 4
         assert preset_layout['apply']['top'] >= max(preset_layout['wrap']['bottom'], preset_layout['game']['bottom']) - 1
         assert abs(preset_layout['apply']['left'] - min(preset_layout['wrap']['left'], preset_layout['game']['left'])) <= 2
         assert abs(preset_layout['apply']['right'] - max(preset_layout['wrap']['right'], preset_layout['game']['right'])) <= 2
