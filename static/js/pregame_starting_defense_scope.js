@@ -27,6 +27,17 @@
         padding-left:10px!important;
         padding-right:10px!important;
       }
+      #${PANEL_ID} .gm-preset-label{display:none!important}
+      #${PANEL_ID} .cb-starting-defense-label{
+        display:block;
+        color:#667085;
+        font-size:.62rem;
+        line-height:1.1;
+        font-weight:850;
+        text-transform:uppercase;
+        letter-spacing:.06em;
+        margin:0 0 5px 2px;
+      }
       #${PANEL_ID} .gm-preset-help{display:none!important}
       #${PANEL_ID} .cb-starting-defense-help{
         margin:-4px 0 11px;
@@ -243,6 +254,9 @@
     const saveButton = panel?.querySelector('#pde-save');
     if (!tools || !select || !inningButton || !saveButton) return;
 
+    const kicker = panel.querySelector('.pde-kicker');
+    if (kicker && kicker.textContent.trim() !== 'Defense Setup') kicker.textContent = 'Defense Setup';
+
     tools.classList.add('cb-starting-defense-tools');
     if (select.getAttribute('aria-label') !== 'Choose Starting Defense') {
       select.setAttribute('aria-label', 'Choose Starting Defense');
@@ -252,9 +266,12 @@
     }
 
     const presetWrap = select.closest('.gm-preset-wrap');
-    const presetLabelElement = presetWrap?.querySelector('.gm-preset-label');
-    if (presetLabelElement && presetLabelElement.textContent !== 'Starting Defense Preset (Optional)') {
-      presetLabelElement.textContent = 'Starting Defense Preset (Optional)';
+    if (presetWrap && !presetWrap.querySelector('.cb-starting-defense-label')) {
+      const canonicalLabel = document.createElement('label');
+      canonicalLabel.className = 'cb-starting-defense-label';
+      canonicalLabel.htmlFor = 'pde-preset';
+      canonicalLabel.textContent = 'Starting Defense Preset (Optional)';
+      presetWrap.insertBefore(canonicalLabel, select);
     }
 
     syncInningButtonLabel(inningButton, panel);
