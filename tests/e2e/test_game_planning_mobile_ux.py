@@ -62,7 +62,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(readiness.get_by_role('button', name=re.compile('Player Availability'))).to_be_visible()
         expect(readiness.get_by_role('button', name=re.compile('Batting Order'))).to_be_visible()
         expect(readiness.get_by_role('button', name=re.compile('Defense'))).to_be_visible()
-        expect(readiness.get_by_role('button', name=re.compile('Pitch Plan'))).to_be_visible()
+        expect(readiness.get_by_role('button', name=re.compile('Game Clock'))).to_be_visible()
 
         # Quick Start is a visible, explicit first-pitch workflow. The prior
         # checklist below Start Game is intentionally hidden as duplicate copy.
@@ -122,7 +122,10 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         defense = page.locator('#pregame-defense-editor-v3')
         expect(defense).to_be_visible(timeout=15_000)
         expect(defense.locator('.pde-title')).to_have_text('Set Defense — Inning 1')
-        expect(defense.locator('.gm-preset-label')).to_have_text('Starting Defense Preset (Optional)')
+        expect(defense.locator('.pde-kicker')).to_have_text('Defense Setup')
+        canonical_label = defense.locator('.cb-starting-defense-label')
+        expect(canonical_label).to_have_count(1)
+        expect(canonical_label).to_have_text('Starting Defense Preset (Optional)')
         expect(defense.locator('.gm-preset-help')).to_be_hidden()
         expect(defense.locator('#pde-apply')).to_have_text('Apply to Inning 1')
         expect(defense.locator('#pde-apply-game')).to_have_text('Apply to Entire Game')
