@@ -73,6 +73,18 @@
         align-items:center!important;
         justify-content:center!important;
       }
+      @media(max-width:767.98px) {
+        /* Quick Start uses a fixed Start Game action on phones. Keep its
+           clearance inside the scrolling main content instead of padding the
+           flex body, which otherwise creates a permanent empty strip above
+           iPhone/Safari's bottom browser chrome. */
+        html body.coach-game-page:not(.cb-dugout) {
+          padding-bottom:0!important;
+        }
+        html body.coach-game-page:not(.cb-dugout) main.container-fluid {
+          padding-bottom:calc(90px + env(safe-area-inset-bottom, 0px))!important;
+        }
+      }
       @media(max-width:575.98px) {
         body.cb-dugout .coach-live-head.cb-command-head {
           min-height:44px!important;
