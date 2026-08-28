@@ -167,7 +167,7 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
 
     readiness = page.locator('#coach-game-readiness-v2')
     expect(readiness).to_be_visible(timeout=15_000)
-    availability_shortcut = readiness.get_by_role('button', name=re.compile("Who's Out"))
+    availability_shortcut = readiness.get_by_role('button', name=re.compile('Player Availability'))
     availability_panel = page.locator('#availabilityCollapse')
     expect(availability_shortcut).to_be_visible()
 
@@ -193,7 +193,7 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     expect(availability_panel).to_have_class(re.compile(r'\bshow\b'), timeout=15_000)
     expect(absent_player).to_be_checked()
     readiness = page.locator('#coach-game-readiness-v2')
-    expect(readiness.get_by_role('button', name=re.compile("Who's Out"))).to_contain_text('1 out', timeout=15_000)
+    expect(readiness.get_by_role('button', name=re.compile('Player Availability'))).to_contain_text('1 out', timeout=15_000)
 
     page.goto(f'{coachboard_url}/game-day')
     expect(page.locator('[data-game-id="1"]')).to_contain_text('8 present · 1 out')
@@ -221,5 +221,15 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     readiness.get_by_role('button', name=re.compile('Defense')).click()
     expect(page.locator('#rotation-board')).to_be_visible(timeout=15_000)
     expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
-    readiness.get_by_role('button', name=re.compile('Pitch Plan')).click()
-    expect(page.locator('#pitcher-availability-card')).to_be_visible()
+
+    readiness.get_by_role('button', name=re.compile('Game Clock')).click()
+    clock = page.locator('#cbPregameClock')
+    expect(clock).to_be_visible()
+    page.wait_for_function(
+        """() => {
+            const clock = document.getElementById('cbPregameClock');
+            if (!clock) return false;
+            const top = clock.getBoundingClientRect().top;
+            return top >= 0 && top <= Math.min(220, window.innerHeight * 0.3);
+        }"""
+    )
