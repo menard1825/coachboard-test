@@ -131,13 +131,13 @@ def _duration_label(seconds):
     return f'{hours}h {rem}m' if rem else f'{hours}h'
 
 
-@coach_usage_bp.route('/api/coach-usage/heartbeat', methods=['POST'])
+@coach_usage_bp.route('/api/coach-usage/heartbeat', methods=['GET', 'POST'])
 def heartbeat():
     user, membership = _current_user_and_membership()
     if not user or not membership:
         return jsonify({'status': 'error', 'message': 'Sign in required.'}), 401
 
-    payload = request.get_json(silent=True) or {}
+    payload = (request.get_json(silent=True) or {}) if request.method == 'POST' else request.args
     browser_session_id = _clean_text(payload.get('browser_session_id'), 96)
     if not browser_session_id:
         browser_session_id = secrets.token_urlsafe(18)
