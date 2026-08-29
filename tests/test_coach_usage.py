@@ -36,11 +36,19 @@ def _build_app(monkeypatch):
             email='assistant@example.com',
             password_hash=generate_password_hash('password123'),
         )
-        db.session.add_all([team, owner, coach])
+        scorekeeper = User(
+            id=3,
+            username='scorekeeper',
+            full_name='Game Changer User',
+            email='scorekeeper@example.com',
+            password_hash=generate_password_hash('password123'),
+        )
+        db.session.add_all([team, owner, coach, scorekeeper])
         db.session.flush()
         db.session.add_all([
             TeamMembership(user_id=1, team_id=1, role='Head Coach', player_order=[]),
             TeamMembership(user_id=2, team_id=1, role='Assistant Coach', player_order=[]),
+            TeamMembership(user_id=3, team_id=1, role='Game Changer', player_order=[]),
         ])
         db.session.commit()
 
@@ -122,3 +130,25 @@ def test_presence_heartbeat_tracks_session_and_meaningful_area_changes(monkeypat
     assert 'Active now' in html
     assert 'iPhone · Safari' in html
     assert 'Opened Pitching.' in html
+
+
+def test_game_changer_presence_uses_read_only_safe_get(monkeypatch):
+    app = _build_app(monkeypatch)
+    scorekeeper = app.test_client()
+    _set_session(scorekeeper, 'scorekeeper', 'Game Changer User', 'Game Changer')
+
+    response = scorekeeper.get('/api/coach-usage/heartbeat', query_string={
+        'browser_session_id': 'game-changer-session',
+        'area': 'Game Day',
+        'path': '/game-day',
+        'timezone': 'America/Indiana/Indianapolis',
+        'utc_offset_minutes': -240,
+    })
+    assert response.status_code == 200
+    assert response.get_json()['status'] == 'ok'
+
+    from blueprints.coach_usage import CoachPresence
+    from db import db
+    with app.app_context():
+        presence = db.session.query(CoachPresence).filter_by(user_id=3, team_id=1).one()
+        assert presence.current_area == 'Game Day'
