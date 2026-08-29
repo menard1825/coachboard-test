@@ -33,7 +33,10 @@
       <h1>Coach Activity</h1>
       <p class="activity-sub">Login and account activity for {{ current_team.team_name }}. Primary times are shown in the team timezone: {{ timezone_name }}.</p>
     </div>
-    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people me-1"></i>User Management</a>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if coach_usage_owner %}<a class="btn btn-sm btn-primary" href="{{ url_for('coach_usage.dashboard') }}"><i class="bi bi-activity me-1"></i>Coach Usage</a>{% endif %}
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.user_management') }}"><i class="bi bi-people me-1"></i>User Management</a>
+    </div>
   </div>
 
   <div class="activity-grid">
