@@ -42,6 +42,7 @@ from blueprints.live_game_bulk_api import live_game_bulk_bp
 from blueprints.live_game_safety import live_game_safety_bp
 from blueprints.live_game_pitching_api import live_game_pitching_bp
 from blueprints.security_guard import security_guard_bp
+from blueprints.coach_usage import coach_usage_bp
 from blueprints.live_game_write_lock import live_game_write_lock_bp
 from blueprints.live_game_clock import live_game_clock_bp
 from blueprints.postgame_navigation import postgame_navigation_bp
@@ -114,6 +115,7 @@ def create_app():
     # Register guards before application routes so their before_request handlers
     # protect all later blueprints.
     app.register_blueprint(security_guard_bp)
+    app.register_blueprint(coach_usage_bp)
     app.register_blueprint(live_game_write_lock_bp)
     app.register_blueprint(live_game_clock_bp)
     app.register_blueprint(postgame_navigation_bp)
