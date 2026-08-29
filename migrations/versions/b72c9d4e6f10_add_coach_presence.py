@@ -1,7 +1,7 @@
 """add coach presence tracking
 
 Revision ID: b72c9d4e6f10
-Revises: 8b1d4f6a2c90
+Revises: c4d8e2f1a730
 Create Date: 2026-08-29
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = 'b72c9d4e6f10'
-down_revision = '8b1d4f6a2c90'
+down_revision = 'c4d8e2f1a730'
 branch_labels = None
 depends_on = None
 
