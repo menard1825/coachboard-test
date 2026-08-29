@@ -135,33 +135,37 @@
     if (!body || body.dataset.coachboardAuthenticated !== '1') return;
 
     const browserSessionId = usageSessionId();
-    let lastSignature = '';
+    const readOnlyRole = body.dataset.coachRole === 'Game Changer';
     let sending = false;
 
-    const sendHeartbeat = async (force = false) => {
+    const sendHeartbeat = async () => {
       if (document.hidden || sending) return;
-      const area = usageArea();
-      const path = `${window.location.pathname || '/'}${window.location.hash || ''}`.slice(0, 180);
-      const signature = `${area}|${path}`;
-      if (!force && signature === lastSignature) {
-        // Still send the minute heartbeat so Last Active remains accurate.
-      }
+      const payload = {
+        browser_session_id: browserSessionId,
+        area: usageArea(),
+        path: `${window.location.pathname || '/'}${window.location.hash || ''}`.slice(0, 180),
+        timezone: context.timezone,
+        utc_offset_minutes: context.utcOffsetMinutes,
+      };
       sending = true;
       try {
-        await fetch('/api/coach-usage/heartbeat', {
-          method: 'POST',
-          credentials: 'same-origin',
-          keepalive: true,
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            browser_session_id: browserSessionId,
-            area,
-            path,
-            timezone: context.timezone,
-            utc_offset_minutes: context.utcOffsetMinutes,
-          }),
-        });
-        lastSignature = signature;
+        if (readOnlyRole) {
+          const query = new URLSearchParams();
+          Object.entries(payload).forEach(([key, value]) => query.set(key, String(value ?? '')));
+          await fetch(`/api/coach-usage/heartbeat?${query.toString()}`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
+          });
+        } else {
+          await fetch('/api/coach-usage/heartbeat', {
+            method: 'POST',
+            credentials: 'same-origin',
+            keepalive: true,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+          });
+        }
       } catch (_) {
         // Presence is testing/administrative telemetry and must never block app use.
       } finally {
@@ -169,12 +173,12 @@
       }
     };
 
-    window.setTimeout(() => sendHeartbeat(true), 500);
-    window.setInterval(() => sendHeartbeat(false), 60000);
-    window.addEventListener('hashchange', () => window.setTimeout(() => sendHeartbeat(true), 100));
-    window.addEventListener('popstate', () => window.setTimeout(() => sendHeartbeat(true), 100));
+    window.setTimeout(sendHeartbeat, 500);
+    window.setInterval(sendHeartbeat, 60000);
+    window.addEventListener('hashchange', () => window.setTimeout(sendHeartbeat, 100));
+    window.addEventListener('popstate', () => window.setTimeout(sendHeartbeat, 100));
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) sendHeartbeat(true);
+      if (!document.hidden) sendHeartbeat();
     });
   }
 
