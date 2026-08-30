@@ -2,6 +2,60 @@
   'use strict';
   if (window.location.pathname !== '/admin/users') return;
 
+  function bindPasswordHelpHandoff(button) {
+    if (!button || button.dataset.cbPasswordHelpHandoff === '1') return;
+
+    const targetSelector = button.getAttribute('data-bs-target') || '';
+    if (!targetSelector.startsWith('#resetPasswordModal-')) return;
+
+    button.dataset.cbPasswordHelpHandoff = '1';
+
+    // Opening one Bootstrap modal while another is still fading out can leave
+    // the old backdrop above the new dialog on iOS/WebKit. Own the transition
+    // explicitly instead of dismissing and toggling two modals in one tap.
+    button.removeAttribute('data-bs-dismiss');
+    button.removeAttribute('data-bs-toggle');
+
+    let handoffPending = false;
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (handoffPending) return;
+
+      const targetModal = document.querySelector(targetSelector);
+      if (!targetModal || !window.bootstrap?.Modal) return;
+
+      handoffPending = true;
+
+      // Bootstrap appends backdrops to <body>. Keeping the target modal there as
+      // a sibling avoids ancestor stacking contexts that can trap a modal below
+      // its own backdrop on Safari/Chrome for iOS.
+      if (targetModal.parentElement !== document.body) {
+        document.body.appendChild(targetModal);
+      }
+
+      const showTarget = () => {
+        const targetInstance = bootstrap.Modal.getOrCreateInstance(targetModal);
+        const finish = () => {
+          handoffPending = false;
+          targetModal.removeEventListener('shown.bs.modal', finish);
+        };
+        targetModal.addEventListener('shown.bs.modal', finish, {once: true});
+        targetInstance.show();
+        window.setTimeout(() => { handoffPending = false; }, 1000);
+      };
+
+      const sourceModal = button.closest('.modal.show');
+      if (!sourceModal) {
+        showTarget();
+        return;
+      }
+
+      sourceModal.addEventListener('hidden.bs.modal', showTarget, {once: true});
+      bootstrap.Modal.getOrCreateInstance(sourceModal).hide();
+    });
+  }
+
   function patch() {
     document.querySelectorAll('button').forEach(button => {
       const text = (button.textContent || '').trim();
@@ -27,6 +81,8 @@
         submit.innerHTML = '<i class="bi bi-link-45deg me-1"></i>Create Reset Link';
       }
     });
+
+    document.querySelectorAll('button[data-bs-target^="#resetPasswordModal-"]').forEach(bindPasswordHelpHandoff);
 
     // Password Help now lives inside the Manage dialog. Keeping it out of every
     // table row makes the user list much easier to scan, especially on phones.
