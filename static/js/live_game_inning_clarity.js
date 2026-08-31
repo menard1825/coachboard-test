@@ -30,10 +30,6 @@
     window.io = exposedIo;
   }
 
-  if (document.readyState === 'loading' && ![...document.scripts].some(node => /\/static\/js\/live_game_feedback_pass\.js(?:\?|$)/.test(node.src || ''))) {
-    document.write('<script src="/static/js/live_game_feedback_pass.js?v=20260831-4" data-cb-live-feedback-pass="true"></' + 'script>');
-  }
-
   async function bridgeDefensiveChange(input, init = {}) {
     const url = typeof input === 'string' ? input : input?.url;
     const method = String(init?.method || (typeof input !== 'string' ? input?.method : '') || 'GET').toUpperCase();
@@ -195,6 +191,14 @@
     refreshUnifiedStateAndReplay(button).catch(() => {});
   }
 
+  function loadUnifiedFeedbackPass() {
+    if ([...document.scripts].some(node => /\/static\/js\/live_game_feedback_pass\.js(?:\?|$)/.test(node.src || ''))) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/live_game_feedback_pass.js?v=20260831-5';
+    script.dataset.cbLiveFeedbackPass = 'true';
+    document.body.appendChild(script);
+  }
+
   function start() {
     if (started) return;
     if (!document.body) {
@@ -206,11 +210,15 @@
     document.getElementById('cbCurrentInningStrip')?.remove();
     patchStaticCopy();
 
+    // Register the authoritative End Inning refresh guard before loading the
+    // unified editor. This guarantees an immediate post-start click refreshes
+    // server state before the editor is allowed to consume the replay.
     document.addEventListener('click', guaranteeUnifiedEndInning, true);
     document.addEventListener('click', retrySuppressedEditorSave, true);
     document.addEventListener('click', event => {
       if (event.target.closest?.('[data-cb-menu], #cbCoachBoardNavBtn')) window.setTimeout(patchMenu, 0);
     }, true);
+    loadUnifiedFeedbackPass();
 
     if (!document.getElementById('cbQuickDefense')) {
       rootObserver = new MutationObserver(() => {
