@@ -299,8 +299,10 @@ def protect_live_game_workflows():
     if request.method == 'POST' and request.endpoint == 'live_game_api.end_inning':
         return _end_inning_with_confirmed_prep()
 
+    # Start readiness belongs exclusively to live_game_api.start via
+    # can_start_game(). This compatibility layer only clears staged next-inning
+    # prep when a game is actually being finalized.
     if request.method == 'POST' and request.endpoint in {
-        'live_game_api.start',
         'live_game_api.end_game',
         'live_game_pitching.end_with_pitching',
     }:
@@ -310,24 +312,6 @@ def protect_live_game_workflows():
             game_id = None
         if game_id:
             user, team, game = _authorized_context(game_id)
-            if game and request.endpoint == 'live_game_api.start':
-                rotation = db.session.query(Rotation).filter_by(
-                    associated_game_id=game.id,
-                    team_id=team.id,
-                ).first()
-                inning_one = deepcopy((rotation.innings or {}).get('1', {}) if rotation else {})
-                if not inning_one.get('P'):
-                    return jsonify({
-                        'status': 'error',
-                        'message': 'Choose the starting pitcher for Inning 1 before starting Live Game.'
-                    }), 409
-                cleaned, message = _clean_complete_alignment(inning_one, game, team)
-                if not cleaned:
-                    return jsonify({
-                        'status': 'error',
-                        'message': f'Finish the Inning 1 defense before starting Live Game. {message}'
-                    }), 409
-
             if game and _clear_prep(game.id, team.id):
                 db.session.commit()
 
