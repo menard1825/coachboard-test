@@ -117,6 +117,85 @@ def drag(page: Page, source, target):
     page.mouse.up()
 
 
+def cleanup_game(page: Page, coachboard_url: str, game_id: int, bench_player_id):
+    state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
+    if state_response.ok and state_response.json().get('game', {}).get('is_live'):
+        page.request.post(
+            f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
+            data={
+                'defer_pitching': True,
+                'end_reason': 'manual',
+                'current_inning_played': True,
+            },
+        )
+    page.request.post(
+        f'{coachboard_url}/game-day/{game_id}/delete',
+        headers={'Accept': 'application/json'},
+    )
+    if bench_player_id:
+        page.request.get(f'{coachboard_url}/delete_player/{bench_player_id}')
+
+
+def test_phone_main_field_drag_stages_bench_move_then_auto_saves_complete_defense(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+    bench_player_id = add_bench_player(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+        page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
+
+        quick = page.locator('#cbQuickDefense')
+        expect(quick).to_be_visible(timeout=15_000)
+        expect(quick.locator('.cb-qd-help')).to_contain_text('Drag players right on the field', timeout=10_000)
+
+        ss_spot = quick.locator('[data-cb-position="SS"]')
+        bench_wrap = quick.locator('.cb-qd-bench-wrap')
+        expect(ss_spot).to_contain_text('Shortstop Shawn')
+        expect(bench_wrap).to_be_visible()
+
+        # Dragging a fielder to Bench is staged locally because CoachBoard must
+        # never save a defense with an empty position.
+        drag(page, ss_spot, bench_wrap)
+        expect(ss_spot).to_contain_text('Open — choose player', timeout=10_000)
+        expect(quick.locator('.cb-main-draft-banner')).to_be_visible()
+        expect(quick.locator('.cb-main-draft-banner')).to_contain_text('SS open')
+        expect(quick.locator('[data-cb-move-player="Shortstop Shawn"]')).to_be_visible()
+
+        server_before = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
+        assert server_before['current_alignment']['SS'] == 'Shortstop Shawn'
+        assert not [
+            event for event in server_before.get('rotation_events', [])
+            if not event.get('reverted') and event.get('event_type') == 'Bulk Defensive Change'
+        ]
+
+        # Filling the open SS spot completes the defense and automatically saves
+        # both moves as one authoritative mid-inning defensive event.
+        bench_player = quick.locator(f'[data-cb-move-player="{BENCH_NAME}"]')
+        expect(bench_player).to_be_visible()
+        drag(page, bench_player, ss_spot)
+
+        expect(quick.locator('.cb-main-draft-banner')).not_to_be_visible(timeout=10_000)
+        expect(quick.locator('.cb-save-state')).to_contain_text('Saved', timeout=10_000)
+
+        state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
+        assert state_response.ok, state_response.text()
+        state = state_response.json()
+        assert state['current_alignment']['SS'] == BENCH_NAME
+        assert 'Shortstop Shawn' not in state['current_alignment'].values()
+        events = [
+            event for event in state.get('rotation_events', [])
+            if not event.get('reverted') and event.get('event_type') == 'Bulk Defensive Change'
+        ]
+        assert len(events) == 1
+        assert events[0]['inning'] == '1'
+        assert events[0]['before_alignment']['SS'] == 'Shortstop Shawn'
+        assert events[0]['after_alignment']['SS'] == BENCH_NAME
+    finally:
+        cleanup_game(page, coachboard_url, game_id, bench_player_id)
+
+
 def test_phone_drag_field_to_bench_then_bench_to_field_and_save_once(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
@@ -172,19 +251,4 @@ def test_phone_drag_field_to_bench_then_bench_to_field_and_save_once(page: Page,
         assert events[0]['before_alignment']['SS'] == 'Shortstop Shawn'
         assert events[0]['after_alignment']['SS'] == BENCH_NAME
     finally:
-        state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
-        if state_response.ok and state_response.json().get('game', {}).get('is_live'):
-            page.request.post(
-                f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
-                data={
-                    'defer_pitching': True,
-                    'end_reason': 'manual',
-                    'current_inning_played': True,
-                },
-            )
-        page.request.post(
-            f'{coachboard_url}/game-day/{game_id}/delete',
-            headers={'Accept': 'application/json'},
-        )
-        if bench_player_id:
-            page.request.get(f'{coachboard_url}/delete_player/{bench_player_id}')
+        cleanup_game(page, coachboard_url, game_id, bench_player_id)
