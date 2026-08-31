@@ -420,6 +420,7 @@
   function renderQuickDefense(shell) {
     const card = ensureQuickDefense(shell);
     if (!card || !state?.game?.is_live) return;
+    if (card.querySelector('.cb-main-draft-banner, .cb-main-open, .cb-save-state.saving')) return;
     const signature = quickDefenseStateSignature();
     if (signature === quickDefenseSignature && card.childElementCount) return;
     quickDefenseSignature = signature;
