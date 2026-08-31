@@ -18,6 +18,7 @@ from playwright.sync_api import Page, expect
 TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
 BENCH_NAME = 'Drag Bench Blake'
+EDITOR_BENCH_NAME = 'Drag Editor Evan'
 
 
 def login(page: Page, coachboard_url: str):
@@ -50,11 +51,11 @@ def alignment():
     }
 
 
-def add_bench_player(page: Page, coachboard_url: str):
+def add_bench_player(page: Page, coachboard_url: str, name=BENCH_NAME):
     response = page.request.post(
         f'{coachboard_url}/add_player',
         form={
-            'name': BENCH_NAME,
+            'name': name,
             'number': '44',
             'position1': 'SS',
             'throws': 'Right',
@@ -199,7 +200,7 @@ def test_phone_main_field_drag_stages_bench_move_then_auto_saves_complete_defens
 def test_phone_drag_field_to_bench_then_bench_to_field_and_save_once(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
-    bench_player_id = add_bench_player(page, coachboard_url)
+    bench_player_id = add_bench_player(page, coachboard_url, EDITOR_BENCH_NAME)
     game_id = create_game(page, coachboard_url)
 
     try:
@@ -226,11 +227,11 @@ def test_phone_drag_field_to_bench_then_bench_to_field_and_save_once(page: Page,
         expect(bench_drop.locator('[data-cb-editor-player="Shortstop Shawn"]')).to_be_visible()
 
         # Then drag an existing bench player into the newly open shortstop spot.
-        bench_player = bench_drop.locator(f'[data-cb-editor-player="{BENCH_NAME}"]')
+        bench_player = bench_drop.locator(f'[data-cb-editor-player="{EDITOR_BENCH_NAME}"]')
         expect(bench_player).to_be_visible()
         drag(page, bench_player, ss_spot)
 
-        expect(ss_spot.locator(f'[data-cb-editor-player="{BENCH_NAME}"]')).to_be_visible()
+        expect(ss_spot.locator(f'[data-cb-editor-player="{EDITOR_BENCH_NAME}"]')).to_be_visible()
         expect(bench_drop.locator('[data-cb-editor-player="Shortstop Shawn"]')).to_be_visible()
         expect(editor.locator('.cb-lf-change-count')).to_contain_text('2 player moves staged')
 
@@ -241,7 +242,7 @@ def test_phone_drag_field_to_bench_then_bench_to_field_and_save_once(page: Page,
         state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
         assert state_response.ok, state_response.text()
         state = state_response.json()
-        assert state['current_alignment']['SS'] == BENCH_NAME
+        assert state['current_alignment']['SS'] == EDITOR_BENCH_NAME
         assert 'Shortstop Shawn' not in state['current_alignment'].values()
         events = [
             event for event in state.get('rotation_events', [])
@@ -249,6 +250,6 @@ def test_phone_drag_field_to_bench_then_bench_to_field_and_save_once(page: Page,
         ]
         assert len(events) == 1
         assert events[0]['before_alignment']['SS'] == 'Shortstop Shawn'
-        assert events[0]['after_alignment']['SS'] == BENCH_NAME
+        assert events[0]['after_alignment']['SS'] == EDITOR_BENCH_NAME
     finally:
         cleanup_game(page, coachboard_url, game_id, bench_player_id)
