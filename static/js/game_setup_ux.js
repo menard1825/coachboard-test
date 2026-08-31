@@ -72,40 +72,39 @@
     return { btn, box };
   }
 
-  function applyStartReadiness(readiness) {
+  function applyStartReadiness(payload) {
     const nodes = ensureStartFeedback();
     if (!nodes) return;
     const { btn, box } = nodes;
-    if (!readiness || readiness.is_live) {
+    const legacy = payload?.readiness || {};
+
+    if (legacy.is_live) {
       box.classList.add('d-none');
       btn.disabled = false;
       btn.classList.remove('disabled');
       return;
     }
 
-    const blockers = Array.isArray(readiness.blockers) ? readiness.blockers.filter(Boolean) : [];
-    const hardBlockers = blockers.filter((text) => {
-      const t = String(text).toLowerCase();
-      return t.includes('pitcher') || t.includes('defense') || t.includes('inning 1') || t.includes('lineup') || t.includes('available');
-    });
-
-    if (!hardBlockers.length && readiness.ready) {
-      box.className = 'alert alert-success border-0 shadow-sm mb-3';
-      box.innerHTML = '<strong>Pregame setup complete.</strong>';
-      btn.disabled = false;
-      btn.classList.remove('disabled');
-      return;
-    }
-
-    if (hardBlockers.length) {
-      box.className = 'alert alert-warning border-0 shadow-sm mb-3';
-      box.innerHTML = `<strong>Finish setup before first pitch</strong><div class="small mt-1">${hardBlockers.map((t) => esc(t)).join('<br>')}</div><div class="small text-muted mt-2">Inning 1 defense must be complete.</div>`;
-    } else if (blockers.length) {
+    if (!payload || typeof payload.ready !== 'boolean') {
+      btn.disabled = true;
+      btn.classList.add('disabled');
       box.className = 'alert alert-light border shadow-sm mb-3';
-      box.innerHTML = `<strong>Optional items still open</strong><div class="small mt-1">${blockers.map((t) => esc(t)).join('<br>')}</div>`;
-    } else {
-      box.classList.add('d-none');
+      box.innerHTML = '<strong>Checking first-pitch setup…</strong>';
+      return;
     }
+
+    const missing = Array.isArray(payload.missing) ? payload.missing.filter(Boolean) : [];
+    btn.disabled = !payload.ready;
+    btn.classList.toggle('disabled', !payload.ready);
+
+    if (payload.ready) {
+      box.className = 'alert alert-success border-0 shadow-sm mb-3';
+      box.innerHTML = '<strong>Ready for first pitch.</strong><div class="small mt-1">Batting order and later innings can be added later.</div>';
+      return;
+    }
+
+    box.className = 'alert alert-warning border-0 shadow-sm mb-3';
+    box.innerHTML = `<strong>Finish setup before first pitch</strong><div class="small mt-1">${missing.map((text) => esc(text)).join('<br>')}</div>`;
   }
 
   async function refreshReadiness() {
@@ -113,7 +112,7 @@
       const response = await fetch(`/api/game-day/${gameId}/readiness`, { cache: 'no-store' });
       if (!response.ok) return;
       const data = await response.json();
-      if (data?.readiness) applyStartReadiness(data.readiness);
+      applyStartReadiness(data);
     } catch (_) {}
   }
 
@@ -491,7 +490,10 @@
     window.setInterval(refreshReadiness, 8000);
     window.setInterval(refreshPitchingState, 12000);
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) refreshPitchingState();
+      if (!document.hidden) {
+        refreshReadiness();
+        refreshPitchingState();
+      }
     });
   }
 
