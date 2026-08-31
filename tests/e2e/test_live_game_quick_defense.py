@@ -161,7 +161,7 @@ def test_phone_live_game_keeps_field_and_bench_visible_and_saves_tap_moves(page:
             assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
             assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
 
-        # Bench -> CF is a two-tap substitution. The outgoing CF becomes bench.
+        # Bench -> CF keeps the quick substitution popup. The outgoing CF becomes bench.
         bench_button.click()
         modal = page.locator('#cbQuickMoveModal')
         expect(modal).to_be_visible()
@@ -176,11 +176,18 @@ def test_phone_live_game_keeps_field_and_bench_visible_and_saves_tap_moves(page:
         assert state['current_alignment']['CF'] == BENCH_NAME
         assert 'Center Casey' not in state['current_alignment'].values()
 
-        # Field -> field is also direct and performs a swap without an extra player-picker screen.
+        # Tapping a current fielder enters the unified editor with that fielder
+        # preselected, so the coach can swap positions or move him to Bench.
         quick.locator('[data-cb-position="SS"]').click()
-        expect(modal).to_be_visible()
-        modal.locator('[data-cb-destination="2B"]').click()
-        expect(modal).not_to_be_visible(timeout=10_000)
+        editor = page.locator('#cb-live-field-editor')
+        expect(editor).to_be_visible()
+        shortstop = editor.locator('[data-cb-editor-player="Shortstop Shawn"]')
+        expect(shortstop).to_have_class(re.compile(r'\bselected\b'))
+        editor.locator('[data-cb-editor-drop="2B"]').click()
+        expect(editor.locator('[data-cb-editor-drop="2B"]')).to_contain_text('Shortstop Shawn')
+        expect(editor.locator('[data-cb-editor-drop="SS"]')).to_contain_text('Second Sam')
+        editor.locator('[data-cb-editor-save]').click()
+        expect(editor).not_to_be_visible(timeout=10_000)
         state = get_json(page, coachboard_url, f'/api/live-game/{game_id}/state')
         assert state['current_alignment']['2B'] == 'Shortstop Shawn'
         assert state['current_alignment']['SS'] == 'Second Sam'
