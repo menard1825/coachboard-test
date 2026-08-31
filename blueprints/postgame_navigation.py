@@ -180,8 +180,8 @@ def resume_game(game_id):
     """Resume a Live Game that a coach accidentally finalized.
 
     The existing game history, inning, defense, and pitching records stay intact.
-    Only the durable End Game marker is reverted. The clock resumes from its
-    prior elapsed value, excluding the time that the game was mistakenly ended.
+    The durable End Game marker is reverted and a Resume Game marker creates a
+    new authoritative live-state sequence. The clock excludes the ended period.
     """
     team, game = _authorized_game(game_id)
     if not team or not game:
@@ -203,17 +203,28 @@ def resume_game(game_id):
         flash('This game does not have a completed Live Game record to resume.', 'warning')
         return redirect(url_for('game_day.game_report', game_id=game.id))
 
+    latest_end = end_events[0]
     for event in end_events:
         event.reverted = True
 
     game.is_live = True
     if not game.live_current_inning:
-        game.live_current_inning = str(end_events[0].inning or '1')
+        game.live_current_inning = str(latest_end.inning or '1')
 
     # Import locally to avoid making the postgame blueprint part of the clock
     # model's startup dependency chain.
-    from blueprints.live_game_api import _broadcast_state
+    from blueprints.live_game_api import _broadcast_state, _event
     from blueprints.live_game_clock import GameClockState, _emit_clock, _utcnow_naive
+
+    resume_alignment = deepcopy(latest_end.after_alignment or latest_end.before_alignment or {})
+    _event(
+        game,
+        team.id,
+        'Resume Game',
+        str(game.live_current_inning or latest_end.inning or '1'),
+        resume_alignment,
+        resume_alignment,
+    )
 
     clock = db.session.query(GameClockState).filter_by(
         game_id=game.id,
