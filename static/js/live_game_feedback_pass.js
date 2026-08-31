@@ -510,6 +510,7 @@
   async function openEditor(mode, options = {}) {
     try {
       await loadState(!socketHealthy && Date.now() - stateLoadedAt > 10000);
+      if (!state?.game?.is_live) await loadState(true);
       if (!state?.game?.is_live) { toast('Live Game is not running.', 'danger'); return; }
       let draft = {...(state.current_alignment || {})};
       let nextInning = null;
