@@ -175,6 +175,73 @@ def route_completed_game_to_report():
     return redirect(url_for('game_day.game_report', game_id=game.id))
 
 
+@postgame_navigation_bp.route('/game-day/<int:game_id>/resume', methods=['POST'])
+def resume_game(game_id):
+    """Resume a Live Game that a coach accidentally finalized.
+
+    The existing game history, inning, defense, and pitching records stay intact.
+    Only the durable End Game marker is reverted. The clock resumes from its
+    prior elapsed value, excluding the time that the game was mistakenly ended.
+    """
+    team, game = _authorized_game(game_id)
+    if not team or not game:
+        return redirect(url_for('auth.login')) if 'logged_in' not in session else redirect(url_for('game_day.game_day_home'))
+    if not _correction_role_allowed(team.id):
+        flash('GameChanger users cannot resume CoachBoard Live Game.', 'warning')
+        return redirect(url_for('game_day.game_report', game_id=game.id))
+    if game.is_live:
+        flash('This game is already live.', 'info')
+        return redirect(url_for('gameday.game_management', game_id=game.id))
+
+    end_events = db.session.query(GameRotationEvent).filter_by(
+        game_id=game.id,
+        team_id=team.id,
+        event_type='End Game',
+        reverted=False,
+    ).order_by(GameRotationEvent.sequence.desc(), GameRotationEvent.id.desc()).all()
+    if not end_events:
+        flash('This game does not have a completed Live Game record to resume.', 'warning')
+        return redirect(url_for('game_day.game_report', game_id=game.id))
+
+    for event in end_events:
+        event.reverted = True
+
+    game.is_live = True
+    if not game.live_current_inning:
+        game.live_current_inning = str(end_events[0].inning or '1')
+
+    # Import locally to avoid making the postgame blueprint part of the clock
+    # model's startup dependency chain.
+    from blueprints.live_game_api import _broadcast_state
+    from blueprints.live_game_clock import GameClockState, _emit_clock, _utcnow_naive
+
+    clock = db.session.query(GameClockState).filter_by(
+        game_id=game.id,
+        team_id=team.id,
+    ).first()
+    if clock:
+        now = _utcnow_naive()
+        if clock.started_at and clock.ended_at:
+            # Treat the accidental finalized period like a pause so elapsed game
+            # time does not include the time spent on the postgame screen.
+            clock.started_at = clock.started_at + (now - clock.ended_at)
+        clock.ended_at = None
+        clock.end_reason = None
+        clock.last_played_inning = str(game.live_current_inning or '1')
+        clock.updated_at = now
+
+    db.session.commit()
+    _broadcast_state(game.id, team.id)
+    if clock:
+        _emit_clock(game, team.id, clock)
+
+    flash(
+        f'Live Game resumed in inning {game.live_current_inning or "1"}. The recorded game history was preserved.',
+        'success',
+    )
+    return redirect(url_for('gameday.game_management', game_id=game.id))
+
+
 @postgame_navigation_bp.route('/game-day/<int:game_id>/correct')
 def correct_game(game_id):
     team, game = _authorized_game(game_id)
