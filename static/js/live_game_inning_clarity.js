@@ -32,7 +32,7 @@
         return;
       }
       script = document.createElement('script');
-      script.src = '/static/js/live_game_feedback_pass.js?v=20260831-1';
+      script.src = '/static/js/live_game_feedback_pass.js?v=20260831-2';
       script.dataset.cbLiveFeedbackPass = 'true';
       script.addEventListener('load', done, {once:true});
       script.addEventListener('error', reject, {once:true});
@@ -66,8 +66,6 @@
     const source = Object.entries(after).find(([, name]) => name === player.name)?.[0] || '';
     if (destination === 'BENCH') {
       if (source) delete after[source];
-      // The legacy single-move endpoint permits an open field position after
-      // sending a fielder to the bench. Keep that behavior on that path.
       return nativeFetch(input, init);
     }
 
@@ -76,9 +74,6 @@
     after[destination] = player.name;
     if (occupant && occupant !== player.name && source) after[source] = occupant;
 
-    // Route complete substitutions through the authoritative bulk endpoint.
-    // It broadcasts live_game_delta, keeping every live UI layer on the same
-    // state instead of allowing an older cached copy to repaint the field.
     const editResponse = await nativeFetch(`/api/live-game/${gameId}/defense-edit`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -184,7 +179,6 @@
     installStyles();
     document.getElementById('cbCurrentInningStrip')?.remove();
     patchStaticCopy();
-    ensureFeedbackPass().catch(() => {});
 
     document.addEventListener('click', guaranteeUnifiedEndInning, true);
     document.addEventListener('click', retrySuppressedEditorSave, true);
