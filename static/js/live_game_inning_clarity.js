@@ -193,8 +193,12 @@
 
   function loadUnifiedFeedbackPass() {
     if ([...document.scripts].some(node => /\/static\/js\/live_game_feedback_pass\.js(?:\?|$)/.test(node.src || ''))) return;
+    if (document.readyState === 'loading') {
+      document.write('<script src="/static/js/live_game_feedback_pass.js?v=20260831-6" data-cb-live-feedback-pass="true"></' + 'script>');
+      return;
+    }
     const script = document.createElement('script');
-    script.src = '/static/js/live_game_feedback_pass.js?v=20260831-5';
+    script.src = '/static/js/live_game_feedback_pass.js?v=20260831-6';
     script.dataset.cbLiveFeedbackPass = 'true';
     document.body.appendChild(script);
   }
@@ -211,8 +215,8 @@
     patchStaticCopy();
 
     // Register the authoritative End Inning refresh guard before loading the
-    // unified editor. This guarantees an immediate post-start click refreshes
-    // server state before the editor is allowed to consume the replay.
+    // unified editor. During normal parsing, load the editor synchronously so
+    // it wraps Socket.IO before the legacy live controller creates its socket.
     document.addEventListener('click', guaranteeUnifiedEndInning, true);
     document.addEventListener('click', retrySuppressedEditorSave, true);
     document.addEventListener('click', event => {
