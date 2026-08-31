@@ -455,10 +455,8 @@
     window.requestAnimationFrame(enhanceQuickDefense);
   }
 
-  // Only take over End Inning when the next-defense board is already visibly
-  // LOCKED IN. If it is NOT SET, the normal controller receives the click and
-  // opens the next-inning editor exactly as before.
-  window.addEventListener('click', interceptLockedEndInning, true);
+  // End Inning is owned by the full-field live editor controller. This module
+  // only owns Quick Defense drag/tap behavior.
 
   document.addEventListener('pointerdown', beginDrag, {capture: true, passive: true});
   document.addEventListener('pointermove', moveDrag, {capture: true, passive: false});
@@ -514,7 +512,14 @@
     queueEnhance();
     const overlay = document.getElementById('live-game-overlay');
     if (overlay) {
-      new MutationObserver(queueEnhance).observe(overlay, {childList: true, subtree: true});
+      new MutationObserver(() => {
+        // A staged defense is the visible source of truth until every position
+        // is filled and the bulk edit is saved. Reassert it in the same
+        // mutation cycle so socket/server rerenders cannot flash or replace the
+        // draft bench/field between the coach's first and second drag.
+        if (draft) renderDraft();
+        queueEnhance();
+      }).observe(overlay, {childList: true, subtree: true});
     }
   });
 })();
