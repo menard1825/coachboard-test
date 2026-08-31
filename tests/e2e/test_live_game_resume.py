@@ -86,6 +86,13 @@ def create_game(page: Page, coachboard_url: str):
     return game_id
 
 
+def active_sequence(state):
+    return max(
+        (int(event.get('sequence') or 0) for event in state.get('rotation_events', []) if not event.get('reverted')),
+        default=0,
+    )
+
+
 def test_ended_game_can_resume_same_inning_clock_and_history_then_end_again(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
@@ -134,6 +141,14 @@ def test_ended_game_can_resume_same_inning_clock_and_history_then_end_again(page
         resumed_markers = [event for event in resumed_state['rotation_events'] if event['event_type'] == 'End Game']
         assert len(resumed_markers) == 1
         assert resumed_markers[0]['reverted'] is True
+        resume_markers = [
+            event for event in resumed_state['rotation_events']
+            if event['event_type'] == 'Resume Game' and not event['reverted']
+        ]
+        assert len(resume_markers) == 1
+        assert resume_markers[0]['inning'] == '2'
+        assert resume_markers[0]['before_alignment'] == alignment()
+        assert resume_markers[0]['after_alignment'] == alignment()
 
         resumed_clock = get_json(page, coachboard_url, f'/api/live-game/{game_id}/clock')['clock']
         assert resumed_clock['is_live'] is True
@@ -141,6 +156,22 @@ def test_ended_game_can_resume_same_inning_clock_and_history_then_end_again(page
         assert resumed_clock['ended_at_utc'] is None
         assert resumed_clock['end_reason'] is None
         assert resumed_clock['last_played_inning'] == '2'
+
+        # The resumed sequence must support the same stale-write protected bulk
+        # defense save used by the direct-drag and full field editors.
+        changed_alignment = dict(resumed_state['current_alignment'])
+        changed_alignment['SS'], changed_alignment['2B'] = changed_alignment['2B'], changed_alignment['SS']
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/defense-edit', {
+            'alignment': changed_alignment,
+            'base_sequence': active_sequence(resumed_state),
+        })
+        changed_state = get_json(page, coachboard_url, f'/api/live-game/{game_id}/state')
+        assert changed_state['current_alignment']['SS'] == 'Second Sam'
+        assert changed_state['current_alignment']['2B'] == 'Shortstop Shawn'
+        assert any(
+            event['event_type'] == 'Bulk Defensive Change' and not event['reverted']
+            for event in changed_state['rotation_events']
+        )
 
         # A later legitimate End Game creates a new active marker. The accidental
         # end remains in history as reverted instead of being erased.
