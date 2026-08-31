@@ -102,8 +102,14 @@ def test_ended_game_can_resume_same_inning_clock_and_history_then_end_again(page
         started = post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
         assert started['state']['game']['is_live'] is True
 
-        advanced = post_json(page, coachboard_url, f'/api/live-game/{game_id}/end-inning', {})
-        assert advanced['state']['current_inning'] == '2'
+        # Use the same stale-write protected advance endpoint as the current
+        # dugout UI. Coaches may carry the same defense forward and rearrange it
+        # after the new inning starts.
+        advanced = post_json(page, coachboard_url, f'/api/live-game/{game_id}/advance-inning', {
+            'alignment': alignment(),
+            'base_sequence': active_sequence(started['state']),
+        })
+        assert advanced['delta']['current_inning'] == '2'
 
         ended = post_json(page, coachboard_url, f'/api/live-game/{game_id}/end-with-pitching', {
             'defer_pitching': True,
