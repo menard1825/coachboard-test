@@ -86,7 +86,7 @@
     badge.classList.remove('saving', 'error');
     if (mode) badge.classList.add(mode);
     const text = badge.querySelector('span');
-    if (text) text.textContent = message;
+    if (text && text.textContent !== message) text.textContent = message;
   }
 
   function renderDraft() {
@@ -102,23 +102,26 @@
       button.disabled = false;
       button.classList.toggle('cb-main-open', !name);
       const label = button.querySelector('.cb-qd-name');
-      if (label) label.textContent = name ? rosterLabel(name) : 'Open — choose player';
+      const desiredLabel = name ? rosterLabel(name) : 'Open — choose player';
+      if (label && label.textContent !== desiredLabel) label.textContent = desiredLabel;
     });
 
     const benchPlayers = draft.roster.filter(player => !assigned.has(player.name));
     const benchHost = card.querySelector('.cb-qd-bench');
     if (benchHost) {
-      benchHost.innerHTML = benchPlayers.length
+      const benchHtml = benchPlayers.length
         ? benchPlayers.map(player => {
             const number = String(player.number ?? '').trim();
             const label = number ? `#${number} ${player.name}` : player.name;
             return `<button type="button" class="cb-qd-bench-player" data-cb-move-player="${esc(player.name)}"><span>${esc(label)}</span><span class="cb-bench-note">Bench now</span></button>`;
           }).join('')
         : '<span class="small text-muted">No players are on the bench.</span>';
+      if (benchHost.innerHTML !== benchHtml) benchHost.innerHTML = benchHtml;
     }
 
     const benchTitle = card.querySelector('.cb-qd-bench-head strong');
-    if (benchTitle) benchTitle.textContent = `Bench now · ${benchPlayers.length}`;
+    const benchTitleText = `Bench now · ${benchPlayers.length}`;
+    if (benchTitle && benchTitle.textContent !== benchTitleText) benchTitle.textContent = benchTitleText;
 
     const missing = fieldPositions().filter(pos => !draft.alignment[pos]);
     let banner = card.querySelector('.cb-main-draft-banner');
@@ -128,7 +131,8 @@
         banner.className = 'cb-main-draft-banner';
         card.querySelector('.cb-qd-bench-wrap')?.insertAdjacentElement('afterend', banner);
       }
-      banner.innerHTML = `<span><strong>${esc(missing.join(', '))} open.</strong> Keep dragging players until every position is filled; CoachBoard will save automatically.</span><button type="button" class="btn btn-sm btn-outline-secondary" data-cb-cancel-main-draft>Cancel</button>`;
+      const bannerHtml = `<span><strong>${esc(missing.join(', '))} open.</strong> Keep dragging players until every position is filled; CoachBoard will save automatically.</span><button type="button" class="btn btn-sm btn-outline-secondary" data-cb-cancel-main-draft>Cancel</button>`;
+      if (banner.innerHTML !== bannerHtml) banner.innerHTML = bannerHtml;
       setSaveBadge('saving', 'Finish defense');
     } else if (banner) {
       banner.remove();
@@ -351,10 +355,12 @@
     installStyles();
     const card = document.getElementById('cbQuickDefense');
     if (!card) return;
+    const helpText = 'Drag players right on the field or bench. Tap a fielder for the full editor. Pitcher changes stay in Change Pitcher.';
+    const tipText = 'Drag a bench player onto a field spot for a substitution, or drag fielders to swap. If you drag a fielder to Bench, fill the open spot and CoachBoard saves the completed defense.';
     const help = card.querySelector('.cb-qd-help');
-    if (help) help.textContent = 'Drag players right on the field or bench. Tap a fielder for the full editor. Pitcher changes stay in Change Pitcher.';
+    if (help && help.textContent !== helpText) help.textContent = helpText;
     const tip = card.querySelector('.cb-qd-tip');
-    if (tip) tip.textContent = 'Drag a bench player onto a field spot for a substitution, or drag fielders to swap. If you drag a fielder to Bench, fill the open spot and CoachBoard saves the completed defense.';
+    if (tip && tip.textContent !== tipText) tip.textContent = tipText;
   }
 
   function queueEnhance() {
