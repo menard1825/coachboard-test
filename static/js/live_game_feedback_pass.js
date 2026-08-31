@@ -252,6 +252,7 @@
 
   function patchVisibleState() {
     if (!state?.game?.is_live) return;
+    if (document.querySelector('#cbQuickDefense .cb-main-draft-banner, #cbQuickDefense .cb-main-open, #cbQuickDefense .cb-save-state.saving')) return;
     const alignment = state.current_alignment || {};
     const inning = String(state.current_inning || state.game?.live_current_inning || '1');
     const inningEl = document.getElementById('live-inning-display');
