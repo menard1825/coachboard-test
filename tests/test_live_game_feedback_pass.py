@@ -250,6 +250,15 @@ def test_field_player_can_take_mound_without_benching_outgoing_pitcher(monkeypat
     client = app.test_client()
     _login(client)
 
+    # This test is about the defensive swap behavior. Keep pitching eligibility
+    # deterministic here; the fail-closed eligibility rules have their own tests.
+    from blueprints import live_game_bulk_api as bulk_module
+    monkeypatch.setattr(
+        bulk_module,
+        'get_authoritative_live_state',
+        lambda game_id, team_id: {'pitch_count_summary': {'Carter': {'status': 'Available'}}},
+    )
+
     # Carter was at 1B. The common youth-baseball swap is Carter -> P and the
     # old pitcher Aiden -> 1B, with nobody unnecessarily sent to the bench.
     swapped = {
