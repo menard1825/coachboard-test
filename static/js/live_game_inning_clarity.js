@@ -9,7 +9,6 @@
   const nativeFetch = window.fetch.bind(window);
   let rootObserver = null;
   let started = false;
-  let feedbackPromise = null;
 
   const setText = (el, value) => {
     if (el && el.textContent !== value) el.textContent = value;
@@ -18,27 +17,28 @@
     if (el && el.innerHTML !== value) el.innerHTML = value;
   };
 
-  function ensureFeedbackPass() {
-    if (document.getElementById('cb-real-game-feedback-styles')) return Promise.resolve();
-    if (feedbackPromise) return feedbackPromise;
+  // Keep a reference to the shared Live Game socket. The unified feedback
+  // controller wraps this factory later and attaches its live_game_delta
+  // listener to the same Socket instance.
+  if (typeof window.io === 'function' && !window.io.__cbSocketExposed) {
+    const originalIo = window.io;
+    const exposedIo = function(...args) {
+      const socket = originalIo.apply(this, args);
+      window.__cbLiveGameSocket = socket;
+      return socket;
+    };
+    Object.keys(originalIo).forEach(key => { try { exposedIo[key] = originalIo[key]; } catch (_) {} });
+    exposedIo.__cbSocketExposed = true;
+    exposedIo.__cbOriginal = originalIo;
+    window.io = exposedIo;
+  }
 
-    feedbackPromise = new Promise((resolve, reject) => {
-      let script = [...document.scripts].find(node => /\/static\/js\/live_game_feedback_pass\.js(?:\?|$)/.test(node.src || ''));
-      const done = () => resolve();
-      if (script) {
-        if (document.getElementById('cb-real-game-feedback-styles')) return resolve();
-        script.addEventListener('load', done, {once:true});
-        script.addEventListener('error', reject, {once:true});
-        return;
-      }
-      script = document.createElement('script');
-      script.src = '/static/js/live_game_feedback_pass.js?v=20260831-2';
-      script.dataset.cbLiveFeedbackPass = 'true';
-      script.addEventListener('load', done, {once:true});
-      script.addEventListener('error', reject, {once:true});
-      document.head.appendChild(script);
-    });
-    return feedbackPromise;
+  // This script is parser-loaded immediately before live_game_v2.js. Insert
+  // the unified controller into the parser stream here so its capture listener
+  // is registered before the legacy v2 End Inning listener. Loading it async
+  // after the game started left the legacy confirmation workflow first in line.
+  if (document.readyState === 'loading' && ![...document.scripts].some(node => /\/static\/js\/live_game_feedback_pass\.js(?:\?|$)/.test(node.src || ''))) {
+    document.write('<script src="/static/js/live_game_feedback_pass.js?v=20260831-3" data-cb-live-feedback-pass="true"><\\/script>');
   }
 
   async function bridgeDefensiveChange(input, init = {}) {
@@ -46,9 +46,7 @@
     const method = String(init?.method || (typeof input !== 'string' ? input?.method : '') || 'GET').toUpperCase();
     let pathname = '';
     try { pathname = new URL(url, window.location.href).pathname; } catch (_) {}
-    if (method !== 'POST' || pathname !== `/api/live-game/${gameId}/defensive-change`) {
-      return nativeFetch(input, init);
-    }
+    if (method !== 'POST' || pathname !== `/api/live-game/${gameId}/defensive-change`) return nativeFetch(input, init);
 
     let requested = {};
     try { requested = JSON.parse(init.body || '{}'); } catch (_) { return nativeFetch(input, init); }
@@ -158,15 +156,50 @@
     }, 400);
   }
 
+  function pushStateIntoUnifiedController(current) {
+    const events = Array.isArray(current?.rotation_events) ? current.rotation_events : [];
+    const sequence = events.reduce((max, item) => item?.reverted ? max : Math.max(max, Number(item?.sequence) || 0), 0);
+    const delta = {
+      game_id: gameId,
+      current_inning: String(current?.current_inning || current?.game?.live_current_inning || '1'),
+      current_alignment: {...(current?.current_alignment || {})},
+      current_pitcher: current?.current_pitcher || current?.current_alignment?.P || null,
+      bench: Array.isArray(current?.bench) ? current.bench : [],
+      sequence,
+    };
+    const socket = window.__cbLiveGameSocket;
+    const listeners = typeof socket?.listeners === 'function' ? socket.listeners('live_game_delta') : [];
+    if (listeners?.length) {
+      listeners.forEach(listener => listener(delta));
+      return true;
+    }
+    if (typeof socket?.emitEvent === 'function') {
+      socket.emitEvent(['live_game_delta', delta]);
+      return true;
+    }
+    return false;
+  }
+
+  async function refreshUnifiedStateAndReplay(button) {
+    const response = await nativeFetch(`/api/live-game/${gameId}/state`, {cache:'no-store'});
+    if (!response.ok) throw new Error('Unable to refresh live game state.');
+    const current = await response.json();
+    pushStateIntoUnifiedController(current);
+    button.dataset.cbUnifiedReplay = '1';
+    button.click();
+  }
+
   function guaranteeUnifiedEndInning(event) {
     const button = event.target.closest?.('#liveEndInningBtn');
-    if (!button || button.disabled || document.getElementById('cb-real-game-feedback-styles')) return;
+    if (!button || button.disabled) return;
+    if (button.dataset.cbUnifiedReplay === '1') {
+      delete button.dataset.cbUnifiedReplay;
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation?.();
-    ensureFeedbackPass().then(() => {
-      if (button.isConnected && !button.disabled) button.click();
-    }).catch(() => {});
+    refreshUnifiedStateAndReplay(button).catch(() => {});
   }
 
   function start() {
