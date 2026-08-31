@@ -440,6 +440,7 @@
     installStyles();
     const card = document.getElementById('cbQuickDefense');
     if (!card) return;
+    if (draft) renderDraft();
     const helpText = 'Drag players right on the field or bench. Tap a fielder for the full editor. Pitcher changes stay in Change Pitcher.';
     const tipText = 'Drag a bench player onto a field spot for a substitution, or drag fielders to swap. If you drag a fielder to Bench, fill the open spot and CoachBoard saves the completed defense.';
     const help = card.querySelector('.cb-qd-help');
