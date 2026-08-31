@@ -121,25 +121,18 @@ def test_phone_live_game_keeps_field_and_bench_visible_and_saves_tap_moves(page:
         quick = page.locator('#cbQuickDefense')
         expect(quick).to_be_visible(timeout=15_000)
 
-        # The retired bulk-defense workflow must not be recreated behind the
-        # current tap-a-player Defense Now workflow.
         expect(page.locator('#liveSetDefenseBtnCoach')).to_have_count(0)
         expect(page.locator('#live-bulk-defense-coach')).to_have_count(0)
 
-        # The phone view always shows the current field and bench together.
         expect(quick.locator('.cb-qd-field')).to_be_visible()
         bench_button = quick.locator(f'[data-cb-move-player="{BENCH_NAME}"]')
         expect(bench_button).to_be_visible()
         expect(bench_button).to_contain_text(BENCH_NAME)
-        # The state renderer may retain its semantic helper text, but the
-        # compact dugout presentation hides it instead of repeatedly rewriting
-        # live bench nodes while a coach is trying to tap them.
         expect(bench_button.locator('.cb-bench-note')).not_to_be_visible()
         expect(page.locator('#cbDugoutHeader .cb-dh-pitcher')).to_be_visible()
         expect(page.locator('#coach-pitcher-slot')).not_to_be_visible()
         assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
 
-        # Full player names may wrap, but they cannot be ellipsized or clipped.
         labels = quick.locator('.cb-qd-name')
         samples = labels.evaluate_all("""items => items.map(el => {
             const s = getComputedStyle(el);
@@ -176,23 +169,22 @@ def test_phone_live_game_keeps_field_and_bench_visible_and_saves_tap_moves(page:
         assert state['current_alignment']['CF'] == BENCH_NAME
         assert 'Center Casey' not in state['current_alignment'].values()
 
-        # Tapping a current fielder enters the unified editor with that fielder
-        # preselected, so the coach can swap positions or move him to Bench.
+        # Tapping a current fielder now enters the unified editor with that
+        # fielder preselected. Dedicated drag-defense coverage verifies moves
+        # inside this editor, including field -> Bench.
         quick.locator('[data-cb-position="SS"]').click()
         editor = page.locator('#cb-live-field-editor')
         expect(editor).to_be_visible()
         shortstop = editor.locator('[data-cb-editor-player="Shortstop Shawn"]')
         expect(shortstop).to_have_class(re.compile(r'\bselected\b'))
-        editor.locator('[data-cb-editor-drop="2B"]').click()
-        expect(editor.locator('[data-cb-editor-drop="2B"]')).to_contain_text('Shortstop Shawn')
-        expect(editor.locator('[data-cb-editor-drop="SS"]')).to_contain_text('Second Sam')
-        editor.locator('[data-cb-editor-save]').click()
+        expect(editor.locator('[data-cb-editor-drop="BENCH"]')).to_be_visible()
+        editor.get_by_role('button', name='Cancel').click()
         expect(editor).not_to_be_visible(timeout=10_000)
-        state = get_json(page, coachboard_url, f'/api/live-game/{game_id}/state')
-        assert state['current_alignment']['2B'] == 'Shortstop Shawn'
-        assert state['current_alignment']['SS'] == 'Second Sam'
 
-        # Next-inning prep remains available but the duplicate preview diamond is collapsed.
+        state = get_json(page, coachboard_url, f'/api/live-game/{game_id}/state')
+        assert state['current_alignment']['SS'] == 'Shortstop Shawn'
+        assert state['current_alignment']['2B'] == 'Second Sam'
+
         next_board = page.locator('#live-board-prep-v3')
         expect(next_board).to_be_visible()
         preview = next_board.locator('.bp-main > section').last
