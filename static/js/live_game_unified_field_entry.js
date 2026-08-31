@@ -10,6 +10,8 @@
   let draft = null;
   let saveBusy = false;
   let enhanceQueued = false;
+  let endInningBusy = false;
+  let allowEndInningPassThrough = false;
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -60,6 +62,91 @@
       throw new Error(data?.message || 'Live Game state is unavailable.');
     }
     return data;
+  }
+
+  async function loadNextInningPrep() {
+    const response = await fetch(`/api/live-game/${gameId}/next-inning-prep`, {cache: 'no-store'});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.status === 'error') {
+      throw new Error(data?.message || 'Next-inning defense is unavailable.');
+    }
+    return data;
+  }
+
+  async function advanceLockedNextInning() {
+    const prep = await loadNextInningPrep();
+    const confirmed = prep?.confirmed;
+    if (!confirmed?.alignment || String(confirmed.inning || '') !== String(prep.next_inning || '')) {
+      return null;
+    }
+
+    const liveState = await loadAuthoritativeState();
+    if (String(liveState.current_inning || liveState.game?.live_current_inning || '1') !== String(prep.current_inning || '1')) {
+      throw new Error('Another coach already moved the game forward. The live field has been refreshed.');
+    }
+
+    const response = await fetch(`/api/live-game/${gameId}/advance-inning`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        alignment: confirmed.alignment,
+        base_sequence: currentSequence(liveState),
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data?.status === 'error') {
+      const error = new Error(data?.message || `Unable to start Inning ${prep.next_inning}.`);
+      error.code = data?.code || '';
+      throw error;
+    }
+    return {nextInning: String(prep.next_inning), delta: data.delta || null};
+  }
+
+  function passEndInningToFullEditor(button) {
+    endInningBusy = false;
+    if (!button?.isConnected) return;
+    button.disabled = false;
+    allowEndInningPassThrough = true;
+    button.click();
+  }
+
+  function interceptLockedEndInning(event) {
+    const button = event.target.closest?.('#liveEndInningBtn');
+    if (!button) return;
+
+    if (allowEndInningPassThrough) {
+      allowEndInningPassThrough = false;
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    if (endInningBusy || button.disabled) return;
+    endInningBusy = true;
+    button.disabled = true;
+
+    advanceLockedNextInning()
+      .then(result => {
+        if (!result) {
+          passEndInningToFullEditor(button);
+          return;
+        }
+
+        clearDraft({restore: true});
+        setSaveBadge('', `Inning ${result.nextInning} started`);
+        endInningBusy = false;
+        window.setTimeout(() => {
+          if (button.isConnected) button.disabled = false;
+        }, 900);
+      })
+      .catch(error => {
+        endInningBusy = false;
+        if (button.isConnected) button.disabled = false;
+        window.alert(`CoachBoard could not start the locked-in next inning. ${error.message}`);
+        passEndInningToFullEditor(button);
+      });
   }
 
   async function ensureDraft() {
@@ -368,6 +455,12 @@
     enhanceQueued = true;
     window.requestAnimationFrame(enhanceQuickDefense);
   }
+
+  // This file loads after the primary Live Game controller, but a window-level
+  // capture listener runs before that controller's document-level click handler.
+  // That lets a coach-confirmed LOCKED IN defense advance immediately instead of
+  // opening the same next-inning editor a second time.
+  window.addEventListener('click', interceptLockedEndInning, true);
 
   document.addEventListener('pointerdown', beginDrag, {capture: true, passive: true});
   document.addEventListener('pointermove', moveDrag, {capture: true, passive: false});
