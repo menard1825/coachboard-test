@@ -13,6 +13,7 @@ from game_pitching_rules import (
     install_request_rule_adapters,
     rule_settings_payload,
 )
+from game_start_readiness import can_start_game
 from models import Game, Lineup, PlayerPitchTarget, Rotation, Team
 
 
@@ -318,7 +319,13 @@ def readiness_api(game_id):
     game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
     if not game:
         return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
-    return jsonify({'status': 'success', 'readiness': _readiness_for_game(game, team)})
+
+    start_readiness = can_start_game(game, team)
+    return jsonify({
+        'status': 'success',
+        **start_readiness,
+        'readiness': _readiness_for_game(game, team),
+    })
 
 
 @game_day_bp.route('/game-day/<int:game_id>/report')
