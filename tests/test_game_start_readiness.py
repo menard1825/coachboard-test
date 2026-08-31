@@ -135,6 +135,8 @@ def test_missing_inning_one_defense_is_rejected_with_same_contract(monkeypatch):
     assert start_response.status_code == 409
     rejected = start_response.get_json()
 
+    assert 'ready' in rejected, rejected
+    assert 'missing' in rejected, rejected
     assert rejected['ready'] == readiness['ready']
     assert rejected['missing'] == readiness['missing']
 
@@ -156,4 +158,7 @@ def test_missing_pitching_rules_blocks_first_pitch(monkeypatch):
 
     rejected = client.post('/api/live-game/91/start', json={})
     assert rejected.status_code == 409
-    assert rejected.get_json()['missing'] == readiness['missing']
+    payload = rejected.get_json()
+    assert 'ready' in payload, payload
+    assert 'missing' in payload, payload
+    assert payload['missing'] == readiness['missing']
