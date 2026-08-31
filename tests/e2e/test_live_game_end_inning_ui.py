@@ -75,8 +75,8 @@ def create_game(page: Page, coachboard_url: str):
         ],
         'associated_game_id': game_id,
     })
-    # Deliberately save only Inning 1. End Inning must ask Same Defense/New
-    # Defense instead of silently advancing to an already-prepared next inning.
+    # Deliberately save only Inning 1. End Inning must carry the current defense
+    # into the new editor and commit the next defense + inning in one operation.
     post_json(page, coachboard_url, '/save_rotation', {
         'title': 'End Inning UI Rotation',
         'innings': {'1': alignment()},
@@ -85,7 +85,7 @@ def create_game(page: Page, coachboard_url: str):
     return game_id
 
 
-def test_end_inning_has_one_coach_facing_workflow(page: Page, coachboard_url: str):
+def test_end_inning_commits_next_defense_and_inning_in_one_workflow(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
@@ -105,20 +105,27 @@ def test_end_inning_has_one_coach_facing_workflow(page: Page, coachboard_url: st
 
         page.locator('#liveEndInningBtn').click()
 
-        # The retired window.confirm() handler must never run. Coaches should
-        # see exactly one baseball decision sheet owned by inning_clarity.
-        expect(page.locator('#cbEndInningSheet')).to_be_visible(timeout=10_000)
-        expect(page.locator('#cbEndInningSheet')).to_contain_text('Who goes back out?')
-        expect(page.locator('#cbEndInningSheet [data-cb-end-same]')).to_contain_text('Same Defense')
-        expect(page.locator('#cbEndInningSheet [data-cb-end-new]')).to_contain_text('New Defense')
+        editor = page.locator('#cb-live-field-editor')
+        expect(editor).to_be_visible(timeout=10_000)
+        expect(editor.locator('.modal-title')).to_contain_text('End Inning 1')
+        expect(editor.locator('[data-cb-editor-subtitle]')).to_contain_text('Inning 2')
+        expect(editor.locator('[data-cb-editor-save]')).to_have_text('Start Inning 2')
+        expect(editor.locator('[data-cb-editor-drop="BENCH"]')).to_be_visible()
         assert native_dialogs == [], f'Legacy End Inning confirm still fired: {native_dialogs}'
 
-        # Canceling the sheet must leave the inning and live state untouched.
-        page.locator('#cbEndInningSheet .btn-close').click()
-        expect(page.locator('#cbEndInningSheet')).to_be_hidden()
+        # This is the real-game regression: one save must both commit the next
+        # defense and advance the live inning. There is no second End Inning tap.
+        editor.locator('[data-cb-editor-save]').click()
+        expect(editor).not_to_be_visible(timeout=10_000)
+
         state = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
         assert state['game']['is_live'] is True
-        assert state['current_inning'] == '1'
+        assert state['current_inning'] == '2'
+        assert state['current_alignment'] == alignment()
+        assert any(
+            event.get('event_type') == 'End Inning' and str(event.get('inning')) == '2'
+            for event in state.get('rotation_events', [])
+        )
     finally:
         state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
         if state_response.ok and state_response.json().get('game', {}).get('is_live'):
