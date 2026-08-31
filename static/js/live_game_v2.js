@@ -19,7 +19,7 @@
     function isLiveActionTarget(target) {
         return target?.closest?.([
             '#startLiveGameBtnAction', '#liveGameModeToggle', '#liveChangePitcherBtn',
-            '#liveDefensiveChangeBtn', '#liveEndInningBtn', '#liveUndoBtn',
+            '#liveDefensiveChangeBtn', '#liveUndoBtn',
             '#liveEndGameBtn', '#confirmFinalCountsBtn'
         ].join(','));
     }
@@ -452,11 +452,6 @@
                 showPitcherPicker();
             } else if (id === 'liveDefensiveChangeBtn') {
                 showDefensiveChange();
-            } else if (id === 'liveEndInningBtn') {
-                if (!confirm('End this inning and load the planned next inning?')) return;
-                actionBusy = true;
-                await api('/end-inning', { method: 'POST', body: '{}' });
-                toast('✓ Inning advanced • Saved & Synced');
             } else if (id === 'liveUndoBtn') {
                 actionBusy = true;
                 await api('/undo', { method: 'POST', body: '{}' });
