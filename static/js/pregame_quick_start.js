@@ -129,7 +129,8 @@
       {
         key:'batting', name:'Batting Order', icon:'bi-list-ol',
         ready:Boolean(readiness.lineup_ready),
-        status:readiness.lineup_ready ? 'Batting order is set' : 'Set the batting order',
+        optional:true,
+        status:readiness.lineup_ready ? 'Batting order is set' : 'Optional — add it later if you need it',
       },
       {
         key:'defense', name:'Starting Defense', icon:'bi-diagram-3-fill',
@@ -212,7 +213,7 @@
     launch.innerHTML = `
       <div class="cb-qsl-copy">
         <div class="cb-qsl-title"><i class="bi bi-lightning-charge-fill me-1" aria-hidden="true"></i>Quick Start</div>
-        <div class="cb-qsl-help">Get ready for first pitch without planning the whole game. Set availability, batting order, Inning 1 defense, pitcher, and pitching tracking.</div>
+        <div class="cb-qsl-help">Get ready for first pitch without planning the whole game. Set availability, Inning 1 defense, pitcher, and pitching tracking. Batting order can be added later.</div>
       </div>
       <button type="button" class="btn btn-primary cb-qsl-button">Open Quick Start</button>`;
     const rules = document.getElementById('game-pitching-rules-v2');
@@ -237,7 +238,7 @@
             <div>
               <div class="cb-qs-kicker">Quick Start</div>
               <h5 class="modal-title mb-0">Get ready for first pitch</h5>
-              <div class="cb-qs-subtitle">Only the essentials. You can plan later defensive innings during the game.</div>
+              <div class="cb-qs-subtitle">Only the essentials. You can add a batting order and plan later defensive innings during the game.</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
@@ -279,7 +280,7 @@
     }
     start.disabled = !status.coreReady;
     const missing = status.steps.filter(step => !step.optional && !step.ready).map(step => step.name);
-    const blockerText = missing.length ? `Still needed: ${missing.join(' · ')}` : 'Ready for first pitch. Later innings can be planned during Live Game.';
+    const blockerText = missing.length ? `Still needed: ${missing.join(' · ')}` : 'Ready for first pitch. Batting order and later innings can be added during Live Game.';
     if (blockers.textContent !== blockerText) blockers.textContent = blockerText;
   }
 
