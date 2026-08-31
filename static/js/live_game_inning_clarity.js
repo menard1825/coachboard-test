@@ -17,9 +17,6 @@
     if (el && el.innerHTML !== value) el.innerHTML = value;
   };
 
-  // Keep a reference to the shared Live Game socket. The unified feedback
-  // controller wraps this factory later and attaches its live_game_delta
-  // listener to the same Socket instance.
   if (typeof window.io === 'function' && !window.io.__cbSocketExposed) {
     const originalIo = window.io;
     const exposedIo = function(...args) {
@@ -33,12 +30,8 @@
     window.io = exposedIo;
   }
 
-  // This script is parser-loaded immediately before live_game_v2.js. Insert
-  // the unified controller into the parser stream here so its capture listener
-  // is registered before the legacy v2 End Inning listener. Loading it async
-  // after the game started left the legacy confirmation workflow first in line.
   if (document.readyState === 'loading' && ![...document.scripts].some(node => /\/static\/js\/live_game_feedback_pass\.js(?:\?|$)/.test(node.src || ''))) {
-    document.write('<script src="/static/js/live_game_feedback_pass.js?v=20260831-3" data-cb-live-feedback-pass="true"><\\/script>');
+    document.write('<script src="/static/js/live_game_feedback_pass.js?v=20260831-4" data-cb-live-feedback-pass="true"></' + 'script>');
   }
 
   async function bridgeDefensiveChange(input, init = {}) {
