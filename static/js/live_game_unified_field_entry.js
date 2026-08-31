@@ -11,7 +11,6 @@
   let saveBusy = false;
   let enhanceQueued = false;
   let endInningBusy = false;
-  let allowEndInningPassThrough = false;
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -95,29 +94,26 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.status === 'error') {
-      const error = new Error(data?.message || `Unable to start Inning ${prep.next_inning}.`);
-      error.code = data?.code || '';
-      throw error;
+      throw new Error(data?.message || `Unable to start Inning ${prep.next_inning}.`);
     }
     return {nextInning: String(prep.next_inning), delta: data.delta || null};
   }
 
-  function passEndInningToFullEditor(button) {
-    endInningBusy = false;
-    if (!button?.isConnected) return;
-    button.disabled = false;
-    allowEndInningPassThrough = true;
-    button.click();
+  function lockedNextInningIsVisible() {
+    const ready = document.querySelector('#live-board-prep-v3 .nxd-status.ready');
+    if (!ready) return false;
+    const badge = ready.querySelector('.nxd-badge');
+    return /LOCKED IN/i.test(String(badge?.textContent || ready.textContent || ''));
+  }
+
+  function openNextDefenseEditor() {
+    const change = document.querySelector('#live-board-prep-v3 [data-bp-action="adjust"]');
+    if (change && !change.disabled) change.click();
   }
 
   function interceptLockedEndInning(event) {
     const button = event.target.closest?.('#liveEndInningBtn');
-    if (!button) return;
-
-    if (allowEndInningPassThrough) {
-      allowEndInningPassThrough = false;
-      return;
-    }
+    if (!button || !lockedNextInningIsVisible()) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -130,7 +126,9 @@
     advanceLockedNextInning()
       .then(result => {
         if (!result) {
-          passEndInningToFullEditor(button);
+          endInningBusy = false;
+          if (button.isConnected) button.disabled = false;
+          openNextDefenseEditor();
           return;
         }
 
@@ -145,7 +143,7 @@
         endInningBusy = false;
         if (button.isConnected) button.disabled = false;
         window.alert(`CoachBoard could not start the locked-in next inning. ${error.message}`);
-        passEndInningToFullEditor(button);
+        openNextDefenseEditor();
       });
   }
 
@@ -456,10 +454,9 @@
     window.requestAnimationFrame(enhanceQuickDefense);
   }
 
-  // This file loads after the primary Live Game controller, but a window-level
-  // capture listener runs before that controller's document-level click handler.
-  // That lets a coach-confirmed LOCKED IN defense advance immediately instead of
-  // opening the same next-inning editor a second time.
+  // Only take over End Inning when the next-defense board is already visibly
+  // LOCKED IN. If it is NOT SET, the normal controller receives the click and
+  // opens the next-inning editor exactly as before.
   window.addEventListener('click', interceptLockedEndInning, true);
 
   document.addEventListener('pointerdown', beginDrag, {capture: true, passive: true});
