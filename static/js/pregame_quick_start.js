@@ -226,10 +226,10 @@
     launch.id = LAUNCH_ID;
     launch.innerHTML = `
       <div class="cb-qsl-copy">
-        <div class="cb-qsl-title"><i class="bi bi-lightning-charge-fill me-1" aria-hidden="true"></i>First Pitch</div>
-        <div class="cb-qsl-help">Set only what is required to start: availability, Inning 1 defense, its pitcher, and pitching tracking. Batting order can wait.</div>
+        <div class="cb-qsl-title"><i class="bi bi-lightning-charge-fill me-1" aria-hidden="true"></i>Quick Start</div>
+        <div class="cb-qsl-help">Get ready for first pitch without planning the whole game. Set availability, Inning 1 defense, pitcher, and pitching tracking. Batting order can be added later.</div>
       </div>
-      <button type="button" class="btn btn-primary cb-qsl-button">Open First Pitch</button>`;
+      <button type="button" class="btn btn-primary cb-qsl-button">Open Quick Start</button>`;
     const rules = document.getElementById('game-pitching-rules-v2');
     const readiness = document.getElementById('coach-game-readiness-v2');
     if (rules?.parentNode) rules.insertAdjacentElement('afterend', launch);
@@ -250,9 +250,9 @@
         <div class="modal-content">
           <div class="modal-header">
             <div>
-              <div class="cb-qs-kicker">First Pitch</div>
-              <h5 class="modal-title mb-0">Get ready to start the game</h5>
-              <div class="cb-qs-subtitle">The server checks the four required items. Batting order and later innings do not block first pitch.</div>
+              <div class="cb-qs-kicker">Quick Start</div>
+              <h5 class="modal-title mb-0">Get ready for first pitch</h5>
+              <div class="cb-qs-subtitle">Only the essentials. You can add a batting order and plan later defensive innings during the game.</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
