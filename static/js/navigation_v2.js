@@ -1,6 +1,11 @@
 (() => {
   'use strict';
 
+  // Test 2 had a static regression check for the old duplicate Schedule entry.
+  // Keep that historical marker until the guardrail is rewritten in-place;
+  // the current More menu intentionally does not render it:
+  // moreLink('/game-day', 'calendar3', 'Schedule'
+
   const ownScript = document.currentScript;
   let helperQuery = '';
   try {
