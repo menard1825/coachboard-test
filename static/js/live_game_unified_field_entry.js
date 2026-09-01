@@ -11,6 +11,8 @@
   let saveBusy = false;
   let enhanceQueued = false;
   let endInningBusy = false;
+  let quickDefenseObserver = null;
+  let quickDefenseOverlay = null;
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -174,53 +176,67 @@
     if (text && text.textContent !== message) text.textContent = message;
   }
 
+  function observeQuickDefense() {
+    if (!quickDefenseObserver || !quickDefenseOverlay) return;
+    quickDefenseObserver.observe(quickDefenseOverlay, {childList: true, subtree: true});
+  }
+
   function renderDraft() {
     if (!draft) return;
     const card = document.getElementById('cbQuickDefense');
     if (!card) return;
 
-    const assigned = new Set(Object.values(draft.alignment).filter(Boolean));
-    card.querySelectorAll('[data-cb-position]').forEach(button => {
-      const pos = String(button.dataset.cbPosition || '').toUpperCase();
-      const name = draft.alignment[pos] || '';
-      button.dataset.cbMovePlayer = name || 'Open';
-      button.disabled = false;
-      button.classList.toggle('cb-main-open', !name);
-      const label = button.querySelector('.cb-qd-name');
-      const desiredLabel = name ? rosterLabel(name) : 'Open — choose player';
-      if (label && label.textContent !== desiredLabel) label.textContent = desiredLabel;
-    });
+    // This observer exists to repair external/socket-driven rerenders while a
+    // defense draft is staged. Do not let the repair paint observe its own DOM
+    // writes, or renderDraft can continuously retrigger itself.
+    const resumeObserver = Boolean(quickDefenseObserver && quickDefenseOverlay);
+    if (resumeObserver) quickDefenseObserver.disconnect();
+    try {
+      const assigned = new Set(Object.values(draft.alignment).filter(Boolean));
+      card.querySelectorAll('[data-cb-position]').forEach(button => {
+        const pos = String(button.dataset.cbPosition || '').toUpperCase();
+        const name = draft.alignment[pos] || '';
+        button.dataset.cbMovePlayer = name || 'Open';
+        button.disabled = false;
+        button.classList.toggle('cb-main-open', !name);
+        const label = button.querySelector('.cb-qd-name');
+        const desiredLabel = name ? rosterLabel(name) : 'Open — choose player';
+        if (label && label.textContent !== desiredLabel) label.textContent = desiredLabel;
+      });
 
-    const benchPlayers = draft.roster.filter(player => !assigned.has(player.name));
-    const benchHost = card.querySelector('.cb-qd-bench');
-    if (benchHost) {
-      const benchHtml = benchPlayers.length
-        ? benchPlayers.map(player => {
-            const number = String(player.number ?? '').trim();
-            const label = number ? `#${number} ${player.name}` : player.name;
-            return `<button type="button" class="cb-qd-bench-player" data-cb-move-player="${esc(player.name)}"><span>${esc(label)}</span><span class="cb-bench-note">Bench now</span></button>`;
-          }).join('')
-        : '<span class="small text-muted">No players are on the bench.</span>';
-      if (benchHost.innerHTML !== benchHtml) benchHost.innerHTML = benchHtml;
-    }
-
-    const benchTitle = card.querySelector('.cb-qd-bench-head strong');
-    const benchTitleText = `Bench now · ${benchPlayers.length}`;
-    if (benchTitle && benchTitle.textContent !== benchTitleText) benchTitle.textContent = benchTitleText;
-
-    const missing = fieldPositions().filter(pos => !draft.alignment[pos]);
-    let banner = card.querySelector('.cb-main-draft-banner');
-    if (missing.length) {
-      if (!banner) {
-        banner = document.createElement('div');
-        banner.className = 'cb-main-draft-banner';
-        card.querySelector('.cb-qd-bench-wrap')?.insertAdjacentElement('afterend', banner);
+      const benchPlayers = draft.roster.filter(player => !assigned.has(player.name));
+      const benchHost = card.querySelector('.cb-qd-bench');
+      if (benchHost) {
+        const benchHtml = benchPlayers.length
+          ? benchPlayers.map(player => {
+              const number = String(player.number ?? '').trim();
+              const label = number ? `#${number} ${player.name}` : player.name;
+              return `<button type="button" class="cb-qd-bench-player" data-cb-move-player="${esc(player.name)}"><span>${esc(label)}</span><span class="cb-bench-note">Bench now</span></button>`;
+            }).join('')
+          : '<span class="small text-muted">No players are on the bench.</span>';
+        if (benchHost.innerHTML !== benchHtml) benchHost.innerHTML = benchHtml;
       }
-      const bannerHtml = `<span><strong>${esc(missing.join(', '))} open.</strong> Keep dragging players until every position is filled; CoachBoard will save automatically.</span><button type="button" class="btn btn-sm btn-outline-secondary" data-cb-cancel-main-draft>Cancel</button>`;
-      if (banner.innerHTML !== bannerHtml) banner.innerHTML = bannerHtml;
-      setSaveBadge('saving', 'Finish defense');
-    } else if (banner) {
-      banner.remove();
+
+      const benchTitle = card.querySelector('.cb-qd-bench-head strong');
+      const benchTitleText = `Bench now · ${benchPlayers.length}`;
+      if (benchTitle && benchTitle.textContent !== benchTitleText) benchTitle.textContent = benchTitleText;
+
+      const missing = fieldPositions().filter(pos => !draft.alignment[pos]);
+      let banner = card.querySelector('.cb-main-draft-banner');
+      if (missing.length) {
+        if (!banner) {
+          banner = document.createElement('div');
+          banner.className = 'cb-main-draft-banner';
+          card.querySelector('.cb-qd-bench-wrap')?.insertAdjacentElement('afterend', banner);
+        }
+        const bannerHtml = `<span><strong>${esc(missing.join(', '))} open.</strong> Keep dragging players until every position is filled; CoachBoard will save automatically.</span><button type="button" class="btn btn-sm btn-outline-secondary" data-cb-cancel-main-draft>Cancel</button>`;
+        if (banner.innerHTML !== bannerHtml) banner.innerHTML = bannerHtml;
+        setSaveBadge('saving', 'Finish defense');
+      } else if (banner) {
+        banner.remove();
+      }
+    } finally {
+      if (resumeObserver) observeQuickDefense();
     }
   }
 
@@ -510,16 +526,17 @@
   document.addEventListener('DOMContentLoaded', () => {
     installStyles();
     queueEnhance();
-    const overlay = document.getElementById('live-game-overlay');
-    if (overlay) {
-      new MutationObserver(() => {
+    quickDefenseOverlay = document.getElementById('live-game-overlay');
+    if (quickDefenseOverlay) {
+      quickDefenseObserver = new MutationObserver(() => {
         // A staged defense is the visible source of truth until every position
-        // is filled and the bulk edit is saved. Reassert it in the same
-        // mutation cycle so socket/server rerenders cannot flash or replace the
-        // draft bench/field between the coach's first and second drag.
+        // is filled and the bulk edit is saved. Reassert it for external
+        // rerenders, but renderDraft temporarily disconnects this observer so
+        // the repair paint cannot observe and retrigger itself.
         if (draft) renderDraft();
         queueEnhance();
-      }).observe(overlay, {childList: true, subtree: true});
+      });
+      observeQuickDefense();
     }
   });
 })();
