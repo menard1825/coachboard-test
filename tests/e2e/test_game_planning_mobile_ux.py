@@ -60,31 +60,24 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(readiness).not_to_contain_text('regulation inning(s)')
         expect(readiness).not_to_contain_text('setup item need attention')
         expect(readiness.get_by_role('button', name=re.compile('Player Availability'))).to_be_visible()
-        expect(readiness.get_by_role('button', name=re.compile('Batting Order'))).to_be_visible()
         expect(readiness.get_by_role('button', name=re.compile('Defense'))).to_be_visible()
         expect(readiness.get_by_role('button', name=re.compile('Game Clock'))).to_be_visible()
 
-        # Quick Start is a visible, explicit first-pitch workflow. The prior
-        # checklist below Start Game is intentionally hidden as duplicate copy.
-        quick_launch = page.locator('#cb-quick-start-launch')
-        expect(quick_launch).to_be_visible(timeout=15_000)
-        expect(quick_launch).to_contain_text('Get ready for first pitch without planning the whole game')
-        expect(quick_launch.get_by_role('button', name='Open Quick Start')).to_be_visible()
-        expect(page.locator('#cb-quick-start-note')).to_be_hidden()
-        quick_launch.get_by_role('button', name='Open Quick Start').click()
-        quick_modal = page.locator('#cb-quick-start-modal')
-        expect(quick_modal).to_be_visible()
-        expect(quick_modal).to_contain_text('Player Availability')
-        expect(quick_modal).to_contain_text('Batting Order')
-        expect(quick_modal).to_contain_text('Starting Defense')
-        expect(quick_modal).to_contain_text('Starting Pitcher')
-        expect(quick_modal).to_contain_text('Pitching Tracking')
-        expect(quick_modal).to_contain_text('Game Clock')
-        expect(quick_modal.get_by_role('button', name='START GAME')).to_be_disabled()
-        quick_modal.get_by_role('button', name='Full Game Plan').click()
+        modes = page.locator('#cb-test2-pregame-modes')
+        expect(modes).to_be_visible(timeout=15_000)
+        first_pitch = modes.get_by_role('button', name='First Pitch')
+        full_plan = modes.get_by_role('button', name='Full Plan')
+        expect(first_pitch).to_have_class(re.compile(r'\bactive\b'))
+        expect(page.locator('#cb-quick-start-launch')).to_have_count(0)
+        expect(page.locator('#cb-quick-start-modal')).to_have_count(0)
+        expect(readiness.get_by_role('button', name=re.compile('Batting Order'))).to_be_hidden()
 
-        # The normal Start Game action is kept out of the middle of the workflow
-        # on phones and stays available as a sticky footer action.
+        # Full Plan intentionally reveals the optional whole-game planning tools.
+        full_plan.click()
+        expect(full_plan).to_have_class(re.compile(r'\bactive\b'))
+        expect(readiness.get_by_role('button', name=re.compile('Batting Order'))).to_be_visible()
+
+        # The normal Start Game action stays available as a sticky footer action.
         start = page.locator('#startLiveGameBtnAction')
         expect(start).to_be_visible()
         expect(start).to_have_text(re.compile('START GAME'))
@@ -96,14 +89,12 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         assert start_style['bottom'] >= start_style['viewport'] - 90
         expect(page.locator('#start-live-blockers')).to_be_hidden()
 
-        # Pitching language leads with what the coach actually tracks during the
-        # game, while the tournament/league rule remains visible as the source.
         rules = page.locator('#game-pitching-rules-v2')
         expect(rules).to_be_visible(timeout=15_000)
         expect(rules.locator('.gpr-label').first).to_have_text('Game Tracking')
         expect(rules.locator('.gpr-rule')).to_have_text(re.compile(r'Track Pitches|Track Innings / Outs|Track Pitching|Choose tracking'))
 
-        # All six regulation innings fit across the phone without being clipped.
+        # Full Plan exposes all regulation innings on the phone without clipping.
         inning_labels = page.locator('#inning-btn-group label.btn')
         expect(inning_labels).to_have_count(6, timeout=15_000)
         inning_bounds = inning_labels.evaluate_all(
@@ -115,9 +106,6 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         assert all(item['left'] >= -1 and item['right'] <= item['viewport'] + 1 for item in inning_bounds)
         assert max(item['top'] for item in inning_bounds) - min(item['top'] for item in inning_bounds) <= 3
 
-        # The visible defense editor is the coach-facing source of truth on phone.
-        # Starting Defense presents two explicit scopes instead of a paragraph the
-        # coach has to decode in the dugout.
         expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
         defense = page.locator('#pregame-defense-editor-v3')
         expect(defense).to_be_visible(timeout=15_000)
@@ -131,10 +119,6 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(defense.locator('#pde-apply-game')).to_have_text('Apply to Entire Game')
         expect(defense.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as assigned')
 
-        # On a phone the saved-defense selector and whole-game action share the
-        # first control row, while the label stays above the saved-defense selector.
-        # Measure the button against the selector itself, not the wrapper that also
-        # includes the label.
         preset_layout = defense.locator('.pde-tools').evaluate(
             """tools => {
                 const wrap = tools.querySelector('.gm-preset-wrap').getBoundingClientRect();
@@ -176,7 +160,6 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
         expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
 
-        # The whole baseball field and all position targets must fit on screen.
         field = defense.locator('.pde-field')
         expect(field).to_be_visible()
         spots = field.locator('.pde-spot')
@@ -202,22 +185,16 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         )
         assert all(spot['width'] >= 44 and spot['height'] >= 36 for spot in geometry['spots'])
 
-        # A player's complete name is game-critical information. Names may wrap,
-        # but they may not be ellipsized or clipped inside a position target.
         diamond_names = field.locator('.pde-name')
         expect(diamond_names).not_to_have_count(0)
         samples = diamond_names.evaluate_all(
             """items => items.map(el => {
                 const s = getComputedStyle(el);
                 return {
-                    text:(el.textContent || '').trim(),
-                    whiteSpace:s.whiteSpace,
-                    overflow:s.overflow,
-                    textOverflow:s.textOverflow,
-                    fontSize:parseFloat(s.fontSize),
-                    scrollWidth:el.scrollWidth,
-                    clientWidth:el.clientWidth,
-                    scrollHeight:el.scrollHeight,
+                    text:(el.textContent || '').trim(), whiteSpace:s.whiteSpace,
+                    overflow:s.overflow, textOverflow:s.textOverflow,
+                    fontSize:parseFloat(s.fontSize), scrollWidth:el.scrollWidth,
+                    clientWidth:el.clientWidth, scrollHeight:el.scrollHeight,
                     clientHeight:el.clientHeight,
                 };
             })"""
@@ -232,8 +209,6 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
             assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
 
-        # Game-planning pitching uses coach language and keeps secondary pitch
-        # metrics collapsed until the coach asks for them.
         pitching = page.locator('#pitcher-availability-card')
         expect(pitching).to_be_visible(timeout=15_000)
         expect(pitching.locator(':scope > .card-header strong, :scope > .card-header h5').first).to_have_text('Who Can Pitch?')
