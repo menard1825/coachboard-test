@@ -10,7 +10,6 @@
   let draft = null;
   let saveBusy = false;
   let enhanceQueued = false;
-  let endInningBusy = false;
   let quickDefenseObserver = null;
   let quickDefenseOverlay = null;
 
@@ -65,90 +64,6 @@
     return data;
   }
 
-  async function loadNextInningPrep() {
-    const response = await fetch(`/api/live-game/${gameId}/next-inning-prep`, {cache: 'no-store'});
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data?.status === 'error') {
-      throw new Error(data?.message || 'Next-inning defense is unavailable.');
-    }
-    return data;
-  }
-
-  async function advanceLockedNextInning() {
-    const prep = await loadNextInningPrep();
-    const confirmed = prep?.confirmed;
-    if (!confirmed?.alignment || String(confirmed.inning || '') !== String(prep.next_inning || '')) {
-      return null;
-    }
-
-    const liveState = await loadAuthoritativeState();
-    if (String(liveState.current_inning || liveState.game?.live_current_inning || '1') !== String(prep.current_inning || '1')) {
-      throw new Error('Another coach already moved the game forward. The live field has been refreshed.');
-    }
-
-    const response = await fetch(`/api/live-game/${gameId}/advance-inning`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        alignment: confirmed.alignment,
-        base_sequence: currentSequence(liveState),
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data?.status === 'error') {
-      throw new Error(data?.message || `Unable to start Inning ${prep.next_inning}.`);
-    }
-    return {nextInning: String(prep.next_inning), delta: data.delta || null};
-  }
-
-  function lockedNextInningIsVisible() {
-    const ready = document.querySelector('#live-board-prep-v3 .nxd-status.ready');
-    if (!ready) return false;
-    const badge = ready.querySelector('.nxd-badge');
-    return /LOCKED IN/i.test(String(badge?.textContent || ready.textContent || ''));
-  }
-
-  function openNextDefenseEditor() {
-    const change = document.querySelector('#live-board-prep-v3 [data-bp-action="adjust"]');
-    if (change && !change.disabled) change.click();
-  }
-
-  function interceptLockedEndInning(event) {
-    const button = event.target.closest?.('#liveEndInningBtn');
-    if (!button || !lockedNextInningIsVisible()) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-
-    if (endInningBusy || button.disabled) return;
-    endInningBusy = true;
-    button.disabled = true;
-
-    advanceLockedNextInning()
-      .then(result => {
-        if (!result) {
-          endInningBusy = false;
-          if (button.isConnected) button.disabled = false;
-          openNextDefenseEditor();
-          return;
-        }
-
-        clearDraft({restore: true});
-        setSaveBadge('', `Inning ${result.nextInning} started`);
-        endInningBusy = false;
-        window.setTimeout(() => {
-          if (button.isConnected) button.disabled = false;
-        }, 900);
-      })
-      .catch(error => {
-        endInningBusy = false;
-        if (button.isConnected) button.disabled = false;
-        window.alert(`CoachBoard could not start the locked-in next inning. ${error.message}`);
-        openNextDefenseEditor();
-      });
-  }
-
   async function ensureDraft() {
     if (draft) return draft;
     const state = await loadAuthoritativeState();
@@ -186,9 +101,6 @@
     const card = document.getElementById('cbQuickDefense');
     if (!card) return;
 
-    // This observer exists to repair external/socket-driven rerenders while a
-    // defense draft is staged. Do not let the repair paint observe its own DOM
-    // writes, or renderDraft can continuously retrigger itself.
     const resumeObserver = Boolean(quickDefenseObserver && quickDefenseOverlay);
     if (resumeObserver) quickDefenseObserver.disconnect();
     try {
@@ -432,33 +344,15 @@
     drag = null;
   }
 
-  function selectPlayerWhenEditorOpens(name) {
-    let timeoutId = null;
-    const onShown = event => {
-      if (event.target?.id !== 'cb-live-field-editor') return;
-      document.removeEventListener('shown.bs.modal', onShown);
-      if (timeoutId) window.clearTimeout(timeoutId);
-      window.requestAnimationFrame(() => {
-        const player = [...document.querySelectorAll('#cb-live-field-editor [data-cb-editor-player]')]
-          .find(button => button.dataset.cbEditorPlayer === name);
-        player?.click();
-      });
-    };
-
-    document.addEventListener('shown.bs.modal', onShown);
-    timeoutId = window.setTimeout(() => {
-      document.removeEventListener('shown.bs.modal', onShown);
-    }, 5000);
-  }
-
   function enhanceQuickDefense() {
     enhanceQueued = false;
     installStyles();
     const card = document.getElementById('cbQuickDefense');
     if (!card) return;
     if (draft) renderDraft();
-    const helpText = 'Drag players right on the field or bench. Tap a fielder for the full editor. Pitcher changes stay in Change Pitcher.';
-    const tipText = 'Drag a bench player onto a field spot for a substitution, or drag fielders to swap. If you drag a fielder to Bench, fill the open spot and CoachBoard saves the completed defense.';
+
+    const helpText = 'Drag or tap players right on the field and bench. Pitcher changes stay in Change Pitcher.';
+    const tipText = 'Tap a player for a quick move, or drag directly between the field and bench. CoachBoard saves a complete defense automatically.';
     const help = card.querySelector('.cb-qd-help');
     if (help && help.textContent !== helpText) help.textContent = helpText;
     const tip = card.querySelector('.cb-qd-tip');
@@ -470,9 +364,6 @@
     enhanceQueued = true;
     window.requestAnimationFrame(enhanceQuickDefense);
   }
-
-  // End Inning is owned by the full-field live editor controller. This module
-  // only owns Quick Defense drag/tap behavior.
 
   document.addEventListener('pointerdown', beginDrag, {capture: true, passive: true});
   document.addEventListener('pointermove', moveDrag, {capture: true, passive: false});
@@ -493,34 +384,7 @@
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      return;
     }
-
-    const fielder = event.target.closest?.(
-      '#cbQuickDefense [data-cb-move-player][data-cb-position]'
-    );
-    if (!fielder || fielder.disabled) return;
-
-    const position = String(fielder.dataset.cbPosition || '').toUpperCase();
-    if (!position || position === 'P') return;
-
-    const defenseButton = document.getElementById('liveDefensiveChangeBtn');
-    if (!defenseButton || defenseButton.disabled) return;
-
-    const name = fielder.dataset.cbMovePlayer;
-    if (!name || name === 'Open') {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-
-    selectPlayerWhenEditorOpens(name);
-    defenseButton.click();
   }, true);
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -529,10 +393,6 @@
     quickDefenseOverlay = document.getElementById('live-game-overlay');
     if (quickDefenseOverlay) {
       quickDefenseObserver = new MutationObserver(() => {
-        // A staged defense is the visible source of truth until every position
-        // is filled and the bulk edit is saved. Reassert it for external
-        // rerenders, but renderDraft temporarily disconnects this observer so
-        // the repair paint cannot observe and retrigger itself.
         if (draft) renderDraft();
         queueEnhance();
       });
