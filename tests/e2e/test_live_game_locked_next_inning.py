@@ -1,4 +1,4 @@
-"""Browser coverage for advancing a coach-confirmed next-inning defense once."""
+"""Browser coverage for starting a coach-confirmed next-inning defense from the huddle."""
 
 import os
 import re
@@ -67,11 +67,6 @@ def create_game(page: Page, coachboard_url: str):
     assert match
     game_id = int(match.group(1))
 
-    post_json(page, coachboard_url, '/add_lineup', {
-        'title': 'Locked Next Inning Lineup',
-        'lineup_data': list(alignment().values()),
-        'associated_game_id': game_id,
-    })
     post_json(page, coachboard_url, '/save_rotation', {
         'title': 'Locked Next Inning Rotation',
         'innings': {'1': alignment()},
@@ -80,7 +75,7 @@ def create_game(page: Page, coachboard_url: str):
     return game_id
 
 
-def test_locked_next_inning_starts_without_duplicate_defense_modal(page: Page, coachboard_url: str):
+def test_locked_next_inning_huddle_requires_explicit_start(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 430, 'height': 932})
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
@@ -101,13 +96,18 @@ def test_locked_next_inning_starts_without_duplicate_defense_modal(page: Page, c
         expect(page.locator('#live-game-overlay')).to_be_visible(timeout=15_000)
         expect(page.locator('#live-inning-display')).to_have_text('1')
 
-        end_inning = page.locator('#liveEndInningBtn')
-        expect(end_inning).to_be_visible(timeout=15_000)
-        end_inning.click()
+        page.locator('#liveEndInningBtn').click()
+        huddle = page.locator('#cb-test2-huddle-modal')
+        expect(huddle).to_be_visible(timeout=10_000)
+        expect(page.locator('#cb-live-field-editor')).to_have_count(0)
+        start = huddle.locator('[data-cb-t2-start-inning]')
+        expect(start).to_be_enabled(timeout=10_000)
+        expect(start).to_have_text('Start Inning 2')
 
-        # A locked-in defense is already the coach's confirmation. The full
-        # next-inning editor must not ask for the same defense a second time.
-        expect(page.locator('#cb-live-field-editor')).not_to_be_visible(timeout=2_000)
+        # A locked defense is ready, but End Inning itself no longer advances the game.
+        expect(page.locator('#live-inning-display')).to_have_text('1')
+        start.click()
+        expect(huddle).not_to_be_visible(timeout=10_000)
         expect(page.locator('#live-inning-display')).to_have_text('2', timeout=10_000)
 
         state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
