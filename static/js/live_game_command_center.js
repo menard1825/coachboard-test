@@ -27,9 +27,8 @@
       #liveUndoBtn.cb-command-undo i{display:inline-block!important;font-size:1.15rem!important;margin:0!important}
       #liveUndoBtn.cb-command-undo .cb-undo-text{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
       .coach-actions.cb-command-actions{grid-template-columns:1fr 1fr!important;gap:8px!important}
-      .coach-actions.cb-command-actions #liveDefensiveChangeBtn{order:1;background:var(--primary-color,#102a66)!important;border-color:var(--primary-color,#102a66)!important;color:#fff!important}
-      .coach-actions.cb-command-actions #liveChangePitcherBtn{order:2;background:#fff!important;border:1px solid #aab4c3!important;color:#26364c!important}
-      .coach-actions.cb-command-actions #liveEndInningBtn{order:3;grid-column:1/-1;background:#202733!important;border-color:#202733!important;color:#fff!important}
+      .coach-actions.cb-command-actions #liveChangePitcherBtn{order:1;background:#fff!important;border:1px solid #aab4c3!important;color:#26364c!important}
+      .coach-actions.cb-command-actions #liveEndInningBtn{order:2;background:#202733!important;border-color:#202733!important;color:#fff!important}
       .coach-actions.cb-command-actions .btn{min-height:58px!important}
       .cb-command-pitcher-status{font-size:.74rem!important;color:#667085!important;line-height:1.3!important}
       .cb-command-pitcher-status .ok{color:#176b38;font-weight:800}
@@ -111,17 +110,9 @@
     const shell = document.querySelector('.coach-live-shell');
     const head = shell?.querySelector('.coach-live-head');
     const slot = shell?.querySelector('#coach-action-slot');
-    let defense = byId('liveDefensiveChangeBtn');
     const pitcher = byId('liveChangePitcherBtn');
     const endInning = byId('liveEndInningBtn');
     const undo = byId('liveUndoBtn');
-
-    if (slot && !defense) {
-      defense = document.createElement('button');
-      defense.type = 'button';
-      defense.id = 'liveDefensiveChangeBtn';
-      defense.className = 'btn';
-    }
 
     if (head) {
       head.classList.add('cb-command-head');
@@ -149,10 +140,9 @@
 
     if (slot) {
       slot.classList.add('cb-command-actions');
-      actionMarkup(defense, 'Defense Change', 'Move field / bench');
       actionMarkup(pitcher, 'Change Pitcher', 'Make a mound change');
       actionMarkup(endInning, 'End Inning', 'Keep or change defense');
-      [defense, pitcher, endInning].filter(Boolean).forEach(button => {
+      [pitcher, endInning].filter(Boolean).forEach(button => {
         if (button.parentElement !== slot) slot.appendChild(button);
       });
     }
