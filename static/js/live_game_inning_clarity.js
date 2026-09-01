@@ -7,7 +7,6 @@
   const gameId = Number(match[1]);
   const STYLE_ID = 'cb-live-dugout-workflow-style';
   const nativeFetch = window.fetch.bind(window);
-  let rootObserver = null;
   let started = false;
 
   const setText = (el, value) => {
@@ -41,16 +40,17 @@
       if (response.ok) {
         const data = await response.clone().json().catch(() => ({}));
         if (data?.state?.game?.is_live) {
-          // The unified editor may still hold the pre-start state that it loaded
-          // during page setup. Seed it directly from the authoritative Start
-          // response so an immediate first live action cannot see stale pregame
-          // state while the normal socket update is still arriving.
+          // The unified controller may still hold pre-start state. Seed it from
+          // the authoritative Start response before the normal socket delta arrives.
           pushStateIntoUnifiedController(data.state);
         }
       }
       return response;
     }
 
+    // Quick Field still uses the legacy defensive-change endpoint name for a
+    // single-player move. Translate that request into the authoritative full
+    // alignment edit so Quick Field remains the only live defense surface.
     if (method !== 'POST' || pathname !== `/api/live-game/${gameId}/defensive-change`) return nativeFetch(input, init);
 
     let requested = {};
@@ -106,7 +106,6 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      body.cb-dugout #liveSetDefenseBtnCoach,body.cb-dugout [data-cb-full-defense]{display:none!important}
       body.cb-dugout #cbQuickDefense .cb-qd-actions{display:none!important}
       body.cb-dugout #cbQuickDefense .cb-bench-note{display:none!important}
       body.cb-dugout #coach-action-slot.coach-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
@@ -124,41 +123,11 @@
     document.head.appendChild(style);
   }
 
-  function removeBulkDefense() {
-    document.getElementById('liveSetDefenseBtnCoach')?.remove();
-    document.getElementById('live-bulk-defense-coach')?.remove();
-    document.querySelectorAll('[data-cb-full-defense]').forEach(button => button.remove());
-  }
-
-  function patchStaticCopy() {
-    removeBulkDefense();
-    const card = document.getElementById('cbQuickDefense');
-    if (card) {
-      setText(card.querySelector('.cb-qd-kicker'), 'ON THE FIELD');
-      setText(card.querySelector('.cb-qd-title'), 'Defense Now');
-      setText(card.querySelector('.cb-qd-help'), 'Tap a fielder or bench player to make one sub.');
-      const benchTitle = card.querySelector('.cb-qd-bench-head strong');
-      if (benchTitle && /^Bench now/i.test(benchTitle.textContent || '')) setText(benchTitle, benchTitle.textContent.replace(/^Bench now/i, 'On the Bench'));
-    }
-    setText(document.querySelector('.cb-end-zone small'), 'After the last out');
-  }
-
   function patchMenu() {
     const modal = document.getElementById('cbCoachBoardNavModal');
     if (!modal) return;
     setText(modal.querySelector('.modal-header .small.text-muted'), 'Game stays live.');
     setHtml(modal.querySelector('.cb-nav-safe'), '<strong>Game stays live.</strong> Clock stays as-is.');
-  }
-
-  function retrySuppressedEditorSave(event) {
-    const save = event.target.closest?.('#cb-live-field-editor [data-cb-editor-save]');
-    if (!save || save.disabled) return;
-    window.setTimeout(() => {
-      const modal = document.getElementById('cb-live-field-editor');
-      const currentSave = modal?.querySelector('[data-cb-editor-save]');
-      if (!modal?.classList.contains('show') || !currentSave || currentSave.disabled) return;
-      currentSave.click();
-    }, 400);
   }
 
   function pushStateIntoUnifiedController(current) {
@@ -185,28 +154,6 @@
     return false;
   }
 
-  async function refreshUnifiedStateAndReplay(button) {
-    const response = await nativeFetch(`/api/live-game/${gameId}/state`, {cache:'no-store'});
-    if (!response.ok) throw new Error('Unable to refresh live game state.');
-    const current = await response.json();
-    pushStateIntoUnifiedController(current);
-    button.dataset.cbUnifiedReplay = '1';
-    button.click();
-  }
-
-  function guaranteeUnifiedEndInning(event) {
-    const button = event.target.closest?.('#liveEndInningBtn');
-    if (!button || button.disabled) return;
-    if (button.dataset.cbUnifiedReplay === '1') {
-      delete button.dataset.cbUnifiedReplay;
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation?.();
-    refreshUnifiedStateAndReplay(button).catch(() => {});
-  }
-
   function loadUnifiedFeedbackPass() {
     if ([...document.scripts].some(node => /\/static\/js\/live_game_feedback_pass\.js(?:\?|$)/.test(node.src || ''))) return;
     if (document.readyState === 'loading') {
@@ -228,25 +175,10 @@
     started = true;
     installStyles();
     document.getElementById('cbCurrentInningStrip')?.remove();
-    patchStaticCopy();
-
-    // End Inning is owned by live_game_feedback_pass.js. Keeping a second
-    // capture-phase refresh/replay owner here can swallow the no-plan editor.
-    document.addEventListener('click', retrySuppressedEditorSave, true);
     document.addEventListener('click', event => {
       if (event.target.closest?.('[data-cb-menu], #cbCoachBoardNavBtn')) window.setTimeout(patchMenu, 0);
     }, true);
     loadUnifiedFeedbackPass();
-
-    if (!document.getElementById('cbQuickDefense')) {
-      rootObserver = new MutationObserver(() => {
-        if (!document.getElementById('cbQuickDefense')) return;
-        patchStaticCopy();
-        rootObserver?.disconnect();
-        rootObserver = null;
-      });
-      rootObserver.observe(document.body, {childList:true, subtree:true});
-    }
   }
 
   start();
