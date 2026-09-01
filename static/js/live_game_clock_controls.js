@@ -19,6 +19,8 @@
     style.id = 'cb-live-time-limit-style';
     style.textContent = `
       #cbDugoutHeader [data-cb-clock] i{display:none!important}
+      #cbDugoutHeader .cb-dh-clock{cursor:pointer;border-radius:8px;padding:4px 6px;margin:-4px -6px}
+      #cbDugoutHeader .cb-dh-clock:focus-visible{outline:2px solid #fff;outline-offset:2px}
       #${MODAL_ID} .modal-content{border:0;border-radius:15px;overflow:hidden}
       #${MODAL_ID} .tl-state{border:1px solid #dfe4ea;background:#f8fafc;border-radius:10px;padding:10px 11px;margin-bottom:11px}
       #${MODAL_ID} .tl-state.paused{background:#fff8e8;border-color:#e5c66f}
@@ -34,11 +36,27 @@
     document.head.appendChild(style);
   }
 
-  function patchHeaderButton() {
+  function pauseLabel() {
+    return clock?.is_paused ? 'Resume' : 'Pause';
+  }
+
+  function patchHeader() {
     const button = document.querySelector('#cbDugoutHeader [data-cb-clock]');
-    if (!button) return false;
-    if (button.textContent.trim() !== 'Time Limit') button.textContent = 'Time Limit';
-    button.setAttribute('aria-label','Time Limit');
+    const display = document.querySelector('#cbDugoutHeader .cb-dh-clock');
+    if (!button && !display) return false;
+    if (button) {
+      const label = pauseLabel();
+      if (button.textContent.trim() !== label) button.textContent = label;
+      button.setAttribute('aria-label', `${label} game clock`);
+      button.title = `${label} the live game clock`;
+      button.disabled = busy;
+    }
+    if (display) {
+      display.setAttribute('role', 'button');
+      display.setAttribute('tabindex', '0');
+      display.setAttribute('aria-label', 'Open time limit controls');
+      display.title = 'Adjust time limit';
+    }
     return true;
   }
 
@@ -95,24 +113,26 @@
 
   function updateModal() {
     const modal = $(MODAL_ID);
-    if (!modal) return;
     const paused = Boolean(clock?.is_paused);
-    const state = modal.querySelector('[data-tl-state]');
-    const button = modal.querySelector('[data-tl-pause]');
-    if (state) {
-      state.classList.toggle('paused',paused);
-      state.innerHTML = paused
-        ? '<strong>Paused</strong><span>Time limit is stopped.</span>'
-        : '<strong>Running</strong><span>Time limit is running.</span>';
-    }
-    if (button) {
-      button.className = `btn ${paused ? 'btn-success' : 'btn-outline-warning'} tl-action`;
-      button.innerHTML = paused
-        ? 'Resume Time<small>Continue the game clock.</small>'
-        : 'Pause for Delay<small>Rain, injury, or another official stoppage.</small>';
-      button.disabled = busy;
+    if (modal) {
+      const state = modal.querySelector('[data-tl-state]');
+      const button = modal.querySelector('[data-tl-pause]');
+      if (state) {
+        state.classList.toggle('paused',paused);
+        state.innerHTML = paused
+          ? '<strong>Paused</strong><span>Time limit is stopped.</span>'
+          : '<strong>Running</strong><span>Time limit is running.</span>';
+      }
+      if (button) {
+        button.className = `btn ${paused ? 'btn-success' : 'btn-outline-warning'} tl-action`;
+        button.innerHTML = paused
+          ? 'Resume Time<small>Continue the game clock.</small>'
+          : 'Pause for Delay<small>Rain, injury, or another official stoppage.</small>';
+        button.disabled = busy;
+      }
     }
     document.body.classList.toggle('cb-clock-paused',paused);
+    patchHeader();
   }
 
   async function fetchClock() {
@@ -136,12 +156,12 @@
         body:JSON.stringify({action})
       });
       const data = await response.json().catch(()=>({}));
-      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to change the time limit.');
+      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to change the game clock.');
       clock = data.clock || clock;
       updateModal();
       document.dispatchEvent(new Event('visibilitychange'));
     } catch (err) {
-      window.alert(err.message || 'Unable to change the time limit.');
+      window.alert(err.message || 'Unable to change the game clock.');
     } finally {
       busy = false;
       updateModal();
@@ -158,9 +178,9 @@
   function attachHeaderObserver() {
     const header = $('cbDugoutHeader');
     if (!header) return false;
-    patchHeaderButton();
+    patchHeader();
     if (!headerObserver) {
-      headerObserver = new MutationObserver(() => requestAnimationFrame(patchHeaderButton));
+      headerObserver = new MutationObserver(() => requestAnimationFrame(patchHeader));
       headerObserver.observe(header,{childList:true,subtree:true});
     }
     return true;
@@ -172,11 +192,27 @@
     window.setInterval(fetchClock,5000);
 
     document.addEventListener('click',event => {
-      const button = event.target.closest('#cbDugoutHeader [data-cb-clock]');
-      if (!button) return;
+      const pause = event.target.closest('#cbDugoutHeader [data-cb-clock]');
+      if (pause) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+        postClock(clock?.is_paused ? 'resume' : 'pause');
+        return;
+      }
+      const display = event.target.closest('#cbDugoutHeader .cb-dh-clock');
+      if (display) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+        openControls();
+      }
+    },true);
+
+    document.addEventListener('keydown',event => {
+      const display = event.target.closest?.('#cbDugoutHeader .cb-dh-clock');
+      if (!display || !['Enter',' '].includes(event.key)) return;
       event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation?.();
       openControls();
     },true);
 
