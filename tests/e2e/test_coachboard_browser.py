@@ -73,14 +73,10 @@ def test_starting_defense_applies_and_survives_reload(page: Page, coachboard_url
         'CF': 'Center Casey',
         'RF': 'Right Riley',
     }
-    # Starting Defense presets intentionally leave pitcher open because the
-    # pitcher changes game to game.
     expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
     for position, player_name in expected_positions.items():
         expect(defense.locator(f'[data-pde-pos="{position}"] .pde-name')).to_have_text(player_name)
 
-    # Applying the visible preset autosaves; wait for API-authoritative game data
-    # to contain the defense before reloading the browser.
     page.wait_for_function(
         """async () => {
           const response = await fetch('/api/game_data/1', {cache:'no-store'});
@@ -198,7 +194,6 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     page.goto(f'{coachboard_url}/game-day')
     expect(page.locator('[data-game-id="1"]')).to_contain_text('8 present · 1 out')
 
-    # Restore the shared seeded game so later browser checks start with the full roster.
     page.goto(f'{coachboard_url}/game/1#availabilityCollapse')
     expect(page.locator('#availabilityCollapse')).to_have_class(re.compile(r'\bshow\b'), timeout=15_000)
     page.locator('#absent_9').uncheck()
@@ -213,6 +208,11 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
 
     readiness = page.locator('#coach-game-readiness-v2')
     expect(readiness).to_be_visible(timeout=15_000)
+    modes = page.locator('#cb-test2-pregame-modes')
+    expect(modes).to_be_visible(timeout=15_000)
+    modes.get_by_role('button', name='Full Plan').click()
+    expect(modes.get_by_role('button', name='Full Plan')).to_have_class(re.compile(r'\bactive\b'))
+
     readiness.get_by_role('button', name=re.compile('Batting Order')).click()
     expect(page.locator('#lineupEditorModal')).to_be_visible()
     page.locator('#lineupEditorModal').get_by_role('button', name='Cancel').click()
