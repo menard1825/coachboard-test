@@ -105,7 +105,7 @@ def create_game_with_plan(page: Page, coachboard_url: str):
     return game_id
 
 
-def test_phone_live_game_keeps_field_and_bench_visible_and_saves_tap_moves(page: Page, coachboard_url: str):
+def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     add_bench_player(page, coachboard_url)
@@ -120,41 +120,25 @@ def test_phone_live_game_keeps_field_and_bench_visible_and_saves_tap_moves(page:
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         quick = page.locator('#cbQuickDefense')
         expect(quick).to_be_visible(timeout=15_000)
+        expect(quick.locator('.cb-qd-title')).to_have_text('Quick Field')
 
-        expect(page.locator('#liveSetDefenseBtnCoach')).to_have_count(0)
-        expect(page.locator('#live-bulk-defense-coach')).to_have_count(0)
+        # Test 2 contract: no second current-defense surface can coexist with Quick Field.
+        for selector in (
+            '#liveDefensiveChangeBtn', '#liveSetDefenseBtnCoach', '#live-bulk-defense-coach',
+            '[data-cb-full-defense]', '#live-defense-v2', '#live-defense-destination-v2',
+            '#liveDefensiveSwapModal', '#cb-live-field-editor',
+        ):
+            expect(page.locator(selector)).to_have_count(0)
 
         expect(quick.locator('.cb-qd-field')).to_be_visible()
         bench_button = quick.locator(f'[data-cb-move-player="{BENCH_NAME}"]')
         expect(bench_button).to_be_visible()
         expect(bench_button).to_contain_text(BENCH_NAME)
-        expect(bench_button.locator('.cb-bench-note')).not_to_be_visible()
         expect(page.locator('#cbDugoutHeader .cb-dh-pitcher')).to_be_visible()
         expect(page.locator('#coach-pitcher-slot')).not_to_be_visible()
         assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
 
-        labels = quick.locator('.cb-qd-name')
-        samples = labels.evaluate_all("""items => items.map(el => {
-            const s = getComputedStyle(el);
-            return {
-                text: (el.textContent || '').trim(),
-                whiteSpace: s.whiteSpace,
-                overflow: s.overflow,
-                textOverflow: s.textOverflow,
-                scrollWidth: el.scrollWidth,
-                clientWidth: el.clientWidth,
-                scrollHeight: el.scrollHeight,
-                clientHeight: el.clientHeight,
-            };
-        })""")
-        for sample in samples:
-            assert sample['whiteSpace'] == 'normal', sample
-            assert sample['overflow'] == 'visible', sample
-            assert sample['textOverflow'] == 'clip', sample
-            assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
-            assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
-
-        # Bench -> CF keeps the quick substitution popup. The outgoing CF becomes bench.
+        # Bench -> CF uses the Quick Field move sheet and saves immediately.
         bench_button.click()
         modal = page.locator('#cbQuickMoveModal')
         expect(modal).to_be_visible()
@@ -169,27 +153,16 @@ def test_phone_live_game_keeps_field_and_bench_visible_and_saves_tap_moves(page:
         assert state['current_alignment']['CF'] == BENCH_NAME
         assert 'Center Casey' not in state['current_alignment'].values()
 
-        # Tapping a current fielder now enters the unified editor with that
-        # fielder preselected. Dedicated drag-defense coverage verifies moves
-        # inside this editor, including field -> Bench.
+        # A current fielder stays in Quick Field too; it must not open the retired full editor.
         quick.locator('[data-cb-position="SS"]').click()
-        editor = page.locator('#cb-live-field-editor')
-        expect(editor).to_be_visible()
-        shortstop = editor.locator('[data-cb-editor-player="Shortstop Shawn"]')
-        expect(shortstop).to_have_class(re.compile(r'\bselected\b'))
-        expect(editor.locator('[data-cb-editor-drop="BENCH"]')).to_be_visible()
-        editor.get_by_role('button', name='Cancel').click()
-        expect(editor).not_to_be_visible(timeout=10_000)
-
-        state = get_json(page, coachboard_url, f'/api/live-game/{game_id}/state')
-        assert state['current_alignment']['SS'] == 'Shortstop Shawn'
-        assert state['current_alignment']['2B'] == 'Second Sam'
+        expect(modal).to_be_visible()
+        expect(modal).to_contain_text('Shortstop Shawn is currently playing SS')
+        expect(page.locator('#cb-live-field-editor')).to_have_count(0)
+        modal.get_by_role('button', name='Close').click()
+        expect(modal).not_to_be_visible(timeout=10_000)
 
         next_board = page.locator('#live-board-prep-v3')
         expect(next_board).to_be_visible()
-        preview = next_board.locator('.bp-main > section').last
-        if preview.count():
-            expect(preview).not_to_be_visible()
     finally:
         state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
         if state_response.ok and state_response.json().get('game', {}).get('is_live'):
