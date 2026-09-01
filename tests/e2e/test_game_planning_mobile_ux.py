@@ -80,7 +80,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(quick_modal).to_contain_text('Starting Pitcher')
         expect(quick_modal).to_contain_text('Pitching Tracking')
         expect(quick_modal).to_contain_text('Game Clock')
-        expect(quick_modal.get_by_role('button', name='Start Live Game')).to_be_disabled()
+        expect(quick_modal.get_by_role('button', name='START GAME')).to_be_disabled()
         quick_modal.get_by_role('button', name='Full Game Plan').click()
 
         # The normal Start Game action is kept out of the middle of the workflow
