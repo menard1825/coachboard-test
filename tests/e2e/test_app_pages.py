@@ -192,9 +192,9 @@ def test_mobile_navigation_reaches_every_primary_area(page: Page, coachboard_url
     login(page, coachboard_url)
     page.goto(coachboard_url)
 
-    bottom_nav = page.locator('nav.bottom-nav-fixed')
+    bottom_nav = page.locator('#cb-global-mobile-nav')
     expect(bottom_nav).to_be_visible()
-    for label in ('Home', 'Game Day', 'Roster', 'Practice', 'More'):
+    for label in ('Home', 'Game Day', 'Roster', 'Pitching', 'More'):
         expect(bottom_nav.get_by_text(label, exact=True)).to_be_visible()
 
     bottom_nav.get_by_text('Home', exact=True).click()
@@ -205,21 +205,30 @@ def test_mobile_navigation_reaches_every_primary_area(page: Page, coachboard_url
     expect(page.locator('#roster')).to_have_class(re.compile(r'\bactive\b'))
     expect(page.locator('#roster-cards-container')).to_contain_text('Pitcher Pat', timeout=15_000)
 
-    bottom_nav.get_by_text('Practice', exact=True).click()
-    expect(page.locator('#practice_plan')).to_have_class(re.compile(r'\bactive\b'))
-
     bottom_nav.get_by_text('More', exact=True).click()
     expect(page.locator('#more')).to_have_class(re.compile(r'\bactive\b'))
-    for label in ('Development', 'Pitching', 'Schedule', 'Lineup Templates', 'Defensive Templates', 'Stats', 'Scouting', 'Coach Notes'):
+    for label in ('Practice', 'Development', 'Lineup Templates', 'Defensive Templates', 'Stats', 'Scouting', 'Coach Notes', 'Sign Set'):
         expect(page.locator('#more').get_by_text(label, exact=True)).to_be_visible()
+    expect(page.locator('#more').get_by_text('Schedule', exact=True)).to_have_count(0)
+    expect(page.locator('#more').get_by_text('Pitching', exact=True)).to_have_count(0)
 
+    page.locator('#more').get_by_text('Practice', exact=True).click()
+    expect(page.locator('#practice_plan')).to_have_class(re.compile(r'\bactive\b'))
+    expect(bottom_nav.locator('[data-cb-mobile-section="more"]')).to_have_class(re.compile(r'\bactive\b'))
+
+    bottom_nav.get_by_text('More', exact=True).click()
     page.locator('#more').get_by_text('Development', exact=True).click()
     expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
+    expect(bottom_nav.locator('[data-cb-mobile-section="more"]')).to_have_class(re.compile(r'\bactive\b'))
     expect(page.locator('#player_development > .cb-tab-intro')).to_have_count(0)
     expect(page.locator('#season-dev-summary-v2')).to_have_count(0)
     expect(page.locator('.cb-dev-mobile-picker')).to_be_visible()
     expect(page.locator('.cb-dev-player-card')).to_be_hidden()
     expect(page.locator('#player-dev-content')).to_contain_text('Individual development plan', timeout=15_000)
+
+    bottom_nav.get_by_text('Pitching', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/pitching$'))
+    expect(page.locator('#cb-global-mobile-nav [data-cb-mobile-section="pitching"]')).to_have_class(re.compile(r'\bactive\b'))
 
 
 def test_coaching_workspaces_expose_new_primary_actions(page: Page, coachboard_url: str):

@@ -31,11 +31,12 @@ def test_coach_lands_on_operational_home(page: Page, coachboard_url: str):
     dashboard = page.locator('.cb-home-dashboard')
     expect(dashboard).to_be_visible(timeout=15_000)
     expect(dashboard).to_contain_text('CoachBoard Home')
+    expect(dashboard).to_contain_text('Team briefing')
     expect(dashboard).to_contain_text('Next game')
     expect(dashboard).to_contain_text(re.compile(r'(?:Browser Bears|No upcoming game)'))
     expect(dashboard).to_contain_text('Needs Attention')
     expect(dashboard).to_contain_text('Next practice')
-    expect(dashboard).to_contain_text('Communication')
+    expect(dashboard).to_contain_text('Arm care')
     expect(dashboard).to_contain_text('Quick Actions')
 
     home_nav = page.locator('.coach-primary-nav [data-cb-section="overview"]')
@@ -73,15 +74,25 @@ def test_home_skips_ended_same_day_game_for_next_game(page: Page, coachboard_url
     page.route('**/api/games', lambda route: route.fulfill(json=[ended, upcoming]))
     page.route('**/api/game-day/91/readiness', lambda route: route.fulfill(json={
         'status': 'success',
+        'ready': False,
+        'missing': ['Game is complete.'],
         'readiness': {'status': 'COMPLETE', 'has_end_game': True},
     }))
     page.route('**/api/game-day/92/readiness', lambda route: route.fulfill(json={
         'status': 'success',
+        'ready': False,
+        'missing': [
+            'Finish the Inning 1 defense before starting.',
+            'Choose the starting pitcher for Inning 1.',
+        ],
         'readiness': {
             'status': 'PREP',
             'has_end_game': False,
             'lineup_ready': False,
             'defense_ready': False,
+            'defense_completed_innings': 0,
+            'regulation_innings': 6,
+            'pitching_plan_ready': False,
             'present_count': 9,
             'absent_count': 0,
             'blockers': ['Batting lineup is not set.'],
@@ -102,6 +113,10 @@ def test_home_skips_ended_same_day_game_for_next_game(page: Page, coachboard_url
     expect(next_card).not_to_contain_text('COMPLETE')
     expect(next_card).to_contain_text('6:00 PM')
     expect(next_card).not_to_contain_text('18:00')
+    expect(next_card).to_contain_text('Optional planning')
+    expect(next_card).to_contain_text('Batting order')
+    expect(next_card).to_contain_text('Optional before first pitch')
+    expect(next_card).to_contain_text('2 required items before first pitch')
 
 
 def test_home_is_first_mobile_destination(page: Page, coachboard_url: str):
@@ -118,12 +133,17 @@ def test_home_is_first_mobile_destination(page: Page, coachboard_url: str):
     expect(items.nth(1)).to_contain_text('Game Day')
     expect(items.nth(1)).to_have_attribute('href', '/game-day')
     expect(items.nth(2)).to_contain_text('Roster')
-    expect(items.nth(3)).to_contain_text('Practice')
+    expect(items.nth(3)).to_contain_text('Pitching')
+    expect(items.nth(3)).to_have_attribute('href', '/pitching')
     expect(items.nth(4)).to_contain_text('More')
 
     items.nth(4).click()
     expect(page).to_have_url(re.compile(r'#more$'))
-    expect(page.locator('#more .cb-mobile-more-card')).to_contain_text('Development')
+    more = page.locator('#more .cb-mobile-more-card')
+    expect(more).to_contain_text('Practice')
+    expect(more).to_contain_text('Development')
+    expect(more).not_to_contain_text('Schedule')
+    expect(more).not_to_contain_text('Pitching')
 
 
 def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page, coachboard_url: str):
@@ -131,22 +151,21 @@ def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page
     login(page, coachboard_url)
     expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
 
-    # Home, Roster, Practice and More are same-document workspaces. Game Day is
-    # intentionally a dedicated route so it can own its game-focused shell.
+    # Home, Roster and More are same-document workspaces. Game Day and Pitching
+    # are dedicated routes so each can own its focused page shell.
     page.wait_for_timeout(400)
     bottom_nav = page.locator('#cb-global-mobile-nav ul')
     same_page_items = bottom_nav.locator('a[href^="#"]')
-    expect(same_page_items).to_have_count(4)
-    for index in range(4):
+    expect(same_page_items).to_have_count(3)
+    for index in range(3):
         expect(same_page_items.nth(index)).not_to_have_attribute('data-bs-toggle', 'tab')
 
     expected = {
         'Home': '#overview',
         'Roster': '#roster',
-        'Practice': '#practice_plan',
         'More': '#more',
     }
-    for label in ('Roster', 'Practice', 'More', 'Home', 'Roster', 'More'):
+    for label in ('Roster', 'More', 'Home', 'Roster', 'More'):
         bottom_nav.get_by_text(label, exact=True).click()
         target = expected[label]
         expect(page.locator(target)).to_have_class(re.compile(r'\bactive\b'))
@@ -157,8 +176,8 @@ def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page
         else:
             expect(page).to_have_url(re.compile(re.escape(target) + r'$'))
 
-    page.locator('#more').get_by_text('Development', exact=True).click()
-    expect(page.locator('#player_development')).to_have_class(re.compile(r'\bactive\b'))
+    page.locator('#more').get_by_text('Practice', exact=True).click()
+    expect(page.locator('#practice_plan')).to_have_class(re.compile(r'\bactive\b'))
     expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
     expect(bottom_nav.locator('a.nav-link.active span')).to_have_text('More')
 
@@ -167,8 +186,20 @@ def test_mobile_workspace_navigation_stays_stable_under_repeated_taps(page: Page
     expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
     expect(page.locator('#mainTabContent > .tab-pane.active')).to_have_count(1)
 
+    # Pitching intentionally performs a real route transition rather than
+    # activating the retired #pitching dashboard pane.
+    bottom_nav.get_by_text('Pitching', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/pitching$'))
+    pitching_nav = page.locator('#cb-global-mobile-nav ul')
+    expect(pitching_nav.get_by_text('Pitching', exact=True)).to_have_class(re.compile(r'\bactive\b'))
+
+    pitching_nav.get_by_text('Home', exact=True).click()
+    expect(page.locator('.cb-home-dashboard')).to_be_visible(timeout=15_000)
+    expect(page.locator('#overview')).to_have_class(re.compile(r'\bactive\b'))
+
     # Game Day intentionally performs a real route transition rather than
     # activating the retired #games dashboard pane.
+    bottom_nav = page.locator('#cb-global-mobile-nav ul')
     bottom_nav.get_by_text('Game Day', exact=True).click()
     expect(page).to_have_url(re.compile(r'/game-day$'))
     expect(page.get_by_role('heading', name='Game Day')).to_be_visible()
@@ -192,7 +223,8 @@ def test_game_day_mobile_navigation_keeps_home(page: Page, coachboard_url: str):
     expect(items.nth(1)).to_contain_text('Game Day')
     expect(items.nth(1)).to_have_class(re.compile(r'\bactive\b'))
     expect(items.nth(2)).to_contain_text('Roster')
-    expect(items.nth(3)).to_contain_text('Practice')
+    expect(items.nth(3)).to_contain_text('Pitching')
+    expect(items.nth(3)).to_have_attribute('href', '/pitching')
     expect(items.nth(4)).to_contain_text('More')
 
     items.nth(0).click()

@@ -82,11 +82,27 @@ def test_mobile_bottom_nav_has_one_clearance_owner(page: Page, coachboard_url: s
     assert css_px(page, '#collaboration', 'paddingBottom') == 0
 
 
-def test_mobile_page_without_bottom_nav_does_not_reserve_nav_height(page: Page, coachboard_url: str):
+def test_pitching_mobile_page_uses_same_single_nav_clearance(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/pitching', wait_until='domcontentloaded')
 
-    expect(page.locator('#cb-global-mobile-nav')).to_have_count(0)
-    padding_bottom = css_px(page, 'main.container-fluid', 'paddingBottom')
-    assert padding_bottom <= 16
+    nav = page.locator('#cb-global-mobile-nav')
+    expect(nav).to_be_visible()
+    expect(nav.locator('[data-cb-mobile-section="pitching"]')).to_have_class(re.compile(r'\bactive\b'))
+
+    geometry = nav.evaluate(
+        """nav => {
+            const rect = nav.getBoundingClientRect();
+            const main = document.querySelector('main.container-fluid');
+            return {
+                navBottom: rect.bottom,
+                navHeight: rect.height,
+                viewportHeight: window.innerHeight,
+                mainPaddingBottom: parseFloat(getComputedStyle(main).paddingBottom) || 0,
+            };
+        }"""
+    )
+    assert abs(geometry['viewportHeight'] - geometry['navBottom']) <= 1
+    assert geometry['mainPaddingBottom'] >= geometry['navHeight']
+    assert geometry['mainPaddingBottom'] - geometry['navHeight'] <= 12

@@ -65,19 +65,6 @@
     return startTime ? `${dateText} · ${esc(formatClockTime(startTime))}` : dateText;
   }
 
-  function coachName() {
-    const desktop = document.getElementById('userMenuDesktop')?.textContent || '';
-    const match = desktop.replace(/\s+/g, ' ').match(/Welcome,\s*(.+?)!/i);
-    return match ? match[1].trim().split(/\s+/)[0] : '';
-  }
-
-  function greeting() {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
   function toneClass(ok, warning = false) {
     if (ok === true) return 'is-ready';
     if (warning) return 'is-warning';
@@ -119,23 +106,38 @@
     </a>`;
   }
 
+  function startContractState(model) {
+    const missing = Array.isArray(model.startReadiness?.missing) ? model.startReadiness.missing : [];
+    const has = pattern => missing.some(item => pattern.test(String(item || '')));
+    return {
+      ready: Boolean(model.startReadiness?.ready),
+      missing,
+      availabilityReady: !has(/at least one player available/i),
+      defenseReady: !has(/finish the inning 1 defense/i),
+      pitcherReady: !has(/starting pitcher/i),
+      rulesReady: !has(/pitching rules|tracking method/i),
+    };
+  }
+
   function nextGameCard(model) {
     const game = model.nextGame;
     if (!game) {
       return `<section class="cb-home-card cb-home-next-game">
         <div class="cb-home-card-head"><div><span class="cb-home-eyebrow">Next up</span><h2>No upcoming game</h2></div><i class="bi bi-calendar-plus cb-home-card-icon"></i></div>
         <p class="cb-home-muted">No upcoming games scheduled.</p>
-        <a class="btn btn-primary" href="/game-day">Open Game Day & Schedule</a>
+        <a class="btn btn-primary" href="/game-day">Open Game Day</a>
       </section>`;
     }
 
     const r = model.readiness || {};
     const rules = model.rules || {};
-    const rulesSelected = Boolean(rules.effective) && rules.source !== 'unselected';
-    const statusLabel = r.status || (game.is_live ? 'LIVE' : 'PREP');
+    const start = startContractState(model);
+    const statusLabel = game.is_live ? 'LIVE' : (start.ready ? 'READY' : 'PREP');
     const statusTone = statusLabel === 'READY' ? 'success' : statusLabel === 'LIVE' ? 'danger' : 'warning';
     const absent = Number(r.absent_count || 0);
     const present = Number(r.present_count || 0);
+    const laterPlanned = Math.max(0, Number(r.defense_completed_innings || 0) - 1);
+    const laterTotal = Math.max(0, Number(r.regulation_innings || r.defense_innings || 0) - 1);
 
     return `<section class="cb-home-card cb-home-next-game">
       <div class="cb-home-card-head">
@@ -149,30 +151,46 @@
       </div>
 
       <div class="cb-home-readiness">
-        ${statusItem(r.lineup_ready ? 'check-circle-fill' : 'exclamation-circle', 'Batting lineup', r.lineup_ready ? `${r.lineup_count || 0} hitters ready` : 'Needs attention before game day', r.lineup_ready, !r.lineup_ready)}
-        ${statusItem(r.defense_ready ? 'check-circle-fill' : 'exclamation-circle', 'Defense', r.defense_ready ? `${r.defense_completed_innings || r.defense_innings || 0} innings planned` : 'Rotation is not complete', r.defense_ready, !r.defense_ready)}
-        ${statusItem('people', 'Availability', r.present_count == null ? 'Open game to review availability' : `${present} available${absent ? ` · ${absent} out` : ''}`, true)}
-        ${statusItem(rulesSelected ? 'check-circle-fill' : 'exclamation-circle', 'Competition rules', rulesSelected ? `${esc(rules.effective)}${rules.source === 'game' ? ' · game override' : ' · team default'}` : 'Select tournament / league rules', rulesSelected, !rulesSelected)}
+        ${statusItem(start.availabilityReady ? 'check-circle-fill' : 'exclamation-circle', 'Availability', `${present} available${absent ? ` · ${absent} out` : ''}`, start.availabilityReady, !start.availabilityReady)}
+        ${statusItem(start.defenseReady ? 'check-circle-fill' : 'exclamation-circle', 'Inning 1 defense', start.defenseReady ? 'First-pitch defense ready' : 'Finish the Inning 1 defense', start.defenseReady, !start.defenseReady)}
+        ${statusItem(start.pitcherReady ? 'check-circle-fill' : 'exclamation-circle', 'Starting pitcher', start.pitcherReady ? 'Starting pitcher set' : 'Choose the Inning 1 pitcher', start.pitcherReady, !start.pitcherReady)}
+        ${statusItem(start.rulesReady ? 'check-circle-fill' : 'exclamation-circle', 'Pitch rules', start.rulesReady ? `${esc(rules.effective || 'Selected')}${rules.source === 'game' ? ' · game override' : rules.source === 'team' ? ' · team default' : ''}` : 'Select rules / tracking method', start.rulesReady, !start.rulesReady)}
       </div>
 
-      ${Array.isArray(r.blockers) && r.blockers.length ? `<div class="cb-home-prep-note"><strong>${r.blockers.length} preparation item${r.blockers.length === 1 ? '' : 's'} remaining</strong><span>${esc(r.blockers[0])}</span></div>` : '<div class="cb-home-ready-note"><i class="bi bi-check2-circle"></i><span>Pregame setup complete.</span></div>'}
+      <div class="mt-3">
+        <span class="cb-home-eyebrow">Optional planning</span>
+        <div class="cb-home-readiness mt-2">
+          ${statusItem(r.lineup_ready ? 'check-circle-fill' : 'card-list', 'Batting order', r.lineup_ready ? `${r.lineup_count || 0} hitters set` : 'Optional before first pitch', r.lineup_ready, false)}
+          ${statusItem(r.defense_ready ? 'check-circle-fill' : 'diagram-3', 'Later innings', r.defense_ready ? 'Full-game defense planned' : `${laterPlanned}/${laterTotal} later innings planned · optional`, r.defense_ready, false)}
+          ${statusItem(r.pitching_plan_ready ? 'check-circle-fill' : 'bullseye', 'Pitching plan', r.pitching_plan_ready ? `${r.pitching_plan_count || 0} pitcher plan${Number(r.pitching_plan_count || 0) === 1 ? '' : 's'} saved` : 'Optional coaching plan', r.pitching_plan_ready, false)}
+        </div>
+      </div>
+
+      ${start.missing.length ? `<div class="cb-home-prep-note"><strong>${start.missing.length} required item${start.missing.length === 1 ? '' : 's'} before first pitch</strong><span>${esc(start.missing[0])}</span></div>` : '<div class="cb-home-ready-note"><i class="bi bi-check2-circle"></i><span>Ready for first pitch. Optional planning can be finished later.</span></div>'}
 
       <div class="cb-home-card-actions">
-        <a class="btn btn-primary" href="/game/${game.id}">${game.is_live ? 'Resume Live Game' : 'Manage Game'}</a>
-        <a class="btn btn-outline-secondary" href="/game-day">Schedule</a>
+        <a class="btn btn-primary" href="/game/${game.id}">${game.is_live ? 'Resume Live Game' : 'Open Game'}</a>
+        <a class="cb-home-text-link" href="/game-day">All games <i class="bi bi-arrow-right"></i></a>
       </div>
     </section>`;
   }
 
   function attentionCard(model) {
     const rows = [];
+    const start = startContractState(model);
     const r = model.readiness || {};
-    const rules = model.rules || {};
 
     if (model.nextGame) {
-      if (!r.lineup_ready) rows.push(attentionRow('card-list', 'Batting lineup', 'Build or finish the lineup for the next game.', `/game/${model.nextGame.id}`));
-      if (!r.defense_ready) rows.push(attentionRow('diagram-3', 'Defensive plan', 'Complete the starting defense / rotation.', `/game/${model.nextGame.id}`));
-      if (!rules.effective || rules.source === 'unselected') rows.push(attentionRow('trophy', 'Competition rules', 'Choose the rules that apply to this event.', `/game/${model.nextGame.id}`));
+      start.missing.forEach(message => {
+        let icon = 'exclamation-circle';
+        let title = 'Game setup';
+        if (/available/i.test(message)) { icon = 'people'; title = 'Availability'; }
+        else if (/defense/i.test(message)) { icon = 'diagram-3'; title = 'Inning 1 defense'; }
+        else if (/pitcher/i.test(message)) { icon = 'bullseye'; title = 'Starting pitcher'; }
+        else if (/rules|tracking/i.test(message)) { icon = 'trophy'; title = 'Pitch rules'; }
+        rows.push(attentionRow(icon, title, message, `/game/${model.nextGame.id}`));
+      });
+
       (r.pitching_alerts || []).slice(0, 2).forEach(item => {
         rows.push(attentionRow('exclamation-triangle', item.name, `${item.status}${item.detail ? ` · ${item.detail}` : ''}`, '/pitching'));
       });
@@ -188,7 +206,7 @@
 
     const body = rows.length
       ? rows.slice(0, 6).join('')
-      : `<div class="cb-home-all-clear"><i class="bi bi-check2-circle"></i><strong>No items need attention</strong></div>`;
+      : `<div class="cb-home-all-clear"><i class="bi bi-check2-circle"></i><strong>No required items need attention</strong></div>`;
 
     return `<section class="cb-home-card cb-home-attention">
       <div class="cb-home-card-head compact"><div><span class="cb-home-eyebrow">Coach checklist</span><h3>Needs Attention</h3></div><i class="bi bi-lightning-charge cb-home-card-icon"></i></div>
@@ -252,13 +270,12 @@
     if (!container) return;
 
     rendering = true;
-    const firstName = coachName();
     const role = model.session?.session?.role || '';
     const competitionDefault = model.pitchingSettings?.settings?.competition_default_rule || '';
 
     container.innerHTML = `<div class="cb-home-dashboard">
       <header class="cb-home-welcome">
-        <div><span class="cb-home-eyebrow">CoachBoard Home</span><h1>${greeting()}${firstName ? `, ${esc(firstName)}` : ''}</h1><p>Next game, practice, pitching, and team status.</p></div>
+        <div><span class="cb-home-eyebrow">CoachBoard Home</span><h1>Team briefing</h1><p>Next game, arms, practice, and anything that needs attention.</p></div>
         <div class="cb-home-context"><span>${esc(role || 'Coach')}</span>${competitionDefault ? `<small>Default rules: ${esc(competitionDefault)}</small>` : '<small>Competition rules: choose by game/event</small>'}</div>
       </header>
 
@@ -279,9 +296,9 @@
         <div class="cb-home-section-head"><div><span class="cb-home-eyebrow">Shortcuts</span><h3>Quick Actions</h3></div></div>
         <div class="cb-home-quick-grid">
           ${quickLink('/game-day', 'diamond', 'Game Day', 'Plan or open the next game')}
-          ${quickLink('/#practice_plan', 'clipboard-check', 'Practice', 'Build the next practice plan')}
           ${quickLink('/pitching', 'bullseye', 'Pitching', 'Eligibility and arm care')}
           ${quickLink('/#roster', 'people', 'Roster', 'Player profiles and roles')}
+          ${quickLink('/#practice_plan', 'clipboard-check', 'Practice', 'Build the next practice plan')}
         </div>
       </section>
     </div>`;
@@ -320,19 +337,8 @@
         <li class="nav-item flex-fill"><a class="nav-link text-center active" data-bs-toggle="tab" role="tab" href="#overview"><i class="bi bi-house-door d-block"></i><span>Home</span></a></li>
         <li class="nav-item flex-fill"><a class="nav-link text-center" href="/game-day"><i class="bi bi-diamond d-block"></i><span>Game Day</span></a></li>
         <li class="nav-item flex-fill"><a class="nav-link text-center" data-bs-toggle="tab" role="tab" href="#roster"><i class="bi bi-people d-block"></i><span>Roster</span></a></li>
-        <li class="nav-item flex-fill"><a class="nav-link text-center" data-bs-toggle="tab" role="tab" href="#practice_plan"><i class="bi bi-clipboard-check d-block"></i><span>Practice</span></a></li>
+        <li class="nav-item flex-fill"><a class="nav-link text-center" href="/pitching"><i class="bi bi-bullseye d-block"></i><span>Pitching</span></a></li>
         <li class="nav-item flex-fill"><a class="nav-link text-center" data-bs-toggle="tab" role="tab" href="#more"><i class="bi bi-three-dots d-block"></i><span>More</span></a></li>`;
-
-      const moreCard = document.querySelector('#more .cb-mobile-more-card');
-      if (moreCard && !moreCard.querySelector('a[href="#player_development"]')) {
-        const link = document.createElement('a');
-        link.className = 'cb-mobile-more-link';
-        link.href = '#player_development';
-        link.setAttribute('data-bs-toggle', 'tab');
-        link.setAttribute('role', 'tab');
-        link.innerHTML = '<span class="cb-mobile-more-icon"><i class="bi bi-graph-up-arrow"></i></span><span class="cb-mobile-more-copy"><strong>Development</strong><small>Player priorities and progress.</small></span><span class="cb-mobile-more-arrow"><i class="bi bi-chevron-right"></i></span>';
-        moreCard.prepend(link);
-      }
     };
 
     update();
@@ -364,6 +370,7 @@
     const endedStatuses = new Set(['COMPLETE', 'GC STATS PENDING', 'NEEDS POSTGAME', 'PAST']);
     let nextGame = null;
     let readiness = {};
+    let startReadiness = {ready: false, missing: []};
     let rules = {};
 
     // Home is for the next coaching decision, not the last game's report. Check
@@ -378,6 +385,10 @@
 
       nextGame = candidate;
       readiness = candidateReadiness;
+      startReadiness = {
+        ready: Boolean(readyPayload?.ready),
+        missing: Array.isArray(readyPayload?.missing) ? readyPayload.missing : [],
+      };
       rules = await getJson(`/api/game-day/${candidate.id}/pitching-rules`, {}) || {};
       break;
     }
@@ -408,6 +419,7 @@
       nextPractice,
       liveGame,
       readiness,
+      startReadiness,
       rules,
       pitcherCount,
       incompleteProfiles,
