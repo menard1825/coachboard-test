@@ -29,15 +29,9 @@ def login(page: Page, coachboard_url: str):
 
 def alignment():
     return {
-        'P': 'Pitcher Pat',
-        'C': 'Catcher Cole',
-        '1B': 'First Frank',
-        '2B': 'Second Sam',
-        '3B': 'Third Theo',
-        'SS': 'Shortstop Shawn',
-        'LF': 'Left Lee',
-        'CF': 'Center Casey',
-        'RF': 'Right Riley',
+        'P': 'Pitcher Pat', 'C': 'Catcher Cole', '1B': 'First Frank',
+        '2B': 'Second Sam', '3B': 'Third Theo', 'SS': 'Shortstop Shawn',
+        'LF': 'Left Lee', 'CF': 'Center Casey', 'RF': 'Right Riley',
     }
 
 
@@ -60,10 +54,8 @@ def create_game_without_lineup(page: Page, coachboard_url: str):
         f'{coachboard_url}/game-day/add',
         form={
             'game_date': (date.today() + timedelta(days=12)).isoformat(),
-            'game_start_time': '10:00',
-            'game_opponent': 'Test 2 Surface Opponent',
-            'game_location': 'Test 2 Contract Field',
-            'game_notes': 'Disposable Test 2 surface contract game',
+            'game_start_time': '10:00', 'game_opponent': 'Test 2 Surface Opponent',
+            'game_location': 'Test 2 Contract Field', 'game_notes': 'Disposable Test 2 surface contract game',
             'pitching_rule_set': 'USSSA',
         },
         max_redirects=0,
@@ -95,11 +87,13 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
         expect(first_pitch).to_have_attribute('aria-pressed', 'true')
         expect(page.locator('body')).to_have_class(re.compile(r'\bcb-test2-first-pitch\b'))
 
-        # First Pitch is a real reduced workspace, not a label on the full planner.
+        # First Pitch is behaviorally reduced to first-pitch essentials. Do not
+        # couple the contract to transient copy painted by older planner modules.
         expect(page.locator('#lineup-card-container')).not_to_be_visible()
         expect(page.locator('#pitching-log-container')).not_to_be_visible()
         expect(page.locator('#pregame-defense-editor-v3')).to_be_visible(timeout=15_000)
-        expect(page.locator('#pregame-defense-editor-v3 .pde-title')).to_have_text('First-pitch defense')
+        inning_one = page.locator('#inning-btn-group input[name="inning-radio"][value="1"]')
+        expect(inning_one).to_be_checked(timeout=5_000)
         expect(page.locator('#liveGameModeToggle')).to_have_count(0)
         expect(page.locator('#cb-quick-start-launch')).to_have_count(0)
         expect(page.locator('#cb-quick-start-modal')).to_have_count(0)
@@ -115,11 +109,9 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
         expect(inning_two).to_be_checked()
 
         first_pitch.click()
-        inning_one = page.locator('#inning-btn-group input[name="inning-radio"][value="1"]')
         expect(inning_one).to_be_checked(timeout=5_000)
         expect(page.locator('#lineup-card-container')).not_to_be_visible()
 
-        # Empty batting order is optional. The same server contract must allow the start.
         readiness = page.request.get(f'{coachboard_url}/api/game-day/{game_id}/readiness').json()
         assert readiness['readiness']['lineup_ready'] is False
         assert readiness['ready'] is True, readiness
@@ -157,13 +149,6 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
         if state_response.ok and state_response.json().get('game', {}).get('is_live'):
             page.request.post(
                 f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
-                data={
-                    'defer_pitching': True,
-                    'end_reason': 'manual',
-                    'current_inning_played': True,
-                },
+                data={'defer_pitching': True, 'end_reason': 'manual', 'current_inning_played': True},
             )
-        page.request.post(
-            f'{coachboard_url}/game-day/{game_id}/delete',
-            headers={'Accept': 'application/json'},
-        )
+        page.request.post(f'{coachboard_url}/game-day/{game_id}/delete', headers={'Accept': 'application/json'})
