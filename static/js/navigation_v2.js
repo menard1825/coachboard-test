@@ -71,9 +71,6 @@
     observer = new MutationObserver(finish);
     observer.observe(document.getElementById('mainTabContent') || main, {subtree: true, childList: true});
 
-    // Never leave the workspace hidden if a future data/render change fails to
-    // produce the expected roster markup. The normal page/error state remains
-    // the final fallback after this guard interval.
     window.setTimeout(() => {
       if (!root.classList.contains('cb-desktop-workspace-boot')) return;
       observer?.disconnect();
@@ -97,8 +94,6 @@
   function loadScript(src, key) {
     if (document.querySelector(`script[data-coach-helper="${key}"]`)) return;
     const script = document.createElement('script');
-    // Dynamically inserted scripts are async by default. Turning async off keeps
-    // dependent helpers deterministic.
     script.async = false;
     script.src = versionedHelperSrc(src);
     script.dataset.coachHelper = key;
@@ -107,16 +102,11 @@
 
   function normalizeHomeEntry() {
     if (window.location.pathname !== '/' || window.location.hash) return;
-    // Home is now the default primary workspace. Set the hash before the legacy
-    // tab controller initializes so it does not briefly activate Roster first.
     if (window.history?.replaceState) window.history.replaceState(null, '', '#overview');
     else window.location.hash = '#overview';
   }
 
   function redirectLegacySchedule() {
-    // Game Day now has one dedicated route on every screen size. Old #games
-    // bookmarks and links are redirected so phones/tablets cannot land on the
-    // retired dashboard Games tab while desktop shows the newer Game Day page.
     if (
       window.location.pathname === '/' &&
       window.location.hash.toLowerCase() === '#games'
@@ -176,8 +166,8 @@
     const list = drawer.querySelector('.list-group');
     if (!list) return;
 
-    // The mobile bottom bar already owns Home / Game Day / Roster / Practice /
-    // More. Remove the old second copy from the account drawer.
+    // Primary navigation owns the frequently used coaching workspaces. Remove
+    // any legacy second copy from the account drawer.
     const coachHeading = [...list.querySelectorAll('h6')]
       .find((heading) => heading.textContent.trim() === 'CoachBoard');
     if (coachHeading) {
@@ -205,8 +195,6 @@
       }
     });
 
-    // Add a small context line so the drawer reads as account/team controls,
-    // not as another full app menu.
     const context = document.createElement('div');
     context.className = 'cb-account-context';
     context.innerHTML = '<i class="bi bi-info-circle me-1"></i>Team, account, and admin controls';
@@ -234,14 +222,14 @@
           <p>Planning, records, and coaching tools that do not need to live in the bottom bar.</p>
         </div>
         <div class="cb-mobile-more-card">
+          ${moreLink('#practice_plan', 'clipboard-check', 'Practice', 'Build, reuse, and run practice plans.')}
           ${moreLink('#player_development', 'graph-up-arrow', 'Development', 'Player priorities, progress, and coaching focus.')}
-          ${moreLink('/pitching', 'bullseye', 'Pitching', 'Eligibility, workload, targets, and pitching history.', false)}
-          ${moreLink('/game-day', 'calendar3', 'Schedule', 'Add games and review the full Game Day dashboard.', false)}
           ${moreLink('#lineups', 'card-list', 'Lineup Templates', 'Reusable batting orders for Game Day.')}
-          ${moreLink('#rotations', 'diagram-3', 'Defensive Templates', 'Starting Defense and full-game rotations.')}
+          ${moreLink('#rotations', 'diagram-3', 'Defensive Templates', 'First-pitch defense and full-game rotations.')}
           ${moreLink('#stats', 'bar-chart', 'Stats', 'Actual season usage and playing history.')}
           ${moreLink('#scouting_list', 'binoculars', 'Scouting', 'Track prospects and roster possibilities.')}
           ${moreLink('#collaboration', 'chat-left-text', 'Coach Notes', 'Shared team and player notes.')}
+          ${moreLink('#signs', 'hand-index-thumb', 'Sign Set', 'Keep the team sign set easy to find.')}
         </div>
       </div>`;
   }
@@ -266,11 +254,11 @@
   function normalizeSharedMobileNav() {
     const nav = sharedMobileNav();
     if (!nav) return;
-    if (window.location.pathname === '/') {
-      const gameDay = nav.querySelector('[data-cb-mobile-section="game-day"]');
-      if (gameDay) gameDay.setAttribute('href', '/game-day');
-    }
-    if (window.location.pathname === '/game-day' || window.location.pathname === '/game-day/') {
+    const gameDay = nav.querySelector('[data-cb-mobile-section="game-day"]');
+    if (gameDay) gameDay.setAttribute('href', '/game-day');
+    const pitching = nav.querySelector('[data-cb-mobile-section="pitching"]');
+    if (pitching) pitching.setAttribute('href', '/pitching');
+    if (window.location.pathname !== '/') {
       const home = nav.querySelector('[data-cb-mobile-section="overview"]');
       if (home) home.setAttribute('href', '/');
     }
@@ -296,10 +284,6 @@
       enforce();
     };
 
-    // The legacy Home tab controller clears `.active` from every `.nav-tabs`
-    // link while activating content and does not emit Bootstrap's shown.bs.tab.
-    // Treat same-document primary-nav taps as the source of truth so the
-    // selected item stays visually active without relying on that legacy event.
     nav.addEventListener('click', (event) => {
       const link = event.target.closest('[data-cb-mobile-section]');
       if (!link || !nav.contains(link)) return;
@@ -329,31 +313,27 @@
       }
     });
 
-    if (window.location.pathname === '/' && ['#overview', '#roster', '#practice_plan', '#more'].includes(window.location.hash || '#overview')) {
+    if (window.location.pathname === '/' && ['#overview', '#roster', '#more'].includes(window.location.hash || '#overview')) {
       window.requestAnimationFrame(() => window.requestAnimationFrame(reset));
     }
   }
 
   function installHomeBottomNav() {
-    // The shared server-rendered bar is stable from first paint and owns its
-    // markup. Older page-specific bars are only a fallback for legacy pages.
     if (sharedMobileNav()) return;
     const nav = document.querySelector('nav.bottom-nav-fixed ul');
     if (!nav) return;
     const target = window.location.hash || '#overview';
-    const moreActive = !['#overview', '#roster', '#practice_plan'].includes(target);
+    const moreActive = !['#overview', '#roster'].includes(target);
     nav.innerHTML = [
       mobileItem('#overview', 'house-door', 'Home', target === '#overview', true),
       mobileItem('/game-day', 'diamond', 'Game Day'),
       mobileItem('#roster', 'people', 'Roster', target === '#roster', true),
-      mobileItem('#practice_plan', 'clipboard-check', 'Practice', target === '#practice_plan', true),
+      mobileItem('/pitching', 'bullseye', 'Pitching'),
       mobileItem('#more', 'three-dots', 'More', moreActive, true),
     ].join('');
   }
 
   function installGameDayBottomNav() {
-    // Do not replace the shared nav after paint; only retain this for legacy
-    // templates that have not moved to the shared shell yet.
     if (sharedMobileNav()) return;
     const nav = document.querySelector('nav.bottom-nav-fixed ul');
     if (!nav) return;
@@ -361,7 +341,7 @@
       mobileItem('/', 'house-door', 'Home'),
       mobileItem('/game-day', 'diamond', 'Game Day', true),
       mobileItem('/#roster', 'people', 'Roster'),
-      mobileItem('/#practice_plan', 'clipboard-check', 'Practice'),
+      mobileItem('/pitching', 'bullseye', 'Pitching'),
       mobileItem('/#more', 'three-dots', 'More'),
     ].join('');
   }
