@@ -44,8 +44,6 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     expect(cards.first).to_contain_text('Arm care')
     expect(cards.first.locator('.pitch-arm-care-slot')).not_to_contain_text('Loading', timeout=15_000)
 
-    # Rules and arm care share one compact row on phones rather than consuming
-    # two full-width cards before the coach reaches pitcher availability.
     rule_items = rule_strip.locator('.cb-pitch-rule-item')
     expect(rule_items).to_have_count(2)
     tops = rule_items.evaluate_all('items => items.map(item => Math.round(item.getBoundingClientRect().top))')
@@ -53,19 +51,13 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     expect(rule_items.first.locator('small')).to_be_hidden()
     expect(page.locator('#pitcherAvailabilityCard > .card-header h5')).to_have_text('Who can pitch today?')
 
-    # The current dashboard is rendered as cards from first paint. The old
-    # table->JavaScript-card replacement and injected duplicate summary are gone.
     status_card = page.locator('#pitcherAvailabilityCard')
     expect(status_card.locator('table')).to_have_count(0)
     expect(page.locator('.cb-pitch-source')).to_have_count(0)
     expect(page.locator('#pitchingDualRuleSummary')).to_have_count(0)
-
-    # The seeded test team intentionally chooses competition rules per game.
-    # The generic Pitching dashboard must not present that as official eligibility.
     expect(status_card).to_contain_text('Competition Rules Needed')
     expect(status_card).not_to_contain_text('Eligible Today\n1')
 
-    # Mobile uses short, high-signal labels and puts attention groups before ready pitchers.
     summary_items = page.locator('.cb-pitch-summary-item[data-cb-pitch-filter]')
     expect(summary_items).to_have_count(3)
     expect(summary_items.nth(0)).to_have_attribute('data-cb-pitch-filter', 'unavailable')
@@ -77,8 +69,6 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     expect(cards.first).to_have_attribute('data-availability-group', 'review')
     expect(cards.first.locator('.cb-pitch-status')).to_have_text('CHECK')
 
-    # Mobile starts scan-first: official decision / next date and arm care stay
-    # visible, while usage, workload, and target detail are collapsed.
     first_card = cards.first
     expect(first_card).to_have_attribute('data-mobile-expanded', 'false')
     details_button = first_card.locator('.cb-pitcher-details-toggle')
@@ -87,7 +77,6 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     expect(details_button).to_contain_text('More details')
     expect(first_card.locator('.cb-pitch-metrics')).to_be_hidden()
 
-    # The top control can always open and close details.
     details_button.click()
     expect(details_button).to_have_attribute('aria-expanded', 'true')
     expect(first_card.locator('.cb-pitch-metrics')).to_be_visible()
@@ -96,8 +85,6 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     expect(details_button).to_have_attribute('aria-expanded', 'false')
     expect(first_card.locator('.cb-pitch-metrics')).to_be_hidden()
 
-    # There is also a collapse control at the bottom so a coach never has to
-    # scroll back to the top of a long expanded pitcher card.
     details_button.click()
     bottom_collapse = first_card.locator('.cb-pitcher-collapse-bottom')
     expect(bottom_collapse).to_be_visible()
@@ -105,8 +92,6 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     expect(first_card).to_have_attribute('data-mobile-expanded', 'false')
     expect(first_card.locator('.cb-pitch-metrics')).to_be_hidden()
 
-    # Availability summary cards are controls, not dead statistics. The seeded
-    # team has no default competition rule, so every pitcher belongs to CHECK.
     review_filter = summary_items.filter(has_text='CHECK')
     expect(review_filter).to_have_attribute('role', 'button')
     assert review_filter.get_attribute('aria-disabled') is None
@@ -127,8 +112,6 @@ def test_pitching_dashboard_is_stable_and_fast_to_scan_on_mobile(page: Page, coa
     assert bounds
     assert all(b['left'] >= -1 and b['right'] <= b['viewport'] + 1 for b in bounds)
 
-    # Secondary work stays one tap away instead of adding several phone screens
-    # below availability. Desktop remains expanded by CSS / responsive mode.
     targets = page.locator('#pitchTargetsCard')
     record = page.locator('#newPitchingOutingForm').locator('xpath=ancestor::div[contains(@class,"cb-pitch-section-card")][1]')
     history = page.locator('#pitchHistoryCard')
@@ -183,6 +166,10 @@ def test_game_planning_uses_same_pitcher_decision_cards(page: Page, coachboard_u
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/game/1', wait_until='domcontentloaded')
+
+    modes = page.locator('#cb-test2-pregame-modes')
+    expect(modes).to_be_visible(timeout=15_000)
+    modes.get_by_role('button', name='Full Plan').click()
 
     availability = page.locator('#pitcher-availability-card')
     expect(availability).to_be_visible(timeout=15_000)
