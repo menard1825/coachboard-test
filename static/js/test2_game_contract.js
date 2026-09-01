@@ -18,6 +18,9 @@
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[char]));
   const sleep = ms => new Promise(resolve => window.setTimeout(resolve, ms));
+  const setText = (element, value) => {
+    if (element && element.textContent !== value) element.textContent = value;
+  };
 
   function installStyles() {
     if ($('cb-test2-contract-styles')) return;
@@ -33,11 +36,10 @@
       #liveDefensiveChangeBtn,#liveSetDefenseBtnCoach,#live-bulk-defense-coach,[data-cb-full-defense],#live-defense-v2,#live-defense-destination-v2,#liveDefensiveSwapModal,#cb-live-field-editor{display:none!important}
       body.cb-test2-first-pitch #lineup-card-container,
       body.cb-test2-first-pitch #pitching-log-container,
-      body.cb-test2-first-pitch #pitching-board-v2{display:none!important}
+      body.cb-test2-first-pitch #pitching-board-v2,
+      body.cb-test2-first-pitch #coach-game-readiness-v2{display:none!important}
       body.cb-test2-first-pitch #rotation-card-container>.card>.card-header{display:none!important}
       body.cb-test2-first-pitch #rotation-board>*:not(#pregame-defense-editor-v3){display:none!important}
-      body.cb-test2-first-pitch #coach-game-readiness-v2 [data-cgr-action="lineup"]{display:none!important}
-      body.cb-test2-first-pitch #coach-game-readiness-v2 .cgr-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
       #${HUDDLE_ID} .modal-content{border:0;border-radius:16px;overflow:hidden}
       #${HUDDLE_ID} .modal-header{padding:12px 14px;border-bottom:1px solid #e7ebef}
       #${HUDDLE_ID} .cb-t2-huddle-kicker{font-size:.59rem;text-transform:uppercase;letter-spacing:.09em;font-weight:900;color:#667085}
@@ -59,15 +61,23 @@
       #${HUDDLE_ID} .cb-t2-start .btn{width:100%;min-height:50px;border-radius:10px;font-weight:900}
       @media(max-width:575.98px){
         #${MODE_ID}{display:grid;grid-template-columns:1fr;padding:8px 9px}#${MODE_ID} .cb-t2-mode-buttons{width:100%}#${MODE_ID} .cb-t2-mode-buttons .btn{flex:1}
-        body.cb-test2-first-pitch #coach-game-readiness-v2 .cgr-grid{grid-template-columns:1fr 1fr}
         #${HUDDLE_ID} .modal-dialog{margin:.35rem}#${HUDDLE_ID} .cb-t2-huddle-actions.two{grid-template-columns:1fr}
       }
     `;
     document.head.appendChild(style);
   }
 
+  function ensureClockControls() {
+    if ([...document.scripts].some(script => /\/live_game_clock_controls\.js(?:\?|$)/.test(script.src || ''))) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/live_game_clock_controls.js?v=test2';
+    script.dataset.cbTest2ClockControls = 'true';
+    document.head.appendChild(script);
+  }
+
   function isLive() {
-    return document.body.classList.contains('cb-dugout') || !$('live-game-overlay')?.classList.contains('d-none');
+    const overlay = $('live-game-overlay');
+    return document.body.classList.contains('cb-dugout') || Boolean(overlay && !overlay.classList.contains('d-none'));
   }
 
   function removeRetiredLiveControls() {
@@ -91,12 +101,9 @@
     if (mode !== 'first-pitch' || isLive()) return;
     const panel = $('pregame-defense-editor-v3');
     if (!panel) return;
-    const kicker = panel.querySelector('.pde-kicker');
-    const title = panel.querySelector('.pde-title');
-    const help = panel.querySelector('.pde-help');
-    if (kicker) kicker.textContent = 'First Pitch';
-    if (title) title.textContent = 'First-pitch defense';
-    if (help) help.textContent = 'Set only the defense needed to start the game. Full Plan is available when you want later innings.';
+    setText(panel.querySelector('.pde-kicker'), 'First Pitch');
+    setText(panel.querySelector('.pde-title'), 'First-pitch defense');
+    setText(panel.querySelector('.pde-help'), 'Set only the defense needed to start the game. Full Plan is available when you want later innings.');
   }
 
   function updateModeButtons() {
@@ -107,10 +114,9 @@
       button.classList.toggle('active', active);
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
-    const help = bar.querySelector('.cb-t2-mode-help');
-    if (help) help.textContent = mode === 'first-pitch'
+    setText(bar.querySelector('.cb-t2-mode-help'), mode === 'first-pitch'
       ? 'Only first-pitch essentials are in view. Batting order and later innings stay optional.'
-      : 'Plan batting order, later defensive innings, pitching, and the rest of the game.';
+      : 'Plan batting order, later defensive innings, pitching, and the rest of the game.');
   }
 
   function setMode(next) {
@@ -153,12 +159,9 @@
   function polishQuickField() {
     const quick = $('cbQuickDefense');
     if (!quick) return;
-    const kicker = quick.querySelector('.cb-qd-kicker');
-    const title = quick.querySelector('.cb-qd-title');
-    const help = quick.querySelector('.cb-qd-help');
-    if (kicker) kicker.textContent = 'Live Defense';
-    if (title) title.textContent = 'Quick Field';
-    if (help) help.textContent = 'Drag or tap players right on the field and bench. Pitcher changes stay in Change Pitcher.';
+    setText(quick.querySelector('.cb-qd-kicker'), 'Live Defense');
+    setText(quick.querySelector('.cb-qd-title'), 'Quick Field');
+    setText(quick.querySelector('.cb-qd-help'), 'Drag or tap players right on the field and bench. Pitcher changes stay in Change Pitcher.');
   }
 
   function applyContract() {
@@ -262,6 +265,19 @@
     throw new Error('Quick Field is still saving. Try End Inning again after Saved ✓ appears.');
   }
 
+  async function waitForLiveWritesToSettle() {
+    await waitForQuickFieldSave();
+    let previous = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const state = await getJson(`/api/live-game/${gameId}/state`);
+      const signature = `${state.current_inning || ''}:${sequenceFromState(state)}`;
+      if (signature === previous) return state;
+      previous = signature;
+      await sleep(120);
+    }
+    return getJson(`/api/live-game/${gameId}/state`);
+  }
+
   function ensureHuddle() {
     let modal = $(HUDDLE_ID);
     if (modal) return modal;
@@ -293,7 +309,7 @@
   function showHuddleError(message) {
     const box = ensureHuddle().querySelector('[data-cb-t2-huddle-error]');
     if (!box) return;
-    box.textContent = message || '';
+    setText(box, message || '');
     box.classList.toggle('show', Boolean(message));
   }
 
@@ -305,7 +321,7 @@
     const body = modal.querySelector('[data-cb-t2-huddle-body]');
     const subtitle = modal.querySelector('.cb-t2-huddle-sub');
     const start = modal.querySelector('[data-cb-t2-start-inning]');
-    if (subtitle) subtitle.textContent = `Inning ${current} is over. Check the next defense before sending the team out.`;
+    setText(subtitle, `Inning ${current} is over. Check the next defense before sending the team out.`);
 
     const target = confirmedAlignment(prep);
     const roster = prep?.roster || [];
@@ -317,7 +333,7 @@
         : '<div class="cb-t2-huddle-status ready"><strong>Same defense</strong><span>The same players and positions are going back out.</span></div>';
       body.innerHTML = `<div class="cb-t2-huddle-status ready"><strong>Inning ${esc(next)} defense is ready</strong><span>${moves.length ? 'Make these moves, then start the inning.' : 'No defensive moves are needed.'}</span></div>${moveMarkup}<div class="cb-t2-huddle-actions"><button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Review Next Inning plan</button></div>`;
       start.disabled = false;
-      start.textContent = `Start Inning ${next}`;
+      setText(start, `Start Inning ${next}`);
       showHuddleError('');
       return;
     }
@@ -330,7 +346,7 @@
         <button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Review Next Inning plan</button>
       </div>`;
     start.disabled = true;
-    start.textContent = `Start Inning ${next}`;
+    setText(start, `Start Inning ${next}`);
     showHuddleError('');
   }
 
@@ -383,7 +399,7 @@
     const button = modal.querySelector('[data-cb-t2-start-inning]');
     if (button) button.disabled = true;
     try {
-      await waitForQuickFieldSave();
+      await waitForLiveWritesToSettle();
       const [prep, liveState] = await Promise.all([
         getJson(`/api/live-game/${gameId}/next-inning-prep`),
         getJson(`/api/live-game/${gameId}/state`),
@@ -420,7 +436,7 @@
     modal.querySelector('[data-cb-t2-start-inning]').disabled = true;
     window.bootstrap?.Modal?.getOrCreateInstance(modal)?.show();
     try {
-      await waitForQuickFieldSave();
+      await waitForLiveWritesToSettle();
       await refreshHuddle();
     } catch (error) {
       showHuddleError(error.message || 'Unable to prepare the next inning.');
@@ -446,6 +462,7 @@
 
   function start() {
     installStyles();
+    ensureClockControls();
     applyContract();
     const observer = new MutationObserver(queueContract);
     observer.observe(document.body, {childList:true, subtree:true});
