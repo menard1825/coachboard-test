@@ -114,7 +114,7 @@ def test_first_pitch_launches_quick_field_command_center(page: Page, coachboard_
 
         quick = page.locator('#cbQuickDefense')
         expect(quick).to_be_visible(timeout=15_000)
-        expect(quick).to_contain_text('Quick Field')
+        expect(quick.locator('.cb-qd-title')).to_have_text('Quick Field', timeout=15_000)
         expect(page.locator('#liveDefensiveChangeBtn')).to_have_count(0)
         expect(page.locator('#cb-live-field-editor')).to_have_count(0)
         expect(page.locator('#liveChangePitcherBtn')).to_be_visible()
