@@ -29,15 +29,9 @@ def login(page: Page, coachboard_url: str):
 
 def alignment():
     return {
-        'P': 'Pitcher Pat',
-        'C': 'Catcher Cole',
-        '1B': 'First Frank',
-        '2B': 'Second Sam',
-        '3B': 'Third Theo',
-        'SS': 'Shortstop Shawn',
-        'LF': 'Left Lee',
-        'CF': 'Center Casey',
-        'RF': 'Right Riley',
+        'P': 'Pitcher Pat', 'C': 'Catcher Cole', '1B': 'First Frank',
+        '2B': 'Second Sam', '3B': 'Third Theo', 'SS': 'Shortstop Shawn',
+        'LF': 'Left Lee', 'CF': 'Center Casey', 'RF': 'Right Riley',
     }
 
 
@@ -52,10 +46,8 @@ def create_game(page: Page, coachboard_url: str, opponent: str, *, complete=True
         f'{coachboard_url}/game-day/add',
         form={
             'game_date': (date.today() + timedelta(days=14)).isoformat(),
-            'game_start_time': '12:30',
-            'game_opponent': opponent,
-            'game_location': 'Test 2 Stress Field',
-            'game_notes': 'Disposable Test 2 stress game',
+            'game_start_time': '12:30', 'game_opponent': opponent,
+            'game_location': 'Test 2 Stress Field', 'game_notes': 'Disposable Test 2 stress game',
             'pitching_rule_set': 'USSSA',
         },
         max_redirects=0,
@@ -64,7 +56,6 @@ def create_game(page: Page, coachboard_url: str, opponent: str, *, complete=True
     match = re.search(r'/game/(\d+)', response.headers.get('location') or '')
     assert match
     game_id = int(match.group(1))
-
     if complete:
         innings = {'1': alignment()}
         if include_inning_two:
@@ -72,8 +63,7 @@ def create_game(page: Page, coachboard_url: str, opponent: str, *, complete=True
         rotation = page.request.post(
             f'{coachboard_url}/save_rotation',
             data={
-                'title': f'{opponent} Stress Rotation',
-                'innings': innings,
+                'title': f'{opponent} Stress Rotation', 'innings': innings,
                 'associated_game_id': game_id,
             },
         )
@@ -83,13 +73,7 @@ def create_game(page: Page, coachboard_url: str, opponent: str, *, complete=True
 
 
 def current_sequence(state):
-    return max(
-        [0] + [
-            int(event.get('sequence') or 0)
-            for event in state.get('rotation_events', [])
-            if not event.get('reverted')
-        ]
-    )
+    return max([0] + [int(event.get('sequence') or 0) for event in state.get('rotation_events', []) if not event.get('reverted')])
 
 
 def cleanup_game(page: Page, coachboard_url: str, game_id: int):
@@ -97,16 +81,9 @@ def cleanup_game(page: Page, coachboard_url: str, game_id: int):
     if state.ok and state.json().get('game', {}).get('is_live'):
         page.request.post(
             f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
-            data={
-                'defer_pitching': True,
-                'end_reason': 'manual',
-                'current_inning_played': True,
-            },
+            data={'defer_pitching': True, 'end_reason': 'manual', 'current_inning_played': True},
         )
-    page.request.post(
-        f'{coachboard_url}/game-day/{game_id}/delete',
-        headers={'Accept': 'application/json'},
-    )
+    page.request.post(f'{coachboard_url}/game-day/{game_id}/delete', headers={'Accept': 'application/json'})
 
 
 def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url: str):
@@ -125,7 +102,6 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         phone.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         ipad.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
-        # Empty batting order must remain optional on both clients.
         phone_ready = phone.request.get(f'{coachboard_url}/api/game-day/{game_id}/readiness').json()
         ipad_ready = ipad.request.get(f'{coachboard_url}/api/game-day/{game_id}/readiness').json()
         for ready in (phone_ready, ipad_ready):
@@ -133,15 +109,19 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
             assert ready['ready'] is True, ready
             assert ready['missing'] == []
 
-        # Client A starts. Client B must converge to the same live transition without reloading.
+        # Both browsers must be attached to the game room before testing the
+        # cross-client start transition. This tests synchronization rather than
+        # racing page boot against the first server broadcast.
+        expect(phone.locator('#live-sync-status-v2')).to_contain_text('SYNCED', timeout=10_000)
+        expect(ipad.locator('#live-sync-status-v2')).to_contain_text('SYNCED', timeout=10_000)
+        ipad.wait_for_timeout(500)
+
         phone.locator('#startLiveGameBtnAction').click()
         expect(phone.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
         expect(ipad.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
         expect(phone.locator('#live-inning-display')).to_have_text('1')
         expect(ipad.locator('#live-inning-display')).to_have_text('1')
 
-        # Planned-but-not-locked Inning 2: End Inning opens a huddle, not an editor,
-        # and the planned defense is an explicit choice before Start Inning is enabled.
         prep = phone.request.get(f'{coachboard_url}/api/live-game/{game_id}/next-inning-prep').json()
         assert prep['confirmed'] is None
         assert prep['planned_alignment']
@@ -154,8 +134,6 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         huddle.get_by_role('button', name='Back to game').click()
         expect(huddle).not_to_be_visible(timeout=10_000)
 
-        # Move -> Undo -> End Inning quickly. The huddle must win the click and the
-        # game must stay coherent while Undo and next-inning preparation settle.
         quick = phone.locator('#cbQuickDefense')
         quick.locator('[data-cb-position="SS"]').click()
         move = phone.locator('#cbQuickMoveModal')
@@ -169,27 +147,18 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         expect(phone.locator('#cb-live-field-editor')).to_have_count(0)
         huddle.get_by_role('button', name='Back to game').click()
 
-        # Navigate away while a defensive bulk save is in flight. keepalive keeps
-        # the write eligible to finish while the page leaves; returning must show
-        # one authoritative defense, never a half-rendered local draft.
         state = phone.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
         inflight = dict(state['current_alignment'])
         inflight['1B'], inflight['3B'] = inflight['3B'], inflight['1B']
         phone.evaluate(
             """({gameId, alignment, baseSequence}) => {
                 fetch(`/api/live-game/${gameId}/defense-edit`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({alignment, base_sequence: baseSequence}),
-                    keepalive: true,
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({alignment, base_sequence: baseSequence}), keepalive: true,
                 });
                 window.location.assign('/game-day');
             }""",
-            {
-                'gameId': game_id,
-                'alignment': inflight,
-                'baseSequence': current_sequence(state),
-            },
+            {'gameId': game_id, 'alignment': inflight, 'baseSequence': current_sequence(state)},
         )
         expect(phone).to_have_url(re.compile(r'/game-day$'), timeout=10_000)
         phone.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
@@ -198,7 +167,6 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         assert authoritative['current_alignment'] in (state['current_alignment'], inflight)
         expect(phone.locator('#cbQuickDefense .cb-main-draft-banner')).to_have_count(0)
 
-        # Both sessions still see the same authoritative inning and live state.
         phone_state = phone.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
         ipad_state = ipad.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
         assert phone_state['game']['is_live'] is True
@@ -206,7 +174,6 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         assert phone_state['current_inning'] == ipad_state['current_inning'] == '1'
         assert phone_state['current_alignment'] == ipad_state['current_alignment']
 
-        # Direct /start must reject an incomplete game using the same server contract.
         incomplete_id = create_game(phone, coachboard_url, 'Test 2 Incomplete Opponent', complete=False)
         rejected = phone.request.post(f'{coachboard_url}/api/live-game/{incomplete_id}/start', data={})
         assert rejected.status == 409, rejected.text()
