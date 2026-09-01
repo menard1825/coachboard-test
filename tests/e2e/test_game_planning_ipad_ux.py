@@ -70,14 +70,16 @@ def test_ipad_game_planning_keeps_tablet_layout(
 
         readiness = page.locator('#coach-game-readiness-v2')
         expect(readiness).to_be_visible(timeout=15_000)
+        modes = page.locator('#cb-test2-pregame-modes')
+        expect(modes).to_be_visible(timeout=15_000)
+        modes.get_by_role('button', name='Full Plan').click()
+        expect(modes.get_by_role('button', name='Full Plan')).to_have_class(re.compile(r'\bactive\b'))
 
         # The phone redesign intentionally hides these four prep cards below
         # 768px. At the exact iPad boundary and above, the tablet layout retains them.
         prep_cards = page.locator('#pregame-checklist-container > .row.g-3.mb-4')
         expect(prep_cards).to_be_visible(timeout=15_000)
 
-        # Start Live Game remains available, but should not be relocated into
-        # the phone-only slot immediately after the compact readiness panel.
         start_button = page.locator('#startLiveGameBtnAction')
         expect(start_button).to_be_visible(timeout=15_000)
         phone_slot_start = readiness.locator(
@@ -85,7 +87,6 @@ def test_ipad_game_planning_keeps_tablet_layout(
         )
         expect(phone_slot_start).to_have_count(0)
 
-        # All regulation inning controls stay inside the viewport.
         inning_labels = page.locator('#inning-btn-group label.btn')
         expect(inning_labels).to_have_count(6, timeout=15_000)
         inning_bounds = inning_labels.evaluate_all(
@@ -96,7 +97,6 @@ def test_ipad_game_planning_keeps_tablet_layout(
         )
         assert all(item['left'] >= -1 and item['right'] <= item['viewport'] + 1 for item in inning_bounds)
 
-        # Use the visible defense editor and the same preset workflow a coach taps.
         expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
         defense = page.locator('#pregame-defense-editor-v3')
         expect(defense).to_be_visible(timeout=15_000)
@@ -158,8 +158,6 @@ def test_ipad_game_planning_keeps_tablet_layout(
             assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
             assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
 
-        # Pitching details are only collapsed into a phone toggle below the
-        # tablet breakpoint. iPad keeps the richer at-a-glance card.
         pitching = page.locator('#pitcher-availability-card')
         expect(pitching).to_be_visible(timeout=15_000)
         pitcher_cards = pitching.locator('.gpa-card')
@@ -167,7 +165,6 @@ def test_ipad_game_planning_keeps_tablet_layout(
         expect(pitcher_cards.first.locator('.gpa-metrics')).to_be_visible()
         expect(pitcher_cards.first.locator('.gm-pitch-card-more')).to_be_hidden()
 
-        # Nothing on Game Planning may make the entire iPad page scroll sideways.
         assert page.evaluate(
             'document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2'
         )
