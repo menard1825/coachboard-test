@@ -252,7 +252,7 @@
 
   function patchVisibleState() {
     if (!state?.game?.is_live) return;
-    if (document.querySelector('#cbQuickDefense .cb-main-draft-banner, #cbQuickDefense .cb-main-open, #cbQuickDefense .cb-save-state.saving')) return;
+    if (document.querySelector('#cbQuickDefense .cb-main-draft-banner, #cbQuickDefense .cb-main-open')) return;
     const alignment = state.current_alignment || {};
     const inning = String(state.current_inning || state.game?.live_current_inning || '1');
     const inningEl = document.getElementById('live-inning-display');
@@ -518,8 +518,18 @@
       if (mode === 'inning') {
         const prep = await readJson(`/api/live-game/${gameId}/next-inning-prep`, {cache:'no-store'});
         nextInning = String(prep.next_inning || (Number(state.current_inning || 1) + 1));
-        if (prep.confirmed?.alignment) draft = {...prep.confirmed.alignment};
-        else if (prep.planned_alignment && Object.values(prep.planned_alignment).some(Boolean)) {
+        if (prep.confirmed?.alignment) {
+          const data = await readJson(`/api/live-game/${gameId}/advance-inning`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({alignment:prep.confirmed.alignment,base_sequence:sequenceFromState()}),
+          });
+          if (!data.delta) throw new Error('CoachBoard did not confirm the next inning.');
+          applyDelta(data.delta);
+          toast(`✓ Inning ${nextInning} started • Saved & Synced`);
+          return;
+        }
+        if (prep.planned_alignment && Object.values(prep.planned_alignment).some(Boolean)) {
           draft = {...prep.planned_alignment};
           if (!draft.P && state.current_alignment?.P) draft.P = state.current_alignment.P;
           const duplicatePitcherPos = Object.entries(draft).find(([pos, name]) => pos !== 'P' && name === draft.P)?.[0];
