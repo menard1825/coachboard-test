@@ -274,32 +274,45 @@
     if (!nav || nav.dataset.cbActiveStateProtected === '1') return;
     nav.dataset.cbActiveStateProtected = '1';
 
-    const enforce = () => {
+    const desiredSection = () => {
+      const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
+      if (currentPath === '/game-day') return 'game-day';
+      if (currentPath === '/pitching') return 'pitching';
+      if (currentPath !== '/') return null;
+
+      const activePane = document.querySelector('#mainTabContent > .tab-pane.active');
+      const paneId = activePane?.id || (window.location.hash || '#overview').slice(1) || 'overview';
+      if (paneId === 'overview') return 'overview';
+      if (paneId === 'roster') return 'roster';
+      return 'more';
+    };
+
+    const setSection = (section) => {
       nav.querySelectorAll('[data-cb-mobile-section]').forEach((link) => {
-        const current = link.getAttribute('aria-current') === 'page';
-        link.classList.toggle('active', current);
+        const active = Boolean(section) && link.dataset.cbMobileSection === section;
+        link.classList.toggle('active', active);
+        if (active) link.setAttribute('aria-current', 'page');
+        else link.removeAttribute('aria-current');
       });
     };
 
-    const select = (selected) => {
-      nav.querySelectorAll('[data-cb-mobile-section]').forEach((link) => {
-        if (link === selected) link.setAttribute('aria-current', 'page');
-        else link.removeAttribute('aria-current');
-      });
-      enforce();
-    };
+    const enforce = () => setSection(desiredSection());
 
     nav.addEventListener('click', (event) => {
       const link = event.target.closest('[data-cb-mobile-section]');
       if (!link || !nav.contains(link)) return;
       const href = link.getAttribute('href') || '';
       if (!href.startsWith('#')) return;
-      select(link);
+      setSection(link.dataset.cbMobileSection || null);
       window.requestAnimationFrame(enforce);
     });
 
     const observer = new MutationObserver(enforce);
-    observer.observe(nav, {subtree: true, attributes: true, attributeFilter: ['class', 'aria-current']});
+    observer.observe(nav, {subtree: true, childList: true});
+    const paneRoot = document.getElementById('mainTabContent');
+    if (paneRoot) observer.observe(paneRoot, {subtree: true, attributes: true, attributeFilter: ['class']});
+    window.addEventListener('hashchange', enforce);
+    window.addEventListener('popstate', enforce);
     enforce();
   }
 
