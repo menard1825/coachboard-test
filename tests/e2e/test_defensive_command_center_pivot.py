@@ -120,8 +120,8 @@ def test_inning_one_quick_start_launches_defensive_command_center(page: Page, co
 
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
-        # Quick Start is now a real, discoverable workflow rather than a hidden
-        # alternate label on the normal Start Game button.
+        # Quick Start is now a discoverable setup workflow around the one
+        # canonical Start Game action. It does not create a second start mode.
         launch = page.locator('#cb-quick-start-launch')
         expect(launch).to_be_visible(timeout=15_000)
         expect(launch).to_contain_text('Quick Start')
@@ -131,7 +131,6 @@ def test_inning_one_quick_start_launches_defensive_command_center(page: Page, co
         start = page.locator('#startLiveGameBtnAction')
         expect(start).to_be_enabled()
         expect(start).to_contain_text('START GAME')
-        assert start.get_attribute('data-cb-start-mode') == 'quick'
 
         launch.get_by_role('button', name='Open Quick Start').click()
         quick = page.locator('#cb-quick-start-modal')
@@ -144,7 +143,7 @@ def test_inning_one_quick_start_launches_defensive_command_center(page: Page, co
         expect(quick).to_contain_text('Pitching Tracking')
         expect(quick).to_contain_text('Track Pitches')
         expect(quick).to_contain_text('Game Clock')
-        quick_start = quick.get_by_role('button', name='Start Live Game')
+        quick_start = quick.get_by_role('button', name='START GAME')
         expect(quick_start).to_be_enabled()
         quick_start.click()
 
