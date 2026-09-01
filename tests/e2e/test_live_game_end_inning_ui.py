@@ -1,4 +1,4 @@
-"""Critical browser coverage for the coach-facing End Inning workflow."""
+"""Critical browser coverage for the CoachBoard End Inning huddle workflow."""
 
 import os
 import re
@@ -67,16 +67,6 @@ def create_game(page: Page, coachboard_url: str):
     assert match
     game_id = int(match.group(1))
 
-    post_json(page, coachboard_url, '/add_lineup', {
-        'title': 'End Inning UI Lineup',
-        'lineup_data': [
-            'Pitcher Pat', 'Catcher Cole', 'First Frank', 'Second Sam',
-            'Third Theo', 'Shortstop Shawn', 'Left Lee', 'Center Casey', 'Right Riley',
-        ],
-        'associated_game_id': game_id,
-    })
-    # Deliberately save only Inning 1. End Inning must carry the current defense
-    # into the new editor and commit the next defense + inning in one operation.
     post_json(page, coachboard_url, '/save_rotation', {
         'title': 'End Inning UI Rotation',
         'innings': {'1': alignment()},
@@ -85,7 +75,7 @@ def create_game(page: Page, coachboard_url: str):
     return game_id
 
 
-def test_end_inning_commits_next_defense_and_inning_in_one_workflow(page: Page, coachboard_url: str):
+def test_end_inning_uses_huddle_then_starts_next_inning(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
@@ -105,18 +95,26 @@ def test_end_inning_commits_next_defense_and_inning_in_one_workflow(page: Page, 
 
         page.locator('#liveEndInningBtn').click()
 
-        editor = page.locator('#cb-live-field-editor')
-        expect(editor).to_be_visible(timeout=10_000)
-        expect(editor.locator('.modal-title')).to_contain_text('End Inning 1')
-        expect(editor.locator('[data-cb-editor-subtitle]')).to_contain_text('Inning 2')
-        expect(editor.locator('[data-cb-editor-save]')).to_have_text('Start Inning 2')
-        expect(editor.locator('[data-cb-editor-drop="BENCH"]')).to_be_visible()
-        assert native_dialogs == [], f'Legacy End Inning confirm still fired: {native_dialogs}'
+        huddle = page.locator('#cb-test2-huddle-modal')
+        expect(huddle).to_be_visible(timeout=10_000)
+        expect(huddle.locator('.modal-title')).to_have_text('End Inning')
+        expect(huddle.locator('.cb-t2-huddle-sub')).to_contain_text('Inning 1 is over')
+        expect(page.locator('#cb-live-field-editor')).to_have_count(0)
+        assert native_dialogs == [], f'Legacy End Inning dialog still fired: {native_dialogs}'
 
-        # This is the real-game regression: one save must both commit the next
-        # defense and advance the live inning. There is no second End Inning tap.
-        editor.locator('[data-cb-editor-save]').click()
-        expect(editor).not_to_be_visible(timeout=10_000)
+        start_next = huddle.locator('[data-cb-t2-start-inning]')
+        expect(start_next).to_be_disabled()
+        huddle.locator('[data-cb-t2-choice="current"]').click()
+        expect(start_next).to_be_enabled(timeout=10_000)
+        expect(start_next).to_have_text('Start Inning 2')
+
+        # The inning does not advance until the coach explicitly starts it.
+        before = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
+        assert before['current_inning'] == '1'
+
+        start_next.click()
+        expect(huddle).not_to_be_visible(timeout=10_000)
+        expect(page.locator('#live-inning-display')).to_have_text('2', timeout=10_000)
 
         state = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
         assert state['game']['is_live'] is True
