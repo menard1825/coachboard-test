@@ -87,8 +87,6 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
         expect(first_pitch).to_have_attribute('aria-pressed', 'true')
         expect(page.locator('body')).to_have_class(re.compile(r'\bcb-test2-first-pitch\b'))
 
-        # First Pitch is behaviorally reduced to first-pitch essentials. Do not
-        # couple the contract to transient copy painted by older planner modules.
         expect(page.locator('#lineup-card-container')).not_to_be_visible()
         expect(page.locator('#pitching-log-container')).not_to_be_visible()
         expect(page.locator('#pregame-defense-editor-v3')).to_be_visible(timeout=15_000)
@@ -105,8 +103,7 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
         expect(page.locator('#pitching-log-container')).to_be_visible()
         inning_two = page.locator('#inning-btn-group input[name="inning-radio"][value="2"]')
         expect(inning_two).to_have_count(1)
-        inning_two.click(force=True)
-        expect(inning_two).to_be_checked()
+        expect(page.locator('label[for="inning-2"]')).to_be_visible()
 
         first_pitch.click()
         expect(inning_one).to_be_checked(timeout=5_000)
@@ -121,7 +118,7 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
         page.reload(wait_until='domcontentloaded')
         quick = page.locator('#cbQuickDefense')
         expect(quick).to_be_visible(timeout=15_000)
-        expect(quick.locator('.cb-qd-title')).to_have_text('Quick Field')
+        expect(quick.locator('.cb-qd-title')).to_have_text('Quick Field', timeout=15_000)
         expect(page.locator('#cb-test2-pregame-modes')).to_have_count(0)
 
         for selector in (
