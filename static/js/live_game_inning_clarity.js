@@ -214,10 +214,8 @@
     document.getElementById('cbCurrentInningStrip')?.remove();
     patchStaticCopy();
 
-    // Register the authoritative End Inning refresh guard before loading the
-    // unified editor. During normal parsing, load the editor synchronously so
-    // it wraps Socket.IO before the legacy live controller creates its socket.
-    document.addEventListener('click', guaranteeUnifiedEndInning, true);
+    // End Inning is owned by live_game_feedback_pass.js. Keeping a second
+    // capture-phase refresh/replay owner here can swallow the no-plan editor.
     document.addEventListener('click', retrySuppressedEditorSave, true);
     document.addEventListener('click', event => {
       if (event.target.closest?.('[data-cb-menu], #cbCoachBoardNavBtn')) window.setTimeout(patchMenu, 0);
