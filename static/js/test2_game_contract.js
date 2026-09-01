@@ -33,7 +33,6 @@
       #${MODE_ID} .cb-t2-mode-buttons .btn{border:0!important;border-radius:7px!important;min-height:36px;padding:6px 10px;font-size:.69rem;font-weight:850;box-shadow:none!important}
       #${MODE_ID} .cb-t2-mode-buttons .active{background:#172033!important;color:#fff!important}
       #cb-quick-start-launch,#cb-quick-start-modal{display:none!important}
-      #liveDefensiveChangeBtn,#liveSetDefenseBtnCoach,#live-bulk-defense-coach,[data-cb-full-defense],#live-defense-v2,#live-defense-destination-v2,#liveDefensiveSwapModal,#cb-live-field-editor{display:none!important}
       body.cb-test2-first-pitch #lineup-card-container,
       body.cb-test2-first-pitch #pitching-log-container,
       body.cb-test2-first-pitch #pitching-board-v2{display:none!important}
@@ -80,30 +79,26 @@
     return document.body.classList.contains('cb-dugout') || Boolean(overlay && !overlay.classList.contains('d-none'));
   }
 
-  function removeRetiredLiveControls() {
-    const toggle = $('liveGameModeToggle');
-    toggle?.closest('.form-check')?.remove();
-    [
-      'liveDefensiveChangeBtn', 'liveSetDefenseBtnCoach', 'live-bulk-defense-coach',
-      'live-defense-v2', 'live-defense-destination-v2', 'liveDefensiveSwapModal',
-      'cb-live-field-editor',
-    ].forEach(id => $(id)?.remove());
-    document.querySelectorAll('[data-cb-full-defense]').forEach(node => node.remove());
-  }
-
   function forceInningOne() {
     if (mode !== 'first-pitch' || isLive()) return;
     const inningOne = document.querySelector('#inning-btn-group input[name="inning-radio"][value="1"]');
     if (inningOne && !inningOne.checked) inningOne.click();
   }
 
-  function polishFirstPitchDefense() {
-    if (mode !== 'first-pitch' || isLive()) return;
+  function polishPregameDefense() {
+    if (isLive()) return;
     const panel = $('pregame-defense-editor-v3');
     if (!panel) return;
-    setText(panel.querySelector('.pde-kicker'), 'First Pitch');
-    setText(panel.querySelector('.pde-title'), 'First-pitch defense');
-    setText(panel.querySelector('.pde-help'), 'Set only the defense needed to start the game. Full Plan is available when you want later innings.');
+    if (mode === 'first-pitch') {
+      setText(panel.querySelector('.pde-kicker'), 'First Pitch');
+      setText(panel.querySelector('.pde-title'), 'First-pitch defense');
+      setText(panel.querySelector('.pde-help'), 'Set only the defense needed to start the game. Full Plan is available when you want later innings.');
+      return;
+    }
+    const selectedInning = document.querySelector('#inning-btn-group input[name="inning-radio"]:checked')?.value || '1';
+    setText(panel.querySelector('.pde-kicker'), 'Defense Setup');
+    setText(panel.querySelector('.pde-title'), `Set Defense — Inning ${selectedInning}`);
+    setText(panel.querySelector('.pde-help'), 'Set the defense for this inning, or use the full-game planning tools for later innings.');
   }
 
   function updateModeButtons() {
@@ -126,7 +121,7 @@
     document.body.classList.toggle('cb-test2-full-plan', mode === 'full-plan');
     updateModeButtons();
     forceInningOne();
-    polishFirstPitchDefense();
+    polishPregameDefense();
   }
 
   function ensureModeBar() {
@@ -167,7 +162,6 @@
   function applyContract() {
     queued = false;
     installStyles();
-    removeRetiredLiveControls();
     $('cb-quick-start-launch')?.remove();
     const quickModal = $('cb-quick-start-modal');
     if (quickModal) {
@@ -182,7 +176,7 @@
     } else {
       ensureModeBar();
       forceInningOne();
-      polishFirstPitchDefense();
+      polishPregameDefense();
     }
   }
 
