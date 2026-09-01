@@ -36,8 +36,8 @@
       #liveDefensiveChangeBtn,#liveSetDefenseBtnCoach,#live-bulk-defense-coach,[data-cb-full-defense],#live-defense-v2,#live-defense-destination-v2,#liveDefensiveSwapModal,#cb-live-field-editor{display:none!important}
       body.cb-test2-first-pitch #lineup-card-container,
       body.cb-test2-first-pitch #pitching-log-container,
-      body.cb-test2-first-pitch #pitching-board-v2,
-      body.cb-test2-first-pitch #coach-game-readiness-v2{display:none!important}
+      body.cb-test2-first-pitch #pitching-board-v2{display:none!important}
+      body.cb-test2-first-pitch #coach-game-readiness-v2 [data-cgr-action="lineup"]{display:none!important}
       body.cb-test2-first-pitch #rotation-card-container>.card>.card-header{display:none!important}
       body.cb-test2-first-pitch #rotation-board>*:not(#pregame-defense-editor-v3){display:none!important}
       #${HUDDLE_ID} .modal-content{border:0;border-radius:16px;overflow:hidden}
