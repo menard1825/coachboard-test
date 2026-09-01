@@ -1,4 +1,4 @@
-"""Browser coverage for entering the unified Live Game editor from a current fielder."""
+"""Browser coverage that current-fielder changes stay inside Quick Field."""
 
 import os
 import re
@@ -57,7 +57,7 @@ def create_game(page: Page, coachboard_url: str):
             'game_start_time': '13:30',
             'game_opponent': 'Field Entry Opponent',
             'game_location': 'Field Entry Test Field',
-            'game_notes': 'Disposable current-fielder editor-entry browser test',
+            'game_notes': 'Disposable current-fielder Quick Field browser test',
             'pitching_rule_set': 'USSSA',
         },
         max_redirects=0,
@@ -80,24 +80,7 @@ def create_game(page: Page, coachboard_url: str):
     return game_id
 
 
-def drag(page: Page, source, target):
-    source_box = source.bounding_box()
-    target_box = target.bounding_box()
-    assert source_box, 'Drag source has no bounding box.'
-    assert target_box, 'Drag target has no bounding box.'
-
-    sx = source_box['x'] + source_box['width'] / 2
-    sy = source_box['y'] + source_box['height'] / 2
-    tx = target_box['x'] + target_box['width'] / 2
-    ty = target_box['y'] + target_box['height'] / 2
-
-    page.mouse.move(sx, sy)
-    page.mouse.down()
-    page.mouse.move(tx, ty, steps=12)
-    page.mouse.up()
-
-
-def test_phone_current_fielder_opens_unified_editor_preselected_and_can_drag_to_bench(page: Page, coachboard_url: str):
+def test_phone_current_fielder_uses_quick_field_move_sheet(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
@@ -106,31 +89,29 @@ def test_phone_current_fielder_opens_unified_editor_preselected_and_can_drag_to_
         post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
-        quick_defense = page.locator('#cbQuickDefense')
-        expect(quick_defense).to_be_visible(timeout=15_000)
-        current_shortstop = quick_defense.locator('[data-cb-position="SS"]')
-        expect(current_shortstop).to_contain_text('Shortstop Shawn')
-        current_shortstop.click()
+        quick = page.locator('#cbQuickDefense')
+        expect(quick).to_be_visible(timeout=15_000)
+        expect(quick.locator('.cb-qd-title')).to_have_text('Quick Field')
+        shortstop = quick.locator('[data-cb-position="SS"]')
+        expect(shortstop).to_contain_text('Shortstop Shawn')
+        shortstop.click()
 
-        editor = page.locator('#cb-live-field-editor')
-        expect(editor).to_be_visible(timeout=10_000)
-        expect(editor.locator('.modal-title')).to_have_text('On Field Now')
+        move_sheet = page.locator('#cbQuickMoveModal')
+        expect(move_sheet).to_be_visible(timeout=10_000)
+        expect(move_sheet).to_contain_text('Shortstop Shawn is currently playing SS')
+        expect(page.locator('#cb-live-field-editor')).to_have_count(0)
+        expect(page.locator('#liveDefensiveChangeBtn')).to_have_count(0)
 
-        shortstop = editor.locator('[data-cb-editor-player="Shortstop Shawn"]')
-        expect(shortstop).to_be_visible()
-        expect(shortstop).to_have_class(re.compile(r'\bselected\b'))
+        # Swap SS and 2B from the one live defense surface.
+        move_sheet.locator('[data-cb-destination="2B"]').click()
+        expect(move_sheet).not_to_be_visible(timeout=10_000)
+        expect(quick.locator('[data-cb-position="2B"]')).to_contain_text('Shortstop Shawn', timeout=10_000)
+        expect(quick.locator('[data-cb-position="SS"]')).to_contain_text('Second Sam', timeout=10_000)
+        expect(quick.locator('.cb-save-state')).to_contain_text('Saved')
 
-        bench = editor.locator('[data-cb-editor-drop="BENCH"]')
-        expect(bench).to_be_visible()
-        drag(page, shortstop, bench)
-
-        expect(editor.locator('[data-cb-editor-drop="SS"]')).to_contain_text('Open')
-        expect(bench.locator('[data-cb-editor-player="Shortstop Shawn"]')).to_be_visible()
-
-        # This test validates the staging interaction only. Do not persist an
-        # intentionally incomplete defense with SS open.
-        editor.get_by_role('button', name='Cancel').click()
-        expect(editor).not_to_be_visible(timeout=10_000)
+        state = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
+        assert state['current_alignment']['2B'] == 'Shortstop Shawn'
+        assert state['current_alignment']['SS'] == 'Second Sam'
     finally:
         state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
         if state_response.ok and state_response.json().get('game', {}).get('is_live'):
