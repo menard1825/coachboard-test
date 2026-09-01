@@ -44,7 +44,6 @@
       body.cb-dugout #live-game-overlay{min-height:100vh;background:#eef1f4!important;padding:0 0 24px!important}
       body.cb-dugout .coach-live-shell{max-width:1100px!important;margin:auto!important;padding:0 10px 24px!important}
       body.cb-dugout #coach-pitcher-slot{display:none!important}
-      body.cb-dugout .cb-legacy-defense-card{display:none!important}
 
       #cbDugoutHeader{position:sticky;top:0;z-index:1040;margin:0 -10px 12px;padding:9px 12px;background:#101828;color:#fff;border-bottom:3px solid var(--primary-color,#102a66);box-shadow:0 4px 14px rgba(16,24,40,.2)}
       .cb-dh-main{display:grid;grid-template-columns:auto auto minmax(0,1fr) minmax(0,auto) auto auto;align-items:center;gap:10px}
@@ -76,7 +75,6 @@
       body.cb-dugout .coach-action-title{font-size:.96rem!important;font-weight:850!important}
       body.cb-dugout .coach-action-note{font-size:.67rem!important;margin-top:4px!important;opacity:.78!important}
       body.cb-dugout #liveChangePitcherBtn{background:var(--primary-color,#102a66)!important;border-color:var(--primary-color,#102a66)!important;color:#fff!important}
-      body.cb-dugout #liveDefensiveChangeBtn{background:#fff!important;border-color:#667085!important;color:#1d2939!important}
       body.cb-dugout #liveEndInningBtn{background:#172033!important;border-color:#172033!important;color:#fff!important}
       body.cb-dugout #liveUndoBtn{background:#fff!important;border-color:#cfd5dd!important;color:#475467!important}
       body.cb-dugout .coach-card{border:1.5px solid #cfd5dd!important;border-radius:14px!important;box-shadow:0 2px 7px #10182814!important;background:#fff!important;padding:13px!important;margin-bottom:12px!important}
@@ -106,7 +104,6 @@
       .cb-qd-bench-player .cb-bench-note{display:block;margin-top:3px;color:#667085;font-size:.58rem;font-weight:650}
       .cb-qd-bench-player.priority{border-color:#d8b96a;background:#fff9e9}
       .cb-qd-actions{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:9px}
-      .cb-qd-actions .btn{min-height:40px;border-radius:9px;font-size:.7rem;font-weight:780}
       .cb-qd-tip{font-size:.62rem;color:#667085;line-height:1.25}
 
       #cbQuickMoveModal .modal-content{border:0;border-radius:15px;overflow:hidden}
@@ -115,7 +112,6 @@
       #cbQuickMoveModal .cb-destination{min-height:60px;border-radius:10px;text-align:left;font-weight:820;padding:8px 10px}
       #cbQuickMoveModal .cb-destination small{display:block;font-size:.62rem;font-weight:550;margin-top:3px;opacity:.75;line-height:1.15}
 
-      .cb-defense-tools{display:none!important}
       body.cb-dugout #live-board-prep-v3{border:1.5px solid #9aa7b8!important;border-radius:13px!important;box-shadow:0 1px 5px #10182814!important;scroll-margin-top:96px!important}
       body.cb-dugout #live-board-prep-v3 .bp-head{background:#fff!important;padding:10px 11px 8px!important}
       body.cb-dugout #live-board-prep-v3 .bp-kicker{color:#344054!important;font-size:.62rem!important;font-weight:900!important}
@@ -132,8 +128,8 @@
       .cb-end-zone{margin-top:16px;padding-top:12px;border-top:1px solid #cfd5dd;text-align:right}
       .cb-end-zone small{display:block;color:#667085;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
       .cb-end-zone #liveEndGameBtn{min-height:42px!important;width:auto!important;border-radius:10px!important;padding:7px 13px!important;font-weight:800!important;background:#fff!important;color:#b42318!important;border:1.5px solid #d92d20!important;box-shadow:none!important}
-      body.cb-dugout #live-defense-v2 .list-group-item,body.cb-dugout #live-pitcher-picker-v2 .pitcher-choice-v2{min-height:58px!important;padding:14px!important;font-size:.94rem!important;touch-action:manipulation}
-      body.cb-dugout #live-defense-destination-v2 .btn,body.cb-dugout #live-pitcher-destination-v2 .btn,body.cb-dugout #next-inning-adjust-modal .btn{min-height:54px!important;font-size:.92rem!important;touch-action:manipulation}
+      body.cb-dugout #live-pitcher-picker-v2 .pitcher-choice-v2{min-height:58px!important;padding:14px!important;font-size:.94rem!important;touch-action:manipulation}
+      body.cb-dugout #live-pitcher-destination-v2 .btn,body.cb-dugout #next-inning-adjust-modal .btn{min-height:54px!important;font-size:.92rem!important;touch-action:manipulation}
       body.cb-dugout #next-inning-adjust-modal .form-select{min-height:52px!important;font-size:.95rem!important}
 
       @media(min-width:768px){
@@ -360,7 +356,7 @@
         }).join('')
       : '<span class="small text-muted">No players are on the bench.</span>';
 
-    return `<div class="cb-qd-head"><div><div class="cb-qd-kicker">Current Defense</div><div class="cb-qd-title">Field + bench at a glance</div><div class="cb-qd-help">Tap any fielder or bench player to move them. Pitcher changes stay in Change Pitcher.</div></div>${saveStateMarkup()}</div><div class="cb-qd-body"><div class="cb-qd-field"><svg class="cb-qd-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true"><path d="M7 57 Q9 13 50 6 Q91 13 93 57" fill="none" stroke="rgba(245,245,220,.38)" stroke-width="1.2"/><path d="M50 84 L8 38 M50 84 L92 38" fill="none" stroke="rgba(255,255,255,.88)" stroke-width=".7"/><polygon points="50,75 27,54 50,32 73,54" fill="#cfa56c" opacity=".95"/><polygon points="50,68 34,54 50,40 66,54" fill="#438f58"/><circle cx="50" cy="61" r="4.8" fill="#cfa56c"/><circle cx="50" cy="81" r="6.2" fill="#cfa56c"/><rect x="49" y="31" width="2" height="2" fill="#fff" transform="rotate(45 50 32)"/><rect x="72" y="53" width="2" height="2" fill="#fff" transform="rotate(45 73 54)"/><rect x="26" y="53" width="2" height="2" fill="#fff" transform="rotate(45 27 54)"/><path d="M48.8 81.5 L50 80.4 L51.2 81.5 L50.8 83 L49.2 83 Z" fill="#fff"/></svg>${positionSpots().map(([pos, left, top]) => fieldSpot(pos, left, top)).join('')}</div><div class="cb-qd-bench-wrap"><div class="cb-qd-bench-head"><strong>Bench now · ${bench.length}</strong><span>${bench.length ? 'Players sitting longest are shown first' : 'Everyone is in the field'}</span></div><div class="cb-qd-bench">${benchMarkup}</div></div><div class="cb-qd-actions"><div class="cb-qd-tip">For a substitution, tap the bench player first, then tap the field position. The outgoing player moves to the bench automatically.</div><button type="button" class="btn btn-outline-secondary" data-cb-full-defense><i class="bi bi-sliders me-1"></i>Full editor</button></div></div>`;
+    return `<div class="cb-qd-head"><div><div class="cb-qd-kicker">Current Defense</div><div class="cb-qd-title">Field + bench at a glance</div><div class="cb-qd-help">Tap any fielder or bench player to move them. Pitcher changes stay in Change Pitcher.</div></div>${saveStateMarkup()}</div><div class="cb-qd-body"><div class="cb-qd-field"><svg class="cb-qd-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true"><path d="M7 57 Q9 13 50 6 Q91 13 93 57" fill="none" stroke="rgba(245,245,220,.38)" stroke-width="1.2"/><path d="M50 84 L8 38 M50 84 L92 38" fill="none" stroke="rgba(255,255,255,.88)" stroke-width=".7"/><polygon points="50,75 27,54 50,32 73,54" fill="#cfa56c" opacity=".95"/><polygon points="50,68 34,54 50,40 66,54" fill="#438f58"/><circle cx="50" cy="61" r="4.8" fill="#cfa56c"/><circle cx="50" cy="81" r="6.2" fill="#cfa56c"/><rect x="49" y="31" width="2" height="2" fill="#fff" transform="rotate(45 50 32)"/><rect x="72" y="53" width="2" height="2" fill="#fff" transform="rotate(45 73 54)"/><rect x="26" y="53" width="2" height="2" fill="#fff" transform="rotate(45 27 54)"/><path d="M48.8 81.5 L50 80.4 L51.2 81.5 L50.8 83 L49.2 83 Z" fill="#fff"/></svg>${positionSpots().map(([pos, left, top]) => fieldSpot(pos, left, top)).join('')}</div><div class="cb-qd-bench-wrap"><div class="cb-qd-bench-head"><strong>Bench now · ${bench.length}</strong><span>${bench.length ? 'Players sitting longest are shown first' : 'Everyone is in the field'}</span></div><div class="cb-qd-bench">${benchMarkup}</div></div><div class="cb-qd-actions"><div class="cb-qd-tip">For a substitution, tap the bench player first, then tap the field position. The outgoing player moves to the bench automatically.</div></div></div>`;
   }
 
   function quickDefenseStateSignature() {
@@ -388,13 +384,6 @@
         const retry = event.target.closest('[data-cb-retry-move]');
         if (retry && lastFailedMove) {
           saveMove(lastFailedMove.playerId, lastFailedMove.destination, lastFailedMove.name);
-          return;
-        }
-        const full = event.target.closest('[data-cb-full-defense]');
-        if (full) {
-          const button = $('liveSetDefenseBtnCoach');
-          if (button) button.click();
-          else $('liveDefensiveChangeBtn')?.click();
           return;
         }
         const player = event.target.closest('[data-cb-move-player]');
@@ -501,34 +490,12 @@
     }
   }
 
-  function defenseCard(shell) {
-    return [...shell.querySelectorAll('.coach-card')].find(card => card !== $('cbQuickDefense') && card.querySelector('.coach-defense-row,.coach-field,.coach-view-toggle')) || null;
-  }
-
   function arrange(shell) {
     [
       ['liveChangePitcherBtn', 'Change Pitcher', 'Mound change'],
-      ['liveDefensiveChangeBtn', 'Defense Change', 'Tap a player or choose manually'],
       ['liveEndInningBtn', 'End Inning', 'Load the saved next defense'],
       ['liveUndoBtn', 'Undo', 'Reverse the last live change'],
     ].forEach(([id, titleText, note]) => setHtml($(id), `<span class="coach-action-title">${titleText}</span><span class="coach-action-note">${note}</span>`));
-
-    const whole = $('liveSetDefenseBtnCoach');
-    const legacyCard = defenseCard(shell);
-    if (legacyCard) {
-      legacyCard.classList.add('cb-legacy-defense-card');
-      legacyCard.querySelector('.coach-view-toggle')?.remove();
-    }
-    if (whole && legacyCard) {
-      let tools = legacyCard.querySelector('.cb-defense-tools');
-      if (!tools) {
-        tools = document.createElement('div');
-        tools.className = 'cb-defense-tools';
-        legacyCard.prepend(tools);
-      }
-      if (whole.parentElement !== tools) tools.appendChild(whole);
-      setHtml(whole, '<span class="coach-action-title">Set Whole Defense</span><span class="coach-action-note">Replace multiple positions at once</span>');
-    }
 
     const end = $('liveEndGameBtn');
     if (end) {
