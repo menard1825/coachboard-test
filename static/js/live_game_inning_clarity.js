@@ -35,6 +35,22 @@
     const method = String(init?.method || (typeof input !== 'string' ? input?.method : '') || 'GET').toUpperCase();
     let pathname = '';
     try { pathname = new URL(url, window.location.href).pathname; } catch (_) {}
+
+    if (method === 'POST' && pathname === `/api/live-game/${gameId}/start`) {
+      const response = await nativeFetch(input, init);
+      if (response.ok) {
+        const data = await response.clone().json().catch(() => ({}));
+        if (data?.state?.game?.is_live) {
+          // The unified editor may still hold the pre-start state that it loaded
+          // during page setup. Seed it directly from the authoritative Start
+          // response so an immediate first live action cannot see stale pregame
+          // state while the normal socket update is still arriving.
+          pushStateIntoUnifiedController(data.state);
+        }
+      }
+      return response;
+    }
+
     if (method !== 'POST' || pathname !== `/api/live-game/${gameId}/defensive-change`) return nativeFetch(input, init);
 
     let requested = {};
