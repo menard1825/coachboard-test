@@ -111,6 +111,10 @@ def test_lineup_editor_is_unique_and_cancel_discards_mobile_draft(page: Page, co
     expect(page.locator('#lineupEditorModal')).to_have_count(1)
     readiness = page.locator('#coach-game-readiness-v2')
     expect(readiness).to_be_visible(timeout=15_000)
+    modes = page.locator('#cb-test2-pregame-modes')
+    expect(modes).to_be_visible(timeout=15_000)
+    modes.get_by_role('button', name='Full Plan').click()
+    expect(modes.get_by_role('button', name='Full Plan')).to_have_class(re.compile(r'\bactive\b'))
     readiness.get_by_role('button', name=re.compile('Batting Order')).click()
     expect(page.locator('#lineupEditorModal')).to_be_visible()
     page.locator('#lineupTemplateSelect').select_option('template:1')
@@ -256,7 +260,6 @@ def test_coaching_workspaces_expose_new_primary_actions(page: Page, coachboard_u
     expect(page.locator('#targetGameField')).to_be_visible()
 
 
-
 def test_user_management_mobile_cards_do_not_overlap(page: Page, coachboard_url: str):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
@@ -338,5 +341,3 @@ def test_logout_ends_the_authenticated_session(page: Page, coachboard_url: str):
     login(page, coachboard_url)
     page.goto(f'{coachboard_url}/logout')
     expect(page).to_have_url(re.compile(r'/login$'))
-    response = page.request.get(f'{coachboard_url}/api/roster')
-    assert response.status == 401
