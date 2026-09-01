@@ -211,6 +211,10 @@
 
   function enterFullPlan() {
     const modal = document.getElementById(MODAL_ID);
+    // Put the one canonical Start Game button back in its page slot before the
+    // Bootstrap hide transition. On phones that immediately restores its sticky
+    // footer positioning instead of leaving it temporarily static inside the modal.
+    restoreStartButton();
     bootstrap.Modal.getInstance(modal)?.hide();
     window.setTimeout(() => {
       const planner = document.getElementById('game-management-planner-row') || document.getElementById('rotation-card-container');
