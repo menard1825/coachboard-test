@@ -130,8 +130,8 @@ def test_mobile_primary_navigation_does_not_jump_between_workspaces(page: Page, 
     nav = page.locator('#cb-global-mobile-nav')
     expect(nav).to_be_visible()
     expect(page.locator('nav.bottom-nav-fixed:visible')).to_have_count(1)
-    expected_labels = ['Home', 'Game Day', 'Roster', 'Practice', 'More']
-    expected_hrefs = ['#overview', '/game-day', '#roster', '#practice_plan', '#more']
+    expected_labels = ['Home', 'Game Day', 'Roster', 'Pitching', 'More']
+    expected_hrefs = ['#overview', '/game-day', '#roster', '/pitching', '#more']
     expect(nav.locator('a')).to_have_count(5)
     assert [label.strip() for label in nav.locator('a').all_text_contents()] == expected_labels
     assert nav.locator('a').evaluate_all("links => links.map(link => link.getAttribute('href'))") == expected_hrefs
@@ -146,7 +146,6 @@ def test_mobile_primary_navigation_does_not_jump_between_workspaces(page: Page, 
     # Same-document workspaces must keep the mobile shell absolutely stable.
     for label, target in (
         ('Roster', '#roster'),
-        ('Practice', '#practice_plan'),
         ('More', '#more'),
         ('Home', '#overview'),
     ):
@@ -158,8 +157,15 @@ def test_mobile_primary_navigation_does_not_jump_between_workspaces(page: Page, 
         assert_mobile_shell_stable(home_shell, mobile_shell_snapshot(page))
         assert page.evaluate('window.location.pathname') == '/'
 
-    # Game Day is intentionally a dedicated page, not the retired #games pane.
-    nav.get_by_text('Game Day', exact=True).click()
+    # Game Day and Pitching are dedicated pages rather than legacy Home panes.
+    nav.get_by_text('Pitching', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/pitching$'))
+    pitching_nav = page.locator('#cb-global-mobile-nav')
+    expect(pitching_nav).to_be_visible()
+    expect(pitching_nav.locator('[data-cb-mobile-section="pitching"]')).to_have_class(re.compile(r'\bactive\b'))
+    expect(page.locator('nav.bottom-nav-fixed:visible')).to_have_count(1)
+
+    pitching_nav.get_by_text('Game Day', exact=True).click()
     expect(page).to_have_url(re.compile(r'/game-day$'))
     expect(page.get_by_role('heading', name='Game Day')).to_be_visible()
     game_day_nav = page.locator('#cb-global-mobile-nav')
