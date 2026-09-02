@@ -443,13 +443,54 @@
     const sourceText = source === 'BENCH' ? `${name} is currently on the bench.` : `${name} is currently playing ${source}.`;
     const benchDestination = source === 'BENCH'
       ? ''
-      : `<button type="button" class="btn btn-outline-secondary cb-destination" data-cb-destination="BENCH"><span>Bench</span><small>Take ${esc(name)} out of the field</small></button>`;
-    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. The player currently there will move to the bench.' : 'Move this player to the bench or choose another field position.'}</div><div class="cb-destination-grid">${benchDestination}${destinations.map(pos => {
+      : `<button type="button" class="btn btn-outline-secondary cb-destination" data-cb-bench-current><span>Bench</span><small>Choose who takes ${esc(source)}</small></button>`;
+    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. The player currently there will move to the bench.' : 'Choose another position, or tap Bench and pick the replacement.'}</div><div class="cb-destination-grid">${benchDestination}${destinations.map(pos => {
       const occupant = alignment[pos] || '';
       return `<button type="button" class="btn btn-outline-primary cb-destination" data-cb-destination="${esc(pos)}"><span>${esc(pos)}</span><small>${occupant ? `Currently ${esc(occupant)}` : 'Open position'}</small></button>`;
     }).join('')}</div>`;
+
     body.querySelectorAll('[data-cb-destination]').forEach(button => {
       button.addEventListener('click', () => saveMove(player.id, button.dataset.cbDestination, player.name));
+    });
+
+    body.querySelector('[data-cb-bench-current]')?.addEventListener('click', () => {
+      const replacements = benchPlayers();
+
+      if (!replacements.length) {
+        body.innerHTML = `<div class="cb-move-current"><strong>No bench player is available.</strong><br>${esc(name)} cannot leave ${esc(source)} without someone taking that position.</div>`;
+        return;
+      }
+
+      body.innerHTML = `
+        <div class="cb-move-current">
+          <strong>Who takes ${esc(source)}?</strong><br>
+          Pick a player from the bench. ${esc(name)} will move to the bench automatically.
+        </div>
+        <div class="cb-destination-grid">
+          ${replacements.map(replacement => {
+            const number = String(replacement.number ?? '').trim();
+            const label = number ? `#${number} ${replacement.name}` : replacement.name;
+            return `<button type="button"
+                           class="btn btn-outline-primary cb-destination"
+                           data-cb-replacement-id="${replacement.id}">
+                      <span>${esc(label)}</span>
+                      <small>Move to ${esc(source)}</small>
+                    </button>`;
+          }).join('')}
+        </div>`;
+
+      body.querySelectorAll('[data-cb-replacement-id]').forEach(button => {
+        const replacementId = Number(button.dataset.cbReplacementId);
+        const replacement = replacements.find(
+          candidate => Number(candidate.id) === replacementId
+        );
+
+        if (!replacement) return;
+
+        button.addEventListener('click', () => {
+          saveMove(replacement.id, source, replacement.name);
+        });
+      });
     });
     bootstrap.Modal.getOrCreateInstance(modal).show();
   }
