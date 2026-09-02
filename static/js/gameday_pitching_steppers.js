@@ -100,44 +100,6 @@
     document.head.appendChild(style);
   }
 
-  function actionMarkup(button, title, note) {
-    if (!button) return;
-    const wanted = `<span class="coach-action-title">${title}</span><span class="coach-action-note">${note}</span>`;
-    if (button.innerHTML !== wanted) button.innerHTML = wanted;
-  }
-
-  function ensureCommandCenterActions() {
-    const shell = document.querySelector('.coach-live-shell');
-    const slot = shell?.querySelector('#coach-action-slot');
-    if (!shell || !slot) return;
-
-    let defense = document.getElementById('liveDefensiveChangeBtn');
-    if (!defense) {
-      defense = document.createElement('button');
-      defense.type = 'button';
-      defense.id = 'liveDefensiveChangeBtn';
-      defense.className = 'btn';
-    }
-
-    const pitcher = document.getElementById('liveChangePitcherBtn');
-    const endInning = document.getElementById('liveEndInningBtn');
-    const undo = document.getElementById('liveUndoBtn');
-
-    actionMarkup(defense, 'Defense Change', 'Move field / bench');
-    actionMarkup(pitcher, 'Change Pitcher', 'Make a mound change');
-    actionMarkup(endInning, 'End Inning', 'Keep or change defense');
-
-    if (defense.parentElement !== slot) slot.prepend(defense);
-
-    if (undo) {
-      const undoMarkup = '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="cb-undo-text">Undo last change</span>';
-      undo.classList.add('cb-command-undo');
-      if (undo.title !== 'Undo the last live-game change') undo.title = 'Undo the last live-game change';
-      if (undo.getAttribute('aria-label') !== 'Undo last change') undo.setAttribute('aria-label', 'Undo last change');
-      if (undo.innerHTML !== undoMarkup) undo.innerHTML = undoMarkup;
-    }
-  }
-
   function installPitcherStatusStabilizer() {
     let stats = null;
     let statsObserver = null;
@@ -199,23 +161,5 @@
     loadOnce('/static/js/live_game_command_center.js', 'live-command-center');
     loadOnce('/static/js/live_game_connection_status.js', 'live-connection-status');
     installPitcherStatusStabilizer();
-
-    // Legacy live helpers can rewrite action labels after the command center first
-    // appears. Watch only the live overlay and restore the coach-facing actions
-    // there, rather than observing the whole page while the game clock changes.
-    const liveOverlay = document.getElementById('live-game-overlay');
-    if (liveOverlay) {
-      let queued = false;
-      const observer = new MutationObserver(() => {
-        if (queued) return;
-        queued = true;
-        window.requestAnimationFrame(() => {
-          queued = false;
-          ensureCommandCenterActions();
-        });
-      });
-      observer.observe(liveOverlay, {childList: true, subtree: true});
-    }
-    ensureCommandCenterActions();
   }, {once: true});
 })();
