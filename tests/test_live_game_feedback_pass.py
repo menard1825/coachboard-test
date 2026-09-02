@@ -285,3 +285,39 @@ def test_field_player_can_take_mound_without_benching_outgoing_pitcher(monkeypat
     assert payload['delta']['current_alignment']['1B'] == 'Aiden'
     assert {player['name'] for player in payload['delta']['bench']} == {'Jack'}
     assert payload['delta']['event']['event_type'] == 'Pitcher Change'
+
+
+def test_quick_field_rejects_player_marked_out(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import GameRotationEvent, PlayerGameAbsence
+
+    # Jack is player 10 in this fixture and begins on the bench.
+    # Mark him Out, then reproduce the Quick Field request that would
+    # otherwise put him into RF.
+    with app.app_context():
+        db.session.add(PlayerGameAbsence(
+            player_id=10,
+            game_id=70,
+            team_id=1,
+        ))
+        db.session.commit()
+
+    response = client.post('/api/live-game/70/defensive-change', json={
+        'player_id': 10,
+        'destination_position': 'RF',
+    })
+
+    assert response.status_code == 409
+    payload = response.get_json()
+    assert payload['status'] == 'error'
+    assert 'not available for this game' in payload['message']
+
+    with app.app_context():
+        assert db.session.query(GameRotationEvent).filter_by(
+            game_id=70,
+            team_id=1,
+        ).count() == 0

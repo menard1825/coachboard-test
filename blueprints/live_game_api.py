@@ -353,6 +353,19 @@ def defensive_change(game_id):
     if not player:
         return jsonify({'status': 'error', 'message': 'Player is not on this team.'}), 400
 
+    absent_ids = {
+        row.player_id
+        for row in db.session.query(PlayerGameAbsence).filter_by(
+            game_id=game.id,
+            team_id=team.id,
+        ).all()
+    }
+    if player.id in absent_ids:
+        return jsonify({
+            'status': 'error',
+            'message': f'{player.name} is not available for this game.',
+        }), 409
+
     _, actual_rotation, _ = _actual_rotation(game, team.id)
     before = _current_alignment(game, team.id, actual_rotation)
     after = deepcopy(before)
@@ -373,8 +386,12 @@ def defensive_change(game_id):
             after[source] = occupant
         # Bench -> occupied field means the occupant goes to the bench automatically.
 
-    roster_names = {p.name for p in db.session.query(Player).filter_by(team_id=team.id).all()}
-    valid, message = _validate_alignment(after, roster_names)
+    present_names = {
+        p.name
+        for p in db.session.query(Player).filter_by(team_id=team.id).all()
+        if p.id not in absent_ids
+    }
+    valid, message = _validate_alignment(after, present_names)
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
 
