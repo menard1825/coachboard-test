@@ -135,7 +135,7 @@
       bar = document.createElement('section');
       bar.id = MODE_ID;
       bar.innerHTML = `
-        <div class="cb-t2-mode-copy"><div class="cb-t2-mode-kicker">Pregame mode</div><div class="cb-t2-mode-help"></div></div>
+        <div class="cb-t2-mode-copy"><div class="cb-t2-mode-kicker">Get ready</div><div class="cb-t2-mode-help"></div></div>
         <div class="cb-t2-mode-buttons" role="group" aria-label="Pregame planning mode">
           <button type="button" class="btn" data-cb-t2-mode="first-pitch">First Pitch</button>
           <button type="button" class="btn" data-cb-t2-mode="full-plan">Full Plan</button>
@@ -283,7 +283,7 @@
     modal.innerHTML = `
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
-          <div class="modal-header"><div><div class="cb-t2-huddle-kicker">CoachBoard huddle</div><h5 class="modal-title mb-0">End Inning</h5><div class="cb-t2-huddle-sub"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Back to game"></button></div>
+          <div class="modal-header"><div><div class="cb-t2-huddle-kicker">Between innings</div><h5 class="modal-title mb-0">End Inning</h5><div class="cb-t2-huddle-sub"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Back to game"></button></div>
           <div class="modal-body"><div data-cb-t2-huddle-body></div><div class="cb-t2-error" data-cb-t2-huddle-error></div></div>
           <div class="cb-t2-start"><button type="button" class="btn btn-dark" data-cb-t2-start-inning disabled>Start Inning</button></div>
         </div>
@@ -325,7 +325,7 @@
       const moveMarkup = moves.length
         ? `<div class="cb-t2-moves">${moves.map(move => `<div class="cb-t2-move"><div><strong>${esc(move.name)}</strong><small>${esc(move.from)} → ${esc(move.to)}</small></div><div class="cb-t2-dest ${move.to === 'BENCH' ? 'bench' : ''}">${esc(move.to)}</div></div>`).join('')}</div>`
         : '<div class="cb-t2-huddle-status ready"><strong>Same defense</strong><span>The same players and positions are going back out.</span></div>';
-      body.innerHTML = `<div class="cb-t2-huddle-status ready"><strong>Inning ${esc(next)} defense is ready</strong><span>${moves.length ? 'Make these moves, then start the inning.' : 'No defensive moves are needed.'}</span></div>${moveMarkup}<div class="cb-t2-huddle-actions"><button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Review Next Inning plan</button></div>`;
+      body.innerHTML = `<div class="cb-t2-huddle-status ready"><strong>Inning ${esc(next)} defense is ready</strong><span>${moves.length ? 'Make these moves, then start the inning.' : 'No defensive moves are needed.'}</span></div>${moveMarkup}<div class="cb-t2-huddle-actions"><button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Change next defense</button></div>`;
       start.disabled = false;
       setText(start, `Start Inning ${next}`);
       showHuddleError('');
@@ -333,11 +333,11 @@
     }
 
     body.innerHTML = `
-      <div class="cb-t2-huddle-status"><strong>Choose the Inning ${esc(next)} defense</strong><span>End Inning no longer opens a second defense editor. Lock the next defense, then start the inning.</span></div>
+      <div class="cb-t2-huddle-status"><strong>Choose the Inning ${esc(next)} defense</strong><span>Pick who goes out next, then start the inning.</span></div>
       <div class="cb-t2-huddle-actions ${planned ? 'two' : ''}">
         <button type="button" class="btn btn-outline-dark" data-cb-t2-choice="current">Same Defense</button>
         ${planned ? '<button type="button" class="btn btn-outline-primary" data-cb-t2-choice="planned">Use Planned Defense</button>' : ''}
-        <button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Review Next Inning plan</button>
+        <button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Change next defense</button>
       </div>`;
     start.disabled = true;
     setText(start, `Start Inning ${next}`);
