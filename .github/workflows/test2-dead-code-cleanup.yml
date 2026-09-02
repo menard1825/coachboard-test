@@ -1,0 +1,117 @@
+name: Test 2 Dead Code Cleanup
+
+on:
+  push:
+    branches:
+      - fix/gameday-dugout-ux
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.event.head_commit.message == 'Run Test 2 dead-code cleanup'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/gameday-dugout-ux
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Remove retired Defense Change code
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          game_logic = Path('static/js/game_logic.js')
+          text = game_logic.read_text()
+          start = "        let swapPlayer1 = null;\n"
+          end = "        document.getElementById('liveUndoBtn')?.addEventListener('click', () => {"
+          assert text.count(start) == 1, 'Expected one retired swap workflow start marker'
+          assert text.count(end) == 1, 'Expected one live Undo marker'
+          a = text.index(start)
+          b = text.index(end, a)
+          game_logic.write_text(text[:a] + text[b:])
+
+          clarity = Path('static/js/live_game_inning_clarity.js')
+          text = clarity.read_text()
+          start = "  function loadUnifiedFeedbackPass() {\n"
+          end = "  function start() {\n"
+          assert text.count(start) == 1, 'Expected one feedback-pass loader'
+          assert text.count(end) == 1, 'Expected one clarity start function'
+          a = text.index(start)
+          b = text.index(end, a)
+          text = text[:a] + text[b:]
+          call = "    loadUnifiedFeedbackPass();\n"
+          assert text.count(call) == 1, 'Expected one feedback-pass loader call'
+          clarity.write_text(text.replace(call, '', 1))
+
+          bulk = Path('blueprints/live_game_bulk_api.py')
+          text = bulk.read_text()
+          assert text.startswith('import os\nimport re\n'), 'Unexpected bulk API import header'
+          text = text.replace('import os\nimport re\n', '', 1)
+          old_import = 'from flask import Blueprint, current_app, g, jsonify, request, url_for\n'
+          new_import = 'from flask import Blueprint, g, jsonify, request\n'
+          assert text.count(old_import) == 1, 'Unexpected Flask import line'
+          text = text.replace(old_import, new_import, 1)
+          tail = '\n\ndef _feedback_asset_url():\n'
+          assert text.count(tail) == 1, 'Expected one feedback injection tail'
+          text = text.split(tail, 1)[0].rstrip() + '\n'
+          bulk.write_text(text)
+
+          feedback = Path('static/js/live_game_feedback_pass.js')
+          assert feedback.exists(), 'Expected retired feedback-pass file'
+          feedback.unlink()
+
+          forbidden = ('liveDefensiveChangeBtn', 'liveDefensiveSwapModal', 'handleLiveSwapClick')
+          roots = [Path('static/js'), Path('templates')]
+          leftovers = []
+          for root in roots:
+              for path in root.rglob('*'):
+                  if not path.is_file() or path.suffix not in {'.js', '.html'}:
+                      continue
+                  body = path.read_text(errors='ignore')
+                  for token in forbidden:
+                      if token in body:
+                          leftovers.append(f'{path}: {token}')
+          assert not leftovers, 'Retired Defense Change UI still present:\n' + '\n'.join(leftovers)
+          PY
+
+      - name: Syntax and regression checks
+        env:
+          SECRET_KEY: ci-test-secret
+          COACHBOARD_ENV: test
+          DATABASE_URL: 'sqlite:///:memory:'
+        run: |
+          python -m py_compile blueprints/live_game_bulk_api.py
+          set -euo pipefail
+          while IFS= read -r -d '' file; do node --check "$file"; done < <(find static/js -type f -name '*.js' -print0 | sort -z)
+          python -m pytest -q
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Full Playwright suite
+        env:
+          COACHBOARD_E2E: '1'
+          PYTHONUNBUFFERED: '1'
+        run: python -u -m pytest -q tests/e2e --browser chromium
+
+      - name: Commit cleanup and remove this workflow
+        run: |
+          rm .github/workflows/test2-dead-code-cleanup.yml
+          git config user.name 'CoachBoard CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Remove retired Defense Change code paths'
+          git push origin HEAD:fix/gameday-dugout-ux
