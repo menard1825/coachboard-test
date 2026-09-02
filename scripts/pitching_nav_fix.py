@@ -6,12 +6,7 @@ text = base.read_text()
 old_route = "{% set cb_primary_nav_route = request.path in ['/', '/game-day', '/game-day/'] %}"
 new_route = "{% set cb_primary_nav_route = request.path in ['/', '/game-day', '/game-day/', '/pitching'] %}"
 assert text.count(old_route) == 1, 'Expected one primary mobile-nav route declaration'
-text = text.replace(old_route, new_route, 1)
-
-old_more = '''<li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="more" href="{% if request.path == '/' %}#more{% else %}{{ url_for('home') }}#more{% endif %}"><i class="bi bi-three-dots d-block"></i><span>More</span></a></li>'''
-new_more = '''<li class="nav-item flex-fill"><a class="nav-link text-center{% if request.path == '/pitching' %} active{% endif %}" data-cb-mobile-section="more" href="{% if request.path == '/' %}#more{% else %}{{ url_for('home') }}#more{% endif %}"{% if request.path == '/pitching' %} aria-current="page"{% endif %}><i class="bi bi-three-dots d-block"></i><span>More</span></a></li>'''
-assert text.count(old_more) == 1, 'Expected one mobile More nav item'
-base.write_text(text.replace(old_more, new_more, 1))
+base.write_text(text.replace(old_route, new_route, 1))
 
 mobile = Path('static/js/pitching_dugout_mobile.js')
 text = mobile.read_text()
@@ -74,11 +69,12 @@ def test_pitching_mobile_has_working_primary_navigation(page: Page, coachboard_u
     nav = page.locator('#cb-global-mobile-nav')
     expect(nav).to_be_visible(timeout=10_000)
     home = nav.locator('[data-cb-mobile-section="overview"]')
+    game_day = nav.locator('[data-cb-mobile-section="game-day"]')
+    roster = nav.locator('[data-cb-mobile-section="roster"]')
+    practice = nav.locator('[data-cb-mobile-section="practice_plan"]')
     more = nav.locator('[data-cb-mobile-section="more"]')
-    expect(home).to_be_visible()
-    expect(more).to_be_visible()
-    expect(more).to_have_class(re.compile(r'\bactive\b'))
-    expect(more).to_have_attribute('aria-current', 'page')
+    for item in (home, game_day, roster, practice, more):
+        expect(item).to_be_visible()
 
     home.click()
     expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?#overview$'))
