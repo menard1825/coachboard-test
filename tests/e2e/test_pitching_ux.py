@@ -184,3 +184,34 @@ def test_game_planning_uses_same_pitcher_decision_cards(page: Page, coachboard_u
     expect(availability).not_to_contain_text('Official today')
     expect(availability.locator('table')).to_be_hidden()
     assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
+
+
+def test_pitching_mobile_has_working_primary_navigation(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+    page.goto(f'{coachboard_url}/pitching', wait_until='domcontentloaded')
+
+    nav = page.locator('#cb-global-mobile-nav')
+    expect(nav).to_be_visible(timeout=10_000)
+    home = nav.locator('[data-cb-mobile-section="overview"]')
+    game_day = nav.locator('[data-cb-mobile-section="game-day"]')
+    roster = nav.locator('[data-cb-mobile-section="roster"]')
+    practice = nav.locator('[data-cb-mobile-section="practice_plan"]')
+    more = nav.locator('[data-cb-mobile-section="more"]')
+    for item in (home, game_day, roster, practice, more):
+        expect(item).to_be_visible()
+
+    home.click()
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?#overview$'))
+
+
+def test_pitching_desktop_does_not_render_mobile_only_collapse_button(page: Page, coachboard_url: str):
+    page.set_viewport_size({'width': 1440, 'height': 900})
+    login(page, coachboard_url)
+    page.goto(f'{coachboard_url}/pitching', wait_until='domcontentloaded')
+
+    cards = page.locator('.cb-pitcher-card')
+    expect(cards).not_to_have_count(0)
+    page.wait_for_function('() => window.CoachBoardPitchingDugoutMobile?.initialized === true')
+    expect(cards.first.locator('.cb-pitch-metrics')).to_be_visible()
+    expect(page.locator('.cb-pitcher-collapse-bottom')).to_have_count(0)

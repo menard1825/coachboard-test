@@ -97,7 +97,7 @@
 
     {% block head %}{% endblock %}
 </head>
-{% set cb_primary_nav_route = request.path in ['/', '/game-day', '/game-day/'] %}
+{% set cb_primary_nav_route = request.path in ['/', '/game-day', '/game-day/', '/pitching'] %}
 <body class="cb-ui{% if cb_primary_nav_route %} cb-primary-nav-route{% endif %}"
       data-coach-role="{{ session.get('role','') }}"
       data-coachboard-authenticated="{{ '1' if session.get('logged_in') else '0' }}"

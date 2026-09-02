@@ -79,8 +79,13 @@
     return button;
   }
 
-  function ensureBottomCollapse(card) {
-    if (card.querySelector('.cb-pitcher-collapse-bottom')) return;
+  function syncBottomCollapse(card, mobile = isMobile()) {
+    const existing = card.querySelector('.cb-pitcher-collapse-bottom');
+    if (!mobile) {
+      existing?.remove();
+      return;
+    }
+    if (existing) return;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'cb-pitcher-collapse-bottom';
@@ -130,7 +135,7 @@
       setCardGroup(card);
       ensureQuickUsage(card);
       freshTopToggle(card);
-      ensureBottomCollapse(card);
+      syncBottomCollapse(card);
       if (isMobile() && card.dataset.mobileExpanded !== 'true') setExpanded(card, false, {keepVisible: false});
       compactStatus(card, isMobile());
     });
@@ -214,7 +219,7 @@
     controlsBound = true;
     document.addEventListener('click', event => {
       const button = event.target.closest('.cb-pitcher-details-toggle, .cb-pitcher-collapse-bottom');
-      if (!button) return;
+      if (!button || !isMobile()) return;
       const card = button.closest('.cb-pitcher-card');
       if (!card) return;
       event.preventDefault();
@@ -249,7 +254,10 @@
 
     compactPageChrome(mobile);
     compactSummaryLabels(mobile);
-    document.querySelectorAll('.cb-pitcher-card').forEach(card => compactStatus(card, mobile));
+    document.querySelectorAll('.cb-pitcher-card').forEach(card => {
+      compactStatus(card, mobile);
+      syncBottomCollapse(card, mobile);
+    });
     if (mobile) {
       reorderDecisionBoard();
       document.querySelectorAll('.cb-pitcher-card').forEach(card => {
