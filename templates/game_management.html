@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_coachboard_formatters.html" import game_time %}
 
 {% block title %}Game vs {{ game['opponent'] }}{% endblock %}
 
@@ -13,15 +14,15 @@
                 <h3 class="mb-0 fw-bold">{{ current_team.team_name }} vs {{ game['opponent'] }}</h3>
                 <p class="text-muted mb-0">
                     <i class="bi bi-calendar-event"></i> {{ game.date | format_datetime }}
-                    {% if game.start_time %} | <i class="bi bi-clock"></i> {{ game.start_time }}{% endif %}
+                    {% if game.start_time %} | <i class="bi bi-clock"></i> {{ game_time(game.start_time) }}{% endif %}
                     {% if game.location %} | <i class="bi bi-geo-alt"></i> {{ game.location }}{% endif %}
                 </p>
             </div>
             <div>
-                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editGameModal">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editGameModal">
                     <i class="bi bi-pencil-square"></i> Edit
                 </button>
-                <a href="{{ url_for('home', _anchor='games') }}" class="btn btn-sm btn-secondary ms-1">
+                <a href="{{ url_for('game_day.game_day_home') }}" class="btn btn-sm btn-secondary ms-1">
                     <i class="bi bi-x-lg"></i> Close
                 </a>
             </div>
@@ -32,7 +33,7 @@
         <div class="row g-3 mb-4">
             <!-- Player Availability Card -->
             <div class="col-md-6 col-lg-3">
-                <div class="card h-100 shadow-sm border-0">
+                <div class="card h-100 shadow-sm border-0" id="availabilitySummaryCard">
                     <div class="card-body">
                         {% set absent_count = absent_player_ids | length %}
                         {% set present_count = roster | length - absent_count %}
@@ -44,9 +45,9 @@
                             <i class="bi bi-exclamation-circle-fill text-warning fs-5"></i>
                             {% endif %}
                         </div>
-                        <p class="h4 mb-0">{{ present_count }} <span class="fs-6 text-muted fw-normal">Present</span></p>
-                        <p class="small text-muted mb-3">{{ absent_count }} absent</p>
-                        <button class="btn btn-sm btn-outline-primary w-100" data-bs-toggle="collapse" data-bs-target="#availabilityCollapse">Edit Availability</button>
+                        <p class="h4 mb-0"><span id="availabilityPresentCount">{{ present_count }}</span> <span class="fs-6 text-muted fw-normal" id="availabilityPresentLabel">Present</span></p>
+                        <p class="small text-muted mb-3" id="availabilityAbsentCount">{{ absent_count }} out</p>
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="availabilityToggleBtn" data-bs-toggle="collapse" data-bs-target="#availabilityCollapse" aria-expanded="false" aria-controls="availabilityCollapse">Edit Availability</button>
                     </div>
                 </div>
             </div>
@@ -54,7 +55,7 @@
             <!-- Batting Lineup Card -->
             <div class="col-md-6 col-lg-3">
                 <div class="card h-100 shadow-sm border-0">
-                    <div class="card-body">
+                    <div class="card-body" id="lineupSummaryCard">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="mb-0"><i class="bi bi-card-list text-primary me-2"></i>Lineup</h6>
                             {% if lineup and lineup.lineup_positions %}
@@ -63,9 +64,9 @@
                             <i class="bi bi-exclamation-circle-fill text-warning fs-5"></i>
                             {% endif %}
                         </div>
-                        <p class="h4 mb-0">{{ lineup.lineup_positions|length if lineup and lineup.lineup_positions else 0 }} <span class="fs-6 text-muted fw-normal">Batters</span></p>
-                        <p class="small text-muted mb-3 text-truncate">{{ lineup.title if lineup else 'Not set' }}</p>
-                        <button class="btn btn-sm btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">Edit Lineup</button>
+                        <p class="h4 mb-0"><span id="lineupSummaryCount">{{ lineup.lineup_positions|length if lineup and lineup.lineup_positions else 0 }}</span> <span class="fs-6 text-muted fw-normal">Batters</span></p>
+                        <p class="small text-muted mb-3 text-truncate" id="lineupSummaryTitle">{{ lineup.title if lineup else 'Not set' }}</p>
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">Edit Lineup</button>
                     </div>
                 </div>
             </div>
@@ -84,7 +85,7 @@
                         </div>
                         <p class="h4 mb-0">{{ rotation.innings|length if rotation and rotation.innings else 0 }} <span class="fs-6 text-muted fw-normal">Innings</span></p>
                         <p class="small text-muted mb-3 text-truncate">{{ rotation.title if rotation else 'Not set' }}</p>
-                        <button class="btn btn-sm btn-outline-primary w-100" onclick="document.getElementById('rotation-card-container').scrollIntoView({behavior: 'smooth'})">Edit Defense</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="editDefenseBtn" onclick="document.getElementById('rotation-card-container').scrollIntoView({behavior: 'smooth'})">Edit Defense</button>
                     </div>
                 </div>
             </div>
@@ -101,15 +102,9 @@
                             <i class="bi bi-exclamation-circle-fill text-warning fs-5"></i>
                             {% endif %}
                         </div>
-                        {% set ns = namespace(count=0) %}
-                        {% for player in roster %}
-                            {% if pitch_count_summary.get(player.name, {}).get('coach_target') %}
-                                {% set ns.count = ns.count + 1 %}
-                            {% endif %}
-                        {% endfor %}
-                        <p class="h4 mb-0">{{ ns.count }} <span class="fs-6 text-muted fw-normal">Targets Set</span></p>
-                        <p class="small text-muted mb-3 text-truncate">Plan and restrictions</p>
-                        <button class="btn btn-sm btn-outline-primary w-100" onclick="document.getElementById('pitching-log-container').scrollIntoView({behavior: 'smooth'})">View Pitching</button>
+                        <p class="h4 mb-0"><span class="fs-6 text-muted fw-normal">Eligibility</span></p>
+                        <p class="small text-muted mb-3 text-truncate">Who can pitch today</p>
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="viewPitchingBtn" onclick="document.getElementById('pitching-log-container').scrollIntoView({behavior: 'smooth'})">View Availability</button>
                     </div>
                 </div>
             </div>
@@ -119,33 +114,33 @@
         <div class="collapse mb-4" id="availabilityCollapse">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <form action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
+                    <form id="gameAvailabilityForm" action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
                         <div class="row">
                             {% for player in roster %}
                             <div class="col-md-4 col-sm-6 mb-2">
-                                <div class="form-check form-switch">
+                                <div class="form-check form-switch border rounded p-2 ps-5">
                                     <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player['id'] }}" id="absent_{{ player['id'] }}" {% if player['id'] in absent_player_ids %}checked{% endif %}>
                                     <label class="form-check-label" for="absent_{{ player['id'] }}">{{ player['name'] }}</label>
                                 </div>
                             </div>
                             {% endfor %}
                         </div>
-                        <button type="submit" class="btn btn-success mt-3">Save Availability</button>
+                        <button type="submit" class="btn btn-success mt-3" id="saveGameAvailabilityBtn">Save Availability</button>
                     </form>
                 </div>
             </div>
         </div>
 
         <div class="d-grid mb-4">
-            <button class="btn btn-danger btn-lg shadow fw-bold py-3" id="startLiveGameBtnAction">
+            <button type="button" class="btn btn-danger btn-lg shadow fw-bold py-3" id="startLiveGameBtnAction">
                 <i class="bi bi-play-circle-fill me-2"></i> START LIVE GAME
             </button>
         </div>
     </div>
 
     <div class="row planner-controls" id="game-management-planner-row">
-        <div class="col-lg-6 mb-4 d-none" id="lineup-card-container">
-            {% include '_lineup_editor.html' %}
+        <div class="col-lg-12 mb-4" id="lineup-card-container">
+            {% include '_game_batting_order.html' %}
         </div>
 
         <div class="col-lg-12 mb-4" id="rotation-card-container">
@@ -155,7 +150,7 @@
         <div class="col-lg-12 mb-4" id="pitching-log-container">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitching Log & Targets</h5>
+                    <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitcher Availability & Plan</h5>
                 </div>
                 <div class="card-body">
                   {% include '_pitching_log.html' %}
@@ -167,43 +162,41 @@
 
 {# Edit Game Modal #}
 <div class="modal fade" id="editGameModal" tabindex="-1" aria-labelledby="editGameModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <form class="modal-content" action="{{ url_for('gameday.edit_game', game_id=game['id']) }}" method="POST">
       <div class="modal-header">
         <h5 class="modal-title" id="editGameModalLabel">Edit Game</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form action="{{ url_for('gameday.edit_game', game_id=game['id']) }}" method="POST">
-          <div class="modal-body">
-              <div class="row">
-                  <div class="col-md-6 mb-3">
-                      <label for="game_date" class="form-label">Date</label>
-                      <input type="date" class="form-control" id="game_date" name="game_date" value="{{ game_date_for_input }}">
-                  </div>
-                  <div class="col-md-6 mb-3">
-                      <label for="game_start_time" class="form-label">Time (Optional)</label>
-                      <input type="time" class="form-control" id="game_start_time" name="game_start_time" value="{{ game.get('start_time', '') }}">
-                  </div>
+      <div class="modal-body">
+          <div class="row">
+              <div class="col-md-6 mb-3">
+                  <label for="game_date" class="form-label">Date</label>
+                  <input type="date" class="form-control" id="game_date" name="game_date" value="{{ game_date_for_input }}" required>
               </div>
-              <div class="mb-3">
-                  <label for="game_opponent" class="form-label">Opponent</label>
-                  <input type="text" class="form-control" id="game_opponent" name="game_opponent" value="{{ game['opponent'] }}">
-              </div>
-              <div class="mb-3">
-                  <label for="game_location" class="form-label">Location</label>
-                  <input type="text" class="form-control" id="game_location" name="game_location" value="{{ game['location'] }}">
-              </div>
-              <div class="mb-3">
-                  <label for="game_notes" class="form-label">Notes</label>
-                  <textarea class="form-control" id="game_notes" name="game_notes" rows="3">{{ game['game_notes'] }}</textarea>
+              <div class="col-md-6 mb-3">
+                  <label for="game_start_time" class="form-label">Time (Optional)</label>
+                  <input type="time" class="form-control" id="game_start_time" name="game_start_time" value="{{ game.get('start_time', '') }}">
               </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            <button type="submit" class="btn btn-primary">Save changes</button>
+          <div class="mb-3">
+              <label for="game_opponent" class="form-label">Opponent</label>
+              <input type="text" class="form-control" id="game_opponent" name="game_opponent" value="{{ game['opponent'] }}" required>
           </div>
-      </form>
-    </div>
+          <div class="mb-3">
+              <label for="game_location" class="form-label">Location</label>
+              <input type="text" class="form-control" id="game_location" name="game_location" value="{{ game['location'] }}">
+          </div>
+          <div class="mb-3">
+              <label for="game_notes" class="form-label">Notes</label>
+              <textarea class="form-control" id="game_notes" name="game_notes" rows="3">{{ game['game_notes'] }}</textarea>
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="submit" class="btn btn-primary">Save changes</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -248,9 +241,15 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/lineup_editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
+<script src="{{ url_for('static', filename='js/live_game_inning_clarity.js') }}" data-live-inning-clarity="true"></script>
 <script src="{{ url_for('static', filename='js/live_game_v2.js') }}"></script>
 <script src="{{ url_for('static', filename='js/live_game_coach_ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/live_game_field_realism.js') }}"></script>
+<script src="{{ url_for('static', filename='js/gameday_pitching_steppers.js') }}"></script>
+<script src="{{ url_for('static', filename='js/game_prep_readiness.js') }}"></script>
+<script src="{{ url_for('static', filename='js/game_setup_ux.js') }}"></script>
+<script src="{{ url_for('static', filename='js/live_game_unified_field_entry.js') }}"></script>
+<script src="{{ url_for('static', filename='js/test2_game_contract.js') }}"></script>
 <script>
     // Keep the game shell visible without observing/mutating the same attributes.
     const keepGameShellVisible = () => {
@@ -276,6 +275,9 @@
             rotation: {{ rotation|tojson }},
             absent_player_ids: {{ absent_player_ids|tojson }},
             lineup_templates: {{ lineup_templates|tojson }},
+            previous_lineup: {{ previous_lineup|tojson }},
+            batting_order_mode: {{ batting_order_mode|tojson }},
+            fixed_lineup_size: {{ fixed_lineup_size|tojson }},
             rotation_templates: {{ rotation_templates|tojson }},
             pitch_count_summary: {{ pitch_count_summary|tojson }},
             outfielder_count: {{ current_team.outfielder_count if current_team else 3 }}

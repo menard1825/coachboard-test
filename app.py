@@ -1,8 +1,9 @@
 import os
 import json
 import sqlite3
+import zoneinfo
 from flask import Flask, render_template, session, jsonify, send_from_directory, redirect, url_for, flash, make_response
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from functools import wraps
 from sqlalchemy.orm import joinedload
 from sqlalchemy import event, func
@@ -41,9 +42,11 @@ from blueprints.live_game_bulk_api import live_game_bulk_bp
 from blueprints.live_game_safety import live_game_safety_bp
 from blueprints.live_game_pitching_api import live_game_pitching_bp
 from blueprints.security_guard import security_guard_bp
+from blueprints.coach_usage import coach_usage_bp
 from blueprints.live_game_write_lock import live_game_write_lock_bp
 from blueprints.live_game_clock import live_game_clock_bp
 from blueprints.postgame_navigation import postgame_navigation_bp
+from blueprints.fair_play import fair_play_bp
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
@@ -85,6 +88,10 @@ def create_app():
     app.secret_key = secret_key
 
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+    # Do not rewrite the signed session cookie on every background API request.
+    # Concurrent responses from a page opened before a team switch can otherwise
+    # overwrite the newer team selection with stale session data.
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = False
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_SECURE'] = _env_bool('SESSION_COOKIE_SECURE', runtime in {'production', 'prod'})
@@ -108,6 +115,7 @@ def create_app():
     # Register guards before application routes so their before_request handlers
     # protect all later blueprints.
     app.register_blueprint(security_guard_bp)
+    app.register_blueprint(coach_usage_bp)
     app.register_blueprint(live_game_write_lock_bp)
     app.register_blueprint(live_game_clock_bp)
     app.register_blueprint(postgame_navigation_bp)
@@ -129,6 +137,7 @@ def create_app():
     app.register_blueprint(live_game_pitching_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(stats_dashboard_bp)
+    app.register_blueprint(fair_play_bp)
 
     from flask_socketio import join_room, leave_room
     from models import TeamMembership
@@ -180,7 +189,21 @@ def create_app():
         if not dt or not isinstance(dt, (datetime, date)):
             return dt
         if isinstance(dt, datetime):
-            return dt.strftime('%A, %m/%d/%y, %I:%M %p')
+            # Timestamp columns in CoachBoard are stored as naive UTC. Convert
+            # them to the active team's timezone so Last Login/activity-style
+            # timestamps do not appear several hours off on a UTC server.
+            aware = dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+            tz_name = 'UTC'
+            team_id = session.get('team_id')
+            if team_id:
+                team = db.session.get(Team, team_id)
+                if team and team.timezone:
+                    tz_name = team.timezone
+            try:
+                aware = aware.astimezone(zoneinfo.ZoneInfo(tz_name))
+            except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+                pass
+            return aware.strftime('%A, %m/%d/%y, %I:%M %p')
         if isinstance(dt, date):
             return dt.strftime('%A, %m/%d/%y')
         return dt

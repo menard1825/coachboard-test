@@ -153,6 +153,60 @@ body.cb-ui .coach-primary-nav .dropdown-item:focus {
   color: var(--cb-ink) !important;
 }
 
+/* Bootstrap switches to the desktop header at 992px. Keep that richer nav on
+   iPad landscape, but compact the low-value account label so the header cannot
+   widen the whole page before full desktop widths are available. */
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  body.cb-ui .navbar > .container-fluid {
+    flex-wrap: nowrap;
+  }
+
+  body.cb-ui .navbar-brand {
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  body.cb-ui .navbar-brand-text {
+    display: block;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.cb-ui .coach-primary-nav {
+    flex: 0 0 auto;
+    gap: .35rem !important;
+    margin-left: .5rem !important;
+  }
+
+  body.cb-ui .coach-primary-nav .cb-nav-link,
+  body.cb-ui .coach-primary-nav .cb-nav-more {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  body.cb-ui #userMenuDesktop {
+    width: 48px;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 0;
+    padding-left: 10px;
+    padding-right: 6px;
+  }
+
+  body.cb-ui #userMenuDesktop .bi {
+    margin-right: 0 !important;
+    font-size: 1rem;
+  }
+
+  body.cb-ui #userMenuDesktop::after {
+    margin-left: 4px;
+    font-size: .7rem;
+    vertical-align: .12em;
+  }
+}
+
 /* Shared cards */
 body.cb-ui main .card,
 body.cb-ui main .accordion-item,
@@ -296,7 +350,6 @@ body.cb-ui .modal-content {
   box-shadow: 0 20px 60px rgba(16,24,40,.24);
   overflow: hidden;
 }
-
 body.cb-ui .modal-header {
   background: #fbfcfd;
   border-bottom-color: #e8ecf1;
@@ -599,5 +652,47 @@ body.cb-ui .gd-hero h1 {
 
   body.cb-ui .card-body {
     padding: 12px;
+  }
+}
+
+/* Shared mobile viewport/bottom-nav spacing.
+   main.css owns the legacy mobile shell, but several newer workspaces also
+   added their own 84-96px bottom spacers. Keep exactly one clearance owner so
+   the fixed bar does not leave a second scrollable buffer. */
+@media (max-width: 991.98px) {
+  html {
+    height: 100dvh;
+    min-height: 100dvh;
+    background: #fff;
+  }
+
+  body.cb-ui {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+
+  /* Pages without the shared five-button bar should not reserve nav space. */
+  body.cb-ui main.container-fluid {
+    min-height: 0;
+    padding-bottom: 16px !important;
+  }
+
+  /* Home and Game Day use the shared fixed bar. Reserve its height once here. */
+  body.cb-ui.cb-primary-nav-route main.container-fluid {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  }
+
+  body.cb-ui.cb-home #overview,
+  body.cb-ui #collaboration {
+    padding-bottom: 0 !important;
+  }
+
+  body.cb-ui #more .cb-mobile-more-shell {
+    padding-bottom: 8px !important;
+  }
+
+  body.cb-ui .bottom-nav-fixed {
+    bottom: 0;
+    background: #fff !important;
   }
 }

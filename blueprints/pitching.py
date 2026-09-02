@@ -11,6 +11,7 @@ from utils import (
 )
 from datetime import datetime
 from functools import wraps
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 
@@ -258,6 +259,35 @@ def pitching_page():
     all_outings = db.session.query(PitchingOuting).filter_by(team_id=team_id).options(joinedload(PitchingOuting.player)).all()
     all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
     recent_outings = sorted(all_outings, key=lambda o: o.date, reverse=True)[:15]
+    try:
+        local_today = datetime.now(ZoneInfo(team.timezone or 'America/Indiana/Indianapolis')).date()
+    except ZoneInfoNotFoundError:
+        local_today = datetime.now().date()
+
+    scheduled_games = sorted(
+        [game for game in db.session.query(Game).filter_by(team_id=team_id).all() if game.date.date() >= local_today],
+        key=lambda game: game.date,
+    )
+    games_by_id = {game.id: game for game in scheduled_games}
+    players_by_id = {player.id: player for player in all_players}
+    planned_targets = []
+    for target in sorted(all_targets, key=lambda item: (item.local_date, players_by_id.get(item.player_id).name if players_by_id.get(item.player_id) else '')):
+        if target.local_date < local_today.isoformat():
+            continue
+        target_player = players_by_id.get(target.player_id)
+        target_game = games_by_id.get(target.game_id)
+        if not target_player:
+            continue
+        planned_targets.append({
+            'id': target.id,
+            'player_id': target.player_id,
+            'player_name': target_player.full_name,
+            'target_pitches': target.target_pitches,
+            'local_date': target.local_date,
+            'reason': target.reason or '',
+            'game_id': target.game_id,
+            'game_label': f"vs {target_game.opponent}" if target_game else 'Entire game day',
+        })
 
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(
@@ -279,6 +309,9 @@ def pitching_page():
         current_team=team,
         pitchers=pitchers,
         rules=rules,
+        scheduled_games=scheduled_games,
+        planned_targets=planned_targets,
+        today_string=local_today.isoformat(),
     )
 
 
@@ -295,14 +328,34 @@ def save_player_target():
     if not team_id or not player_id or not local_date:
         return jsonify({'status': 'error', 'message': 'Missing required fields.'}), 400
 
-    player = db.session.query(Player).filter_by(id=int(player_id), team_id=team_id).first()
+    try:
+        player_id = int(player_id)
+        parsed_target_date = datetime.strptime(str(local_date), '%Y-%m-%d').date()
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': 'Player and target date must be valid.'}), 400
+
+    player = db.session.query(Player).filter_by(id=player_id, team_id=team_id).first()
     if not player:
         return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
 
+    normalized_game_id = None
+    if game_id not in (None, ''):
+        try:
+            normalized_game_id = int(game_id)
+        except (TypeError, ValueError):
+            return jsonify({'status': 'error', 'message': 'Scheduled game must be valid.'}), 400
+        game = db.session.query(Game).filter_by(id=normalized_game_id, team_id=team_id).first()
+        if not game:
+            return jsonify({'status': 'error', 'message': 'Scheduled game was not found for this team.'}), 404
+        parsed_target_date = game.date.date()
+
+    normalized_date = parsed_target_date.isoformat()
+    normalized_reason = str(reason or '').strip() or None
+
     target = db.session.query(PlayerPitchTarget).filter_by(
         player_id=player.id,
-        local_date=local_date,
-        game_id=game_id,
+        local_date=normalized_date,
+        game_id=normalized_game_id,
         team_id=team_id,
     ).first()
 
@@ -322,14 +375,14 @@ def save_player_target():
 
     if target:
         target.target_pitches = target_value
-        target.reason = reason
+        target.reason = normalized_reason
     else:
         db.session.add(PlayerPitchTarget(
             player_id=player.id,
             target_pitches=target_value,
-            local_date=local_date,
-            game_id=game_id,
-            reason=reason,
+            local_date=normalized_date,
+            game_id=normalized_game_id,
+            reason=normalized_reason,
             team_id=team_id,
         ))
 

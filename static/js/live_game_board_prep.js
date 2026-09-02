@@ -92,16 +92,22 @@
       #${PANEL_ID} .pde-spot:hover,#${PANEL_ID} .pde-spot:focus-visible{border-color:#667f9e;box-shadow:0 0 0 3px rgba(55,91,135,.14);outline:0}
       #${PANEL_ID} .pde-spot.open{background:#fff5f5;border-color:#d99a9a}
       #${PANEL_ID} .pde-pos{display:block;font-size:.52rem;line-height:1;font-weight:900;letter-spacing:.04em;color:#667085;margin-bottom:3px}
-      #${PANEL_ID} .pde-name{display:block;font-size:.68rem;line-height:1.08;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #${PANEL_ID} .pde-name{display:block;font-size:.68rem;line-height:1.08;font-weight:800;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
       #${PANEL_ID} .pde-spot.open .pde-name{color:#a63d3d}
       #${PANEL_ID} .pde-bench{padding:9px 10px 10px;background:#fff;border-top:1px solid #e4e9e4}
       #${PANEL_ID} .pde-label{font-size:.61rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin-bottom:6px}
       #${PANEL_ID} .pde-chips{display:flex;gap:5px;flex-wrap:wrap}
       #${PANEL_ID} .pde-chips span{font-size:.65rem;border:1px solid #dde2e7;background:#f8f9fb;border-radius:999px;padding:4px 7px;color:#475467;font-weight:650}
-      #${PANEL_ID} .pde-status{text-align:center;font-size:.71rem;color:#667085;margin-top:9px}
-      #${PANEL_ID} .pde-status .open{color:#a63d3d;font-weight:800}
+      #${PANEL_ID} .pde-status{display:flex;align-items:center;gap:10px;text-align:left;font-size:.72rem;margin-top:10px;border:2px solid #a66500;border-radius:11px;background:#fff4d8;color:#3f2b00;padding:9px 10px;box-shadow:0 2px 5px rgba(75,48,0,.08)}
+      #${PANEL_ID} .pde-status.complete{border-color:#176b38;background:#edf8f1;color:#123d23}
+      #${PANEL_ID} .pde-status-icon{font-size:1.05rem;line-height:1;flex:0 0 auto}
+      #${PANEL_ID} .pde-status-copy{min-width:0;flex:1}
+      #${PANEL_ID} .pde-status-copy strong{display:block;font-size:.76rem;font-weight:900;color:inherit}
+      #${PANEL_ID} .pde-status-copy span{display:block;font-size:.68rem;font-weight:700;color:inherit;margin-top:1px;line-height:1.25}
+      #${PANEL_ID} .pde-status-badge{flex:0 0 auto;background:#694200;color:#fff;border-radius:999px;padding:4px 8px;font-size:.56rem;font-weight:900;letter-spacing:.05em}
+      #${PANEL_ID} .pde-status.complete .pde-status-badge{background:#176b38}
       #pde-player-modal .modal-content,#pde-preset-modal .modal-content{border:0;border-radius:16px;overflow:hidden}
-      #pde-player-modal .pde-choice{padding:12px 14px}
+      #pde-player-modal .pde-choice{padding:14px;min-height:56px}
       #pde-player-modal .pde-choice small{display:block;color:#667085;margin-top:2px}
 
       @media (max-width:575.98px){
@@ -109,6 +115,8 @@
         #${PANEL_ID} .pde-body{padding:11px 12px 13px}
         #${PANEL_ID} .pde-tools{grid-template-columns:1fr 1fr}
         #${PANEL_ID} .pde-tools select{grid-column:1/-1}
+        #${PANEL_ID} .pde-status{align-items:flex-start}
+        #${PANEL_ID} .pde-status-badge{display:none}
         #${PANEL_ID} .pde-field{height:300px}
         #${PANEL_ID} .pde-spot{width:66px;min-height:41px;padding:4px}
         #${PANEL_ID} .pde-name{font-size:.58rem}
@@ -261,21 +269,29 @@
         <div>
           <div class="pde-kicker">Pregame Defense</div>
           <div class="pde-title">Set Inning ${esc(inning)}</div>
-          <div class="pde-help">Tap a position and choose the player. Nothing auto-swaps or bounces back.</div>
+          <div class="pde-help">Tap a position to assign a player.</div>
         </div>
         <div class="pde-inning"><small>INNING</small><strong>${esc(inning)}</strong></div>
       </div>
       <div class="pde-body">
         <div class="pde-tools">
           <select class="form-select" id="pde-preset">
-            <option value="">Defense Preset…</option>
+            <option value="">Starting Defense Template…</option>
             ${savedPresets.map((preset) => `<option value="${preset.id}">${esc(presetName(preset))}</option>`).join('')}
           </select>
           <button class="btn btn-outline-primary" id="pde-apply" disabled>Apply to Inning ${esc(inning)}</button>
-          <button class="btn btn-outline-secondary" id="pde-save">Save This Inning</button>
+          <button class="btn btn-outline-secondary" id="pde-save">Save as Starting Defense</button>
         </div>
         ${baseballField(source)}
-        <div class="pde-status">${open.length ? `<span class="open">Open: ${esc(open.join(', '))}</span>` : '<strong>Defense complete</strong>'} • Changes save to this inning only.</div>
+        <div class="pde-status ${open.length ? 'needs' : 'complete'}">
+          <i class="bi ${open.length ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill'} pde-status-icon" aria-hidden="true"></i>
+          <div class="pde-status-copy">
+            <strong>${open.length ? `${open.length} open position${open.length === 1 ? '' : 's'}` : 'Defense complete'}</strong>
+            <span class="pde-status-detail">${open.length ? esc(open.join(', ')) : 'Every field position has a player.'}</span>
+            <span class="pde-status-note">Changes save to this inning only.</span>
+          </div>
+          <span class="pde-status-badge">${open.length ? 'ACTION NEEDED' : 'READY'}</span>
+        </div>
       </div>`;
 
     panel.querySelectorAll('[data-pde-pos]').forEach((button) => {
@@ -297,7 +313,7 @@
     modal.className = 'modal fade';
     modal.tabIndex = -1;
     modal.innerHTML = `
-      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content">
           <div class="modal-header">
             <div><h5 class="modal-title mb-0"></h5><div class="small text-muted" id="pde-help"></div></div>
@@ -317,8 +333,8 @@
     const occupant = source[pos] || '';
     modal.querySelector('.modal-title').textContent = `${pos} — Choose Player`;
     $('pde-help').textContent = occupant
-      ? `Currently ${occupant}. Choosing someone else puts ${occupant} on the bench unless you place him elsewhere.`
-      : 'Open position. Choose who should play here.';
+      ? `Current: ${occupant}. Replacing him moves him to the bench.`
+      : 'Choose a player for this position.';
 
     const choices = presentPlayers()
       .map((player) => ({player, position: playerPosition(player.name, source)}))
@@ -428,7 +444,7 @@
       toast(
         unavailable.length
           ? `Preset applied. Open spots remain because ${[...new Set(unavailable)].join(', ')} is unavailable.`
-          : `${name} applied to Inning ${inning}.`,
+          : next.P ? `${name} applied to Inning ${inning}.` : `${name} applied. Choose the pitcher for Inning ${inning}.`,
         unavailable.length ? 'warning' : 'success'
       );
     } catch (error) {
@@ -448,14 +464,14 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <div><h5 class="modal-title mb-0">Save Defense Preset</h5><div class="small text-muted">Save this inning's defense for use in any single inning later.</div></div>
+            <div><h5 class="modal-title mb-0">Save Starting Defense</h5><div class="small text-muted">Reuse this starting defense from any Game Day planning screen.</div></div>
             <button class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <label class="form-label fw-semibold">Preset name</label>
+            <label class="form-label fw-semibold">Template name</label>
             <input id="pde-name" class="form-control form-control-lg" maxlength="60" placeholder="e.g. #1 Defense">
-            <div class="form-text">Separate from full-game Pool/Bracket templates.</div>
-            <div class="d-grid mt-3"><button class="btn btn-primary btn-lg" id="pde-confirm">Save Defense Preset</button></div>
+            <div class="form-text">Pitcher may remain open so you can choose him for each game.</div>
+            <div class="d-grid mt-3"><button class="btn btn-primary btn-lg" id="pde-confirm">Save Starting Defense</button></div>
           </div>
         </div>
       </div>`;
@@ -464,9 +480,9 @@
   }
 
   function openPresetModal() {
-    const open = positions().filter((pos) => !alignment()[pos]);
+    const open = positions().filter((pos) => pos !== 'P' && !alignment()[pos]);
     if (open.length) {
-      toast(`Fill ${open.join(', ')} before saving a defense preset.`, 'warning');
+      toast(`Fill ${open.join(', ')} before saving. Pitcher may remain open.`, 'warning');
       return;
     }
     const modal = presetModal();
@@ -486,7 +502,7 @@
     }
     input.classList.remove('is-invalid');
     if (presets().some((preset) => presetName(preset).toLowerCase() === name.toLowerCase())) {
-      toast(`A defense preset named “${name}” already exists.`, 'warning');
+      toast(`A Starting Defense named “${name}” already exists.`, 'warning');
       return;
     }
 
@@ -495,10 +511,10 @@
     button.disabled = true;
     button.textContent = 'Saving…';
     try {
-      const response = await fetch('/save_rotation_as_template', {
+      const response = await fetch('/api/starting-defense-template/save', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({title: PREFIX + name, innings: {'1': {...alignment()}}}),
+        body: JSON.stringify({title: name, innings: {'1': {...alignment()}}}),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.status === 'error') throw new Error(result.message || 'Unable to save preset.');
@@ -506,13 +522,13 @@
       bootstrap.Modal.getOrCreateInstance($('pde-preset-modal')).hide();
       filterWholeGameTemplates();
       render();
-      toast(`${name} saved as a one-inning defense preset.`);
+      toast(`${name} saved as a Starting Defense template.`);
     } catch (error) {
       toast(error.message, 'danger');
     } finally {
       busy = false;
       button.disabled = false;
-      button.textContent = 'Save Defense Preset';
+      button.textContent = 'Save Starting Defense';
     }
   }
 
@@ -570,7 +586,12 @@
 
     window.addEventListener('orientationchange', () => setTimeout(syncLegacyVisibility, 150));
     window.addEventListener('resize', () => syncLegacyVisibility(), {passive: true});
-    setInterval(syncLegacyVisibility, 1200);
+
+    const liveOverlay = $('live-game-overlay');
+    if (liveOverlay) {
+      const liveObserver = new MutationObserver(syncLegacyVisibility);
+      liveObserver.observe(liveOverlay, {attributes:true, attributeFilter:['class']});
+    }
   }
 
   async function init() {

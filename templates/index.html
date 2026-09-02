@@ -54,11 +54,26 @@
     </div>
     {# Roster is the default active tab #}
     <div class="tab-pane fade" id="roster" role="tabpanel">
+        <div class="cb-page-head cb-workspace-head">
+            <div>
+                <div class="cb-kicker">Team workspace</div>
+                <h2 class="cb-page-title">Roster</h2>
+                <p class="cb-page-subtitle">Keep player details accurate for lineups, defensive plans, pitching, and coach notes.</p>
+            </div>
+            <div class="cb-roster-metrics" aria-label="Roster summary">
+                <span><strong id="rosterPlayerCount">0</strong> players</span>
+                <span><strong id="rosterPitcherCount">0</strong> pitchers</span>
+                <span id="rosterProfileStatus"><strong>0</strong> profiles to finish</span>
+            </div>
+        </div>
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h5 class="mb-0">Current Roster</h5>
+                <div>
+                    <h5 class="mb-0">Player profiles</h5>
+                    <div class="small text-muted">Tap a player to review or edit their baseball profile.</div>
+                </div>
                 <div class="d-flex align-items-center gap-2">
-                    <input type="search" id="rosterSearch" class="form-control form-control-sm" placeholder="Search roster...">
+                    <input type="search" id="rosterSearch" class="form-control form-control-sm" placeholder="Search name, number, or position...">
                     <button class="btn btn-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#addPlayerModal">
                         <i class="bi bi-plus-circle"></i> New Player
                     </button>
@@ -77,11 +92,29 @@
     </div>
 
     <div class="tab-pane fade" id="player_development" role="tabpanel">
-        <div class="row">
-            <div class="col-lg-4 mb-3 mb-lg-0">
-                <div class="card">
+        <div class="cb-page-head cb-workspace-head">
+            <div>
+                <div class="cb-kicker">Coach development board</div>
+                <h2 class="cb-page-title">Player Development</h2>
+                <p class="cb-page-subtitle">Give each player a small number of clear priorities, record progress, and close the loop when a focus is complete.</p>
+            </div>
+            <div class="cb-page-actions">
+                <select id="devStatusFilter" class="form-select form-select-sm" aria-label="Filter development focuses">
+                    <option value="active">Active priorities</option>
+                    <option value="all">Active and completed</option>
+                    <option value="completed">Completed history</option>
+                </select>
+            </div>
+        </div>
+        <div class="cb-dev-mobile-picker d-lg-none">
+            <label for="devPlayerSelectMobile" class="form-label">Player</label>
+            <select id="devPlayerSelectMobile" class="form-select" aria-label="Choose a player"></select>
+        </div>
+        <div class="row g-3">
+            <div class="col-lg-4 mb-3 mb-lg-0 d-none d-lg-block">
+                <div class="card cb-dev-player-card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Players</h5>
+                        <div><h5 class="mb-0">Choose a player</h5><div class="small text-muted">Active priorities appear beside each name.</div></div>
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-outline-secondary" id="dev-sort-az" title="Sort A-Z"><i class="bi bi-sort-alpha-down"></i></button>
                             <button class="btn btn-outline-secondary" id="dev-sort-za" title="Sort Z-A"><i class="bi bi-sort-alpha-up"></i></button>
@@ -94,7 +127,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-lg-8">
+            <div class="col-12 col-lg-8">
                 <div id="player-dev-content"></div>
             </div>
         </div>
@@ -118,7 +151,7 @@
         </div>
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Unassigned Lineups</h5>
+                <h5 class="mb-0">Saved Lineup Templates</h5>
                 <button class="btn btn-primary btn-sm" id="createLineupBtn" data-bs-toggle="modal" data-bs-target="#lineupEditorModal"><i class="bi bi-plus-circle"></i> Create New</button>
             </div>
             <div class="accordion accordion-flush" id="lineupsAccordion"></div>
@@ -129,7 +162,7 @@
         {# NEW: Add an informational alert #}
         <div class="alert alert-info">
             <i class="bi bi-info-circle-fill"></i>
-            Create and manage reusable defensive rotation templates here. You can then load a template into any game from its 'Manage' screen.
+            Create a reusable Starting Defense with an optional pitcher, or build complete inning-by-inning rotation templates. Both are available from Game Day planning.
         </div>
         <div class="card">
             {# MODIFICATION: Update the card header text #}
@@ -231,30 +264,38 @@
     </div>
 
     <div class="tab-pane fade" id="practice_plan" role="tabpanel">
+        <div class="cb-page-head cb-workspace-head">
+            <div>
+                <div class="cb-kicker">Practice workspace</div>
+                <h2 class="cb-page-title">Practice Plans</h2>
+                <p class="cb-page-subtitle">Build the purpose and work areas for practice, track attendance and setup tasks, then reuse a successful plan on another date.</p>
+            </div>
+            <div class="cb-practice-summary" id="practicePlanSummary">No practices planned yet</div>
+        </div>
         <button class="btn btn-primary d-lg-none mb-3 w-100" type="button" data-bs-toggle="collapse" data-bs-target="#createPracticePlanForm">
-            <i class="bi bi-plus-circle"></i> Create New Plan
+            <i class="bi bi-plus-circle"></i> Plan a Practice
         </button>
         <div class="collapse d-lg-block" id="createPracticePlanForm">
-            <div class="card mb-4">
-                <div class="card-header"><h5 class="mb-0">Create New Practice Plan</h5></div>
+            <div class="card mb-4 cb-practice-create-card">
+                <div class="card-header"><h5 class="mb-0">Plan the next practice</h5><div class="small text-muted">Start with the reason for practice, then outline the four main work areas.</div></div>
                 <div class="card-body">
                     <form action="{{ url_for('team_management.add_practice_plan') }}" method="POST">
                         <div class="row g-3">
                             <div class="col-md-4"><label class="form-label">Date</label><input type="date" name="plan_date" class="form-control" required></div>
-                            <div class="col-md-8"><label class="form-label">General Notes</label><input type="text" name="general_notes" class="form-control" placeholder="e.g., Pre-tournament tune-up"></div>
-                            <div class="col-12"><label class="form-label">Emphasis</label><textarea name="emphasis" class="form-control" rows="2" placeholder="e.g., First-pitch strikes, aggressive baserunning"></textarea></div>
-                            <div class="col-md-6"><label class="form-label">Warm-up / Throwing</label><textarea name="warm_up" class="form-control" rows="3" placeholder="Dynamic warm-up, band work..."></textarea></div>
-                            <div class="col-md-6"><label class="form-label">Infield / Outfield</label><textarea name="infield_outfield" class="form-control" rows="3" placeholder="Ground balls, fly balls..."></textarea></div>
-                            <div class="col-md-6"><label class="form-label">Hitting</label><textarea name="hitting" class="form-control" rows="3" placeholder="Tee work, soft toss, live BP..."></textarea></div>
-                            <div class="col-md-6"><label class="form-label">Pitching / Catching</label><textarea name="pitching_catching" class="form-control" rows="3" placeholder="Bullpens, blocking drills..."></textarea></div>
-                            <div class="col-12 d-flex justify-content-end"><button type="submit" class="btn btn-primary">Create Plan</button></div>
+                            <div class="col-md-8"><label class="form-label">Practice title</label><input type="text" name="general_notes" class="form-control" placeholder="e.g., Pre-tournament communication and execution"></div>
+                            <div class="col-12"><label class="form-label">Top priorities</label><textarea name="emphasis" class="form-control" rows="2" placeholder="What should players improve or understand by the end?"></textarea></div>
+                            <div class="col-md-6"><label class="form-label"><i class="bi bi-activity me-1"></i>Arrival, warm-up & throwing</label><textarea name="warm_up" class="form-control" rows="3" placeholder="Dynamic warm-up, throwing progression, arm-care work..."></textarea></div>
+                            <div class="col-md-6"><label class="form-label"><i class="bi bi-shield-check me-1"></i>Team defense</label><textarea name="infield_outfield" class="form-control" rows="3" placeholder="Infield/outfield communication, coverage, team defense..."></textarea></div>
+                            <div class="col-md-6"><label class="form-label"><i class="bi bi-lightning-charge me-1"></i>Offensive work</label><textarea name="hitting" class="form-control" rows="3" placeholder="Hitting stations, baserunning, situational offense..."></textarea></div>
+                            <div class="col-md-6"><label class="form-label"><i class="bi bi-bullseye me-1"></i>Pitching & catching</label><textarea name="pitching_catching" class="form-control" rows="3" placeholder="Bullpens, command work, receiving, blocking..."></textarea></div>
+                            <div class="col-12 d-flex justify-content-end"><button type="submit" class="btn btn-primary"><i class="bi bi-calendar-check me-1"></i>Create Practice Plan</button></div>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
         <div class="card">
-            <div class="card-header"><h5 class="mb-0">Saved Practice Plans</h5></div>
+            <div class="card-header"><h5 class="mb-0">Practice library</h5><div class="small text-muted">Upcoming plans appear first. Open a plan to edit details, attendance, and setup tasks.</div></div>
             <div class="accordion accordion-flush" id="practicePlanAccordion"></div>
         </div>
     </div>
@@ -390,6 +431,19 @@
     </form>
   </div></div>
 </div>
+<div class="modal fade" id="reusePracticeModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Reuse Practice Plan</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <p class="text-muted">Copy <strong id="reusePracticeName">this plan</strong> to a new date. Attendance and completed task status always start fresh.</p>
+      <input type="hidden" id="reusePracticePlanId">
+      <div class="mb-3"><label for="reusePracticeDate" class="form-label fw-semibold">New practice date</label><input type="date" id="reusePracticeDate" class="form-control" required></div>
+      <div class="form-check"><input class="form-check-input" type="checkbox" id="reusePracticeTasks" checked><label class="form-check-label" for="reusePracticeTasks">Copy setup tasks as incomplete</label></div>
+      <div class="alert alert-danger d-none mt-3 mb-0" id="reusePracticeError"></div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" id="confirmReusePractice"><i class="bi bi-copy me-1"></i>Create Copy</button></div>
+  </div></div>
+</div>
 <div class="modal fade" id="editSignModal" tabindex="-1">
     <div class="modal-dialog"><div class="modal-content">
         <div class="modal-header"><h5 class="modal-title">Edit Sign</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -461,8 +515,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/lineup_editor.js') }}"></script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lineup_editor.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/main.js', v=css_version) }}"></script>
 {% endblock %}
 
 {# ========================================================================================= #}

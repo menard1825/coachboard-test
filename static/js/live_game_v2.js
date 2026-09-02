@@ -19,8 +19,7 @@
     function isLiveActionTarget(target) {
         return target?.closest?.([
             '#startLiveGameBtnAction', '#liveGameModeToggle', '#liveChangePitcherBtn',
-            '#liveDefensiveChangeBtn', '#liveEndInningBtn', '#liveUndoBtn',
-            '#liveEndGameBtn', '#confirmFinalCountsBtn'
+            '#liveUndoBtn', '#liveEndGameBtn', '#confirmFinalCountsBtn'
         ].join(','));
     }
 
@@ -317,49 +316,6 @@
         bootstrap.Modal.getOrCreateInstance(modal).show();
     }
 
-    function showDefensiveChange() {
-        const modal = modalShell('live-defense-v2', 'Defensive Change');
-        const body = modal.querySelector('.modal-body');
-        const alignment = currentAlignment();
-        const assigned = new Set(Object.values(alignment).filter(Boolean));
-        const field = Object.entries(alignment).filter(([, name]) => name);
-        const bench = (liveState.roster || []).filter(p => !assigned.has(p.name));
-        body.innerHTML = `<div class="small text-uppercase text-muted fw-bold mb-2">Who are you moving?</div><div class="list-group">${field.map(([pos, name]) => {
-            const p = liveState.roster.find(x => x.name === name);
-            return p ? `<button type="button" class="list-group-item list-group-item-action defense-player-v2" data-player-id="${p.id}"><strong>${esc(pos)}</strong> — ${esc(name)}</button>` : '';
-        }).join('')}<div class="list-group-item bg-light fw-bold small">BENCH</div>${bench.map(p => `<button type="button" class="list-group-item list-group-item-action defense-player-v2" data-player-id="${p.id}">${esc(p.name)}</button>`).join('')}</div>`;
-        body.addEventListener('click', e => {
-            const btn = e.target.closest('.defense-player-v2');
-            if (!btn) return;
-            bootstrap.Modal.getOrCreateInstance(modal).hide();
-            showDefensiveDestination(Number(btn.dataset.playerId));
-        });
-        bootstrap.Modal.getOrCreateInstance(modal).show();
-    }
-
-    function showDefensiveDestination(playerId) {
-        const player = liveState.roster.find(p => Number(p.id) === Number(playerId));
-        if (!player) return;
-        const alignment = currentAlignment();
-        const currentPos = Object.entries(alignment).find(([, name]) => name === player.name)?.[0] || 'BENCH';
-        const positions = ['BENCH','P','C','1B','2B','3B','SS','LF', ...(liveState.outfielder_count === 4 ? ['LCF','RCF'] : ['CF']), 'RF'];
-        const modal = modalShell('live-defense-destination-v2', `Move ${player.name}`);
-        const body = modal.querySelector('.modal-body');
-        body.innerHTML = `<p class="text-muted">Currently: ${esc(currentPos)}</p><div class="row g-2">${positions.filter(p => p !== currentPos).map(pos => `<div class="col-6 col-md-4"><button type="button" class="btn btn-outline-primary w-100 py-3 defense-destination-v2" data-destination="${pos}">${esc(pos)}${alignment[pos] ? `<div class="small">Swap with ${esc(alignment[pos])}</div>` : ''}</button></div>`).join('')}</div>`;
-        body.addEventListener('click', async e => {
-            const btn = e.target.closest('.defense-destination-v2');
-            if (!btn || actionBusy) return;
-            actionBusy = true;
-            try {
-                await api('/defensive-change', { method: 'POST', body: JSON.stringify({ player_id: playerId, destination_position: btn.dataset.destination }) });
-                bootstrap.Modal.getOrCreateInstance(modal).hide();
-                toast(`✓ ${player.name} → ${btn.dataset.destination} • Saved & Synced`);
-            } catch (err) { toast(err.message, 'danger'); }
-            finally { actionBusy = false; }
-        });
-        bootstrap.Modal.getOrCreateInstance(modal).show();
-    }
-
     function renderPitchingBoard() {
         const pregame = byId('pregame-checklist-container');
         if (!pregame || liveState?.game?.is_live) return;
@@ -441,7 +397,7 @@
             else hit.checked = false;
             return;
         }
-        if (actionBusy && id !== 'liveChangePitcherBtn' && id !== 'liveDefensiveChangeBtn') return;
+        if (actionBusy && id !== 'liveChangePitcherBtn') return;
 
         try {
             if (id === 'startLiveGameBtnAction') {
@@ -450,13 +406,6 @@
                 toast('✓ Live Game started • Saved & Synced');
             } else if (id === 'liveChangePitcherBtn') {
                 showPitcherPicker();
-            } else if (id === 'liveDefensiveChangeBtn') {
-                showDefensiveChange();
-            } else if (id === 'liveEndInningBtn') {
-                if (!confirm('End this inning and load the planned next inning?')) return;
-                actionBusy = true;
-                await api('/end-inning', { method: 'POST', body: '{}' });
-                toast('✓ Inning advanced • Saved & Synced');
             } else if (id === 'liveUndoBtn') {
                 actionBusy = true;
                 await api('/undo', { method: 'POST', body: '{}' });
@@ -485,6 +434,11 @@
     }
 
     function connectSocket() {
+        if (typeof io !== 'function') {
+            connected = false;
+            setSyncStatus(liveState?.game?.is_live ? 'offline' : 'synced');
+            return;
+        }
         socket = io();
         socket.on('connect', async () => {
             connected = true;

@@ -74,7 +74,7 @@
       #${PANEL_ID} .pde-title{font-size:1rem!important}
       #${PANEL_ID} .pde-help{font-size:.72rem!important}
       #${PANEL_ID} .pde-tools{
-        grid-template-columns:minmax(0,1fr) auto!important;
+        grid-template-columns:minmax(0,1fr) auto auto!important;
         align-items:end;
         padding:10px;
         background:#f8fafc;
@@ -93,8 +93,10 @@
         letter-spacing:.06em;
         margin:0 0 5px 2px;
       }
+      #${PANEL_ID} .gm-preset-help{display:none!important}
       #${PANEL_ID} #pde-save{display:none!important}
-      #${PANEL_ID} #pde-apply{white-space:nowrap}
+      #${PANEL_ID} #pde-apply{white-space:normal}
+      #${PANEL_ID} #pde-primary-fill{white-space:nowrap}
       #${PANEL_ID} .pde-status{font-size:.7rem!important}
       #${PANEL_ID} .pde-field-caption strong{font-size:.72rem!important}
       #rotation-card-container .gm-secondary-report .accordion-collapse,
@@ -104,8 +106,28 @@
         #rotation-card-container .gm-coach-inning-label{width:100%;margin-bottom:2px}
         #rotation-card-container .gm-coach-actions{display:grid!important;grid-template-columns:1fr auto;width:100%}
         #rotation-card-container .gm-coach-actions #copyPreviousInningBtn{width:100%}
-        #${PANEL_ID} .pde-tools{grid-template-columns:1fr!important}
-        #${PANEL_ID} #pde-apply{width:100%}
+        #${PANEL_ID} .pde-tools{
+          display:grid!important;
+          grid-template-columns:minmax(0,1fr)!important;
+          gap:8px!important;
+          align-items:stretch!important;
+        }
+        #${PANEL_ID} .gm-preset-wrap,
+        #${PANEL_ID} #pde-preset,
+        #${PANEL_ID} #pde-apply,
+        #${PANEL_ID} #pde-primary-fill{
+          width:100%!important;
+          max-width:none!important;
+        }
+        #${PANEL_ID} .gm-preset-wrap{grid-row:1!important}
+        #${PANEL_ID} #pde-apply{grid-row:2!important}
+        #${PANEL_ID} #pde-primary-fill{grid-row:3!important}
+        #${PANEL_ID} #pde-apply{
+          display:block!important;
+          min-height:42px;
+          text-align:center;
+          justify-self:stretch;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -201,9 +223,6 @@
     }
 
     try {
-      // Force the original editor to persist the newly-created sub-inning before
-      // we remove it. This matters if the coach adds it and immediately changes
-      // their mind before the normal autosave timer fires.
       document.getElementById('saveRotationBtn')?.click();
       const data = await fetchLatestRotationUntil(raw);
       if (!data?.rotation) throw new Error('Could not find the current defense plan.');
@@ -214,9 +233,6 @@
         throw new Error('That planned change was not found. Refresh the page and try again.');
       }
 
-      // Move the original game editor back to the base inning before the server
-      // broadcasts the updated rotation, so its private currentInning state never
-      // points at a key that is about to disappear.
       document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`)?.click();
 
       delete innings[raw];
@@ -271,14 +287,26 @@
     if (menuToggle && menuToggle.dataset.coachSimplified !== '1') {
       menuToggle.dataset.coachSimplified = '1';
       setHtml(menuToggle, '<i class="bi bi-sliders me-1"></i> Defense Options');
-      menuToggle.title = 'Less-used defense tools';
+      menuToggle.title = 'Defense tools';
     }
 
     const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');
-    if (rotationTemplateSelect?.options?.length) setText(rotationTemplateSelect.options[0], 'Load full rotation template…');
+    if (rotationTemplateSelect?.options?.length) {
+      setText(rotationTemplateSelect.options[0], 'Load full-game defense plan (all innings)…');
+    }
+
+    if (menu && rotationTemplateSelect && !document.getElementById('gmFullGamePlanHeader')) {
+      const templateItem = rotationTemplateSelect.closest('li');
+      if (templateItem) {
+        const header = document.createElement('li');
+        header.id = 'gmFullGamePlanHeader';
+        header.innerHTML = '<div class="dropdown-header">Full-game defense plan · all innings</div>';
+        menu.insertBefore(header, templateItem);
+      }
+    }
 
     const saveFullTemplate = document.getElementById('saveAsTemplateBtn');
-    setHtml(saveFullTemplate, '<i class="bi bi-journal-plus me-1"></i> Save Full Rotation as Template');
+    setHtml(saveFullTemplate, '<i class="bi bi-journal-plus me-1"></i> Save All Innings as Full-Game Plan');
 
     const printCard = document.getElementById('printCardBtn');
     setHtml(printCard, '<i class="bi bi-printer me-1"></i> Print Defense / Lineup Card');
@@ -290,7 +318,7 @@
       const divider = document.createElement('li');
       divider.innerHTML = '<hr class="dropdown-divider">';
       const item = document.createElement('li');
-      item.innerHTML = '<button type="button" class="dropdown-item" id="gmSaveCurrentDefensePreset"><i class="bi bi-bookmark-plus me-1"></i> Save Current Defense as Preset</button>';
+      item.innerHTML = '<button type="button" class="dropdown-item" id="gmSaveCurrentDefensePreset"><i class="bi bi-bookmark-plus me-1"></i> Save This Inning as a Starting Defense</button>';
       const deleteItem = deleteRotation?.closest('li');
       if (deleteItem) {
         menu.insertBefore(divider, deleteItem);
@@ -405,7 +433,7 @@
     const toolsMenu = toolsToggle?.nextElementSibling;
     if (toolsToggle) {
       setHtml(toolsToggle, '<i class="bi bi-three-dots me-1"></i> Inning Options');
-      toolsToggle.title = 'Less-used inning tools';
+      toolsToggle.title = 'Inning tools';
     }
 
     if (toolsMenu && toolsMenu.dataset.coachSimplified !== '1') {
@@ -424,8 +452,6 @@
       toolsMenu.appendChild(divider);
       addInningOption(toolsMenu, 'gmAddInningAction', 'plus-circle', 'Add Another Inning', 'addInningBtn');
       addInningOption(toolsMenu, 'gmRemoveInningAction', 'dash-circle', 'Remove Last Inning', 'removeInningBtn', true);
-      // Mid-inning planning intentionally lives under Defense Options now. It is
-      // a rare/advanced workflow and should not compete with normal inning setup.
       document.getElementById('gmAddSubInningAction')?.closest('li')?.remove();
     }
     syncRemoveCurrentSubAction(toolsMenu);
@@ -434,7 +460,7 @@
     if (planner && !planner.querySelector('.gm-coach-help')) {
       const help = document.createElement('div');
       help.className = 'gm-coach-help';
-      help.innerHTML = '<i class="bi bi-info-circle me-1"></i>Pick an inning, then tap a position on the field to assign a player. Changes save automatically.';
+      help.innerHTML = '<i class="bi bi-info-circle me-1"></i>Select an inning, then tap a position to assign a player. Saves automatically.';
       pickerRow.insertAdjacentElement('afterend', help);
     }
   }
@@ -450,26 +476,34 @@
     setText(
       help,
       isSubInning(inning)
-        ? `Set the defense after this planned change during Inning ${Math.floor(Number.parseFloat(inning))}. Changes save automatically.`
-        : 'Tap a position to assign or change a player. Changes save automatically.'
+        ? `Set the defense after this planned change during Inning ${Math.floor(Number.parseFloat(inning))}. Saves automatically.`
+        : 'Tap a position to assign or change a player. Saves automatically.'
     );
 
     const tools = panel.querySelector('.pde-tools');
     const select = document.getElementById('pde-preset');
     const apply = document.getElementById('pde-apply');
-    if (select?.options?.length) setText(select.options[0], 'Optional: choose a defense preset…');
-    setText(apply, 'Use Preset');
+    if (select?.options?.length) setText(select.options[0], 'Choose Starting Defense…');
+    setText(apply, `Apply to Inning ${shortInningLabel(inning)}`);
 
-    if (tools && select && !tools.querySelector('.gm-preset-wrap')) {
-      const wrap = document.createElement('div');
+    let wrap = tools?.querySelector('.gm-preset-wrap');
+    if (tools && select && !wrap) {
+      wrap = document.createElement('div');
       wrap.className = 'gm-preset-wrap';
-      const label = document.createElement('label');
-      label.className = 'gm-preset-label';
-      label.htmlFor = 'pde-preset';
-      label.textContent = 'Quick Setup (Optional)';
       tools.insertBefore(wrap, select);
-      wrap.appendChild(label);
       wrap.appendChild(select);
+    }
+
+    if (wrap) {
+      let label = wrap.querySelector('.gm-preset-label');
+      if (!label) {
+        label = document.createElement('label');
+        label.className = 'gm-preset-label';
+        label.htmlFor = 'pde-preset';
+        wrap.insertBefore(label, select);
+      }
+      setText(label, 'Starting Defense Preset (Optional)');
+      wrap.querySelector('.gm-preset-help')?.remove();
     }
 
     setText(panel.querySelector('.pde-field-caption strong'), 'Current Defense');
@@ -477,11 +511,7 @@
 
     const status = panel.querySelector('.pde-status');
     if (status) {
-      const open = status.querySelector('.open')?.textContent?.trim();
-      const desired = open
-        ? `<span class="open">${open}</span> <span class="mx-1">•</span> Changes save automatically`
-        : '<strong>Defense complete</strong> <span class="mx-1">•</span> Changes save automatically';
-      setHtml(status, desired);
+      setText(status.querySelector('.pde-status-note'), 'Saves automatically.');
     }
   }
 

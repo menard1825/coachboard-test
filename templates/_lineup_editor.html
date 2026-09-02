@@ -1,44 +1,57 @@
 <div class="modal fade" id="lineupEditorModal" tabindex="-1" aria-labelledby="lineupEditorModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-fullscreen-sm-down modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-fullscreen-sm-down modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="lineupEditorModalLabel">Edit Batting Lineup</h5>
+                <div>
+                    <h5 class="modal-title" id="lineupEditorModalLabel">Batting Lineup</h5>
+                    <div class="small text-muted" id="lineupEditorSubtitle">Add players and set the batting order.</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="lineupTemplateSelect" class="form-label">Load from Template</label>
-                        <select id="lineupTemplateSelect" class="form-select">
-                            <option value="">-- Select a Template --</option>
-                            </select>
+                <div class="card bg-light border-0 mb-3" id="lineupSourceCard">
+                    <div class="card-body p-3">
+                        <label for="lineupTemplateSelect" class="form-label fw-semibold mb-1">Start from</label>
+                        <div class="input-group">
+                            <select id="lineupTemplateSelect" class="form-select"><option value="">Blank lineup</option></select>
+                            <button type="button" class="btn btn-outline-primary" id="applyLineupSourceBtn">Apply</button>
+                        </div>
+                        <div class="form-text">Select a template and choose Apply.</div>
                     </div>
                 </div>
-                <p class="text-muted">Or, build a new lineup below. Drag and drop players...</p>
-                <form onsubmit="return false;">
-                    <input type="hidden" id="lineupId" name="lineup_id" value="{{ lineup.id if lineup else '' }}">
-                    <div class="mb-3">
-                        <label for="lineupTitle" class="form-label visually-hidden">Lineup Title</label>
-                        <input type="text" class="form-control" id="lineupTitle" value="{{ lineup.title if lineup else '' }}" placeholder="Lineup Title" required>
+                <div id="lineupEditorFeedback" class="d-none" role="status"></div>
+                <div id="lineupEditorStatus" class="alert alert-light border py-2 mb-3"></div>
+                <input type="hidden" id="lineupId" value="">
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-md">
+                        <label for="lineupTitle" class="form-label fw-semibold">Lineup name</label>
+                        <input type="text" class="form-control" id="lineupTitle" maxlength="120" placeholder="Example: Everyday batting order" required>
                     </div>
-                    
-                    <div class="row" id="lineup-editor-lists">
-                        <div class="col-md-7 order-1 order-md-2">
-                            <h6>Batting Order</h6>
-                            <div id="lineup-order" class="list-group border rounded p-2" style="max-height: 50vh; overflow-y: auto;">
-                                </div>
-                        </div>
-                        <div class="col-md-5 order-2 order-md-1">
-                            <h6>Bench</h6>
-                            <div id="lineup-bench" class="list-group border rounded p-2" style="max-height: 50vh; overflow-y: auto;">
-                                </div>
-                        </div>
+                    <div class="col-md-auto">
+                        <button type="button" class="btn btn-outline-secondary w-100" id="rotateLineupBtn"><i class="bi bi-arrow-repeat me-1"></i>Rotate top to bottom</button>
                     </div>
-                </form>
+                </div>
+                <div class="form-check form-switch mb-3" id="lineupDefaultWrap">
+                    <input class="form-check-input" type="checkbox" role="switch" id="lineupIsDefault">
+                    <label class="form-check-label" for="lineupIsDefault">Use as default Game Day lineup</label>
+                </div>
+                <div class="row g-3" id="lineup-editor-lists">
+                    <div class="col-lg-7">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="mb-0">Batting Order</h6>
+                            <span class="small text-muted d-none d-md-inline">Drag the grip or use arrows</span>
+                        </div>
+                        <div id="lineup-order" class="list-group border rounded overflow-auto" style="max-height: 52vh;"></div>
+                    </div>
+                    <div class="col-lg-5">
+                        <h6 class="mb-2">Available Players</h6>
+                        <div id="lineup-bench" class="list-group border rounded overflow-auto" style="max-height: 52vh;"></div>
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="saveLineupBtn" class="btn btn-primary">Save Lineup</button>
+            <div class="modal-footer flex-nowrap">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="saveLineupBtn" class="btn btn-primary flex-grow-1 flex-sm-grow-0">Save Lineup</button>
             </div>
         </div>
     </div>

@@ -250,3 +250,752 @@ body.cb-ui:has(#pregame-defense-editor-v3) main > .container-fluid {
 body.cb-ui:has(#pregame-defense-editor-v3) main::before {
   content: none;
 }
+
+/* Coaching workspaces: roster, development, and practice planning. */
+.cb-workspace-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.cb-roster-metrics,
+.cb-dev-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cb-roster-metrics > span,
+.cb-dev-metrics > span,
+.cb-practice-summary {
+  padding: 8px 11px;
+  border: 1px solid var(--cb-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--cb-muted);
+  font-size: .76rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.cb-roster-metrics strong,
+.cb-dev-metrics strong,
+.cb-practice-summary strong {
+  color: var(--cb-ink);
+}
+
+.cb-roster-metrics .is-complete {
+  border-color: #a7d9bd;
+  background: #f0faf4;
+  color: #17653b;
+}
+
+.cb-roster-player {
+  overflow: hidden;
+  border-color: var(--cb-border);
+  box-shadow: none;
+}
+
+.cb-roster-player.cb-profile-incomplete {
+  border-left: 3px solid #d6a526;
+}
+
+.cb-roster-player-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.cb-roster-player-main,
+.cb-roster-player-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cb-player-initial {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #edf2ff;
+  color: var(--cb-primary);
+  font-size: .9rem;
+  font-weight: 800;
+}
+
+.cb-player-initial-sm {
+  flex-basis: 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: .72rem;
+}
+
+.cb-roster-name {
+  color: var(--cb-ink);
+  font-size: .94rem;
+}
+
+.cb-jersey-number {
+  color: var(--cb-primary);
+  font-size: .74rem;
+  font-weight: 800;
+}
+
+.cb-roster-meta {
+  margin-top: 2px;
+  color: var(--cb-muted);
+  font-size: .72rem;
+}
+
+.cb-position-badges {
+  display: flex;
+  gap: 5px;
+}
+
+.cb-expand-icon {
+  color: var(--cb-muted);
+  transition: transform .2s ease;
+}
+
+.cb-roster-player-summary[aria-expanded="true"] .cb-expand-icon {
+  transform: rotate(180deg);
+}
+
+.cb-roster-editor {
+  border-top: 1px solid var(--cb-border);
+  background: #f8fafc;
+}
+
+.cb-form-section-title {
+  color: var(--cb-primary);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.cb-dev-player-card .list-group-item {
+  border-left: 0;
+  border-right: 0;
+  padding: 11px 12px;
+}
+
+.cb-dev-mobile-picker {
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--cb-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--cb-shadow);
+}
+
+.cb-dev-mobile-picker .form-label {
+  margin-bottom: 5px;
+  color: var(--cb-muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.cb-dev-player.active {
+  border-color: var(--cb-primary);
+  background: #eef3ff;
+  color: var(--cb-ink);
+}
+
+.cb-dev-count {
+  color: var(--cb-muted);
+  font-size: .68rem;
+  text-align: right;
+}
+
+.cb-dev-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.cb-dev-metrics {
+  margin-bottom: 14px;
+}
+
+.cb-focus-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.cb-focus-card {
+  padding: 14px;
+  border: 1px solid #cfdaf0;
+  border-left: 4px solid var(--cb-primary);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.cb-focus-card.is-completed {
+  border-color: var(--cb-border);
+  border-left-color: #5ca578;
+  background: #fbfdfb;
+}
+
+.cb-focus-topline,
+.cb-focus-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cb-skill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--cb-primary);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.cb-focus-card h5 {
+  margin: 9px 0;
+  font-size: .98rem;
+}
+
+.cb-focus-note,
+.cb-focus-progress {
+  margin-top: 7px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f5f7fa;
+  color: #4d5b70;
+  font-size: .76rem;
+}
+
+.cb-focus-progress {
+  background: #eef8f1;
+}
+
+.cb-focus-actions {
+  justify-content: flex-start;
+  margin-top: 11px;
+}
+
+.cb-lesson-card {
+  border-color: var(--cb-border);
+  box-shadow: none;
+}
+
+.cb-empty-state i {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--cb-primary);
+  font-size: 1.7rem;
+}
+
+.cb-empty-state h5 {
+  margin-bottom: 4px;
+}
+
+.cb-empty-state p {
+  margin-bottom: 0;
+}
+
+.cb-practice-plan-button {
+  display: grid;
+  grid-template-columns: 190px minmax(240px, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 15px 18px;
+}
+
+.cb-practice-date,
+.cb-practice-title {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  text-align: left;
+}
+
+.cb-practice-date small,
+.cb-practice-title small {
+  overflow: hidden;
+  color: var(--cb-muted);
+  font-size: .69rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cb-practice-plan.is-upcoming .cb-practice-date small {
+  color: #17653b;
+  font-weight: 750;
+}
+
+.cb-practice-meta {
+  display: flex;
+  gap: 6px;
+  margin-right: 20px;
+}
+
+.cb-practice-meta span {
+  padding: 4px 7px;
+  border: 1px solid var(--cb-border);
+  border-radius: 999px;
+  color: var(--cb-muted);
+  font-size: .65rem;
+  white-space: nowrap;
+}
+
+.cb-practice-preview {
+  display: grid;
+  grid-template-columns: minmax(180px, .7fr) minmax(0, 1.8fr);
+  gap: 14px;
+}
+
+.cb-practice-purpose,
+.cb-practice-work {
+  padding: 12px;
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.cb-practice-purpose p,
+.cb-practice-work p {
+  margin: 5px 0 0;
+  color: #536074;
+  font-size: .75rem;
+  white-space: pre-line;
+}
+
+.cb-practice-work-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cb-practice-work {
+  display: flex;
+  gap: 9px;
+  background: #fff;
+}
+
+.cb-practice-work > i {
+  color: var(--cb-primary);
+}
+
+.cb-practice-work strong {
+  font-size: .74rem;
+}
+
+.cb-practice-edit {
+  padding: 15px;
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.cb-practice-operations {
+  padding-top: 14px;
+  border-top: 1px solid var(--cb-border);
+}
+
+.cb-attendance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+
+@media (max-width: 767.98px) {
+  .cb-workspace-head,
+  .cb-dev-detail-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cb-roster-player-summary {
+    align-items: flex-start;
+  }
+
+  .cb-roster-player-side {
+    align-items: flex-end;
+    flex-direction: column-reverse;
+  }
+
+  .cb-position-badges {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .cb-practice-plan-button {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .cb-practice-meta {
+    margin-right: 0;
+  }
+
+  .cb-practice-preview,
+  .cb-practice-work-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #player_development .cb-workspace-head {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  #player_development .cb-page-title {
+    font-size: 1.25rem;
+  }
+
+  #player_development .cb-page-subtitle {
+    font-size: .72rem;
+  }
+
+  #player_development .cb-page-actions {
+    margin-top: 0;
+  }
+
+  #player_development .cb-dev-detail-head h3 {
+    font-size: 1.22rem;
+  }
+}
+
+/* Coach Notes workspace. The legacy markup is intentionally preserved for
+   data/permission compatibility, while this adapter makes it read like the
+   newer CoachBoard workspaces on desktop and mobile. */
+#collaboration {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-bottom: 84px;
+}
+
+#collaboration::before {
+  content: 'Coach Notes';
+  display: block;
+  margin: 2px 0 2px;
+  color: var(--cb-ink);
+  font-size: 1.55rem;
+  font-weight: 850;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+}
+
+#collaboration > .row {
+  row-gap: 14px;
+}
+
+#collaboration > .row::before {
+  content: 'Shared team context and player-specific notes for the coaching staff.';
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 4px;
+  padding: 0 12px;
+  color: var(--cb-muted);
+  font-size: .78rem;
+  line-height: 1.4;
+}
+
+#collaboration > .row > [class*='col-'] {
+  display: flex;
+}
+
+#collaboration > .row > [class*='col-'] > .card {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--cb-border) !important;
+  border-radius: 14px !important;
+  background: #fff;
+  box-shadow: var(--cb-shadow) !important;
+}
+
+#collaboration > .row > [class*='col-']:first-of-type > .card {
+  border-top: 4px solid var(--cb-primary) !important;
+}
+
+#collaboration > .row > [class*='col-']:last-of-type > .card {
+  border-top: 4px solid #6377a8 !important;
+}
+
+#collaboration .card > .card-header {
+  min-height: 64px;
+  padding: 14px 15px 12px;
+  border-bottom: 1px solid #edf0f3;
+  background: #fff;
+}
+
+#collaboration .card > .card-header h5 {
+  position: relative;
+  margin: 0;
+  padding-left: 34px;
+  color: var(--cb-ink);
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+#collaboration .card > .card-header h5::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  transform: translateY(-50%);
+  background: #eef3ff;
+  color: var(--cb-primary);
+  font-family: 'bootstrap-icons';
+  font-size: .82rem;
+  font-weight: 400;
+}
+
+#collaboration > .row > [class*='col-']:first-of-type .card-header h5::before {
+  content: '\f4cb';
+}
+
+#collaboration > .row > [class*='col-']:last-of-type .card-header h5::before {
+  content: '\f4d0';
+}
+
+#collaboration .card > .card-body {
+  padding: 13px;
+  background: #fbfcfd;
+}
+
+#collaboration .card-body > form {
+  margin-bottom: 14px !important;
+  padding: 12px;
+  border: 1px solid #dfe5ec;
+  border-radius: 11px;
+  background: #fff;
+}
+
+#collaboration .card-body > form::before {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--cb-muted);
+  font-size: .62rem;
+  font-weight: 850;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+#collaboration > .row > [class*='col-']:first-of-type form::before {
+  content: 'New team note';
+}
+
+#collaboration > .row > [class*='col-']:last-of-type form::before {
+  content: 'New player note';
+}
+
+#collaboration .card-body > form .form-control,
+#collaboration .card-body > form .form-select {
+  min-height: 44px;
+  border-color: #d8dee7;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: none;
+  font-size: .8rem;
+}
+
+#collaboration .card-body > form textarea.form-control {
+  min-height: 94px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+#collaboration .card-body > form .form-control:focus,
+#collaboration .card-body > form .form-select:focus {
+  border-color: color-mix(in srgb, var(--cb-primary) 55%, #d8dee7);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cb-primary) 10%, transparent);
+}
+
+#collaboration .card-body > form .btn-primary {
+  min-height: 40px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: .74rem;
+  font-weight: 800;
+}
+
+#team-notes-container,
+#player-notes-container {
+  display: grid;
+  gap: 9px;
+}
+
+#team-notes-container > .card,
+#player-notes-container > .card {
+  margin-bottom: 0 !important;
+  overflow: hidden;
+  border: 1px solid #dfe5ec !important;
+  border-left: 4px solid #c8d4ef !important;
+  border-radius: 11px !important;
+  background: #fff;
+  box-shadow: none !important;
+}
+
+#player-notes-container > .card {
+  border-left-color: #c9d0df !important;
+}
+
+#team-notes-container > .card .card-body,
+#player-notes-container > .card .card-body {
+  padding: 11px 12px !important;
+  background: #fff;
+}
+
+#team-notes-container .card-text,
+#player-notes-container .card-text {
+  margin-bottom: 7px !important;
+  color: #263247;
+  font-size: .8rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+#player-notes-container .card-text strong {
+  color: var(--cb-primary);
+  font-size: .74rem;
+  font-weight: 850;
+}
+
+#team-notes-container .card-body > small,
+#player-notes-container .card-body > small {
+  color: #7d8796 !important;
+  font-size: .64rem;
+  line-height: 1.35;
+}
+
+#team-notes-container .card-body > .mt-1,
+#player-notes-container .card-body > .mt-1 {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px !important;
+  padding-top: 7px;
+  border-top: 1px solid #eef1f4;
+}
+
+#team-notes-container .btn-link,
+#player-notes-container .btn-link {
+  min-height: 34px;
+  padding: 5px 9px !important;
+  border: 1px solid #e0e5eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #596579 !important;
+  font-size: .66rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+#team-notes-container .btn-link.text-danger,
+#player-notes-container .btn-link.text-danger {
+  margin-left: auto;
+  border-color: #f0d3d3;
+  color: #a33b3b !important;
+}
+
+#team-notes-container > .text-center,
+#player-notes-container > .text-center {
+  padding: 22px 16px !important;
+  border: 1px dashed #cfd6df !important;
+  border-radius: 11px !important;
+  background: #fff;
+  color: var(--cb-muted) !important;
+  font-size: .76rem;
+}
+
+@media (max-width: 767.98px) {
+  #collaboration {
+    padding-bottom: 96px;
+  }
+
+  #collaboration::before {
+    margin-top: 0;
+    font-size: 1.35rem;
+  }
+
+  #collaboration > .row {
+    --bs-gutter-x: 0;
+    row-gap: 10px;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  #collaboration > .row::before {
+    margin-bottom: 2px;
+    padding: 0;
+    font-size: .72rem;
+  }
+
+  #collaboration > .row > [class*='col-'] {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  #collaboration > .row > [class*='col-'] > .card {
+    border-radius: 12px !important;
+  }
+
+  #collaboration .card > .card-header {
+    min-height: 56px;
+    padding: 12px;
+  }
+
+  #collaboration .card > .card-body {
+    padding: 10px;
+  }
+
+  #collaboration .card-body > form {
+    padding: 10px;
+  }
+
+  #collaboration .card-body > form .form-control,
+  #collaboration .card-body > form .form-select,
+  #collaboration .card-body > form textarea.form-control {
+    font-size: 16px;
+  }
+
+  #collaboration .card-body > form textarea.form-control {
+    min-height: 88px;
+  }
+
+  #collaboration .card-body > form .btn-primary {
+    width: 100%;
+    min-height: 46px;
+    font-size: .78rem;
+  }
+
+  #team-notes-container .card-text,
+  #player-notes-container .card-text {
+    font-size: .82rem;
+  }
+
+  #team-notes-container .btn-link,
+  #player-notes-container .btn-link {
+    min-height: 40px;
+    padding: 7px 10px !important;
+    font-size: .7rem;
+  }
+}

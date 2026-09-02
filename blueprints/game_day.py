@@ -13,6 +13,7 @@ from game_pitching_rules import (
     install_request_rule_adapters,
     rule_settings_payload,
 )
+from game_start_readiness import can_start_game
 from models import Game, Lineup, PlayerPitchTarget, Rotation, Team
 
 
@@ -75,21 +76,26 @@ def game_day_home():
         Game.date < next_day,
     ).order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).all()
 
-    focus_games = todays_games
+    # Calculate today's readiness once so the same-day history section can tell
+    # the difference between an upcoming/current game and one that has actually
+    # been played. Previously a completed game stayed only under "Today's Games"
+    # until midnight, which made Past Games appear to disappear on game day.
+    todays_cards = [
+        {'game': game, 'readiness': _readiness_for_game(game, team)}
+        for game in todays_games
+    ]
+
+    game_cards = todays_cards
     focus_label = "Today's Games"
-    if not focus_games:
+    if not game_cards:
         next_game = db.session.query(Game).filter(
             Game.team_id == team.id,
             Game.date >= next_day,
         ).order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).first()
-        focus_games = [next_game] if next_game else []
+        game_cards = [
+            {'game': next_game, 'readiness': _readiness_for_game(next_game, team)}
+        ] if next_game else []
         focus_label = 'Next Game'
-
-    game_cards = [
-        {'game': game, 'readiness': _readiness_for_game(game, team)}
-        for game in focus_games
-        if game is not None
-    ]
 
     focus_ids = {item['game'].id for item in game_cards}
 
@@ -108,6 +114,7 @@ def game_day_home():
             followup_cards.append({'game': game, 'readiness': readiness})
         if len(followup_cards) >= 6:
             break
+    followup_ids = {item['game'].id for item in followup_cards}
 
     # Game Day doubles as the schedule manager. Keep a useful upcoming window
     # here instead of forcing coaches back to the legacy home-page Games tab.
@@ -119,6 +126,28 @@ def game_day_home():
         upcoming_query = upcoming_query.filter(~Game.id.in_(focus_ids))
     upcoming = upcoming_query.order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(12).all()
 
+    # Preserve schedule history. Include games from earlier dates plus games from
+    # today that have actually reached postgame/completion. A game that still has
+    # postgame work stays only in Postgame Follow-Up until that work is complete,
+    # so the same game is never rendered twice on Game Day.
+    historical_games = db.session.query(Game).filter(
+        Game.team_id == team.id,
+        Game.date < day_start,
+    ).order_by(Game.date.desc(), Game.start_time.desc(), Game.id.desc()).all()
+
+    same_day_history = []
+    for item in todays_cards:
+        readiness = item['readiness']
+        if readiness.get('has_end_game') or readiness.get('status') in {
+            'COMPLETE', 'GC STATS PENDING', 'NEEDS POSTGAME'
+        }:
+            same_day_history.append(item['game'])
+
+    past_games = [
+        game for game in [*same_day_history, *historical_games]
+        if game.id not in focus_ids and game.id not in followup_ids
+    ]
+
     return render_template(
         'game_day.html',
         current_team=team,
@@ -127,6 +156,7 @@ def game_day_home():
         focus_label=focus_label,
         local_now=now,
         upcoming=upcoming,
+        past_games=past_games,
     )
 
 
@@ -289,7 +319,13 @@ def readiness_api(game_id):
     game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
     if not game:
         return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
-    return jsonify({'status': 'success', 'readiness': _readiness_for_game(game, team)})
+
+    start_readiness = can_start_game(game, team)
+    return jsonify({
+        'status': 'success',
+        **start_readiness,
+        'readiness': _readiness_for_game(game, team),
+    })
 
 
 @game_day_bp.route('/game-day/<int:game_id>/report')

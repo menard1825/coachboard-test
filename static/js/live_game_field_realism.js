@@ -3,6 +3,9 @@
 
   const STYLE_ID = 'coach-real-field-styles';
   const FIELD_SELECTOR = '#coach-current-defense .coach-field';
+  let decorateQueued = false;
+  let fieldObserver = null;
+  let dugoutObserver = null;
 
   function loadPitcherChangeWizard() {
     if (document.querySelector('script[data-live-pitcher-change-complete]')) return;
@@ -17,6 +20,42 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
+      /* Dugout mode is a full-screen workspace. Keeping the live overlay in
+         normal page flow allowed hidden planner content to reserve space above
+         it on iOS. A dedicated scroll container also gives Safari much less
+         layout work to do while the coach is scrolling. */
+      body.cb-dugout {
+        overflow: hidden !important;
+      }
+      body.cb-dugout #live-game-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 1030 !important;
+        width: 100% !important;
+        height: 100dvh !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding-top: 0 !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+      }
+      body.cb-dugout .coach-live-shell {
+        min-height: 100% !important;
+      }
+      body.cb-dugout #cbDugoutHeader {
+        top: 0 !important;
+      }
+
+      /* live_game_clock_controls.js used to add a second CoachBoard navigation
+         button beside the newer Dugout Menu button. They open the same menu,
+         so keep one clear navigation control in the live header. */
+      body.cb-dugout #cbCoachBoardNavBtn {
+        display: none !important;
+      }
+
       .coach-field.coach-real-field {
         position: relative;
         overflow: hidden;
@@ -117,6 +156,56 @@
         .coach-field.coach-real-field { max-width: 720px; }
       }
 
+      /* Tablet landscape needs a real tablet layout, not a stretched phone
+         layout. Keep the field readable while putting bench/substitution tools
+         beside it so an iPad Air does not spend nearly the whole screen on the
+         diamond alone. */
+      @media (min-width: 900px) and (max-width: 1180px) and (orientation: landscape) {
+        body.cb-dugout .coach-live-shell {
+          max-width: 1080px !important;
+          padding: 0 14px 24px !important;
+        }
+        body.cb-dugout #cbDugoutHeader {
+          margin-bottom: 10px !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-body {
+          display: grid !important;
+          grid-template-columns: minmax(0,1.55fr) minmax(280px,.75fr) !important;
+          grid-template-areas: "field bench" "field tools";
+          gap: 12px 14px !important;
+          align-items: start !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-field {
+          grid-area: field;
+          width: min(100%,665px) !important;
+          min-height: 0 !important;
+          aspect-ratio: 1.28 / 1 !important;
+          margin: 0 auto !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-bench-wrap {
+          grid-area: bench;
+          margin-top: 0 !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-actions {
+          grid-area: tools;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 10px !important;
+          margin-top: 0 !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-actions .btn {
+          width: 100% !important;
+        }
+        body.cb-dugout #cbQuickDefense .cb-qd-tip {
+          font-size: .72rem !important;
+          line-height: 1.35 !important;
+        }
+        body.cb-dugout .coach-actions {
+          grid-template-columns: repeat(4,minmax(0,1fr)) !important;
+        }
+      }
+
       @media (min-width: 1181px) and (max-width: 1440px) {
         .coach-live-shell { max-width: 1080px !important; padding: 0 14px; }
         .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
@@ -126,7 +215,7 @@
 
       @media (min-width: 1441px) {
         .coach-live-shell { max-width: 1120px !important; }
-        .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
+        .coach-actions { grid-template-columns: repeat(5,minmax(0,1fr)) !important; gap:10px !important; }
         #liveSetDefenseBtnCoach { grid-column:auto !important; }
         .coach-card:has(#coach-current-defense) { padding: 14px 18px 16px !important; }
         .coach-field.coach-real-field {
@@ -226,12 +315,15 @@
       const pos = spot.querySelector('strong')?.textContent?.trim();
       const xy = coordinates[pos];
       if (!xy) return;
-      spot.style.left = `${xy[0]}%`;
-      spot.style.top = `${xy[1]}%`;
+      const left = `${xy[0]}%`;
+      const top = `${xy[1]}%`;
+      if (spot.style.left !== left) spot.style.left = left;
+      if (spot.style.top !== top) spot.style.top = top;
     });
   }
 
   function decorateField() {
+    decorateQueued = false;
     const field = document.querySelector(FIELD_SELECTOR);
     if (!field) return;
     if (!field.classList.contains('coach-real-field')) {
@@ -242,19 +334,56 @@
   }
 
   function scheduleDecorate() {
+    if (decorateQueued) return;
+    decorateQueued = true;
     requestAnimationFrame(() => requestAnimationFrame(decorateField));
+  }
+
+  function watchFieldChanges() {
+    const host = document.getElementById('coach-current-defense');
+    if (!host || fieldObserver) return;
+    fieldObserver = new MutationObserver(() => scheduleDecorate());
+    fieldObserver.observe(host, { childList: true, subtree: true });
+  }
+
+  function mountDugoutOverlay() {
+    const overlay = document.getElementById('live-game-overlay');
+    if (!overlay || !document.body.classList.contains('cb-dugout')) return;
+
+    /* iOS treats fixed descendants inconsistently when they remain nested
+       inside the Bootstrap card/planner hierarchy. Portal the live workspace
+       directly under <body> so inset:0 is relative to the real viewport. */
+    if (overlay.parentElement !== document.body) {
+      document.body.appendChild(overlay);
+      overlay.scrollTop = 0;
+      requestAnimationFrame(() => { overlay.scrollTop = 0; });
+    }
+  }
+
+  function watchDugoutMode() {
+    if (dugoutObserver) return;
+    dugoutObserver = new MutationObserver(() => {
+      if (document.body.classList.contains('cb-dugout')) mountDugoutOverlay();
+    });
+    dugoutObserver.observe(document.body, { attributes:true, attributeFilter:['class'] });
+    mountDugoutOverlay();
   }
 
   loadPitcherChangeWizard();
 
   document.addEventListener('DOMContentLoaded', () => {
     installStyles();
+    watchDugoutMode();
+    watchFieldChanges();
     scheduleDecorate();
     document.addEventListener('click', event => {
       if (event.target.closest('[data-coach-defense-view="field"]')) scheduleDecorate();
     });
     window.addEventListener('resize', scheduleDecorate, {passive:true});
     window.addEventListener('orientationchange', scheduleDecorate, {passive:true});
-    setInterval(decorateField, 1200);
+
+    /* Do not poll and rewrite field geometry while the user is scrolling.
+       Live-game DOM changes are observed above, so the field still updates
+       immediately when a defensive change actually occurs. */
   });
 })();

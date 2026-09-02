@@ -5,6 +5,8 @@
 <p class="auth-subtitle">Open your team workspace, Game Day tools, roster, and pitching board.</p>
 
 <form method="POST" action="{{ url_for('auth.login') }}">
+  <input type="hidden" name="client_timezone" data-client-timezone>
+  <input type="hidden" name="client_utc_offset_minutes" data-client-utc-offset>
   <div class="mb-3">
     <label class="form-label" for="identity">Username or email</label>
     <input type="text" class="form-control" id="identity" name="identity" value="{{ identity or '' }}" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>

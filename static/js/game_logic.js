@@ -15,6 +15,9 @@ function initializeGameManagement(gameData) {
         rotation: gameData.rotation || { id: null, title: `Rotation for vs ${gameData.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
         game: gameData.game,
         lineup_templates: gameData.lineup_templates || [],
+        previous_lineup: gameData.previous_lineup || null,
+        batting_order_mode: gameData.batting_order_mode || 'bat_all',
+        fixed_lineup_size: gameData.fixed_lineup_size || 9,
         // NEW: Add rotation_templates to the state
         rotation_templates: gameData.rotation_templates || [],
         outfielder_count: gameData.outfielder_count || 3,
@@ -46,6 +49,7 @@ function initializeGameManagement(gameData) {
 
     let assignPlayerModal;
     let lineupEditorModal;
+    let lineupEditorController;
     let saveTemplateModal;
 
     // --- Rotation Editor Functions ---
@@ -471,28 +475,43 @@ function applyOutOfPositionIndicators() {
 
     async function saveLineup() {
         const btn = document.getElementById('saveLineupBtn');
+        const title = document.getElementById('lineupTitle').value.trim();
+        const playerIds = lineupEditorController?.getPlayerIds() || [];
+        const playerNames = lineupEditorController?.getPlayerNames() || [];
+        if (!title) {
+            document.getElementById('lineupTitle').focus();
+            return;
+        }
+        if (!playerIds.length) {
+            alert('Add at least one available player to the batting order.');
+            return;
+        }
+        if (lineupEditorController?.getUnavailableEntries().length) {
+            alert('Remove unavailable players before saving this Game Day lineup.');
+            return;
+        }
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
-        state.lineup.title = document.getElementById('lineupTitle').value;
-        state.lineup.lineup_positions = Array.from(document.querySelectorAll('#lineup-order .list-group-item')).map(item => item.dataset.playerName);
         const url = state.lineup.id ? `/edit_lineup/${state.lineup.id}` : '/add_lineup';
         try {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    title: state.lineup.title,
-                    lineup_data: state.lineup.lineup_positions,
+                    title,
+                    lineup_data: playerNames,
+                    lineup_player_ids: playerIds,
                     associated_game_id: state.game.id
                 })
             });
             const result = await response.json();
             if(!response.ok) throw new Error(result.message);
-            if (result.new_id) state.lineup.id = result.new_id;
+            state.lineup = result.lineup;
             lineupEditorModal.hide();
             window.location.reload();
         } catch (error) {
             alert('Error saving lineup: ' + error.message);
+        } finally {
             btn.disabled = false;
             btn.innerHTML = 'Save Lineup';
         }
@@ -578,6 +597,9 @@ function applyOutOfPositionIndicators() {
             state.rotation = parsedRotation;
 
             state.lineup_templates = newData.lineup_templates || [];
+            state.previous_lineup = newData.previous_lineup || null;
+            state.batting_order_mode = newData.batting_order_mode || 'bat_all';
+            state.fixed_lineup_size = newData.fixed_lineup_size || 9;
             state.rotation_templates = newData.rotation_templates || [];
             state.pitch_count_summary = newData.pitch_count_summary || {};
 
@@ -613,42 +635,36 @@ function applyOutOfPositionIndicators() {
             // Re-render
             renderRotationEditor();
 
-            // If lineup modal is open, re-render it
-            if (document.getElementById('lineupEditorModal')?.classList.contains('show')) {
-                 initializeLineupEditor({
-                    roster: state.roster,
-                    lineup: state.lineup,
-                    benchEl: document.getElementById('lineup-bench'),
-                    orderEl: document.getElementById('lineup-order')
-                });
-            }
-
             // Check if we need to update the availability list UI
             const presentCount = newData.roster.length - newData.absent_player_ids.length;
             const absentCount = newData.absent_player_ids.length;
-            const cardBody = document.querySelector('#availabilityCollapse').closest('.card-body');
-            if(cardBody) {
-                 const pTag = cardBody.querySelector('p');
-                 if(pTag) pTag.innerHTML = `<strong>${presentCount}</strong> players present, <strong>${absentCount}</strong> absent.`;
+            const presentMetric = document.getElementById('availabilityPresentCount');
+            const absentMetric = document.getElementById('availabilityAbsentCount');
+            if (presentMetric) presentMetric.textContent = String(presentCount);
+            if (absentMetric) absentMetric.textContent = `${absentCount} out`;
 
-                 // Update checkboxes
-                 newData.roster.forEach(player => {
-                     const cb = document.getElementById(`player-${player.id}`);
-                     if (cb) {
-                         cb.checked = newData.absent_player_ids.includes(player.id);
-                     }
-                 });
-            }
+            // Keep the open availability editor synchronized when another
+            // coach updates the same game. Dispatching change also refreshes
+            // the OUT labels and counter added by the availability helper.
+            newData.roster.forEach(player => {
+                const checkbox = document.getElementById(`absent_${player.id}`);
+                if (!checkbox) return;
+                const checked = newData.absent_player_ids.includes(player.id);
+                if (checkbox.checked !== checked) {
+                    checkbox.checked = checked;
+                    checkbox.dispatchEvent(new Event('change', {bubbles: true}));
+                }
+            });
 
-            // Update lineup text list on the main page
-            const lineupCardBody = document.querySelector('.card:has(#lineupEditorModal) .card-body') || document.querySelector('.card:nth-child(2) .card-body');
-            if (lineupCardBody && !lineupCardBody.closest('.modal')) {
-                 if (state.lineup && state.lineup.lineup_positions && state.lineup.lineup_positions.length > 0) {
-                      lineupCardBody.innerHTML = `<ol class="list-group list-group-numbered">${state.lineup.lineup_positions.map(p => `<li class="list-group-item">${escapeHTML(p)}</li>`).join('')}</ol>`;
-                 } else {
-                      lineupCardBody.innerHTML = `<div class="text-center p-3 text-muted"><p class="mb-1">No lineup has been set.</p></div>`;
-                 }
-            }
+            // Refresh the compact checklist metric without replacing the card
+            // body (which previously removed its Edit Lineup button).
+            const lineupCount = state.lineup?.lineup_positions?.length || 0;
+            const lineupMetric = document.getElementById('lineupSummaryCount');
+            const lineupTitle = document.getElementById('lineupSummaryTitle');
+            if (lineupMetric) lineupMetric.textContent = String(lineupCount);
+            if (lineupTitle) lineupTitle.textContent = lineupCount
+                ? (state.lineup.title || 'Game lineup')
+                : 'Not set';
 
         } catch (e) {
             console.error(e);
@@ -657,41 +673,43 @@ function applyOutOfPositionIndicators() {
 
     // --- Event Listeners ---
     function setupEventListeners() {
-        const socket = io();
+        const socket = typeof io === 'function' ? io() : null;
 
-        socket.on('connect', () => {
-            // Join the game-specific room to ensure we only get relevant live game broadcasts
-            socket.emit('join_game_room', { game_id: state.game.id });
-        });
+        if (socket) {
+            socket.on('connect', () => {
+                // Join the game-specific room to ensure we only get relevant live game broadcasts
+                socket.emit('join_game_room', { game_id: state.game.id });
+            });
 
-        socket.on('data_updated', fetchLatestGameData);
-        socket.on('lineup_add', fetchLatestGameData);
-        socket.on('lineup_update', fetchLatestGameData);
-        socket.on('rotation_save', fetchLatestGameData);
-        socket.on('roster_update', fetchLatestGameData);
-        socket.on('game_updated', fetchLatestGameData);
-        socket.on('pitching_update', fetchLatestGameData);
+            socket.on('data_updated', fetchLatestGameData);
+            socket.on('lineup_add', fetchLatestGameData);
+            socket.on('lineup_update', fetchLatestGameData);
+            socket.on('rotation_save', fetchLatestGameData);
+            socket.on('roster_update', fetchLatestGameData);
+            socket.on('game_updated', fetchLatestGameData);
+            socket.on('pitching_update', fetchLatestGameData);
 
-        // Listen for authoritative state broadcasts specifically for the live game
-        socket.on('game_state_update', (newState) => {
-            console.log("Received server-authoritative live game state broadcast.", newState);
+            // Listen for authoritative state broadcasts specifically for the live game
+            socket.on('game_state_update', (newState) => {
+                console.log("Received server-authoritative live game state broadcast.", newState);
 
-            // Re-apply essential parsed objects if needed
-            if (newState.rotation && typeof newState.rotation.innings === 'string') {
-                newState.rotation.innings = JSON.parse(newState.rotation.innings);
-            }
+                // Re-apply essential parsed objects if needed
+                if (newState.rotation && typeof newState.rotation.innings === 'string') {
+                    newState.rotation.innings = JSON.parse(newState.rotation.innings);
+                }
 
-            state.actual_rotation = newState.actual_rotation;
-            state.rotation_events = newState.rotation_events;
-            state.pitch_count_summary = newState.pitch_count_summary;
-            state.pitching_plans = newState.pitching_plans;
-            state.game = newState.game;
-            state.liveMode = newState.game.is_live;
-            state.currentInning = state.liveMode ? state.game.live_current_inning || '1' : state.currentInning;
+                state.actual_rotation = newState.actual_rotation;
+                state.rotation_events = newState.rotation_events;
+                state.pitch_count_summary = newState.pitch_count_summary;
+                state.pitching_plans = newState.pitching_plans;
+                state.game = newState.game;
+                state.liveMode = newState.game.is_live;
+                state.currentInning = state.liveMode ? state.game.live_current_inning || '1' : state.currentInning;
 
-            renderRotationEditor();
-            renderBenchReport();
-        });
+                renderRotationEditor();
+                renderBenchReport();
+            });
+        }
 
         assignPlayerModal = new bootstrap.Modal(document.getElementById('assignPlayerModal'));
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
@@ -699,44 +717,45 @@ function applyOutOfPositionIndicators() {
         saveTemplateModal = new bootstrap.Modal(document.getElementById('saveRotationTemplateModal'));
 
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
+        document.getElementById('rotateLineupBtn')?.addEventListener('click', () => lineupEditorController?.rotate());
+        document.getElementById('applyLineupSourceBtn')?.addEventListener('click', () => {
+            const select = document.getElementById('lineupTemplateSelect');
+            let source = null;
+            if (select.value === 'previous') source = state.previous_lineup;
+            if (select.value.startsWith('template:')) {
+                const id = Number(select.value.split(':')[1]);
+                source = state.lineup_templates.find(template => template.id === id);
+            }
+            if (select.value === 'blank') source = { title: 'a blank lineup', lineup_entries: [], lineup_positions: [] };
+            if (!source) return;
+
+            const presentIds = new Set(state.roster.map(player => Number(player.id)));
+            const presentNames = new Set(state.roster.map(player => player.name));
+            const entries = Array.isArray(source.lineup_entries) && source.lineup_entries.length
+                ? source.lineup_entries
+                : (source.lineup_positions || []).map(name => ({ name, player_id: null }));
+            const appliedEntries = [];
+            const skippedNames = [];
+            entries.forEach(entry => {
+                const available = entry.player_id != null
+                    ? presentIds.has(Number(entry.player_id))
+                    : presentNames.has(entry.name || entry.player_name_snapshot);
+                if (available) appliedEntries.push(entry);
+                else skippedNames.push(entry.name || entry.player_name_snapshot || 'Unknown player');
+            });
+            lineupEditorController?.setLineup({ lineup_entries: appliedEntries });
+            const benchCount = lineupEditorController?.getBenchPlayers().length || 0;
+            const feedback = document.getElementById('lineupEditorFeedback');
+            feedback.className = skippedNames.length ? 'alert alert-warning py-2' : 'alert alert-info py-2';
+            feedback.textContent = `Applied ${source.title || 'lineup'}. ${skippedNames.length ? `Skipped unavailable: ${skippedNames.join(', ')}. ` : ''}${benchCount} available player${benchCount === 1 ? '' : 's'} remain on the bench.`;
+        });
         document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
         document.getElementById('saveRotationBtnMobile')?.addEventListener('click', saveRotation); // Add mobile listener
         document.getElementById('printCardBtn')?.addEventListener('click', printLineupCard);
 
-        // Live Game Mode Toggle
-        const toggleLiveGame = (isLive) => {
-            state.liveMode = isLive;
-
-            // Tell backend about the toggle
-            fetch('/api/toggle_live_game', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ game_id: state.game.id, is_live: state.liveMode })
-            });
-
-            const liveOverlay = document.getElementById('live-game-overlay');
-            const plannerControls = document.querySelectorAll('.planner-controls');
-
-            const toggle = document.getElementById('liveGameModeToggle');
-            if (toggle) toggle.checked = isLive;
-
-            if (state.liveMode) {
-                liveOverlay.classList.remove('d-none');
-                plannerControls.forEach(el => el.classList.add('d-none'));
-                document.getElementById('rotation-board')?.classList.add('bg-light'); // slight visual diff
-                state.currentInning = state.game.live_current_inning || '1';
-            } else {
-                liveOverlay.classList.add('d-none');
-                plannerControls.forEach(el => el.classList.remove('d-none'));
-                document.getElementById('rotation-board')?.classList.remove('bg-light');
-            }
-
-            // Re-render everything with the correct state (actual vs planned)
-            renderRotationEditor();
-        };
-
-        document.getElementById('liveGameModeToggle')?.addEventListener('change', (e) => toggleLiveGame(e.target.checked));
-        document.getElementById('startLiveGameBtnAction')?.addEventListener('click', () => toggleLiveGame(true));
+        // Live Game start/change/end actions are owned by live_game_v2.js so the
+        // server remains authoritative. Do not bind the retired toggle endpoint
+        // here; duplicate listeners can otherwise make a failed start look live.
 
         // Initialize UI state if live on load
         if (state.liveMode) {
@@ -798,136 +817,6 @@ function applyOutOfPositionIndicators() {
                  logLiveEvent('End Inning', beforeAlign, afterAlign, null, null);
              }
         });
-
-        let swapPlayer1 = null;
-        let liveDefSwapModalObj = null;
-
-        document.getElementById('liveDefensiveChangeBtn')?.addEventListener('click', () => {
-            liveDefSwapModalObj = new bootstrap.Modal(document.getElementById('liveDefensiveSwapModal'));
-            swapPlayer1 = null;
-            document.getElementById('swapInstructionText').innerHTML = 'Tap the <strong>first player</strong> to swap/move.';
-            renderLiveDefensiveSwapList();
-            liveDefSwapModalObj.show();
-        });
-
-        window.handleLiveSwapClick = (playerName) => {
-            if (!swapPlayer1) {
-                swapPlayer1 = playerName;
-                document.getElementById('swapInstructionText').innerHTML = `Select position/player to swap <strong>${escapeHTML(playerName)}</strong> with.`;
-                renderLiveDefensiveSwapList();
-            } else {
-                const swapPlayer2 = playerName;
-                const beforeAlign = { ...state.actual_rotation[state.currentInning] };
-
-                // Find positions
-                let pos1 = null;
-                let pos2 = null;
-                for (const [pos, pName] of Object.entries(state.actual_rotation[state.currentInning] || {})) {
-                    if (pName === swapPlayer1) pos1 = pos;
-                    if (pName === swapPlayer2) pos2 = pos;
-                }
-
-                // Execute swap
-                if (pos1) state.actual_rotation[state.currentInning][pos1] = swapPlayer2 !== 'BENCH' ? swapPlayer2 : null;
-                if (pos2) state.actual_rotation[state.currentInning][pos2] = swapPlayer1 !== 'BENCH' ? swapPlayer1 : null;
-
-                // If they were benched, assign them back.
-                // This naive logic might leave nulls if moving to an empty bench.
-                // If moving a bench player to an empty position (swapPlayer2 is an empty position name like "1B (Empty)"):
-                if (!pos2 && state.roster.some(p => p.name === swapPlayer2)) {
-                    // Not assigned to field? We actually need to pick positions, not just players.
-                    // For a robust swap, we'll iterate through all positions.
-                }
-
-                logLiveEvent('Defensive Change', beforeAlign, state.actual_rotation[state.currentInning], null, null);
-                renderRotationEditor();
-                liveDefSwapModalObj.hide();
-            }
-        };
-
-        function renderLiveDefensiveSwapList() {
-            const container = document.getElementById('liveSwapPlayerList');
-            const currentAlign = state.actual_rotation[state.currentInning] || {};
-
-            // Build a list of all defined field positions + players on them
-            const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'LCF', 'RCF'];
-
-            let html = '';
-
-            // Fielders
-            html += '<div class="list-group-item bg-light fw-bold text-muted small">ON FIELD</div>';
-            positions.forEach(pos => {
-                // If 3 OF, skip LCF/RCF. If 4 OF, skip CF.
-                if (state.outfielder_count === 3 && (pos === 'LCF' || pos === 'RCF')) return;
-                if (state.outfielder_count === 4 && pos === 'CF') return;
-
-                const pName = currentAlign[pos];
-                const isSelected = pName === swapPlayer1;
-                const display = pName ? pName : '(Empty)';
-
-                html += `
-                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${isSelected ? 'active' : ''}"
-                        onclick="handleLiveSwapClick('${pName || 'EMPTY_' + pos}')">
-                    <span><strong>${pos}</strong>: ${escapeHTML(display)}</span>
-                </button>`;
-            });
-
-            // Bench
-            html += '<div class="list-group-item bg-light fw-bold text-muted small mt-2">BENCH</div>';
-            const assignedPlayers = new Set(Object.values(currentAlign));
-            state.roster.forEach(p => {
-                if (!assignedPlayers.has(p.name)) {
-                    const isSelected = p.name === swapPlayer1;
-                    html += `
-                    <button type="button" class="list-group-item list-group-item-action ${isSelected ? 'active' : ''}"
-                            onclick="handleLiveSwapClick('${escapeHTML(p.name)}')">
-                        ${escapeHTML(p.name)}
-                    </button>`;
-                }
-            });
-
-            container.innerHTML = html;
-        }
-
-        // Re-write handleLiveSwapClick to handle position-based swapping properly
-        window.handleLiveSwapClick = (target) => {
-            if (!swapPlayer1) {
-                swapPlayer1 = target; // Target could be a player name, or 'EMPTY_1B'
-                document.getElementById('swapInstructionText').innerHTML = `Select position/player to swap <strong>${escapeHTML(target.replace('EMPTY_', 'Empty '))}</strong> with.`;
-                renderLiveDefensiveSwapList();
-            } else {
-                const target1 = swapPlayer1;
-                const target2 = target;
-
-                const beforeAlign = { ...state.actual_rotation[state.currentInning] };
-                if (!state.actual_rotation[state.currentInning]) state.actual_rotation[state.currentInning] = {};
-
-                // Helpers to find where a target is
-                const getPos = (t) => {
-                    if (t.startsWith('EMPTY_')) return t.replace('EMPTY_', '');
-                    for (const [pos, name] of Object.entries(state.actual_rotation[state.currentInning])) {
-                        if (name === t) return pos;
-                    }
-                    return null; // Means they are on bench
-                };
-
-                const pos1 = getPos(target1);
-                const pos2 = getPos(target2);
-
-                const name1 = target1.startsWith('EMPTY_') ? null : target1;
-                const name2 = target2.startsWith('EMPTY_') ? null : target2;
-
-                const afterAlign = { ...beforeAlign };
-
-                // Do the swap
-                if (pos1) afterAlign[pos1] = name2;
-                if (pos2) afterAlign[pos2] = name1;
-
-                logLiveEvent('Defensive Change', beforeAlign, afterAlign, null, null);
-                liveDefSwapModalObj.hide();
-            }
-        };
-
 
         document.getElementById('liveUndoBtn')?.addEventListener('click', () => {
              if (state.rotation_events.length > 0) {
@@ -1108,33 +997,33 @@ function applyOutOfPositionIndicators() {
 
         document.getElementById('lineupEditorModal')?.addEventListener('shown.bs.modal', () => {
             const templateSelect = document.getElementById('lineupTemplateSelect');
-            templateSelect.innerHTML = '<option value="">-- Select a Template --</option>';
+            templateSelect.innerHTML = '<option value="blank">Blank lineup</option>';
             state.lineup_templates.forEach(lt => {
-                const option = new Option(`${lt.title} (${lt.lineup_positions.length} players)`, lt.id);
+                const label = `${lt.is_default ? 'Default — ' : ''}${lt.title} (${lt.lineup_positions.length} players)`;
+                const option = new Option(label, `template:${lt.id}`);
                 templateSelect.add(option);
             });
-
-            const renderLineup = () => {
-                 initializeLineupEditor({
-                    roster: state.roster,
-                    lineup: state.lineup,
-                    benchEl: document.getElementById('lineup-bench'),
-                    orderEl: document.getElementById('lineup-order')
-                });
-            };
-
-            templateSelect.addEventListener('change', (e) => {
-                const selectedTemplateId = e.target.value;
-                if (selectedTemplateId) {
-                    const selectedTemplate = state.lineup_templates.find(lt => lt.id == selectedTemplateId);
-                    if (selectedTemplate) {
-                        state.lineup.lineup_positions = [...selectedTemplate.lineup_positions];
-                        renderLineup();
-                    }
-                }
+            if (state.previous_lineup) {
+                templateSelect.add(new Option(`Previous game — ${state.previous_lineup.title}`, 'previous'));
+            }
+            const defaultTemplate = state.lineup_templates.find(template => template.is_default);
+            templateSelect.value = defaultTemplate ? `template:${defaultTemplate.id}` : 'blank';
+            document.getElementById('lineupId').value = state.lineup.id || '';
+            document.getElementById('lineupTitle').value = state.lineup.title || `Lineup for vs ${state.game.opponent}`;
+            document.getElementById('lineupDefaultWrap').classList.add('d-none');
+            document.getElementById('lineupEditorFeedback').className = 'd-none';
+            const rule = state.batting_order_mode === 'fixed'
+                ? `Fixed Lineup: ${Math.min(state.fixed_lineup_size, state.roster.length)} batters are required with today's availability.`
+                : `Bat Everyone: all ${state.roster.length} available players are required.`;
+            document.getElementById('lineupEditorSubtitle').textContent = rule;
+            lineupEditorController?.destroy();
+            lineupEditorController = initializeLineupEditor({
+                roster: state.roster,
+                lineup: state.lineup,
+                benchEl: document.getElementById('lineup-bench'),
+                orderEl: document.getElementById('lineup-order'),
+                statusEl: document.getElementById('lineupEditorStatus')
             });
-
-            renderLineup();
         });
 
         document.getElementById('deleteRotationBtn')?.addEventListener('click', () => {
