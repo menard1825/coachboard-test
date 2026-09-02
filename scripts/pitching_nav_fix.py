@@ -91,6 +91,6 @@ def test_pitching_desktop_does_not_render_mobile_only_collapse_button(page: Page
     expect(cards.first.locator('.cb-pitch-metrics')).to_be_visible()
     expect(page.locator('.cb-pitcher-collapse-bottom')).to_have_count(0)
 '''
-tests.write_text(text.rstrip() + addition + '\n')
+tests.write_text(text.rstrip() + addition.rstrip() + '\n')
 
 print('Pitching navigation/detail-control patch applied.')
