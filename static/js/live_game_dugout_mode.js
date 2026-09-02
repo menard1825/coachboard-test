@@ -454,45 +454,165 @@
     });
 
     body.querySelector('[data-cb-bench-current]')?.addEventListener('click', () => {
-      const replacements = benchPlayers();
+      const availableBench = benchPlayers();
 
-      if (!replacements.length) {
-        body.innerHTML = `<div class="cb-move-current"><strong>No bench player is available.</strong><br>${esc(name)} cannot leave ${esc(source)} without someone taking that position.</div>`;
+      if (!availableBench.length) {
+        body.innerHTML = `<div class="cb-move-current"><strong>No bench player is available.</strong><br>${esc(name)} cannot come out without leaving a position open.</div>`;
         return;
       }
 
-      body.innerHTML = `
-        <div class="cb-move-current">
-          <strong>Who takes ${esc(source)}?</strong><br>
-          Pick a player from the bench. ${esc(name)} will move to the bench automatically.
-        </div>
-        <div class="cb-destination-grid">
-          ${replacements.map(replacement => {
-            const number = String(replacement.number ?? '').trim();
-            const label = number ? `#${number} ${replacement.name}` : replacement.name;
-            return `<button type="button"
-                           class="btn btn-outline-primary cb-destination"
-                           data-cb-replacement-id="${replacement.id}">
-                      <span>${esc(label)}</span>
-                      <small>Move to ${esc(source)}</small>
-                    </button>`;
-          }).join('')}
-        </div>`;
+      const draft = {...alignment};
+      delete draft[source];
 
-      body.querySelectorAll('[data-cb-replacement-id]').forEach(button => {
-        const replacementId = Number(button.dataset.cbReplacementId);
-        const replacement = replacements.find(
-          candidate => Number(candidate.id) === replacementId
-        );
+      // The original player is definitely coming out. Players selected from
+      // other field positions become fixed in their new spots as we follow
+      // the vacancy around the field.
+      const lockedNames = new Set([name]);
 
-        if (!replacement) return;
+      const playerPositionInDraft = playerName =>
+        Object.entries(draft).find(([, assigned]) => assigned === playerName)?.[0] || 'BENCH';
 
-        button.addEventListener('click', () => {
-          saveMove(replacement.id, source, replacement.name);
+      const renderVacancy = vacancy => {
+        const choices = (state?.roster || [])
+          .filter(candidate => !lockedNames.has(candidate.name))
+          .map(candidate => ({
+            ...candidate,
+            currentPosition: playerPositionInDraft(candidate.name),
+          }))
+          .filter(candidate => candidate.currentPosition !== 'P');
+
+        const fieldChoices = choices
+          .filter(candidate => candidate.currentPosition !== 'BENCH')
+          .sort((a, b) => a.currentPosition.localeCompare(b.currentPosition));
+
+        const benchChoices = choices
+          .filter(candidate => candidate.currentPosition === 'BENCH')
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        const choiceButton = candidate => {
+          const number = String(candidate.number ?? '').trim();
+          const label = number ? `#${number} ${candidate.name}` : candidate.name;
+          const detail = candidate.currentPosition === 'BENCH'
+            ? `Bench → ${vacancy}`
+            : `${candidate.currentPosition} → ${vacancy}`;
+
+          return `<button type="button"
+                         class="btn btn-outline-primary cb-destination"
+                         data-cb-chain-player-id="${candidate.id}"
+                         data-cb-chain-from="${esc(candidate.currentPosition)}">
+                    <span>${esc(label)}</span>
+                    <small>${esc(detail)}</small>
+                  </button>`;
+        };
+
+        body.innerHTML = `
+          <div class="cb-move-current">
+            <strong>Who takes ${esc(vacancy)}?</strong><br>
+            ${esc(name)} is going to the bench. Pick anyone except the pitcher.
+          </div>
+
+          ${fieldChoices.length ? `
+            <div class="small fw-bold text-uppercase text-muted mb-2">On the field</div>
+            <div class="cb-destination-grid mb-3">
+              ${fieldChoices.map(choiceButton).join('')}
+            </div>
+          ` : ''}
+
+          <div class="small fw-bold text-uppercase text-muted mb-2">On the bench</div>
+          <div class="cb-destination-grid">
+            ${benchChoices.map(choiceButton).join('')}
+          </div>`;
+
+        body.querySelectorAll('[data-cb-chain-player-id]').forEach(button => {
+          const playerId = Number(button.dataset.cbChainPlayerId);
+          const fromPosition = button.dataset.cbChainFrom;
+          const replacement = choices.find(
+            candidate => Number(candidate.id) === playerId
+          );
+
+          if (!replacement) return;
+
+          button.addEventListener('click', () => {
+            if (fromPosition !== 'BENCH') {
+              delete draft[fromPosition];
+            }
+
+            draft[vacancy] = replacement.name;
+
+            // Choosing somebody from the bench fills the final vacancy,
+            // so the complete defense can be saved in one transaction.
+            if (fromPosition === 'BENCH') {
+              saveDefenseDraft(
+                draft,
+                `${name} to bench · ${replacement.name} to ${vacancy}`
+              );
+              return;
+            }
+
+            // A player came from another field position. Keep them in their
+            // new spot and follow their old position as the new vacancy.
+            lockedNames.add(replacement.name);
+            renderVacancy(fromPosition);
+          });
         });
-      });
+      };
+
+      renderVacancy(source);
     });
     bootstrap.Modal.getOrCreateInstance(modal).show();
+  }
+
+  async function saveDefenseDraft(alignment, successMessage) {
+    if (moveBusy) return;
+    moveBusy = true;
+    saveMode = 'saving';
+    saveMessage = 'Saving…';
+    lastFailedMove = null;
+    quickDefenseSignature = '';
+
+    const shell = document.querySelector('#live-game-overlay .coach-live-shell');
+    if (shell) renderQuickDefense(shell);
+
+    try {
+      const response = await fetch(`/api/live-game/${gameId}/set-defense`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({alignment}),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.status === 'error') {
+        throw new Error(data.message || `Unable to save defense (${response.status}).`);
+      }
+
+      if (data.state) state = data.state;
+
+      saveMode = 'saved';
+      saveMessage = 'Saved ✓';
+      quickDefenseSignature = '';
+
+      bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
+      queue();
+    } catch (error) {
+      saveMode = 'error';
+      saveMessage = 'Not saved';
+      quickDefenseSignature = '';
+
+      if (shell) renderQuickDefense(shell);
+
+      const modal = ensureMoveModal();
+      const modalBody = modal.querySelector('.modal-body');
+
+      if (modalBody && !modalBody.querySelector('.alert-danger')) {
+        modalBody.insertAdjacentHTML(
+          'afterbegin',
+          `<div class="alert alert-danger py-2 small"><strong>Change was not saved.</strong><br>${esc(error.message)}</div>`
+        );
+      }
+    } finally {
+      moveBusy = false;
+    }
   }
 
   async function saveMove(playerId, destination, name) {
