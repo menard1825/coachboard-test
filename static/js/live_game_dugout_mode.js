@@ -441,7 +441,10 @@
     const body = modal.querySelector('.modal-body');
     const destinations = positions().filter(pos => pos !== 'P' && pos !== source);
     const sourceText = source === 'BENCH' ? `${name} is currently on the bench.` : `${name} is currently playing ${source}.`;
-    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. The player currently there will move to the bench.' : 'Choose another field position to swap the two players.'}</div><div class="cb-destination-grid">${destinations.map(pos => {
+    const benchDestination = source === 'BENCH'
+      ? ''
+      : `<button type="button" class="btn btn-outline-secondary cb-destination" data-cb-destination="BENCH"><span>Bench</span><small>Take ${esc(name)} out of the field</small></button>`;
+    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. The player currently there will move to the bench.' : 'Move this player to the bench or choose another field position.'}</div><div class="cb-destination-grid">${benchDestination}${destinations.map(pos => {
       const occupant = alignment[pos] || '';
       return `<button type="button" class="btn btn-outline-primary cb-destination" data-cb-destination="${esc(pos)}"><span>${esc(pos)}</span><small>${occupant ? `Currently ${esc(occupant)}` : 'Open position'}</small></button>`;
     }).join('')}</div>`;
