@@ -163,11 +163,40 @@ def test_phone_quick_field_swaps_two_fielders_without_second_editor(page: Page, 
         expect(second).to_contain_text('Second Sam')
 
         drag(page, ss, second)
-        expect(quick.locator('.cb-save-state')).to_contain_text('Saved', timeout=10_000)
-        expect(page.locator('#cb-live-field-editor')).to_have_count(0)
 
-        state = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
-        assert state['current_alignment']['2B'] == 'Shortstop Shawn'
-        assert state['current_alignment']['SS'] == 'Second Sam'
+        # First prove the drag was accepted by the Quick Field UI. This also
+        # prevents the initial pre-drag "Saved" badge from satisfying the save
+        # assertion before the asynchronous write has even started.
+        expect(second).to_contain_text(
+            'Shortstop Shawn',
+            timeout=10_000,
+        )
+        expect(ss).to_contain_text(
+            'Second Sam',
+            timeout=10_000,
+        )
+
+        expect(
+            quick.locator('.cb-save-state')
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+        expect(
+            page.locator('#cb-live-field-editor')
+        ).to_have_count(0)
+
+        state = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        assert (
+            state['current_alignment']['2B']
+            == 'Shortstop Shawn'
+        )
+        assert (
+            state['current_alignment']['SS']
+            == 'Second Sam'
+        )
     finally:
         cleanup(page, coachboard_url, game_id, None)

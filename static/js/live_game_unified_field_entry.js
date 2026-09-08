@@ -236,17 +236,27 @@
       return;
     }
 
+    // A direct field-to-field swap needs an authoritative-state fetch before
+    // the draft can be built. Do not leave the old "Saved" indicator visible
+    // during that request or a coach can reasonably think the new move is
+    // already persisted.
+    setSaveBadge('saving', 'Saving…');
+
     try {
       const working = await ensureDraft();
       const source = positionForName(working.alignment, name);
       if (source === 'P') {
+        setSaveBadge('', 'Saved ✓');
         clearDraft({restore: true});
         document.getElementById('liveChangePitcherBtn')?.click();
         return;
       }
 
       const result = applyMove(working.alignment, name, destination);
-      if (!result.changed) return;
+      if (!result.changed) {
+        setSaveBadge('', 'Saved ✓');
+        return;
+      }
       renderDraft();
       await saveCompletedDraft();
     } catch (error) {
