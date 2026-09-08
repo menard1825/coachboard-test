@@ -86,6 +86,7 @@ class Player(db.Model):
     lesson_focus = Column(Text)
     notes_author = Column(String)
     notes_timestamp = Column(DateTime) # Changed to DateTime
+    is_guest = Column(Boolean, default=False, nullable=False)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="players")

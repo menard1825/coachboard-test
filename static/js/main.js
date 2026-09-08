@@ -76,11 +76,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const pNotesSafe = escapeHTML(p.notes || '');
         const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
+        const guestBadge = p.is_guest
+            ? '<span class="badge text-bg-info">GUEST</span>'
+            : '';
         const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}" data-delete-name="${pNameSafe}">Delete</button>`;
 
         const positionValues = [p.position1, p.position2, p.position3].filter(Boolean);
         const positions = positionValues.map((pos, index) => `<span class="badge ${index === 0 ? 'text-bg-primary' : 'text-bg-secondary'}">${escapeHTML(pos)}</span>`).join('') || '<span class="badge text-bg-warning">Positions needed</span>';
-        const batsThrows = `Bats ${p.bats || 'not set'} · Throws ${p.throws || 'not set'}`;
+        const batsThrows = `${p.is_guest ? 'Guest player · ' : ''}Bats ${p.bats || 'not set'} · Throws ${p.throws || 'not set'}`;
         const profileComplete = Boolean(p.number && p.position1 && p.throws && p.bats);
         const pitcherRole = p.pitcher_role && p.pitcher_role !== 'Not a Pitcher' ? p.pitcher_role : 'Position player';
         const initial = p.name ? escapeHTML(p.name.trim().charAt(0).toUpperCase()) : '?';
@@ -93,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i class="bi bi-grip-vertical text-muted drag-handle" style="cursor: move;" title="Drag to reorder"></i>
                         <span class="cb-player-initial">${initial}</span>
                         <div class="min-w-0">
-                            <div class="d-flex align-items-center flex-wrap gap-2"><strong class="cb-roster-name">${pNameSafe}</strong><span class="cb-jersey-number">#${escapeHTML(p.number || '—')}</span></div>
+                            <div class="d-flex align-items-center flex-wrap gap-2"><strong class="cb-roster-name">${pNameSafe}</strong>${guestBadge}<span class="cb-jersey-number">#${escapeHTML(p.number || '—')}</span></div>
                             <div class="cb-roster-meta">${escapeHTML(batsThrows)} · ${escapeHTML(pitcherRole)}</div>
                         </div>
                     </div>
@@ -109,6 +112,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="col-12 col-md-5"><label class="form-label">Player name</label><input type="text" class="form-control" name="name" value="${pNameSafe}"></div>
                             <div class="col-5 col-md-2"><label class="form-label">Jersey #</label><input type="number" class="form-control" name="number" value="${p.number || ''}"></div>
                             <div class="col-7 col-md-5"><label class="form-label">Player type</label><select name="pitcher_role" class="form-select"><option value="Not a Pitcher" ${p.pitcher_role === "Not a Pitcher" ? 'selected' : ''}>Position player</option><option value="Starter" ${p.pitcher_role === "Starter" ? 'selected' : ''}>Starting pitcher</option><option value="Reliever" ${p.pitcher_role === "Reliever" ? 'selected' : ''}>Relief pitcher</option></select></div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Roster status</label>
+                                <select name="roster_status" class="form-select">
+                                    <option value="regular" ${!p.is_guest ? 'selected' : ''}>Regular Player</option>
+                                    <option value="guest" ${p.is_guest ? 'selected' : ''}>Guest Player</option>
+                                </select>
+                                <div class="form-text">Guests default to Out on future games.</div>
+                            </div>
                             <div class="col-6 col-md-4"><label class="form-label">Primary position</label>${renderPositionSelect('position1', `position1_${p.id}`, p.position1, 'Choose primary', 'form-select')}</div>
                             <div class="col-6 col-md-4"><label class="form-label">Secondary position</label>${renderPositionSelect('position2', `position2_${p.id}`, p.position2, 'Optional', 'form-select')}</div>
                             <div class="col-6 col-md-4"><label class="form-label">Additional position</label>${renderPositionSelect('position3', `position3_${p.id}`, p.position3, 'Optional', 'form-select')}</div>

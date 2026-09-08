@@ -122,6 +122,26 @@ def add_game():
         team_id=session['team_id']
     )
     db.session.add(new_game)
+    db.session.flush()
+
+    # Guests are opt-in for each game. Any newly created game starts with
+    # every guest player marked Out until a coach explicitly marks them Playing.
+    guest_player_ids = [
+        player_id
+        for (player_id,) in db.session.query(Player.id).filter_by(
+            team_id=session['team_id'],
+            is_guest=True,
+        ).all()
+    ]
+    db.session.add_all([
+        PlayerGameAbsence(
+            player_id=player_id,
+            game_id=new_game.id,
+            team_id=session['team_id'],
+        )
+        for player_id in guest_player_ids
+    ])
+
     db.session.commit()
     flash(f'Game vs "{new_game.opponent}" on {new_game.date.strftime("%m/%d/%Y")} added successfully!', 'success')
     socketio.emit('data_updated', {'message': 'New game added.'})

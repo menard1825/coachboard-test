@@ -4,6 +4,9 @@
   const path = window.location.pathname;
   const isSettingsPage = path === '/admin/settings';
   const isGamePage = /^\/game\/\d+\/?$/.test(path);
+  const gameId = isGamePage
+    ? Number(path.match(/^\/game\/(\d+)\/?$/)?.[1] || 0)
+    : null;
   if (!isSettingsPage && !isGamePage) return;
 
   const API_URL = '/api/fair-play/settings';
@@ -11,6 +14,7 @@
   let settingsResponse = null;
   let matrixObserver = null;
   let renderTimer = null;
+  let guestPlayerNames = new Set();
 
   const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -29,6 +33,25 @@
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'Could not load playing-time settings.');
     return data;
+  }
+
+  async function fetchGuestPlayersForGame() {
+    if (!gameId) return new Set();
+
+    const response = await fetch(`/api/game_data/${gameId}`, {
+      method: 'GET',
+      headers: {Accept: 'application/json'},
+      cache: 'no-store',
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return new Set();
+
+    return new Set(
+      (data.roster || [])
+        .filter((player) => Boolean(player.is_guest))
+        .map((player) => String(player.name || '').trim())
+        .filter(Boolean)
+    );
   }
 
   async function saveSettings(payload) {
@@ -365,10 +388,16 @@
     const details = document.getElementById('fairPlayGameDetailsBody');
     const icon = document.getElementById('fairPlayGameIcon');
     const innerCard = card.querySelector('.card');
-    const rows = parseRotationMatrix();
+    const allRows = parseRotationMatrix();
+    const guestRows = allRows.filter((row) => guestPlayerNames.has(row.player));
+    const rows = allRows.filter((row) => !guestPlayerNames.has(row.player));
 
     if (!rows.length) {
-      if (summary) summary.textContent = 'Add defensive innings to see Fair Play status.';
+      if (summary) {
+        summary.textContent = guestRows.length
+          ? `${guestRows.length} guest player${guestRows.length === 1 ? '' : 's'} excluded from Fair Play.`
+          : 'Add defensive innings to see Fair Play status.';
+      }
       if (details) details.innerHTML = '<span class="text-muted">No rotation data yet.</span>';
       return;
     }
@@ -386,6 +415,9 @@
     if (minInfield > 0) summaryParts.push(`${metInfield}/${statuses.length} meet the ${minInfield}-inning IF goal`);
     if (maxBench > 0) summaryParts.push(`${benchWarnings.length} bench-streak warning${benchWarnings.length === 1 ? '' : 's'}`);
     if (!summaryParts.length) summaryParts.push('Rules are active, but no checks are currently enabled.');
+    if (guestRows.length) {
+      summaryParts.push(`${guestRows.length} guest excluded`);
+    }
 
     if (summary) summary.textContent = summaryParts.join(' · ');
 
@@ -456,7 +488,12 @@
 
   async function initGamePage() {
     try {
-      settingsResponse = await fetchSettings();
+      const [settings, guests] = await Promise.all([
+        fetchSettings(),
+        fetchGuestPlayersForGame(),
+      ]);
+      settingsResponse = settings;
+      guestPlayerNames = guests;
       if (settingsResponse?.settings?.mode !== 'rules') return;
       ensureGameStatusCard();
       observeRotationMatrix();
