@@ -309,6 +309,7 @@ def test_quick_field_rejects_player_marked_out(monkeypatch):
     response = client.post('/api/live-game/70/defensive-change', json={
         'player_id': 10,
         'destination_position': 'RF',
+        'base_sequence': 0,
     })
 
     assert response.status_code == 409
@@ -321,3 +322,237 @@ def test_quick_field_rejects_player_marked_out(monkeypatch):
             game_id=70,
             team_id=1,
         ).count() == 0
+
+
+
+def test_weekend_multicoach_write_guards(monkeypatch):
+    app = _build_app(monkeypatch)
+    first_client = app.test_client()
+    second_client = app.test_client()
+    _login(first_client)
+    _login(second_client)
+
+    from db import db
+    from models import (
+        GameRotationEvent,
+        Player,
+        PlayerGameAbsence,
+    )
+
+    # Old/unversioned Quick Field requests fail closed.
+    response = first_client.post(
+        '/api/live-game/70/defensive-change',
+        json={
+            'player_id': 10,
+            'destination_position': 'RF',
+        },
+    )
+    assert response.status_code == 409
+    assert (
+        response.get_json()['code']
+        == 'missing_live_state_version'
+    )
+
+    # Coach 1 saves from sequence 0.
+    response = first_client.post(
+        '/api/live-game/70/defensive-change',
+        json={
+            'player_id': 10,
+            'destination_position': 'RF',
+            'base_sequence': 0,
+        },
+    )
+    assert response.status_code == 200
+
+    with app.app_context():
+        assert db.session.query(
+            GameRotationEvent
+        ).filter_by(
+            game_id=70,
+            team_id=1,
+        ).count() == 1
+
+    # Coach 2 is still looking at sequence 0.
+    # Their otherwise-valid move must not overwrite Coach 1.
+    response = second_client.post(
+        '/api/live-game/70/defensive-change',
+        json={
+            'player_id': 10,
+            'destination_position': 'CF',
+            'base_sequence': 0,
+        },
+    )
+    assert response.status_code == 409
+
+    payload = response.get_json()
+    assert payload['code'] == 'stale_live_state'
+    assert payload['current_sequence'] == 1
+    assert payload['current_alignment']['RF'] == 'Jack'
+
+    # Bulk/chained Quick Field cannot bypass version checking.
+    alignment = {
+        'P': 'Aiden',
+        'C': 'Bennett',
+        '1B': 'Carter',
+        '2B': 'Drew',
+        '3B': 'Eli',
+        'SS': 'Finn',
+        'LF': 'Gavin',
+        'CF': 'Hudson',
+        'RF': 'Isaac',
+    }
+
+    response = first_client.post(
+        '/api/live-game/70/set-defense',
+        json={'alignment': alignment},
+    )
+    assert response.status_code == 409
+    assert (
+        response.get_json()['code']
+        == 'missing_live_state_version'
+    )
+
+    # Undo also requires the state version.
+    response = first_client.post(
+        '/api/live-game/70/undo',
+        json={},
+    )
+    assert response.status_code == 409
+    assert (
+        response.get_json()['code']
+        == 'missing_live_state_version'
+    )
+
+    # The old direct inning-advance route is shut down.
+    response = first_client.post(
+        '/api/live-game/70/end-inning',
+        json={},
+    )
+    assert response.status_code == 409
+    assert (
+        response.get_json()['code']
+        == 'legacy_live_write_disabled'
+    )
+
+    # Playing / Out cannot change once first pitch happened.
+    response = first_client.post(
+        '/game/70/update_absences',
+        data={'absent_players': '10'},
+    )
+    assert response.status_code == 302
+
+    with app.app_context():
+        assert db.session.query(
+            PlayerGameAbsence
+        ).filter_by(
+            game_id=70,
+            team_id=1,
+            player_id=10,
+        ).count() == 0
+
+    # Guest-status changes are locked once the game is live.
+    #
+    # Keep Jack's name unchanged here. A rename is already independently
+    # protected by CoachBoard's historical-player safety guard because Jack
+    # appears in the saved rotation fixture. This request specifically tests
+    # the new live-roster lock.
+    response = first_client.post(
+        '/update_player_inline/10',
+        data={
+            'name': 'Jack',
+            'roster_status': 'guest',
+        },
+    )
+    assert response.status_code == 409
+
+    payload = response.get_json()
+    assert payload['code'] == 'live_roster_locked'
+
+    with app.app_context():
+        player = db.session.get(Player, 10)
+        assert player.name == 'Jack'
+        assert player.is_guest is False
+
+
+def test_invalid_live_alignment_stays_visible(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Rotation
+
+    with app.app_context():
+        rotation = db.session.get(Rotation, 1)
+        innings = dict(rotation.innings or {})
+        inning_two = dict(innings['2'])
+        inning_two['RF'] = 'Renamed Player'
+        innings['2'] = inning_two
+        rotation.innings = innings
+        db.session.commit()
+
+    response = client.get('/api/live-game/70/state')
+    assert response.status_code == 200
+
+    payload = response.get_json()
+
+    assert (
+        payload['current_alignment']['RF']
+        == 'Renamed Player'
+    )
+    assert payload['current_alignment'] != {}
+    assert payload['alignment_valid'] is False
+    assert (
+        'Renamed Player'
+        in payload['alignment_offending_names']
+    )
+
+
+def test_reverted_event_does_not_count_as_active_version(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import GameRotationEvent
+
+    inning_two = {
+        'P': 'Aiden',
+        'C': 'Bennett',
+        '1B': 'Carter',
+        '2B': 'Drew',
+        '3B': 'Eli',
+        'SS': 'Finn',
+        'LF': 'Gavin',
+        'CF': 'Hudson',
+        'RF': 'Isaac',
+    }
+
+    with app.app_context():
+        db.session.add(
+            GameRotationEvent(
+                team_id=1,
+                game_id=70,
+                inning='2',
+                sequence=1,
+                event_type='Defensive Change',
+                changed_by_user='coach',
+                before_alignment=inning_two,
+                after_alignment=inning_two,
+                reverted=True,
+            )
+        )
+        db.session.commit()
+
+    response = client.post(
+        '/api/live-game/70/defense-edit',
+        json={
+            'base_sequence': 0,
+            'alignment': _inning_two_with_jack_in_right(),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+
+    assert payload['delta']['sequence'] == 2

@@ -58,7 +58,19 @@ def _current_sequence(game_id, team_id):
 
 def _stale_write_response(data, game, team):
     if data.get('base_sequence') in (None, ''):
-        return None
+        return jsonify({
+            'status': 'error',
+            'code': 'missing_live_state_version',
+            'message': (
+                'This Live Game screen is out of date. '
+                'Refresh the live field before saving '
+                'this change.'
+            ),
+            'current_sequence': _current_sequence(
+                game.id,
+                team.id,
+            ),
+        }), 409
     try:
         expected = int(data.get('base_sequence'))
     except (TypeError, ValueError):
@@ -271,6 +283,15 @@ def set_defense(game_id):
         return jsonify({'status': 'error', 'message': 'Game is not live.'}), 409
 
     data = request.get_json(silent=True) or {}
+
+    stale = _stale_write_response(
+        data,
+        game,
+        team,
+    )
+    if stale:
+        return stale
+
     proposed = data.get('alignment')
     if not isinstance(proposed, dict):
         return jsonify({'status': 'error', 'message': 'A complete defensive alignment is required.'}), 400

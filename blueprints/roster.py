@@ -44,6 +44,31 @@ def get_player_order_as_list(player_order_data):
     return []
 
 
+def _active_live_game_for_team(team_id):
+    if not team_id:
+        return None
+
+    return db.session.query(Game).filter_by(
+        team_id=team_id,
+        is_live=True,
+    ).order_by(Game.id.desc()).first()
+
+
+def _live_roster_lock_message(game):
+    opponent = str(getattr(game, 'opponent', '') or '').strip()
+
+    if opponent:
+        return (
+            f'Roster changes are locked while the game vs {opponent} is live. '
+            'End the live game before changing players or Guest status.'
+        )
+
+    return (
+        'Roster changes are locked while a game is live. '
+        'End the live game before changing players or Guest status.'
+    )
+
+
 def _mark_guest_out_for_future_games(player):
     """Guest players opt in per game; future games default them to Out."""
     if not player or not player.is_guest:
@@ -61,6 +86,7 @@ def _mark_guest_out_for_future_games(player):
         for (game_id,) in db.session.query(Game.id).filter(
             Game.team_id == player.team_id,
             Game.date >= start_today,
+            Game.is_live.is_(False),
         ).all()
     ]
 
@@ -89,6 +115,11 @@ def _mark_guest_out_for_future_games(player):
 
 @roster_bp.route('/add_player', methods=['POST'])
 def add_player():
+    live_game = _active_live_game_for_team(session.get('team_id'))
+    if live_game:
+        flash(_live_roster_lock_message(live_game), 'warning')
+        return redirect(url_for('home', _anchor='roster'))
+
     name = request.form.get('name')
     if not name:
         flash('Player name is required.', 'danger')
@@ -139,6 +170,14 @@ def add_player():
 
 @roster_bp.route('/update_player_inline/<int:player_id>', methods=['POST'])
 def update_player_inline(player_id):
+    live_game = _active_live_game_for_team(session.get('team_id'))
+    if live_game:
+        return jsonify({
+            'status': 'error',
+            'code': 'live_roster_locked',
+            'message': _live_roster_lock_message(live_game),
+        }), 409
+
     player_to_edit = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
     if not player_to_edit:
         return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
@@ -249,6 +288,19 @@ def update_pitching_profile(player_id):
 
 @roster_bp.route('/delete_player/<int:player_id>')
 def delete_player(player_id):
+    live_game = _active_live_game_for_team(session.get('team_id'))
+    if live_game:
+        flash(_live_roster_lock_message(live_game), 'warning')
+        return redirect(
+            url_for(
+                'home',
+                _anchor=request.args.get(
+                    'active_tab',
+                    'roster',
+                ).lstrip('#'),
+            )
+        )
+
     player_to_delete = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
     if player_to_delete:
         player_name = player_to_delete.name
@@ -275,6 +327,14 @@ def delete_player(player_id):
 
 @roster_bp.route('/save_player_order', methods=['POST'])
 def save_player_order():
+    live_game = _active_live_game_for_team(session.get('team_id'))
+    if live_game:
+        return jsonify({
+            'status': 'error',
+            'code': 'live_roster_locked',
+            'message': _live_roster_lock_message(live_game),
+        }), 409
+
     user = db.session.query(User).filter_by(username=session['username']).first()
     if not user:
         return jsonify({'status': 'error', 'message': 'User not found'}), 404

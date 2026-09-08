@@ -297,7 +297,14 @@ def _versioned_static(filename):
 def protect_live_game_workflows():
     """Protect the pregame plan and require an explicit next-inning decision."""
     if request.method == 'POST' and request.endpoint == 'live_game_api.end_inning':
-        return _end_inning_with_confirmed_prep()
+        return jsonify({
+            'status': 'error',
+            'code': 'legacy_live_write_disabled',
+            'message': (
+                'This End Inning action is no longer supported. '
+                'Use the current End Inning huddle and Start Inning button.'
+            ),
+        }), 409
 
     # Start readiness belongs exclusively to live_game_api.start via
     # can_start_game(). This compatibility layer only clears staged next-inning

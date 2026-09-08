@@ -29,6 +29,19 @@
   let saveMessage = 'Saved';
   let quickDefenseSignature = '';
 
+  function sequenceFromState(value = state) {
+    return (value?.rotation_events || []).reduce(
+      (max, event) => {
+        if (event?.reverted) return max;
+        return Math.max(
+          max,
+          Number(event?.sequence) || 0,
+        );
+      },
+      0,
+    );
+  }
+
   function styles() {
     if ($('dugout-mode-styles')) return;
     const style = document.createElement('style');
@@ -577,13 +590,26 @@
       const response = await fetch(`/api/live-game/${gameId}/set-defense`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({alignment}),
+        body: JSON.stringify({
+          alignment,
+          base_sequence: sequenceFromState(),
+        }),
       });
 
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok || data.status === 'error') {
-        throw new Error(data.message || `Unable to save defense (${response.status}).`);
+        if (
+          data.code === 'stale_live_state' ||
+          data.code === 'missing_live_state_version'
+        ) {
+          await getState();
+        }
+
+        throw new Error(
+          data.message ||
+          `Unable to save defense (${response.status}).`
+        );
       }
 
       if (data.state) state = data.state;
@@ -628,10 +654,26 @@
       const response = await fetch(`/api/live-game/${gameId}/defensive-change`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player_id: playerId, destination_position: destination }),
+        body: JSON.stringify({
+          player_id: playerId,
+          destination_position: destination,
+          base_sequence: sequenceFromState(),
+        }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.status === 'error') throw new Error(data.message || `Unable to save defense (${response.status}).`);
+      if (!response.ok || data.status === 'error') {
+        if (
+          data.code === 'stale_live_state' ||
+          data.code === 'missing_live_state_version'
+        ) {
+          await getState();
+        }
+
+        throw new Error(
+          data.message ||
+          `Unable to save defense (${response.status}).`
+        );
+      }
       if (data.state) state = data.state;
       saveMode = 'saved';
       saveMessage = 'Saved ✓';

@@ -16,6 +16,19 @@
 
     const byId = (id) => document.getElementById(id);
 
+    function sequenceFromState(value = liveState) {
+        return (value?.rotation_events || []).reduce(
+            (max, event) => {
+                if (event?.reverted) return max;
+                return Math.max(
+                    max,
+                    Number(event?.sequence) || 0,
+                );
+            },
+            0,
+        );
+    }
+
     function isLiveActionTarget(target) {
         return target?.closest?.([
             '#startLiveGameBtnAction', '#liveGameModeToggle', '#liveChangePitcherBtn',
@@ -69,7 +82,19 @@
         let data = {};
         try { data = await response.json(); } catch (_) {}
         if (!response.ok || data.status === 'error') {
-            throw new Error(data.message || `Request failed (${response.status})`);
+            if (
+                data.code === 'stale_live_state' ||
+                data.code === 'missing_live_state_version'
+            ) {
+                try {
+                    await fetchState();
+                } catch (_) {}
+            }
+
+            throw new Error(
+                data.message ||
+                `Request failed (${response.status})`
+            );
         }
         if (data.state) applyState(data.state);
         return data;
@@ -306,7 +331,14 @@
             if (!btn || btn.disabled || actionBusy) return;
             actionBusy = true;
             try {
-                await api('/change-pitcher', { method: 'POST', body: JSON.stringify({ new_pitcher_id: newPitcherId, outgoing_destination: btn.dataset.destination }) });
+                await api('/change-pitcher', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        new_pitcher_id: newPitcherId,
+                        outgoing_destination: btn.dataset.destination,
+                        base_sequence: sequenceFromState(),
+                    }),
+                });
                 bootstrap.Modal.getOrCreateInstance(modal).hide();
                 toast(`✓ ${incoming.name} → P • Saved & Synced`);
             } catch (err) {
@@ -408,7 +440,12 @@
                 showPitcherPicker();
             } else if (id === 'liveUndoBtn') {
                 actionBusy = true;
-                await api('/undo', { method: 'POST', body: '{}' });
+                await api('/undo', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        base_sequence: sequenceFromState(),
+                    }),
+                });
                 toast('✓ Last live change undone • Saved & Synced');
             } else if (id === 'liveEndGameBtn') {
                 const pitched = new Set();

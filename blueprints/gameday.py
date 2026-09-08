@@ -203,6 +203,20 @@ def update_absences(game_id):
         flash('Game not found.', 'danger')
         return redirect(url_for('game_day.game_day_home'))
 
+    if game.is_live:
+        flash(
+            'Playing / Out is locked once Live Game starts. '
+            'Use Quick Field to move players to or from the bench.',
+            'warning',
+        )
+        return redirect(
+            url_for(
+                '.game_management',
+                game_id=game_id,
+                _anchor='availabilityCollapse',
+            )
+        )
+
     try:
         absent_player_ids = {
             int(player_id)

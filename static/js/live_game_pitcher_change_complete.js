@@ -18,6 +18,19 @@
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[ch]));
 
+  function sequenceFromState(value = state) {
+    return (value?.rotation_events || []).reduce(
+      (max, event) => {
+        if (event?.reverted) return max;
+        return Math.max(
+          max,
+          Number(event?.sequence) || 0,
+        );
+      },
+      0,
+    );
+  }
+
   function installStyles() {
     if ($('pitcher-change-simple-styles')) return;
     const style = document.createElement('style');
@@ -153,10 +166,33 @@
       const response = await fetch(`/api/live-game/${gameId}/complete-pitcher-change`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({new_pitcher_id:Number(incoming.id), alignment})
+        body:JSON.stringify({
+          new_pitcher_id:Number(incoming.id),
+          alignment,
+          base_sequence:sequenceFromState(),
+        })
       });
       const data = await response.json().catch(()=>({}));
-      if (!response.ok || data.status === 'error') throw new Error(data.message || `Unable to change pitcher (${response.status}).`);
+      if (!response.ok || data.status === 'error') {
+        if (
+          data.code === 'stale_live_state' ||
+          data.code === 'missing_live_state_version'
+        ) {
+          try {
+            state = await loadState();
+          } catch (_) {}
+
+          bootstrap.Modal
+            .getOrCreateInstance(modal)
+            .hide();
+        }
+
+        throw new Error(
+          data.message ||
+          `Unable to change pitcher (${response.status}).`
+        );
+      }
+
       bootstrap.Modal.getOrCreateInstance(modal).hide();
       toast(successMessage);
     } catch (err) {
