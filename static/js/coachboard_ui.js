@@ -385,10 +385,79 @@
     }
   }
 
+  function installDefensiveTemplateDeleteButtons() {
+    if (path !== '/') return;
+
+    const pane = document.getElementById('rotations');
+    if (!pane) return;
+
+    const enhance = () => {
+      pane.querySelectorAll(
+        'a[href^="/starting-defense-template/"], a[href^="/rotation-template/"]'
+      ).forEach((link) => {
+        const href = link.getAttribute('href') || '';
+        const match = href.match(
+          /^\/(?:starting-defense-template|rotation-template)\/(\d+)\/?$/
+        );
+
+        // Ignore "new" links and anything that is not a saved template.
+        if (!match) return;
+
+        const templateId = match[1];
+
+        if (
+          pane.querySelector(
+            `[data-cb-defense-template-delete="${templateId}"]`
+          )
+        ) return;
+
+        const templateName = (link.textContent || '')
+          .replace(/\s+/g, ' ')
+          .trim() || 'this defensive template';
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className =
+          'btn btn-sm btn-outline-danger ms-2 cb-defense-template-delete';
+
+        deleteButton.dataset.cbDefenseTemplateDelete = templateId;
+        deleteButton.dataset.deleteUrl = `/delete_rotation/${templateId}`;
+        deleteButton.dataset.deleteName = templateName;
+
+        deleteButton.setAttribute('data-bs-toggle', 'modal');
+        deleteButton.setAttribute('data-bs-target', '#confirmDeleteModal');
+        deleteButton.setAttribute(
+          'aria-label',
+          `Delete ${templateName}`
+        );
+
+        deleteButton.innerHTML =
+          '<i class="bi bi-trash me-1"></i>Delete';
+
+        link.insertAdjacentElement('afterend', deleteButton);
+      });
+    };
+
+    enhance();
+
+    // The template list is rendered asynchronously by the existing page.
+    // Keep watching it so the Delete buttons survive refreshes/re-renders.
+    if (pane.dataset.cbDefenseDeleteObserver === '1') return;
+
+    pane.dataset.cbDefenseDeleteObserver = '1';
+
+    const observer = new MutationObserver(enhance);
+    observer.observe(pane, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
   function init() {
     useNeutralFaviconWhenTeamHasNoLogo();
     ensureHomeNavigation();
     addHomeIntros();
+    installDefensiveTemplateDeleteButtons();
     modernizeLegacyAdminHeader();
     enhancePitchingStructure();
     markSimpleEmptyStates();
