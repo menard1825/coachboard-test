@@ -101,6 +101,17 @@ def alignment(pitcher='Pitcher Pat'):
     }
 
 
+def active_sequence(state):
+    return max(
+        (
+            int(event.get('sequence') or 0)
+            for event in state.get('rotation_events', [])
+            if not event.get('reverted')
+        ),
+        default=0,
+    )
+
+
 def create_game_with_plan(page: Page, coachboard_url: str):
     game_date = (date.today() + timedelta(days=5)).isoformat()
     response = post_form(page, coachboard_url, '/game-day/add', {
@@ -224,22 +235,48 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     })
     assert restarted['clock']['time_limit_minutes'] == 90
 
-    changed = post_json(page, coachboard_url, f'/api/live-game/{game_id}/defensive-change', {
-        'player_id': 4,
-        'destination_position': 'SS',
-    })
+    live_state = get_json(
+        page,
+        coachboard_url,
+        f'/api/live-game/{game_id}/state',
+    )
+
+    changed = post_json(
+        page,
+        coachboard_url,
+        f'/api/live-game/{game_id}/defensive-change',
+        {
+            'player_id': 4,
+            'destination_position': 'SS',
+            'base_sequence': active_sequence(live_state),
+        },
+    )
     assert changed['state']['current_alignment']['SS'] == 'Second Sam'
-    restored = post_json(page, coachboard_url, f'/api/live-game/{game_id}/set-defense', {
-        'alignment': alignment(),
-    })
+
+    restored = post_json(
+        page,
+        coachboard_url,
+        f'/api/live-game/{game_id}/set-defense',
+        {
+            'alignment': alignment(),
+            'base_sequence': active_sequence(changed['state']),
+        },
+    )
     assert restored['state']['current_alignment']['SS'] == 'Shortstop Shawn'
 
     pitching_change = alignment('Second Sam')
     pitching_change['2B'] = 'Pitcher Pat'
-    completed = post_json(page, coachboard_url, f'/api/live-game/{game_id}/complete-pitcher-change', {
-        'new_pitcher_id': 4,
-        'alignment': pitching_change,
-    })
+
+    completed = post_json(
+        page,
+        coachboard_url,
+        f'/api/live-game/{game_id}/complete-pitcher-change',
+        {
+            'new_pitcher_id': 4,
+            'alignment': pitching_change,
+            'base_sequence': active_sequence(restored['state']),
+        },
+    )
     assert completed['state']['current_alignment']['P'] == 'Second Sam'
 
     prep = post_json(page, coachboard_url, f'/api/live-game/{game_id}/next-inning-prep', {
@@ -254,9 +291,37 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
         'mode': 'current',
     })
 
-    inning = post_json(page, coachboard_url, f'/api/live-game/{game_id}/end-inning', {})
-    assert inning['state']['current_inning'] == '2'
-    undone = post_json(page, coachboard_url, f'/api/live-game/{game_id}/undo', {})
+    before_advance = get_json(
+        page,
+        coachboard_url,
+        f'/api/live-game/{game_id}/state',
+    )
+
+    inning = post_json(
+        page,
+        coachboard_url,
+        f'/api/live-game/{game_id}/advance-inning',
+        {
+            'alignment': before_advance['current_alignment'],
+            'base_sequence': active_sequence(before_advance),
+        },
+    )
+    assert inning['delta']['current_inning'] == '2'
+
+    after_advance = get_json(
+        page,
+        coachboard_url,
+        f'/api/live-game/{game_id}/state',
+    )
+
+    undone = post_json(
+        page,
+        coachboard_url,
+        f'/api/live-game/{game_id}/undo',
+        {
+            'base_sequence': active_sequence(after_advance),
+        },
+    )
     assert undone['state']['current_inning'] == '1'
 
     # Socket state broadcasts used to call a removed renderBenchReport() helper.

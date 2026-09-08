@@ -80,7 +80,10 @@
     const editResponse = await nativeFetch(`/api/live-game/${gameId}/defense-edit`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({alignment:after}),
+      body:JSON.stringify({
+        alignment:after,
+        base_sequence:requested.base_sequence,
+      }),
     });
     if (!editResponse.ok) return editResponse;
     const editData = await editResponse.clone().json().catch(() => ({}));
