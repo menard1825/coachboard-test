@@ -229,16 +229,55 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
 
         header = page.locator('#cbDugoutHeader')
         expect(header).to_be_visible(timeout=15_000)
+
+        live_status = header.locator(
+            '[data-cb-live-label]'
+        )
+
+        # Phone-sized Live Game must explicitly say whether the game
+        # is running or paused instead of relying on header color.
+        expect(live_status).to_be_visible()
+        expect(live_status).to_contain_text(
+            'Live',
+            timeout=10_000,
+        )
+
         pause = header.locator('[data-cb-clock]')
         expect(pause).to_have_text('Pause', timeout=10_000)
         pause.click()
-        expect(pause).to_have_text('Resume', timeout=10_000)
-        clock = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/clock').json()['clock']
+
+        expect(pause).to_have_text(
+            'Resume',
+            timeout=10_000,
+        )
+
+        expect(live_status).to_have_text(
+            'Paused',
+            timeout=10_000,
+        )
+
+        clock = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/clock'
+        ).json()['clock']
+
         assert clock['is_paused'] is True
 
         pause.click()
-        expect(pause).to_have_text('Pause', timeout=10_000)
-        clock = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/clock').json()['clock']
+
+        expect(pause).to_have_text(
+            'Pause',
+            timeout=10_000,
+        )
+
+        expect(live_status).to_contain_text(
+            'Live',
+            timeout=10_000,
+        )
+
+        clock = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/clock'
+        ).json()['clock']
+
         assert clock['is_paused'] is False
     finally:
         state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')

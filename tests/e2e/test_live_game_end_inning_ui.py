@@ -139,3 +139,138 @@ def test_end_inning_uses_huddle_then_starts_next_inning(page: Page, coachboard_u
             f'{coachboard_url}/game-day/{game_id}/delete',
             headers={'Accept': 'application/json'},
         )
+
+
+def test_stale_huddle_closes_when_game_advances_elsewhere(
+    page: Page,
+    coachboard_url: str,
+):
+    page.set_viewport_size({'width': 390, 'height': 844})
+    login(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        started = post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+
+        assert started['state']['current_inning'] == '1'
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            page.locator('#live-game-overlay')
+        ).to_be_visible(timeout=15_000)
+
+        page.locator('#liveEndInningBtn').click()
+
+        huddle = page.locator(
+            '#cb-test2-huddle-modal'
+        )
+
+        expect(huddle).to_be_visible(timeout=10_000)
+
+        huddle.locator(
+            '[data-cb-t2-choice="current"]'
+        ).click()
+
+        start_next = huddle.locator(
+            '[data-cb-t2-start-inning]'
+        )
+
+        expect(start_next).to_be_enabled(
+            timeout=10_000
+        )
+
+        state = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        sequence = max(
+            (
+                int(event.get('sequence') or 0)
+                for event in state.get(
+                    'rotation_events',
+                    [],
+                )
+                if not event.get('reverted')
+            ),
+            default=0,
+        )
+
+        # Simulate another coach starting Inning 2 while this
+        # browser still has the Inning 1 huddle open.
+        advanced = page.request.post(
+            f'{coachboard_url}/api/live-game/{game_id}/advance-inning',
+            data={
+                'alignment': alignment(),
+                'base_sequence': sequence,
+            },
+        )
+
+        assert advanced.status == 200, advanced.text()
+        assert advanced.json()['status'] == 'success'
+
+        # The stale huddle should disappear automatically from the
+        # live delta. No coach should be left looking at a stale
+        # "Start Inning 2" button.
+        expect(huddle).not_to_be_visible(
+            timeout=10_000
+        )
+
+        notice = page.locator(
+            '#cb-test2-inning-recovery'
+        )
+
+        expect(notice).to_be_visible(
+            timeout=10_000
+        )
+
+        expect(notice).to_contain_text(
+            'already started Inning 2'
+        )
+
+        expect(
+            page.locator('#live-inning-display')
+        ).to_have_text(
+            '2',
+            timeout=10_000,
+        )
+
+        final_state = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        # Most important: no double advance.
+        assert final_state['current_inning'] == '2'
+
+    finally:
+        state_response = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        )
+
+        if (
+            state_response.ok
+            and state_response.json()
+            .get('game', {})
+            .get('is_live')
+        ):
+            page.request.post(
+                f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
+                data={
+                    'defer_pitching': True,
+                    'end_reason': 'manual',
+                    'current_inning_played': True,
+                },
+            )
+
+        page.request.post(
+            f'{coachboard_url}/game-day/{game_id}/delete',
+            headers={'Accept': 'application/json'},
+        )

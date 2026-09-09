@@ -13,6 +13,7 @@
   let queued = false;
   let huddleBusy = false;
   let huddlePrep = null;
+  let recoveryNoticeTimer = null;
 
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -60,6 +61,8 @@
       #${HUDDLE_ID} .cb-t2-error{display:none;border:1px solid #efbbb6;border-radius:9px;background:#fff2f0;color:#912d28;padding:8px 9px;font-size:.7rem;margin-top:8px}#${HUDDLE_ID} .cb-t2-error.show{display:block}
       #${HUDDLE_ID} .cb-t2-start{position:sticky;bottom:0;background:#fff;border-top:1px solid #e7ebef;padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
       #${HUDDLE_ID} .cb-t2-start .btn{width:100%;min-height:50px;border-radius:10px;font-weight:900}
+      #cb-test2-inning-recovery{display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:2200;width:min(92vw,520px);border:1px solid #9fc5b0;border-radius:11px;background:#edf8f1;color:#176b38;padding:10px 12px;box-shadow:0 8px 24px rgba(16,24,40,.18);font-size:.76rem;font-weight:780;line-height:1.35;text-align:center}
+      #cb-test2-inning-recovery.show{display:block}
       @media(max-width:575.98px){
         #${MODE_ID}{display:grid;grid-template-columns:1fr;padding:8px 9px}#${MODE_ID} .cb-t2-mode-buttons{width:100%}#${MODE_ID} .cb-t2-mode-buttons .btn{flex:1}
         #${HUDDLE_ID} .modal-dialog{margin:.35rem}#${HUDDLE_ID} .cb-t2-huddle-actions.two{grid-template-columns:1fr}
@@ -309,6 +312,116 @@
     box.classList.toggle('show', Boolean(message));
   }
 
+  function showInningRecoveryNotice(inning) {
+    let notice = $('cb-test2-inning-recovery');
+
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'cb-test2-inning-recovery';
+      notice.setAttribute('role', 'status');
+      notice.setAttribute('aria-live', 'polite');
+      document.body.appendChild(notice);
+    }
+
+    setText(
+      notice,
+      `Another coach already started Inning ${inning}. Live Game is updated.`
+    );
+
+    notice.classList.add('show');
+
+    if (recoveryNoticeTimer) {
+      window.clearTimeout(recoveryNoticeTimer);
+    }
+
+    recoveryNoticeTimer = window.setTimeout(() => {
+      notice.classList.remove('show');
+    }, 4500);
+  }
+
+  function stateAsLiveDelta(value) {
+    const events = Array.isArray(value?.rotation_events)
+      ? value.rotation_events.filter(event => !event?.reverted)
+      : [];
+
+    const latestEvent = events.reduce((latest, event) => {
+      if (!latest) return event;
+
+      return Number(event?.sequence || 0) >
+        Number(latest?.sequence || 0)
+        ? event
+        : latest;
+    }, null);
+
+    const alignment = {
+      ...(value?.current_alignment || {}),
+    };
+
+    return {
+      game_id: gameId,
+      current_inning: String(
+        value?.current_inning ||
+        value?.game?.live_current_inning ||
+        '1'
+      ),
+      current_alignment: alignment,
+      current_pitcher:
+        value?.current_pitcher ||
+        alignment.P ||
+        null,
+      bench: Array.isArray(value?.bench)
+        ? value.bench
+        : [],
+      sequence:
+        Number(value?.sequence) ||
+        Number(latestEvent?.sequence) ||
+        sequenceFromState(value),
+      event: value?.event || latestEvent || undefined,
+    };
+  }
+
+  function recoverAdvancedInning(
+    liveState,
+    {publish = true} = {}
+  ) {
+    const inning = String(
+      liveState?.current_inning ||
+      liveState?.game?.live_current_inning ||
+      ''
+    );
+
+    if (!inning) return;
+
+    huddlePrep = null;
+
+    const modal = $(HUDDLE_ID);
+    if (modal) {
+      try {
+        window.bootstrap?.Modal
+          ?.getOrCreateInstance(modal)
+          ?.hide();
+      } catch (_) {}
+    }
+
+    if (publish) {
+      document.dispatchEvent(
+        new CustomEvent('coachboard:live-delta', {
+          detail: stateAsLiveDelta(liveState),
+        })
+      );
+    }
+
+    window.CBNextDefense?.refresh?.();
+    showInningRecoveryNotice(inning);
+
+    window.setTimeout(() => {
+      $('cbQuickDefense')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 180);
+  }
+
   function renderHuddle(prep) {
     huddlePrep = prep;
     const modal = ensureHuddle();
@@ -327,7 +440,7 @@
       const moveMarkup = moves.length
         ? `<div class="cb-t2-moves">${moves.map(move => `<div class="cb-t2-move"><div><strong>${esc(move.name)}</strong><small>${esc(move.from)} → ${esc(move.to)}</small></div><div class="cb-t2-dest ${move.to === 'BENCH' ? 'bench' : ''}">${esc(move.to)}</div></div>`).join('')}</div>`
         : '<div class="cb-t2-huddle-status ready"><strong>Same defense</strong><span>The same players and positions are going back out.</span></div>';
-      body.innerHTML = `<div class="cb-t2-huddle-status ready"><strong>Inning ${esc(next)} defense is ready</strong><span>${moves.length ? 'Make these moves, then start the inning.' : 'No defensive moves are needed.'}</span></div>${moveMarkup}<div class="cb-t2-huddle-actions"><button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Change next defense</button></div>`;
+      body.innerHTML = `<div class="cb-t2-huddle-status ready"><strong>Inning ${esc(next)} defense is ready</strong><span>${moves.length ? 'Make these moves, then start the inning.' : 'No defensive moves are needed.'} Current pitcher stays unless you use Change Pitcher.</span></div>${moveMarkup}<div class="cb-t2-huddle-actions"><button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Change next defense</button></div>`;
       start.disabled = false;
       setText(start, `Start Inning ${next}`);
       showHuddleError('');
@@ -335,7 +448,7 @@
     }
 
     body.innerHTML = `
-      <div class="cb-t2-huddle-status"><strong>Choose the Inning ${esc(next)} defense</strong><span>Pick who goes out next, then start the inning.</span></div>
+      <div class="cb-t2-huddle-status"><strong>Choose the Inning ${esc(next)} defense</strong><span>Pick who goes out next, then start the inning. Current pitcher stays; use Change Pitcher separately.</span></div>
       <div class="cb-t2-huddle-actions ${planned ? 'two' : ''}">
         <button type="button" class="btn btn-outline-dark" data-cb-t2-choice="current">Same Defense</button>
         ${planned ? '<button type="button" class="btn btn-outline-primary" data-cb-t2-choice="planned">Use Planned Defense</button>' : ''}
@@ -389,36 +502,134 @@
 
   async function startNextInning() {
     if (huddleBusy) return;
+
     huddleBusy = true;
     showHuddleError('');
+
     const modal = ensureHuddle();
-    const button = modal.querySelector('[data-cb-t2-start-inning]');
+    const button = modal.querySelector(
+      '[data-cb-t2-start-inning]'
+    );
+
+    const expectedInning = String(
+      huddlePrep?.current_inning || ''
+    );
+
     if (button) button.disabled = true;
+
     try {
       await waitForLiveWritesToSettle();
+
       const [prep, liveState] = await Promise.all([
-        getJson(`/api/live-game/${gameId}/next-inning-prep`),
-        getJson(`/api/live-game/${gameId}/state`),
+        getJson(
+          `/api/live-game/${gameId}/next-inning-prep`
+        ),
+        getJson(
+          `/api/live-game/${gameId}/state`
+        ),
       ]);
-      const alignment = confirmedAlignment(prep);
-      if (!alignment) throw new Error('Lock the next defense before starting the inning.');
-      if (String(liveState.current_inning || '') !== String(prep.current_inning || '')) {
-        throw new Error('Another coach already moved the game forward. The huddle has been refreshed.');
+
+      const liveInning = String(
+        liveState.current_inning || ''
+      );
+
+      // The huddle may have been opened for Inning 1 while another
+      // coach already started Inning 2. Do not turn the now-current
+      // Inning 2 prep into an error screen. Close the stale huddle
+      // and put this phone on the authoritative live inning instead.
+      if (
+        expectedInning &&
+        liveInning &&
+        liveInning !== expectedInning
+      ) {
+        recoverAdvancedInning(liveState);
+        return;
       }
-      const result = await postJson(`/api/live-game/${gameId}/advance-inning`, {
-        alignment,
-        base_sequence: sequenceFromState(liveState),
-      });
-      window.bootstrap?.Modal?.getOrCreateInstance(modal)?.hide();
-      document.dispatchEvent(new CustomEvent('coachboard:test2-inning-started', {detail:{result}}));
+
+      if (
+        String(liveState.current_inning || '') !==
+        String(prep.current_inning || '')
+      ) {
+        recoverAdvancedInning(liveState);
+        return;
+      }
+
+      const alignment = confirmedAlignment(prep);
+
+      if (!alignment) {
+        throw new Error(
+          'Lock the next defense before starting the inning.'
+        );
+      }
+
+      const result = await postJson(
+        `/api/live-game/${gameId}/advance-inning`,
+        {
+          alignment,
+          base_sequence: sequenceFromState(liveState),
+        }
+      );
+
+      window.bootstrap?.Modal
+        ?.getOrCreateInstance(modal)
+        ?.hide();
+
+      document.dispatchEvent(
+        new CustomEvent(
+          'coachboard:test2-inning-started',
+          {detail: {result}}
+        )
+      );
+
       window.CBNextDefense?.refresh?.();
-      window.setTimeout(() => $('cbQuickDefense')?.scrollIntoView({behavior:'smooth', block:'start'}), 180);
+
+      window.setTimeout(
+        () => $('cbQuickDefense')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        }),
+        180
+      );
     } catch (error) {
-      showHuddleError(error.message || 'Unable to start the next inning.');
-      try { await refreshHuddle(); } catch (_) {}
+      // A second coach can advance in the small window between our
+      // state read and POST. One fresh read distinguishes that safe
+      // race from a real error.
+      try {
+        const fresh = await getJson(
+          `/api/live-game/${gameId}/state`
+        );
+
+        const freshInning = String(
+          fresh.current_inning || ''
+        );
+
+        if (
+          expectedInning &&
+          freshInning &&
+          freshInning !== expectedInning
+        ) {
+          recoverAdvancedInning(fresh);
+          return;
+        }
+      } catch (_) {}
+
+      showHuddleError(
+        error.message ||
+        'Unable to start the next inning.'
+      );
+
+      try {
+        await refreshHuddle();
+      } catch (_) {}
     } finally {
       huddleBusy = false;
-      if (button?.isConnected && confirmedAlignment(huddlePrep)) button.disabled = false;
+
+      if (
+        button?.isConnected &&
+        confirmedAlignment(huddlePrep)
+      ) {
+        button.disabled = false;
+      }
     }
   }
 
@@ -440,6 +651,46 @@
       huddleBusy = false;
     }
   }
+
+  document.addEventListener(
+    'coachboard:live-delta',
+    event => {
+      const delta = event?.detail;
+
+      if (
+        !delta ||
+        Number(delta.game_id) !== gameId ||
+        !huddlePrep
+      ) {
+        return;
+      }
+
+      const modal = $(HUDDLE_ID);
+
+      if (!modal?.classList.contains('show')) {
+        return;
+      }
+
+      const expected = String(
+        huddlePrep.current_inning || ''
+      );
+
+      const current = String(
+        delta.current_inning || ''
+      );
+
+      if (
+        expected &&
+        current &&
+        expected !== current
+      ) {
+        recoverAdvancedInning(
+          delta,
+          {publish: false}
+        );
+      }
+    }
+  );
 
   window.addEventListener('click', event => {
     const button = event.target.closest?.('#liveEndInningBtn');

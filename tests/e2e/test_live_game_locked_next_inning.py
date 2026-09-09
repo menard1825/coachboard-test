@@ -192,6 +192,18 @@ def test_new_defense_is_position_first_and_follows_vacancy(
         next_board = page.locator('#live-board-prep-v3')
         expect(next_board).to_be_visible(timeout=15_000)
 
+        expect(
+            next_board.locator('.nxd-plan-note')
+        ).to_contain_text(
+            'Next inning only'
+        )
+
+        expect(
+            next_board.locator('.nxd-plan-note')
+        ).to_contain_text(
+            'Current pitcher stays'
+        )
+
         next_board.get_by_role(
             'button',
             name='New Defense',
@@ -199,6 +211,18 @@ def test_new_defense_is_position_first_and_follows_vacancy(
 
         modal = page.locator('#next-inning-adjust-modal')
         expect(modal).to_be_visible(timeout=10_000)
+
+        expect(
+            modal.locator('.modal-header .small.text-muted')
+        ).to_contain_text(
+            'plans Inning 2 only'
+        )
+
+        expect(
+            modal.locator('.ni-pitcher-note')
+        ).to_contain_text(
+            'stays at P'
+        )
 
         expect(
             modal.locator('.ni-selected')

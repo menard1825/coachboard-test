@@ -153,8 +153,9 @@
       }
       @media(max-width:575.98px){
         #cbDugoutHeader{margin:0 -10px 10px;padding:8px 9px}
-        .cb-dh-main{grid-template-columns:auto minmax(62px,.8fr) minmax(70px,1fr) auto auto;gap:5px}
-        .cb-dh-live{display:none}
+        .cb-dh-main{grid-template-columns:auto auto minmax(56px,.8fr) minmax(64px,1fr) auto auto;gap:4px}
+        .cb-dh-live{display:flex;font-size:.5rem;letter-spacing:.04em;gap:3px}
+        .cb-dh-dot{width:7px;height:7px}
         .cb-dh-pitcher{display:block!important;text-align:left}
         .cb-dh-inning{min-width:43px;padding:0 5px;border-left:0}
         .cb-dh-inning strong{font-size:1.12rem}
@@ -171,8 +172,9 @@
         #cbCoachBoardNavModal .cb-app-grid{grid-template-columns:1fr 1fr}
       }
       @media(max-width:374.98px){
-        .cb-dh-main{grid-template-columns:auto minmax(54px,.75fr) minmax(62px,.9fr) auto auto;gap:3px}
-        .cb-dh-btn{font-size:.6rem!important;padding:4px 5px!important}
+        .cb-dh-main{grid-template-columns:auto auto minmax(50px,.7fr) minmax(58px,.85fr) auto auto;gap:2px}
+        .cb-dh-live{font-size:.47rem;letter-spacing:.02em}
+        .cb-dh-btn{font-size:.58rem!important;padding:4px 5px!important}
         .cb-qd-spot{width:61px}
         .cb-qd-name{font-size:.55rem}
       }
@@ -285,7 +287,11 @@
     const pitcher = state?.current_pitcher || state?.current_alignment?.P || 'None';
     const sync = $('live-sync-status-v2')?.textContent || '';
     const synced = /synced/i.test(sync) && !/not synced|reconnecting/i.test(sync);
-    setText(header.querySelector('[data-cb-live-label]'), synced ? 'Live · Synced' : 'Live Game');
+    const paused = Boolean(clock?.is_paused);
+    setText(
+      header.querySelector('[data-cb-live-label]'),
+      paused ? 'Paused' : (synced ? 'Live · Synced' : 'Live')
+    );
     setText(header.querySelector('[data-cb-inning]'), String(inning));
     setText(header.querySelector('[data-cb-clock-label]'), info.label);
     const time = header.querySelector('[data-cb-clock-time]');

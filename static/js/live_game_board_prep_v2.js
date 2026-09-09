@@ -51,6 +51,8 @@
       #${CARD_ID} .ready .nxd-badge{background:#176b38}
       #${CARD_ID} .nxd-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
       #${CARD_ID} .nxd-actions .btn{min-height:43px;border-radius:9px;font-size:.72rem;font-weight:820}
+      #${CARD_ID} .nxd-plan-note{margin-top:7px;padding:7px 8px;border:1px solid #dfe4ea;border-radius:8px;background:#f8fafc;color:#667085;font-size:.64rem;line-height:1.35}
+      #${CARD_ID} .nxd-plan-note strong{color:#344054}
       #${CARD_ID} .nxd-change{width:100%;min-height:40px;border-radius:9px;font-size:.72rem;font-weight:820}
       #${CARD_ID} .nxd-moves{display:grid;gap:6px;margin-bottom:9px}
       #${CARD_ID} .nxd-move{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e3e7ec;background:#f8fafc;border-radius:9px;padding:7px 9px}
@@ -185,6 +187,11 @@
       <button type="button" class="btn btn-outline-dark" data-bp-action="current">Same Defense</button>
       <button type="button" class="btn btn-outline-primary" data-bp-action="planned" ${pregame ? '' : 'disabled'}>Use Planned Defense</button>
       <button type="button" class="btn btn-primary" data-bp-action="adjust">New Defense</button>
+    </div>
+    <div class="nxd-plan-note">
+      <strong>Next inning only.</strong>
+      Nothing changes on the live field until you start the next inning.
+      Current pitcher stays; use Change Pitcher separately.
     </div>`;
   }
 
@@ -316,8 +323,9 @@
         : 'Plan Next Defense';
     }
     if (subtitle) {
-      subtitle.textContent =
-        'Tap the position you want to change, then choose the player.';
+      subtitle.textContent = inning
+        ? `This plans Inning ${inning} only. It does not change the live field.`
+        : 'This plans the next inning only. It does not change the live field.';
     }
   }
 
