@@ -105,7 +105,18 @@ def test_first_pitch_launches_quick_field_command_center(page: Page, coachboard_
 
         modes = page.locator('#cb-test2-pregame-modes')
         expect(modes).to_be_visible(timeout=15_000)
-        expect(modes.get_by_role('button', name='First Pitch')).to_have_class(re.compile(r'\bactive\b'))
+
+        first_pitch = modes.get_by_role('button', name='First Pitch')
+        full_plan = modes.get_by_role('button', name='Full Plan')
+
+        # Full Plan is now the default coaching workspace.
+        expect(full_plan).to_have_class(re.compile(r'\bactive\b'))
+
+        # This test specifically covers the First Pitch path, so choose it
+        # intentionally before starting the game.
+        first_pitch.click()
+        expect(first_pitch).to_have_class(re.compile(r'\bactive\b'))
+
         expect(page.locator('#cb-quick-start-launch')).to_have_count(0)
 
         start = page.locator('#startLiveGameBtnAction')

@@ -74,7 +74,15 @@
   }
 
   function playingTimeSummary() {
-    const inningKeys = wholeInningKeys();
+    // Regulation inning slots are created ahead of time, but an entirely empty
+    // inning is not yet a coaching plan. Do not turn those empty future slots
+    // into artificial bench innings in the playing-time totals.
+    const inningKeys = wholeInningKeys().filter((key) => {
+      const source = state.rotation.innings[key];
+      return source &&
+        typeof source === 'object' &&
+        Object.values(source).some((name) => String(name || '').trim());
+    });
     if (!inningKeys.length) return '';
 
     const positionOrder = positions();

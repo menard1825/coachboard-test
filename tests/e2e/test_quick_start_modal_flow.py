@@ -57,22 +57,26 @@ def test_first_pitch_and_full_plan_are_distinct_pregame_modes(page: Page, coachb
         expect(modes).to_be_visible(timeout=15_000)
         first_pitch = modes.get_by_role('button', name='First Pitch')
         full_plan = modes.get_by_role('button', name='Full Plan')
-        expect(first_pitch).to_have_class(re.compile(r'\bactive\b'))
+
+        # Full Plan is the normal default workspace.
+        expect(full_plan).to_have_class(re.compile(r'\bactive\b'))
         expect(page.locator('#cb-quick-start-launch')).to_have_count(0)
         expect(page.locator('#cb-quick-start-modal')).to_have_count(0)
 
         expect(page.locator('#pregame-defense-editor-v3')).to_be_visible(timeout=15_000)
-        expect(page.locator('#lineup-card-container')).to_be_hidden()
-        expect(page.locator('#pitching-log-container')).to_be_hidden()
-
-        full_plan.click()
-        expect(full_plan).to_have_class(re.compile(r'\bactive\b'))
         expect(page.locator('#lineup-card-container')).to_be_visible(timeout=10_000)
         expect(page.locator('#pitching-log-container')).to_be_visible(timeout=10_000)
 
+        # First Pitch still provides the intentionally stripped-down view.
         first_pitch.click()
         expect(first_pitch).to_have_class(re.compile(r'\bactive\b'))
         expect(page.locator('#lineup-card-container')).to_be_hidden()
         expect(page.locator('#pitching-log-container')).to_be_hidden()
+
+        # And the coach can return to the full planning workspace.
+        full_plan.click()
+        expect(full_plan).to_have_class(re.compile(r'\bactive\b'))
+        expect(page.locator('#lineup-card-container')).to_be_visible(timeout=10_000)
+        expect(page.locator('#pitching-log-container')).to_be_visible(timeout=10_000)
     finally:
         page.request.post(f'{coachboard_url}/game-day/{game_id}/delete', headers={'Accept': 'application/json'})
