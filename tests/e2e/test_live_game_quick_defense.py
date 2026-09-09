@@ -180,3 +180,184 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         )
         if bench_player_id:
             page.request.get(f'{coachboard_url}/delete_player/{bench_player_id}')
+
+
+def test_pitcher_change_can_follow_field_vacancy_to_bench(
+    page: Page,
+    coachboard_url: str,
+):
+    page.set_viewport_size({'width': 430, 'height': 932})
+    login(page, coachboard_url)
+
+    relief_name = 'Relief Ryan'
+    relief_id = None
+    game_id = None
+
+    add = page.request.post(
+        f'{coachboard_url}/add_player',
+        form={
+            'name': relief_name,
+            'number': '23',
+            'position1': '2B',
+            'throws': 'Right',
+            'bats': 'Right',
+            'pitcher_role': 'Starter',
+        },
+        headers={'X-Requested-With': 'XMLHttpRequest'},
+    )
+    assert add.status == 200, add.text()
+    add_payload = add.json()
+    assert add_payload['status'] == 'success'
+
+    try:
+        response = page.request.post(
+            f'{coachboard_url}/game-day/add',
+            form={
+                'game_date': (
+                    date.today() + timedelta(days=17)
+                ).isoformat(),
+                'game_start_time': '15:00',
+                'game_opponent': 'Pitcher Chain Opponent',
+                'game_location': 'Pitcher Chain Field',
+                'game_notes': 'Disposable pitcher chain test',
+                'pitching_rule_set': 'USSSA',
+            },
+            max_redirects=0,
+        )
+        assert response.status in {302, 303}
+
+        match = re.search(
+            r'/game/(\d+)',
+            response.headers.get('location') or '',
+        )
+        assert match
+        game_id = int(match.group(1))
+
+        chain_alignment = alignment()
+        chain_alignment['2B'] = relief_name
+
+        post_json(
+            page,
+            coachboard_url,
+            '/save_rotation',
+            {
+                'title': 'Pitcher Chain Rotation',
+                'innings': {'1': chain_alignment},
+                'associated_game_id': game_id,
+            },
+        )
+
+        started = post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+        assert started['state']['current_alignment']['2B'] == relief_name
+
+        relief_player = next(
+            player
+            for player in started['state']['roster']
+            if player['name'] == relief_name
+        )
+        relief_id = int(relief_player['id'])
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            page.locator('#cbQuickDefense')
+        ).to_be_visible(timeout=15_000)
+
+        page.locator('#liveChangePitcherBtn').click()
+
+        picker = page.locator('#live-pitcher-picker-v2')
+        expect(picker).to_be_visible(timeout=10_000)
+
+        relief_choice = picker.locator(
+            '.pitcher-choice-v2',
+            has_text=relief_name,
+        )
+        expect(relief_choice).to_be_visible()
+        relief_choice.click()
+
+        finish = page.locator('#live-pitcher-finish-v3')
+        expect(finish).to_be_visible(timeout=10_000)
+        expect(finish).to_contain_text(f'{relief_name} → P')
+        expect(finish).to_contain_text('Pitcher Pat')
+
+        # Old pitcher goes to the bench, leaving Relief Ryan's old 2B
+        # position open.
+        finish.locator('[data-pc-bench-old]').click()
+
+        expect(finish).to_contain_text('Who takes 2B?')
+
+        shortstop = finish.locator(
+            '[data-pc-chain-player="Shortstop Shawn"]'
+        )
+        expect(shortstop).to_be_visible()
+        expect(shortstop).to_contain_text('SS → 2B')
+        shortstop.click()
+
+        # Following the field player creates the next vacancy.
+        expect(finish).to_contain_text('Who takes SS?')
+
+        second = finish.locator(
+            '[data-pc-chain-player="Second Sam"]'
+        )
+        expect(second).to_be_visible()
+        expect(second).to_contain_text('BENCH → SS')
+        second.click()
+
+        expect(finish).not_to_be_visible(timeout=10_000)
+
+        state = get_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/state',
+        )
+
+        assert state['current_alignment']['P'] == relief_name
+        assert (
+            state['current_alignment']['2B']
+            == 'Shortstop Shawn'
+        )
+        assert (
+            state['current_alignment']['SS']
+            == 'Second Sam'
+        )
+        assert 'Pitcher Pat' not in (
+            state['current_alignment'].values()
+        )
+
+    finally:
+        if game_id is not None:
+            state_response = page.request.get(
+                f'{coachboard_url}/api/live-game/{game_id}/state'
+            )
+            if (
+                state_response.ok
+                and state_response.json()
+                .get('game', {})
+                .get('is_live')
+            ):
+                page.request.post(
+                    f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
+                    data={
+                        'defer_pitching': True,
+                        'end_reason': 'manual',
+                        'current_inning_played': True,
+                    },
+                )
+
+            page.request.post(
+                f'{coachboard_url}/game-day/{game_id}/delete',
+                headers={'Accept': 'application/json'},
+            )
+
+        if relief_id is not None:
+            page.request.get(
+                f'{coachboard_url}/delete_player/{relief_id}'
+            )

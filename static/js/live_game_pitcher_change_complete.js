@@ -42,8 +42,10 @@
       #${MODAL_ID} .pc-action{min-height:58px;border-radius:11px;font-weight:850;text-align:left;padding:9px 11px}
       #${MODAL_ID} .pc-action small{display:block;margin-top:2px;font-size:.67rem;font-weight:550;opacity:.78}
       #${MODAL_ID} .pc-replacements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
-      #${MODAL_ID} .pc-replacements .btn{min-height:48px;border-radius:9px;font-weight:750}
+      #${MODAL_ID} .pc-replacements .btn{min-height:52px;border-radius:9px;font-weight:750;text-align:left}
+      #${MODAL_ID} .pc-replacements .btn small{display:block;margin-top:3px;font-size:.64rem;font-weight:550;opacity:.72}
       #${MODAL_ID} .pc-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin:12px 0 6px}
+      #${MODAL_ID} .pc-vacancy-note{border:1px solid #dfe4ea;background:#f8fafc;border-radius:10px;padding:9px 10px;margin-bottom:9px;font-size:.75rem;color:#475467}
       @media(max-width:575.98px){#${MODAL_ID} .modal-dialog{margin:.5rem}}
     `;
     document.head.appendChild(style);
@@ -86,9 +88,9 @@
     return modal;
   }
 
-  function benchPlayers() {
-    const assigned = new Set(Object.values(before || {}).filter(Boolean));
-    return (state?.roster || []).filter(player => !assigned.has(player.name) && player.name !== incoming?.name);
+  function playerPositionInDraft(draft, name) {
+    return Object.entries(draft || {})
+      .find(([, assigned]) => assigned === name)?.[0] || 'BENCH';
   }
 
   function baseDraft() {
@@ -96,6 +98,130 @@
     if (incomingPosition) delete draft[incomingPosition];
     draft.P = incoming.name;
     return draft;
+  }
+
+  function renderVacancy(draft, vacancy, lockedNames) {
+    const modal = ensureModal();
+    const body = modal.querySelector('[data-pc-body]');
+    if (!body || !incoming || !vacancy) return;
+
+    const choices = (state?.roster || [])
+      .filter(player => (
+        player?.name &&
+        !lockedNames.has(player.name)
+      ))
+      .map(player => ({
+        ...player,
+        currentPosition: playerPositionInDraft(
+          draft,
+          player.name
+        ),
+      }))
+      .filter(player => player.currentPosition !== 'P');
+
+    const fieldChoices = choices
+      .filter(player => player.currentPosition !== 'BENCH')
+      .sort((a, b) => (
+        a.currentPosition.localeCompare(b.currentPosition) ||
+        a.name.localeCompare(b.name)
+      ));
+
+    const benchChoices = choices
+      .filter(player => player.currentPosition === 'BENCH')
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const choiceButton = player => {
+      const number = String(player.number ?? '').trim();
+      const label = number
+        ? `#${number} ${player.name}`
+        : player.name;
+
+      return `
+        <button
+          type="button"
+          class="btn btn-outline-primary"
+          data-pc-chain-player="${esc(player.name)}"
+          data-pc-chain-from="${esc(player.currentPosition)}"
+        >
+          <span>${esc(label)}</span>
+          <small>
+            ${esc(player.currentPosition)} → ${esc(vacancy)}
+          </small>
+        </button>`;
+    };
+
+    body.innerHTML = `
+      <div class="pc-summary">
+        <strong>${esc(incoming.name)}</strong> → P<br>
+        <span class="text-muted">
+          ${esc(oldPitcher)} → Bench
+        </span>
+      </div>
+
+      <div class="pc-vacancy-note">
+        <strong>Who takes ${esc(vacancy)}?</strong><br>
+        Pick a fielder or bench player.
+        If you move a fielder, CoachBoard will follow
+        the open position automatically.
+      </div>
+
+      ${fieldChoices.length ? `
+        <div class="pc-label">On the field</div>
+        <div class="pc-replacements">
+          ${fieldChoices.map(choiceButton).join('')}
+        </div>
+      ` : ''}
+
+      <div class="pc-label">On the bench</div>
+      <div class="pc-replacements">
+        ${
+          benchChoices.length
+            ? benchChoices.map(choiceButton).join('')
+            : '<div class="small text-muted">No bench player is available.</div>'
+        }
+      </div>`;
+
+    body.querySelectorAll('[data-pc-chain-player]')
+      .forEach(button => {
+        button.addEventListener('click', () => {
+          const replacementName =
+            button.dataset.pcChainPlayer || '';
+          const fromPosition =
+            button.dataset.pcChainFrom || 'BENCH';
+
+          const replacement = choices.find(
+            player => player.name === replacementName
+          );
+
+          if (!replacement) return;
+
+          if (fromPosition !== 'BENCH') {
+            delete draft[fromPosition];
+          }
+
+          draft[vacancy] = replacement.name;
+
+          // A bench player closes the final vacancy. Save the whole
+          // defensive alignment plus pitcher change as one transaction.
+          if (fromPosition === 'BENCH') {
+            save(
+              draft,
+              `${incoming.name} in at P · ${oldPitcher} to bench`
+            );
+            return;
+          }
+
+          // A fielder moved into the vacancy. Their old position is now
+          // open, so keep walking the coach through the chain.
+          lockedNames.add(replacement.name);
+
+          renderVacancy(
+            draft,
+            fromPosition,
+            lockedNames
+          );
+        });
+      });
   }
 
   function render() {
@@ -117,10 +243,6 @@
             ${esc(oldPitcher)} → Bench
             <small>Choose who fills ${esc(incomingPosition)}.</small>
           </button>
-        </div>
-        <div data-pc-replacement-wrap class="d-none">
-          <div class="pc-label">Who takes ${esc(incomingPosition)}?</div>
-          <div class="pc-replacements">${benchPlayers().map(player => `<button type="button" class="btn btn-outline-primary" data-pc-replacement="${esc(player.name)}">${esc(player.name)}</button>`).join('') || '<div class="small text-muted">No bench player is available.</div>'}</div>
         </div>`;
     } else {
       actions = `
@@ -142,18 +264,20 @@
 
     body.querySelector('[data-pc-bench-old]')?.addEventListener('click', () => {
       if (incomingPosition && oldPitcher) {
-        body.querySelector('[data-pc-replacement-wrap]')?.classList.remove('d-none');
+        const draft = baseDraft();
+
+        renderVacancy(
+          draft,
+          incomingPosition,
+          new Set([
+            incoming.name,
+            oldPitcher,
+          ]),
+        );
         return;
       }
-      save(baseDraft(), `${incoming.name} in at P`);
-    });
 
-    body.querySelectorAll('[data-pc-replacement]').forEach(button => {
-      button.addEventListener('click', () => {
-        const draft = baseDraft();
-        draft[incomingPosition] = button.dataset.pcReplacement;
-        save(draft, `${incoming.name} in at P · ${button.dataset.pcReplacement} to ${incomingPosition}`);
-      });
+      save(baseDraft(), `${incoming.name} in at P`);
     });
   }
 

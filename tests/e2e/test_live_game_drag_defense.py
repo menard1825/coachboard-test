@@ -199,9 +199,11 @@ def test_phone_quick_field_swaps_two_fielders_without_second_editor(page: Page, 
             == 'Second Sam'
         )
 
-        # A coach commonly drags a swap and immediately taps one of the players
-        # involved in that swap. The tap modal must use the NEW live alignment,
+        # The drag controller intentionally suppresses the synthetic click
+        # generated immediately after pointer-up for 700 ms. Once that guard
+        # expires, the next real coach tap must use the NEW live alignment,
         # not the pre-drag cached state.
+        page.wait_for_timeout(750)
         ss.click()
 
         modal = page.locator('#cbQuickMoveModal')

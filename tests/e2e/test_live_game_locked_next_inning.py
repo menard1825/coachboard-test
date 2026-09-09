@@ -137,3 +137,166 @@ def test_locked_next_inning_huddle_requires_explicit_start(page: Page, coachboar
             f'{coachboard_url}/game-day/{game_id}/delete',
             headers={'Accept': 'application/json'},
         )
+
+
+def test_new_defense_is_position_first_and_auto_swaps(
+    page: Page,
+    coachboard_url: str,
+):
+    page.set_viewport_size({'width': 430, 'height': 932})
+    login(page, coachboard_url)
+
+    bench_name = 'Next Bench Nate'
+    bench_id = None
+    game_id = None
+
+    add = page.request.post(
+        f'{coachboard_url}/add_player',
+        form={
+            'name': bench_name,
+            'number': '24',
+            'position1': 'SS',
+            'throws': 'Right',
+            'bats': 'Right',
+            'pitcher_role': 'Not a Pitcher',
+        },
+        headers={'X-Requested-With': 'XMLHttpRequest'},
+    )
+    assert add.status == 200, add.text()
+    add_payload = add.json()
+    assert add_payload['status'] == 'success'
+
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        started = post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+        assert started['state']['current_inning'] == '1'
+
+        bench_player = next(
+            player
+            for player in started['state']['roster']
+            if player['name'] == bench_name
+        )
+        bench_id = int(bench_player['id'])
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        next_board = page.locator('#live-board-prep-v3')
+        expect(next_board).to_be_visible(timeout=15_000)
+
+        next_board.get_by_role(
+            'button',
+            name='New Defense',
+        ).click()
+
+        modal = page.locator('#next-inning-adjust-modal')
+        expect(modal).to_be_visible(timeout=10_000)
+
+        expect(
+            modal.locator('.ni-selected')
+        ).to_contain_text(
+            'Tap the position you want to change'
+        )
+
+        # Coach thinks "I want to change 2B" first.
+        modal.locator('[data-ni-pos="2B"]').click()
+
+        chooser = modal.locator('.ni-player-chooser')
+        expect(chooser).to_contain_text('Who plays 2B?')
+        expect(chooser).to_contain_text('Second Sam')
+
+        # Pick somebody already on the field. This should true-swap.
+        shortstop = chooser.locator(
+            '[data-ni-player="Shortstop Shawn"]'
+        )
+        expect(shortstop).to_contain_text('SS → 2B')
+        shortstop.click()
+
+        expect(
+            modal.locator('[data-ni-pos="2B"]')
+        ).to_contain_text('Shortstop Shawn')
+
+        expect(
+            modal.locator('[data-ni-pos="SS"]')
+        ).to_contain_text('Second Sam')
+
+        # Now change SS and use a bench player. Second Sam should
+        # automatically become the bench player.
+        modal.locator('[data-ni-pos="SS"]').click()
+
+        chooser = modal.locator('.ni-player-chooser')
+        expect(chooser).to_contain_text('Who plays SS?')
+
+        bench_choice = chooser.locator(
+            f'[data-ni-player="{bench_name}"]'
+        )
+        expect(bench_choice).to_contain_text('BENCH → SS')
+        bench_choice.click()
+
+        expect(
+            modal.locator('[data-ni-pos="SS"]')
+        ).to_contain_text(bench_name)
+
+        expect(
+            modal.locator('.ni-bench')
+        ).to_contain_text('Second Sam')
+
+        # Pitcher is fixed in this planner.
+        expect(
+            modal.locator('[data-ni-pos="P"]')
+        ).to_contain_text('Pitcher Pat')
+
+        modal.locator('#save-next-inning-adjust').click()
+        expect(modal).not_to_be_visible(timeout=10_000)
+
+        prep_response = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/next-inning-prep'
+        )
+        assert prep_response.ok, prep_response.text()
+        prep = prep_response.json()
+
+        confirmed = prep['confirmed']['alignment']
+
+        assert confirmed['P'] == 'Pitcher Pat'
+        assert confirmed['2B'] == 'Shortstop Shawn'
+        assert confirmed['SS'] == bench_name
+        assert 'Second Sam' not in confirmed.values()
+
+    finally:
+        if game_id is not None:
+            state_response = page.request.get(
+                f'{coachboard_url}/api/live-game/{game_id}/state'
+            )
+
+            if (
+                state_response.ok
+                and state_response.json()
+                .get('game', {})
+                .get('is_live')
+            ):
+                page.request.post(
+                    f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
+                    data={
+                        'defer_pitching': True,
+                        'end_reason': 'manual',
+                        'current_inning_played': True,
+                    },
+                )
+
+            page.request.post(
+                f'{coachboard_url}/game-day/{game_id}/delete',
+                headers={'Accept': 'application/json'},
+            )
+
+        if bench_id is not None:
+            page.request.get(
+                f'{coachboard_url}/delete_player/{bench_id}'
+            )

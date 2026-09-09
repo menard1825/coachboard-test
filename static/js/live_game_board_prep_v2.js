@@ -12,7 +12,7 @@
   const STYLE_ID = 'live-next-defense-styles';
   let latest = null;
   let draft = null;
-  let selectedName = '';
+  let selectedPosition = '';
   let busy = false;
   let lastSignature = '';
   let bodyObserver = null;
@@ -68,6 +68,14 @@
       #${MODAL_ID} .ni-bench-player.selected{background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66);color:#fff}
       #${MODAL_ID} .ni-selected{min-height:34px;border:1px solid #dfe4ea;background:#f8fafc;border-radius:9px;padding:7px 9px;margin-bottom:8px;color:#475467;font-size:.72rem}
       #${MODAL_ID} .ni-selected strong{color:#172033}
+      #${MODAL_ID} .ni-player-chooser{border:2px solid var(--primary-color,#102a66);background:#f7f9fd;border-radius:11px;padding:10px;margin-bottom:9px}
+      #${MODAL_ID} .ni-player-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}
+      #${MODAL_ID} .ni-player-head strong{display:block;font-size:.82rem;color:#172033}
+      #${MODAL_ID} .ni-player-head span{display:block;font-size:.65rem;color:#667085;margin-top:2px}
+      #${MODAL_ID} .ni-player-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+      #${MODAL_ID} .ni-player-choice{min-height:49px;border-radius:9px;text-align:left;padding:7px 9px;font-size:.72rem;font-weight:800}
+      #${MODAL_ID} .ni-player-choice small{display:block;font-size:.6rem;font-weight:600;opacity:.72;margin-top:2px}
+      #${MODAL_ID} .ni-player-cancel{min-height:34px;border-radius:8px;font-size:.67rem;font-weight:750}
       #${MODAL_ID} .ni-field-wrap{margin:0 -2px 8px}
       #${MODAL_ID} .cb-qd-field{width:100%!important;min-height:0!important;aspect-ratio:1.48/1!important;margin:0!important}
       #${MODAL_ID} .cb-qd-spot{cursor:pointer}
@@ -302,10 +310,15 @@
     const inning = String(latest?.next_inning || '').trim();
     const title = modal.querySelector('.modal-title');
     const subtitle = title?.parentElement?.querySelector('.small.text-muted');
-    if (title) title.textContent = inning ? `Set Defense — Inning ${inning}` : 'Set Defense';
-    if (subtitle) subtitle.textContent = inning
-      ? `Choose who takes the field for Inning ${inning}.`
-      : 'Choose who takes the field next inning.';
+    if (title) {
+      title.textContent = inning
+        ? `Plan Inning ${inning} Defense`
+        : 'Plan Next Defense';
+    }
+    if (subtitle) {
+      subtitle.textContent =
+        'Tap the position you want to change, then choose the player.';
+    }
   }
 
   function ensureAdjustModal() {
@@ -323,7 +336,7 @@
         if (modal.contains(active) && typeof active?.blur === 'function') active.blur();
       });
       modal.addEventListener('hidden.bs.modal', () => {
-        selectedName = '';
+        selectedPosition = '';
         if (skipHiddenRefresh) {
           skipHiddenRefresh = false;
           return;
@@ -382,7 +395,10 @@
       const name = draft?.[pos] || '';
       spot.dataset.niPos = pos;
       spot.removeAttribute('disabled');
-      spot.classList.toggle('ni-selected-spot', Boolean(selectedName && name === selectedName));
+      spot.classList.toggle(
+        'ni-selected-spot',
+        selectedPosition === pos
+      );
       if (pos === 'P') {
         spot.disabled = true;
         spot.setAttribute('aria-label', `${playerLabel(name)} stays at pitcher`);
@@ -397,33 +413,132 @@
     return field;
   }
 
-  function selectOrMove(pos) {
+  function choosePosition(pos) {
     if (!draft || !pos || pos === 'P') return;
-    const occupant = draft[pos] || '';
 
-    if (!selectedName) {
-      if (!occupant) return;
-      selectedName = occupant;
+    selectedPosition = pos;
+    renderAdjust();
+  }
+
+  function assignPlayer(name) {
+    if (
+      !draft ||
+      !selectedPosition ||
+      selectedPosition === 'P' ||
+      !name
+    ) {
+      return;
+    }
+
+    const target = selectedPosition;
+    const occupant = draft[target] || '';
+
+    if (name === occupant) {
+      selectedPosition = '';
       renderAdjust();
       return;
     }
 
-    const source = findDraftPosition(selectedName);
-    if (source === pos) {
-      selectedName = '';
-      renderAdjust();
-      return;
-    }
+    const source = findDraftPosition(name);
 
     if (source && source !== 'P') {
+      // Field-to-field move: true swap.
       draft[source] = occupant;
-      draft[pos] = selectedName;
+      draft[target] = name;
     } else if (!source) {
-      draft[pos] = selectedName;
+      // Bench-to-field move: the current occupant becomes benched.
+      draft[target] = name;
     }
 
-    selectedName = '';
+    selectedPosition = '';
     renderAdjust();
+  }
+
+  function playerChooserMarkup() {
+    if (!selectedPosition) {
+      return `
+        <div class="ni-selected">
+          <strong>Tap the position you want to change.</strong><br>
+          Then choose the player who should play there.
+          Fielders swap automatically.
+        </div>`;
+    }
+
+    const target = selectedPosition;
+    const currentName = draft?.[target] || '';
+    const pitcher = draft?.P || '';
+
+    const choices = (latest?.roster || [])
+      .filter(player => (
+        player?.name &&
+        player.name !== currentName &&
+        player.name !== pitcher
+      ))
+      .map(player => ({
+        ...player,
+        currentPosition:
+          findDraftPosition(player.name) || 'BENCH',
+      }))
+      .filter(player => player.currentPosition !== 'P');
+
+    const fieldChoices = choices
+      .filter(player => player.currentPosition !== 'BENCH')
+      .sort((a, b) => (
+        a.currentPosition.localeCompare(b.currentPosition) ||
+        a.name.localeCompare(b.name)
+      ));
+
+    const benchChoices = choices
+      .filter(player => player.currentPosition === 'BENCH')
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const button = player => `
+      <button
+        type="button"
+        class="btn btn-outline-primary ni-player-choice"
+        data-ni-player="${esc(player.name)}"
+      >
+        ${esc(playerLabel(player.name))}
+        <small>
+          ${esc(player.currentPosition)} → ${esc(target)}
+        </small>
+      </button>`;
+
+    return `
+      <div class="ni-player-chooser">
+        <div class="ni-player-head">
+          <div>
+            <strong>Who plays ${esc(target)}?</strong>
+            <span>
+              Current:
+              ${esc(currentName ? playerLabel(currentName) : 'Open')}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline-secondary ni-player-cancel"
+            data-ni-cancel-position
+          >
+            Cancel
+          </button>
+        </div>
+
+        ${fieldChoices.length ? `
+          <div class="ni-label">Already on the field</div>
+          <div class="ni-player-grid mb-2">
+            ${fieldChoices.map(button).join('')}
+          </div>
+        ` : ''}
+
+        <div class="ni-label">On the bench</div>
+        <div class="ni-player-grid">
+          ${
+            benchChoices.length
+              ? benchChoices.map(button).join('')
+              : '<div class="small text-muted">Nobody on the bench.</div>'
+          }
+        </div>
+      </div>`;
   }
 
   function renderAdjust() {
@@ -431,30 +546,109 @@
     if (!body || !latest || !draft) return;
     syncAdjustHeader();
 
-    const pitcher = latest.current_alignment?.P || draft.P || '';
+    const pitcher =
+      latest.current_alignment?.P ||
+      draft.P ||
+      '';
+
     if (pitcher) draft.P = pitcher;
 
     const posList = positions(latest.outfielder_count);
     const holes = posList.filter(pos => !draft[pos]);
     const bench = draftBenchPlayers();
-    const selected = selectedName ? playerLabel(selectedName) : '';
     const inning = String(latest.next_inning || '').trim();
-    const saveLabel = inning ? `Set Inning ${inning} Defense` : 'Set Defense';
+    const saveLabel = inning
+      ? `Set Inning ${inning} Defense`
+      : 'Set Defense';
 
-    body.innerHTML = `<div id="${OWNED_ID}"><div class="ni-label">Who’s sitting</div><div class="ni-bench">${bench.length ? bench.map(player => `<button type="button" class="ni-bench-player ${selectedName === player.name ? 'selected' : ''}" data-ni-bench="${esc(player.name)}">${esc(playerLabel(player.name))}</button>`).join('') : '<span class="small text-muted">Nobody</span>'}</div><div class="ni-selected">${selected ? `<strong>${esc(selected)}</strong> — tap a position.` : 'Tap a bench player or fielder, then tap the spot.'}</div><div class="ni-field-wrap" data-ni-field></div><div class="ni-pitcher-note">${pitcher ? `${esc(playerLabel(pitcher))} stays at P.` : 'Pitcher stays the same.'}</div><div class="ni-footer"><div class="me-auto">${holes.length ? `<div class="ni-warning">Fill ${esc(holes.join(', '))}.</div>` : ''}</div><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-dark" id="save-next-inning-adjust" ${holes.length ? 'disabled' : ''}>${esc(saveLabel)}</button></div></div>`;
+    const benchLabel = inning
+      ? `Bench for Inning ${inning}`
+      : 'Bench for next inning';
 
-    body.querySelector('[data-ni-field]')?.appendChild(nextField());
+    body.innerHTML = `
+      <div id="${OWNED_ID}">
+        ${playerChooserMarkup()}
 
-    body.querySelectorAll('[data-ni-bench]').forEach(button => {
-      button.addEventListener('click',() => {
-        selectedName = button.dataset.niBench || '';
+        <div class="ni-field-wrap" data-ni-field></div>
+
+        <div class="ni-label">${esc(benchLabel)}</div>
+        <div class="ni-bench">
+          ${
+            bench.length
+              ? bench.map(player => `
+                  <span class="ni-bench-player">
+                    ${esc(playerLabel(player.name))}
+                  </span>
+                `).join('')
+              : '<span class="small text-muted">Nobody</span>'
+          }
+        </div>
+
+        <div class="ni-pitcher-note">
+          ${
+            pitcher
+              ? `${esc(playerLabel(pitcher))} stays at P. Use Change Pitcher for the mound.`
+              : 'Pitcher stays the same.'
+          }
+        </div>
+
+        <div class="ni-footer">
+          <div class="me-auto">
+            ${
+              holes.length
+                ? `<div class="ni-warning">Fill ${esc(holes.join(', '))}.</div>`
+                : ''
+            }
+          </div>
+          <button
+            class="btn btn-outline-secondary"
+            data-bs-dismiss="modal"
+          >
+            Cancel
+          </button>
+          <button
+            class="btn btn-dark"
+            id="save-next-inning-adjust"
+            ${holes.length ? 'disabled' : ''}
+          >
+            ${esc(saveLabel)}
+          </button>
+        </div>
+      </div>`;
+
+    body.querySelector('[data-ni-field]')
+      ?.appendChild(nextField());
+
+    body.querySelectorAll('[data-ni-pos]')
+      .forEach(spot => {
+        spot.addEventListener(
+          'click',
+          () => choosePosition(spot.dataset.niPos),
+        );
+      });
+
+    body.querySelectorAll('[data-ni-player]')
+      .forEach(button => {
+        button.addEventListener(
+          'click',
+          () => assignPlayer(
+            button.dataset.niPlayer || ''
+          ),
+        );
+      });
+
+    body.querySelector('[data-ni-cancel-position]')
+      ?.addEventListener('click', () => {
+        selectedPosition = '';
         renderAdjust();
       });
-    });
-    body.querySelectorAll('[data-ni-pos]').forEach(spot => {
-      spot.addEventListener('click',() => selectOrMove(spot.dataset.niPos));
-    });
-    document.getElementById('save-next-inning-adjust')?.addEventListener('click',saveAdjust);
+
+    document.getElementById('save-next-inning-adjust')
+      ?.addEventListener('click', saveAdjust);
+
+    if (selectedPosition) {
+      body.scrollTop = 0;
+    }
   }
 
   function openAdjust() {
@@ -463,7 +657,7 @@
     draft = {};
     positions(latest.outfielder_count).forEach(pos => { draft[pos] = source[pos] || ''; });
     if (latest.current_alignment?.P) draft.P = latest.current_alignment.P;
-    selectedName = '';
+    selectedPosition = '';
     ensureAdjustModal();
     renderAdjust();
     bootstrap.Modal.getOrCreateInstance(document.getElementById(MODAL_ID)).show();
