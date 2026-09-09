@@ -153,6 +153,75 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         assert state['current_alignment']['CF'] == BENCH_NAME
         assert 'Center Casey' not in state['current_alignment'].values()
 
+        # Regression: swapping catchers through the fielder -> Bench ->
+        # replacement chain must repaint this exact Quick Field immediately.
+        #
+        # Center Casey is on the bench after the CF substitution above.
+        page.evaluate(
+            "window.__catcherSwapStayedOnPage = 'yes'"
+        )
+
+        quick.locator('[data-cb-position="C"]').click()
+
+        expect(modal).to_be_visible()
+        expect(modal).to_contain_text(
+            'Catcher Cole is currently playing C'
+        )
+
+        modal.locator('[data-cb-bench-current]').click()
+
+        expect(modal).to_contain_text('Who takes C?')
+
+        catcher_replacement = modal.locator(
+            '[data-cb-chain-player-id]',
+            has_text='Center Casey',
+        )
+
+        expect(catcher_replacement).to_be_visible()
+        expect(catcher_replacement).to_contain_text(
+            'Bench → C'
+        )
+
+        catcher_replacement.click()
+
+        expect(modal).not_to_be_visible(timeout=10_000)
+
+        assert (
+            page.evaluate(
+                'window.__catcherSwapStayedOnPage'
+            )
+            == 'yes'
+        )
+
+        expect(
+            quick.locator('[data-cb-position="C"]')
+        ).to_contain_text(
+            'Center Casey',
+            timeout=10_000,
+        )
+
+        expect(
+            quick.locator(
+                '[data-cb-move-player="Catcher Cole"]'
+            )
+        ).to_be_visible(timeout=10_000)
+
+        expect(
+            quick.locator('.cb-save-state')
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        state = get_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/state',
+        )
+
+        assert state['current_alignment']['C'] == 'Center Casey'
+        assert 'Catcher Cole' not in state['current_alignment'].values()
+
         # A current fielder stays in Quick Field too; it must not open the retired full editor.
         quick.locator('[data-cb-position="SS"]').click()
         expect(modal).to_be_visible()

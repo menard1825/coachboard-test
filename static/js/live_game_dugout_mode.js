@@ -575,6 +575,31 @@
     bootstrap.Modal.getOrCreateInstance(modal).show();
   }
 
+  async function applyQuickDefenseSaveResponse(data) {
+    if (data?.delta) {
+      // Use the exact same local contract as drag-and-drop and pitcher
+      // changes. This updates this coach immediately while Socket.IO
+      // sends the same authoritative delta to the other coaches.
+      document.dispatchEvent(
+        new CustomEvent('coachboard:live-delta', {
+          detail: data.delta,
+        })
+      );
+      return;
+    }
+
+    // Compatibility fallback only. Quick Field should normally receive
+    // a delta from /defense-edit.
+    if (data?.state) {
+      state = data.state;
+      quickDefenseSignature = '';
+      queue();
+      return;
+    }
+
+    await getState();
+  }
+
   async function saveDefenseDraft(alignment, successMessage) {
     if (moveBusy) return;
     moveBusy = true;
@@ -587,7 +612,7 @@
     if (shell) renderQuickDefense(shell);
 
     try {
-      const response = await fetch(`/api/live-game/${gameId}/set-defense`, {
+      const response = await fetch(`/api/live-game/${gameId}/defense-edit`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
@@ -612,7 +637,7 @@
         );
       }
 
-      if (data.state) state = data.state;
+      await applyQuickDefenseSaveResponse(data);
 
       saveMode = 'saved';
       saveMessage = 'Saved ✓';
@@ -651,12 +676,62 @@
     const shell = document.querySelector('#live-game-overlay .coach-live-shell');
     if (shell) renderQuickDefense(shell);
     try {
-      const response = await fetch(`/api/live-game/${gameId}/defensive-change`, {
+      const player = (state?.roster || []).find(
+        candidate => Number(candidate.id) === Number(playerId)
+      );
+
+      if (!player) {
+        throw new Error(
+          'That player is no longer available. Refresh the live field and try again.'
+        );
+      }
+
+      const alignment = {...currentAlignment()};
+      const source = Object.entries(alignment)
+        .find(([, assigned]) => assigned === player.name)?.[0] || 'BENCH';
+      const target = String(destination || '').toUpperCase();
+
+      if (!target || target === 'P') {
+        throw new Error(
+          'Use Change Pitcher for changes involving P.'
+        );
+      }
+
+      if (target === 'BENCH') {
+        throw new Error(
+          'Choose Bench from the move sheet so CoachBoard can fill the open position.'
+        );
+      }
+
+      if (source === target) {
+        throw new Error(
+          `${player.name} is already playing ${target}.`
+        );
+      }
+
+      const occupant = alignment[target] || null;
+
+      if (source !== 'BENCH') {
+        delete alignment[source];
+      }
+
+      alignment[target] = player.name;
+
+      // Field -> field is a true swap.
+      // Bench -> occupied field sends the old occupant to the bench.
+      if (
+        occupant &&
+        occupant !== player.name &&
+        source !== 'BENCH'
+      ) {
+        alignment[source] = occupant;
+      }
+
+      const response = await fetch(`/api/live-game/${gameId}/defense-edit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          player_id: playerId,
-          destination_position: destination,
+          alignment,
           base_sequence: sequenceFromState(),
         }),
       });
@@ -674,7 +749,8 @@
           `Unable to save defense (${response.status}).`
         );
       }
-      if (data.state) state = data.state;
+      await applyQuickDefenseSaveResponse(data);
+
       saveMode = 'saved';
       saveMessage = 'Saved ✓';
       quickDefenseSignature = '';
