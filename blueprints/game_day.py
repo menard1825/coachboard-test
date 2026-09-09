@@ -14,7 +14,15 @@ from game_pitching_rules import (
     rule_settings_payload,
 )
 from game_start_readiness import can_start_game
-from models import Game, Lineup, PlayerPitchTarget, Rotation, Team
+from models import (
+    Game,
+    Lineup,
+    Player,
+    PlayerGameAbsence,
+    PlayerPitchTarget,
+    Rotation,
+    Team,
+)
 
 
 game_day_bp = Blueprint('game_day', __name__)
@@ -244,6 +252,24 @@ def add_game():
     )
     db.session.add(game)
     db.session.flush()
+
+    # Guest players are opt-in for every game. Keep Game Day game creation
+    # consistent with the legacy /add_game route by defaulting every guest Out.
+    guest_player_ids = [
+        player_id
+        for (player_id,) in db.session.query(Player.id).filter_by(
+            team_id=team.id,
+            is_guest=True,
+        ).all()
+    ]
+    db.session.add_all([
+        PlayerGameAbsence(
+            player_id=player_id,
+            game_id=game.id,
+            team_id=team.id,
+        )
+        for player_id in guest_player_ids
+    ])
 
     if requested_rule:
         db.session.add(GamePitchingRule(

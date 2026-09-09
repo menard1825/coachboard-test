@@ -198,6 +198,55 @@ def test_new_game_defaults_existing_guest_out(monkeypatch):
         assert absence is not None
 
 
+def test_game_day_add_defaults_existing_guest_out(monkeypatch):
+    """Games created from the normal Game Day UI must default guests Out."""
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game, Player, PlayerGameAbsence
+
+    with app.app_context():
+        guest = Player(
+            name='Game Day Guest',
+            number='88',
+            pitcher_role='Not a Pitcher',
+            is_guest=True,
+            team_id=1,
+        )
+        db.session.add(guest)
+        db.session.commit()
+        guest_id = guest.id
+
+    game_date = (
+        datetime.now() + timedelta(days=6)
+    ).strftime('%Y-%m-%d')
+
+    response = client.post('/game-day/add', data={
+        'game_date': game_date,
+        'game_start_time': '11:00',
+        'game_opponent': 'Game Day Guest Test',
+        'game_location': 'Test Field',
+    })
+
+    assert response.status_code == 302
+
+    with app.app_context():
+        game = db.session.query(Game).filter_by(
+            team_id=1,
+            opponent='Game Day Guest Test',
+        ).one()
+
+        absence = db.session.query(PlayerGameAbsence).filter_by(
+            team_id=1,
+            game_id=game.id,
+            player_id=guest_id,
+        ).one_or_none()
+
+        assert absence is not None
+
+
 def test_guest_can_be_marked_playing_for_selected_game(monkeypatch):
     app = _build_app(monkeypatch)
     client = app.test_client()
