@@ -28,6 +28,54 @@
   let saveMode = 'saved';
   let saveMessage = 'Saved';
   let quickDefenseSignature = '';
+  let lastFailureKind = null;
+  let reconnectMessageUntil = 0;
+
+  function failureKind(error) {
+    const message = String(
+      error?.message || ''
+    ).toLowerCase();
+
+    if (
+      error instanceof TypeError ||
+      message.includes('load failed') ||
+      message.includes('failed to fetch') ||
+      message.includes('networkerror') ||
+      message.includes('network request failed') ||
+      message.includes('offline')
+    ) {
+      return 'network';
+    }
+
+    return 'server';
+  }
+
+  function clearRecoveredNetworkFailure() {
+    if (lastFailureKind !== 'network') return;
+
+    lastFailureKind = null;
+    lastFailedMove = null;
+    saveMode = 'saved';
+    saveMessage = 'Reconnected · Live field updated';
+    reconnectMessageUntil = Date.now() + 5000;
+    quickDefenseSignature = '';
+
+    const modal = $('cbQuickMoveModal');
+
+    if (modal) {
+      modal
+        .querySelectorAll('.alert-danger')
+        .forEach(alert => alert.remove());
+
+      if (modal.classList.contains('show')) {
+        try {
+          bootstrap.Modal
+            .getOrCreateInstance(modal)
+            .hide();
+        } catch (_) {}
+      }
+    }
+  }
 
   function sequenceFromState(value = state) {
     return (value?.rotation_events || []).reduce(
@@ -645,6 +693,8 @@
 
       await applyQuickDefenseSaveResponse(data);
 
+      lastFailureKind = null;
+      reconnectMessageUntil = 0;
       saveMode = 'saved';
       saveMessage = 'Saved ✓';
       quickDefenseSignature = '';
@@ -652,6 +702,7 @@
       bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
       queue();
     } catch (error) {
+      lastFailureKind = failureKind(error);
       saveMode = 'error';
       saveMessage = 'Not saved';
       quickDefenseSignature = '';
@@ -757,12 +808,15 @@
       }
       await applyQuickDefenseSaveResponse(data);
 
+      lastFailureKind = null;
+      reconnectMessageUntil = 0;
       saveMode = 'saved';
       saveMessage = 'Saved ✓';
       quickDefenseSignature = '';
       bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
       queue();
     } catch (error) {
+      lastFailureKind = failureKind(error);
       saveMode = 'error';
       saveMessage = 'Not saved — Retry';
       lastFailedMove = { playerId, destination, name };
@@ -776,6 +830,42 @@
     } finally {
       moveBusy = false;
     }
+  }
+
+  function applySharedLiveState(event) {
+    const detail = event?.detail || {};
+
+    if (Number(detail.game_id) !== gameId) {
+      return;
+    }
+
+    const next = detail.state;
+
+    if (
+      !next ||
+      Number(next?.game?.id) !== gameId
+    ) {
+      return;
+    }
+
+    // Full server state always wins after reconnect, wake, or an
+    // explicit authoritative refresh.
+    state = next;
+    quickDefenseSignature = '';
+
+    const source = String(
+      detail.source || ''
+    );
+
+    if (
+      source === 'socket-reconnect' ||
+      source === 'online' ||
+      source === 'visibility'
+    ) {
+      clearRecoveredNetworkFailure();
+    }
+
+    queue();
   }
 
   function applySharedLiveDelta(event) {
@@ -930,10 +1020,21 @@
       if (!response.ok) return;
       const next = await response.json();
       state = next;
-      if (saveMode !== 'error') {
+
+      if (
+        lastFailureKind === 'network' &&
+        navigator.onLine
+      ) {
+        clearRecoveredNetworkFailure();
+      } else if (
+        saveMode !== 'error' &&
+        Date.now() >= reconnectMessageUntil
+      ) {
         saveMode = 'saved';
         saveMessage = 'Saved ✓';
       }
+
+      quickDefenseSignature = '';
       queue();
       if (endInningFrom && String(next.current_inning) !== String(endInningFrom)) {
         endInningFrom = null;
@@ -965,6 +1066,11 @@
 
     // live_game_feedback_pass.js publishes Socket.IO live deltas here, and
     // drag-and-drop publishes its successful response here as well.
+    document.addEventListener(
+      'coachboard:live-state',
+      applySharedLiveState
+    );
+
     document.addEventListener(
       'coachboard:live-delta',
       applySharedLiveDelta

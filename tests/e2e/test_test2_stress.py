@@ -189,3 +189,235 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
             cleanup_game(phone, coachboard_url, incomplete_id)
         phone_context.close()
         ipad_context.close()
+
+
+
+def test_test2_offline_quick_field_recovers_authoritative_state(
+    browser: Browser,
+    coachboard_url: str,
+):
+    coach_a_context = browser.new_context(
+        viewport={'width': 390, 'height': 844}
+    )
+    coach_b_context = browser.new_context(
+        viewport={'width': 390, 'height': 844}
+    )
+
+    coach_a = coach_a_context.new_page()
+    coach_b = coach_b_context.new_page()
+    game_id = None
+
+    try:
+        login(coach_a, coachboard_url)
+        login(coach_b, coachboard_url)
+
+        game_id = create_game(
+            coach_a,
+            coachboard_url,
+            'Test 2 Offline Recovery Opponent',
+            include_inning_two=False,
+        )
+
+        coach_a.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        coach_b.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            coach_a.locator('#live-sync-status-v2')
+        ).to_contain_text(
+            'SYNCED',
+            timeout=10_000,
+        )
+
+        expect(
+            coach_b.locator('#live-sync-status-v2')
+        ).to_contain_text(
+            'SYNCED',
+            timeout=10_000,
+        )
+
+        coach_a.locator(
+            '#startLiveGameBtnAction'
+        ).click()
+
+        quick_a = coach_a.locator('#cbQuickDefense')
+        quick_b = coach_b.locator('#cbQuickDefense')
+
+        expect(quick_a).to_be_visible(timeout=15_000)
+        expect(quick_b).to_be_visible(timeout=15_000)
+
+        # Open the Quick Field move sheet while Coach B still has
+        # network. Chromium's context-level offline emulation can race
+        # Playwright locator auto-waiting if we try to open the sheet
+        # only after networking has been disabled.
+        quick_b.locator(
+            '[data-cb-position="SS"]'
+        ).click()
+
+        move_b = coach_b.locator('#cbQuickMoveModal')
+
+        expect(move_b).to_be_visible(timeout=10_000)
+
+        expect(
+            move_b.locator(
+                '[data-cb-destination="2B"]'
+            )
+        ).to_be_visible(timeout=10_000)
+
+        # Coach B now loses all network.
+        coach_b_context.set_offline(True)
+
+        # Trigger the already-rendered destination button directly in
+        # the page. The application still executes its normal
+        # /defense-edit fetch, which must fail because the browser is
+        # offline. This avoids making Playwright itself auto-wait for a
+        # locator after Chromium networking has been disabled.
+        coach_b.evaluate(
+            """() => {
+                const button = document.querySelector(
+                    '#cbQuickMoveModal [data-cb-destination="2B"]'
+                );
+
+                if (!button) {
+                    throw new Error(
+                        'Offline test destination button disappeared.'
+                    );
+                }
+
+                button.click();
+            }"""
+        )
+
+        expect(
+            quick_b.locator('.cb-save-state')
+        ).to_contain_text(
+            'Not saved',
+            timeout=10_000,
+        )
+
+        # While B is offline, Coach A changes the actual live field.
+        quick_a.locator(
+            '[data-cb-position="1B"]'
+        ).click()
+
+        move_a = coach_a.locator('#cbQuickMoveModal')
+
+        expect(move_a).to_be_visible(timeout=10_000)
+
+        move_a.locator(
+            '[data-cb-destination="3B"]'
+        ).click()
+
+        expect(move_a).not_to_be_visible(timeout=10_000)
+
+        expect(
+            quick_a.locator('.cb-save-state')
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        authoritative = coach_a.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        assert (
+            authoritative['current_alignment']['1B']
+            == 'Third Theo'
+        )
+        assert (
+            authoritative['current_alignment']['3B']
+            == 'First Frank'
+        )
+
+        # Prove recovery happens in-place, without a browser reload.
+        coach_b.evaluate(
+            "window.__cbOfflineRecoveryStayedOnPage = 'yes'"
+        )
+
+        coach_b_context.set_offline(False)
+
+        expect(
+            coach_b.locator('#live-sync-status-v2')
+        ).to_contain_text(
+            'SYNCED',
+            timeout=15_000,
+        )
+
+        expect(move_b).not_to_be_visible(timeout=15_000)
+
+        expect(
+            quick_b.locator('.cb-save-state')
+        ).to_contain_text(
+            'Reconnected',
+            timeout=15_000,
+        )
+
+        expect(
+            quick_b.locator('[data-cb-position="1B"]')
+        ).to_contain_text(
+            'Third Theo',
+            timeout=15_000,
+        )
+
+        expect(
+            quick_b.locator('[data-cb-position="3B"]')
+        ).to_contain_text(
+            'First Frank',
+            timeout=15_000,
+        )
+
+        # The offline SS -> 2B attempt never reached the server.
+        expect(
+            quick_b.locator('[data-cb-position="SS"]')
+        ).to_contain_text(
+            'Shortstop Shawn',
+            timeout=15_000,
+        )
+
+        expect(
+            quick_b.locator('[data-cb-position="2B"]')
+        ).to_contain_text(
+            'Second Sam',
+            timeout=15_000,
+        )
+
+        assert (
+            coach_b.evaluate(
+                'window.__cbOfflineRecoveryStayedOnPage'
+            )
+            == 'yes'
+        )
+
+        recovered = coach_b.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        assert (
+            recovered['current_alignment']
+            == authoritative['current_alignment']
+        )
+
+        assert recovered['current_inning'] == '1'
+
+    finally:
+        try:
+            coach_b_context.set_offline(False)
+        except Exception:
+            pass
+
+        if game_id is not None:
+            cleanup_game(
+                coach_a,
+                coachboard_url,
+                game_id,
+            )
+
+        coach_a_context.close()
+        coach_b_context.close()

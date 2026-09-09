@@ -72,7 +72,10 @@
     return number ? `#${number} ${player.name}` : player.name;
   }
 
-  async function loadState(force = false) {
+  async function loadState(
+    force = false,
+    source = 'state-load'
+  ) {
     if (!force && state && (socketHealthy || Date.now() - stateLoadedAt < 15000)) return state;
     const response = await window.fetch(stateUrl, {cache:'no-store'});
     if (!response.ok) return state;
@@ -80,8 +83,23 @@
     if (!data) return state;
     state = data;
     stateLoadedAt = Date.now();
-    lastSequence = Math.max(lastSequence, sequenceFromState(data));
+    lastSequence = Math.max(
+      lastSequence,
+      sequenceFromState(data)
+    );
+
     queuePatch();
+
+    document.dispatchEvent(
+      new CustomEvent('coachboard:live-state', {
+        detail: {
+          game_id: gameId,
+          state: data,
+          source,
+        },
+      })
+    );
+
     return state;
   }
 
@@ -89,7 +107,13 @@
     if (!delta || Number(delta.game_id) !== gameId) return;
     const sequence = Number(delta.sequence) || 0;
     if (sequence && sequence < lastSequence) return;
-    if (sequence && lastSequence && sequence > lastSequence + 1) loadState(true).catch(() => {});
+    if (
+      sequence &&
+      lastSequence &&
+      sequence > lastSequence + 1
+    ) {
+      loadState(true, 'sequence-gap').catch(() => {});
+    }
     lastSequence = Math.max(lastSequence, sequence);
 
     if (!state) state = {game:{id:gameId,is_live:true}, roster:[], actual_rotation:{}, rotation_events:[]};
@@ -116,8 +140,23 @@
   function wireSocket(socket) {
     if (!socket || socket.__cbStateSyncWired) return socket;
     socket.__cbStateSyncWired = true;
-    socket.on?.('connect', () => { socketHealthy = true; });
-    socket.on?.('disconnect', () => { socketHealthy = false; });
+    socket.on?.('connect', () => {
+      const source = socket.__cbConnectedOnce
+        ? 'socket-reconnect'
+        : 'socket-connect';
+
+      socket.__cbConnectedOnce = true;
+      socketHealthy = true;
+
+      // A reconnect can miss every delta that occurred while the
+      // browser had no network. Always pull the complete current
+      // game state rather than trusting the old in-memory lineup.
+      loadState(true, source).catch(() => {});
+    });
+
+    socket.on?.('disconnect', () => {
+      socketHealthy = false;
+    });
     socket.on?.('live_game_delta', applyDelta);
     return socket;
   }
@@ -217,10 +256,37 @@
   const start = () => {
     installSharedGameModalStyles();
     observer.observe(document.body, {childList:true, subtree:true});
-    loadState(true).catch(() => {});
+    loadState(true, 'initial').catch(() => {});
     queuePatch();
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && state?.game?.is_live && !socketHealthy) loadState(true).catch(() => {});
+
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (
+          !document.hidden &&
+          state?.game?.is_live
+        ) {
+          loadState(
+            true,
+            'visibility'
+          ).catch(() => {});
+        }
+      }
+    );
+
+    // iOS/Safari can restore network before Socket.IO finishes its
+    // reconnect handshake. Recover from the HTTP state endpoint too.
+    window.addEventListener('online', () => {
+      [0, 700, 2000].forEach(delay => {
+        window.setTimeout(() => {
+          if (!state?.game?.is_live) return;
+
+          loadState(
+            true,
+            'online'
+          ).catch(() => {});
+        }, delay);
+      });
     });
   };
 
