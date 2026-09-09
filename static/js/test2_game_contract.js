@@ -5,10 +5,11 @@
   if (!route) return;
 
   const gameId = Number(route[1]);
-  const MODE_KEY = `coachboard:test2-pregame-mode:${gameId}`;
+  const MODE_KEY = `coachboard:test2-pregame-mode:v2:${gameId}`;
   const MODE_ID = 'cb-test2-pregame-modes';
   const HUDDLE_ID = 'cb-test2-huddle-modal';
-  let mode = window.sessionStorage.getItem(MODE_KEY) === 'full-plan' ? 'full-plan' : 'first-pitch';
+  const storedMode = window.sessionStorage.getItem(MODE_KEY);
+  let mode = storedMode === 'first-pitch' ? 'first-pitch' : 'full-plan';
   let queued = false;
   let huddleBusy = false;
   let huddlePrep = null;
@@ -36,6 +37,7 @@
       body.cb-test2-first-pitch #lineup-card-container,
       body.cb-test2-first-pitch #pitching-log-container,
       body.cb-test2-first-pitch #pitching-board-v2{display:none!important}
+      body.cb-test2-first-pitch #pde-playing-time-summary{display:none!important}
       body.cb-test2-first-pitch #coach-game-readiness-v2 [data-cgr-action="lineup"]{display:none!important}
       body.cb-test2-first-pitch #rotation-card-container>.card>.card-header{display:none!important}
       body.cb-test2-first-pitch #rotation-board>*:not(#pregame-defense-editor-v3){display:none!important}

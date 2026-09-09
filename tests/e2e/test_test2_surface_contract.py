@@ -84,30 +84,129 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
         expect(modes).to_be_visible(timeout=15_000)
         first_pitch = modes.locator('[data-cb-t2-mode="first-pitch"]')
         full_plan = modes.locator('[data-cb-t2-mode="full-plan"]')
-        expect(first_pitch).to_have_attribute('aria-pressed', 'true')
-        expect(page.locator('body')).to_have_class(re.compile(r'\bcb-test2-first-pitch\b'))
+        # Full Plan is the normal coaching workspace. First Pitch remains
+        # available as an intentional shortcut instead of being the default.
+        expect(full_plan).to_have_attribute('aria-pressed', 'true')
+        expect(page.locator('body')).to_have_class(
+            re.compile('cb-test2-full-plan')
+        )
 
-        expect(page.locator('#lineup-card-container')).not_to_be_visible()
-        expect(page.locator('#pitching-log-container')).not_to_be_visible()
-        expect(page.locator('#pregame-defense-editor-v3')).to_be_visible(timeout=15_000)
-        inning_one = page.locator('#inning-btn-group input[name="inning-radio"][value="1"]')
+        expect(page.locator('#lineup-card-container')).to_be_visible()
+        expect(page.locator('#pitching-log-container')).to_be_visible()
+
+        defense = page.locator('#pregame-defense-editor-v3')
+        expect(defense).to_be_visible(timeout=15_000)
+
+        inning_one = page.locator(
+            '#inning-btn-group input[name="inning-radio"][value="1"]'
+        )
         expect(inning_one).to_be_checked(timeout=5_000)
+
+        inning_two = page.locator(
+            '#inning-btn-group input[name="inning-radio"][value="2"]'
+        )
+        expect(inning_two).to_have_count(1)
+        expect(
+            page.locator('label[for="inning-2"]')
+        ).to_be_visible()
+
         expect(page.locator('#liveGameModeToggle')).to_have_count(0)
         expect(page.locator('#cb-quick-start-launch')).to_have_count(0)
         expect(page.locator('#cb-quick-start-modal')).to_have_count(0)
 
-        full_plan.click()
-        expect(full_plan).to_have_attribute('aria-pressed', 'true')
-        expect(page.locator('body')).to_have_class(re.compile(r'\bcb-test2-full-plan\b'))
-        expect(page.locator('#lineup-card-container')).to_be_visible()
-        expect(page.locator('#pitching-log-container')).to_be_visible()
-        inning_two = page.locator('#inning-btn-group input[name="inning-radio"][value="2"]')
-        expect(inning_two).to_have_count(1)
-        expect(page.locator('label[for="inning-2"]')).to_be_visible()
+        # Coaches can evaluate the whole defensive plan without manually
+        # counting inning chips.
+        summary = page.locator('#pde-playing-time-summary')
+        expect(summary).to_be_visible(timeout=10_000)
 
+        shawn_summary = summary.locator(
+            '[data-player-name="Shortstop Shawn"]'
+        )
+        expect(shawn_summary).to_contain_text(
+            '2 field · 0 bench'
+        )
+        expect(shawn_summary).to_contain_text('2B × 1')
+        expect(shawn_summary).to_contain_text('SS × 1')
+
+        # An occupied field position now acts like a puzzle piece:
+        # selecting another fielder swaps the two players directly.
+        defense.locator('[data-pde-pos="SS"]').click()
+
+        picker = page.locator('#pde-player-modal')
+        expect(picker).to_be_visible(timeout=5_000)
+
+        second_sam = picker.locator(
+            '.pde-choice[data-player="Second Sam"]'
+        )
+        expect(second_sam).to_be_visible()
+        expect(second_sam).to_contain_text(
+            'swaps with Shortstop Shawn'
+        )
+
+        second_sam.click()
+
+        expect(
+            defense.locator(
+                '[data-pde-pos="SS"] .pde-name'
+            )
+        ).to_have_text('Second Sam')
+
+        expect(
+            defense.locator(
+                '[data-pde-pos="2B"] .pde-name'
+            )
+        ).to_have_text('Shortstop Shawn')
+
+        expect(
+            page.locator('#pde-toast .toast-body').last
+        ).to_contain_text(
+            'swapped',
+            timeout=10_000,
+        )
+
+        updated = page.request.get(
+            f'{coachboard_url}/api/game_data/{game_id}'
+        ).json()
+
+        inning_one_saved = (
+            updated['rotation']['innings']['1']
+        )
+        assert inning_one_saved['SS'] == 'Second Sam'
+        assert inning_one_saved['2B'] == 'Shortstop Shawn'
+
+        # The totals update as the coach solves the defensive puzzle.
+        second_summary = page.locator(
+            '#pde-playing-time-summary '
+            '[data-player-name="Second Sam"]'
+        )
+        expect(second_summary).to_contain_text('SS × 2')
+
+        # First Pitch still exists for a coach who explicitly wants it.
         first_pitch.click()
+        expect(first_pitch).to_have_attribute(
+            'aria-pressed',
+            'true',
+        )
+        expect(page.locator('body')).to_have_class(
+            re.compile('cb-test2-first-pitch')
+        )
         expect(inning_one).to_be_checked(timeout=5_000)
-        expect(page.locator('#lineup-card-container')).not_to_be_visible()
+        expect(
+            page.locator('#lineup-card-container')
+        ).not_to_be_visible()
+        expect(
+            page.locator('#pde-playing-time-summary')
+        ).not_to_be_visible()
+
+        # And the coach can immediately return to Full Plan.
+        full_plan.click()
+        expect(full_plan).to_have_attribute(
+            'aria-pressed',
+            'true',
+        )
+        expect(
+            page.locator('#lineup-card-container')
+        ).to_be_visible()
 
         readiness = page.request.get(f'{coachboard_url}/api/game-day/{game_id}/readiness').json()
         assert readiness['readiness']['lineup_ready'] is False

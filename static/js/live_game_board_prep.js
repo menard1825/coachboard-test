@@ -66,6 +66,73 @@
     return Object.entries(source).find(([, playerName]) => playerName === name)?.[0] || null;
   }
 
+  function wholeInningKeys() {
+    ensureRotation();
+    return Object.keys(state.rotation.innings || {})
+      .filter((key) => /^\d+$/.test(String(key)))
+      .sort((a, b) => Number(a) - Number(b));
+  }
+
+  function playingTimeSummary() {
+    const inningKeys = wholeInningKeys();
+    if (!inningKeys.length) return '';
+
+    const positionOrder = positions();
+
+    const rows = presentPlayers().map((player) => {
+      const counts = new Map();
+      let fieldInnings = 0;
+      let benchInnings = 0;
+
+      inningKeys.forEach((key) => {
+        const source = state.rotation.innings[key] || {};
+        const position = playerPosition(player.name, source);
+
+        if (position) {
+          fieldInnings += 1;
+          counts.set(
+            position,
+            (counts.get(position) || 0) + 1
+          );
+        } else {
+          benchInnings += 1;
+        }
+      });
+
+      const chips = positionOrder
+        .filter((position) => counts.get(position))
+        .map((position) => (
+          `<span class="pde-time-chip">${esc(position)} × ${counts.get(position)}</span>`
+        ));
+
+      if (benchInnings) {
+        chips.push(
+          `<span class="pde-time-chip bench">BN × ${benchInnings}</span>`
+        );
+      }
+
+      return `
+        <div class="pde-time-row" data-player-name="${esc(player.name)}">
+          <div class="pde-time-main">
+            <strong class="pde-time-name">${esc(player.name)}</strong>
+            <span class="pde-time-total">${fieldInnings} field · ${benchInnings} bench</span>
+          </div>
+          <div class="pde-time-chips">${chips.join('')}</div>
+        </div>`;
+    }).join('');
+
+    return `
+      <section class="pde-playing-time" id="pde-playing-time-summary">
+        <div class="pde-playing-time-head">
+          <div>
+            <strong>Playing Time Summary</strong>
+            <span>${inningKeys.length} planned inning${inningKeys.length === 1 ? '' : 's'} · updates as you move players</span>
+          </div>
+        </div>
+        <div class="pde-time-rows">${rows}</div>
+      </section>`;
+  }
+
   function installStyles() {
     if ($(STYLE_ID)) return;
     const style = document.createElement('style');
@@ -98,6 +165,18 @@
       #${PANEL_ID} .pde-label{font-size:.61rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin-bottom:6px}
       #${PANEL_ID} .pde-chips{display:flex;gap:5px;flex-wrap:wrap}
       #${PANEL_ID} .pde-chips span{font-size:.65rem;border:1px solid #dde2e7;background:#f8f9fb;border-radius:999px;padding:4px 7px;color:#475467;font-weight:650}
+      #${PANEL_ID} .pde-playing-time{margin-top:12px;border:1px solid #dfe4ea;border-radius:12px;background:#fff;overflow:hidden}
+      #${PANEL_ID} .pde-playing-time-head{padding:9px 10px;background:#f8fafc;border-bottom:1px solid #e7ebef}
+      #${PANEL_ID} .pde-playing-time-head strong{display:block;font-size:.76rem;color:#172033;font-weight:900}
+      #${PANEL_ID} .pde-playing-time-head span{display:block;margin-top:1px;font-size:.62rem;color:#667085}
+      #${PANEL_ID} .pde-time-row{padding:8px 10px;border-top:1px solid #eef1f4}
+      #${PANEL_ID} .pde-time-row:first-child{border-top:0}
+      #${PANEL_ID} .pde-time-main{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+      #${PANEL_ID} .pde-time-name{font-size:.72rem;color:#172033;min-width:0}
+      #${PANEL_ID} .pde-time-total{font-size:.61rem;color:#667085;white-space:nowrap;font-weight:700}
+      #${PANEL_ID} .pde-time-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+      #${PANEL_ID} .pde-time-chip{display:inline-flex;align-items:center;border:1px solid #4aae72;background:#f4fbf6;color:#176b38;border-radius:6px;padding:3px 6px;font-size:.59rem;font-weight:800;line-height:1}
+      #${PANEL_ID} .pde-time-chip.bench{border-color:#d6dbe1;background:#f4f5f7;color:#667085}
       #${PANEL_ID} .pde-status{display:flex;align-items:center;gap:10px;text-align:left;font-size:.72rem;margin-top:10px;border:2px solid #a66500;border-radius:11px;background:#fff4d8;color:#3f2b00;padding:9px 10px;box-shadow:0 2px 5px rgba(75,48,0,.08)}
       #${PANEL_ID} .pde-status.complete{border-color:#176b38;background:#edf8f1;color:#123d23}
       #${PANEL_ID} .pde-status-icon{font-size:1.05rem;line-height:1;flex:0 0 auto}
@@ -283,6 +362,7 @@
           <button class="btn btn-outline-secondary" id="pde-save">Save as Starting Defense</button>
         </div>
         ${baseballField(source)}
+        ${playingTimeSummary()}
         <div class="pde-status ${open.length ? 'needs' : 'complete'}">
           <i class="bi ${open.length ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill'} pde-status-icon" aria-hidden="true"></i>
           <div class="pde-status-copy">
@@ -352,7 +432,13 @@
       ${choices.map(({player, position}) => `
         <button class="list-group-item list-group-item-action pde-choice" data-player="${esc(player.name)}">
           <strong>${esc(player.name)}</strong>
-          <small>${position === pos ? `Currently at ${esc(pos)}` : position ? `Currently at ${esc(position)} — ${esc(position)} will become open` : 'On bench this inning'}</small>
+          <small>${position === pos
+            ? `Currently at ${esc(pos)}`
+            : position
+              ? (occupant && occupant !== player.name
+                  ? `Currently at ${esc(position)} — swaps with ${esc(occupant)}`
+                  : `Currently at ${esc(position)} — ${esc(position)} will become open`)
+              : 'On bench this inning'}</small>
         </button>`).join('')}`;
 
     list.onclick = async (event) => {
@@ -369,9 +455,25 @@
         const playerName = choice.dataset.player;
         const sourcePos = playerPosition(playerName, next);
         const displaced = next[pos];
-        if (sourcePos && sourcePos !== pos) delete next[sourcePos];
-        next[pos] = playerName;
+
         if (sourcePos && sourcePos !== pos) {
+          if (displaced && displaced !== playerName) {
+            next[sourcePos] = displaced;
+          } else {
+            delete next[sourcePos];
+          }
+        }
+
+        next[pos] = playerName;
+
+        if (
+          sourcePos &&
+          sourcePos !== pos &&
+          displaced &&
+          displaced !== playerName
+        ) {
+          message = `${playerName} swapped ${sourcePos} ↔ ${pos} with ${displaced}.`;
+        } else if (sourcePos && sourcePos !== pos) {
           message = `${playerName}: ${sourcePos} → ${pos}. ${sourcePos} is now open.`;
         } else if (displaced && displaced !== playerName) {
           message = `${playerName} → ${pos}. ${displaced} is now on the bench.`;

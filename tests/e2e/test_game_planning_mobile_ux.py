@@ -67,15 +67,55 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(modes).to_be_visible(timeout=15_000)
         first_pitch = modes.get_by_role('button', name='First Pitch')
         full_plan = modes.get_by_role('button', name='Full Plan')
-        expect(first_pitch).to_have_class(re.compile(r'\bactive\b'))
-        expect(page.locator('#cb-quick-start-launch')).to_have_count(0)
-        expect(page.locator('#cb-quick-start-modal')).to_have_count(0)
-        expect(readiness.get_by_role('button', name=re.compile('Batting Order'))).to_be_hidden()
+        # Full Plan is now the normal planning workspace.
+        expect(full_plan).to_have_class(
+            re.compile(r'\bactive\b')
+        )
+        expect(page.locator('body')).to_have_class(
+            re.compile('cb-test2-full-plan')
+        )
+        expect(
+            page.locator('#cb-quick-start-launch')
+        ).to_have_count(0)
+        expect(
+            page.locator('#cb-quick-start-modal')
+        ).to_have_count(0)
+        expect(
+            readiness.get_by_role(
+                'button',
+                name=re.compile('Batting Order'),
+            )
+        ).to_be_visible()
 
-        # Full Plan intentionally reveals the optional whole-game planning tools.
+        # First Pitch remains available as an explicit shortcut.
+        first_pitch.click()
+        expect(first_pitch).to_have_class(
+            re.compile(r'\bactive\b')
+        )
+        expect(page.locator('body')).to_have_class(
+            re.compile('cb-test2-first-pitch')
+        )
+        expect(
+            readiness.get_by_role(
+                'button',
+                name=re.compile('Batting Order'),
+            )
+        ).to_be_hidden()
+
+        # Return to the default Full Plan workspace.
         full_plan.click()
-        expect(full_plan).to_have_class(re.compile(r'\bactive\b'))
-        expect(readiness.get_by_role('button', name=re.compile('Batting Order'))).to_be_visible()
+        expect(full_plan).to_have_class(
+            re.compile(r'\bactive\b')
+        )
+        expect(page.locator('body')).to_have_class(
+            re.compile('cb-test2-full-plan')
+        )
+        expect(
+            readiness.get_by_role(
+                'button',
+                name=re.compile('Batting Order'),
+            )
+        ).to_be_visible()
 
         # The normal Start Game action stays available as a sticky footer action.
         start = page.locator('#startLiveGameBtnAction')
