@@ -285,6 +285,22 @@ def test_pitcher_change_can_follow_field_vacancy_to_bench(
 
         finish = page.locator('#live-pitcher-finish-v3')
         expect(finish).to_be_visible(timeout=10_000)
+
+        # Single-path contract:
+        # the retired v2 destination editor must never be created.
+        expect(
+            page.locator('#live-pitcher-destination-v2')
+        ).to_have_count(0)
+
+        assert page.evaluate(
+            """
+            () => (
+                window.CBPitcherChangeComplete?.version === 3 &&
+                typeof window.CBPitcherChangeComplete?.open === 'function'
+            )
+            """
+        )
+
         expect(finish).to_contain_text(f'{relief_name} → P')
         expect(finish).to_contain_text('Pitcher Pat')
 

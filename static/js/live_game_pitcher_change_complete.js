@@ -5,6 +5,14 @@
   if (!match) return;
 
   const gameId = Number(match[1]);
+
+  // Idempotent: some older enhancement loaders may still request this
+  // file. Once the v3 controller exists, a duplicate script load does
+  // nothing.
+  if (window.CBPitcherChangeComplete?.version === 3) {
+    return;
+  }
+
   const MODAL_ID = 'live-pitcher-finish-v3';
   let state = null;
   let incoming = null;
@@ -356,24 +364,10 @@
     }
   }
 
-  function intercept(event) {
-    const choice = event.target.closest?.('.pitcher-choice-v2');
-    if (!choice || choice.disabled) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    const playerId = Number(choice.dataset.playerId);
-    if (!Number.isFinite(playerId)) return;
-    const picker = $('live-pitcher-picker-v2');
-    if (picker?.classList.contains('show')) {
-      const instance = bootstrap.Modal.getOrCreateInstance(picker);
-      picker.addEventListener('hidden.bs.modal',()=>open(playerId),{once:true});
-      instance.hide();
-    } else {
-      open(playerId);
-    }
-  }
+  window.CBPitcherChangeComplete = Object.freeze({
+    version: 3,
+    open,
+  });
 
   installStyles();
-  document.addEventListener('click',intercept,true);
 })();

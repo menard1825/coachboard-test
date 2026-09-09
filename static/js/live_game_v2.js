@@ -263,6 +263,90 @@
         return el;
     }
 
+    let pitcherChangeControllerPromise = null;
+
+    function ensurePitcherChangeController() {
+        const existing = window.CBPitcherChangeComplete;
+
+        if (existing?.version === 3 && typeof existing.open === 'function') {
+            return Promise.resolve(existing);
+        }
+
+        if (pitcherChangeControllerPromise) {
+            return pitcherChangeControllerPromise;
+        }
+
+        pitcherChangeControllerPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src =
+                '/static/js/live_game_pitcher_change_complete.js' +
+                '?v=single-pitcher-path-v1';
+            script.dataset.cbPitcherChangeController = 'true';
+
+            script.addEventListener('load', () => {
+                const controller =
+                    window.CBPitcherChangeComplete;
+
+                if (
+                    controller?.version === 3 &&
+                    typeof controller.open === 'function'
+                ) {
+                    resolve(controller);
+                    return;
+                }
+
+                pitcherChangeControllerPromise = null;
+                reject(
+                    new Error(
+                        'Pitcher change controls did not initialize. ' +
+                        'Refresh this Live Game screen and try again.'
+                    )
+                );
+            }, { once: true });
+
+            script.addEventListener('error', () => {
+                pitcherChangeControllerPromise = null;
+                reject(
+                    new Error(
+                        'Unable to load pitcher change controls. ' +
+                        'Check your connection and try again.'
+                    )
+                );
+            }, { once: true });
+
+            document.head.appendChild(script);
+        });
+
+        return pitcherChangeControllerPromise;
+    }
+
+    async function openCompletePitcherChange(
+        pickerModal,
+        playerId
+    ) {
+        const controller =
+            await ensurePitcherChangeController();
+
+        const instance =
+            bootstrap.Modal.getOrCreateInstance(pickerModal);
+
+        const openFinish = () => {
+            controller.open(playerId);
+        };
+
+        if (pickerModal.classList.contains('show')) {
+            pickerModal.addEventListener(
+                'hidden.bs.modal',
+                openFinish,
+                { once: true },
+            );
+            instance.hide();
+            return;
+        }
+
+        openFinish();
+    }
+
     function showPitcherPicker() {
         if (!liveState) return;
         const modal = modalShell('live-pitcher-picker-v2', 'Change Pitcher');
@@ -302,49 +386,36 @@
             const btn = e.target.closest('[data-need]');
             if (btn) renderList(btn.dataset.need);
         });
-        body.querySelector('#pitcher-list-v2').addEventListener('click', e => {
+        body.querySelector('#pitcher-list-v2').addEventListener('click', async e => {
             const btn = e.target.closest('.pitcher-choice-v2');
-            if (btn && !btn.disabled) {
-                bootstrap.Modal.getOrCreateInstance(modal).hide();
-                showPitcherDestination(Number(btn.dataset.playerId));
-            }
-        });
-        bootstrap.Modal.getOrCreateInstance(modal).show();
-    }
-
-    function showPitcherDestination(newPitcherId) {
-        const incoming = (liveState.roster || []).find(p => Number(p.id) === Number(newPitcherId));
-        if (!incoming) return;
-        const alignment = currentAlignment();
-        const oldPitcher = alignment.P || 'current pitcher';
-        const incomingPosition = Object.entries(alignment).find(([, name]) => name === incoming.name)?.[0] || null;
-        const positions = ['BENCH','C','1B','2B','3B','SS','LF', ...(liveState.outfielder_count === 4 ? ['LCF','RCF'] : ['CF']), 'RF'];
-        const modal = modalShell('live-pitcher-destination-v2', `${incoming.name} → P`);
-        const body = modal.querySelector('.modal-body');
-        body.innerHTML = `<p class="fw-semibold">Where does ${esc(oldPitcher)} go?</p><div class="row g-2">${positions.map(pos => {
-            const occupant = alignment[pos];
-            const usable = pos === 'BENCH' || !occupant || pos === incomingPosition;
-            return `<div class="col-6 col-md-4"><button type="button" class="btn ${usable ? 'btn-outline-primary' : 'btn-outline-secondary'} w-100 py-3 destination-v2" data-destination="${pos}" ${usable ? '' : 'disabled'}>${esc(pos)}${occupant && pos !== incomingPosition ? `<div class="small">${esc(occupant)}</div>` : ''}</button></div>`;
-        }).join('')}</div>`;
-        body.addEventListener('click', async e => {
-            const btn = e.target.closest('.destination-v2');
             if (!btn || btn.disabled || actionBusy) return;
+
+            const playerId = Number(btn.dataset.playerId);
+            if (!Number.isFinite(playerId)) return;
+
             actionBusy = true;
+            btn.disabled = true;
+
+            // There is only one pitcher-change completion flow:
+            // live_game_pitcher_change_complete.js.
+            //
+            // The old #live-pitcher-destination-v2 surface is retired.
+            byId('live-pitcher-destination-v2')?.remove();
+
             try {
-                await api('/change-pitcher', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        new_pitcher_id: newPitcherId,
-                        outgoing_destination: btn.dataset.destination,
-                        base_sequence: sequenceFromState(),
-                    }),
-                });
-                bootstrap.Modal.getOrCreateInstance(modal).hide();
-                toast(`✓ ${incoming.name} → P • Saved & Synced`);
+                await openCompletePitcherChange(
+                    modal,
+                    playerId,
+                );
             } catch (err) {
                 toast(err.message, 'danger');
-            } finally { actionBusy = false; }
-        }, { once: false });
+                if (document.body.contains(btn)) {
+                    btn.disabled = false;
+                }
+            } finally {
+                actionBusy = false;
+            }
+        });
         bootstrap.Modal.getOrCreateInstance(modal).show();
     }
 
