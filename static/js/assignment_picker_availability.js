@@ -72,29 +72,12 @@
     const list = document.getElementById('pde-list');
     if (!list) return;
 
-    // The older clarity helper tucked already-fielded players behind a secondary
-    // toggle. The new rule is simpler: they are not choices in a unique-position
-    // picker at all.
-    list.querySelectorAll('.pde-field-move-toggle, .pde-field-move-wrap').forEach((node) => node.remove());
-
-    [...list.querySelectorAll('.pde-choice[data-player]')].forEach((button) => {
-      const detail = detailText(button, 'small');
-      if (/^Currently at\b/i.test(detail)) button.remove();
-    });
-
-    const help = document.getElementById('pde-help');
-    if (help) {
-      help.textContent = 'Only players still on the bench are shown. To move a fielder, open that player’s current position first.';
-    }
-
-    const existingClarityEmpty = list.querySelector('.pde-picker-empty');
-    if (!existingClarityEmpty) {
-      ensureEmptyMessage(
-        list,
-        '.cb-assignment-empty-pde',
-        'No unassigned players remain this inning.'
-      );
-    }
+    // Pregame defense intentionally supports one-tap field-to-field swaps.
+    // live_game_board_prep.js owns the swap behavior and
+    // pregame_defense_picker_clarity.js owns this picker's presentation.
+    // Do not remove players already on the field and do not overwrite the
+    // swap instructions here.
+    list.querySelector('.cb-assignment-empty-pde')?.remove();
   }
 
   function cacheOptions(select) {
