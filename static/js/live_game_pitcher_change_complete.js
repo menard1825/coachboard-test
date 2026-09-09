@@ -294,6 +294,7 @@
           new_pitcher_id:Number(incoming.id),
           alignment,
           base_sequence:sequenceFromState(),
+          fast:true,
         })
       });
       const data = await response.json().catch(()=>({}));
@@ -314,6 +315,18 @@
         throw new Error(
           data.message ||
           `Unable to change pitcher (${response.status}).`
+        );
+      }
+
+      // The fast pitcher-change response contains the same
+      // authoritative live delta broadcast to the other coaches.
+      // Apply it locally immediately so the coach who made the
+      // change sees the header AND Quick Field update together.
+      if (data.delta) {
+        document.dispatchEvent(
+          new CustomEvent('coachboard:live-delta', {
+            detail: data.delta,
+          })
         );
       }
 

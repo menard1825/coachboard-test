@@ -309,9 +309,60 @@ def test_pitcher_change_can_follow_field_vacancy_to_bench(
         )
         expect(second).to_be_visible()
         expect(second).to_contain_text('BENCH → SS')
+
+        # Prove the pitching change updates this exact browser rather
+        # than relying on a page refresh or navigation afterward.
+        page.evaluate(
+            "window.__pitcherChangeStayedOnPage = 'yes'"
+        )
+
         second.click()
 
         expect(finish).not_to_be_visible(timeout=10_000)
+
+        assert (
+            page.evaluate(
+                'window.__pitcherChangeStayedOnPage'
+            )
+            == 'yes'
+        )
+
+        quick = page.locator('#cbQuickDefense')
+
+        expect(
+            quick.locator('[data-cb-position="P"]')
+        ).to_contain_text(
+            relief_name,
+            timeout=10_000,
+        )
+
+        expect(
+            quick.locator('[data-cb-position="2B"]')
+        ).to_contain_text(
+            'Shortstop Shawn',
+            timeout=10_000,
+        )
+
+        expect(
+            quick.locator('[data-cb-position="SS"]')
+        ).to_contain_text(
+            'Second Sam',
+            timeout=10_000,
+        )
+
+        expect(
+            quick.locator('.cb-qd-bench')
+        ).to_contain_text(
+            'Pitcher Pat',
+            timeout=10_000,
+        )
+
+        expect(
+            page.locator('#cbDugoutHeader [data-cb-pitcher]')
+        ).to_contain_text(
+            relief_name,
+            timeout=10_000,
+        )
 
         state = get_json(
             page,
