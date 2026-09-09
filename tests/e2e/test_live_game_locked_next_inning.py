@@ -139,7 +139,7 @@ def test_locked_next_inning_huddle_requires_explicit_start(page: Page, coachboar
         )
 
 
-def test_new_defense_is_position_first_and_auto_swaps(
+def test_new_defense_is_position_first_and_follows_vacancy(
     page: Page,
     coachboard_url: str,
 ):
@@ -213,7 +213,9 @@ def test_new_defense_is_position_first_and_auto_swaps(
         expect(chooser).to_contain_text('Who plays 2B?')
         expect(chooser).to_contain_text('Second Sam')
 
-        # Pick somebody already on the field. This should true-swap.
+        # Pick somebody already on the field.
+        # CoachBoard should move that fielder to 2B, bench the old 2B,
+        # and immediately follow the newly-open SS position.
         shortstop = chooser.locator(
             '[data-ni-player="Shortstop Shawn"]'
         )
@@ -226,12 +228,15 @@ def test_new_defense_is_position_first_and_auto_swaps(
 
         expect(
             modal.locator('[data-ni-pos="SS"]')
+        ).to_contain_text('Open')
+
+        # Second Sam was displaced from 2B and should now be on the bench.
+        expect(
+            modal.locator('.ni-bench')
         ).to_contain_text('Second Sam')
 
-        # Now change SS and use a bench player. Second Sam should
-        # automatically become the bench player.
-        modal.locator('[data-ni-pos="SS"]').click()
-
+        # No second position tap is required. CoachBoard should already
+        # be asking the coach to fill the vacancy left at SS.
         chooser = modal.locator('.ni-player-chooser')
         expect(chooser).to_contain_text('Who plays SS?')
 

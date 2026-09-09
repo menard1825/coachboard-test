@@ -442,11 +442,24 @@
     const source = findDraftPosition(name);
 
     if (source && source !== 'P') {
-      // Field-to-field move: true swap.
-      draft[source] = occupant;
+      // Planning the next inning is easier when we follow the vacancy
+      // instead of silently swapping two fielders.
+      //
+      // Example:
+      //   Declan RF -> 2B
+      //   current 2B -> Bench
+      //   RF becomes the next position CoachBoard asks the coach to fill.
+      delete draft[source];
       draft[target] = name;
-    } else if (!source) {
-      // Bench-to-field move: the current occupant becomes benched.
+
+      selectedPosition = source;
+      renderAdjust();
+      return;
+    }
+
+    if (!source) {
+      // A bench player closes the vacancy. The current occupant of the
+      // target position becomes benched automatically.
       draft[target] = name;
     }
 
@@ -460,7 +473,7 @@
         <div class="ni-selected">
           <strong>Tap the position you want to change.</strong><br>
           Then choose the player who should play there.
-          Fielders swap automatically.
+          If you move a fielder, CoachBoard follows the open position.
         </div>`;
     }
 
