@@ -214,6 +214,16 @@
         throw new Error(data.message || `Unable to save defense (${response.status}).`);
       }
 
+      // Keep the tap-based Quick Field controller on the exact same live
+      // version as drag-and-drop. Socket.IO normally broadcasts this delta too,
+      // but publishing the successful response locally removes the race where a
+      // coach drags a player and immediately taps the updated field.
+      if (data.delta) {
+        document.dispatchEvent(new CustomEvent('coachboard:live-delta', {
+          detail: data.delta,
+        }));
+      }
+
       if (draft === savedDraft) draft = null;
       document.querySelector('#cbQuickDefense .cb-main-draft-banner')?.remove();
       setSaveBadge('', 'Saved ✓');

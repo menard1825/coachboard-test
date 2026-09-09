@@ -696,6 +696,85 @@
     }
   }
 
+  function applySharedLiveDelta(event) {
+    const delta = event?.detail;
+    if (!delta || Number(delta.game_id) !== gameId) return;
+
+    // If this controller has not loaded its initial state yet, let the normal
+    // state loader establish the full roster/team context.
+    if (!state) {
+      getState();
+      return;
+    }
+
+    const inning = String(
+      delta.current_inning ||
+      state.current_inning ||
+      state.game?.live_current_inning ||
+      '1'
+    );
+
+    state.game = state.game || {id: gameId};
+    state.game.is_live = true;
+    state.game.live_current_inning = inning;
+    state.current_inning = inning;
+
+    if (delta.current_alignment) {
+      state.current_alignment = {...delta.current_alignment};
+    }
+
+    state.current_pitcher =
+      delta.current_pitcher ||
+      state.current_alignment?.P ||
+      state.current_pitcher ||
+      null;
+
+    state.actual_rotation = state.actual_rotation || {};
+    state.actual_rotation[inning] = {
+      ...(state.current_alignment || {}),
+    };
+
+    if (Array.isArray(delta.bench)) {
+      state.bench = delta.bench;
+    }
+
+    if (delta.event) {
+      state.rotation_events = Array.isArray(state.rotation_events)
+        ? state.rotation_events
+        : [];
+
+      const incomingId = Number(delta.event.id) || 0;
+      const incomingSequence =
+        Number(delta.event.sequence) ||
+        Number(delta.sequence) ||
+        0;
+
+      const index = state.rotation_events.findIndex(existing => {
+        const existingId = Number(existing?.id) || 0;
+        const existingSequence = Number(existing?.sequence) || 0;
+
+        if (incomingId && existingId === incomingId) return true;
+        if (
+          incomingSequence &&
+          existingSequence === incomingSequence
+        ) return true;
+
+        return false;
+      });
+
+      if (index >= 0) {
+        state.rotation_events[index] = delta.event;
+      } else {
+        state.rotation_events.push(delta.event);
+      }
+    }
+
+    // Force Quick Field to redraw from the newest alignment. This also means
+    // the next tap uses the newest base_sequence instead of an old one.
+    quickDefenseSignature = '';
+    queue();
+  }
+
   function arrange(shell) {
     [
       ['liveChangePitcherBtn', 'Change Pitcher', 'Mound change'],
@@ -801,6 +880,14 @@
 
   function start() {
     styles();
+
+    // live_game_feedback_pass.js publishes Socket.IO live deltas here, and
+    // drag-and-drop publishes its successful response here as well.
+    document.addEventListener(
+      'coachboard:live-delta',
+      applySharedLiveDelta
+    );
+
     document.addEventListener('click', event => {
       const button = event.target.closest('#liveEndInningBtn');
       if (!button || button.disabled) return;

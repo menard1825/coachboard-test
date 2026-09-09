@@ -198,5 +198,62 @@ def test_phone_quick_field_swaps_two_fielders_without_second_editor(page: Page, 
             state['current_alignment']['SS']
             == 'Second Sam'
         )
+
+        # A coach commonly drags a swap and immediately taps one of the players
+        # involved in that swap. The tap modal must use the NEW live alignment,
+        # not the pre-drag cached state.
+        ss.click()
+
+        modal = page.locator('#cbQuickMoveModal')
+        expect(modal).to_be_visible(timeout=10_000)
+
+        expect(
+            modal.locator('.cb-move-current')
+        ).to_contain_text(
+            'Second Sam is currently playing SS'
+        )
+
+        two_b_destination = modal.locator(
+            '[data-cb-destination="2B"]'
+        )
+        expect(two_b_destination).to_contain_text(
+            'Currently Shortstop Shawn'
+        )
+
+        one_b_destination = modal.locator(
+            '[data-cb-destination="1B"]'
+        )
+        expect(one_b_destination).to_contain_text(
+            'Currently First Frank'
+        )
+
+        # Prove the tap save also carries the newest live sequence instead of
+        # failing with stale_live_state / HTTP 409.
+        one_b_destination.click()
+
+        expect(modal).not_to_be_visible(timeout=10_000)
+        expect(
+            quick.locator('.cb-save-state')
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        tapped_state = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        assert (
+            tapped_state['current_alignment']['1B']
+            == 'Second Sam'
+        )
+        assert (
+            tapped_state['current_alignment']['SS']
+            == 'First Frank'
+        )
+        assert (
+            tapped_state['current_alignment']['2B']
+            == 'Shortstop Shawn'
+        )
     finally:
         cleanup(page, coachboard_url, game_id, None)
