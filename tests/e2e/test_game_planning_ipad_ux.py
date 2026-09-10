@@ -158,6 +158,198 @@ def test_ipad_game_planning_keeps_tablet_layout(
             assert sample['scrollWidth'] <= sample['clientWidth'] + 1, sample
             assert sample['scrollHeight'] <= sample['clientHeight'] + 1, sample
 
+        # Game Management defense layout:
+        # landscape iPad keeps innings reachable, shows Rotation Table
+        # immediately after Set Defense, and demotes Player Time.
+        if orientation == 'landscape':
+            inning_picker = page.locator(
+                '#rotation-card-container '
+                '.gm-coach-inning-picker'
+            )
+
+            expect(inning_picker).to_be_visible()
+
+            sticky = inning_picker.evaluate(
+                """el => ({
+                    position:getComputedStyle(el).position,
+                    top:getComputedStyle(el).top,
+                })"""
+            )
+
+            assert sticky['position'] == 'sticky'
+            assert sticky['top'] == '56px'
+
+            # Prove the picker is no longer trapped inside the short
+            # planner-controls wrapper. CSS alone is not enough:
+            # sticky elements stop sticking at their containing
+            # block's bottom.
+            assert inning_picker.evaluate(
+                "el => el.parentElement?.id"
+            ) == 'rotation-board'
+
+            # The outer rotation card must not create an overflow
+            # boundary around the sticky picker.
+            rotation_card = page.locator(
+                '#rotation-card-container > .card'
+            )
+
+            assert rotation_card.evaluate(
+                "el => getComputedStyle(el).overflow"
+            ) == 'visible'
+
+            field_document_top = field.evaluate(
+                """el => (
+                    el.getBoundingClientRect().top +
+                    window.scrollY
+                )"""
+            )
+
+            page.evaluate(
+                "y => window.scrollTo(0, y)",
+                field_document_top + 120,
+            )
+
+            page.wait_for_timeout(150)
+
+            first_sticky_box = inning_picker.bounding_box()
+            assert first_sticky_box is not None
+            assert 54 <= first_sticky_box['y'] <= 60
+
+            # Scroll substantially farther through the field. The
+            # inning row must still remain pinned instead of moving
+            # away after one frame.
+            page.evaluate(
+                "window.scrollBy(0, 220)"
+            )
+
+            page.wait_for_timeout(150)
+
+            second_sticky_box = inning_picker.bounding_box()
+            assert second_sticky_box is not None
+            assert 54 <= second_sticky_box['y'] <= 60
+
+            assert abs(
+                second_sticky_box['y'] -
+                first_sticky_box['y']
+            ) <= 2
+
+            rotation_table = page.locator(
+                '#rotationMatrixCollapse'
+            )
+
+            expect(
+                rotation_table
+            ).to_be_visible(timeout=15_000)
+
+            expect(
+                rotation_table
+            ).to_have_class(
+                re.compile(r'\bshow\b')
+            )
+
+            player_time = page.locator(
+                '#gm-playing-time-report'
+            )
+
+            expect(
+                player_time
+            ).to_be_visible(timeout=15_000)
+
+            player_time_collapse = page.locator(
+                '#gmPlayingTimeCollapse'
+            )
+
+            expect(
+                player_time_collapse
+            ).to_be_hidden()
+
+            bench_summary = page.locator(
+                '#benchReportDesktopCollapse'
+            )
+
+            expect(
+                bench_summary
+            ).to_be_hidden()
+
+            order = page.evaluate(
+                """() => {
+                    const panel = document.getElementById(
+                        'pregame-defense-editor-v3'
+                    );
+                    const rotationCollapse = document.getElementById(
+                        'rotationMatrixCollapse'
+                    );
+                    const rotation = rotationCollapse?.closest(
+                        '.d-none.d-lg-block'
+                    ) || rotationCollapse?.closest('.card');
+                    const playerTime = document.getElementById(
+                        'gm-playing-time-report'
+                    );
+                    const benchCollapse = document.getElementById(
+                        'benchReportDesktopCollapse'
+                    );
+                    const bench = benchCollapse?.closest(
+                        '.d-none.d-lg-block'
+                    ) || benchCollapse?.closest('.card');
+
+                    const before = (a, b) => Boolean(
+                        a &&
+                        b &&
+                        (
+                            a.compareDocumentPosition(b) &
+                            Node.DOCUMENT_POSITION_FOLLOWING
+                        )
+                    );
+
+                    return {
+                        panelBeforeRotation:before(panel, rotation),
+                        rotationBeforePlayerTime:before(
+                            rotation,
+                            playerTime
+                        ),
+                        playerTimeBeforeBench:before(
+                            playerTime,
+                            bench
+                        ),
+                    };
+                }"""
+            )
+
+            assert order == {
+                'panelBeforeRotation': True,
+                'rotationBeforePlayerTime': True,
+                'playerTimeBeforeBench': True,
+            }
+
+            # James's player-time information is still available.
+            player_time.locator(
+                '.gm-playing-time-toggle'
+            ).click()
+
+            expect(
+                player_time_collapse
+            ).to_be_visible()
+
+            expect(
+                player_time_collapse.locator(
+                    '.pde-time-row'
+                )
+            ).not_to_have_count(0)
+
+        else:
+            # Portrait tablet keeps the established compact planner
+            # presentation; this landscape change must not remove the
+            # original player-time information.
+            expect(
+                page.locator('#gm-playing-time-report')
+            ).to_have_count(0)
+
+            expect(
+                defense.locator(
+                    '#pde-playing-time-summary'
+                )
+            ).to_be_visible()
+
         pitching = page.locator('#pitcher-availability-card')
         expect(pitching).to_be_visible(timeout=15_000)
         pitcher_cards = pitching.locator('.gpa-card')

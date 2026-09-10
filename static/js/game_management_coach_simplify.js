@@ -101,6 +101,139 @@
       #${PANEL_ID} .pde-field-caption strong{font-size:.72rem!important}
       #rotation-card-container .gm-secondary-report .accordion-collapse,
       #rotation-card-container .gm-secondary-report .collapse{scroll-margin-top:90px}
+
+      /*
+       * Playing-time information stays available for fair-play review,
+       * but on desktop/iPad it lives after the Rotation Table instead
+       * of separating the field from the table.
+       */
+      #gm-playing-time-report{
+        margin:0 0 12px;
+      }
+      #gm-playing-time-report .gm-playing-time-toggle{
+        width:100%;
+        min-height:42px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        border:0;
+        background:#fbfcfd;
+        color:#172033;
+        padding:10px 12px;
+        text-align:left;
+        font-size:.78rem;
+        font-weight:850;
+      }
+      #gm-playing-time-report .gm-playing-time-toggle:hover,
+      #gm-playing-time-report .gm-playing-time-toggle:focus{
+        background:#f5f7fa;
+      }
+      #gm-playing-time-report .gm-playing-time-toggle small{
+        display:block;
+        margin-top:1px;
+        color:#667085;
+        font-size:.61rem;
+        font-weight:650;
+      }
+      #gm-playing-time-report .pde-playing-time{
+        margin:0!important;
+        border:0!important;
+        border-radius:0!important;
+        background:#fff;
+        overflow:hidden;
+      }
+      #gm-playing-time-report .pde-playing-time-head{
+        display:none!important;
+      }
+      #gm-playing-time-report .pde-time-row{
+        padding:8px 10px;
+        border-top:1px solid #eef1f4;
+      }
+      #gm-playing-time-report .pde-time-row:first-child{
+        border-top:0;
+      }
+      #gm-playing-time-report .pde-time-main{
+        display:flex;
+        justify-content:space-between;
+        align-items:baseline;
+        gap:8px;
+      }
+      #gm-playing-time-report .pde-time-name{
+        font-size:.72rem;
+        color:#172033;
+        min-width:0;
+      }
+      #gm-playing-time-report .pde-time-total{
+        font-size:.61rem;
+        color:#667085;
+        white-space:nowrap;
+        font-weight:700;
+      }
+      #gm-playing-time-report .pde-time-chips{
+        display:flex;
+        flex-wrap:wrap;
+        gap:4px;
+        margin-top:5px;
+      }
+      #gm-playing-time-report .pde-time-chip{
+        display:inline-flex;
+        align-items:center;
+        border:1px solid #4aae72;
+        background:#f4fbf6;
+        color:#176b38;
+        border-radius:6px;
+        padding:3px 6px;
+        font-size:.59rem;
+        font-weight:800;
+        line-height:1;
+      }
+      #gm-playing-time-report .pde-time-chip.bench{
+        border-color:#d6dbe1;
+        background:#f4f5f7;
+        color:#667085;
+      }
+
+      /*
+       * iPad landscape: the field can consume the viewport vertically.
+       * Keep the inning buttons reachable directly below CoachBoard's
+       * sticky navigation while the coach works on the diamond.
+       *
+       * This is enabled only while the pregame Game Management defense
+       * panel exists, so Live Game does not inherit the behavior.
+       */
+      @media(min-width:992px) and (max-width:1366px) and (orientation:landscape){
+        /*
+         * The global Game Management card styling uses overflow:hidden.
+         * That creates a sticky containing boundary and prevents the
+         * inning picker from following the viewport. Allow overflow only
+         * on this pregame defense card while the landscape planner is active.
+         */
+        body.gm-pregame-planning #rotation-card-container > .card{
+          overflow:visible!important;
+        }
+
+        body.gm-pregame-planning #rotation-card-container .gm-coach-inning-picker{
+          position:sticky!important;
+          top:56px;
+          z-index:1030;
+          width:100%;
+          margin-bottom:8px!important;
+          background:#fff!important;
+          box-shadow:0 4px 12px rgba(16,24,40,.14);
+        }
+        body.gm-pregame-planning #rotation-card-container #inning-btn-group{
+          flex-wrap:nowrap!important;
+          overflow-x:auto;
+          overflow-y:hidden;
+          min-width:0;
+          scrollbar-width:thin;
+        }
+        body.gm-pregame-planning #rotation-card-container #inning-btn-group > *{
+          flex:0 0 auto;
+        }
+      }
+
       @media(max-width:575.98px){
         #rotation-card-container .gm-coach-inning-picker{align-items:flex-start!important;flex-wrap:wrap}
         #rotation-card-container .gm-coach-inning-label{width:100%;margin-bottom:2px}
@@ -465,8 +598,100 @@
     }
   }
 
+  function syncInningPickerPlacement() {
+    const board = document.getElementById(
+      'rotation-board'
+    );
+
+    const controls = board?.querySelector(
+      ':scope > .planner-controls'
+    );
+
+    const panel = document.getElementById(
+      PANEL_ID
+    );
+
+    const group = document.getElementById(
+      'inning-btn-group'
+    );
+
+    const picker = group?.closest(
+      '.gm-coach-inning-picker'
+    );
+
+    if (
+      !board ||
+      !controls ||
+      !picker
+    ) {
+      return;
+    }
+
+    const ipadLandscape = window.matchMedia(
+      '(min-width: 992px) and ' +
+      '(max-width: 1366px) and ' +
+      '(orientation: landscape)'
+    ).matches;
+
+    const shouldStick = Boolean(
+      panel &&
+      ipadLandscape
+    );
+
+    if (shouldStick) {
+      /*
+       * position:sticky is constrained by the bounds of its
+       * containing block. The original picker lives inside the
+       * short .planner-controls wrapper, so it can only stick for
+       * a moment before that wrapper scrolls away.
+       *
+       * Move only the picker row to rotation-board, immediately
+       * before the pregame defense panel. rotation-board spans the
+       * entire defensive workspace, giving sticky enough vertical
+       * range to stay available while the coach works the field.
+       */
+      picker.classList.add(
+        'gm-ipad-sticky-inning-picker'
+      );
+
+      if (
+        picker.parentElement !== board ||
+        picker.nextElementSibling !== panel
+      ) {
+        panel.insertAdjacentElement(
+          'beforebegin',
+          picker
+        );
+      }
+
+      return;
+    }
+
+    /*
+     * Portrait, phone, desktop, or Live Game:
+     * put the picker back in its original planner-controls home.
+     */
+    picker.classList.remove(
+      'gm-ipad-sticky-inning-picker'
+    );
+
+    if (picker.parentElement !== controls) {
+      controls.insertBefore(
+        picker,
+        controls.firstElementChild
+      );
+    }
+  }
+
   function simplifyDefensePanel() {
     const panel = document.getElementById(PANEL_ID);
+
+    // Scope tablet sticky behavior to pregame Game Management only.
+    document.body.classList.toggle(
+      'gm-pregame-planning',
+      Boolean(panel)
+    );
+
     if (!panel) return;
 
     const inning = currentInning();
@@ -515,21 +740,264 @@
     }
   }
 
+  function reportShell(collapse) {
+    if (!collapse) return null;
+
+    return (
+      collapse.closest('.d-none.d-lg-block') ||
+      collapse.closest('.card')
+    );
+  }
+
+  function markPlayingTimeHandled(panel) {
+    if (
+      !panel ||
+      panel.querySelector('#gm-playing-time-handled')
+    ) {
+      return;
+    }
+
+    const marker = document.createElement('span');
+    marker.id = 'gm-playing-time-handled';
+    marker.hidden = true;
+
+    const status = panel.querySelector('.pde-status');
+
+    if (status) {
+      status.insertAdjacentElement(
+        'beforebegin',
+        marker
+      );
+    } else {
+      panel.appendChild(marker);
+    }
+  }
+
+  function syncPlayingTimePlacement() {
+    const panel = document.getElementById(PANEL_ID);
+    let host = document.getElementById(
+      'gm-playing-time-report'
+    );
+
+    // Once Live Game replaces the pregame defense surface, remove
+    // the pregame-only report wrapper as well.
+    if (!panel) {
+      host?.remove();
+      return;
+    }
+
+    const desktop = window.matchMedia(
+      '(min-width: 992px)'
+    ).matches;
+
+    const summary = panel.querySelector(
+      '#pde-playing-time-summary'
+    );
+
+    const handled = panel.querySelector(
+      '#gm-playing-time-handled'
+    );
+
+    // Preserve the original phone / portrait-tablet presentation.
+    if (!desktop) {
+      if (!summary && host) {
+        const moved = host.querySelector(
+          '#pde-playing-time-summary'
+        );
+        const status = panel.querySelector(
+          '.pde-status'
+        );
+
+        if (moved && status) {
+          status.insertAdjacentElement(
+            'beforebegin',
+            moved
+          );
+        }
+      }
+
+      handled?.remove();
+      host?.remove();
+      return;
+    }
+
+    /*
+     * If the current render was already handled, the summary is
+     * intentionally outside the panel. Do not rebuild the wrapper.
+     */
+    if (!summary && handled) {
+      return;
+    }
+
+    /*
+     * A fresh render with no summary means there are no planned
+     * defensive innings to summarize. Do not leave stale player-time
+     * information from the previous render.
+     */
+    if (!summary) {
+      host?.remove();
+      markPlayingTimeHandled(panel);
+      return;
+    }
+
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'gm-playing-time-report';
+      host.className = 'd-none d-lg-block';
+
+      host.innerHTML = `
+        <div class="card gm-secondary-report">
+          <div class="card-header p-0">
+            <button
+              type="button"
+              class="gm-playing-time-toggle"
+              data-bs-toggle="collapse"
+              data-bs-target="#gmPlayingTimeCollapse"
+              aria-expanded="false"
+              aria-controls="gmPlayingTimeCollapse"
+            >
+              <span>
+                <i class="bi bi-person-check me-2"></i>
+                Player Time / Position Summary
+                <small>Fair-play and position totals</small>
+              </span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+          </div>
+          <div
+            id="gmPlayingTimeCollapse"
+            class="collapse"
+          >
+            <div class="gm-playing-time-body"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    const body = host.querySelector(
+      '.gm-playing-time-body'
+    );
+
+    if (body) {
+      // The base defense renderer owns the summary data. We only move
+      // its freshly rendered DOM; no rotation state is duplicated.
+      body.replaceChildren(summary);
+    }
+
+    markPlayingTimeHandled(panel);
+
+    const rotationCollapse = document.getElementById(
+      'rotationMatrixCollapse'
+    );
+
+    const rotation = reportShell(
+      rotationCollapse
+    );
+
+    /*
+     * Original order is:
+     * field -> legacy hidden layout -> Rotation Table -> Bench Summary.
+     *
+     * Put Player Time immediately after Rotation Table. The hidden
+     * legacy layout stays untouched for Live Game restoration.
+     */
+    if (rotation) {
+      if (rotation.nextElementSibling !== host) {
+        rotation.insertAdjacentElement(
+          'afterend',
+          host
+        );
+      }
+    } else if (panel.nextElementSibling !== host) {
+      panel.insertAdjacentElement(
+        'afterend',
+        host
+      );
+    }
+  }
+
   function collapseSecondaryReportsOnce() {
     if (reportsCollapsed) return;
-    const ids = ['rotationMatrixCollapse', 'benchReportDesktopCollapse'];
-    ids.forEach((id) => {
-      const collapse = document.getElementById(id);
-      if (!collapse) return;
-      collapse.classList.remove('show');
-      collapse.closest('.card')?.classList.add('gm-secondary-report');
-      const headerText = collapse.previousElementSibling?.querySelector('span');
+
+    const rotation = document.getElementById(
+      'rotationMatrixCollapse'
+    );
+
+    const bench = document.getElementById(
+      'benchReportDesktopCollapse'
+    );
+
+    if (!rotation && !bench) return;
+
+    if (rotation) {
+      // Rotation Table is the coach's primary all-inning reference.
+      // Start it open, but only set the default once so the coach can
+      // still collapse it manually afterward.
+      rotation.classList.add('show');
+
+      const card = rotation.closest('.card');
+      card?.classList.remove('gm-secondary-report');
+
+      const header = rotation.previousElementSibling;
+      const trigger = header?.matches?.(
+        '[data-bs-toggle="collapse"]'
+      )
+        ? header
+        : header?.querySelector(
+            '[data-bs-toggle="collapse"]'
+          );
+
+      trigger?.setAttribute(
+        'aria-expanded',
+        'true'
+      );
+
+      const headerText = header?.querySelector(
+        'span'
+      );
+
       if (headerText) {
-        if (id === 'rotationMatrixCollapse') setHtml(headerText, '<i class="bi bi-grid-3x3 me-2"></i>Rotation Table');
-        if (id === 'benchReportDesktopCollapse') setHtml(headerText, '<i class="bi bi-clipboard-x me-2"></i>Bench Summary');
+        setHtml(
+          headerText,
+          '<i class="bi bi-grid-3x3 me-2"></i>Rotation Table'
+        );
       }
-    });
-    reportsCollapsed = ids.some((id) => document.getElementById(id));
+    }
+
+    if (bench) {
+      // Bench Summary remains useful but secondary.
+      bench.classList.remove('show');
+      bench
+        .closest('.card')
+        ?.classList.add('gm-secondary-report');
+
+      const header = bench.previousElementSibling;
+      const trigger = header?.matches?.(
+        '[data-bs-toggle="collapse"]'
+      )
+        ? header
+        : header?.querySelector(
+            '[data-bs-toggle="collapse"]'
+          );
+
+      trigger?.setAttribute(
+        'aria-expanded',
+        'false'
+      );
+
+      const headerText = header?.querySelector(
+        'span'
+      );
+
+      if (headerText) {
+        setHtml(
+          headerText,
+          '<i class="bi bi-clipboard-x me-2"></i>Bench Summary'
+        );
+      }
+    }
+
+    reportsCollapsed = true;
   }
 
   function patch() {
@@ -538,6 +1006,8 @@
     simplifyHeader();
     simplifyInningControls();
     simplifyDefensePanel();
+    syncInningPickerPlacement();
+    syncPlayingTimePlacement();
     collapseSecondaryReportsOnce();
   }
 
@@ -548,10 +1018,39 @@
   }
 
   function start() {
-    document.addEventListener('click', preventActionAnchorJumps, true);
+    document.addEventListener(
+      'click',
+      preventActionAnchorJumps,
+      true
+    );
+
+    window.addEventListener(
+      'resize',
+      queuePatch,
+      {passive:true}
+    );
+
+    window.addEventListener(
+      'orientationchange',
+      queuePatch,
+      {passive:true}
+    );
+
     patch();
-    const observer = new MutationObserver(queuePatch);
-    observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
+
+    const observer = new MutationObserver(
+      queuePatch
+    );
+
+    observer.observe(
+      document.body,
+      {
+        childList:true,
+        subtree:true,
+        attributes:true,
+        attributeFilter:['class']
+      }
+    );
   }
 
   document.readyState === 'loading'
