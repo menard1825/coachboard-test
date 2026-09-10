@@ -365,3 +365,268 @@ def test_ipad_game_planning_keeps_tablet_layout(
             f'{coachboard_url}/game-day/{game_id}/delete',
             headers={'Accept': 'application/json'},
         )
+
+
+def test_phone_landscape_keeps_innings_sticky_while_scrolling(
+    page: Page,
+    coachboard_url: str,
+):
+    """Keep inning controls reachable on a wide phone in landscape."""
+    page.set_viewport_size(
+        {
+            'width': 955,
+            'height': 440,
+        }
+    )
+
+    login(page, coachboard_url)
+
+    opponent = 'iPhone Landscape Prep UX Opponent'
+
+    created = page.request.post(
+        f'{coachboard_url}/game-day/add',
+        form={
+            'game_date': '2030-01-17',
+            'game_start_time': '14:00',
+            'game_opponent': opponent,
+            'game_location': 'Phone Landscape Test Field',
+            'game_notes': (
+                'Disposable phone landscape pregame UX test'
+            ),
+        },
+    )
+
+    assert created.ok
+
+    games = page.request.get(
+        f'{coachboard_url}/api/games'
+    ).json()
+
+    game = next(
+        item
+        for item in games
+        if item.get('opponent') == opponent
+    )
+
+    game_id = int(game['id'])
+
+    try:
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        modes = page.locator(
+            '#cb-test2-pregame-modes'
+        )
+
+        expect(
+            modes
+        ).to_be_visible(timeout=15_000)
+
+        modes.get_by_role(
+            'button',
+            name='Full Plan',
+        ).click()
+
+        defense = page.locator(
+            '#pregame-defense-editor-v3'
+        )
+
+        expect(
+            defense
+        ).to_be_visible(timeout=15_000)
+
+        inning_labels = page.locator(
+            '#inning-btn-group label.btn'
+        )
+
+        expect(
+            inning_labels
+        ).to_have_count(
+            6,
+            timeout=15_000,
+        )
+
+        inning_picker = page.locator(
+            '#rotation-card-container '
+            '.gm-coach-inning-picker'
+        )
+
+        expect(
+            inning_picker
+        ).to_be_visible()
+
+        sticky = inning_picker.evaluate(
+            """el => ({
+                position:getComputedStyle(el).position,
+                top:getComputedStyle(el).top,
+            })"""
+        )
+
+        assert sticky['position'] == 'sticky'
+        assert sticky['top'] == '0px'
+
+        assert inning_picker.evaluate(
+            "el => el.parentElement?.id"
+        ) == 'rotation-board'
+
+        rotation_card = page.locator(
+            '#rotation-card-container > .card'
+        )
+
+        assert rotation_card.evaluate(
+            "el => getComputedStyle(el).overflow"
+        ) == 'visible'
+
+        # Below 992px CoachBoard intentionally makes <main> the
+        # vertical scrollport while html/body stay fixed.
+        scroller = page.locator(
+            'main.container-fluid'
+        )
+
+        expect(
+            scroller
+        ).to_be_visible()
+
+        assert scroller.evaluate(
+            "el => getComputedStyle(el).overflowY"
+        ) in {'auto', 'scroll'}
+
+        field = defense.locator(
+            '.pde-field'
+        )
+
+        expect(
+            field
+        ).to_be_visible()
+
+        target_scroll = field.evaluate(
+            """el => {
+                const scroller =
+                    document.querySelector('main.container-fluid');
+
+                const fieldBox =
+                    el.getBoundingClientRect();
+
+                const scrollBox =
+                    scroller.getBoundingClientRect();
+
+                return (
+                    scroller.scrollTop +
+                    fieldBox.top -
+                    scrollBox.top +
+                    120
+                );
+            }"""
+        )
+
+        scroller.evaluate(
+            "(el, top) => { el.scrollTop = top; }",
+            target_scroll,
+        )
+
+        page.wait_for_timeout(150)
+
+        assert scroller.evaluate(
+            "el => el.scrollTop"
+        ) > 0
+
+        # The browser window itself should remain stationary in the
+        # mobile layout.
+        assert page.evaluate(
+            "window.scrollY"
+        ) == 0
+
+        scroll_box = scroller.bounding_box()
+        first_box = inning_picker.bounding_box()
+
+        assert scroll_box is not None
+        assert first_box is not None
+
+        # The picker lives inside rotation-board/card-body, so a small
+        # intentional inset from the mobile scrollport is allowed.
+        # What matters is that the inset stays fixed while scrolling.
+        first_offset = (
+            first_box['y'] -
+            scroll_box['y']
+        )
+
+        assert 0 <= first_offset <= 20
+
+        # Continue farther through the field. The inning selector
+        # must remain pinned at the same visible offset.
+        scroller.evaluate(
+            "el => { el.scrollTop += 140; }"
+        )
+
+        page.wait_for_timeout(150)
+
+        second_box = inning_picker.bounding_box()
+
+        assert second_box is not None
+
+        second_offset = (
+            second_box['y'] -
+            scroll_box['y']
+        )
+
+        assert 0 <= second_offset <= 20
+
+        assert abs(
+            second_offset -
+            first_offset
+        ) <= 2
+
+        assert abs(
+            second_box['y'] -
+            first_box['y']
+        ) <= 2
+
+        # And prove the coach can change innings without scrolling
+        # back to the top.
+        inning_labels.nth(1).click()
+
+        expect(
+            page.locator(
+                'input[name="inning-radio"][value="2"]'
+            )
+        ).to_be_checked()
+
+        expect(
+            defense.locator(
+                '.pde-inning strong'
+            )
+        ).to_have_text(
+            '2',
+            timeout=10_000,
+        )
+
+        after_switch = inning_picker.bounding_box()
+
+        assert after_switch is not None
+
+        after_switch_offset = (
+            after_switch['y'] -
+            scroll_box['y']
+        )
+
+        assert 0 <= after_switch_offset <= 20
+
+        assert abs(
+            after_switch_offset -
+            first_offset
+        ) <= 2
+
+        assert page.evaluate(
+            """
+            document.documentElement.scrollWidth
+            <= document.documentElement.clientWidth + 2
+            """
+        )
+
+    finally:
+        page.request.post(
+            f'{coachboard_url}/game-day/{game_id}/delete',
+            headers={'Accept': 'application/json'},
+        )
