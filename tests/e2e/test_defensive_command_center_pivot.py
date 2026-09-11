@@ -119,7 +119,8 @@ def test_first_pitch_launches_quick_field_command_center(page: Page, coachboard_
 
         expect(page.locator('#cb-quick-start-launch')).to_have_count(0)
 
-        start = page.locator('#startLiveGameBtnAction')
+        start = page.locator('#gm-mobile-start-game')
+        expect(start).to_be_visible()
         expect(start).to_be_enabled()
         start.click()
 

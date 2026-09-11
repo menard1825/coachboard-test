@@ -89,7 +89,10 @@ def test_end_inning_uses_huddle_then_starts_next_inning(page: Page, coachboard_u
 
     try:
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
-        page.locator('#startLiveGameBtnAction').click()
+
+        start = page.locator('#gm-mobile-start-game')
+        expect(start).to_be_visible(timeout=15_000)
+        start.click()
         expect(page.locator('#live-game-overlay')).to_be_visible(timeout=15_000)
         expect(page.locator('#liveEndInningBtn')).to_be_visible(timeout=15_000)
 

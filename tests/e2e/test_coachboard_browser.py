@@ -163,7 +163,19 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
 
     readiness = page.locator('#coach-game-readiness-v2')
     expect(readiness).to_be_visible(timeout=15_000)
-    availability_shortcut = readiness.get_by_role('button', name=re.compile('Player Availability'))
+
+    details = readiness.get_by_role(
+        'button',
+        name='Details',
+    )
+    expect(details).to_be_visible()
+    details.click()
+    expect(readiness.locator('.cgr-grid')).to_be_visible()
+
+    availability_shortcut = readiness.get_by_role(
+        'button',
+        name=re.compile('Player Availability'),
+    )
     availability_panel = page.locator('#availabilityCollapse')
     expect(availability_shortcut).to_be_visible()
 
@@ -189,7 +201,12 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     expect(availability_panel).to_have_class(re.compile(r'\bshow\b'), timeout=15_000)
     expect(absent_player).to_be_checked()
     readiness = page.locator('#coach-game-readiness-v2')
-    expect(readiness.get_by_role('button', name=re.compile('Player Availability'))).to_contain_text('1 out', timeout=15_000)
+    expect(
+        readiness.locator('.cgr-head small')
+    ).to_contain_text(
+        '1 out',
+        timeout=15_000,
+    )
 
     page.goto(f'{coachboard_url}/game-day')
     expect(page.locator('[data-game-id="1"]')).to_contain_text('8 present · 1 out')
@@ -213,7 +230,20 @@ def test_pregame_controls_and_availability_work_on_phone_size(page: Page, coachb
     modes.get_by_role('button', name='Full Plan').click()
     expect(modes.get_by_role('button', name='Full Plan')).to_have_class(re.compile(r'\bactive\b'))
 
-    readiness.get_by_role('button', name=re.compile('Batting Order')).click()
+    # Returning to Game Management intentionally restores the compact
+    # Pregame Overview. Open Details before using its operational shortcuts.
+    details = readiness.get_by_role(
+        'button',
+        name='Details',
+    )
+    expect(details).to_be_visible()
+    details.click()
+    expect(readiness.locator('.cgr-grid')).to_be_visible()
+
+    readiness.get_by_role(
+        'button',
+        name=re.compile('Batting Order'),
+    ).click()
     expect(page.locator('#lineupEditorModal')).to_be_visible()
     page.locator('#lineupEditorModal').get_by_role('button', name='Cancel').click()
     expect(page.locator('#lineupEditorModal')).to_be_hidden()

@@ -115,7 +115,19 @@ def test_lineup_editor_is_unique_and_cancel_discards_mobile_draft(page: Page, co
     expect(modes).to_be_visible(timeout=15_000)
     modes.get_by_role('button', name='Full Plan').click()
     expect(modes.get_by_role('button', name='Full Plan')).to_have_class(re.compile(r'\bactive\b'))
-    readiness.get_by_role('button', name=re.compile('Batting Order')).click()
+
+    details = readiness.get_by_role(
+        'button',
+        name='Details',
+    )
+    expect(details).to_be_visible()
+    details.click()
+    expect(readiness.locator('.cgr-grid')).to_be_visible()
+
+    readiness.get_by_role(
+        'button',
+        name=re.compile('Batting Order'),
+    ).click()
     expect(page.locator('#lineupEditorModal')).to_be_visible()
     page.locator('#lineupTemplateSelect').select_option('template:1')
     page.locator('#applyLineupSourceBtn').click()

@@ -116,7 +116,9 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         expect(ipad.locator('#live-sync-status-v2')).to_contain_text('SYNCED', timeout=10_000)
         ipad.wait_for_timeout(500)
 
-        phone.locator('#startLiveGameBtnAction').click()
+        phone_start = phone.locator('#gm-mobile-start-game')
+        expect(phone_start).to_be_visible(timeout=15_000)
+        phone_start.click()
         expect(phone.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
         expect(ipad.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
         expect(phone.locator('#live-inning-display')).to_have_text('1')
@@ -242,9 +244,13 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
             timeout=10_000,
         )
 
-        coach_a.locator(
-            '#startLiveGameBtnAction'
-        ).click()
+        coach_a_start = coach_a.locator(
+            '#gm-mobile-start-game'
+        )
+        expect(
+            coach_a_start
+        ).to_be_visible(timeout=15_000)
+        coach_a_start.click()
 
         quick_a = coach_a.locator('#cbQuickDefense')
         quick_b = coach_b.locator('#cbQuickDefense')

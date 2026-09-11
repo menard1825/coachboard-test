@@ -114,10 +114,17 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
         expect(page.locator('#cb-quick-start-launch')).to_have_count(0)
         expect(page.locator('#cb-quick-start-modal')).to_have_count(0)
 
-        # Coaches can evaluate the whole defensive plan without manually
-        # counting inning chips.
+        # Player Time remains available, but the long report is
+        # intentionally collapsed by default on phones.
         summary = page.locator('#pde-playing-time-summary')
-        expect(summary).to_be_visible(timeout=10_000)
+        expect(summary).to_be_hidden(timeout=10_000)
+
+        summary_toggle = page.locator(
+            '.gm-phone-playing-time-toggle'
+        )
+        expect(summary_toggle).to_be_visible()
+        summary_toggle.click()
+        expect(summary).to_be_visible()
 
         shawn_summary = summary.locator(
             '[data-player-name="Shortstop Shawn"]'
