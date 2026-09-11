@@ -54,20 +54,118 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
     try:
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
+        # Game Management JavaScript must use versioned URLs so
+        # a coach does not stay on a stale four-hour browser cache
+        # after a deployment.
+        for filename in (
+            'game_prep_readiness.js',
+            'test2_game_contract.js',
+        ):
+            direct_script = page.locator(
+                f'script[src*="{filename}"]'
+            )
+
+            expect(
+                direct_script
+            ).to_have_count(
+                1,
+                timeout=15_000,
+            )
+
+            direct_src = (
+                direct_script.get_attribute('src')
+                or ''
+            )
+
+            assert 'v=' in direct_src
+
+        for helper_name in (
+            'game-management-visual-polish',
+            'game-management-coach-simplify',
+        ):
+            helper_script = page.locator(
+                'script[data-coach-helper='
+                f'"{helper_name}"]'
+            )
+
+            expect(
+                helper_script
+            ).to_have_count(
+                1,
+                timeout=15_000,
+            )
+
+            helper_src = (
+                helper_script.get_attribute('src')
+                or ''
+            )
+
+            assert 'v=' in helper_src
+
         readiness = page.locator('#coach-game-readiness-v2')
         expect(readiness).to_be_visible(timeout=15_000)
         expect(readiness).not_to_contain_text('Finish the defense for innings 1–6.')
         expect(readiness).not_to_contain_text('regulation inning(s)')
         expect(readiness).not_to_contain_text('setup item need attention')
-        expect(readiness.get_by_role('button', name=re.compile('Player Availability'))).to_be_visible()
-        expect(readiness.get_by_role('button', name=re.compile('Defense'))).to_be_visible()
-        expect(readiness.get_by_role('button', name=re.compile('Game Clock'))).to_be_visible()
+        readiness_grid = readiness.locator('.cgr-grid')
+        expect(readiness_grid).to_be_hidden()
+
+        compact_summary = readiness.locator(
+            '.cgr-head small'
+        )
+
+        expect(
+            compact_summary
+        ).to_have_text(
+            re.compile(r'.+ · .+ · .+ · .+')
+        )
+
+        readiness_details = readiness.get_by_role(
+            'button',
+            name='Details',
+        )
+
+        expect(
+            readiness_details
+        ).to_be_visible()
+
+        readiness_details.click()
+
+        expect(
+            readiness_grid
+        ).to_be_visible()
+
+        expect(
+            readiness.get_by_role(
+                'button',
+                name=re.compile('Player Availability'),
+            )
+        ).to_be_visible()
+
+        expect(
+            readiness.get_by_role(
+                'button',
+                name=re.compile('Defense'),
+            )
+        ).to_be_visible()
+
+        expect(
+            readiness.get_by_role(
+                'button',
+                name=re.compile('Game Clock'),
+            )
+        ).to_be_visible()
 
         modes = page.locator('#cb-test2-pregame-modes')
         expect(modes).to_be_visible(timeout=15_000)
         first_pitch = modes.get_by_role('button', name='First Pitch')
         full_plan = modes.get_by_role('button', name='Full Plan')
-        # Full Plan is now the normal planning workspace.
+        # Full Plan remains the normal planning workspace.
+        # The phone mode selector is deliberately secondary.
+        expect(
+            modes.locator('.cb-t2-mode-copy')
+        ).to_be_hidden()
+
         expect(full_plan).to_have_class(
             re.compile(r'\bactive\b')
         )
@@ -117,17 +215,144 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             )
         ).to_be_visible()
 
-        # The normal Start Game action stays available as a sticky footer action.
-        start = page.locator('#startLiveGameBtnAction')
-        expect(start).to_be_visible()
-        expect(start).to_have_text(re.compile('START GAME'))
-        start_style = start.evaluate(
-            """button => ({position:getComputedStyle(button).position,bottom:button.getBoundingClientRect().bottom,viewport:innerHeight})"""
+        # Batting Order stays available without leaving the
+        # entire player table expanded on the phone.
+        batting = page.locator(
+            '#gameBattingOrderCard'
         )
-        assert start_style['position'] == 'fixed'
-        assert start_style['bottom'] <= start_style['viewport'] + 1
-        assert start_style['bottom'] >= start_style['viewport'] - 90
-        expect(page.locator('#start-live-blockers')).to_be_hidden()
+
+        expect(
+            batting
+        ).to_be_visible()
+
+        batting_body = batting.locator(
+            ':scope > .card-body'
+        )
+
+        expect(
+            batting_body
+        ).to_be_hidden()
+
+        batting_toggle = batting.get_by_role(
+            'button',
+            name='View',
+        )
+
+        expect(
+            batting_toggle
+        ).to_be_visible()
+
+        batting_toggle.click()
+
+        expect(
+            batting_body
+        ).to_be_visible()
+
+        batting.get_by_role(
+            'button',
+            name='Hide',
+        ).click()
+
+        expect(
+            batting_body
+        ).to_be_hidden()
+
+        # The canonical Start Game control stays in its
+        # original DOM location so Game Clock / pitching helpers
+        # can continue anchoring around it. Phones receive a
+        # compact header proxy instead.
+        canonical_start = page.locator(
+            '#startLiveGameBtnAction'
+        )
+
+        mobile_start = page.locator(
+            '#gm-mobile-start-game'
+        )
+
+        header_actions = page.locator(
+            '#gm-game-header-actions'
+        )
+
+        expect(
+            canonical_start
+        ).to_have_count(1)
+
+        expect(
+            canonical_start.locator('xpath=..')
+        ).to_be_hidden()
+
+        expect(
+            mobile_start
+        ).to_be_visible()
+
+        expect(
+            mobile_start
+        ).to_have_text(
+            re.compile('Start Game', re.I)
+        )
+
+        expect(
+            header_actions.locator(
+                '#gm-mobile-start-game'
+            )
+        ).to_have_count(1)
+
+        expect(
+            header_actions.get_by_role(
+                'button',
+                name=re.compile('Edit', re.I),
+            )
+        ).to_be_visible()
+
+        expect(
+            header_actions.get_by_role(
+                'link',
+                name=re.compile('Close', re.I),
+            )
+        ).to_be_visible()
+
+        start_layout = mobile_start.evaluate(
+            """button => {
+                const r =
+                    button.getBoundingClientRect();
+
+                return {
+                    position:
+                        getComputedStyle(button).position,
+                    height:
+                        r.height,
+                    width:
+                        r.width,
+                };
+            }"""
+        )
+
+        assert (
+            start_layout['position']
+            not in ('fixed', 'sticky')
+        )
+
+        assert start_layout['height'] <= 44
+        assert start_layout['width'] > 70
+
+        # Readiness state must still come from the canonical
+        # server-controlled Start button.
+        assert (
+            mobile_start.is_disabled()
+            == canonical_start.is_disabled()
+        )
+
+        # Dynamic pregame cards must never be dragged into the
+        # game-header action row again.
+        expect(
+            header_actions.locator(
+                '#cbPregameClock'
+            )
+        ).to_have_count(0)
+
+        expect(
+            page.locator('#start-live-blockers')
+        ).to_be_hidden()
 
         rules = page.locator('#game-pitching-rules-v2')
         expect(rules).to_be_visible(timeout=15_000)
@@ -151,15 +376,68 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(defense).to_be_visible(timeout=15_000)
         expect(defense.locator('.pde-title')).to_have_text('Set Defense — Inning 1')
         expect(defense.locator('.pde-kicker')).to_have_text('Defense Setup')
-        canonical_label = defense.locator('.cb-starting-defense-label')
-        expect(canonical_label).to_have_count(1)
-        expect(canonical_label).to_have_text('Starting Defense Preset (Optional)')
-        expect(defense.locator('.gm-preset-help')).to_be_hidden()
-        expect(defense.locator('#pde-apply')).to_have_text('Apply to Inning 1')
-        expect(defense.locator('#pde-apply-game')).to_have_text('Apply to Entire Game')
-        expect(defense.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as assigned')
+        canonical_label = defense.locator(
+            '.cb-starting-defense-label'
+        )
 
-        preset_layout = defense.locator('.pde-tools').evaluate(
+        expect(
+            canonical_label
+        ).to_have_count(1)
+
+        expect(
+            canonical_label
+        ).to_have_text(
+            'Starting Defense Preset (Optional)'
+        )
+
+        expect(
+            defense.locator('.gm-preset-help')
+        ).to_be_hidden()
+
+        preset_tools = defense.locator(
+            '.pde-tools'
+        )
+
+        expect(
+            preset_tools
+        ).to_be_hidden()
+
+        preset_toggle = defense.get_by_role(
+            'button',
+            name='Preset / Apply',
+        )
+
+        expect(
+            preset_toggle
+        ).to_be_visible()
+
+        preset_toggle.click()
+
+        expect(
+            preset_tools
+        ).to_be_visible()
+
+        expect(
+            defense.locator('#pde-apply')
+        ).to_have_text(
+            'Apply to Inning 1'
+        )
+
+        expect(
+            defense.locator('#pde-apply-game')
+        ).to_have_text(
+            'Apply to Entire Game'
+        )
+
+        expect(
+            defense.locator(
+                '.cb-starting-defense-help'
+            )
+        ).to_contain_text(
+            'Pitchers stay as assigned'
+        )
+
+        preset_layout = preset_tools.evaluate(
             """tools => {
                 const wrap = tools.querySelector('.gm-preset-wrap').getBoundingClientRect();
                 const select = tools.querySelector('#pde-preset').getBoundingClientRect();
@@ -199,6 +477,60 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         defense.locator('#pde-apply').click()
         expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
         expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
+
+        playing_time = defense.locator(
+            '#pde-playing-time-summary'
+        )
+
+        expect(
+            playing_time
+        ).to_be_hidden(
+            timeout=15_000,
+        )
+
+        playing_time_toggle = defense.locator(
+            '.gm-phone-playing-time-toggle'
+        )
+
+        expect(
+            playing_time_toggle
+        ).to_have_count(1)
+
+        expect(
+            playing_time_toggle
+        ).to_be_visible()
+
+        expect(
+            playing_time_toggle
+        ).to_contain_text(
+            'Player Time / Position Summary'
+        )
+
+        expect(
+            playing_time_toggle
+        ).to_have_attribute(
+            'aria-expanded',
+            'false',
+        )
+
+        playing_time_toggle.click()
+
+        expect(
+            playing_time
+        ).to_be_visible()
+
+        expect(
+            playing_time_toggle
+        ).to_have_attribute(
+            'aria-expanded',
+            'true',
+        )
+
+        playing_time_toggle.click()
+
+        expect(
+            playing_time
+        ).to_be_hidden()
 
         field = defense.locator('.pde-field')
         expect(field).to_be_visible()

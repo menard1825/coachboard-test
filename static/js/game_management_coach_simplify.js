@@ -7,6 +7,8 @@
   const gameId = Number(routeMatch[1]);
   const PANEL_ID = 'pregame-defense-editor-v3';
   let reportsCollapsed = false;
+  let presetToolsOpen = false;
+  let phonePlayingTimeOpen = false;
   let patchQueued = false;
 
   const setText = (element, value) => {
@@ -101,6 +103,27 @@
       #${PANEL_ID} .pde-field-caption strong{font-size:.72rem!important}
       #rotation-card-container .gm-secondary-report .accordion-collapse,
       #rotation-card-container .gm-secondary-report .collapse{scroll-margin-top:90px}
+
+      #${PANEL_ID} .gm-mobile-preset-toggle{
+        display:none;
+      }
+      @media(max-width:767.98px){
+        #${PANEL_ID} .gm-mobile-preset-toggle{
+          display:inline-flex;
+          align-items:center;
+          gap:5px;
+          width:auto;
+          min-height:30px;
+          margin:0 0 6px;
+          padding:4px 7px;
+          border:1px solid #d7dde5;
+          border-radius:8px;
+          background:#fff;
+          color:#475467;
+          font-size:.59rem;
+          font-weight:850;
+        }
+      }
 
       /*
        * Playing-time information stays available for fair-play review,
@@ -705,6 +728,76 @@
     }
   }
 
+  function syncMobilePresetDisclosure(
+    panel,
+    tools
+  ) {
+    if (!panel || !tools) return;
+
+    const mobile = window.matchMedia(
+      '(max-width: 767.98px)'
+    ).matches;
+
+    let toggle = panel.querySelector(
+      '.gm-mobile-preset-toggle'
+    );
+
+    if (!toggle) {
+      toggle = document.createElement(
+        'button'
+      );
+
+      toggle.type = 'button';
+      toggle.className = (
+        'gm-mobile-preset-toggle'
+      );
+
+      tools.insertAdjacentElement(
+        'beforebegin',
+        toggle
+      );
+
+      toggle.addEventListener(
+        'click',
+        () => {
+          presetToolsOpen = !presetToolsOpen;
+          queuePatch();
+        }
+      );
+    }
+
+    if (!mobile) {
+      toggle.hidden = true;
+      tools.style.removeProperty(
+        'display'
+      );
+      return;
+    }
+
+    toggle.hidden = false;
+
+    toggle.setAttribute(
+      'aria-expanded',
+      presetToolsOpen
+        ? 'true'
+        : 'false'
+    );
+
+    toggle.innerHTML = (
+      presetToolsOpen
+        ? '<i class="bi bi-chevron-up"></i> Hide Preset / Apply'
+        : '<i class="bi bi-bookmark"></i> Preset / Apply'
+    );
+
+    tools.style.setProperty(
+      'display',
+      presetToolsOpen
+        ? 'grid'
+        : 'none',
+      'important'
+    );
+  }
+
   function simplifyDefensePanel() {
     const panel = document.getElementById(PANEL_ID);
 
@@ -740,6 +833,11 @@
       tools.insertBefore(wrap, select);
       wrap.appendChild(select);
     }
+
+    syncMobilePresetDisclosure(
+      panel,
+      tools
+    );
 
     if (wrap) {
       let label = wrap.querySelector('.gm-preset-label');
@@ -795,6 +893,87 @@
     }
   }
 
+  function syncPhonePlayingTimeDisclosure(
+    panel,
+    summary
+  ) {
+    if (!panel) return;
+
+    const mobile = window.matchMedia(
+      '(max-width: 767.98px)'
+    ).matches;
+
+    let toggle = panel.querySelector(
+      '.gm-phone-playing-time-toggle'
+    );
+
+    if (!mobile || !summary) {
+      toggle?.remove();
+
+      if (summary) {
+        summary.hidden = false;
+      }
+
+      return;
+    }
+
+    if (!toggle) {
+      toggle = document.createElement(
+        'button'
+      );
+
+      toggle.type = 'button';
+
+      toggle.className = (
+        'gm-phone-playing-time-toggle '
+        + 'btn btn-light border w-100 '
+        + 'd-flex align-items-center '
+        + 'justify-content-between '
+        + 'text-start mb-2'
+      );
+
+      toggle.addEventListener(
+        'click',
+        () => {
+          phonePlayingTimeOpen = (
+            !phonePlayingTimeOpen
+          );
+
+          queuePatch();
+        }
+      );
+    }
+
+    if (
+      toggle.nextElementSibling !== summary
+    ) {
+      summary.insertAdjacentElement(
+        'beforebegin',
+        toggle
+      );
+    }
+
+    summary.hidden = !phonePlayingTimeOpen;
+
+    toggle.setAttribute(
+      'aria-expanded',
+      phonePlayingTimeOpen
+        ? 'true'
+        : 'false'
+    );
+
+    toggle.innerHTML = `
+      <span>
+        <i class="bi bi-person-check me-2"></i>
+        <strong>Player Time / Position Summary</strong>
+      </span>
+      <span class="small text-muted">
+        ${phonePlayingTimeOpen ? 'Hide' : 'View'}
+        <i class="bi bi-chevron-${phonePlayingTimeOpen ? 'up' : 'down'} ms-1"></i>
+      </span>
+    `;
+  }
+
   function syncPlayingTimePlacement() {
     const panel = document.getElementById(PANEL_ID);
     let host = document.getElementById(
@@ -820,12 +999,17 @@
       '#gm-playing-time-handled'
     );
 
-    // Preserve the original phone / portrait-tablet presentation.
+    // Preserve the original portrait-tablet presentation.
+    // Phones keep the same data, but collapse the long report by
+    // default so the defensive field stays primary.
     if (!desktop) {
-      if (!summary && host) {
+      let activeSummary = summary;
+
+      if (!activeSummary && host) {
         const moved = host.querySelector(
           '#pde-playing-time-summary'
         );
+
         const status = panel.querySelector(
           '.pde-status'
         );
@@ -835,13 +1019,28 @@
             'beforebegin',
             moved
           );
+
+          activeSummary = moved;
         }
       }
 
       handled?.remove();
       host?.remove();
+
+      syncPhonePlayingTimeDisclosure(
+        panel,
+        activeSummary
+      );
+
       return;
     }
+
+    // Desktop/iPad landscape report handling must never inherit
+    // phone-only hidden state or its disclosure button.
+    syncPhonePlayingTimeDisclosure(
+      panel,
+      summary
+    );
 
     /*
      * If the current render was already handled, the summary is

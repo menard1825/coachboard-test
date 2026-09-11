@@ -239,17 +239,17 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/lineup_editor.js') }}"></script>
-<script src="{{ url_for('static', filename='js/game_logic.js') }}"></script>
-<script src="{{ url_for('static', filename='js/live_game_inning_clarity.js') }}" data-live-inning-clarity="true"></script>
-<script src="{{ url_for('static', filename='js/live_game_v2.js') }}"></script>
-<script src="{{ url_for('static', filename='js/live_game_coach_ui.js') }}"></script>
-<script src="{{ url_for('static', filename='js/live_game_field_realism.js') }}"></script>
-<script src="{{ url_for('static', filename='js/gameday_pitching_steppers.js') }}"></script>
-<script src="{{ url_for('static', filename='js/game_prep_readiness.js') }}"></script>
-<script src="{{ url_for('static', filename='js/game_setup_ux.js') }}"></script>
-<script src="{{ url_for('static', filename='js/live_game_unified_field_entry.js') }}"></script>
-<script src="{{ url_for('static', filename='js/test2_game_contract.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lineup_editor.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/game_logic.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/live_game_inning_clarity.js', v=css_version) }}" data-live-inning-clarity="true"></script>
+<script src="{{ url_for('static', filename='js/live_game_v2.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/live_game_coach_ui.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/live_game_field_realism.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/gameday_pitching_steppers.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/game_prep_readiness.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/game_setup_ux.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/live_game_unified_field_entry.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/test2_game_contract.js', v=css_version) }}"></script>
 <script>
     // Keep the game shell visible without observing/mutating the same attributes.
     const keepGameShellVisible = () => {

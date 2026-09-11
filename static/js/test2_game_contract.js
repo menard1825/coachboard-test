@@ -63,9 +63,33 @@
       #${HUDDLE_ID} .cb-t2-start .btn{width:100%;min-height:50px;border-radius:10px;font-weight:900}
       #cb-test2-inning-recovery{display:none;position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:2200;width:min(92vw,520px);border:1px solid #9fc5b0;border-radius:11px;background:#edf8f1;color:#176b38;padding:10px 12px;box-shadow:0 8px 24px rgba(16,24,40,.18);font-size:.76rem;font-weight:780;line-height:1.35;text-align:center}
       #cb-test2-inning-recovery.show{display:block}
-      @media(max-width:575.98px){
-        #${MODE_ID}{display:grid;grid-template-columns:1fr;padding:8px 9px}#${MODE_ID} .cb-t2-mode-buttons{width:100%}#${MODE_ID} .cb-t2-mode-buttons .btn{flex:1}
-        #${HUDDLE_ID} .modal-dialog{margin:.35rem}#${HUDDLE_ID} .cb-t2-huddle-actions.two{grid-template-columns:1fr}
+      @media(max-width:767.98px){
+        #${MODE_ID}{
+          justify-content:flex-end;
+          padding:5px 6px;
+          margin-bottom:7px;
+        }
+        #${MODE_ID} .cb-t2-mode-copy{
+          display:none;
+        }
+        #${MODE_ID} .cb-t2-mode-buttons{
+          width:auto;
+          padding:2px;
+          gap:3px;
+          margin-left:auto;
+        }
+        #${MODE_ID} .cb-t2-mode-buttons .btn{
+          flex:0 0 auto;
+          min-height:30px;
+          padding:4px 8px;
+          font-size:.61rem;
+        }
+        #${HUDDLE_ID} .modal-dialog{
+          margin:.35rem;
+        }
+        #${HUDDLE_ID} .cb-t2-huddle-actions.two{
+          grid-template-columns:1fr;
+        }
       }
     `;
     document.head.appendChild(style);

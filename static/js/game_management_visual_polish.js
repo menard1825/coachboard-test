@@ -8,7 +8,9 @@
   const mobileMedia = window.matchMedia(MOBILE_QUERY);
   const pitchDetailsOpen = new Set();
   let showAvailablePitchers = false;
+  let battingOrderOpen = false;
   let startPlaceholder = null;
+  let mobileStartObserver = null;
   let passQueued = false;
 
   function isMobile() {
@@ -162,9 +164,75 @@
         body.coach-game-page #game-pitching-rules-v2 .gpr-rule,
         body.coach-game-page #game-pitching-rules-v2 .gpr-arm{font-size:.7rem!important}
 
-        body.coach-game-page .gm-mobile-start-wrap{margin:0 0 10px!important}
-        body.coach-game-page #startLiveGameBtnAction{
-          border-left-width:4px!important;min-height:52px;padding:10px 12px!important;font-size:1rem!important;
+        body.coach-game-page #gm-game-header-actions{
+          display:grid!important;
+          grid-template-columns:
+            minmax(0,1.4fr)
+            minmax(0,.8fr)
+            minmax(0,.8fr)!important;
+          gap:6px!important;
+          width:100%!important;
+        }
+        body.coach-game-page #gm-mobile-start-game{
+          width:100%!important;
+          min-width:0!important;
+          height:38px!important;
+          min-height:38px!important;
+          max-height:38px!important;
+          margin:0!important;
+          padding:6px 8px!important;
+          border:1px solid var(--gm-navy)!important;
+          border-left:4px solid var(--gm-gold)!important;
+          border-radius:9px!important;
+          background:var(--gm-navy)!important;
+          color:#fff!important;
+          box-shadow:none!important;
+          font-size:.72rem!important;
+          font-weight:800!important;
+          line-height:1.1!important;
+          white-space:nowrap!important;
+        }
+        body.coach-game-page #gm-mobile-start-game i{
+          color:var(--gm-gold)!important;
+        }
+        body.coach-game-page #gm-mobile-start-game:disabled{
+          opacity:.55!important;
+        }
+        body.coach-game-page .gm-canonical-start-mobile-hidden{
+          display:none!important;
+        }
+
+        body.coach-game-page #gameBattingOrderCard{
+          margin-bottom:8px!important;
+        }
+        body.coach-game-page #gameBattingOrderCard > .card-header{
+          padding:7px 8px!important;
+          gap:7px!important;
+        }
+        body.coach-game-page #gameBattingOrderCard .card-header h5{
+          font-size:.88rem!important;
+        }
+        body.coach-game-page #gameBattingOrderCard .card-header .small{
+          margin-top:1px!important;
+          font-size:.59rem!important;
+          line-height:1.2!important;
+        }
+        body.coach-game-page #gameBattingOrderCard .gm-lineup-actions{
+          display:flex;
+          align-items:center;
+          gap:5px;
+          flex:0 0 auto;
+        }
+        body.coach-game-page #gameBattingOrderCard .gm-lineup-actions .btn{
+          min-height:32px!important;
+          padding:4px 7px!important;
+          font-size:.61rem!important;
+        }
+        body.coach-game-page #gameBattingOrderCard:not(.gm-lineup-open) > .card-body{
+          display:none!important;
+        }
+        body.coach-game-page #gameBattingOrderCard > .card-body{
+          padding:7px!important;
         }
 
         body.coach-game-page #rotation-card-container,
@@ -353,6 +421,151 @@
     setText(panel.querySelector('.pde-status-note'), 'Saves automatically.');
   }
 
+  function polishBattingOrder() {
+    const card = document.getElementById(
+      'gameBattingOrderCard'
+    );
+
+    if (!card) return;
+
+    const header = card.querySelector(
+      ':scope > .card-header'
+    );
+
+    const subtitle = header?.querySelector(
+      '.small.text-muted'
+    );
+
+    const edit = header?.querySelector(
+      '[data-bs-target="#lineupEditorModal"]'
+    );
+
+    let actions = header?.querySelector(
+      '.gm-lineup-actions'
+    );
+
+    /*
+     * The compact wrapper is phone-only. If the viewport grows back
+     * to tablet/desktop, restore the original header structure.
+     */
+    if (!isMobile()) {
+      card.classList.remove(
+        'gm-lineup-open'
+      );
+
+      if (actions && edit) {
+        actions.insertAdjacentElement(
+          'beforebegin',
+          edit
+        );
+
+        actions.remove();
+      }
+
+      if (subtitle) {
+        setText(
+          subtitle,
+          'Top to bottom, exactly as they hit.'
+        );
+      }
+
+      return;
+    }
+
+    const summaryCount = Number.parseInt(
+      document.getElementById(
+        'lineupSummaryCount'
+      )?.textContent || '',
+      10
+    );
+
+    const rowCount = card.querySelectorAll(
+      '.card-body '
+      + '[aria-label="Batting order"] '
+      + '> div:last-child > .d-grid'
+    ).length;
+
+    const count = Number.isFinite(
+      summaryCount
+    )
+      ? summaryCount
+      : rowCount;
+
+    if (subtitle) {
+      setText(
+        subtitle,
+        count > 0
+          ? `${count} hitters set`
+          : 'Order not set'
+      );
+    }
+
+    if (!edit || !header) return;
+
+    actions = header.querySelector(
+      '.gm-lineup-actions'
+    );
+
+    if (!actions) {
+      actions = document.createElement(
+        'div'
+      );
+
+      actions.className = (
+        'gm-lineup-actions'
+      );
+
+      edit.insertAdjacentElement(
+        'beforebegin',
+        actions
+      );
+
+      actions.appendChild(
+        edit
+      );
+    }
+
+    let toggle = actions.querySelector(
+      '.gm-lineup-toggle'
+    );
+
+    if (!toggle) {
+      toggle = document.createElement(
+        'button'
+      );
+
+      toggle.type = 'button';
+
+      toggle.className = (
+        'btn btn-sm btn-outline-secondary '
+        + 'gm-lineup-toggle'
+      );
+
+      actions.insertBefore(
+        toggle,
+        edit
+      );
+    }
+
+    card.classList.toggle(
+      'gm-lineup-open',
+      battingOrderOpen
+    );
+
+    toggle.setAttribute(
+      'aria-expanded',
+      battingOrderOpen
+        ? 'true'
+        : 'false'
+    );
+
+    toggle.textContent = (
+      battingOrderOpen
+        ? 'Hide'
+        : 'View'
+    );
+  }
+
   function polishPitcherCard(card) {
     const status = card.querySelector('.gpa-status');
     const statusText = status?.textContent.trim().toLowerCase() || '';
@@ -467,32 +680,201 @@
   }
 
   function positionStartButton() {
-    const button = document.getElementById('startLiveGameBtnAction');
-    const wrap = button?.closest('.d-grid');
+    const button = document.getElementById(
+      'startLiveGameBtnAction'
+    );
+
+    const wrap = button?.closest(
+      '.d-grid'
+    );
+
     if (!button || !wrap) return;
 
-    if (!startPlaceholder && wrap.parentNode) {
-      startPlaceholder = document.createComment('CoachBoard start-live original position');
-      wrap.parentNode.insertBefore(startPlaceholder, wrap);
+    /*
+     * Keep the canonical Start Game control in its original DOM
+     * position. Several existing pregame helpers intentionally
+     * anchor themselves around this .d-grid, including Game Clock.
+     */
+    if (
+      !startPlaceholder &&
+      wrap.parentNode
+    ) {
+      startPlaceholder = document.createComment(
+        'CoachBoard canonical Start Game position'
+      );
+
+      wrap.parentNode.insertBefore(
+        startPlaceholder,
+        wrap
+      );
     }
 
+    if (
+      startPlaceholder?.parentNode &&
+      startPlaceholder.nextSibling !== wrap
+    ) {
+      startPlaceholder.parentNode.insertBefore(
+        wrap,
+        startPlaceholder.nextSibling
+      );
+    }
+
+    wrap.classList.remove(
+      'gm-mobile-start-wrap'
+    );
+
+    const existingProxy = document.getElementById(
+      'gm-mobile-start-game'
+    );
+
     if (!isMobile()) {
-      wrap.classList.remove('gm-mobile-start-wrap');
-      if (startPlaceholder?.parentNode && startPlaceholder.nextSibling !== wrap) {
-        startPlaceholder.parentNode.insertBefore(wrap, startPlaceholder.nextSibling);
-      }
+      wrap.classList.remove(
+        'gm-canonical-start-mobile-hidden'
+      );
+
+      existingProxy?.remove();
+
+      mobileStartObserver?.disconnect();
+      mobileStartObserver = null;
+
+      const actions = document.getElementById(
+        'gm-game-header-actions'
+      );
+
+      actions?.removeAttribute(
+        'id'
+      );
+
       return;
     }
 
-    wrap.classList.add('gm-mobile-start-wrap');
-    const readiness = document.getElementById('coach-game-readiness-v2');
-    if (readiness && readiness.nextElementSibling !== wrap) readiness.insertAdjacentElement('afterend', wrap);
+    const gameHeader = document.querySelector(
+      '#pregame-checklist-container '
+      + '> .d-flex:first-child'
+    );
+
+    if (!gameHeader) return;
+
+    const headerActions = Array.from(
+      gameHeader.children
+    ).find((child) => (
+      child.querySelector(
+        '[data-bs-target="#editGameModal"]'
+      ) &&
+      child.querySelector(
+        'a[href*="/game-day"]'
+      )
+    ));
+
+    if (!headerActions) return;
+
+    headerActions.id = (
+      'gm-game-header-actions'
+    );
+
+    let proxy = document.getElementById(
+      'gm-mobile-start-game'
+    );
+
+    if (!proxy) {
+      proxy = document.createElement(
+        'button'
+      );
+
+      proxy.type = 'button';
+      proxy.id = 'gm-mobile-start-game';
+
+      proxy.className = (
+        'btn btn-primary'
+      );
+
+      proxy.innerHTML = (
+        '<i class="bi bi-play-circle-fill me-1"></i>'
+        + 'Start Game'
+      );
+
+      proxy.addEventListener(
+        'click',
+        () => {
+          if (
+            button.disabled ||
+            button.classList.contains('disabled')
+          ) {
+            return;
+          }
+
+          button.click();
+        }
+      );
+    }
+
+    if (
+      proxy.parentElement !== headerActions ||
+      headerActions.firstElementChild !== proxy
+    ) {
+      headerActions.insertBefore(
+        proxy,
+        headerActions.firstElementChild
+      );
+    }
+
+    wrap.classList.add(
+      'gm-canonical-start-mobile-hidden'
+    );
+
+    const syncProxy = () => {
+      const disabled = (
+        button.disabled ||
+        button.classList.contains(
+          'disabled'
+        )
+      );
+
+      proxy.disabled = disabled;
+
+      proxy.classList.toggle(
+        'disabled',
+        disabled
+      );
+
+      proxy.setAttribute(
+        'aria-disabled',
+        disabled ? 'true' : 'false'
+      );
+
+      proxy.title = (
+        button.title ||
+        'Start Game'
+      );
+    };
+
+    syncProxy();
+
+    mobileStartObserver?.disconnect();
+
+    mobileStartObserver = (
+      new MutationObserver(syncProxy)
+    );
+
+    mobileStartObserver.observe(
+      button,
+      {
+        attributes: true,
+        attributeFilter: [
+          'disabled',
+          'class',
+          'title',
+          'aria-disabled',
+        ],
+      }
+    );
   }
 
   function runPass() {
     passQueued = false;
     polishGeneralCopy();
     polishDefenseCopy();
+    polishBattingOrder();
     polishPitcherAvailability();
     positionStartButton();
   }
@@ -505,6 +887,19 @@
 
   function bindControls() {
     document.addEventListener('click', (event) => {
+      const lineupToggle = event.target.closest(
+        '.gm-lineup-toggle'
+      );
+
+      if (lineupToggle) {
+        event.preventDefault();
+
+        battingOrderOpen = !battingOrderOpen;
+        schedulePass();
+
+        return;
+      }
+
       const listToggle = event.target.closest('.gm-pitcher-list-toggle');
       if (listToggle) {
         event.preventDefault();

@@ -6,6 +6,10 @@
   const gameId = Number(match[1]);
   const ID = 'coach-game-readiness-v2';
   let actionsBound = false;
+  let detailsOpen = false;
+  const mobileMedia = window.matchMedia(
+    '(max-width: 767.98px)'
+  );
 
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -97,13 +101,58 @@
         html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot{width:60px!important}
         html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot .pde-name{font-size:.54rem!important}
       }
-      @media(max-width:575.98px){
-        #${ID}{margin-bottom:9px;border-radius:12px}
-        .cgr-grid{grid-template-columns:1fr 1fr;gap:6px;padding:8px 9px}
-        .cgr-head{padding:8px 9px}
-        .cgr-head strong{font-size:.78rem}.cgr-head small{font-size:.61rem}
-        .cgr-item{min-height:57px;padding:7px 8px}
-        .cgr-v{font-size:.7rem}
+      @media(max-width:767.98px){
+        #${ID}{
+          margin-bottom:8px;
+          border-radius:11px;
+        }
+        #${ID} .cgr-head{
+          padding:7px 8px;
+          gap:7px;
+        }
+        #${ID} .cgr-head strong{
+          font-size:.75rem;
+        }
+        #${ID} .cgr-head small{
+          font-size:.58rem;
+          line-height:1.25;
+        }
+        #${ID} .cgr-head-actions{
+          display:flex;
+          align-items:center;
+          gap:5px;
+          flex:0 0 auto;
+        }
+        #${ID} .cgr-badge{
+          padding:3px 6px;
+          font-size:.52rem;
+        }
+        #${ID} .cgr-toggle{
+          min-height:30px;
+          border:1px solid #d7dde5;
+          border-radius:8px;
+          background:#fff;
+          color:#344054;
+          padding:4px 7px;
+          font-size:.59rem;
+          font-weight:850;
+        }
+        #${ID}:not(.cgr-open) .cgr-grid{
+          display:none;
+        }
+        #${ID}.cgr-open .cgr-grid{
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:6px;
+          padding:7px 8px 8px;
+        }
+        #${ID} .cgr-item{
+          min-height:52px;
+          padding:6px 7px;
+        }
+        #${ID} .cgr-v{
+          font-size:.67rem;
+        }
       }
       @media(orientation:landscape) and (max-height:900px){.cgr-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
     `;
@@ -153,9 +202,73 @@
       : 'Confirm availability';
     const clockValue = clockSummary();
 
-    panel.className = coreReady ? 'ready' : 'needs';
+    const compactAvailability = (
+      r.present_count > 0
+        ? (
+            r.absent_count
+              ? `${r.absent_count} out`
+              : 'All available'
+          )
+        : 'Availability needed'
+    );
+
+    const compactLineup = (
+      r.lineup_ready
+        ? `${r.lineup_count} hitters`
+        : 'Lineup needed'
+    );
+
+    const compactDefense = (
+      r.defense_ready
+        ? (
+            `${r.regulation_innings || r.defense_innings}`
+            + ' innings'
+          )
+        : (
+            `${r.defense_completed_innings || 0}/`
+            + `${r.regulation_innings || r.defense_innings || 0}`
+            + ' defense'
+          )
+    );
+
+    const compactClock = (
+      clockValue === 'Optional'
+        ? 'Clock optional'
+        : clockValue
+    );
+
+    const compactSummary = [
+      compactAvailability,
+      compactLineup,
+      compactDefense,
+      compactClock,
+    ].join(' · ');
+
+    const mobile = mobileMedia.matches;
+
+    panel.className = (
+      `${coreReady ? 'ready' : 'needs'}`
+      + `${detailsOpen ? ' cgr-open' : ''}`
+    );
+
     panel.innerHTML = `
-      <div class="cgr-head"><div><strong>${esc(heading)}</strong><small>${esc(subtitle)}</small></div><span class="cgr-badge">${coreReady ? 'READY' : 'SETUP'}</span></div>
+      <div class="cgr-head">
+        <div>
+          <strong>${esc(heading)}</strong>
+          <small>${esc(mobile ? compactSummary : subtitle)}</small>
+        </div>
+        <div class="cgr-head-actions">
+          <span class="cgr-badge">${coreReady ? 'READY' : 'SETUP'}</span>
+          ${mobile ? `
+            <button
+              type="button"
+              class="cgr-toggle"
+              data-cgr-toggle
+              aria-expanded="${detailsOpen ? 'true' : 'false'}"
+            >${detailsOpen ? 'Hide' : 'Details'}</button>
+          ` : ''}
+        </div>
+      </div>
       <div class="cgr-grid">
         ${item('Player Availability', r.present_count > 0 ? 'good' : 'need', availabilityValue, 'availability')}
         ${item('Batting Order', r.lineup_ready ? 'good' : 'need', lineupValue, 'lineup')}
@@ -200,8 +313,41 @@
     if (actionsBound) return;
     actionsBound = true;
     document.addEventListener('click', (event) => {
-      const button = event.target.closest(`#${ID} [data-cgr-action]`);
+      const toggle = event.target.closest(
+        `#${ID} [data-cgr-toggle]`
+      );
+
+      if (toggle) {
+        event.preventDefault();
+
+        detailsOpen = !detailsOpen;
+
+        const panel = document.getElementById(ID);
+        panel?.classList.toggle(
+          'cgr-open',
+          detailsOpen
+        );
+
+        toggle.setAttribute(
+          'aria-expanded',
+          detailsOpen ? 'true' : 'false'
+        );
+
+        toggle.textContent = (
+          detailsOpen
+            ? 'Hide'
+            : 'Details'
+        );
+
+        return;
+      }
+
+      const button = event.target.closest(
+        `#${ID} [data-cgr-action]`
+      );
+
       if (!button) return;
+
       event.preventDefault();
       runAction(button.dataset.cgrAction);
     });
@@ -218,6 +364,13 @@
 
   styles();
   bindActions();
-  const start = () => { refresh(); window.setInterval(refresh, 5000); };
+  const start = () => {
+    refresh();
+    window.setInterval(refresh, 5000);
+    mobileMedia.addEventListener?.(
+      'change',
+      refresh
+    );
+  };
   document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', start, {once:true}) : start();
 })();

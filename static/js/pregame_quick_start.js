@@ -61,11 +61,11 @@
       @media(max-width:767.98px){
         #${LAUNCH_ID}{padding:10px;align-items:stretch}
         #${LAUNCH_ID} .cb-qsl-button{min-width:112px}
-        body.coach-game-page:not(.cb-dugout) #startLiveGameBtnAction{
-          position:fixed!important;left:10px!important;right:10px!important;bottom:calc(10px + env(safe-area-inset-bottom))!important;
-          width:auto!important;z-index:1035!important;box-shadow:0 8px 24px rgba(16,24,40,.24)!important
-        }
-        body.coach-game-page:not(.cb-dugout){padding-bottom:78px!important}
+        /*
+         * Start Game now belongs with the game header on phones.
+         * Do not promote the canonical action into a fixed footer
+         * or reserve extra body space for that retired treatment.
+         */
         #${MODAL_ID} .modal-dialog{height:calc(100dvh - 12px);margin:6px}
         #${MODAL_ID} .modal-content{height:100%;max-height:100%}
         #${MODAL_ID} .modal-body{overflow:auto}
