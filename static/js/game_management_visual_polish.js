@@ -9,6 +9,7 @@
     '(max-width: 1199.98px), '
     + '(min-width: 1200px) and '
     + '(max-width: 1399.98px) and '
+    + '(min-height: 900px) and '
     + '(max-height: 1100px)'
   );
   const mobileMedia = window.matchMedia(MOBILE_QUERY);
@@ -152,7 +153,7 @@
        * workspace, but collapses low-frequency setup/reporting UI.
        */
       @media (min-width:768px) and (max-width:1199.98px),
-             (min-width:1200px) and (max-width:1399.98px) and (max-height:1100px){
+             (min-width:1200px) and (max-width:1399.98px) and (min-height:900px) and (max-height:1100px){
         body.coach-game-page #pregame-checklist-container > h5.text-uppercase{
           display:none!important;
         }

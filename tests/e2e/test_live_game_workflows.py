@@ -337,7 +337,17 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
 
     delete_json(page, coachboard_url, f'/api/live-game/{game_id}/pitching-plan/2')
 
-    page.goto(f'{coachboard_url}/game-day/{game_id}/report')
+    # The real Live Game page automatically routes a completed game to its
+    # report once the state changes from live to ended. Do not issue a second
+    # page.goto() to the same URL here; that races the app's navigation and
+    # Chromium can abort one of the two requests with net::ERR_ABORTED.
+    expect(page).to_have_url(
+        re.compile(
+            rf'^{re.escape(coachboard_url)}/game-day/{game_id}/report$'
+        ),
+        timeout=5_000,
+    )
+
     expect(page.get_by_role(
         'heading',
         name=re.compile(r'Automation Live Opponent'),

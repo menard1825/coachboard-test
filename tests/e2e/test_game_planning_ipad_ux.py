@@ -266,6 +266,193 @@ def test_ipad_game_planning_keeps_tablet_layout(
                 "el => getComputedStyle(el).overflow"
             ) == 'visible'
 
+
+            # Landscape iPads get a read-only Coach Rail beside the
+            # canonical defensive field. The rail mirrors the existing
+            # Rotation Table rather than becoming a second editor.
+            coach_layout = page.locator(
+                '#gm-landscape-defense-workspace'
+            )
+            expect(coach_layout).to_be_visible(
+                timeout=15_000
+            )
+
+            coach_rail = page.locator(
+                '#gm-landscape-coach-rail'
+            )
+            expect(coach_rail).to_be_visible(
+                timeout=15_000
+            )
+
+            expect(
+                coach_rail.locator(
+                    '.gm-rail-title strong'
+                )
+            ).to_have_text('Rotation View')
+
+            rotation_tab = coach_rail.locator(
+                '[data-gm-rail-tab="rotation"]'
+            )
+
+            expect(rotation_tab).to_have_attribute(
+                'aria-selected',
+                'true',
+            )
+
+            rotation_view = coach_rail.locator(
+                '#gm-coach-rail-rotation'
+            )
+
+            expect(rotation_view).to_be_visible()
+
+            expect(
+                rotation_view.locator(
+                    '.gm-rail-row'
+                )
+            ).not_to_have_count(0)
+
+            expect(
+                rotation_view
+            ).to_contain_text('Inning 1')
+
+            side_by_side = page.evaluate(
+                """() => {
+                    const field = document.querySelector(
+                        '#gm-landscape-defense-workspace > .pde-field-card'
+                    );
+                    const rail = document.getElementById(
+                        'gm-landscape-coach-rail'
+                    );
+
+                    if (!field || !rail) {
+                        return null;
+                    }
+
+                    const f = field.getBoundingClientRect();
+                    const r = rail.getBoundingClientRect();
+
+                    return {
+                        fieldRight:f.right,
+                        fieldWidth:f.width,
+                        railLeft:r.left,
+                        railWidth:r.width,
+                    };
+                }"""
+            )
+
+            assert side_by_side is not None
+
+            assert (
+                side_by_side['railLeft'] >=
+                side_by_side['fieldRight'] - 2
+            )
+
+            assert side_by_side['railWidth'] >= 280
+
+            open_field_width = (
+                side_by_side['fieldWidth']
+            )
+
+            rail_collapse = coach_rail.locator(
+                '.gm-rail-collapse'
+            )
+
+            expect(
+                rail_collapse
+            ).to_have_attribute(
+                'aria-label',
+                'Collapse Rotation View',
+            )
+
+            rail_collapse.click()
+
+            expect(coach_layout).to_have_class(
+                re.compile(
+                    r'\bgm-rail-collapsed\b'
+                )
+            )
+
+            expect(
+                rail_collapse
+            ).to_have_attribute(
+                'aria-label',
+                'Expand Rotation View',
+            )
+
+            collapsed_geometry = page.evaluate(
+                """() => {
+                    const field = document.querySelector(
+                        '#gm-landscape-defense-workspace > .pde-field-card'
+                    );
+                    const rail = document.getElementById(
+                        'gm-landscape-coach-rail'
+                    );
+
+                    return {
+                        fieldWidth:
+                            field.getBoundingClientRect().width,
+                        railWidth:
+                            rail.getBoundingClientRect().width,
+                    };
+                }"""
+            )
+
+            assert (
+                collapsed_geometry['railWidth']
+                <= 50
+            )
+
+            assert (
+                collapsed_geometry['fieldWidth']
+                >= open_field_width + 150
+            )
+
+            rail_collapse.click()
+
+            expect(
+                coach_layout
+            ).not_to_have_class(
+                re.compile(
+                    r'\bgm-rail-collapsed\b'
+                )
+            )
+
+            bench_tab = coach_rail.locator(
+                '[data-gm-rail-tab="bench"]'
+            )
+
+            bench_tab.click()
+
+            expect(bench_tab).to_have_attribute(
+                'aria-selected',
+                'true',
+            )
+
+            bench_view = coach_rail.locator(
+                '#gm-coach-rail-bench'
+            )
+
+            expect(bench_view).to_be_visible()
+
+            expect(
+                bench_view
+            ).to_contain_text(
+                'Inning 1 Bench'
+            )
+
+            expect(
+                bench_view.locator(
+                    '.gm-rail-bench-section'
+                )
+            ).not_to_have_count(0)
+
+            rotation_tab.click()
+
+            expect(rotation_tab).to_have_attribute(
+                'aria-selected',
+                'true',
+            )
+
             field_document_top = field.evaluate(
                 """el => (
                     el.getBoundingClientRect().top +
@@ -406,6 +593,14 @@ def test_ipad_game_planning_keeps_tablet_layout(
             ).not_to_have_count(0)
 
         else:
+
+            # Coach Rail is intentionally landscape-only.
+            expect(
+                page.locator(
+                    '#gm-landscape-coach-rail'
+                )
+            ).to_have_count(0)
+
             # Portrait tablets keep Player Time available but collapsed.
             # The narrow iPad presentation keeps it inline; wider iPad Pro
             # portrait uses the same secondary report shell as desktop.

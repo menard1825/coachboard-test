@@ -112,6 +112,16 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
         post_json(page, coachboard_url, '/save_rotation', rotation_payload)
 
         page.reload(wait_until='domcontentloaded')
+
+        # 1024x768 is an iPad-landscape planning surface. Starting Defense
+        # tools are intentionally secondary there, so open Preset / Apply
+        # before interacting with the canonical preset controls.
+        preset_toggle = page.locator('.gm-mobile-preset-toggle')
+        expect(preset_toggle).to_be_visible(timeout=15_000)
+        expect(preset_toggle).to_have_attribute('aria-expanded', 'false')
+        preset_toggle.click()
+        expect(preset_toggle).to_have_attribute('aria-expanded', 'true')
+
         select = page.locator('#pde-preset')
         expect(select).to_be_visible(timeout=15_000)
         select.select_option(label=template_title)

@@ -9,6 +9,8 @@
   let reportsCollapsed = false;
   let presetToolsOpen = false;
   let phonePlayingTimeOpen = false;
+  let coachRailCollapsed = false;
+  let coachRailTab = 'rotation';
   let patchQueued = false;
 
   const setText = (element, value) => {
@@ -108,7 +110,7 @@
         display:none;
       }
       @media(max-width:1199.98px),
-             (min-width:1200px) and (max-width:1399.98px) and (max-height:1100px){
+             (min-width:1200px) and (max-width:1399.98px) and (min-height:900px) and (max-height:1100px){
         #${PANEL_ID} .gm-mobile-preset-toggle{
           display:inline-flex;
           align-items:center;
@@ -227,7 +229,8 @@
        * panel exists, so Live Game does not inherit the behavior.
        */
       @media(max-width:767.98px),
-             (min-width:640px) and (max-width:1399.98px) and (orientation:landscape){
+             (min-width:640px) and (max-width:991.98px) and (orientation:landscape),
+             (min-width:992px) and (max-width:1399.98px) and (min-height:760px) and (orientation:landscape){
         /*
          * The global Game Management card styling uses overflow:hidden.
          * That creates a sticky containing boundary and prevents the
@@ -301,6 +304,335 @@
           justify-self:stretch;
         }
       }
+
+      /*
+       * Landscape iPad Coach Rail
+       *
+       * The field remains the canonical defensive editor.
+       * This rail is read-only and mirrors the canonical Rotation Table.
+       */
+      #gm-landscape-defense-workspace{
+        display:block;
+      }
+
+      #gm-landscape-coach-rail{
+        display:none;
+      }
+
+      @media
+        (min-width:992px)
+        and (max-width:1399.98px)
+        and (min-height:760px)
+        and (orientation:landscape){
+
+        #gm-landscape-defense-workspace{
+          display:grid;
+          grid-template-columns:
+            minmax(0,1fr)
+            minmax(285px,32%);
+          align-items:start;
+          gap:10px;
+          width:100%;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed{
+          grid-template-columns:minmax(0,1fr) 46px;
+        }
+
+        #gm-landscape-defense-workspace > .pde-field-card{
+          width:100%!important;
+          max-width:none!important;
+          min-width:0!important;
+          margin-left:0!important;
+          margin-right:0!important;
+        }
+
+        #gm-landscape-coach-rail{
+          display:block;
+          min-width:0;
+          position:sticky;
+          top:116px;
+          align-self:start;
+          max-height:calc(100vh - 128px);
+          overflow:hidden;
+          border:1px solid #d8e0e8;
+          border-radius:13px;
+          background:#fff;
+          box-shadow:0 4px 14px rgba(16,24,40,.08);
+        }
+
+        #gm-landscape-coach-rail .gm-rail-head{
+          min-height:42px;
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:8px;
+          padding:7px 8px 7px 10px;
+          border-bottom:1px solid #e7ebef;
+          background:#fbfcfd;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-title{
+          min-width:0;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-title strong{
+          display:block;
+          color:#172033;
+          font-size:.75rem;
+          line-height:1.1;
+          font-weight:900;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-title small{
+          display:block;
+          margin-top:2px;
+          color:#667085;
+          font-size:.55rem;
+          line-height:1.15;
+          font-weight:650;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-collapse{
+          flex:0 0 auto;
+          width:30px;
+          height:30px;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          padding:0;
+          border:1px solid #d7dde5;
+          border-radius:8px;
+          background:#fff;
+          color:#344054;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-tabs{
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:5px;
+          padding:7px;
+          border-bottom:1px solid #edf0f3;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-tab{
+          min-height:32px;
+          border:1px solid #d7dde5;
+          border-radius:8px;
+          background:#f8fafc;
+          color:#475467;
+          font-size:.62rem;
+          line-height:1;
+          font-weight:850;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-tab.active{
+          border-color:#173b78;
+          background:#173b78;
+          color:#fff;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-body{
+          max-height:calc(100vh - 220px);
+          overflow:auto;
+          overscroll-behavior:contain;
+          padding:8px;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-summary{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:8px;
+          margin-bottom:7px;
+          padding:7px 8px;
+          border:1px solid #e4e7ec;
+          border-radius:9px;
+          background:#f8fafc;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-summary strong{
+          color:#172033;
+          font-size:.66rem;
+          line-height:1.1;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-summary span{
+          color:#667085;
+          font-size:.55rem;
+          font-weight:750;
+          white-space:nowrap;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-grid-head,
+        #gm-landscape-coach-rail .gm-rail-row{
+          display:grid;
+          grid-template-columns:minmax(0,1fr) 52px 52px;
+          align-items:center;
+          gap:4px;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-grid-head{
+          padding:0 6px 4px;
+          color:#667085;
+          font-size:.49rem;
+          text-transform:uppercase;
+          letter-spacing:.05em;
+          font-weight:900;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-row{
+          min-height:31px;
+          padding:5px 6px;
+          border-top:1px solid #eef1f4;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-player{
+          min-width:0;
+          color:#26354c;
+          font-size:.61rem;
+          line-height:1.1;
+          font-weight:800;
+          white-space:normal;
+          overflow-wrap:anywhere;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-pos{
+          min-height:23px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          padding:2px 4px;
+          border-radius:6px;
+          background:#eef4fb;
+          color:#173b78;
+          font-size:.55rem;
+          line-height:1;
+          font-weight:900;
+          text-align:center;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-pos.bench{
+          background:#f2f4f7;
+          color:#667085;
+          font-size:.48rem;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-section{
+          margin-bottom:9px;
+          padding:8px;
+          border:1px solid #e4e7ec;
+          border-radius:9px;
+          background:#fbfcfd;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-head{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:8px;
+          margin-bottom:6px;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-head strong{
+          color:#172033;
+          font-size:.64rem;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-count{
+          min-width:22px;
+          height:20px;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          padding:0 6px;
+          border-radius:999px;
+          background:#eef2f6;
+          color:#475467;
+          font-size:.52rem;
+          font-weight:900;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-list{
+          display:flex;
+          flex-wrap:wrap;
+          gap:4px;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-chip{
+          max-width:100%;
+          padding:4px 6px;
+          border:1px solid #e0e5eb;
+          border-radius:7px;
+          background:#fff;
+          color:#344054;
+          font-size:.55rem;
+          line-height:1.1;
+          font-weight:750;
+          white-space:normal;
+          overflow-wrap:anywhere;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-empty{
+          padding:14px 8px;
+          color:#667085;
+          font-size:.61rem;
+          line-height:1.35;
+          text-align:center;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-full-table{
+          width:100%;
+          min-height:32px;
+          margin-top:8px;
+          border:1px solid #ccd6e1;
+          border-radius:8px;
+          background:#fff;
+          color:#173b78;
+          font-size:.59rem;
+          font-weight:850;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail{
+          width:46px;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-head{
+          min-height:112px;
+          padding:6px;
+          flex-direction:column;
+          justify-content:flex-start;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-title{
+          flex:1 1 auto;
+          width:100%;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-title strong{
+          writing-mode:vertical-rl;
+          transform:rotate(180deg);
+          font-size:.58rem;
+          letter-spacing:.04em;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-title small,
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-tabs,
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-body{
+          display:none!important;
+        }
+      }
+
     `;
     document.head.appendChild(style);
   }
@@ -671,9 +1003,13 @@
     ).matches;
 
     const compactLandscape = window.matchMedia(
-      '(min-width: 640px) and ' +
-      '(max-width: 1399.98px) and ' +
-      '(orientation: landscape)'
+      '(min-width: 640px) and '
+      + '(max-width: 991.98px) and '
+      + '(orientation: landscape), '
+      + '(min-width: 992px) and '
+      + '(max-width: 1399.98px) and '
+      + '(min-height: 760px) and '
+      + '(orientation: landscape)'
     ).matches;
 
     const shouldStick = Boolean(
@@ -739,6 +1075,7 @@
       '(max-width: 1199.98px), '
       + '(min-width: 1200px) and '
       + '(max-width: 1399.98px) and '
+      + '(min-height: 900px) and '
       + '(max-height: 1100px)'
     ).matches;
 
@@ -1141,6 +1478,609 @@
     }
   }
 
+
+  function landscapeCoachRailEnabled() {
+    return window.matchMedia(
+      '(min-width: 992px) and '
+      + '(max-width: 1399.98px) and '
+      + '(min-height: 760px) and '
+      + '(orientation: landscape)'
+    ).matches;
+  }
+
+  function coachRailEscape(value) {
+    return String(value ?? '').replace(
+      /[&<>"']/g,
+      char => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;',
+      }[char])
+    );
+  }
+
+  function coachRailMatrixData() {
+    const table = document.querySelector(
+      '#rotationMatrixCollapse table'
+    );
+
+    if (!table) return null;
+
+    const headers = Array.from(
+      table.querySelectorAll('thead th')
+    ).map(
+      cell => cell.textContent.trim()
+    );
+
+    const rows = Array.from(
+      table.querySelectorAll('tbody tr')
+    ).map(row => {
+      const cells = Array.from(
+        row.querySelectorAll('th,td')
+      ).map(
+        cell => cell.textContent.trim()
+      );
+
+      return {
+        player:cells[0] || '',
+        cells,
+      };
+    }).filter(
+      row => row.player
+    );
+
+    return {headers, rows};
+  }
+
+  function coachRailInningColumns(matrix) {
+    const raw = Number.parseFloat(
+      currentInning()
+    );
+
+    const currentNumber = (
+      Number.isFinite(raw)
+        ? Math.floor(raw)
+        : 1
+    );
+
+    const nextNumber = currentNumber + 1;
+
+    const findColumn = number => {
+      const wanted = `inning ${number}`;
+
+      return matrix.headers.findIndex(
+        header => (
+          header.trim().toLowerCase() === wanted
+        )
+      );
+    };
+
+    return {
+      currentNumber,
+      nextNumber,
+      currentIndex:findColumn(currentNumber),
+      nextIndex:findColumn(nextNumber),
+    };
+  }
+
+  function coachRailPosition(row, index) {
+    if (
+      !row ||
+      !Number.isInteger(index) ||
+      index < 1
+    ) {
+      return '—';
+    }
+
+    return row.cells[index]?.trim() || '—';
+  }
+
+  function coachRailPositionHtml(value) {
+    const normalized = (
+      value || '—'
+    ).trim();
+
+    const isBench = (
+      normalized.toUpperCase() === 'BENCH'
+    );
+
+    return `
+      <span
+        class="gm-rail-pos${isBench ? ' bench' : ''}"
+        title="${coachRailEscape(normalized)}"
+      >
+        ${isBench ? 'BENCH' : coachRailEscape(normalized)}
+      </span>
+    `;
+  }
+
+  function coachRailRotationHtml(matrix, columns) {
+    if (
+      !matrix ||
+      columns.currentIndex < 1
+    ) {
+      return `
+        <div
+          id="gm-coach-rail-rotation"
+          class="gm-rail-empty"
+        >
+          Rotation information is still loading.
+        </div>
+      `;
+    }
+
+    const hasNext = (
+      columns.nextIndex >= 1
+    );
+
+    const rows = matrix.rows.map(row => {
+      const current = coachRailPosition(
+        row,
+        columns.currentIndex
+      );
+
+      const next = (
+        hasNext
+          ? coachRailPosition(
+              row,
+              columns.nextIndex
+            )
+          : '—'
+      );
+
+      return `
+        <div class="gm-rail-row">
+          <div class="gm-rail-player">
+            ${coachRailEscape(row.player)}
+          </div>
+          ${coachRailPositionHtml(current)}
+          ${coachRailPositionHtml(next)}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div id="gm-coach-rail-rotation">
+        <div class="gm-rail-summary">
+          <strong>
+            Inning ${columns.currentNumber}
+            ${hasNext ? ` → Inning ${columns.nextNumber}` : ''}
+          </strong>
+          <span>
+            ${hasNext ? 'Current → Next' : 'Current inning'}
+          </span>
+        </div>
+
+        <div class="gm-rail-grid-head">
+          <span>Player</span>
+          <span>Current</span>
+          <span>${hasNext ? 'Next' : '—'}</span>
+        </div>
+
+        ${rows}
+
+        <button
+          type="button"
+          class="gm-rail-full-table"
+        >
+          <i class="bi bi-grid-3x3 me-1"></i>
+          Full Rotation Table
+        </button>
+      </div>
+    `;
+  }
+
+  function coachRailBenchNames(matrix, index) {
+    if (
+      !matrix ||
+      !Number.isInteger(index) ||
+      index < 1
+    ) {
+      return [];
+    }
+
+    return matrix.rows.filter(row => (
+      coachRailPosition(
+        row,
+        index
+      ).toUpperCase() === 'BENCH'
+    )).map(
+      row => row.player
+    );
+  }
+
+  function coachRailBenchSectionHtml(label, names) {
+    const chips = (
+      names.length
+        ? names.map(name => `
+            <span class="gm-rail-bench-chip">
+              ${coachRailEscape(name)}
+            </span>
+          `).join('')
+        : `
+            <span class="gm-rail-empty p-0">
+              No one planned on the bench.
+            </span>
+          `
+    );
+
+    return `
+      <section class="gm-rail-bench-section">
+        <div class="gm-rail-bench-head">
+          <strong>${coachRailEscape(label)}</strong>
+          <span class="gm-rail-count">
+            ${names.length}
+          </span>
+        </div>
+
+        <div class="gm-rail-bench-list">
+          ${chips}
+        </div>
+      </section>
+    `;
+  }
+
+  function coachRailBenchHtml(matrix, columns) {
+    if (
+      !matrix ||
+      columns.currentIndex < 1
+    ) {
+      return `
+        <div
+          id="gm-coach-rail-bench"
+          class="gm-rail-empty"
+        >
+          Bench information is still loading.
+        </div>
+      `;
+    }
+
+    const current = coachRailBenchNames(
+      matrix,
+      columns.currentIndex
+    );
+
+    const next = (
+      columns.nextIndex >= 1
+        ? coachRailBenchNames(
+            matrix,
+            columns.nextIndex
+          )
+        : []
+    );
+
+    return `
+      <div id="gm-coach-rail-bench">
+        ${coachRailBenchSectionHtml(
+          `Inning ${columns.currentNumber} Bench`,
+          current
+        )}
+
+        ${
+          columns.nextIndex >= 1
+            ? coachRailBenchSectionHtml(
+                `Inning ${columns.nextNumber} Bench`,
+                next
+              )
+            : ''
+        }
+
+        <button
+          type="button"
+          class="gm-rail-full-table"
+        >
+          <i class="bi bi-grid-3x3 me-1"></i>
+          Full Rotation Table
+        </button>
+      </div>
+    `;
+  }
+
+  function removeLandscapeCoachRail() {
+    const wrapper = document.getElementById(
+      'gm-landscape-defense-workspace'
+    );
+
+    if (!wrapper) return;
+
+    const fieldCard = wrapper.querySelector(
+      ':scope > .pde-field-card'
+    );
+
+    if (
+      fieldCard &&
+      wrapper.parentElement
+    ) {
+      wrapper.insertAdjacentElement(
+        'beforebegin',
+        fieldCard
+      );
+    }
+
+    wrapper.remove();
+  }
+
+  function syncLandscapeCoachRail() {
+    const panel = document.getElementById(
+      PANEL_ID
+    );
+
+    if (
+      !panel ||
+      !landscapeCoachRailEnabled()
+    ) {
+      removeLandscapeCoachRail();
+      return;
+    }
+
+    const fieldCard = panel.querySelector(
+      '.pde-field-card'
+    );
+
+    if (!fieldCard) return;
+
+    let wrapper = document.getElementById(
+      'gm-landscape-defense-workspace'
+    );
+
+    let rail = document.getElementById(
+      'gm-landscape-coach-rail'
+    );
+
+    if (
+      !wrapper ||
+      !wrapper.contains(fieldCard)
+    ) {
+      removeLandscapeCoachRail();
+
+      wrapper = document.createElement('div');
+      wrapper.id = (
+        'gm-landscape-defense-workspace'
+      );
+
+      fieldCard.insertAdjacentElement(
+        'beforebegin',
+        wrapper
+      );
+
+      wrapper.appendChild(fieldCard);
+
+      rail = document.createElement('aside');
+      rail.id = 'gm-landscape-coach-rail';
+
+      rail.setAttribute(
+        'aria-label',
+        'Landscape rotation planning view'
+      );
+
+      rail.innerHTML = `
+        <div class="gm-rail-head">
+          <div class="gm-rail-title">
+            <strong>Rotation View</strong>
+            <small>
+              Current and next inning at a glance
+            </small>
+          </div>
+
+          <button
+            type="button"
+            class="gm-rail-collapse"
+            aria-label="Collapse Rotation View"
+          ></button>
+        </div>
+
+        <div
+          class="gm-rail-tabs"
+          role="tablist"
+          aria-label="Coach Rail views"
+        >
+          <button
+            type="button"
+            class="gm-rail-tab"
+            data-gm-rail-tab="rotation"
+            role="tab"
+          >
+            Rotation
+          </button>
+
+          <button
+            type="button"
+            class="gm-rail-tab"
+            data-gm-rail-tab="bench"
+            role="tab"
+          >
+            Bench
+          </button>
+        </div>
+
+        <div
+          id="gm-coach-rail-body"
+          class="gm-rail-body"
+        ></div>
+      `;
+
+      wrapper.appendChild(rail);
+
+      rail.addEventListener(
+        'click',
+        event => {
+          const collapse = event.target.closest(
+            '.gm-rail-collapse'
+          );
+
+          if (collapse) {
+            coachRailCollapsed = (
+              !coachRailCollapsed
+            );
+
+            queuePatch();
+            return;
+          }
+
+          const tab = event.target.closest(
+            '[data-gm-rail-tab]'
+          );
+
+          if (tab) {
+            coachRailTab = (
+              tab.dataset.gmRailTab ||
+              'rotation'
+            );
+
+            queuePatch();
+            return;
+          }
+
+          const fullTable = event.target.closest(
+            '.gm-rail-full-table'
+          );
+
+          if (fullTable) {
+            const rotationCollapse = (
+              document.getElementById(
+                'rotationMatrixCollapse'
+              )
+            );
+
+            if (
+              rotationCollapse &&
+              !rotationCollapse.classList.contains('show')
+            ) {
+              const header = (
+                rotationCollapse.previousElementSibling
+              );
+
+              const trigger = header?.matches?.(
+                '[data-bs-toggle="collapse"]'
+              )
+                ? header
+                : header?.querySelector(
+                    '[data-bs-toggle="collapse"]'
+                  );
+
+              trigger?.click();
+            }
+
+            const shell = reportShell(
+              rotationCollapse
+            );
+
+            shell?.scrollIntoView({
+              behavior:'smooth',
+              block:'start',
+            });
+          }
+        }
+      );
+    }
+
+    if (!rail) return;
+
+    wrapper.classList.toggle(
+      'gm-rail-collapsed',
+      coachRailCollapsed
+    );
+
+    const collapseButton = rail.querySelector(
+      '.gm-rail-collapse'
+    );
+
+    if (collapseButton) {
+      collapseButton.setAttribute(
+        'aria-label',
+        coachRailCollapsed
+          ? 'Expand Rotation View'
+          : 'Collapse Rotation View'
+      );
+
+      setHtml(
+        collapseButton,
+        coachRailCollapsed
+          ? '<i class="bi bi-chevron-left"></i>'
+          : '<i class="bi bi-chevron-right"></i>'
+      );
+    }
+
+    rail.querySelectorAll(
+      '[data-gm-rail-tab]'
+    ).forEach(button => {
+      const active = (
+        button.dataset.gmRailTab ===
+        coachRailTab
+      );
+
+      button.classList.toggle(
+        'active',
+        active
+      );
+
+      button.setAttribute(
+        'aria-selected',
+        active ? 'true' : 'false'
+      );
+    });
+
+    const inningGroup = document.getElementById(
+      'inning-btn-group'
+    );
+
+    if (
+      inningGroup &&
+      inningGroup.dataset.coachRailBound !== '1'
+    ) {
+      inningGroup.dataset.coachRailBound = '1';
+
+      inningGroup.addEventListener(
+        'change',
+        queuePatch
+      );
+    }
+
+    const matrix = coachRailMatrixData();
+    if (!matrix) return;
+
+    const columns = coachRailInningColumns(
+      matrix
+    );
+
+    const body = rail.querySelector(
+      '#gm-coach-rail-body'
+    );
+
+    if (!body) return;
+
+    const html = (
+      coachRailTab === 'bench'
+        ? coachRailBenchHtml(
+            matrix,
+            columns
+          )
+        : coachRailRotationHtml(
+            matrix,
+            columns
+          )
+    );
+
+    const renderKey = JSON.stringify({
+      tab:coachRailTab,
+      current:columns.currentNumber,
+      next:columns.nextNumber,
+      headers:matrix.headers,
+      rows:matrix.rows.map(
+        row => row.cells
+      ),
+    });
+
+    if (
+      body.dataset.renderKey !== renderKey
+    ) {
+      body.dataset.renderKey = renderKey;
+      body.innerHTML = html;
+    }
+  }
+
   function collapseSecondaryReportsOnce() {
     if (reportsCollapsed) return;
 
@@ -1233,6 +2173,7 @@
     simplifyDefensePanel();
     syncInningPickerPlacement();
     syncPlayingTimePlacement();
+    syncLandscapeCoachRail();
     collapseSecondaryReportsOnce();
   }
 

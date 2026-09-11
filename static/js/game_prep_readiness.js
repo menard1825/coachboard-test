@@ -11,6 +11,7 @@
     '(max-width: 1199.98px), '
     + '(min-width: 1200px) and '
     + '(max-width: 1399.98px) and '
+    + '(min-height: 900px) and '
     + '(max-height: 1100px)'
   );
 
@@ -105,7 +106,7 @@
         html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot .pde-name{font-size:.54rem!important}
       }
       @media(max-width:1199.98px),
-             (min-width:1200px) and (max-width:1399.98px) and (max-height:1100px){
+             (min-width:1200px) and (max-width:1399.98px) and (min-height:900px) and (max-height:1100px){
         #${ID}{
           margin-bottom:8px;
           border-radius:11px;
