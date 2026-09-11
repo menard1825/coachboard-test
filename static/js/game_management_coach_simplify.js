@@ -107,7 +107,8 @@
       #${PANEL_ID} .gm-mobile-preset-toggle{
         display:none;
       }
-      @media(max-width:767.98px){
+      @media(max-width:1199.98px),
+             (min-width:1200px) and (max-width:1399.98px) and (max-height:1100px){
         #${PANEL_ID} .gm-mobile-preset-toggle{
           display:inline-flex;
           align-items:center;
@@ -226,7 +227,7 @@
        * panel exists, so Live Game does not inherit the behavior.
        */
       @media(max-width:767.98px),
-             (min-width:640px) and (max-width:1366px) and (orientation:landscape){
+             (min-width:640px) and (max-width:1399.98px) and (orientation:landscape){
         /*
          * The global Game Management card styling uses overflow:hidden.
          * That creates a sticky containing boundary and prevents the
@@ -671,7 +672,7 @@
 
     const compactLandscape = window.matchMedia(
       '(min-width: 640px) and ' +
-      '(max-width: 1366px) and ' +
+      '(max-width: 1399.98px) and ' +
       '(orientation: landscape)'
     ).matches;
 
@@ -735,7 +736,10 @@
     if (!panel || !tools) return;
 
     const mobile = window.matchMedia(
-      '(max-width: 767.98px)'
+      '(max-width: 1199.98px), '
+      + '(min-width: 1200px) and '
+      + '(max-width: 1399.98px) and '
+      + '(max-height: 1100px)'
     ).matches;
 
     let toggle = panel.querySelector(
@@ -900,7 +904,7 @@
     if (!panel) return;
 
     const mobile = window.matchMedia(
-      '(max-width: 767.98px)'
+      '(max-width: 991.98px)'
     ).matches;
 
     let toggle = panel.querySelector(

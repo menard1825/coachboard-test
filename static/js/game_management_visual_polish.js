@@ -5,7 +5,14 @@
 
   const STYLE_ID = 'game-management-visual-polish-v2';
   const MOBILE_QUERY = '(max-width: 767.98px)';
+  const COMPACT_QUERY = (
+    '(max-width: 1199.98px), '
+    + '(min-width: 1200px) and '
+    + '(max-width: 1399.98px) and '
+    + '(max-height: 1100px)'
+  );
   const mobileMedia = window.matchMedia(MOBILE_QUERY);
+  const compactMedia = window.matchMedia(COMPACT_QUERY);
   const pitchDetailsOpen = new Set();
   let showAvailablePitchers = false;
   let battingOrderOpen = false;
@@ -15,6 +22,10 @@
 
   function isMobile() {
     return mobileMedia.matches;
+  }
+
+  function isCompact() {
+    return compactMedia.matches;
   }
 
   function workspace() {
@@ -135,6 +146,106 @@
       @media (max-width:991.98px){
         body.coach-game-page .game-workspace-v2{max-width:none;padding-left:8px;padding-right:8px;padding-bottom:18px}
       }
+
+      /*
+       * Tablet Game Management keeps the full-size field and inning
+       * workspace, but collapses low-frequency setup/reporting UI.
+       */
+      @media (min-width:768px) and (max-width:1199.98px),
+             (min-width:1200px) and (max-width:1399.98px) and (max-height:1100px){
+        body.coach-game-page #pregame-checklist-container > h5.text-uppercase{
+          display:none!important;
+        }
+        body.coach-game-page #pregame-checklist-container > .row.g-3.mb-4{
+          display:none!important;
+        }
+        body.coach-game-page #start-live-blockers{
+          display:none!important;
+        }
+
+        body.coach-game-page #pregame-checklist-container > .d-flex:first-child{
+          align-items:start!important;
+          gap:12px!important;
+          margin-bottom:10px!important;
+        }
+
+        body.coach-game-page #gm-game-header-actions{
+          display:grid!important;
+          grid-template-columns:
+            minmax(0,1.25fr)
+            minmax(0,.8fr)
+            minmax(0,.8fr)!important;
+          gap:6px!important;
+          min-width:330px;
+        }
+
+        body.coach-game-page #gm-mobile-start-game{
+          width:100%!important;
+          height:38px!important;
+          min-height:38px!important;
+          max-height:38px!important;
+          margin:0!important;
+          padding:6px 9px!important;
+          border:1px solid var(--gm-navy)!important;
+          border-left:4px solid var(--gm-gold)!important;
+          border-radius:9px!important;
+          background:var(--gm-navy)!important;
+          color:#fff!important;
+          box-shadow:none!important;
+          font-size:.72rem!important;
+          font-weight:800!important;
+          line-height:1.1!important;
+          white-space:nowrap!important;
+        }
+
+        body.coach-game-page #gm-mobile-start-game i{
+          color:var(--gm-gold)!important;
+        }
+
+        body.coach-game-page #gm-mobile-start-game:disabled{
+          opacity:.55!important;
+        }
+
+        body.coach-game-page .gm-canonical-start-mobile-hidden{
+          display:none!important;
+        }
+
+        body.coach-game-page #gameBattingOrderCard{
+          margin-bottom:10px!important;
+        }
+
+        body.coach-game-page #gameBattingOrderCard > .card-header{
+          padding:9px 10px!important;
+          gap:8px!important;
+        }
+
+        body.coach-game-page #gameBattingOrderCard .gm-lineup-actions{
+          display:flex;
+          align-items:center;
+          gap:6px;
+          flex:0 0 auto;
+        }
+
+        body.coach-game-page #gameBattingOrderCard .gm-lineup-actions .btn{
+          min-height:34px!important;
+          padding:5px 9px!important;
+          font-size:.67rem!important;
+        }
+
+        body.coach-game-page #gameBattingOrderCard:not(.gm-lineup-open) > .card-body{
+          display:none!important;
+        }
+
+        body.coach-game-page #gameBattingOrderCard > .card-body{
+          padding:9px!important;
+        }
+
+        body.coach-game-page .gm-pitcher-list-toggle{
+          min-height:36px;
+          margin-bottom:8px;
+        }
+      }
+
       @media (max-width:767.98px){
         body.coach-game-page .game-workspace-v2{padding-left:4px;padding-right:4px;padding-bottom:12px}
         body.coach-game-page #pregame-checklist-container > h5.text-uppercase{display:none!important}
@@ -445,10 +556,10 @@
     );
 
     /*
-     * The compact wrapper is phone-only. If the viewport grows back
-     * to tablet/desktop, restore the original header structure.
+     * The compact batting-order wrapper is used on phones and tablets.
+     * Wide desktop restores the full batting-order presentation.
      */
-    if (!isMobile()) {
+    if (!isCompact()) {
       card.classList.remove(
         'gm-lineup-open'
       );
@@ -630,7 +741,7 @@
     setText(header?.querySelector('strong, h5'), 'Who Can Pitch?');
     setText(header?.querySelector('.cb-pitch-rule-note'), 'Game eligibility uses the selected pitching rules. Arm-care guidance is separate.');
     const rulesButton = header?.querySelector('a.btn');
-    if (rulesButton) setText(rulesButton, isMobile() ? 'Rules' : 'View Rules');
+    if (rulesButton) setText(rulesButton, isCompact() ? 'Rules' : 'View Rules');
 
     const rows = [...card.querySelectorAll('.gpa-card')];
     if (!rows.length) return;
@@ -661,7 +772,7 @@
       card.querySelector('.gpa-summary')?.insertAdjacentElement('afterend', toggle);
     }
 
-    if (isMobile()) {
+    if (isCompact()) {
       safeRows.forEach((row) => { row.hidden = !showAvailablePitchers; });
       attentionRows.forEach((row) => { row.hidden = false; });
       if (toggle) {
@@ -727,7 +838,7 @@
       'gm-mobile-start-game'
     );
 
-    if (!isMobile()) {
+    if (!isCompact()) {
       wrap.classList.remove(
         'gm-canonical-start-mobile-hidden'
       );
@@ -929,6 +1040,7 @@
     const observer = new MutationObserver(schedulePass);
     observer.observe(document.body, {childList:true, subtree:true});
     mobileMedia.addEventListener?.('change', schedulePass);
+    compactMedia.addEventListener?.('change', schedulePass);
     window.addEventListener('orientationchange', () => window.setTimeout(schedulePass, 120));
   }
 

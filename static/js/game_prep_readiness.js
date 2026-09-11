@@ -8,7 +8,10 @@
   let actionsBound = false;
   let detailsOpen = false;
   const mobileMedia = window.matchMedia(
-    '(max-width: 767.98px)'
+    '(max-width: 1199.98px), '
+    + '(min-width: 1200px) and '
+    + '(max-width: 1399.98px) and '
+    + '(max-height: 1100px)'
   );
 
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
@@ -101,7 +104,8 @@
         html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot{width:60px!important}
         html body.coach-game-page #pregame-defense-editor-v3 .pde-field .pde-spot .pde-name{font-size:.54rem!important}
       }
-      @media(max-width:767.98px){
+      @media(max-width:1199.98px),
+             (min-width:1200px) and (max-width:1399.98px) and (max-height:1100px){
         #${ID}{
           margin-bottom:8px;
           border-radius:11px;

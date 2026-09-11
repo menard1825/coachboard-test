@@ -34,8 +34,30 @@ def login(page: Page, coachboard_url: str):
 @pytest.mark.parametrize(
     ('orientation', 'width', 'height'),
     [
-        pytest.param('portrait', 768, 1024, id='ipad-portrait-768x1024'),
-        pytest.param('landscape', 1024, 768, id='ipad-landscape-1024x768'),
+        pytest.param(
+            'portrait',
+            768,
+            1024,
+            id='ipad-mini-portrait-768x1024',
+        ),
+        pytest.param(
+            'landscape',
+            1024,
+            768,
+            id='ipad-mini-landscape-1024x768',
+        ),
+        pytest.param(
+            'portrait',
+            1032,
+            1376,
+            id='ipad-pro-13-portrait-1032x1376',
+        ),
+        pytest.param(
+            'landscape',
+            1376,
+            1032,
+            id='ipad-pro-13-landscape-1376x1032',
+        ),
     ],
 )
 def test_ipad_game_planning_keeps_tablet_layout(
@@ -58,6 +80,7 @@ def test_ipad_game_planning_keeps_tablet_layout(
             'game_opponent': opponent,
             'game_location': 'Tablet Test Field',
             'game_notes': f'Disposable iPad {orientation} pregame UX test',
+            'pitching_rule_set': 'USSSA',
         },
     )
     assert created.ok
@@ -75,17 +98,54 @@ def test_ipad_game_planning_keeps_tablet_layout(
         modes.get_by_role('button', name='Full Plan').click()
         expect(modes.get_by_role('button', name='Full Plan')).to_have_class(re.compile(r'\bactive\b'))
 
-        # The phone redesign intentionally hides these four prep cards below
-        # 768px. At the exact iPad boundary and above, the tablet layout retains them.
-        prep_cards = page.locator('#pregame-checklist-container > .row.g-3.mb-4')
-        expect(prep_cards).to_be_visible(timeout=15_000)
+        # Tablet Game Management now uses the same compact pregame summary
+        # philosophy as phones while retaining tablet field geometry.
+        prep_cards = page.locator(
+            '#pregame-checklist-container > .row.g-3.mb-4'
+        )
+        expect(prep_cards).to_be_hidden(timeout=15_000)
+
+        readiness_grid = readiness.locator('.cgr-grid')
+        expect(readiness_grid).to_be_hidden()
+
+        details = readiness.locator('[data-cgr-toggle]')
+        expect(details).to_be_visible()
+        expect(details).to_have_text('Details')
+
+        details.click()
+        expect(readiness_grid).to_be_visible()
+        expect(details).to_have_text('Hide')
+
+        details.click()
+        expect(readiness_grid).to_be_hidden()
+        expect(details).to_have_text('Details')
 
         start_button = page.locator('#startLiveGameBtnAction')
-        expect(start_button).to_be_visible(timeout=15_000)
-        phone_slot_start = readiness.locator(
-            'xpath=following-sibling::*[1]//button[@id="startLiveGameBtnAction"]'
+        expect(start_button).to_be_hidden(timeout=15_000)
+
+        compact_start = page.locator('#gm-mobile-start-game')
+        expect(compact_start).to_be_visible(timeout=15_000)
+
+        header_actions = page.locator('#gm-game-header-actions')
+        expect(header_actions).to_be_visible()
+        expect(
+            header_actions.locator('#gm-mobile-start-game')
+        ).to_have_count(1)
+        expect(
+            header_actions.locator('[data-bs-target="#editGameModal"]')
+        ).to_have_count(1)
+        expect(
+            header_actions.locator('a[href*="/game-day"]')
+        ).to_have_count(1)
+
+        start_style = compact_start.evaluate(
+            """el => ({
+                position:getComputedStyle(el).position,
+                height:el.getBoundingClientRect().height,
+            })"""
         )
-        expect(phone_slot_start).to_have_count(0)
+        assert start_style['position'] not in ('fixed', 'sticky')
+        assert start_style['height'] <= 44
 
         inning_labels = page.locator('#inning-btn-group label.btn')
         expect(inning_labels).to_have_count(6, timeout=15_000)
@@ -100,8 +160,17 @@ def test_ipad_game_planning_keeps_tablet_layout(
         expect(page.locator('#rotation-editor-title')).to_have_text('Set Defense')
         defense = page.locator('#pregame-defense-editor-v3')
         expect(defense).to_be_visible(timeout=15_000)
+        preset_toggle = defense.locator('.gm-mobile-preset-toggle')
+        expect(preset_toggle).to_be_visible()
+        expect(preset_toggle).to_have_attribute('aria-expanded', 'false')
+
         preset = defense.locator('#pde-preset')
+        expect(preset).to_be_hidden()
+
+        preset_toggle.click()
+        expect(preset_toggle).to_have_attribute('aria-expanded', 'true')
         expect(preset).to_be_visible()
+
         everyday = preset.locator('option').filter(has_text='Everyday Defense')
         expect(everyday).to_have_count(1)
         preset_id = everyday.get_attribute('value')
@@ -337,18 +406,36 @@ def test_ipad_game_planning_keeps_tablet_layout(
             ).not_to_have_count(0)
 
         else:
-            # Portrait tablet keeps the established compact planner
-            # presentation. The exact 768px iPad boundary must remain
-            # outside the phone sticky behavior.
-            expect(
-                page.locator('#gm-playing-time-report')
-            ).to_have_count(0)
+            # Portrait tablets keep Player Time available but collapsed.
+            # The narrow iPad presentation keeps it inline; wider iPad Pro
+            # portrait uses the same secondary report shell as desktop.
+            if width < 992:
+                expect(
+                    page.locator('#gm-playing-time-report')
+                ).to_have_count(0)
 
-            expect(
-                defense.locator(
+                portrait_summary = defense.locator(
                     '#pde-playing-time-summary'
                 )
-            ).to_be_visible()
+                expect(portrait_summary).to_be_hidden()
+
+                portrait_time_toggle = defense.locator(
+                    '.gm-phone-playing-time-toggle'
+                )
+                expect(portrait_time_toggle).to_be_visible()
+                portrait_time_toggle.click()
+                expect(portrait_summary).to_be_visible()
+            else:
+                portrait_report = page.locator(
+                    '#gm-playing-time-report'
+                )
+                expect(
+                    portrait_report
+                ).to_be_visible(timeout=15_000)
+
+                expect(
+                    page.locator('#gmPlayingTimeCollapse')
+                ).to_be_hidden()
 
             portrait_picker = page.locator(
                 '#rotation-card-container '
@@ -369,10 +456,27 @@ def test_ipad_game_planning_keeps_tablet_layout(
 
         pitching = page.locator('#pitcher-availability-card')
         expect(pitching).to_be_visible(timeout=15_000)
+
         pitcher_cards = pitching.locator('.gpa-card')
         expect(pitcher_cards).not_to_have_count(0)
-        expect(pitcher_cards.first.locator('.gpa-metrics')).to_be_visible()
-        expect(pitcher_cards.first.locator('.gm-pitch-card-more')).to_be_hidden()
+
+        pitcher_toggle = pitching.locator(
+            '.gm-pitcher-list-toggle'
+        )
+        expect(pitcher_toggle).to_be_visible(timeout=15_000)
+
+        available_pitchers = pitching.locator(
+            '.gpa-card[data-available="true"]'
+        )
+        expect(available_pitchers).not_to_have_count(0)
+        expect(available_pitchers.first).to_be_hidden()
+
+        pitcher_toggle.click()
+
+        expect(available_pitchers.first).to_be_visible()
+        expect(
+            available_pitchers.first.locator('.gpa-metrics')
+        ).to_be_visible()
 
         assert page.evaluate(
             'document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2'
