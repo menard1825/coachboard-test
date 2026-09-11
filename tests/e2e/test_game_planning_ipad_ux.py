@@ -338,8 +338,8 @@ def test_ipad_game_planning_keeps_tablet_layout(
 
         else:
             # Portrait tablet keeps the established compact planner
-            # presentation; this landscape change must not remove the
-            # original player-time information.
+            # presentation. The exact 768px iPad boundary must remain
+            # outside the phone sticky behavior.
             expect(
                 page.locator('#gm-playing-time-report')
             ).to_have_count(0)
@@ -349,6 +349,23 @@ def test_ipad_game_planning_keeps_tablet_layout(
                     '#pde-playing-time-summary'
                 )
             ).to_be_visible()
+
+            portrait_picker = page.locator(
+                '#rotation-card-container '
+                '.gm-coach-inning-picker'
+            )
+
+            expect(
+                portrait_picker
+            ).to_be_visible()
+
+            assert portrait_picker.evaluate(
+                "el => el.parentElement?.classList.contains('planner-controls')"
+            ) is True
+
+            assert portrait_picker.evaluate(
+                "el => getComputedStyle(el).position"
+            ) != 'sticky'
 
         pitching = page.locator('#pitcher-availability-card')
         expect(pitching).to_be_visible(timeout=15_000)
@@ -367,21 +384,91 @@ def test_ipad_game_planning_keeps_tablet_layout(
         )
 
 
-def test_phone_landscape_keeps_innings_sticky_while_scrolling(
+@pytest.mark.parametrize(
+    ('profile', 'width', 'height'),
+    [
+        pytest.param(
+            'small-iphone-portrait',
+            320,
+            568,
+            id='small-iphone-portrait-320x568',
+        ),
+        pytest.param(
+            'compact-android-portrait',
+            360,
+            800,
+            id='compact-android-portrait-360x800',
+        ),
+        pytest.param(
+            'standard-phone-portrait',
+            390,
+            844,
+            id='standard-phone-portrait-390x844',
+        ),
+        pytest.param(
+            'iphone-pro-max-portrait',
+            430,
+            932,
+            id='iphone-pro-max-portrait-430x932',
+        ),
+        pytest.param(
+            'large-android-portrait',
+            412,
+            915,
+            id='large-android-portrait-412x915',
+        ),
+        pytest.param(
+            'large-phone-foldable-portrait',
+            600,
+            960,
+            id='large-phone-foldable-portrait-600x960',
+        ),
+        pytest.param(
+            'phone-upper-bound-portrait',
+            767,
+            1024,
+            id='phone-upper-bound-portrait-767x1024',
+        ),
+        pytest.param(
+            'small-phone-landscape',
+            568,
+            320,
+            id='small-phone-landscape-568x320',
+        ),
+        pytest.param(
+            'android-landscape',
+            800,
+            360,
+            id='android-landscape-800x360',
+        ),
+        pytest.param(
+            'wide-phone-landscape',
+            955,
+            440,
+            id='wide-phone-landscape-955x440',
+        ),
+    ],
+)
+def test_phone_viewports_keep_innings_sticky_while_scrolling(
     page: Page,
     coachboard_url: str,
+    profile: str,
+    width: int,
+    height: int,
 ):
-    """Keep inning controls reachable on a wide phone in landscape."""
+    """Keep inning controls reachable across phone-class viewports."""
     page.set_viewport_size(
         {
-            'width': 955,
-            'height': 440,
+            'width': width,
+            'height': height,
         }
     )
 
     login(page, coachboard_url)
 
-    opponent = 'iPhone Landscape Prep UX Opponent'
+    opponent = (
+        f'Phone Sticky {profile} Prep UX Opponent'
+    )
 
     created = page.request.post(
         f'{coachboard_url}/game-day/add',
@@ -389,9 +476,9 @@ def test_phone_landscape_keeps_innings_sticky_while_scrolling(
             'game_date': '2030-01-17',
             'game_start_time': '14:00',
             'game_opponent': opponent,
-            'game_location': 'Phone Landscape Test Field',
+            'game_location': 'Phone Responsive Test Field',
             'game_notes': (
-                'Disposable phone landscape pregame UX test'
+                f'Disposable {profile} pregame UX test'
             ),
         },
     )

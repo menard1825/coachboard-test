@@ -195,14 +195,15 @@
       }
 
       /*
-       * Phone/tablet landscape: the field can consume the viewport vertically.
-       * Keep the inning buttons reachable directly below CoachBoard's
-       * sticky navigation while the coach works on the diamond.
+       * Phones in either orientation, plus tablet landscape:
+       * the field can consume the viewport vertically. Keep the inning
+       * buttons reachable while the coach works on the diamond.
        *
        * This is enabled only while the pregame Game Management defense
        * panel exists, so Live Game does not inherit the behavior.
        */
-      @media(min-width:640px) and (max-width:1366px) and (orientation:landscape){
+      @media(max-width:767.98px),
+             (min-width:640px) and (max-width:1366px) and (orientation:landscape){
         /*
          * The global Game Management card styling uses overflow:hidden.
          * That creates a sticky containing boundary and prevents the
@@ -235,13 +236,14 @@
       }
 
       /*
-       * Below Bootstrap's lg breakpoint, CoachBoard does not scroll
-       * the browser window. main.container-fluid is the scrollport and
-       * already begins below the fixed top navigation. Therefore the
-       * sticky inning bar belongs at the top of that scrollport rather
-       * than another 56px below it.
+       * On phones, and on compact landscape layouts below Bootstrap's
+       * lg breakpoint, CoachBoard does not scroll the browser window.
+       * main.container-fluid is the scrollport and already begins below
+       * the fixed top navigation. Therefore the sticky inning bar belongs
+       * at the top of that scrollport rather than another 56px below it.
        */
-      @media(min-width:640px) and (max-width:991.98px) and (orientation:landscape){
+      @media(max-width:767.98px),
+             (min-width:640px) and (max-width:991.98px) and (orientation:landscape){
         body.gm-pregame-planning #rotation-card-container .gm-coach-inning-picker{
           top:0;
         }
@@ -640,6 +642,10 @@
       return;
     }
 
+    const phoneViewport = window.matchMedia(
+      '(max-width: 767.98px)'
+    ).matches;
+
     const compactLandscape = window.matchMedia(
       '(min-width: 640px) and ' +
       '(max-width: 1366px) and ' +
@@ -648,7 +654,10 @@
 
     const shouldStick = Boolean(
       panel &&
-      compactLandscape
+      (
+        phoneViewport ||
+        compactLandscape
+      )
     );
 
     if (shouldStick) {
@@ -681,7 +690,7 @@
     }
 
     /*
-     * Portrait, wide desktop, or Live Game:
+     * Portrait tablet, wide desktop, or Live Game:
      * put the picker back in its original planner-controls home.
      */
     picker.classList.remove(
