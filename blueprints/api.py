@@ -4,6 +4,7 @@ from models import User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer, Ro
 from blueprints.auth import get_player_order_as_list
 from team_game_settings import regulation_innings_for_team
 from utils import model_to_dict, pitching_outing_to_dict, get_pitching_rules_for_team, calculate_pitch_count_summary, calculate_cumulative_pitching_stats
+from lineup_service import lineup_to_dict
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from functools import wraps
@@ -58,8 +59,11 @@ def get_lineups():
     if not team_id:
         return jsonify({"error": "Team not found"}), 404
 
-    lineups_db = db.session.query(Lineup).filter_by(team_id=team_id).all()
-    return jsonify([model_to_dict(l) for l in lineups_db])
+    lineups_db = db.session.query(Lineup).filter_by(team_id=team_id).order_by(
+        Lineup.is_default.desc(),
+        Lineup.title.asc(),
+    ).all()
+    return jsonify([lineup_to_dict(lineup) for lineup in lineups_db])
 
 @api_bp.route('/pitching_data')
 @login_required
@@ -244,8 +248,25 @@ def get_live_game_state(game_id, team_id):
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone, current_game_id=game.id)
 
-    lineup_templates = db.session.query(Lineup).filter_by(team_id=team_id, associated_game_id=None).all()
+    lineup_templates = db.session.query(Lineup).filter_by(
+        team_id=team_id,
+        associated_game_id=None,
+    ).order_by(Lineup.is_default.desc(), Lineup.title.asc()).all()
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team_id, associated_game_id=None).all()
+
+    previous_game = db.session.query(Game).filter(
+        Game.team_id == team_id,
+        db.or_(
+            Game.date < game.date,
+            db.and_(Game.date == game.date, Game.id < game.id),
+        ),
+    ).order_by(Game.date.desc(), Game.id.desc()).first()
+    previous_lineup = None
+    if previous_game:
+        previous_lineup = db.session.query(Lineup).filter_by(
+            team_id=team_id,
+            associated_game_id=previous_game.id,
+        ).first()
 
     import json
     actual_rotation = {}
@@ -259,13 +280,16 @@ def get_live_game_state(game_id, team_id):
     return {
         'game': model_to_dict(game),
         'roster': [model_to_dict(p) for p in roster_objects],
-        'lineup': model_to_dict(lineup_obj) if lineup_obj else None,
+        'lineup': lineup_to_dict(lineup_obj),
         'rotation': model_to_dict(rotation_obj) if rotation_obj else None,
         'actual_rotation': actual_rotation,
         'game_pitching_log': [pitching_outing_to_dict(o) for o in game_pitching_log],
         'absent_player_ids': absent_player_ids,
         'pitch_count_summary': pitch_count_summary,
-        'lineup_templates': [model_to_dict(lt) for lt in lineup_templates],
+        'lineup_templates': [lineup_to_dict(lt) for lt in lineup_templates],
+        'previous_lineup': lineup_to_dict(previous_lineup),
+        'batting_order_mode': team.batting_order_mode,
+        'fixed_lineup_size': team.fixed_lineup_size,
         'rotation_templates': [model_to_dict(rt) for rt in rotation_templates],
         'outfielder_count': team.outfielder_count,
         'regulation_innings': regulation_innings_for_team(team),

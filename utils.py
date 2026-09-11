@@ -1,5 +1,9 @@
 from datetime import date, timedelta, datetime
+import logging
 import zoneinfo
+
+
+logger = logging.getLogger(__name__)
 
 
 def model_to_dict(obj):
@@ -52,9 +56,9 @@ PITCHING_RULES = {
         **{
             age: {
                 'rule_type': 'innings',
-                'next_day_max_outs': 9,       # 3.0 IP
-                'max_daily_outs': 18,          # 6.0 IP
-                'rolling_3_day_max_outs': 24,  # 8.0 IP
+                'next_day_max_outs': 9,
+                'max_daily_outs': 18,
+                'rolling_3_day_max_outs': 24,
                 'max_consecutive_days': 3,
             }
             for age in ('7U', '8U', '9U', '10U', '11U', '12U')
@@ -62,9 +66,9 @@ PITCHING_RULES = {
         **{
             age: {
                 'rule_type': 'innings',
-                'next_day_max_outs': 9,       # 3.0 IP
-                'max_daily_outs': 21,          # 7.0 IP
-                'rolling_3_day_max_outs': 24,  # 8.0 IP
+                'next_day_max_outs': 9,
+                'max_daily_outs': 21,
+                'rolling_3_day_max_outs': 24,
                 'max_consecutive_days': 3,
             }
             for age in ('13U', '14U')
@@ -318,8 +322,6 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                     next_available = 'Verify game pitch counts'
                     official_history_complete = False
                 else:
-                    # Rest owed from prior days. A 1–20 pitch outing correctly requires
-                    # zero rest days and therefore does not force a day off tomorrow.
                     for outing_date in sorted((d for d in games_by_date if d < today), reverse=True):
                         day_pitches = sum(int(o.pitches) for o in games_by_date[outing_date])
                         rest_days = _required_rest_days(day_pitches, thresholds)
@@ -330,8 +332,6 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                             next_available = eligible_date.strftime('%a, %b %d')
                             break
 
-                    # Pitch Smart guidance forbids an appearance as pitcher on a third
-                    # consecutive day, regardless of the individual pitch counts.
                     if status == 'Available' and (today - timedelta(days=1)) in games_by_date and (today - timedelta(days=2)) in games_by_date:
                         status = 'Resting'
                         status_detail = 'Pitch Smart: do not pitch on a third consecutive day.'
@@ -361,8 +361,6 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                                 status = 'Same-Day Game Restriction'
                                 status_detail = 'Pitch Smart guidance: do not pitch in multiple games on the same day.'
                                 next_available = after_today_date.strftime('%a, %b %d')
-                            # While evaluating the same live/scheduled game, a pitcher can
-                            # still be available within that game until a limit is reached.
 
                 if official_daily_pitches is not None and status == 'Available':
                     pitches_remaining_today = max(0, max_daily - official_daily_pitches)
@@ -426,7 +424,6 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
             coach_target_remaining = None
             coach_target_reached = False
 
-            # Targets are coach guidance for game pitching, not practice/lesson workload.
             if coach_target is not None:
                 target_basis = None
                 if game_target and current_game_id is not None:
@@ -449,13 +446,11 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                 'name': player.name,
                 'rule_type': rule_type,
                 'rule_set_name': rule_set_name,
-                # Compatibility aliases used by existing Live Game UI.
                 'daily': official_daily_pitches,
                 'weekly': official_weekly_pitches,
                 'daily_known_pitches': official_daily_known,
                 'weekly_known_pitches': official_weekly_known,
                 'pitch_history_complete': eligibility_complete,
-                # Explicit official/workload values for new UI.
                 'official_daily_pitches': official_daily_pitches,
                 'official_7_day_pitches': official_weekly_pitches,
                 'workload_daily_pitches': workload_daily_pitches,
@@ -478,8 +473,39 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                 'coach_target_reached': coach_target_reached,
                 'coach_target_remaining': coach_target_remaining,
             }
-        except Exception as exc:
-            print(f'Error calculating pitching summary for {player.name} (ID {player.id}): {exc}')
-            continue
+        except Exception:
+            logger.exception('Error calculating pitching summary for %s (ID %s)', player.name, player.id)
+            summary[player.name] = {
+                'id': player.id,
+                'name': player.name,
+                'rule_type': rule_type,
+                'rule_set_name': rule_set_name,
+                'daily': None,
+                'weekly': None,
+                'daily_known_pitches': 0,
+                'weekly_known_pitches': 0,
+                'pitch_history_complete': False,
+                'official_daily_pitches': None,
+                'official_7_day_pitches': None,
+                'workload_daily_pitches': None,
+                'workload_7_day_pitches': None,
+                'workload_history_complete': False,
+                'status': 'Eligibility Error',
+                'status_detail': 'CoachBoard could not calculate pitching eligibility. Verify this player\'s pitching history before using them to pitch.',
+                'next_available': 'Verify pitching history',
+                'max_daily': None,
+                'pitches_remaining_today': None,
+                'last_outing_display': 'Unknown',
+                'daily_outs': None,
+                'daily_innings': None,
+                'rolling_3_day_outs': None,
+                'rolling_3_day_innings': None,
+                'innings_remaining_today_outs': None,
+                'innings_remaining_today': None,
+                'coach_target': None,
+                'coach_target_reason': None,
+                'coach_target_reached': False,
+                'coach_target_remaining': None,
+            }
 
     return summary

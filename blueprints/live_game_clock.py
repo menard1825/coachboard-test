@@ -60,10 +60,23 @@ def _inning_number(value):
         return None
 
 
+def _clock_is_paused(game, row):
+    """A live game with a temporary stop timestamp and no end reason is paused."""
+    return bool(
+        game
+        and game.is_live
+        and row
+        and row.started_at
+        and row.ended_at
+        and not row.end_reason
+    )
+
+
 def _clock_payload(game, row):
     now = _utcnow_naive()
     started = row.started_at if row else None
     ended = row.ended_at if row else None
+    paused = _clock_is_paused(game, row)
     elapsed = None
     if started:
         stop = ended or now
@@ -77,9 +90,11 @@ def _clock_payload(game, row):
     return {
         'game_id': game.id,
         'is_live': bool(game.is_live),
+        'is_paused': paused,
         'current_inning': str(game.live_current_inning or '1'),
         'started_at_utc': _iso_utc(started),
         'ended_at_utc': _iso_utc(ended),
+        'paused_at_utc': _iso_utc(ended) if paused else None,
         'elapsed_seconds': elapsed,
         'time_limit_minutes': limit_minutes,
         'remaining_seconds': remaining,
@@ -220,13 +235,32 @@ def game_clock(game_id):
                 return jsonify({'status': 'error', 'message': 'Game time limit must be between 15 and 300 minutes.'}), 400
             row.time_limit_minutes = minutes
 
+    if action in {'restart', 'pause', 'resume'} and not game.is_live:
+        return jsonify({'status': 'error', 'message': 'Game clock controls are only available while Live Game is active.'}), 409
+
     if action == 'restart':
-        if not game.is_live:
-            return jsonify({'status': 'error', 'message': 'The game clock can only be restarted while Live Game is active.'}), 409
         row.started_at = _utcnow_naive()
         row.ended_at = None
         row.end_reason = None
         row.last_played_inning = str(game.live_current_inning or '1')
+
+    elif action == 'pause':
+        if not row.started_at:
+            row.started_at = _utcnow_naive()
+        if not _clock_is_paused(game, row):
+            row.ended_at = _utcnow_naive()
+            row.end_reason = None
+            row.last_played_inning = str(game.live_current_inning or '1')
+
+    elif action == 'resume':
+        if _clock_is_paused(game, row):
+            now = _utcnow_naive()
+            paused_at = row.ended_at
+            # Shift the effective start time forward by the delay duration so
+            # elapsed game time does not include rain/lightning/injury delays.
+            row.started_at = (row.started_at or now) + (now - paused_at)
+            row.ended_at = None
+            row.end_reason = None
 
     row.updated_at = _utcnow_naive()
     db.session.commit()
@@ -320,11 +354,17 @@ def persist_live_game_clock_lifecycle(response):
             last_played = _adjust_unplayed_current_inning(game, team_id)
 
         row = _clock_row(game.id, team_id, create=True)
-        row.started_at = row.started_at or _utcnow_naive()
-        row.ended_at = row.ended_at or _utcnow_naive()
+        now = _utcnow_naive()
+        row.started_at = row.started_at or now
+        # If the game is ended while the clock is paused, keep the delay out of
+        # elapsed game time before converting the temporary pause timestamp into
+        # the durable game-end timestamp.
+        if row.ended_at is not None and row.end_reason is None:
+            row.started_at = row.started_at + (now - row.ended_at)
+        row.ended_at = now
         row.end_reason = reason
         row.last_played_inning = last_played
-        row.updated_at = _utcnow_naive()
+        row.updated_at = now
         db.session.commit()
 
         # The normal end workflow broadcasts before this hook runs. Broadcast one

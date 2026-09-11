@@ -21,18 +21,10 @@
             <div class="card h-100">
                 <div class="card-header">
                     <ul class="nav nav-tabs card-header-tabs">
-                        <li class="nav-item">
-                            <a class="nav-link active" data-bs-toggle="tab" href="#general-settings">General</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#appearance-settings">Appearance</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#pitching-rules-settings">Pitching Rules</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#season-management">Season Management</a>
-                        </li>
+                        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#general-settings">General</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#appearance-settings">Appearance</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#pitching-rules-settings">Pitching Rules</a></li>
+                        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#season-management">Season Management</a></li>
                     </ul>
                 </div>
                 <div class="card-body">
@@ -55,6 +47,43 @@
                                     </select>
                                     <label for="outfielder_count">Defensive Setup</label>
                                 </div>
+
+                                <hr class="my-4">
+                                <h6 class="text-muted mb-1">Team Time Zone</h6>
+                                <p class="small text-muted mb-2">Schedules and Coach Activity are shown in this team's home time zone. CoachBoard can detect the time zone from this device without using GPS or location permission.</p>
+                                <div class="input-group mb-1">
+                                    <div class="form-floating flex-grow-1">
+                                        <input type="text" class="form-control" id="timezone" name="timezone" value="{{ settings.timezone or 'UTC' }}" list="teamTimezoneSuggestions" required>
+                                        <label for="timezone">Team Time Zone</label>
+                                    </div>
+                                    <button class="btn btn-outline-secondary" type="button" data-use-device-timezone="timezone"><i class="bi bi-crosshair me-1"></i>Use This Device</button>
+                                </div>
+                                <datalist id="teamTimezoneSuggestions">
+                                    <option value="America/New_York">Eastern</option>
+                                    <option value="America/Indiana/Indianapolis">Indiana / Eastern</option>
+                                    <option value="America/Chicago">Central</option>
+                                    <option value="America/Denver">Mountain</option>
+                                    <option value="America/Phoenix">Arizona</option>
+                                    <option value="America/Los_Angeles">Pacific</option>
+                                    <option value="America/Anchorage">Alaska</option>
+                                    <option value="Pacific/Honolulu">Hawaii</option>
+                                </datalist>
+                                <div class="form-text mb-3">This device reports: <strong data-detected-timezone>Detecting…</strong>. Traveling coaches do not automatically change the team's saved time zone.</div>
+
+                                <hr class="my-4">
+                                <h6 class="text-muted mb-1">Batting Lineup Readiness</h6>
+                                <p class="small text-muted mb-3">CoachBoard uses this rule to decide whether a Game Day lineup is complete.</p>
+                                <div class="form-floating mb-3">
+                                    <select class="form-select" id="batting_order_mode" name="batting_order_mode">
+                                        <option value="bat_all" {% if settings.batting_order_mode == 'bat_all' %}selected{% endif %}>Bat Everyone</option>
+                                        <option value="fixed" {% if settings.batting_order_mode == 'fixed' %}selected{% endif %}>Fixed Lineup</option>
+                                    </select>
+                                    <label for="batting_order_mode">Batting Order Rule</label>
+                                </div>
+                                <div class="form-floating mb-3" id="fixedLineupSizeWrap">
+                                    <input type="number" class="form-control" id="fixed_lineup_size" name="fixed_lineup_size" min="1" max="30" value="{{ settings.fixed_lineup_size or 9 }}">
+                                    <label for="fixed_lineup_size">Fixed Number of Batters</label>
+                                </div>
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                             </form>
 
@@ -67,57 +96,39 @@
                                 <div class="form-floating mb-2">
                                     <select class="form-select" id="regulation_innings" name="regulation_innings">
                                         <option value="" {% if settings.regulation_innings is none %}selected{% endif %}>Auto — follow team age group</option>
-                                        {% for inning_count in range(3, 13) %}
-                                            <option value="{{ inning_count }}" {% if settings.regulation_innings == inning_count %}selected{% endif %}>{{ inning_count }} innings</option>
-                                        {% endfor %}
+                                        {% for inning_count in range(3, 13) %}<option value="{{ inning_count }}" {% if settings.regulation_innings == inning_count %}selected{% endif %}>{{ inning_count }} innings</option>{% endfor %}
                                     </select>
                                     <label for="regulation_innings">Regulation Innings</label>
                                 </div>
-                                <div class="form-text mb-3" id="regulationInningsHelp">
-                                    Current: <strong>{{ effective_regulation }} innings</strong>{% if settings.regulation_innings is none %} automatically for {{ settings.age_group }}{% else %} (manual override){% endif %}.
-                                </div>
+                                <div class="form-text mb-3" id="regulationInningsHelp">Current: <strong>{{ effective_regulation }} innings</strong>{% if settings.regulation_innings is none %} automatically for {{ settings.age_group }}{% else %} (manual override){% endif %}.</div>
                                 <button type="submit" class="btn btn-outline-primary w-100">Save Game Length</button>
                             </form>
                         </div>
+
                         <div class="tab-pane fade" id="appearance-settings">
                             <form action="{{ url_for('admin.update_admin_settings') }}" method="POST">
                                 <h6 class="text-muted">Team Colors</h6>
                                 <div class="row mb-3">
-                                    <div class="col">
-                                        <label for="primary_color" class="form-label">Primary Color (Header)</label>
-                                        <input type="color" class="form-control form-control-color" id="primary_color" name="primary_color" value="{{ settings.primary_color or '#1F2937' }}" title="Choose your primary color">
-                                    </div>
-                                    <div class="col">
-                                        <label for="secondary_color" class="form-label">Secondary Color</label>
-                                        <input type="color" class="form-control form-control-color" id="secondary_color" name="secondary_color" value="{{ settings.secondary_color or '#E5E7EB' }}" title="Choose your secondary color">
-                                    </div>
+                                    <div class="col"><label for="primary_color" class="form-label">Primary Color (Header)</label><input type="color" class="form-control form-control-color" id="primary_color" name="primary_color" value="{{ settings.primary_color or '#1F2937' }}" title="Choose your primary color"></div>
+                                    <div class="col"><label for="secondary_color" class="form-label">Secondary Color</label><input type="color" class="form-control form-control-color" id="secondary_color" name="secondary_color" value="{{ settings.secondary_color or '#E5E7EB' }}" title="Choose your secondary color"></div>
                                 </div>
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                             </form>
                         </div>
+
                         <div class="tab-pane fade" id="pitching-rules-settings">
                             <form action="{{ url_for('admin.update_admin_settings') }}" method="POST">
                                 <h6 class="text-muted">Pitching Rules</h6>
                                 <div class="form-floating mb-3">
                                     <select class="form-select" id="pitching_rule_set" name="pitching_rule_set">
-                                        {% for rule_set_name in all_rules.keys() %}
-                                            <option value="{{ rule_set_name }}" {% if settings.pitching_rule_set == rule_set_name %}selected{% endif %}>
-                                                {{ rule_set_name }}
-                                            </option>
-                                        {% endfor %}
+                                        {% for rule_set_name in all_rules.keys() %}<option value="{{ rule_set_name }}" {% if settings.pitching_rule_set == rule_set_name %}selected{% endif %}>{{ rule_set_name }}</option>{% endfor %}
                                     </select>
                                     <label for="pitching_rule_set">Pitching Rule Set</label>
                                 </div>
                                 <div class="form-floating mb-3">
                                     <select class="form-select" id="age_group" name="age_group">
                                         {% set sample_rule_set = all_rules['MLB Pitch Smart'] %}
-                                        {% for age_group_key in sample_rule_set.keys() %}
-                                            {% if age_group_key != 'default' %}
-                                                <option value="{{ age_group_key }}" {% if settings.age_group == age_group_key %}selected{% endif %}>
-                                                    {{ age_group_key }}
-                                                </option>
-                                            {% endif %}
-                                        {% endfor %}
+                                        {% for age_group_key in sample_rule_set.keys() %}{% if age_group_key != 'default' %}<option value="{{ age_group_key }}" {% if settings.age_group == age_group_key %}selected{% endif %}>{{ age_group_key }}</option>{% endif %}{% endfor %}
                                     </select>
                                     <label for="age_group">Team Age Group</label>
                                 </div>
@@ -125,108 +136,62 @@
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                             </form>
                         </div>
+
                         <div class="tab-pane fade" id="season-management">
                             <h6 class="text-muted">Start New Season</h6>
                             <p class="small text-muted">Create a new team for the upcoming season. Your current team and all its historical data (games, stats, absences) will remain completely untouched and accessible via the "Switch Team" menu.</p>
-
                             <form action="{{ url_for('admin.rollover_season') }}" method="POST">
-                                <div class="form-floating mb-3">
-                                    <input type="text" class="form-control" id="new_team_name" name="new_team_name" placeholder="New Team Name (e.g. Tigers 2025)" required>
-                                    <label for="new_team_name">New Team Name</label>
-                                </div>
+                                <div class="form-floating mb-3"><input type="text" class="form-control" id="new_team_name" name="new_team_name" placeholder="New Team Name (e.g. Tigers 2025)" required><label for="new_team_name">New Team Name</label></div>
                                 <div class="form-floating mb-3">
                                     <select class="form-select" id="new_age_group" name="new_age_group">
                                         {% set sample_rule_set = all_rules['MLB Pitch Smart'] %}
-                                        {% for age_group_key in sample_rule_set.keys() %}
-                                            {% if age_group_key != 'default' %}
-                                                <option value="{{ age_group_key }}" {% if settings.age_group == age_group_key %}selected{% endif %}>
-                                                    {{ age_group_key }}
-                                                </option>
-                                            {% endif %}
-                                        {% endfor %}
+                                        {% for age_group_key in sample_rule_set.keys() %}{% if age_group_key != 'default' %}<option value="{{ age_group_key }}" {% if settings.age_group == age_group_key %}selected{% endif %}>{{ age_group_key }}</option>{% endif %}{% endfor %}
                                     </select>
                                     <label for="new_age_group">New Age Group</label>
                                 </div>
                                 <p class="form-text">New seasons start with Regulation Innings on Auto, so moving from 12U to 13U automatically changes new templates from 6 to 7 innings.</p>
-
                                 <h6 class="mt-4 mb-2">Data to Carry Over</h6>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="copy_roster" id="copy_roster" checked>
-                                    <label class="form-check-label" for="copy_roster">Current Roster (Players & Profiles)</label>
-                                </div>
-                                <div class="form-check ms-4 mb-2">
-                                    <input class="form-check-input" type="checkbox" name="copy_dev_notes" id="copy_dev_notes" checked>
-                                    <label class="form-check-label small" for="copy_dev_notes">Include Player Development Notes</label>
-                                </div>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" name="copy_scouted" id="copy_scouted" checked>
-                                    <label class="form-check-label" for="copy_scouted">Scouted Players</label>
-                                </div>
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" name="copy_collab" id="copy_collab" checked>
-                                    <label class="form-check-label" for="copy_collab">Collaboration Notes (Coaches Log)</label>
-                                </div>
-                                <div class="form-check mb-4">
-                                    <input class="form-check-input" type="checkbox" name="copy_signs" id="copy_signs" checked>
-                                    <label class="form-check-label" for="copy_signs">Signs & Indicators</label>
-                                </div>
-
-                                <button type="submit" class="btn btn-warning w-100" onclick="return confirm('Are you sure you want to start a new season? Your current season data will be preserved as a historical record.')">
-                                    <i class="bi bi-arrow-repeat me-1"></i> Start New Season
-                                </button>
+                                <div class="form-check"><input class="form-check-input" type="checkbox" name="copy_roster" id="copy_roster" checked><label class="form-check-label" for="copy_roster">Current Roster (Players & Profiles)</label></div>
+                                <div class="form-check ms-4 mb-2"><input class="form-check-input" type="checkbox" name="copy_dev_notes" id="copy_dev_notes" checked><label class="form-check-label small" for="copy_dev_notes">Include Player Development Notes</label></div>
+                                <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="copy_scouted" id="copy_scouted" checked><label class="form-check-label" for="copy_scouted">Scouted Players</label></div>
+                                <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="copy_collab" id="copy_collab" checked><label class="form-check-label" for="copy_collab">Collaboration Notes (Coaches Log)</label></div>
+                                <div class="form-check mb-4"><input class="form-check-input" type="checkbox" name="copy_signs" id="copy_signs" checked><label class="form-check-label" for="copy_signs">Signs & Indicators</label></div>
+                                <button type="submit" class="btn btn-warning w-100" onclick="return confirm('Are you sure you want to start a new season? Your current season data will be preserved as a historical record.')"><i class="bi bi-arrow-repeat me-1"></i> Start New Season</button>
                             </form>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
         <div class="col-lg-4 mb-4">
             <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Team Logo</h5>
-                </div>
+                <div class="card-header"><h5 class="mb-0">Team Logo</h5></div>
                 <div class="card-body text-center">
                     <p>Current Logo:</p>
-                    {% if settings.logo_path %}
-                        <img src="{{ url_for('static', filename='uploads/logos/' + settings.logo_path) }}" alt="Team Logo" class="img-thumbnail mb-3" style="max-height: 150px;">
-                    {% else %}
-                        <p class="text-muted">No custom logo uploaded.</p>
-                    {% endif %}
-
+                    {% if settings.logo_path %}<img src="{{ url_for('static', filename='uploads/logos/' + settings.logo_path) }}" alt="Team Logo" class="img-thumbnail mb-3" style="max-height: 150px;">{% else %}<p class="text-muted">No custom logo uploaded.</p>{% endif %}
                     <form action="{{ url_for('admin.upload_logo') }}" method="POST" enctype="multipart/form-data">
-                        <div class="mb-3">
-                            <label for="logo" class="form-label">Upload New Logo</label>
-                            <input class="form-control" type="file" id="logo" name="logo" required>
-                            <div class="form-text">Allowed types: png, jpg, gif, svg.</div>
-                        </div>
+                        <div class="mb-3"><label for="logo" class="form-label">Upload New Logo</label><input class="form-control" type="file" id="logo" name="logo" required><div class="form-text">Allowed types: png, jpg, gif, svg.</div></div>
                         <button type="submit" class="btn btn-primary w-100">Upload Logo</button>
                     </form>
                 </div>
             </div>
 
             <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-shield-lock me-1"></i> Team Join Code</h5>
-                </div>
+                <div class="card-header"><h5 class="mb-0"><i class="bi bi-shield-lock me-1"></i> Team Join Code</h5></div>
                 <div class="card-body">
                     <p class="small text-muted">Coaches use this code when registering for your team. Treat it like an invitation link and only share it with people who should have team access.</p>
                     <label for="teamRegistrationCode" class="form-label fw-semibold">Current Code</label>
-                    <div class="input-group mb-3">
-                        <input type="text" class="form-control font-monospace" id="teamRegistrationCode" value="{{ settings.registration_code }}" readonly>
-                        <button class="btn btn-outline-secondary" type="button" id="copyTeamRegistrationCode"><i class="bi bi-copy me-1"></i>Copy</button>
-                    </div>
-                    <div class="alert alert-warning small py-2" role="alert">
-                        Rotating the code immediately invalidates the old one. Existing coach accounts are not affected.
-                    </div>
-                    <form action="{{ url_for('security_guard.rotate_registration_code') }}" method="POST" onsubmit="return confirm('Rotate the team join code? The current code will stop working immediately.');">
-                        <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-arrow-repeat me-1"></i>Rotate Join Code</button>
-                    </form>
+                    <div class="input-group mb-3"><input type="text" class="form-control font-monospace" id="teamRegistrationCode" value="{{ settings.registration_code }}" readonly><button class="btn btn-outline-secondary" type="button" id="copyTeamRegistrationCode"><i class="bi bi-copy me-1"></i>Copy</button></div>
+                    <div class="alert alert-warning small py-2" role="alert">Rotating the code immediately invalidates the old one. Existing coach accounts are not affected.</div>
+                    <form action="{{ url_for('security_guard.rotate_registration_code') }}" method="POST" onsubmit="return confirm('Rotate the team join code? The current code will stop working immediately.');"><button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-arrow-repeat me-1"></i>Rotate Join Code</button></form>
                 </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -237,32 +202,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const regulationHelp = document.getElementById('regulationInningsHelp');
     const copyJoinCode = document.getElementById('copyTeamRegistrationCode');
     const joinCodeInput = document.getElementById('teamRegistrationCode');
+    const battingOrderMode = document.getElementById('batting_order_mode');
+    const fixedLineupSizeWrap = document.getElementById('fixedLineupSizeWrap');
 
-    if (primaryColorInput) {
-        primaryColorInput.addEventListener('input', function() {
-            document.documentElement.style.setProperty('--primary-color', this.value);
-        });
-    }
-
-    if (secondaryColorInput) {
-        secondaryColorInput.addEventListener('input', function() {
-            document.documentElement.style.setProperty('--secondary-color', this.value);
-        });
-    }
+    if (primaryColorInput) primaryColorInput.addEventListener('input', function() { document.documentElement.style.setProperty('--primary-color', this.value); });
+    if (secondaryColorInput) secondaryColorInput.addEventListener('input', function() { document.documentElement.style.setProperty('--secondary-color', this.value); });
 
     function suggestedInnings(ageGroup) {
         const age = parseInt(String(ageGroup || '').replace(/\D/g, ''), 10);
         return Number.isFinite(age) && age >= 13 ? 7 : 6;
     }
-
     function refreshRegulationHelp() {
         if (!regulationInput || !regulationHelp) return;
         const ageGroup = ageGroupInput ? ageGroupInput.value : '{{ settings.age_group }}';
-        if (regulationInput.value) {
-            regulationHelp.innerHTML = `Current: <strong>${regulationInput.value} innings</strong> (manual override).`;
-        } else {
-            regulationHelp.innerHTML = `Current: <strong>${suggestedInnings(ageGroup)} innings</strong> automatically for ${ageGroup}.`;
-        }
+        if (regulationInput.value) regulationHelp.innerHTML = `Current: <strong>${regulationInput.value} innings</strong> (manual override).`;
+        else regulationHelp.innerHTML = `Current: <strong>${suggestedInnings(ageGroup)} innings</strong> automatically for ${ageGroup}.`;
     }
 
     if (copyJoinCode && joinCodeInput) {
@@ -281,6 +235,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (ageGroupInput) ageGroupInput.addEventListener('change', refreshRegulationHelp);
     if (regulationInput) regulationInput.addEventListener('change', refreshRegulationHelp);
+    function refreshBattingOrderFields() {
+        if (fixedLineupSizeWrap && battingOrderMode) fixedLineupSizeWrap.classList.toggle('d-none', battingOrderMode.value !== 'fixed');
+    }
+    if (battingOrderMode) battingOrderMode.addEventListener('change', refreshBattingOrderFields);
+    refreshBattingOrderFields();
     refreshRegulationHelp();
 });
 </script>

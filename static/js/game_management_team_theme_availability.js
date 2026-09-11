@@ -39,6 +39,10 @@
         color:var(--gm-accent,var(--gm-gold,#98a2b3))!important;
       }
 
+      #availabilityCollapse{
+        scroll-margin-top:78px;
+      }
+
       #availabilityCollapse .availability-guide-v2{
         display:flex;
         justify-content:space-between;
@@ -200,10 +204,87 @@
     if (value) value.textContent = String(count);
   }
 
+  function availabilityTrigger() {
+    return document.getElementById('availabilityToggleBtn')
+      || document.querySelector('[data-bs-target="#availabilityCollapse"]');
+  }
+
+  function setAvailabilityExpanded(trigger, collapse, expanded) {
+    trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    collapse.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+  }
+
+  function setAvailabilityOpen(trigger, collapse, open) {
+    setAvailabilityExpanded(trigger, collapse, open);
+    const Collapse = window.bootstrap?.Collapse;
+    if (Collapse) {
+      const instance = Collapse.getOrCreateInstance(collapse, {toggle: false});
+      open ? instance.show() : instance.hide();
+      return;
+    }
+
+    // Keep this essential Game Day control usable even if Bootstrap's CDN
+    // script is delayed or unavailable. Bootstrap's CSS already treats .show
+    // as the visible state for a collapse panel.
+    collapse.classList.remove('collapsing');
+    collapse.classList.toggle('show', open);
+    collapse.style.removeProperty('height');
+  }
+
+  function revealAvailability(collapse) {
+    collapse.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+
+  function openAndRevealAvailability(trigger, collapse) {
+    let revealed = false;
+    const revealOnce = () => {
+      if (revealed) return;
+      revealed = true;
+      revealAvailability(collapse);
+    };
+
+    // Bootstrap hides the panel until its collapse transition completes, so
+    // scroll after the shown event. The timeout also covers a missing/delayed
+    // Bootstrap script and reduced-motion browsers that skip the transition.
+    collapse.addEventListener('shown.bs.collapse', revealOnce, {once: true});
+    setAvailabilityOpen(trigger, collapse, true);
+    window.setTimeout(revealOnce, window.bootstrap?.Collapse ? 450 : 0);
+  }
+
+  function bindAvailabilityTrigger(collapse) {
+    const trigger = availabilityTrigger();
+    if (!trigger || trigger.dataset.availabilityBound === 'true') return;
+    trigger.dataset.availabilityBound = 'true';
+
+    // Use one explicit handler instead of depending on Bootstrap's document
+    // data API. Removing data-bs-toggle prevents a second automatic toggle.
+    trigger.removeAttribute('data-bs-toggle');
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      const opening = !collapse.classList.contains('show');
+      if (opening) {
+        openAndRevealAvailability(trigger, collapse);
+      } else {
+        setAvailabilityOpen(trigger, collapse, false);
+      }
+    });
+    collapse.addEventListener('shown.bs.collapse', () => setAvailabilityExpanded(trigger, collapse, true));
+    collapse.addEventListener('hidden.bs.collapse', () => setAvailabilityExpanded(trigger, collapse, false));
+    setAvailabilityExpanded(trigger, collapse, collapse.classList.contains('show'));
+
+    if (['#availability', '#availabilityCollapse'].includes(window.location.hash)) {
+      window.requestAnimationFrame(() => {
+        openAndRevealAvailability(trigger, collapse);
+      });
+    }
+  }
+
   function enhanceAvailability() {
     const collapse = document.getElementById('availabilityCollapse');
     const form = collapse?.querySelector('form');
-    if (!collapse || !form || form.dataset.availabilityEnhanced === 'true') return;
+    if (!collapse || !form) return;
+    bindAvailabilityTrigger(collapse);
+    if (form.dataset.availabilityEnhanced === 'true') return;
 
     const inputs = [...form.querySelectorAll('input[name="absent_players"]')];
     if (!inputs.length) return;
@@ -264,7 +345,7 @@
       save.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Save Game Availability';
     }
 
-    const trigger = document.querySelector('[data-bs-target="#availabilityCollapse"]');
+    const trigger = availabilityTrigger();
     if (trigger) trigger.textContent = "Set Who's Out";
 
     const availabilityCard = trigger?.closest('.card');

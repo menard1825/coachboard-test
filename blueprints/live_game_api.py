@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from db import db
 from extensions import socketio
+from game_start_readiness import can_start_game
 from models import (
     Game,
     GamePitchingPlan,
@@ -90,6 +91,78 @@ def _next_sequence(game_id, team_id):
     return (last_event.sequence + 1) if last_event else 1
 
 
+def _current_sequence(game_id, team_id):
+    last_event = db.session.query(GameRotationEvent).filter_by(
+        game_id=game_id,
+        team_id=team_id,
+        reverted=False,
+    ).order_by(
+        GameRotationEvent.sequence.desc(),
+        GameRotationEvent.id.desc(),
+    ).first()
+
+    return int(last_event.sequence or 0) if last_event else 0
+
+
+def _stale_write_response(data, game, team):
+    raw_sequence = data.get('base_sequence')
+
+    if raw_sequence in (None, ''):
+        return jsonify({
+            'status': 'error',
+            'code': 'missing_live_state_version',
+            'message': (
+                'This Live Game screen is out of date. '
+                'Refresh the live field before saving this change.'
+            ),
+            'current_sequence': _current_sequence(
+                game.id,
+                team.id,
+            ),
+        }), 409
+
+    try:
+        expected = int(raw_sequence)
+    except (TypeError, ValueError):
+        return jsonify({
+            'status': 'error',
+            'code': 'invalid_live_state_version',
+            'message': (
+                'The Live Game version is invalid. '
+                'Refresh and try again.'
+            ),
+        }), 400
+
+    current = _current_sequence(game.id, team.id)
+
+    if expected == current:
+        return None
+
+    _, actual_rotation, _ = _actual_rotation(
+        game,
+        team.id,
+    )
+    alignment = _current_alignment(
+        game,
+        team.id,
+        actual_rotation,
+    )
+
+    return jsonify({
+        'status': 'error',
+        'code': 'stale_live_state',
+        'message': (
+            'Another coach changed the live game first. '
+            'Review the updated field before saving.'
+        ),
+        'current_sequence': current,
+        'current_inning': str(
+            game.live_current_inning or '1'
+        ),
+        'current_alignment': alignment,
+    }), 409
+
+
 def _player_name(player_id, team_id):
     if player_id is None:
         return None
@@ -148,12 +221,62 @@ def get_authoritative_live_state(game_id, team_id):
 
     rotation, actual_rotation, events = _actual_rotation(game, team_id)
     current_inning = str(game.live_current_inning or '1')
-    current_alignment = deepcopy(actual_rotation.get(current_inning, {}) or {})
-    valid, _ = _validate_alignment(current_alignment, roster_names)
-    if not valid:
-        current_alignment = {}
+    current_alignment = deepcopy(
+        actual_rotation.get(current_inning, {}) or {}
+    )
 
-    assigned = {name for name in current_alignment.values() if name}
+    roster_valid, roster_warning = _validate_alignment(
+        current_alignment,
+        roster_names,
+    )
+
+    alignment_names = {
+        name
+        for name in current_alignment.values()
+        if name
+    }
+
+    present_names = {
+        player.name
+        for player in present_roster
+    }
+
+    alignment_offending_names = sorted(
+        name
+        for name in alignment_names
+        if name not in roster_names
+    )
+
+    alignment_availability_conflicts = sorted(
+        name
+        for name in alignment_names
+        if name in roster_names
+        and name not in present_names
+    )
+
+    alignment_valid = (
+        roster_valid
+        and not alignment_availability_conflicts
+    )
+
+    if not roster_valid:
+        alignment_warning = roster_warning
+    elif alignment_availability_conflicts:
+        alignment_warning = (
+            f'{alignment_availability_conflicts[0]} '
+            'is marked Out for this game.'
+        )
+    else:
+        alignment_warning = None
+
+    # Never erase the saved diamond merely because the roster or
+    # availability changed underneath it. Showing the last saved
+    # defense is safer than turning the whole field blank.
+    assigned = {
+        name
+        for name in current_alignment.values()
+        if name
+    }
     bench = [model_to_dict(p) for p in present_roster if p.name not in assigned]
 
     try:
@@ -184,6 +307,10 @@ def get_authoritative_live_state(game_id, team_id):
         'actual_rotation': actual_rotation,
         'current_inning': current_inning,
         'current_alignment': current_alignment,
+        'alignment_valid': alignment_valid,
+        'alignment_warning': alignment_warning,
+        'alignment_offending_names': alignment_offending_names,
+        'alignment_availability_conflicts': alignment_availability_conflicts,
         'current_pitcher': current_alignment.get('P'),
         'bench': bench,
         'planned_next_inning': next_inning,
@@ -244,12 +371,24 @@ def start(game_id):
     if not game:
         return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
 
+    start_readiness = can_start_game(game, team)
+    if not start_readiness['ready']:
+        return jsonify({
+            'status': 'error',
+            'message': 'Game is not ready to start.',
+            **start_readiness,
+        }), 409
+
     game.is_live = True
     if not game.live_current_inning:
         game.live_current_inning = '1'
     db.session.commit()
     state = _broadcast_state(game.id, team.id)
-    return jsonify({'status': 'success', 'state': state})
+    return jsonify({
+        'status': 'success',
+        **start_readiness,
+        'state': state,
+    })
 
 
 @live_game_api_bp.route('/<int:game_id>/change-pitcher', methods=['POST'])
@@ -261,6 +400,15 @@ def change_pitcher(game_id):
         return jsonify({'status': 'error', 'message': 'Game is not live.'}), 409
 
     data = request.get_json(silent=True) or {}
+
+    stale = _stale_write_response(
+        data,
+        game,
+        team,
+    )
+    if stale:
+        return stale
+
     try:
         new_pitcher_id = int(data.get('new_pitcher_id'))
     except (TypeError, ValueError):
@@ -330,6 +478,15 @@ def defensive_change(game_id):
         return jsonify({'status': 'error', 'message': 'Game is not live.'}), 409
 
     data = request.get_json(silent=True) or {}
+
+    stale = _stale_write_response(
+        data,
+        game,
+        team,
+    )
+    if stale:
+        return stale
+
     try:
         player_id = int(data.get('player_id'))
     except (TypeError, ValueError):
@@ -339,6 +496,19 @@ def defensive_change(game_id):
     player = db.session.query(Player).filter_by(id=player_id, team_id=team.id).first()
     if not player:
         return jsonify({'status': 'error', 'message': 'Player is not on this team.'}), 400
+
+    absent_ids = {
+        row.player_id
+        for row in db.session.query(PlayerGameAbsence).filter_by(
+            game_id=game.id,
+            team_id=team.id,
+        ).all()
+    }
+    if player.id in absent_ids:
+        return jsonify({
+            'status': 'error',
+            'message': f'{player.name} is not available for this game.',
+        }), 409
 
     _, actual_rotation, _ = _actual_rotation(game, team.id)
     before = _current_alignment(game, team.id, actual_rotation)
@@ -360,8 +530,12 @@ def defensive_change(game_id):
             after[source] = occupant
         # Bench -> occupied field means the occupant goes to the bench automatically.
 
-    roster_names = {p.name for p in db.session.query(Player).filter_by(team_id=team.id).all()}
-    valid, message = _validate_alignment(after, roster_names)
+    present_names = {
+        p.name
+        for p in db.session.query(Player).filter_by(team_id=team.id).all()
+        if p.id not in absent_ids
+    }
+    valid, message = _validate_alignment(after, present_names)
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
 
@@ -385,34 +559,38 @@ def defensive_change(game_id):
 @live_game_api_bp.route('/<int:game_id>/end-inning', methods=['POST'])
 def end_inning(game_id):
     user, team, game = _authorized_context(game_id)
+
     if not game:
-        return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
-    if not game.is_live:
-        return jsonify({'status': 'error', 'message': 'Game is not live.'}), 409
+        return jsonify({
+            'status': 'error',
+            'message': 'Unauthorized or game not found.',
+        }), 403
 
-    rotation, actual_rotation, _ = _actual_rotation(game, team.id)
-    current = str(game.live_current_inning or '1')
-    before = deepcopy(actual_rotation.get(current, {}) or {})
-    try:
-        next_inning = str(int(float(current)) + 1)
-    except (TypeError, ValueError):
-        return jsonify({'status': 'error', 'message': 'Current inning is invalid.'}), 409
-
-    planned_next = deepcopy((rotation.innings or {}).get(next_inning, {}) if rotation else {})
-    after = planned_next if planned_next else deepcopy(before)
-
-    _event(game, team.id, 'End Inning', next_inning, before, after)
-    game.live_current_inning = next_inning
-    db.session.commit()
-    state = _broadcast_state(game.id, team.id)
-    return jsonify({'status': 'success', 'state': state})
-
+    return jsonify({
+        'status': 'error',
+        'code': 'legacy_live_write_disabled',
+        'message': (
+            'This End Inning action is no longer supported. '
+            'Use End Inning, review the huddle, then '
+            'use Start Inning.'
+        ),
+    }), 409
 
 @live_game_api_bp.route('/<int:game_id>/undo', methods=['POST'])
 def undo(game_id):
     user, team, game = _authorized_context(game_id)
     if not game:
         return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
+
+    data = request.get_json(silent=True) or {}
+
+    stale = _stale_write_response(
+        data,
+        game,
+        team,
+    )
+    if stale:
+        return stale
 
     last_event = db.session.query(GameRotationEvent).filter_by(
         game_id=game.id,

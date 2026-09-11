@@ -1,12 +1,12 @@
-from datetime import datetime
 import json
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 from sqlalchemy import func, or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from blueprints.security_guard import normalize_timezone_name, normalize_utc_offset_minutes, record_activity
 from db import db
-from models import Team, TeamMembership, User
+from models import Team, TeamMembership, User, utcnow_naive
 from password_recovery import (
     email_delivery_configured,
     normalize_email,
@@ -16,10 +16,8 @@ from password_recovery import (
     send_password_reset_email,
     valid_email,
 )
+from permissions import ASSISTANT_COACH, GAME_CHANGER, HEAD_COACH, SUPER_ADMIN
 
-HEAD_COACH = 'Head Coach'
-ASSISTANT_COACH = 'Assistant Coach'
-SUPER_ADMIN = 'Super Admin'
 MIN_PASSWORD_LENGTH = 8
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
@@ -79,6 +77,44 @@ def _password_help_page(user):
     )
 
 
+def _latest_membership(user):
+    if not user:
+        return None
+    return db.session.query(TeamMembership).filter_by(user_id=user.id).order_by(TeamMembership.id.desc()).first()
+
+
+def _signed_in_destination(role):
+    return url_for('game_day.game_day_home') if role == GAME_CHANGER else url_for('home')
+
+
+def _capture_submitted_client_context():
+    """Persist browser-reported timezone in the signed-in session.
+
+    When the first coach joins a brand-new team, that Head Coach's browser is
+    also the best initial signal for the team's home timezone. It remains
+    editable in Team Settings and later travel never changes it automatically.
+    """
+    timezone_name = normalize_timezone_name(request.form.get('client_timezone'))
+    offset_minutes = normalize_utc_offset_minutes(request.form.get('client_utc_offset_minutes'))
+    if timezone_name:
+        session['client_timezone'] = timezone_name
+    if offset_minutes is not None:
+        session['client_utc_offset_minutes'] = offset_minutes
+
+    if (
+        timezone_name
+        and request.endpoint == 'auth.register'
+        and session.get('role') == HEAD_COACH
+        and session.get('team_id')
+    ):
+        team_id = session['team_id']
+        if db.session.query(TeamMembership).filter_by(team_id=team_id).count() == 1:
+            team = db.session.get(Team, team_id)
+            if team and team.timezone != timezone_name:
+                team.timezone = timezone_name
+                db.session.commit()
+
+
 @auth_bp.before_app_request
 def replace_legacy_admin_password_reset():
     """Turn the old random-password admin action into secure password help."""
@@ -95,7 +131,7 @@ def replace_legacy_admin_password_reset():
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if session.get('logged_in'):
-        return redirect(url_for('home'))
+        return redirect(_signed_in_destination(session.get('role')))
 
     if request.method == 'POST':
         identity = request.form.get('identity') or request.form.get('username')
@@ -103,16 +139,16 @@ def login():
         user = _find_user_by_identity(identity)
 
         if user and check_password_hash(user.password_hash, password):
-            user.last_login = datetime.now()
-            primary_membership = db.session.query(TeamMembership).filter_by(
-                user_id=user.id
-            ).order_by(TeamMembership.id.desc()).first()
-
+            primary_membership = _latest_membership(user)
             if not primary_membership:
                 flash('Your CoachBoard account is not assigned to a team yet. Ask your Head Coach for access.', 'danger')
                 return render_template('login.html', identity=identity)
 
+            # Store login timestamps consistently in UTC. The audit/user UI
+            # converts them to the active team's timezone for display.
+            user.last_login = utcnow_naive()
             db.session.commit()
+
             session['logged_in'] = True
             session['username'] = user.username
             session['full_name'] = user.full_name or ''
@@ -120,7 +156,17 @@ def login():
             session['team_id'] = primary_membership.team_id
             session['player_order'] = get_player_order_as_list(primary_membership.player_order)
             session.permanent = True
-            return redirect(url_for('home'))
+            _capture_submitted_client_context()
+
+            team = db.session.get(Team, primary_membership.team_id)
+            record_activity(
+                'login',
+                user=user,
+                team_id=primary_membership.team_id,
+                role=primary_membership.role,
+                detail=f"Signed in to {team.team_name if team else 'team'}.",
+            )
+            return redirect(_signed_in_destination(primary_membership.role))
 
         flash('That username/email and password combination did not match.', 'danger')
         return render_template('login.html', identity=identity)
@@ -130,6 +176,16 @@ def login():
 
 @auth_bp.route('/logout')
 def logout():
+    if session.get('logged_in'):
+        user = _find_user_by_identity(session.get('username'))
+        team = db.session.get(Team, session.get('team_id')) if session.get('team_id') else None
+        record_activity(
+            'logout',
+            user=user,
+            team_id=session.get('team_id'),
+            role=session.get('role'),
+            detail=f"Signed out of {team.team_name if team else 'CoachBoard'}.",
+        )
     session.clear()
     flash('You were successfully logged out.', 'success')
     return redirect(url_for('auth.login'))
@@ -150,11 +206,20 @@ def switch_team(team_id):
         flash('You do not have access to that team.', 'danger')
         return redirect(url_for('home'))
 
+    previous_team = db.session.get(Team, session.get('team_id')) if session.get('team_id') else None
+    new_team = db.session.get(Team, membership.team_id)
     session['team_id'] = membership.team_id
     session['role'] = membership.role
     session['player_order'] = get_player_order_as_list(membership.player_order)
+    record_activity(
+        'team_switch',
+        user=user,
+        team_id=membership.team_id,
+        role=membership.role,
+        detail=f"Switched from {previous_team.team_name if previous_team else 'another team'} to {new_team.team_name if new_team else 'this team'}.",
+    )
     flash('Switched team successfully.', 'success')
-    return redirect(url_for('home'))
+    return redirect(_signed_in_destination(membership.role))
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
@@ -196,7 +261,8 @@ def register():
             email=email,
             full_name=full_name,
             password_hash=generate_password_hash(password),
-            tab_order=json.dumps(default_tab_keys)
+            tab_order=json.dumps(default_tab_keys),
+            last_login=utcnow_naive(),
         )
         db.session.add(new_user)
         db.session.flush()
@@ -216,8 +282,23 @@ def register():
         session['team_id'] = new_membership.team_id
         session['player_order'] = []
         session.permanent = True
+        _capture_submitted_client_context()
+        record_activity(
+            'account_created',
+            user=new_user,
+            team_id=team.id,
+            role=user_role,
+            detail=f'Joined {team.team_name}.',
+        )
+        record_activity(
+            'login',
+            user=new_user,
+            team_id=team.id,
+            role=user_role,
+            detail=f'Signed in to {team.team_name} after registration.',
+        )
         flash(f'Welcome to CoachBoard. You joined {team.team_name}.', 'success')
-        return redirect(url_for('home'))
+        return redirect(_signed_in_destination(user_role))
 
     registration_code = request.args.get('code', '')
     return render_template('register.html', registration_code=registration_code, form={})
@@ -296,6 +377,14 @@ def reset_password_token(token):
 
         user.password_hash = generate_password_hash(new_password)
         db.session.commit()
+        membership = _latest_membership(user)
+        record_activity(
+            'password_reset',
+            user=user,
+            team_id=membership.team_id if membership else None,
+            role=membership.role if membership else None,
+            detail='Password changed with a recovery link.',
+        )
         session.clear()
         flash('Your password has been changed. Sign in with your new password.', 'success')
         return redirect(url_for('auth.login'))
@@ -324,6 +413,7 @@ def change_password():
                 return redirect(url_for('auth.change_password'))
             user.email = email
             db.session.commit()
+            record_activity('recovery_email_changed', user=user, detail='Recovery email updated.')
             flash('Your recovery email has been saved.', 'success')
             return redirect(url_for('auth.change_password'))
 
@@ -342,7 +432,8 @@ def change_password():
 
         user.password_hash = generate_password_hash(new_password)
         db.session.commit()
+        record_activity('password_changed', user=user, detail='Password changed while signed in.')
         flash('Your password has been updated successfully.', 'success')
-        return redirect(url_for('home'))
+        return redirect(_signed_in_destination(session.get('role')))
 
     return render_template('change_password.html', user=user)

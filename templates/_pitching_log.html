@@ -1,150 +1,309 @@
-<div class="row g-3">
-    <div class="col-lg-5 mb-3">
-        <div class="card h-100 shadow-sm border-0">
-            <div class="card-header bg-white py-3">
-                <strong>Record Game Pitching</strong>
-                <div class="small text-muted">Enter the final GameChanger numbers for this game.</div>
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
-                    <input type="hidden" name="game_id" value="{{ game['id'] }}">
-                    <input type="hidden" name="pitch_date" value="{{ game['date'] }}">
-                    <input type="hidden" name="opponent" value="{{ game['opponent'] }}">
-                    <input type="hidden" name="outing_type" value="Game">
-
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label for="gameday-player-select" class="form-label fw-semibold">Pitcher</label>
-                            <select name="player_id" class="form-select" required id="gameday-player-select">
-                                <option value="">Select pitcher…</option>
-                                {% for p in roster %}
-                                    <option value="{{ p['id'] }}">{{ p['name'] }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div class="col-12 col-sm-5">
-                            <label for="pitches" class="form-label fw-semibold">Game Pitches</label>
-                            <input type="number" min="0" step="1" inputmode="numeric" id="pitches" name="pitches" class="form-control" required>
-                        </div>
-
-                        <div class="col-7 col-sm-4">
-                            <label for="innings_whole" class="form-label fw-semibold">Full Innings</label>
-                            <input type="number" min="0" step="1" inputmode="numeric" id="innings_whole" name="innings_whole" class="form-control" placeholder="2" required>
-                        </div>
-
-                        <div class="col-5 col-sm-3">
-                            <label for="innings_outs" class="form-label fw-semibold">Extra Outs</label>
-                            <select id="innings_outs" name="innings_outs" class="form-select">
-                                <option value="0">0</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                            </select>
-                        </div>
-
-                        <div class="col-12">
-                            <label for="pitcher_type" class="form-label fw-semibold">Role</label>
-                            <select name="pitcher_type" id="pitcher_type" class="form-select">
-                                <option value="Starter">Starter</option>
-                                <option value="Reliever">Reliever</option>
-                            </select>
-                        </div>
+{% macro pitcher_availability_row(player, summary) -%}
+    {% set available = summary.status == 'Available' %}
+    <tr class="pitcher-availability-row {{ 'is-available' if available else 'needs-attention' }}">
+        <td class="ps-3 fw-semibold">{{ player['name'] }}</td>
+        <td>
+            {% if available %}
+                <span class="pitch-status-available"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Available</span>
+            {% elif summary.status in ['Pitch Count Incomplete', 'Innings Incomplete'] %}
+                <span class="badge text-bg-warning">Verify Data</span>
+            {% elif summary.status == 'Same-Day Game Restriction' %}
+                <span class="badge text-bg-warning">No 2nd Game</span>
+            {% else %}
+                <span class="badge text-bg-danger">{{ summary.status }}</span>
+            {% endif %}
+            {% if summary.status_detail and not available %}<div class="pitch-status-detail">{{ summary.status_detail }}</div>{% endif %}
+        </td>
+        <td>
+            {% if summary.rule_type == 'innings' %}
+                <strong>{{ summary.daily_innings if summary.daily_innings is not none else '—' }}</strong>
+                <span class="pitch-unit">IP</span>
+                <div class="pitch-cell-note">{{ summary.rolling_3_day_innings if summary.rolling_3_day_innings is not none else '—' }} IP / 3 days</div>
+            {% else %}
+                {% set game_pitches = summary.official_daily_pitches %}
+                <strong>{{ game_pitches if game_pitches is not none else '—' }}</strong>
+                {% if game_pitches is not none and summary.max_daily %}
+                    {% set pitch_percent = [100, ((game_pitches * 100 / summary.max_daily)|round(0)|int)]|min %}
+                    <div class="progress pitch-limit-progress" role="progressbar" aria-label="{{ player['name'] }} game-pitch usage" aria-valuenow="{{ game_pitches }}" aria-valuemin="0" aria-valuemax="{{ summary.max_daily }}">
+                        <div class="progress-bar {{ 'bg-danger' if pitch_percent >= 90 else 'bg-warning' if pitch_percent >= 70 else 'bg-success' }}" style="width:{{ pitch_percent }}%"></div>
                     </div>
-                    <div class="small text-muted mt-2">Example: 2 full innings + 1 out is recorded as 2.1 IP.</div>
-                    <button type="submit" class="btn btn-primary w-100 mt-3">Save Game Outing</button>
-                </form>
-            </div>
-        </div>
-    </div>
+                {% endif %}
+            {% endif %}
+        </td>
+        <td>
+            <strong>{{ summary.workload_daily_pitches if summary.workload_daily_pitches is not none else '—' }}</strong>
+        </td>
+        <td class="pe-3">{{ summary.next_available }}</td>
+    </tr>
+{%- endmacro %}
 
-    <div class="col-lg-7 mb-3">
-        <div class="card h-100 shadow-sm border-0">
-            <div class="card-header bg-white py-3">
-                <strong>Pitching for This Game</strong>
-                <div class="small text-muted">Game pitches affect the configured competition-rule calculation.</div>
-            </div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush" id="recorded-outings-list">
-                    {% if game_pitching_log %}
-                        {% for o in game_pitching_log %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center gap-3 py-3">
-                            <div>
-                                <div class="fw-bold">{{ o.player_name }}</div>
-                                <div class="small text-muted">
-                                    {{ o.pitches if o.pitches is not none else 'Pitch count missing' }} pitches
-                                    {% if o.innings is not none %} • {{ o.innings }} IP{% endif %}
-                                    {% if o.pitcher_type %} • {{ o.pitcher_type }}{% endif %}
-                                </div>
-                            </div>
-                            <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this pitching outing?');">Delete</a>
-                        </li>
-                        {% endfor %}
-                    {% else %}
-                        <li class="list-group-item text-muted py-4 text-center">No final pitching numbers entered for this game yet.</li>
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
+<style id="gameday-pitching-ui-styles">
+    .pitch-stepper {
+        display: grid;
+        grid-template-columns: 48px minmax(64px, 1fr) 48px 54px;
+        gap: 6px;
+        align-items: stretch;
+    }
+    .pitch-stepper.innings-stepper { grid-template-columns: 48px minmax(58px, 1fr) 48px; }
+    .pitch-stepper .btn {
+        min-height: 48px;
+        padding: 0 8px;
+        border-radius: 9px;
+        font-size: 1rem;
+        font-weight: 850;
+        touch-action: manipulation;
+    }
+    .pitch-stepper .pitch-step-five { font-size: .78rem; }
+    .pitch-stepper .form-control {
+        min-width: 0;
+        min-height: 48px;
+        padding-left: 6px;
+        padding-right: 6px;
+        text-align: center;
+        font-size: 1.05rem;
+        font-weight: 800;
+        border-radius: 9px;
+    }
+    .pitcher-availability-table th {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        color: #344054;
+        font-size: .7rem;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+    .pitcher-availability-table td { padding-top: 11px; padding-bottom: 11px; }
+    .pitcher-availability-table .needs-attention { background: #fffdf7; }
+    .pitch-status-available {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: #176b38;
+        font-size: .72rem;
+        font-weight: 750;
+        white-space: nowrap;
+    }
+    .pitch-status-available i { font-size: .7rem; }
+    .pitch-status-detail {
+        max-width: 260px;
+        margin-top: 4px;
+        color: #667085;
+        font-size: .65rem;
+        line-height: 1.3;
+    }
+    .pitch-header-limit {
+        display: block;
+        color: #667085;
+        font-size: .59rem;
+        font-weight: 700;
+        margin-top: 1px;
+    }
+    .pitch-header-info {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        margin-left: 2px;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: #475467;
+        vertical-align: middle;
+    }
+    .pitch-limit-progress { width: 76px; height: 6px; margin-top: 5px; background: #e8edf2; }
+    .pitch-unit, .pitch-cell-note { color: #667085; font-size: .64rem; }
+    .pitch-cell-note { margin-top: 2px; white-space: nowrap; }
+    .postgame-pitch-entry {
+        border: 1px solid #e4e7ec;
+        border-radius: 12px;
+        background: #fafbfc;
+        overflow: hidden;
+    }
+    .postgame-pitch-entry summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 12px 14px;
+        font-weight: 750;
+        color: #1d2939;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        user-select: none;
+    }
+    .postgame-pitch-entry summary::-webkit-details-marker { display: none; }
+    .postgame-pitch-entry summary .hint {
+        font-size: .72rem;
+        font-weight: 550;
+        color: #667085;
+    }
+    .postgame-pitch-entry[open] summary {
+        border-bottom: 1px solid #e4e7ec;
+        background: #fff;
+    }
+    .postgame-pitch-entry .postgame-body { padding: 14px; background: #fff; }
+    @media (max-width: 575.98px) {
+        .pitch-stepper { grid-template-columns: 46px minmax(56px, 1fr) 46px 50px; }
+        .pitch-stepper.innings-stepper { grid-template-columns: 46px minmax(54px, 1fr) 46px; }
+        .pitch-stepper .btn, .pitch-stepper .form-control { min-height: 50px; }
+        .pitcher-availability-table th, .pitcher-availability-table td { padding-left: 10px; padding-right: 10px; }
+    }
+</style>
 
-<div class="card border-0 shadow-sm mb-3">
+{# Pregame: eligibility only. Official outing entry belongs after the game. #}
+<div class="card border-0 shadow-sm mb-3" id="pitcher-availability-card">
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
             <strong>Pitcher Availability</strong>
-            <div class="small text-muted">Official game-rule status is kept separate from practice/lesson workload.</div>
+            <div class="small text-muted">Who is eligible today based on rest rules and prior outings — not pitches from this game yet.</div>
         </div>
         <a href="{{ url_for('pitching.pitching_rules') }}" class="btn btn-sm btn-outline-secondary">View Rules</a>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
+            {% set availability_summaries = pitch_count_summary.values()|list %}
+            {% set first_summary = availability_summaries[0] if availability_summaries else none %}
+            <table class="table table-sm align-middle mb-0 pitcher-availability-table">
                 <thead class="table-light">
                     <tr>
-                        <th class="ps-3">Pitcher</th>
-                        <th>Official</th>
-                        <th>Today</th>
-                        <th>Workload</th>
-                        <th class="pe-3">Next</th>
+                        <th class="ps-3" scope="col">Pitcher</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">
+                            {{ 'Innings Today' if first_summary and first_summary.rule_type == 'innings' else 'Game Pitches' }}
+                            {% if first_summary and first_summary.rule_type != 'innings' and first_summary.max_daily %}
+                                <span class="pitch-header-limit">Max {{ first_summary.max_daily }}</span>
+                            {% endif %}
+                        </th>
+                        <th scope="col">
+                            Workload
+                            <span class="pitch-header-info" role="img" aria-label="Workload includes games, practices, and lessons" title="Games + practice + lessons"><i class="bi bi-info-circle" aria-hidden="true"></i></span>
+                        </th>
+                        <th class="pe-3" scope="col">Next</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for p in roster %}
                     {% set summary = pitch_count_summary.get(p['name']) %}
-                    {% if summary %}
-                    <tr>
-                        <td class="ps-3 fw-semibold">{{ p['name'] }}</td>
-                        <td>
-                            {% if summary.status == 'Available' %}
-                                <span class="badge text-bg-success">Available</span>
-                            {% elif summary.status in ['Pitch Count Incomplete', 'Innings Incomplete'] %}
-                                <span class="badge text-bg-warning">Verify Data</span>
-                            {% elif summary.status == 'Same-Day Game Restriction' %}
-                                <span class="badge text-bg-warning">No 2nd Game</span>
-                            {% else %}
-                                <span class="badge text-bg-danger">{{ summary.status }}</span>
-                            {% endif %}
-                            {% if summary.status_detail %}<div class="small text-muted mt-1">{{ summary.status_detail }}</div>{% endif %}
-                        </td>
-                        <td>
-                            {% if summary.rule_type == 'innings' %}
-                                <strong>{{ summary.daily_innings or '—' }}</strong> IP today
-                                <div class="small text-muted">{{ summary.rolling_3_day_innings or '—' }} IP / 3 days</div>
-                            {% else %}
-                                <strong>{{ summary.official_daily_pitches if summary.official_daily_pitches is not none else '—' }}</strong>
-                                {% if summary.max_daily %}/ {{ summary.max_daily }} game pitches{% endif %}
-                            {% endif %}
-                        </td>
-                        <td>
-                            <strong>{{ summary.workload_daily_pitches if summary.workload_daily_pitches is not none else '—' }}</strong> pitches today
-                            <div class="small text-muted">Games + practice + lessons</div>
-                        </td>
-                        <td class="pe-3">{{ summary.next_available }}</td>
-                    </tr>
-                    {% endif %}
+                    {% if summary and summary.status != 'Available' %}{{ pitcher_availability_row(p, summary) }}{% endif %}
+                {% endfor %}
+                {% for p in roster %}
+                    {% set summary = pitch_count_summary.get(p['name']) %}
+                    {% if summary and summary.status == 'Available' %}{{ pitcher_availability_row(p, summary) }}{% endif %}
                 {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+
+{% set open_pitch_entry = request.args.get('pitching') or (game_pitching_log and game_pitching_log|length > 0) %}
+<details class="postgame-pitch-entry mb-3" id="postgame-pitch-entry" {% if open_pitch_entry %}open{% endif %}>
+    <summary>
+        <span>After the game · Enter GameChanger results</span>
+        <span class="hint">{% if game_pitching_log and game_pitching_log|length > 0 %}{{ game_pitching_log|length }} recorded{% else %}Official outing numbers only{% endif %}</span>
+    </summary>
+    <div class="postgame-body">
+        <div class="alert alert-light border small mb-3">
+            Use this only after pitches have been thrown. Pregame planning belongs in <strong>Today's Pitching Board</strong> above and in Live Game controls — not here.
+        </div>
+        <div class="row g-3">
+            <div class="col-lg-5 mb-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white py-3">
+                        <strong>Record Game Pitching</strong>
+                        <div class="small text-muted">Enter the final GameChanger numbers for this game.</div>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('pitching.add_pitching') }}" method="POST">
+                            <input type="hidden" name="game_id" value="{{ game['id'] }}">
+                            <input type="hidden" name="pitch_date" value="{{ game['date'] }}">
+                            <input type="hidden" name="opponent" value="{{ game['opponent'] }}">
+                            <input type="hidden" name="outing_type" value="Game">
+
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label for="gameday-player-select" class="form-label fw-semibold">Pitcher</label>
+                                    <select name="player_id" class="form-select" required id="gameday-player-select">
+                                        <option value="">Select pitcher…</option>
+                                        {% for p in roster %}
+                                            <option value="{{ p['id'] }}">{{ p['name'] }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="col-12 col-sm-6">
+                                    <label for="pitches" class="form-label fw-semibold">Game Pitches</label>
+                                    <div class="pitch-stepper" aria-label="Game pitch count controls">
+                                        <button type="button" class="btn btn-outline-secondary" data-pitch-step="-1" data-pitch-target="pitches" aria-label="Subtract one game pitch">−</button>
+                                        <input type="number" min="0" step="1" inputmode="numeric" id="pitches" name="pitches" class="form-control" value="0" required>
+                                        <button type="button" class="btn btn-outline-secondary" data-pitch-step="1" data-pitch-target="pitches" aria-label="Add one game pitch">+</button>
+                                        <button type="button" class="btn btn-outline-primary pitch-step-five" data-pitch-step="5" data-pitch-target="pitches" aria-label="Add five game pitches">+5</button>
+                                    </div>
+                                </div>
+
+                                <div class="col-8 col-sm-6">
+                                    <label for="innings_whole" class="form-label fw-semibold">Full Innings</label>
+                                    <div class="pitch-stepper innings-stepper" aria-label="Full innings controls">
+                                        <button type="button" class="btn btn-outline-secondary" data-pitch-step="-1" data-pitch-target="innings_whole" aria-label="Subtract one full inning">−</button>
+                                        <input type="number" min="0" step="1" inputmode="numeric" id="innings_whole" name="innings_whole" class="form-control" value="0" required>
+                                        <button type="button" class="btn btn-outline-secondary" data-pitch-step="1" data-pitch-target="innings_whole" aria-label="Add one full inning">+</button>
+                                    </div>
+                                </div>
+
+                                <div class="col-4 col-sm-4">
+                                    <label for="innings_outs" class="form-label fw-semibold">Extra Outs</label>
+                                    <select id="innings_outs" name="innings_outs" class="form-select">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12">
+                                    <label for="pitcher_type" class="form-label fw-semibold">Role</label>
+                                    <select name="pitcher_type" id="pitcher_type" class="form-select">
+                                        <option value="Starter">Starter</option>
+                                        <option value="Reliever">Reliever</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-2">Example: 2 full innings + 1 out is recorded as 2.1 IP.</div>
+                            <button type="submit" class="btn btn-primary w-100 mt-3">Save Game Outing</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7 mb-3">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-white py-3">
+                        <strong>Pitching for This Game</strong>
+                        <div class="small text-muted">Official numbers that feed rest rules and history.</div>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="list-group list-group-flush" id="recorded-outings-list">
+                            {% if game_pitching_log %}
+                                {% for o in game_pitching_log %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center gap-3 py-3">
+                                    <div>
+                                        <div class="fw-bold">{{ o.player_name }}</div>
+                                        <div class="small text-muted">
+                                            {{ o.pitches if o.pitches is not none else 'Pitch count missing' }} pitches
+                                            {% if o.innings is not none %} • {{ o.innings }} IP{% endif %}
+                                            {% if o.pitcher_type %} • {{ o.pitcher_type }}{% endif %}
+                                        </div>
+                                    </div>
+                                    <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Undo this pitching entry?');"><i class="bi bi-arrow-counterclockwise me-1"></i>Undo Entry</a>
+                                </li>
+                                {% endfor %}
+                            {% else %}
+                                <li class="list-group-item text-muted py-4 text-center">No final pitching numbers entered for this game yet.</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</details>

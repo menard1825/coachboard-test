@@ -7,6 +7,10 @@
   const gameId = Number(routeMatch[1]);
   const PANEL_ID = 'pregame-defense-editor-v3';
   let reportsCollapsed = false;
+  let presetToolsOpen = false;
+  let phonePlayingTimeOpen = false;
+  let coachRailCollapsed = false;
+  let coachRailTab = 'rotation';
   let patchQueued = false;
 
   const setText = (element, value) => {
@@ -74,7 +78,7 @@
       #${PANEL_ID} .pde-title{font-size:1rem!important}
       #${PANEL_ID} .pde-help{font-size:.72rem!important}
       #${PANEL_ID} .pde-tools{
-        grid-template-columns:minmax(0,1fr) auto!important;
+        grid-template-columns:minmax(0,1fr) auto auto!important;
         align-items:end;
         padding:10px;
         background:#f8fafc;
@@ -93,20 +97,542 @@
         letter-spacing:.06em;
         margin:0 0 5px 2px;
       }
+      #${PANEL_ID} .gm-preset-help{display:none!important}
       #${PANEL_ID} #pde-save{display:none!important}
-      #${PANEL_ID} #pde-apply{white-space:nowrap}
+      #${PANEL_ID} #pde-apply{white-space:normal}
+      #${PANEL_ID} #pde-primary-fill{white-space:nowrap}
       #${PANEL_ID} .pde-status{font-size:.7rem!important}
       #${PANEL_ID} .pde-field-caption strong{font-size:.72rem!important}
       #rotation-card-container .gm-secondary-report .accordion-collapse,
       #rotation-card-container .gm-secondary-report .collapse{scroll-margin-top:90px}
+
+      #${PANEL_ID} .gm-mobile-preset-toggle{
+        display:none;
+      }
+      @media(max-width:1199.98px),
+             (min-width:1200px) and (max-width:1399.98px) and (min-height:900px) and (max-height:1100px){
+        #${PANEL_ID} .gm-mobile-preset-toggle{
+          display:inline-flex;
+          align-items:center;
+          gap:5px;
+          width:auto;
+          min-height:30px;
+          margin:0 0 6px;
+          padding:4px 7px;
+          border:1px solid #d7dde5;
+          border-radius:8px;
+          background:#fff;
+          color:#475467;
+          font-size:.59rem;
+          font-weight:850;
+        }
+      }
+
+      /*
+       * Playing-time information stays available for fair-play review,
+       * but on desktop/iPad it lives after the Rotation Table instead
+       * of separating the field from the table.
+       */
+      #gm-playing-time-report{
+        margin:0 0 12px;
+      }
+      #gm-playing-time-report .gm-playing-time-toggle{
+        width:100%;
+        min-height:42px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+        border:0;
+        background:#fbfcfd;
+        color:#172033;
+        padding:10px 12px;
+        text-align:left;
+        font-size:.78rem;
+        font-weight:850;
+      }
+      #gm-playing-time-report .gm-playing-time-toggle:hover,
+      #gm-playing-time-report .gm-playing-time-toggle:focus{
+        background:#f5f7fa;
+      }
+      #gm-playing-time-report .gm-playing-time-toggle small{
+        display:block;
+        margin-top:1px;
+        color:#667085;
+        font-size:.61rem;
+        font-weight:650;
+      }
+      #gm-playing-time-report .pde-playing-time{
+        margin:0!important;
+        border:0!important;
+        border-radius:0!important;
+        background:#fff;
+        overflow:hidden;
+      }
+      #gm-playing-time-report .pde-playing-time-head{
+        display:none!important;
+      }
+      #gm-playing-time-report .pde-time-row{
+        padding:8px 10px;
+        border-top:1px solid #eef1f4;
+      }
+      #gm-playing-time-report .pde-time-row:first-child{
+        border-top:0;
+      }
+      #gm-playing-time-report .pde-time-main{
+        display:flex;
+        justify-content:space-between;
+        align-items:baseline;
+        gap:8px;
+      }
+      #gm-playing-time-report .pde-time-name{
+        font-size:.72rem;
+        color:#172033;
+        min-width:0;
+      }
+      #gm-playing-time-report .pde-time-total{
+        font-size:.61rem;
+        color:#667085;
+        white-space:nowrap;
+        font-weight:700;
+      }
+      #gm-playing-time-report .pde-time-chips{
+        display:flex;
+        flex-wrap:wrap;
+        gap:4px;
+        margin-top:5px;
+      }
+      #gm-playing-time-report .pde-time-chip{
+        display:inline-flex;
+        align-items:center;
+        border:1px solid #4aae72;
+        background:#f4fbf6;
+        color:#176b38;
+        border-radius:6px;
+        padding:3px 6px;
+        font-size:.59rem;
+        font-weight:800;
+        line-height:1;
+      }
+      #gm-playing-time-report .pde-time-chip.bench{
+        border-color:#d6dbe1;
+        background:#f4f5f7;
+        color:#667085;
+      }
+
+      /*
+       * Phones in either orientation, plus tablet landscape:
+       * the field can consume the viewport vertically. Keep the inning
+       * buttons reachable while the coach works on the diamond.
+       *
+       * This is enabled only while the pregame Game Management defense
+       * panel exists, so Live Game does not inherit the behavior.
+       */
+      @media(max-width:767.98px),
+             (min-width:640px) and (max-width:991.98px) and (orientation:landscape),
+             (min-width:992px) and (max-width:1399.98px) and (min-height:760px) and (orientation:landscape){
+        /*
+         * The global Game Management card styling uses overflow:hidden.
+         * That creates a sticky containing boundary and prevents the
+         * inning picker from following the viewport. Allow overflow only
+         * on this pregame defense card while the landscape planner is active.
+         */
+        body.gm-pregame-planning #rotation-card-container > .card{
+          overflow:visible!important;
+        }
+
+        body.gm-pregame-planning #rotation-card-container .gm-coach-inning-picker{
+          position:sticky!important;
+          top:56px;
+          z-index:1030;
+          width:100%;
+          margin-bottom:8px!important;
+          background:#fff!important;
+          box-shadow:0 4px 12px rgba(16,24,40,.14);
+        }
+        body.gm-pregame-planning #rotation-card-container #inning-btn-group{
+          flex-wrap:nowrap!important;
+          overflow-x:auto;
+          overflow-y:hidden;
+          min-width:0;
+          scrollbar-width:thin;
+        }
+        body.gm-pregame-planning #rotation-card-container #inning-btn-group > *{
+          flex:0 0 auto;
+        }
+      }
+
+      /*
+       * On phones, and on compact landscape layouts below Bootstrap's
+       * lg breakpoint, CoachBoard does not scroll the browser window.
+       * main.container-fluid is the scrollport and already begins below
+       * the fixed top navigation. Therefore the sticky inning bar belongs
+       * at the top of that scrollport rather than another 56px below it.
+       */
+      @media(max-width:767.98px),
+             (min-width:640px) and (max-width:991.98px) and (orientation:landscape){
+        body.gm-pregame-planning #rotation-card-container .gm-coach-inning-picker{
+          top:0;
+        }
+      }
+
       @media(max-width:575.98px){
         #rotation-card-container .gm-coach-inning-picker{align-items:flex-start!important;flex-wrap:wrap}
         #rotation-card-container .gm-coach-inning-label{width:100%;margin-bottom:2px}
         #rotation-card-container .gm-coach-actions{display:grid!important;grid-template-columns:1fr auto;width:100%}
         #rotation-card-container .gm-coach-actions #copyPreviousInningBtn{width:100%}
-        #${PANEL_ID} .pde-tools{grid-template-columns:1fr!important}
-        #${PANEL_ID} #pde-apply{width:100%}
+        #${PANEL_ID} .pde-tools{
+          display:grid!important;
+          grid-template-columns:minmax(0,1fr)!important;
+          gap:8px!important;
+          align-items:stretch!important;
+        }
+        #${PANEL_ID} .gm-preset-wrap,
+        #${PANEL_ID} #pde-preset,
+        #${PANEL_ID} #pde-apply,
+        #${PANEL_ID} #pde-primary-fill{
+          width:100%!important;
+          max-width:none!important;
+        }
+        #${PANEL_ID} .gm-preset-wrap{grid-row:1!important}
+        #${PANEL_ID} #pde-apply{grid-row:2!important}
+        #${PANEL_ID} #pde-primary-fill{grid-row:3!important}
+        #${PANEL_ID} #pde-apply{
+          display:block!important;
+          min-height:42px;
+          text-align:center;
+          justify-self:stretch;
+        }
       }
+
+      /*
+       * Landscape iPad Coach Rail
+       *
+       * The field remains the canonical defensive editor.
+       * This rail is read-only and mirrors the canonical Rotation Table.
+       */
+      #gm-landscape-defense-workspace{
+        display:block;
+      }
+
+      #gm-landscape-coach-rail{
+        display:none;
+      }
+
+      @media
+        (min-width:992px)
+        and (max-width:1399.98px)
+        and (min-height:760px)
+        and (orientation:landscape){
+
+        #gm-landscape-defense-workspace{
+          display:grid;
+          grid-template-columns:
+            minmax(0,1fr)
+            minmax(285px,32%);
+          align-items:start;
+          gap:10px;
+          width:100%;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed{
+          grid-template-columns:minmax(0,1fr) 46px;
+        }
+
+        #gm-landscape-defense-workspace > .pde-field-card{
+          width:100%!important;
+          max-width:none!important;
+          min-width:0!important;
+          margin-left:0!important;
+          margin-right:0!important;
+        }
+
+        #gm-landscape-coach-rail{
+          display:block;
+          min-width:0;
+          position:sticky;
+          top:116px;
+          align-self:start;
+          max-height:calc(100vh - 128px);
+          overflow:hidden;
+          border:1px solid #d8e0e8;
+          border-radius:13px;
+          background:#fff;
+          box-shadow:0 4px 14px rgba(16,24,40,.08);
+        }
+
+        #gm-landscape-coach-rail .gm-rail-head{
+          min-height:42px;
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:8px;
+          padding:7px 8px 7px 10px;
+          border-bottom:1px solid #e7ebef;
+          background:#fbfcfd;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-title{
+          min-width:0;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-title strong{
+          display:block;
+          color:#172033;
+          font-size:.75rem;
+          line-height:1.1;
+          font-weight:900;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-title small{
+          display:block;
+          margin-top:2px;
+          color:#667085;
+          font-size:.55rem;
+          line-height:1.15;
+          font-weight:650;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-collapse{
+          flex:0 0 auto;
+          width:30px;
+          height:30px;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          padding:0;
+          border:1px solid #d7dde5;
+          border-radius:8px;
+          background:#fff;
+          color:#344054;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-tabs{
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:5px;
+          padding:7px;
+          border-bottom:1px solid #edf0f3;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-tab{
+          min-height:32px;
+          border:1px solid #d7dde5;
+          border-radius:8px;
+          background:#f8fafc;
+          color:#475467;
+          font-size:.62rem;
+          line-height:1;
+          font-weight:850;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-tab.active{
+          border-color:#173b78;
+          background:#173b78;
+          color:#fff;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-body{
+          max-height:calc(100vh - 220px);
+          overflow:auto;
+          overscroll-behavior:contain;
+          padding:8px;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-summary{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:8px;
+          margin-bottom:7px;
+          padding:7px 8px;
+          border:1px solid #e4e7ec;
+          border-radius:9px;
+          background:#f8fafc;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-summary strong{
+          color:#172033;
+          font-size:.66rem;
+          line-height:1.1;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-summary span{
+          color:#667085;
+          font-size:.55rem;
+          font-weight:750;
+          white-space:nowrap;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-grid-head,
+        #gm-landscape-coach-rail .gm-rail-row{
+          display:grid;
+          grid-template-columns:minmax(0,1fr) 52px 52px;
+          align-items:center;
+          gap:4px;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-grid-head{
+          padding:0 6px 4px;
+          color:#667085;
+          font-size:.49rem;
+          text-transform:uppercase;
+          letter-spacing:.05em;
+          font-weight:900;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-row{
+          min-height:31px;
+          padding:5px 6px;
+          border-top:1px solid #eef1f4;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-player{
+          min-width:0;
+          color:#26354c;
+          font-size:.61rem;
+          line-height:1.1;
+          font-weight:800;
+          white-space:normal;
+          overflow-wrap:anywhere;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-pos{
+          min-height:23px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          padding:2px 4px;
+          border-radius:6px;
+          background:#eef4fb;
+          color:#173b78;
+          font-size:.55rem;
+          line-height:1;
+          font-weight:900;
+          text-align:center;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-pos.bench{
+          background:#f2f4f7;
+          color:#667085;
+          font-size:.48rem;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-section{
+          margin-bottom:9px;
+          padding:8px;
+          border:1px solid #e4e7ec;
+          border-radius:9px;
+          background:#fbfcfd;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-head{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:8px;
+          margin-bottom:6px;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-head strong{
+          color:#172033;
+          font-size:.64rem;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-count{
+          min-width:22px;
+          height:20px;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          padding:0 6px;
+          border-radius:999px;
+          background:#eef2f6;
+          color:#475467;
+          font-size:.52rem;
+          font-weight:900;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-list{
+          display:flex;
+          flex-wrap:wrap;
+          gap:4px;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-bench-chip{
+          max-width:100%;
+          padding:4px 6px;
+          border:1px solid #e0e5eb;
+          border-radius:7px;
+          background:#fff;
+          color:#344054;
+          font-size:.55rem;
+          line-height:1.1;
+          font-weight:750;
+          white-space:normal;
+          overflow-wrap:anywhere;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-empty{
+          padding:14px 8px;
+          color:#667085;
+          font-size:.61rem;
+          line-height:1.35;
+          text-align:center;
+        }
+
+        #gm-landscape-coach-rail .gm-rail-full-table{
+          width:100%;
+          min-height:32px;
+          margin-top:8px;
+          border:1px solid #ccd6e1;
+          border-radius:8px;
+          background:#fff;
+          color:#173b78;
+          font-size:.59rem;
+          font-weight:850;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail{
+          width:46px;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-head{
+          min-height:112px;
+          padding:6px;
+          flex-direction:column;
+          justify-content:flex-start;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-title{
+          flex:1 1 auto;
+          width:100%;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-title strong{
+          writing-mode:vertical-rl;
+          transform:rotate(180deg);
+          font-size:.58rem;
+          letter-spacing:.04em;
+        }
+
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-title small,
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-tabs,
+        #gm-landscape-defense-workspace.gm-rail-collapsed
+        #gm-landscape-coach-rail .gm-rail-body{
+          display:none!important;
+        }
+      }
+
     `;
     document.head.appendChild(style);
   }
@@ -201,9 +727,6 @@
     }
 
     try {
-      // Force the original editor to persist the newly-created sub-inning before
-      // we remove it. This matters if the coach adds it and immediately changes
-      // their mind before the normal autosave timer fires.
       document.getElementById('saveRotationBtn')?.click();
       const data = await fetchLatestRotationUntil(raw);
       if (!data?.rotation) throw new Error('Could not find the current defense plan.');
@@ -214,9 +737,6 @@
         throw new Error('That planned change was not found. Refresh the page and try again.');
       }
 
-      // Move the original game editor back to the base inning before the server
-      // broadcasts the updated rotation, so its private currentInning state never
-      // points at a key that is about to disappear.
       document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`)?.click();
 
       delete innings[raw];
@@ -271,14 +791,26 @@
     if (menuToggle && menuToggle.dataset.coachSimplified !== '1') {
       menuToggle.dataset.coachSimplified = '1';
       setHtml(menuToggle, '<i class="bi bi-sliders me-1"></i> Defense Options');
-      menuToggle.title = 'Less-used defense tools';
+      menuToggle.title = 'Defense tools';
     }
 
     const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');
-    if (rotationTemplateSelect?.options?.length) setText(rotationTemplateSelect.options[0], 'Load full rotation template…');
+    if (rotationTemplateSelect?.options?.length) {
+      setText(rotationTemplateSelect.options[0], 'Load full-game defense plan (all innings)…');
+    }
+
+    if (menu && rotationTemplateSelect && !document.getElementById('gmFullGamePlanHeader')) {
+      const templateItem = rotationTemplateSelect.closest('li');
+      if (templateItem) {
+        const header = document.createElement('li');
+        header.id = 'gmFullGamePlanHeader';
+        header.innerHTML = '<div class="dropdown-header">Full-game defense plan · all innings</div>';
+        menu.insertBefore(header, templateItem);
+      }
+    }
 
     const saveFullTemplate = document.getElementById('saveAsTemplateBtn');
-    setHtml(saveFullTemplate, '<i class="bi bi-journal-plus me-1"></i> Save Full Rotation as Template');
+    setHtml(saveFullTemplate, '<i class="bi bi-journal-plus me-1"></i> Save All Innings as Full-Game Plan');
 
     const printCard = document.getElementById('printCardBtn');
     setHtml(printCard, '<i class="bi bi-printer me-1"></i> Print Defense / Lineup Card');
@@ -290,7 +822,7 @@
       const divider = document.createElement('li');
       divider.innerHTML = '<hr class="dropdown-divider">';
       const item = document.createElement('li');
-      item.innerHTML = '<button type="button" class="dropdown-item" id="gmSaveCurrentDefensePreset"><i class="bi bi-bookmark-plus me-1"></i> Save Current Defense as Preset</button>';
+      item.innerHTML = '<button type="button" class="dropdown-item" id="gmSaveCurrentDefensePreset"><i class="bi bi-bookmark-plus me-1"></i> Save This Inning as a Starting Defense</button>';
       const deleteItem = deleteRotation?.closest('li');
       if (deleteItem) {
         menu.insertBefore(divider, deleteItem);
@@ -405,7 +937,7 @@
     const toolsMenu = toolsToggle?.nextElementSibling;
     if (toolsToggle) {
       setHtml(toolsToggle, '<i class="bi bi-three-dots me-1"></i> Inning Options');
-      toolsToggle.title = 'Less-used inning tools';
+      toolsToggle.title = 'Inning tools';
     }
 
     if (toolsMenu && toolsMenu.dataset.coachSimplified !== '1') {
@@ -424,8 +956,6 @@
       toolsMenu.appendChild(divider);
       addInningOption(toolsMenu, 'gmAddInningAction', 'plus-circle', 'Add Another Inning', 'addInningBtn');
       addInningOption(toolsMenu, 'gmRemoveInningAction', 'dash-circle', 'Remove Last Inning', 'removeInningBtn', true);
-      // Mid-inning planning intentionally lives under Defense Options now. It is
-      // a rare/advanced workflow and should not compete with normal inning setup.
       document.getElementById('gmAddSubInningAction')?.closest('li')?.remove();
     }
     syncRemoveCurrentSubAction(toolsMenu);
@@ -434,13 +964,190 @@
     if (planner && !planner.querySelector('.gm-coach-help')) {
       const help = document.createElement('div');
       help.className = 'gm-coach-help';
-      help.innerHTML = '<i class="bi bi-info-circle me-1"></i>Pick an inning, then tap a position on the field to assign a player. Changes save automatically.';
+      help.innerHTML = '<i class="bi bi-info-circle me-1"></i>Select an inning, then tap a position to assign a player. Saves automatically.';
       pickerRow.insertAdjacentElement('afterend', help);
     }
   }
 
+  function syncInningPickerPlacement() {
+    const board = document.getElementById(
+      'rotation-board'
+    );
+
+    const controls = board?.querySelector(
+      ':scope > .planner-controls'
+    );
+
+    const panel = document.getElementById(
+      PANEL_ID
+    );
+
+    const group = document.getElementById(
+      'inning-btn-group'
+    );
+
+    const picker = group?.closest(
+      '.gm-coach-inning-picker'
+    );
+
+    if (
+      !board ||
+      !controls ||
+      !picker
+    ) {
+      return;
+    }
+
+    const phoneViewport = window.matchMedia(
+      '(max-width: 767.98px)'
+    ).matches;
+
+    const compactLandscape = window.matchMedia(
+      '(min-width: 640px) and '
+      + '(max-width: 991.98px) and '
+      + '(orientation: landscape), '
+      + '(min-width: 992px) and '
+      + '(max-width: 1399.98px) and '
+      + '(min-height: 760px) and '
+      + '(orientation: landscape)'
+    ).matches;
+
+    const shouldStick = Boolean(
+      panel &&
+      (
+        phoneViewport ||
+        compactLandscape
+      )
+    );
+
+    if (shouldStick) {
+      /*
+       * position:sticky is constrained by the bounds of its
+       * containing block. The original picker lives inside the
+       * short .planner-controls wrapper, so it can only stick for
+       * a moment before that wrapper scrolls away.
+       *
+       * Move only the picker row to rotation-board, immediately
+       * before the pregame defense panel. rotation-board spans the
+       * entire defensive workspace, giving sticky enough vertical
+       * range to stay available while the coach works the field.
+       */
+      picker.classList.add(
+        'gm-ipad-sticky-inning-picker'
+      );
+
+      if (
+        picker.parentElement !== board ||
+        picker.nextElementSibling !== panel
+      ) {
+        panel.insertAdjacentElement(
+          'beforebegin',
+          picker
+        );
+      }
+
+      return;
+    }
+
+    /*
+     * Portrait tablet, wide desktop, or Live Game:
+     * put the picker back in its original planner-controls home.
+     */
+    picker.classList.remove(
+      'gm-ipad-sticky-inning-picker'
+    );
+
+    if (picker.parentElement !== controls) {
+      controls.insertBefore(
+        picker,
+        controls.firstElementChild
+      );
+    }
+  }
+
+  function syncMobilePresetDisclosure(
+    panel,
+    tools
+  ) {
+    if (!panel || !tools) return;
+
+    const mobile = window.matchMedia(
+      '(max-width: 1199.98px), '
+      + '(min-width: 1200px) and '
+      + '(max-width: 1399.98px) and '
+      + '(min-height: 900px) and '
+      + '(max-height: 1100px)'
+    ).matches;
+
+    let toggle = panel.querySelector(
+      '.gm-mobile-preset-toggle'
+    );
+
+    if (!toggle) {
+      toggle = document.createElement(
+        'button'
+      );
+
+      toggle.type = 'button';
+      toggle.className = (
+        'gm-mobile-preset-toggle'
+      );
+
+      tools.insertAdjacentElement(
+        'beforebegin',
+        toggle
+      );
+
+      toggle.addEventListener(
+        'click',
+        () => {
+          presetToolsOpen = !presetToolsOpen;
+          queuePatch();
+        }
+      );
+    }
+
+    if (!mobile) {
+      toggle.hidden = true;
+      tools.style.removeProperty(
+        'display'
+      );
+      return;
+    }
+
+    toggle.hidden = false;
+
+    toggle.setAttribute(
+      'aria-expanded',
+      presetToolsOpen
+        ? 'true'
+        : 'false'
+    );
+
+    toggle.innerHTML = (
+      presetToolsOpen
+        ? '<i class="bi bi-chevron-up"></i> Hide Preset / Apply'
+        : '<i class="bi bi-bookmark"></i> Preset / Apply'
+    );
+
+    tools.style.setProperty(
+      'display',
+      presetToolsOpen
+        ? 'grid'
+        : 'none',
+      'important'
+    );
+  }
+
   function simplifyDefensePanel() {
     const panel = document.getElementById(PANEL_ID);
+
+    // Scope tablet sticky behavior to pregame Game Management only.
+    document.body.classList.toggle(
+      'gm-pregame-planning',
+      Boolean(panel)
+    );
+
     if (!panel) return;
 
     const inning = currentInning();
@@ -450,26 +1157,39 @@
     setText(
       help,
       isSubInning(inning)
-        ? `Set the defense after this planned change during Inning ${Math.floor(Number.parseFloat(inning))}. Changes save automatically.`
-        : 'Tap a position to assign or change a player. Changes save automatically.'
+        ? `Set the defense after this planned change during Inning ${Math.floor(Number.parseFloat(inning))}. Saves automatically.`
+        : 'Tap a position to assign or change a player. Saves automatically.'
     );
 
     const tools = panel.querySelector('.pde-tools');
     const select = document.getElementById('pde-preset');
     const apply = document.getElementById('pde-apply');
-    if (select?.options?.length) setText(select.options[0], 'Optional: choose a defense preset…');
-    setText(apply, 'Use Preset');
+    if (select?.options?.length) setText(select.options[0], 'Choose Starting Defense…');
+    setText(apply, `Apply to Inning ${shortInningLabel(inning)}`);
 
-    if (tools && select && !tools.querySelector('.gm-preset-wrap')) {
-      const wrap = document.createElement('div');
+    let wrap = tools?.querySelector('.gm-preset-wrap');
+    if (tools && select && !wrap) {
+      wrap = document.createElement('div');
       wrap.className = 'gm-preset-wrap';
-      const label = document.createElement('label');
-      label.className = 'gm-preset-label';
-      label.htmlFor = 'pde-preset';
-      label.textContent = 'Quick Setup (Optional)';
       tools.insertBefore(wrap, select);
-      wrap.appendChild(label);
       wrap.appendChild(select);
+    }
+
+    syncMobilePresetDisclosure(
+      panel,
+      tools
+    );
+
+    if (wrap) {
+      let label = wrap.querySelector('.gm-preset-label');
+      if (!label) {
+        label = document.createElement('label');
+        label.className = 'gm-preset-label';
+        label.htmlFor = 'pde-preset';
+        wrap.insertBefore(label, select);
+      }
+      setText(label, 'Starting Defense Preset (Optional)');
+      wrap.querySelector('.gm-preset-help')?.remove();
     }
 
     setText(panel.querySelector('.pde-field-caption strong'), 'Current Defense');
@@ -477,29 +1197,972 @@
 
     const status = panel.querySelector('.pde-status');
     if (status) {
-      const open = status.querySelector('.open')?.textContent?.trim();
-      const desired = open
-        ? `<span class="open">${open}</span> <span class="mx-1">•</span> Changes save automatically`
-        : '<strong>Defense complete</strong> <span class="mx-1">•</span> Changes save automatically';
-      setHtml(status, desired);
+      setText(status.querySelector('.pde-status-note'), 'Saves automatically.');
+    }
+  }
+
+  function reportShell(collapse) {
+    if (!collapse) return null;
+
+    return (
+      collapse.closest('.d-none.d-lg-block') ||
+      collapse.closest('.card')
+    );
+  }
+
+  function markPlayingTimeHandled(panel) {
+    if (
+      !panel ||
+      panel.querySelector('#gm-playing-time-handled')
+    ) {
+      return;
+    }
+
+    const marker = document.createElement('span');
+    marker.id = 'gm-playing-time-handled';
+    marker.hidden = true;
+
+    const status = panel.querySelector('.pde-status');
+
+    if (status) {
+      status.insertAdjacentElement(
+        'beforebegin',
+        marker
+      );
+    } else {
+      panel.appendChild(marker);
+    }
+  }
+
+  function syncPhonePlayingTimeDisclosure(
+    panel,
+    summary
+  ) {
+    if (!panel) return;
+
+    const mobile = window.matchMedia(
+      '(max-width: 991.98px)'
+    ).matches;
+
+    let toggle = panel.querySelector(
+      '.gm-phone-playing-time-toggle'
+    );
+
+    if (!mobile || !summary) {
+      toggle?.remove();
+
+      if (summary) {
+        summary.hidden = false;
+      }
+
+      return;
+    }
+
+    if (!toggle) {
+      toggle = document.createElement(
+        'button'
+      );
+
+      toggle.type = 'button';
+
+      toggle.className = (
+        'gm-phone-playing-time-toggle '
+        + 'btn btn-light border w-100 '
+        + 'd-flex align-items-center '
+        + 'justify-content-between '
+        + 'text-start mb-2'
+      );
+
+      toggle.addEventListener(
+        'click',
+        () => {
+          phonePlayingTimeOpen = (
+            !phonePlayingTimeOpen
+          );
+
+          queuePatch();
+        }
+      );
+    }
+
+    if (
+      toggle.nextElementSibling !== summary
+    ) {
+      summary.insertAdjacentElement(
+        'beforebegin',
+        toggle
+      );
+    }
+
+    summary.hidden = !phonePlayingTimeOpen;
+
+    toggle.setAttribute(
+      'aria-expanded',
+      phonePlayingTimeOpen
+        ? 'true'
+        : 'false'
+    );
+
+    toggle.innerHTML = `
+      <span>
+        <i class="bi bi-person-check me-2"></i>
+        <strong>Player Time / Position Summary</strong>
+      </span>
+      <span class="small text-muted">
+        ${phonePlayingTimeOpen ? 'Hide' : 'View'}
+        <i class="bi bi-chevron-${phonePlayingTimeOpen ? 'up' : 'down'} ms-1"></i>
+      </span>
+    `;
+  }
+
+  function syncPlayingTimePlacement() {
+    const panel = document.getElementById(PANEL_ID);
+    let host = document.getElementById(
+      'gm-playing-time-report'
+    );
+
+    // Once Live Game replaces the pregame defense surface, remove
+    // the pregame-only report wrapper as well.
+    if (!panel) {
+      host?.remove();
+      return;
+    }
+
+    const desktop = window.matchMedia(
+      '(min-width: 992px)'
+    ).matches;
+
+    const summary = panel.querySelector(
+      '#pde-playing-time-summary'
+    );
+
+    const handled = panel.querySelector(
+      '#gm-playing-time-handled'
+    );
+
+    // Preserve the original portrait-tablet presentation.
+    // Phones keep the same data, but collapse the long report by
+    // default so the defensive field stays primary.
+    if (!desktop) {
+      let activeSummary = summary;
+
+      if (!activeSummary && host) {
+        const moved = host.querySelector(
+          '#pde-playing-time-summary'
+        );
+
+        const status = panel.querySelector(
+          '.pde-status'
+        );
+
+        if (moved && status) {
+          status.insertAdjacentElement(
+            'beforebegin',
+            moved
+          );
+
+          activeSummary = moved;
+        }
+      }
+
+      handled?.remove();
+      host?.remove();
+
+      syncPhonePlayingTimeDisclosure(
+        panel,
+        activeSummary
+      );
+
+      return;
+    }
+
+    // Desktop/iPad landscape report handling must never inherit
+    // phone-only hidden state or its disclosure button.
+    syncPhonePlayingTimeDisclosure(
+      panel,
+      summary
+    );
+
+    /*
+     * If the current render was already handled, the summary is
+     * intentionally outside the panel. Do not rebuild the wrapper.
+     */
+    if (!summary && handled) {
+      return;
+    }
+
+    /*
+     * A fresh render with no summary means there are no planned
+     * defensive innings to summarize. Do not leave stale player-time
+     * information from the previous render.
+     */
+    if (!summary) {
+      host?.remove();
+      markPlayingTimeHandled(panel);
+      return;
+    }
+
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'gm-playing-time-report';
+      host.className = 'd-none d-lg-block';
+
+      host.innerHTML = `
+        <div class="card gm-secondary-report">
+          <div class="card-header p-0">
+            <button
+              type="button"
+              class="gm-playing-time-toggle"
+              data-bs-toggle="collapse"
+              data-bs-target="#gmPlayingTimeCollapse"
+              aria-expanded="false"
+              aria-controls="gmPlayingTimeCollapse"
+            >
+              <span>
+                <i class="bi bi-person-check me-2"></i>
+                Player Time / Position Summary
+                <small>Fair-play and position totals</small>
+              </span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+          </div>
+          <div
+            id="gmPlayingTimeCollapse"
+            class="collapse"
+          >
+            <div class="gm-playing-time-body"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    const body = host.querySelector(
+      '.gm-playing-time-body'
+    );
+
+    if (body) {
+      // The base defense renderer owns the summary data. We only move
+      // its freshly rendered DOM; no rotation state is duplicated.
+      body.replaceChildren(summary);
+    }
+
+    markPlayingTimeHandled(panel);
+
+    const rotationCollapse = document.getElementById(
+      'rotationMatrixCollapse'
+    );
+
+    const rotation = reportShell(
+      rotationCollapse
+    );
+
+    /*
+     * Original order is:
+     * field -> legacy hidden layout -> Rotation Table -> Bench Summary.
+     *
+     * Put Player Time immediately after Rotation Table. The hidden
+     * legacy layout stays untouched for Live Game restoration.
+     */
+    if (rotation) {
+      if (rotation.nextElementSibling !== host) {
+        rotation.insertAdjacentElement(
+          'afterend',
+          host
+        );
+      }
+    } else if (panel.nextElementSibling !== host) {
+      panel.insertAdjacentElement(
+        'afterend',
+        host
+      );
+    }
+  }
+
+
+  function landscapeCoachRailEnabled() {
+    return window.matchMedia(
+      '(min-width: 992px) and '
+      + '(max-width: 1399.98px) and '
+      + '(min-height: 760px) and '
+      + '(orientation: landscape)'
+    ).matches;
+  }
+
+  function coachRailEscape(value) {
+    return String(value ?? '').replace(
+      /[&<>"']/g,
+      char => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;',
+      }[char])
+    );
+  }
+
+  function coachRailMatrixData() {
+    const table = document.querySelector(
+      '#rotationMatrixCollapse table'
+    );
+
+    if (!table) return null;
+
+    const headers = Array.from(
+      table.querySelectorAll('thead th')
+    ).map(
+      cell => cell.textContent.trim()
+    );
+
+    const rows = Array.from(
+      table.querySelectorAll('tbody tr')
+    ).map(row => {
+      const cells = Array.from(
+        row.querySelectorAll('th,td')
+      ).map(
+        cell => cell.textContent.trim()
+      );
+
+      return {
+        player:cells[0] || '',
+        cells,
+      };
+    }).filter(
+      row => row.player
+    );
+
+    return {headers, rows};
+  }
+
+  function coachRailInningColumns(matrix) {
+    const raw = Number.parseFloat(
+      currentInning()
+    );
+
+    const currentNumber = (
+      Number.isFinite(raw)
+        ? Math.floor(raw)
+        : 1
+    );
+
+    const nextNumber = currentNumber + 1;
+
+    const findColumn = number => {
+      const wanted = `inning ${number}`;
+
+      return matrix.headers.findIndex(
+        header => (
+          header.trim().toLowerCase() === wanted
+        )
+      );
+    };
+
+    return {
+      currentNumber,
+      nextNumber,
+      currentIndex:findColumn(currentNumber),
+      nextIndex:findColumn(nextNumber),
+    };
+  }
+
+  function coachRailPosition(row, index) {
+    if (
+      !row ||
+      !Number.isInteger(index) ||
+      index < 1
+    ) {
+      return '—';
+    }
+
+    return row.cells[index]?.trim() || '—';
+  }
+
+  function coachRailPositionHtml(value) {
+    const normalized = (
+      value || '—'
+    ).trim();
+
+    const isBench = (
+      normalized.toUpperCase() === 'BENCH'
+    );
+
+    return `
+      <span
+        class="gm-rail-pos${isBench ? ' bench' : ''}"
+        title="${coachRailEscape(normalized)}"
+      >
+        ${isBench ? 'BENCH' : coachRailEscape(normalized)}
+      </span>
+    `;
+  }
+
+  function coachRailRotationHtml(matrix, columns) {
+    if (
+      !matrix ||
+      columns.currentIndex < 1
+    ) {
+      return `
+        <div
+          id="gm-coach-rail-rotation"
+          class="gm-rail-empty"
+        >
+          Rotation information is still loading.
+        </div>
+      `;
+    }
+
+    const hasNext = (
+      columns.nextIndex >= 1
+    );
+
+    const rows = matrix.rows.map(row => {
+      const current = coachRailPosition(
+        row,
+        columns.currentIndex
+      );
+
+      const next = (
+        hasNext
+          ? coachRailPosition(
+              row,
+              columns.nextIndex
+            )
+          : '—'
+      );
+
+      return `
+        <div class="gm-rail-row">
+          <div class="gm-rail-player">
+            ${coachRailEscape(row.player)}
+          </div>
+          ${coachRailPositionHtml(current)}
+          ${coachRailPositionHtml(next)}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div id="gm-coach-rail-rotation">
+        <div class="gm-rail-summary">
+          <strong>
+            Inning ${columns.currentNumber}
+            ${hasNext ? ` → Inning ${columns.nextNumber}` : ''}
+          </strong>
+          <span>
+            ${hasNext ? 'Current → Next' : 'Current inning'}
+          </span>
+        </div>
+
+        <div class="gm-rail-grid-head">
+          <span>Player</span>
+          <span>Current</span>
+          <span>${hasNext ? 'Next' : '—'}</span>
+        </div>
+
+        ${rows}
+
+        <button
+          type="button"
+          class="gm-rail-full-table"
+        >
+          <i class="bi bi-grid-3x3 me-1"></i>
+          Full Rotation Table
+        </button>
+      </div>
+    `;
+  }
+
+  function coachRailBenchNames(matrix, index) {
+    if (
+      !matrix ||
+      !Number.isInteger(index) ||
+      index < 1
+    ) {
+      return [];
+    }
+
+    return matrix.rows.filter(row => (
+      coachRailPosition(
+        row,
+        index
+      ).toUpperCase() === 'BENCH'
+    )).map(
+      row => row.player
+    );
+  }
+
+  function coachRailBenchSectionHtml(label, names) {
+    const chips = (
+      names.length
+        ? names.map(name => `
+            <span class="gm-rail-bench-chip">
+              ${coachRailEscape(name)}
+            </span>
+          `).join('')
+        : `
+            <span class="gm-rail-empty p-0">
+              No one planned on the bench.
+            </span>
+          `
+    );
+
+    return `
+      <section class="gm-rail-bench-section">
+        <div class="gm-rail-bench-head">
+          <strong>${coachRailEscape(label)}</strong>
+          <span class="gm-rail-count">
+            ${names.length}
+          </span>
+        </div>
+
+        <div class="gm-rail-bench-list">
+          ${chips}
+        </div>
+      </section>
+    `;
+  }
+
+  function coachRailBenchHtml(matrix, columns) {
+    if (
+      !matrix ||
+      columns.currentIndex < 1
+    ) {
+      return `
+        <div
+          id="gm-coach-rail-bench"
+          class="gm-rail-empty"
+        >
+          Bench information is still loading.
+        </div>
+      `;
+    }
+
+    const current = coachRailBenchNames(
+      matrix,
+      columns.currentIndex
+    );
+
+    const next = (
+      columns.nextIndex >= 1
+        ? coachRailBenchNames(
+            matrix,
+            columns.nextIndex
+          )
+        : []
+    );
+
+    return `
+      <div id="gm-coach-rail-bench">
+        ${coachRailBenchSectionHtml(
+          `Inning ${columns.currentNumber} Bench`,
+          current
+        )}
+
+        ${
+          columns.nextIndex >= 1
+            ? coachRailBenchSectionHtml(
+                `Inning ${columns.nextNumber} Bench`,
+                next
+              )
+            : ''
+        }
+
+        <button
+          type="button"
+          class="gm-rail-full-table"
+        >
+          <i class="bi bi-grid-3x3 me-1"></i>
+          Full Rotation Table
+        </button>
+      </div>
+    `;
+  }
+
+  function removeLandscapeCoachRail() {
+    const wrapper = document.getElementById(
+      'gm-landscape-defense-workspace'
+    );
+
+    if (!wrapper) return;
+
+    const fieldCard = wrapper.querySelector(
+      ':scope > .pde-field-card'
+    );
+
+    if (
+      fieldCard &&
+      wrapper.parentElement
+    ) {
+      wrapper.insertAdjacentElement(
+        'beforebegin',
+        fieldCard
+      );
+    }
+
+    wrapper.remove();
+  }
+
+  function syncLandscapeCoachRail() {
+    const panel = document.getElementById(
+      PANEL_ID
+    );
+
+    if (
+      !panel ||
+      !landscapeCoachRailEnabled()
+    ) {
+      removeLandscapeCoachRail();
+      return;
+    }
+
+    const fieldCard = panel.querySelector(
+      '.pde-field-card'
+    );
+
+    if (!fieldCard) return;
+
+    let wrapper = document.getElementById(
+      'gm-landscape-defense-workspace'
+    );
+
+    let rail = document.getElementById(
+      'gm-landscape-coach-rail'
+    );
+
+    if (
+      !wrapper ||
+      !wrapper.contains(fieldCard)
+    ) {
+      removeLandscapeCoachRail();
+
+      wrapper = document.createElement('div');
+      wrapper.id = (
+        'gm-landscape-defense-workspace'
+      );
+
+      fieldCard.insertAdjacentElement(
+        'beforebegin',
+        wrapper
+      );
+
+      wrapper.appendChild(fieldCard);
+
+      rail = document.createElement('aside');
+      rail.id = 'gm-landscape-coach-rail';
+
+      rail.setAttribute(
+        'aria-label',
+        'Landscape rotation planning view'
+      );
+
+      rail.innerHTML = `
+        <div class="gm-rail-head">
+          <div class="gm-rail-title">
+            <strong>Rotation View</strong>
+            <small>
+              Current and next inning at a glance
+            </small>
+          </div>
+
+          <button
+            type="button"
+            class="gm-rail-collapse"
+            aria-label="Collapse Rotation View"
+          ></button>
+        </div>
+
+        <div
+          class="gm-rail-tabs"
+          role="tablist"
+          aria-label="Coach Rail views"
+        >
+          <button
+            type="button"
+            class="gm-rail-tab"
+            data-gm-rail-tab="rotation"
+            role="tab"
+          >
+            Rotation
+          </button>
+
+          <button
+            type="button"
+            class="gm-rail-tab"
+            data-gm-rail-tab="bench"
+            role="tab"
+          >
+            Bench
+          </button>
+        </div>
+
+        <div
+          id="gm-coach-rail-body"
+          class="gm-rail-body"
+        ></div>
+      `;
+
+      wrapper.appendChild(rail);
+
+      rail.addEventListener(
+        'click',
+        event => {
+          const collapse = event.target.closest(
+            '.gm-rail-collapse'
+          );
+
+          if (collapse) {
+            coachRailCollapsed = (
+              !coachRailCollapsed
+            );
+
+            queuePatch();
+            return;
+          }
+
+          const tab = event.target.closest(
+            '[data-gm-rail-tab]'
+          );
+
+          if (tab) {
+            coachRailTab = (
+              tab.dataset.gmRailTab ||
+              'rotation'
+            );
+
+            queuePatch();
+            return;
+          }
+
+          const fullTable = event.target.closest(
+            '.gm-rail-full-table'
+          );
+
+          if (fullTable) {
+            const rotationCollapse = (
+              document.getElementById(
+                'rotationMatrixCollapse'
+              )
+            );
+
+            if (
+              rotationCollapse &&
+              !rotationCollapse.classList.contains('show')
+            ) {
+              const header = (
+                rotationCollapse.previousElementSibling
+              );
+
+              const trigger = header?.matches?.(
+                '[data-bs-toggle="collapse"]'
+              )
+                ? header
+                : header?.querySelector(
+                    '[data-bs-toggle="collapse"]'
+                  );
+
+              trigger?.click();
+            }
+
+            const shell = reportShell(
+              rotationCollapse
+            );
+
+            shell?.scrollIntoView({
+              behavior:'smooth',
+              block:'start',
+            });
+          }
+        }
+      );
+    }
+
+    if (!rail) return;
+
+    wrapper.classList.toggle(
+      'gm-rail-collapsed',
+      coachRailCollapsed
+    );
+
+    const collapseButton = rail.querySelector(
+      '.gm-rail-collapse'
+    );
+
+    if (collapseButton) {
+      collapseButton.setAttribute(
+        'aria-label',
+        coachRailCollapsed
+          ? 'Expand Rotation View'
+          : 'Collapse Rotation View'
+      );
+
+      setHtml(
+        collapseButton,
+        coachRailCollapsed
+          ? '<i class="bi bi-chevron-left"></i>'
+          : '<i class="bi bi-chevron-right"></i>'
+      );
+    }
+
+    rail.querySelectorAll(
+      '[data-gm-rail-tab]'
+    ).forEach(button => {
+      const active = (
+        button.dataset.gmRailTab ===
+        coachRailTab
+      );
+
+      button.classList.toggle(
+        'active',
+        active
+      );
+
+      button.setAttribute(
+        'aria-selected',
+        active ? 'true' : 'false'
+      );
+    });
+
+    const inningGroup = document.getElementById(
+      'inning-btn-group'
+    );
+
+    if (
+      inningGroup &&
+      inningGroup.dataset.coachRailBound !== '1'
+    ) {
+      inningGroup.dataset.coachRailBound = '1';
+
+      inningGroup.addEventListener(
+        'change',
+        queuePatch
+      );
+    }
+
+    const matrix = coachRailMatrixData();
+    if (!matrix) return;
+
+    const columns = coachRailInningColumns(
+      matrix
+    );
+
+    const body = rail.querySelector(
+      '#gm-coach-rail-body'
+    );
+
+    if (!body) return;
+
+    const html = (
+      coachRailTab === 'bench'
+        ? coachRailBenchHtml(
+            matrix,
+            columns
+          )
+        : coachRailRotationHtml(
+            matrix,
+            columns
+          )
+    );
+
+    const renderKey = JSON.stringify({
+      tab:coachRailTab,
+      current:columns.currentNumber,
+      next:columns.nextNumber,
+      headers:matrix.headers,
+      rows:matrix.rows.map(
+        row => row.cells
+      ),
+    });
+
+    if (
+      body.dataset.renderKey !== renderKey
+    ) {
+      body.dataset.renderKey = renderKey;
+      body.innerHTML = html;
     }
   }
 
   function collapseSecondaryReportsOnce() {
     if (reportsCollapsed) return;
-    const ids = ['rotationMatrixCollapse', 'benchReportDesktopCollapse'];
-    ids.forEach((id) => {
-      const collapse = document.getElementById(id);
-      if (!collapse) return;
-      collapse.classList.remove('show');
-      collapse.closest('.card')?.classList.add('gm-secondary-report');
-      const headerText = collapse.previousElementSibling?.querySelector('span');
+
+    const rotation = document.getElementById(
+      'rotationMatrixCollapse'
+    );
+
+    const bench = document.getElementById(
+      'benchReportDesktopCollapse'
+    );
+
+    if (!rotation && !bench) return;
+
+    if (rotation) {
+      // Rotation Table is the coach's primary all-inning reference.
+      // Start it open, but only set the default once so the coach can
+      // still collapse it manually afterward.
+      rotation.classList.add('show');
+
+      const card = rotation.closest('.card');
+      card?.classList.remove('gm-secondary-report');
+
+      const header = rotation.previousElementSibling;
+      const trigger = header?.matches?.(
+        '[data-bs-toggle="collapse"]'
+      )
+        ? header
+        : header?.querySelector(
+            '[data-bs-toggle="collapse"]'
+          );
+
+      trigger?.setAttribute(
+        'aria-expanded',
+        'true'
+      );
+
+      const headerText = header?.querySelector(
+        'span'
+      );
+
       if (headerText) {
-        if (id === 'rotationMatrixCollapse') setHtml(headerText, '<i class="bi bi-grid-3x3 me-2"></i>Rotation Table');
-        if (id === 'benchReportDesktopCollapse') setHtml(headerText, '<i class="bi bi-clipboard-x me-2"></i>Bench Summary');
+        setHtml(
+          headerText,
+          '<i class="bi bi-grid-3x3 me-2"></i>Rotation Table'
+        );
       }
-    });
-    reportsCollapsed = ids.some((id) => document.getElementById(id));
+    }
+
+    if (bench) {
+      // Bench Summary remains useful but secondary.
+      bench.classList.remove('show');
+      bench
+        .closest('.card')
+        ?.classList.add('gm-secondary-report');
+
+      const header = bench.previousElementSibling;
+      const trigger = header?.matches?.(
+        '[data-bs-toggle="collapse"]'
+      )
+        ? header
+        : header?.querySelector(
+            '[data-bs-toggle="collapse"]'
+          );
+
+      trigger?.setAttribute(
+        'aria-expanded',
+        'false'
+      );
+
+      const headerText = header?.querySelector(
+        'span'
+      );
+
+      if (headerText) {
+        setHtml(
+          headerText,
+          '<i class="bi bi-clipboard-x me-2"></i>Bench Summary'
+        );
+      }
+    }
+
+    reportsCollapsed = true;
   }
 
   function patch() {
@@ -508,6 +2171,9 @@
     simplifyHeader();
     simplifyInningControls();
     simplifyDefensePanel();
+    syncInningPickerPlacement();
+    syncPlayingTimePlacement();
+    syncLandscapeCoachRail();
     collapseSecondaryReportsOnce();
   }
 
@@ -518,10 +2184,39 @@
   }
 
   function start() {
-    document.addEventListener('click', preventActionAnchorJumps, true);
+    document.addEventListener(
+      'click',
+      preventActionAnchorJumps,
+      true
+    );
+
+    window.addEventListener(
+      'resize',
+      queuePatch,
+      {passive:true}
+    );
+
+    window.addEventListener(
+      'orientationchange',
+      queuePatch,
+      {passive:true}
+    );
+
     patch();
-    const observer = new MutationObserver(queuePatch);
-    observer.observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
+
+    const observer = new MutationObserver(
+      queuePatch
+    );
+
+    observer.observe(
+      document.body,
+      {
+        childList:true,
+        subtree:true,
+        attributes:true,
+        attributeFilter:['class']
+      }
+    );
   }
 
   document.readyState === 'loading'

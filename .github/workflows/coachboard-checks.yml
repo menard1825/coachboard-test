@@ -23,6 +23,17 @@ jobs:
           python -m py_compile \
             app.py \
             models.py \
+            lineup_service.py \
+            game_pitching_rules.py \
+            pitching_rule_presets.py \
+            migrations/versions/d4f8b2a719ce_normalize_lineup_templates.py \
+            migrations/versions/f9a2b6c4d1e7_add_team_fair_play_settings.py \
+            migrations/versions/3d9c8b7a4f21_add_team_pitching_preferences.py \
+            migrations/versions/5a7c2d9e4b11_add_activity_log.py \
+            migrations/versions/8b1d4f6a2c90_add_activity_timezone_context.py \
+            blueprints/auth.py \
+            blueprints/roster.py \
+            blueprints/fair_play.py \
             season_stats.py \
             blueprints/security_guard.py \
             blueprints/postgame_navigation.py \
@@ -34,27 +45,65 @@ jobs:
 
       - name: JavaScript syntax checks
         run: |
-          node --check static/js/navigation_v2.js
-          node --check static/js/postgame_game_management_cleanup.js
-          node --check static/js/user_management_password_help.js
-          node --check static/js/user_management_cleanup.js
-          node --check static/js/live_game_pitching_finalize.js
-          node --check static/js/live_game_clock.js
-          node --check static/js/stats_dashboard_integrity.js
-          node --check static/js/stats_dashboard_render.js
-          node --check static/js/stats_dashboard_v2.js
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "Checking ${file}"
+            node --check "$file"
+          done < <(find static/js -type f -name '*.js' -print0 | sort -z)
 
       - name: Migration chain check
         env:
           SECRET_KEY: ci-test-secret
           COACHBOARD_ENV: test
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: 'sqlite:///ci-lineup-migration.db'
           FLASK_APP: app.py
-        run: flask db heads
+        run: |
+          flask db heads
+          flask db upgrade
 
       - name: Regression tests
         env:
           SECRET_KEY: ci-test-secret
           COACHBOARD_ENV: test
-          DATABASE_URL: sqlite:///:memory:
-        run: pytest -q
+          DATABASE_URL: 'sqlite:///:memory:'
+        run: python -m pytest -q
+
+  browser-tests:
+    name: Playwright browser tests
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        env:
+          COACHBOARD_E2E: '1'
+          PYTHONUNBUFFERED: '1'
+        run: >-
+          python -u -m pytest -vv tests/e2e
+          --browser chromium
+          --tracing retain-on-failure
+          --screenshot only-on-failure
+          --video retain-on-failure
+          --output test-results/e2e
+
+      - name: Upload browser failure details
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coachboard-playwright-results
+          path: test-results/e2e
+          if-no-files-found: ignore
+          retention-days: 7

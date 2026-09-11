@@ -4,6 +4,8 @@
 <h2 class="auth-title">Join your team</h2>
 <p class="auth-subtitle">Use the registration code from your Head Coach. Your email is used for password recovery.</p>
 <form method="POST" action="{{ url_for('auth.register') }}">
+  <input type="hidden" name="client_timezone" data-client-timezone>
+  <input type="hidden" name="client_utc_offset_minutes" data-client-utc-offset>
   <div class="mb-3"><label class="form-label" for="full_name">Full name</label><input class="form-control" id="full_name" name="full_name" value="{{ form.get('full_name','') }}" autocomplete="name" required></div>
   <div class="mb-3"><label class="form-label" for="email">Email</label><input type="email" class="form-control" id="email" name="email" value="{{ form.get('email','') }}" autocomplete="email" required></div>
   <div class="mb-3"><label class="form-label" for="username">Username</label><input class="form-control" id="username" name="username" value="{{ form.get('username','') }}" autocomplete="username" autocapitalize="none" required></div>

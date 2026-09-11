@@ -51,9 +51,18 @@
         .cb-user-admin-card .card-header{padding:.85rem}
         .cb-user-admin-table thead{display:none}
         .cb-user-admin-table,.cb-user-admin-table tbody,.cb-user-admin-table tr,.cb-user-admin-table td{display:block;width:100%}
-        .cb-user-admin-table tr{padding:.8rem;border-bottom:1px solid #e5e7eb}
-        .cb-user-admin-table td{padding:.25rem 0;border:0!important;text-align:left!important}
-        .cb-user-admin-table td[data-label="Actions"]{padding-top:.6rem}
+        .cb-user-admin-table tbody{padding:.75rem;background:#f8fafc}
+        .cb-user-admin-table tr{margin:0 0 .75rem;padding:.9rem;border:1px solid #e2e8f0!important;border-radius:12px;background:#fff!important;box-shadow:0 2px 8px rgba(15,23,42,.05)}
+        .cb-user-admin-table tr:last-child{margin-bottom:0}
+        .cb-user-admin-table td{padding:.35rem 0;border:0!important;position:static;text-align:left!important}
+        .cb-user-admin-table td:not([data-label="Username"]):not([data-label="Full Name"]):not([data-label="Actions"]){display:grid;grid-template-columns:80px minmax(0,1fr);column-gap:.55rem;align-items:center}
+        .cb-user-admin-table td::before{position:static;display:block;width:auto;padding:0;margin:0;color:#64748b;font-size:.64rem;font-weight:800;letter-spacing:.05em;line-height:1.2;text-align:left;text-transform:uppercase}
+        .cb-user-admin-table td[data-label="Username"]::before,
+        .cb-user-admin-table td[data-label="Full Name"]::before,
+        .cb-user-admin-table td[data-label="Actions"]::before{display:none}
+        .cb-user-admin-table td[data-label="Username"]{padding-bottom:.55rem}
+        .cb-user-admin-table td[data-label="Actions"]{padding-top:.75rem}
+        .cb-current-team-pill{max-width:100%;white-space:normal}
         .cb-manage-user{width:100%}
         .cb-switch-team-note{max-width:none}
       }
