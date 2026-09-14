@@ -152,15 +152,34 @@
     }
   }
 
-  function clearDraft({restore = false} = {}) {
+  function clearDraft({
+    restore = false,
+    preserveOpen = false,
+  } = {}) {
     if (restore && draft) {
       draft.alignment = {...draft.baseAlignment};
       renderDraft();
     }
-    document.querySelector('#cbQuickDefense .cb-main-draft-banner')?.remove();
-    document.querySelectorAll('#cbQuickDefense .cb-main-open').forEach(el => el.classList.remove('cb-main-open'));
+
+    document.querySelector(
+      '#cbQuickDefense .cb-main-draft-banner'
+    )?.remove();
+
+    if (!preserveOpen) {
+      document.querySelectorAll(
+        '#cbQuickDefense .cb-main-open'
+      ).forEach(
+        element => element.classList.remove(
+          'cb-main-open'
+        )
+      );
+    }
+
     draft = null;
-    if (!saveBusy) setSaveBadge('', 'Saved ✓');
+
+    if (!saveBusy) {
+      setSaveBadge('', 'Saved ✓');
+    }
   }
 
   function applyMove(alignment, name, destination) {
@@ -289,7 +308,10 @@
           }
 
           renderDraft();
-          clearDraft({restore: false});
+          clearDraft({
+            restore: false,
+            preserveOpen: true,
+          });
         } else {
           clearDraft({restore: true});
         }
