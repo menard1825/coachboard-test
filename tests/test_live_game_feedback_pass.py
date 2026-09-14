@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import pytest
 from werkzeug.security import generate_password_hash
 
 
@@ -243,6 +244,219 @@ def test_advance_inning_commits_new_defense_and_inning_together(monkeypatch):
         assert event.inning == '3'
         assert event.after_alignment == next_alignment
         assert db.session.query(GameNextInningPrep).filter_by(game_id=70, team_id=1).first() is None
+
+
+def _next_alignment_with_new_pitcher(pitcher_name):
+    # Jack comes in from the bench to pitch; Aiden (the old pitcher) moves
+    # to 1B instead of the bench, matching a realistic in-game shuffle.
+    return {
+        'P': pitcher_name,
+        'C': 'Bennett',
+        '1B': 'Aiden',
+        '2B': 'Drew',
+        '3B': 'Eli',
+        'SS': 'Finn',
+        'LF': 'Gavin',
+        'CF': 'Hudson',
+        'RF': 'Carter',
+    }
+
+
+def _seed_next_inning_prep(alignment):
+    """Call inside an active app context."""
+    from blueprints.live_game_ui import GameNextInningPrep
+    from db import db
+
+    db.session.add(GameNextInningPrep(
+        inning='3',
+        alignment=alignment,
+        source='custom',
+        updated_by='Test Coach',
+        game_id=70,
+        team_id=1,
+    ))
+    db.session.commit()
+
+
+def test_advance_inning_eligible_new_pitcher_succeeds(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from blueprints import live_game_bulk_api as bulk_module
+    monkeypatch.setattr(
+        bulk_module,
+        'get_authoritative_live_state',
+        lambda game_id, team_id: {'pitch_count_summary': {'Jack': {'status': 'Available'}}},
+    )
+
+    next_alignment = _next_alignment_with_new_pitcher('Jack')
+
+    with app.app_context():
+        _seed_next_inning_prep(next_alignment)
+
+    response = client.post('/api/live-game/70/advance-inning', json={
+        'base_sequence': 0,
+        'alignment': next_alignment,
+    })
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['status'] == 'success'
+    assert payload['delta']['current_inning'] == '3'
+    assert payload['delta']['current_alignment']['P'] == 'Jack'
+
+    from blueprints.live_game_ui import GameNextInningPrep
+    from db import db
+    from models import Game
+
+    with app.app_context():
+        game = db.session.get(Game, 70)
+        assert game.live_current_inning == '3'
+        assert db.session.query(GameNextInningPrep).filter_by(game_id=70, team_id=1).first() is None
+
+
+def test_advance_inning_continuing_pitcher_bypasses_eligibility_gate(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    # Aiden continues from NOW into NEXT. If the gate were invoked at all
+    # for a continuing pitcher, this would raise and fail the test.
+    from blueprints import live_game_bulk_api as bulk_module
+
+    def _boom(game_id, team_id):
+        raise AssertionError(
+            'the new-pitcher eligibility gate must not run for a '
+            'continuing pitcher'
+        )
+    monkeypatch.setattr(bulk_module, 'get_authoritative_live_state', _boom)
+
+    next_alignment = {
+        'P': 'Aiden',
+        'C': 'Bennett',
+        '1B': 'Jack',
+        '2B': 'Drew',
+        '3B': 'Eli',
+        'SS': 'Finn',
+        'LF': 'Gavin',
+        'CF': 'Hudson',
+        'RF': 'Carter',
+    }
+
+    with app.app_context():
+        _seed_next_inning_prep(next_alignment)
+
+    response = client.post('/api/live-game/70/advance-inning', json={
+        'base_sequence': 0,
+        'alignment': next_alignment,
+    })
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['status'] == 'success'
+    assert payload['delta']['current_alignment']['P'] == 'Aiden'
+
+
+@pytest.mark.parametrize('pitch_count_summary, expected_message_fragment', [
+    ({'Jack': {'status': 'Resting', 'status_detail': '40 game pitches on Mon, Aug 24 require 2 day(s) rest.'}}, 'Resting'),
+    ({'Jack': {'status': 'Pitch Count Incomplete'}}, 'Pitch Count Incomplete'),
+    ({'Jack': {'status': 'Innings Incomplete'}}, 'Innings Incomplete'),
+    ({'Jack': {'status': 'Verify Rules'}}, 'Verify Rules'),
+    ({'Jack': {'status': 'Eligibility Error', 'status_detail': "CoachBoard could not calculate pitching eligibility."}}, 'Eligibility Error'),
+    ({}, "could not verify Jack's pitching eligibility"),
+    ({'Jack': {'status': ''}}, "could not verify Jack's pitching eligibility"),
+    ({'Jack': {'status': 'Something Nobody Has Invented Yet'}}, 'Something Nobody Has Invented Yet'),
+], ids=[
+    'resting', 'pitch_count_incomplete', 'innings_incomplete', 'verify_rules',
+    'eligibility_error', 'missing_summary', 'empty_status', 'unknown_future_status',
+])
+def test_advance_inning_ineligible_new_pitcher_is_rejected(monkeypatch, pitch_count_summary, expected_message_fragment):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from blueprints import live_game_bulk_api as bulk_module
+    monkeypatch.setattr(
+        bulk_module,
+        'get_authoritative_live_state',
+        lambda game_id, team_id: {'pitch_count_summary': pitch_count_summary},
+    )
+
+    next_alignment = _next_alignment_with_new_pitcher('Jack')
+
+    with app.app_context():
+        _seed_next_inning_prep(next_alignment)
+
+    response = client.post('/api/live-game/70/advance-inning', json={
+        'base_sequence': 0,
+        'alignment': next_alignment,
+    })
+
+    assert response.status_code == 409
+    payload = response.get_json()
+    assert payload['status'] == 'error'
+    assert payload['code'] == 'pitcher_not_eligible'
+    assert expected_message_fragment in payload['message']
+
+    from blueprints.live_game_ui import GameNextInningPrep
+    from db import db
+    from models import Game, GameRotationEvent
+
+    with app.app_context():
+        game = db.session.get(Game, 70)
+        assert game.live_current_inning == '2'
+        assert db.session.query(GameNextInningPrep).filter_by(game_id=70, team_id=1).first() is not None
+        assert db.session.query(GameRotationEvent).filter_by(game_id=70, team_id=1).count() == 0
+
+
+@pytest.mark.parametrize('pitch_count_summary, expected_message_fragment', [
+    ({'Carter': {'status': 'Eligibility Error'}}, 'Eligibility Error'),
+    ({}, "could not verify Carter's pitching eligibility"),
+    ({'Carter': {'status': 'Something Nobody Has Invented Yet'}}, 'Something Nobody Has Invented Yet'),
+], ids=['eligibility_error', 'missing_summary', 'unknown_future_status'])
+def test_complete_pitcher_change_blocks_via_shared_helper(monkeypatch, pitch_count_summary, expected_message_fragment):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from blueprints import live_game_bulk_api as bulk_module
+    monkeypatch.setattr(
+        bulk_module,
+        'get_authoritative_live_state',
+        lambda game_id, team_id: {'pitch_count_summary': pitch_count_summary},
+    )
+
+    swapped = {
+        'P': 'Carter',
+        'C': 'Bennett',
+        '1B': 'Aiden',
+        '2B': 'Drew',
+        '3B': 'Eli',
+        'SS': 'Finn',
+        'LF': 'Gavin',
+        'CF': 'Hudson',
+        'RF': 'Isaac',
+    }
+    response = client.post('/api/live-game/70/complete-pitcher-change', json={
+        'base_sequence': 0,
+        'fast': True,
+        'new_pitcher_id': 3,
+        'alignment': swapped,
+    })
+
+    assert response.status_code == 409
+    payload = response.get_json()
+    assert payload['status'] == 'error'
+    assert expected_message_fragment in payload['message']
+
+    from models import Game, GameRotationEvent
+    from db import db
+
+    with app.app_context():
+        game = db.session.get(Game, 70)
+        assert game.live_current_inning == '2'
+        assert db.session.query(GameRotationEvent).filter_by(game_id=70, team_id=1).count() == 0
 
 
 def test_field_player_can_take_mound_without_benching_outgoing_pitcher(monkeypatch):

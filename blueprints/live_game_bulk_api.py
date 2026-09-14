@@ -37,11 +37,37 @@ def _present_players(game, team_id):
     return [player for player in players if player.id not in absent_ids]
 
 
-def _pitcher_status_blocks_change(summary):
-    status = str((summary or {}).get('status') or '').lower()
-    return any(term in status for term in (
-        'rest', 'unavailable', 'ineligible', 'incomplete', 'restriction', 'verify'
-    ))
+def _pitcher_eligibility_block(game, team, pitcher_name):
+    """Authoritative eligibility check shared by every action that puts a
+    pitcher on the mound as live state (Change Pitcher, End Inning).
+
+    Fail-closed by allowlist, not blocklist: only an explicit 'Available'
+    status permits assigning a new pitcher. A known-blocking status, an
+    unrecognized/future status, an empty status, or a missing summary
+    entirely all block. A caller that already knows the pitcher is simply
+    continuing from NOW into NEXT should not call this at all.
+
+    Returns (blocked, message). message is only meaningful when blocked.
+    """
+    state = get_authoritative_live_state(game.id, team.id) or {}
+    summary = (state.get('pitch_count_summary') or {}).get(pitcher_name)
+    status = str((summary or {}).get('status') or '').strip()
+
+    if status == 'Available':
+        return False, None
+
+    if not summary or not status:
+        return True, (
+            f"CoachBoard could not verify {pitcher_name}'s pitching "
+            "eligibility. Verify pitching history before using this "
+            "player to pitch."
+        )
+
+    detail = summary.get('status_detail') or summary.get('next_available')
+    message = f'{pitcher_name} cannot pitch right now: {status}.'
+    if detail:
+        message += f' {detail}'
+    return True, message
 
 
 def _missing_positions(alignment, allowed):
@@ -222,14 +248,8 @@ def complete_pitcher_change(game_id):
     if old_pitcher_name == new_pitcher.name:
         return jsonify({'status': 'error', 'message': 'That player is already pitching.'}), 409
 
-    state = get_authoritative_live_state(game.id, team.id) or {}
-    pitcher_summary = (state.get('pitch_count_summary') or {}).get(new_pitcher.name, {})
-    if _pitcher_status_blocks_change(pitcher_summary):
-        status = pitcher_summary.get('status') or 'not available'
-        detail = pitcher_summary.get('status_detail') or pitcher_summary.get('next_available')
-        message = f'{new_pitcher.name} cannot pitch right now: {status}.'
-        if detail:
-            message += f' {detail}'
+    blocked, message = _pitcher_eligibility_block(game, team, new_pitcher.name)
+    if blocked:
         return jsonify({'status': 'error', 'message': message}), 409
 
     after = {}
@@ -481,12 +501,22 @@ def advance_inning(game_id):
 
     old_pitcher = before.get('P')
     new_pitcher = after.get('P')
+
+    # NEXT defaults to carrying the current pitcher forward, so this is the
+    # common case and must not gate on eligibility. Only a genuine pitching
+    # change at the End Inning commit boundary goes through the same
+    # authoritative check Change Pitcher already enforces.
+    if new_pitcher != old_pitcher:
+        blocked, message = _pitcher_eligibility_block(game, team, new_pitcher)
+        if blocked:
+            return jsonify({
+                'status': 'error',
+                'code': 'pitcher_not_eligible',
+                'message': message,
+            }), 409
+
     old_pitcher_id = _player_id_by_name(old_pitcher, team.id)
     new_pitcher_id = _player_id_by_name(new_pitcher, team.id)
-
-    # CoachBoard is the defensive whiteboard during a live game.
-    # Pitching status can be advisory, but it does not block putting the
-    # planned pitcher on the field for the next inning.
 
     event = _event(
         game,
