@@ -178,21 +178,18 @@ def edit_game(game_id):
 
 @gameday_bp.route('/delete_game/<int:game_id>')
 def delete_game(game_id):
-    team_id = session['team_id']
-    game_to_delete = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
-    if game_to_delete:
-        game_date_str = game_to_delete.date.strftime('%m/%d/%Y')
-
-        # Delete associated Lineup and Rotation to prevent orphaning
-        db.session.query(Lineup).filter_by(associated_game_id=game_id, team_id=team_id).delete()
-        db.session.query(Rotation).filter_by(associated_game_id=game_id, team_id=team_id).delete()
-
-        db.session.delete(game_to_delete)
-        db.session.commit()
-        flash(f'Game vs "{game_to_delete.opponent}" on {game_date_str} removed successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Game deleted.'})
-    else:
-        flash('Game not found.', 'danger')
+    # This legacy GET route no longer deletes anything. It used to clean up
+    # only Lineup/Rotation and skip PlayerPitchTarget/GamePitchingRule/
+    # GameNextInningPrep, which could either crash with a foreign-key error
+    # or, worse, silently delete a live game that hadn't yet auto-seeded a
+    # NEXT-inning prep row. Game deletion now only ever happens through the
+    # canonical POST /game-day/<id>/delete route (game_day.delete_game),
+    # which is the one place the authoritative cleanup list lives.
+    #
+    # Deliberately does not query the database at all: no lookup means no
+    # mutation and no way to leak whether a game id exists or which team
+    # owns it, for any caller including a stale client hitting an old link.
+    flash('Deleting a game now happens from Game Day. Use the delete button there.', 'info')
     return redirect(url_for('game_day.game_day_home'))
 
 @gameday_bp.route('/game/<int:game_id>/update_absences', methods=['POST'])

@@ -284,24 +284,33 @@ def add_game():
     return redirect(url_for('gameday.game_management', game_id=game.id))
 
 
-@game_day_bp.route('/game-day/<int:game_id>/delete', methods=['POST'])
-def delete_game(game_id):
-    """Delete a scheduled/test game from Game Day without allowing live-game loss."""
-    team = _team_context()
-    if not team or 'logged_in' not in session:
-        return jsonify({'status': 'error', 'message': 'Unauthorized.'}), 401
+def delete_game_and_related(game, team):
+    """Authoritative cleanup for a permanently deleted game.
 
-    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
-    if not game:
-        return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
+    This is CoachBoard's one canonical game-deletion implementation. Every
+    caller (dashboard, Game Day) must route through this function so the
+    cleanup list cannot drift between two independent implementations again.
+
+    Refuses to delete a live game and mutates nothing in that case. This is
+    the one place that rule is enforced, so any future caller inherits it
+    automatically instead of depending on the calling route remembering to
+    check game.is_live itself.
+
+    Lineup/Rotation/PlayerPitchTarget/GamePitchingRule/GameNextInningPrep use
+    integer game ids rather than an ORM relationship with cascade, so they are
+    removed explicitly here. PlayerGameAbsence, PitchingOuting,
+    GameRotationEvent, and GamePitchingPlan already cascade via the Game
+    model's own relationships; GameClockState cascades at the database level.
+    Deleting a game's PitchingOuting history along with it is existing,
+    intentional behavior and is not changed here.
+
+    Returns True if the game was deleted, False if it was live and nothing
+    was mutated. Callers are responsible for the team-scoped lookup and for
+    committing afterward so the whole operation stays one transaction.
+    """
     if game.is_live:
-        return jsonify({
-            'status': 'error',
-            'message': 'A live game cannot be deleted. End the game first.',
-        }), 409
+        return False
 
-    # Planning records use integer game ids rather than ORM relationships, so
-    # remove them explicitly before deleting the game.
     db.session.query(Lineup).filter_by(
         associated_game_id=game.id,
         team_id=team.id,
@@ -327,8 +336,28 @@ def delete_game(game_id):
         team_id=team.id,
     ).delete(synchronize_session=False)
 
-    opponent = game.opponent
     db.session.delete(game)
+    return True
+
+
+@game_day_bp.route('/game-day/<int:game_id>/delete', methods=['POST'])
+def delete_game(game_id):
+    """Delete a scheduled/test game from Game Day without allowing live-game loss."""
+    team = _team_context()
+    if not team or 'logged_in' not in session:
+        return jsonify({'status': 'error', 'message': 'Unauthorized.'}), 401
+
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
+    if not game:
+        return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
+
+    opponent = game.opponent
+    if not delete_game_and_related(game, team):
+        return jsonify({
+            'status': 'error',
+            'message': 'A live game cannot be deleted. End the game first.',
+        }), 409
+
     db.session.commit()
     socketio.emit('data_updated', {'message': f'Game vs {opponent} deleted.'})
     return jsonify({
