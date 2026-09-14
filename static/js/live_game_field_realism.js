@@ -134,7 +134,7 @@
         }
       }
 
-      @media (min-width: 576px) and (max-width: 899.98px) {
+      @media (min-width: 576px) and (max-width: 899.98px) and (min-height: 600px) {
         .coach-live-shell { max-width: 860px !important; padding: 0 10px; }
         .coach-actions { grid-template-columns: repeat(3, minmax(0,1fr)) !important; gap:10px !important; }
         #liveSetDefenseBtnCoach { grid-column: auto !important; }
@@ -148,7 +148,7 @@
         .coach-field.coach-real-field .coach-field-spot span { font-size: .68rem !important; }
       }
 
-      @media (min-width: 900px) and (max-width: 1180px) {
+      @media (min-width: 900px) and (max-width: 1180px) and (min-height: 600px) {
         .coach-live-shell { max-width: 1040px !important; padding: 0 14px; }
         .coach-actions { grid-template-columns: repeat(5, minmax(0,1fr)) !important; gap:10px !important; }
         #liveSetDefenseBtnCoach { grid-column:auto !important; }
@@ -160,7 +160,7 @@
          layout. Keep the field readable while putting bench/substitution tools
          beside it so an iPad Air does not spend nearly the whole screen on the
          diamond alone. */
-      @media (min-width: 900px) and (max-width: 1180px) and (orientation: landscape) {
+      @media (min-width: 900px) and (max-width: 1180px) and (min-height: 600px) and (orientation: landscape) {
         body.cb-dugout .coach-live-shell {
           max-width: 1080px !important;
           padding: 0 14px 24px !important;

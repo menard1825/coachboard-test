@@ -127,16 +127,28 @@
       )
       .sort((a,b)=>a.value-b.value);
 
-    const currentAssigned = new Set(Object.values(state?.current_alignment || {}).filter(Boolean));
+    const currentAssigned = new Set(
+      Object.values(state?.current_alignment || {})
+        .map(value => String(value ?? '').trim())
+        .filter(Boolean)
+    );
     const history = roster.map(player => {
       const name = String(player.name).trim();
       const sat = [];
       completed.forEach(item => {
-        if (!Object.values(item.alignment || {}).includes(name)) sat.push(inningLabel(item.inning));
+        const assigned = Object.values(item.alignment || {})
+          .map(value => String(value ?? '').trim());
+        if (!assigned.includes(name)) {
+          sat.push(inningLabel(item.inning));
+        }
       });
       const currentBench = !currentAssigned.has(name);
       const plannedSat = futurePlanned
-        .filter(item => !Object.values(item.alignment || {}).includes(name))
+        .filter(item => {
+          const assigned = Object.values(item.alignment || {})
+            .map(value => String(value ?? '').trim());
+          return !assigned.includes(name);
+        })
         .map(item => inningLabel(item.inning));
       const total = sat.length + (currentBench ? 1 : 0);
       return {player,name,display:rosterName(player),sat,currentBench,plannedSat,total};

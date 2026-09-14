@@ -152,7 +152,7 @@
       if (endButton) {
         endButton.classList.remove('btn-outline-danger');
         endButton.classList.add('btn-link', 'text-danger', 'text-decoration-none', 'px-0', 'small');
-        endButton.innerHTML = 'End Game & Enter Final Pitch Counts';
+        endButton.innerHTML = 'End Game';
       }
       extra?.appendChild(endGame);
     }
@@ -162,21 +162,9 @@
     enhanced = true;
   }
 
-  function polishPitcherPicker() {
-    document.querySelectorAll('#live-pitcher-picker-v2 .pitcher-choice-v2').forEach(button => {
-      if (!/Pitch Count Incomplete|Eligibility unknown/i.test(button.textContent || '')) return;
-      if (!button.hasAttribute('disabled')) button.setAttribute('disabled', 'disabled');
-      button.classList.add('opacity-50');
-    });
-  }
-
   function keepExistingExtrasInShell() {
-    const extra = $('coach-existing-extra');
-    if (!extra) return;
-    const upNext = $('live-up-next-v2');
-    if (upNext && !extra.contains(upNext)) extra.prepend(upNext);
-    const endGame = $('liveEndGameBtn')?.closest('.d-grid') || $('liveEndGameBtn');
-    if (endGame && !extra.contains(endGame)) extra.appendChild(endGame);
+    // enhance() performs initial placement.
+    // Do not reclaim or move live controls afterward.
   }
 
   function tick() {
@@ -188,7 +176,6 @@
       const inning = $('live-inning-display');
       if (inningCopy && inning && inningCopy.textContent !== inning.textContent) inningCopy.textContent = inning.textContent;
       keepExistingExtrasInShell();
-      polishPitcherPicker();
       return;
     }
 
@@ -214,8 +201,6 @@
     if (overlay) {
       const lifecycleObserver = new MutationObserver(queueTick);
       lifecycleObserver.observe(overlay, {attributes:true, attributeFilter:['class']});
-      const contentObserver = new MutationObserver(queueTick);
-      contentObserver.observe(overlay, {childList:true, subtree:true, characterData:true});
     }
     const modalObserver = new MutationObserver(queueTick);
     modalObserver.observe(document.body, {childList:true, subtree:true});

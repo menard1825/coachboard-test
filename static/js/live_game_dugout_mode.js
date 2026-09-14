@@ -78,7 +78,7 @@
   }
 
   function sequenceFromState(value = state) {
-    return (value?.rotation_events || []).reduce(
+    const eventSequence = (value?.rotation_events || []).reduce(
       (max, event) => {
         if (event?.reverted) return max;
         return Math.max(
@@ -87,6 +87,15 @@
         );
       },
       0,
+    );
+
+    // Fast live writes arrive as deltas and can contain a newer
+    // authoritative sequence before rotation_events is refreshed.
+    // Using only rotation_events makes an immediate Undo look stale.
+    return Math.max(
+      eventSequence,
+      Number(value?.sequence) || 0,
+      Number(value?.event?.sequence) || 0,
     );
   }
 
@@ -102,7 +111,11 @@
       body.cb-dugout #rotation-card-container{padding:0!important;margin:0!important}
       body.cb-dugout #rotation-card-container>.card{border:0!important;border-radius:0!important;box-shadow:none!important;background:#eef1f4!important}
       body.cb-dugout #rotation-card-container>.card>.card-header,body.cb-dugout .coach-live-head,body.cb-dugout #cbLiveGameClock{display:none!important}
-      body.cb-dugout #live-game-overlay{min-height:100vh;background:#eef1f4!important;padding:0 0 24px!important}
+      body.cb-dugout #live-game-overlay{
+        min-height:100vh;
+        background:#eef1f4!important;
+        padding:0 0 24px!important;
+      }
       body.cb-dugout .coach-live-shell{max-width:1100px!important;margin:auto!important;padding:0 10px 24px!important}
       body.cb-dugout #coach-pitcher-slot{display:none!important}
 
@@ -193,7 +206,7 @@
       body.cb-dugout #live-pitcher-destination-v2 .btn,body.cb-dugout #next-inning-adjust-modal .btn{min-height:54px!important;font-size:.92rem!important;touch-action:manipulation}
       body.cb-dugout #next-inning-adjust-modal .form-select{min-height:52px!important;font-size:.95rem!important}
 
-      @media(min-width:768px){
+      @media(min-width:768px) and (min-height:600px){
         body.cb-dugout .coach-actions{grid-template-columns:repeat(4,minmax(0,1fr))!important}
         .cb-qd-field{min-height:330px}
         .cb-qd-spot{width:clamp(78px,11vw,122px)}
@@ -865,6 +878,35 @@
       clearRecoveredNetworkFailure();
     }
 
+    /*
+     * Undo is authoritative.
+     *
+     * The server has already reverted the event and returned the
+     * complete replacement state. Paint Quick Field immediately
+     * from that state instead of waiting for requestAnimationFrame.
+     *
+     * This intentionally bypasses the normal cb-main-* draft guard:
+     * a stale local editor must never be allowed to cover up a
+     * successful server-side Undo.
+     */
+    if (source === 'undo') {
+      const shell = document.querySelector(
+        '#live-game-overlay .coach-live-shell'
+      );
+
+      const card = shell
+        ? ensureQuickDefense(shell)
+        : null;
+
+      if (card && state?.game?.is_live) {
+        quickDefenseSignature =
+          quickDefenseStateSignature();
+
+        card.innerHTML =
+          quickDefenseMarkup();
+      }
+    }
+
     queue();
   }
 
@@ -876,6 +918,57 @@
     // state loader establish the full roster/team context.
     if (!state) {
       getState();
+      return;
+    }
+
+    /*
+     * An authoritative Undo leaves the reverted rotation event in
+     * rotation_events with reverted=true.
+     *
+     * A delayed Socket.IO/local delta for that SAME old event must
+     * never resurrect its pre-Undo alignment on this coach's screen.
+     *
+     * Prefer event id when available. Sequence is only a fallback for
+     * older delta shapes that do not include an event id.
+     */
+    const incomingEventId =
+      Number(delta.event?.id) || 0;
+
+    const incomingSequence =
+      Number(delta.event?.sequence) ||
+      Number(delta.sequence) ||
+      0;
+
+    const matchesRevertedEvent =
+      Array.isArray(state.rotation_events) &&
+      state.rotation_events.some(existing => {
+        if (!existing?.reverted) return false;
+
+        const existingId =
+          Number(existing?.id) || 0;
+
+        const existingSequence =
+          Number(existing?.sequence) || 0;
+
+        if (
+          incomingEventId &&
+          existingId === incomingEventId
+        ) {
+          return true;
+        }
+
+        if (
+          !incomingEventId &&
+          incomingSequence &&
+          existingSequence === incomingSequence
+        ) {
+          return true;
+        }
+
+        return false;
+      });
+
+    if (matchesRevertedEvent) {
       return;
     }
 
@@ -948,38 +1041,14 @@
   }
 
   function arrange(shell) {
-    [
-      ['liveChangePitcherBtn', 'Change Pitcher', 'Mound change'],
-      ['liveEndInningBtn', 'End Inning', 'Load the saved next defense'],
-      ['liveUndoBtn', 'Undo', 'Reverse the last live change'],
-    ].forEach(([id, titleText, note]) => setHtml($(id), `<span class="coach-action-title">${titleText}</span><span class="coach-action-note">${note}</span>`));
-
-    const end = $('liveEndGameBtn');
-    if (end) {
-      let zone = shell.querySelector('.cb-end-zone');
-      if (!zone) {
-        zone = document.createElement('div');
-        zone.className = 'cb-end-zone';
-        zone.innerHTML = '<small>Only when the baseball game is over</small>';
-        shell.appendChild(zone);
-      }
-      if (end.parentElement !== zone) zone.appendChild(end);
-      setHtml(end, '<i class="bi bi-stop-circle me-1"></i> End Game');
-    }
-
-    const board = $('live-board-prep-v3');
-    if (board) {
-      setText(board.querySelector('.bp-kicker'), 'Next Inning');
-      setText(board.querySelector('.bp-help'), 'Pick the next defense. CoachBoard shows the physical-board moves you need to make.');
-      const badge = board.querySelector('.bp-status.ready .bp-status-badge');
-      if (badge) setText(badge, 'DEFENSE SAVED');
-    }
+    // Canonical live action controls retain one DOM owner.
+    // Dugout does not rewrite or reparent them on every patch.
+    void shell;
   }
 
   function focusBoard() {
     const board = $('live-board-prep-v3');
     if (!board) return;
-    board.scrollIntoView({ behavior: 'smooth', block: 'start' });
     board.classList.remove('cb-board-flash');
     void board.offsetWidth;
     board.classList.add('cb-board-flash');
@@ -1091,8 +1160,6 @@
       // clock text, menus, toasts, and unrelated Bootstrap changes — caused needless
       // redraw scheduling during every live inning.
       new MutationObserver(queue).observe(liveOverlay, {
-        childList: true,
-        subtree: true,
         attributes: true,
         attributeFilter: ['class'],
       });

@@ -7,16 +7,6 @@
   let latestState = null;
   let busy = false;
 
-  function loadPitchingWorkloadUi() {
-    if (document.querySelector('script[data-pitching-workload-game]')) return;
-    const script = document.createElement('script');
-    script.src = '/static/js/live_game_pitching_workload.js';
-    script.dataset.pitchingWorkloadGame = 'true';
-    document.head.appendChild(script);
-  }
-
-  loadPitchingWorkloadUi();
-
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[ch]));
@@ -270,7 +260,7 @@
 
   async function finishGame() {
     if (busy) return;
-    const okay = window.confirm('End this game now?\n\nThe actual defense and live history will be saved. You can enter the final GameChanger pitching stats later when they are ready.');
+    const okay = window.confirm('End this game? You can paste GameChanger pitching stats later.');
     if (!okay) return;
 
     busy = true;

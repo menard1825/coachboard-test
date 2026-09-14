@@ -424,7 +424,7 @@
     loadScript('/static/js/game_management_coach_simplify.js', 'game-management-coach-simplify');
     loadScript('/static/js/future_pitcher_tbd.js', 'future-pitcher-tbd');
     loadScript('/static/js/game_pitching_rule_picker.js', 'game-pitching-rules');
-    loadScript('/static/js/live_game_sync_status.js', 'live-sync');
+    loadScript('/static/js/live_game_sync_status.js?v=20260914-live-cache-1', 'live-sync');
     loadScript('/static/js/live_game_clock.js', 'live-game-clock');
     loadScript('/static/js/assignment_picker_availability.js', 'assignment-picker-availability');
   }

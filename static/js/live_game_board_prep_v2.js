@@ -5,747 +5,1574 @@
   if (!match) return;
 
   const gameId = Number(match[1]);
+
   const CARD_ID = 'live-board-prep-v3';
-  const MODAL_ID = 'next-inning-adjust-modal';
-  const BODY_ID = 'next-inning-adjust-body';
-  const OWNED_ID = 'next-defense-editor-owned';
+  const SWITCH_ID = 'cb-now-next-switch';
   const STYLE_ID = 'live-next-defense-styles';
+
   let latest = null;
-  let draft = null;
+  let draft = {};
+  let activeView = 'now';
+  let selected = null;
   let selectedPosition = '';
   let busy = false;
   let lastSignature = '';
-  let bodyObserver = null;
-  let skipHiddenRefresh = false;
+  let saveMode = 'saved';
+  let saveMessage = 'Saved ✓';
+  let errorMessage = '';
+  let undoStack = [];
+  let socketBound = false;
 
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
-    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
-  }[ch]));
+  const $ = id => document.getElementById(id);
 
-  function positions(count) {
+  const esc = value => String(value ?? '').replace(
+    /[&<>"']/g,
+    ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch])
+  );
+
+  function positions(count = latest?.outfielder_count) {
     return Number(count) === 4
-      ? ['P','C','1B','2B','3B','SS','LF','LCF','RCF','RF']
-      : ['P','C','1B','2B','3B','SS','LF','CF','RF'];
+      ? ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'RCF', 'RF']
+      : ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
   }
 
-  function installStyles() {
-    if (document.getElementById(STYLE_ID)) return;
-    const style = document.createElement('style');
-    style.id = STYLE_ID;
-    style.textContent = `
-      #${CARD_ID}{border:1.5px solid #cfd6df;border-radius:13px;background:#fff;overflow:hidden;margin-bottom:12px;box-shadow:0 1px 4px rgba(16,24,40,.06)}
-      #${CARD_ID} .nxd-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:11px 12px 9px;border-bottom:1px solid #edf0f3}
-      #${CARD_ID} .nxd-kicker{font-size:.61rem;text-transform:uppercase;letter-spacing:.09em;font-weight:900;color:#667085}
-      #${CARD_ID} .nxd-title{font-size:1rem;font-weight:850;color:#172033;margin-top:1px}
-      #${CARD_ID} .nxd-help{font-size:.68rem;color:#667085;margin-top:2px}
-      #${CARD_ID} .nxd-inning{min-width:58px;border-radius:10px;background:#172033;color:#fff;padding:7px 9px;text-align:center}
-      #${CARD_ID} .nxd-inning small{display:block;font-size:.5rem;letter-spacing:.08em;opacity:.72;font-weight:800}
-      #${CARD_ID} .nxd-inning strong{display:block;font-size:1.25rem;line-height:1.05}
-      #${CARD_ID} .nxd-body{padding:10px 12px 12px}
-      #${CARD_ID} .nxd-status{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 9px;border-radius:10px;margin-bottom:9px}
-      #${CARD_ID} .nxd-status.waiting{background:#f7f9fc;border:1px solid #d8dee7}
-      #${CARD_ID} .nxd-status.ready{background:#edf8f1;border:1px solid #b7dcc3}
-      #${CARD_ID} .nxd-status strong{font-size:.78rem;color:#1d2939}
-      #${CARD_ID} .nxd-status small{display:block;margin-top:1px;font-size:.64rem;color:#667085}
-      #${CARD_ID} .nxd-badge{flex:0 0 auto;border-radius:999px;padding:4px 8px;font-size:.58rem;font-weight:900;letter-spacing:.04em;background:#667085;color:#fff}
-      #${CARD_ID} .ready .nxd-badge{background:#176b38}
-      #${CARD_ID} .nxd-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-      #${CARD_ID} .nxd-actions .btn{min-height:43px;border-radius:9px;font-size:.72rem;font-weight:820}
-      #${CARD_ID} .nxd-plan-note{margin-top:7px;padding:7px 8px;border:1px solid #dfe4ea;border-radius:8px;background:#f8fafc;color:#667085;font-size:.64rem;line-height:1.35}
-      #${CARD_ID} .nxd-plan-note strong{color:#344054}
-      #${CARD_ID} .nxd-change{width:100%;min-height:40px;border-radius:9px;font-size:.72rem;font-weight:820}
-      #${CARD_ID} .nxd-moves{display:grid;gap:6px;margin-bottom:9px}
-      #${CARD_ID} .nxd-move{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e3e7ec;background:#f8fafc;border-radius:9px;padding:7px 9px}
-      #${CARD_ID} .nxd-move strong{font-size:.76rem;color:#1d2939}
-      #${CARD_ID} .nxd-move small{display:block;font-size:.63rem;color:#667085;margin-top:1px}
-      #${CARD_ID} .nxd-dest{min-width:46px;border-radius:7px;background:#172033;color:#fff;padding:5px 6px;text-align:center;font-size:.66rem;font-weight:850}
-      #${CARD_ID} .nxd-dest.bench{background:#eef1f5;color:#475467}
-      #${CARD_ID} .nxd-none{border:1px dashed #d6dce3;border-radius:9px;padding:9px;color:#667085;font-size:.72rem;text-align:center;background:#fafbfc;margin-bottom:9px}
+  function spots(count = latest?.outfielder_count) {
+    const outfield = Number(count) === 4
+      ? [
+          ['LF', 10, 24],
+          ['LCF', 37, 14],
+          ['RCF', 63, 14],
+          ['RF', 90, 24],
+        ]
+      : [
+          ['LF', 14, 22],
+          ['CF', 50, 11],
+          ['RF', 86, 22],
+        ];
 
-      #${MODAL_ID} .modal-content{border:0;border-radius:15px;overflow:hidden}
-      #${MODAL_ID} .modal-body{padding:12px 14px 0}
-      #${MODAL_ID} .ni-label{font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;font-weight:900;color:#667085;margin-bottom:6px}
-      #${MODAL_ID} .ni-bench{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px}
-      #${MODAL_ID} .ni-bench-player{border:1px solid #cfd5dd;background:#fff;color:#253047;border-radius:9px;padding:7px 9px;font-size:.72rem;font-weight:780;touch-action:manipulation}
-      #${MODAL_ID} .ni-bench-player.selected{background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66);color:#fff}
-      #${MODAL_ID} .ni-selected{min-height:34px;border:1px solid #dfe4ea;background:#f8fafc;border-radius:9px;padding:7px 9px;margin-bottom:8px;color:#475467;font-size:.72rem}
-      #${MODAL_ID} .ni-selected strong{color:#172033}
-      #${MODAL_ID} .ni-player-chooser{border:2px solid var(--primary-color,#102a66);background:#f7f9fd;border-radius:11px;padding:10px;margin-bottom:9px}
-      #${MODAL_ID} .ni-player-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}
-      #${MODAL_ID} .ni-player-head strong{display:block;font-size:.82rem;color:#172033}
-      #${MODAL_ID} .ni-player-head span{display:block;font-size:.65rem;color:#667085;margin-top:2px}
-      #${MODAL_ID} .ni-player-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
-      #${MODAL_ID} .ni-player-choice{min-height:49px;border-radius:9px;text-align:left;padding:7px 9px;font-size:.72rem;font-weight:800}
-      #${MODAL_ID} .ni-player-choice small{display:block;font-size:.6rem;font-weight:600;opacity:.72;margin-top:2px}
-      #${MODAL_ID} .ni-player-cancel{min-height:34px;border-radius:8px;font-size:.67rem;font-weight:750}
-      #${MODAL_ID} .ni-field-wrap{margin:0 -2px 8px}
-      #${MODAL_ID} .cb-qd-field{width:100%!important;min-height:0!important;aspect-ratio:1.48/1!important;margin:0!important}
-      #${MODAL_ID} .cb-qd-spot{cursor:pointer}
-      #${MODAL_ID} .cb-qd-spot[data-ni-pos="P"]{cursor:default}
-      #${MODAL_ID} .cb-qd-spot.ni-selected-spot .cb-qd-name{outline:3px solid rgba(16,42,102,.22);border-color:var(--primary-color,#102a66)}
-      #${MODAL_ID} .ni-pitcher-note{font-size:.67rem;color:#667085;text-align:center;margin:-2px 0 8px}
-      #${MODAL_ID} .ni-footer{position:sticky;bottom:0;z-index:3;background:#fff;border-top:1px solid #e7eaf0;margin:10px -14px 0;padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center}
-      #${MODAL_ID} .ni-footer .btn{min-height:46px;border-radius:10px;font-weight:800}
-      #${MODAL_ID} .ni-warning{font-size:.7rem;color:#a32929;font-weight:750}
-      @media(max-width:575.98px){
-        #${CARD_ID} .nxd-actions{grid-template-columns:1fr 1fr}
-        #${CARD_ID} .nxd-actions .btn:last-child{grid-column:1/-1}
-        #${MODAL_ID} .modal-dialog{margin:.35rem}
-        #${MODAL_ID} .modal-header{padding:11px 13px 9px}
-        #${MODAL_ID} .modal-body{padding:9px 10px 0}
-        #${MODAL_ID} .cb-qd-field{aspect-ratio:1.58/1!important;max-height:235px!important}
-        #${MODAL_ID} .cb-qd-spot{width:62px!important}
-        #${MODAL_ID} .cb-qd-name{font-size:.56rem!important;padding:4px!important}
-        #${MODAL_ID} .ni-footer{margin:8px -10px 0;padding:9px 10px calc(9px + env(safe-area-inset-bottom))}
-      }
-    `;
-    document.head.appendChild(style);
+    return [
+      ...outfield,
+      ['3B', 18, 57],
+      ['SS', 38, 43],
+      ['2B', 62, 43],
+      ['1B', 82, 57],
+      ['P', 50, 61],
+      ['C', 50, 84],
+    ];
   }
 
-  function ensureCard() {
-    const host = document.getElementById('coach-existing-extra');
-    if (!host) return null;
-    let card = document.getElementById(CARD_ID);
-    if (!card) {
-      card = document.createElement('div');
-      card.id = CARD_ID;
-      host.prepend(card);
-    }
-    const legacy = document.getElementById('live-up-next-v2');
-    if (legacy) legacy.style.display = 'none';
-    return card;
-  }
-
-  function numberMap() {
-    const map = new Map();
-    document.querySelectorAll('#cbQuickDefense [data-cb-move-player]').forEach(el => {
-      const name = String(el.dataset.cbMovePlayer || '').trim();
-      if (!name || name === 'Open') return;
-      const text = String(el.textContent || '').replace(/\s+/g,' ').trim();
-      const found = text.match(/#(\d+)/);
-      if (found) map.set(name, found[1]);
+  function normalize(alignment) {
+    const clean = {};
+    positions().forEach(pos => {
+      clean[pos] = alignment?.[pos] || '';
     });
-    return map;
-  }
-
-  function playerLabel(name) {
-    const clean = String(name || '').trim();
-    if (!clean) return 'Open';
-    const number = numberMap().get(clean);
-    return number ? `#${number} ${clean}` : clean;
-  }
-
-  function coachLabel(value) {
-    const clean = String(value || '').trim();
-    if (!clean) return '';
-    if (!clean.includes(' ')) return '';
     return clean;
   }
 
-  function locationMap(alignment, roster) {
-    const map = new Map();
-    Object.entries(alignment || {}).forEach(([pos,name]) => { if (name) map.set(name,pos); });
-    (roster || []).forEach(player => { if (!map.has(player.name)) map.set(player.name,'BENCH'); });
-    return map;
+  function snapshot() {
+    return normalize(draft);
   }
 
-  function effectiveTarget(data) {
-    const confirmed = data?.confirmed;
-    if (!confirmed) return {};
-    if (confirmed.source === 'current') return data.current_alignment || {};
-    return confirmed.alignment || {};
+  function playerByName(name) {
+    return (latest?.roster || []).find(
+      player => player.name === name
+    ) || null;
   }
 
-  function movesBetween(current, next, roster) {
-    const before = locationMap(current, roster);
-    const after = locationMap(next, roster);
-    return [...new Set([...before.keys(), ...after.keys()])]
-      .map(name => ({name, from:before.get(name)||'BENCH', to:after.get(name)||'BENCH'}))
-      .filter(move => move.from !== move.to)
-      .sort((a,b) => {
-        if (a.to === 'P') return -1;
-        if (b.to === 'P') return 1;
-        if (a.to === 'BENCH' && b.to !== 'BENCH') return 1;
-        if (b.to === 'BENCH' && a.to !== 'BENCH') return -1;
-        return a.to.localeCompare(b.to) || a.name.localeCompare(b.name);
+  function playerLabel(name) {
+    if (!name) return 'OPEN';
+
+    const player = playerByName(name);
+    const number = String(player?.number ?? '').trim();
+
+    return number
+      ? `#${number} ${name}`
+      : name;
+  }
+
+  function assignedNames() {
+    return new Set(
+      Object.values(draft || {}).filter(Boolean)
+    );
+  }
+
+  function benchPlayers() {
+    const assigned = assignedNames();
+
+    return (latest?.roster || [])
+      .filter(player => !assigned.has(player.name))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function findSource(name) {
+    return positions().find(
+      pos => draft?.[pos] === name
+    ) || 'BENCH';
+  }
+
+  function duplicateNames() {
+    const counts = new Map();
+
+    Object.values(draft || {})
+      .filter(Boolean)
+      .forEach(name => {
+        counts.set(name, (counts.get(name) || 0) + 1);
       });
+
+    return [...counts.entries()]
+      .filter(([, count]) => count > 1)
+      .map(([name]) => name);
   }
 
-  function pregameCandidate(data) {
-    const planned = {...(data?.planned_alignment || {})};
-    const currentPitcher = data?.current_alignment?.P || '';
-    if (!Object.values(planned).some(Boolean) || !currentPitcher) return null;
-    const conflict = Object.entries(planned).find(([pos,name]) => pos !== 'P' && name === currentPitcher)?.[0];
-    if (conflict) return null;
-    planned.P = currentPitcher;
-    return planned;
+  function openPositions() {
+    return positions().filter(
+      pos => !draft?.[pos]
+    );
   }
 
-  function actionButtons(data) {
-    const pregame = pregameCandidate(data);
-    return `<div class="nxd-actions">
-      <button type="button" class="btn btn-outline-dark" data-bp-action="current">Same Defense</button>
-      <button type="button" class="btn btn-outline-primary" data-bp-action="planned" ${pregame ? '' : 'disabled'}>Use Planned Defense</button>
-      <button type="button" class="btn btn-primary" data-bp-action="adjust">New Defense</button>
-    </div>
-    <div class="nxd-plan-note">
-      <strong>Next inning only.</strong>
-      Nothing changes on the live field until you start the next inning.
-      Current pitcher stays; use Change Pitcher separately.
-    </div>`;
-  }
+  function nextWarningsMarkup() {
+    const open = openPositions();
+    const duplicates = duplicateNames();
+    const items = [];
 
-  function render(data) {
-    latest = data;
-    if (!data || data.status === 'inactive' || data.is_live === false) {
-      document.getElementById(CARD_ID)?.remove();
-      return false;
+    if (!draft?.P) {
+      items.push(
+        '<div class="cb-next-warning danger">' +
+        'Set a pitcher for the next inning.' +
+        '</div>'
+      );
     }
 
-    const card = ensureCard();
-    if (!card) return false;
-    const next = data.next_inning || '';
-    const confirmed = data.confirmed;
-    const current = data.current_alignment || {};
-    const roster = data.roster || [];
-    const head = `<div class="nxd-head"><div><div class="nxd-kicker">NEXT INNING</div><div class="nxd-title">Who’s Going Out Next?</div><div class="nxd-help">Inning ${esc(next)} defense</div></div><div class="nxd-inning"><small>NEXT</small><strong>${esc(next)}</strong></div></div>`;
+    const otherOpen = open.filter(pos => pos !== 'P');
 
-    if (!confirmed) {
-      const pregame = Object.values(data.planned_alignment || {}).some(Boolean)
-        ? `<div class="nxd-none">Your planned Inning ${esc(next)} defense is ready. <strong>Pregame Defense</strong> means the plan you saved before the game.</div>`
-        : `<div class="nxd-none">No planned defense for Inning ${esc(next)}.</div>`;
-      card.innerHTML = `${head}<div class="nxd-body"><div class="nxd-status waiting"><div><strong>Defense not set</strong><small>Choose who goes out after the third out.</small></div><span class="nxd-badge">NOT SET</span></div>${pregame}${actionButtons(data)}</div>`;
-      wireActions(card);
-      return true;
+    if (otherOpen.length) {
+      items.push(
+        `<div class="cb-next-warning">⚠ ${esc(
+          otherOpen.join(', ')
+        )} ${otherOpen.length === 1 ? 'is' : 'are'} open.</div>`
+      );
     }
 
-    const target = effectiveTarget(data);
-    const moves = movesBetween(current, target, roster);
-    const moveMarkup = moves.length
-      ? `<div class="nxd-moves">${moves.map(move => `<div class="nxd-move"><div><strong>${esc(playerLabel(move.name))}</strong><small>${esc(move.from)} → ${esc(move.to)}</small></div><div class="nxd-dest ${move.to === 'BENCH' ? 'bench' : ''}">${esc(move.to)}</div></div>`).join('')}</div>`
-      : '<div class="nxd-none">Same nine going back out.</div>';
-    const coach = coachLabel(confirmed.updated_by);
-    const status = moves.length ? 'New defense locked in' : 'Same nine going back out';
-    card.innerHTML = `${head}<div class="nxd-body"><div class="nxd-status ready"><div><strong>${status}</strong>${coach ? `<small>${esc(coach)} set this</small>` : ''}</div><span class="nxd-badge">LOCKED IN</span></div>${moveMarkup}<button type="button" class="btn btn-outline-primary nxd-change" data-bp-action="adjust">Change it</button></div>`;
-    wireActions(card);
-    return true;
-  }
-
-  async function api(method='GET', body=null) {
-    const response = await fetch(`/api/live-game/${gameId}/next-inning-prep`, {
-      method,
-      headers: body ? {'Content-Type':'application/json'} : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-      cache:'no-store'
+    duplicates.forEach(name => {
+      items.push(
+        `<div class="cb-next-warning danger">` +
+        `${esc(playerLabel(name))} is assigned to more than one position.` +
+        `</div>`
+      );
     });
+
+    if (!items.length) {
+      items.push(
+        '<div class="cb-next-ready">✓ NEXT is ready</div>'
+      );
+    }
+
+    return items.join('');
+  }
+
+  function planStateText() {
+    const source = latest?.confirmed?.source || '';
+
+    if (source === 'planned') {
+      return 'Loaded from your pregame plan';
+    }
+
+    if (source === 'current') {
+      return 'Matches current defense';
+    }
+
+    return 'NEXT edited';
+  }
+
+  function selectionHelp() {
+    if (selected) {
+      return `
+        <div class="cb-next-selection active" role="status" aria-live="polite">
+          <div class="cb-next-step">STEP 2 · CHOOSE DESTINATION</div>
+          <div class="cb-next-selection-main">
+            Moving <strong>${esc(playerLabel(selected.name))}</strong>
+          </div>
+          <div class="cb-next-selection-sub">
+            Tap the position where this player should go.
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary mt-2"
+            data-next-cancel
+          >Cancel move</button>
+        </div>`;
+    }
+
+    if (selectedPosition) {
+      return `
+        <div class="cb-next-selection active" role="status" aria-live="polite">
+          <div class="cb-next-step">STEP 2 · CHOOSE PLAYER</div>
+          <div class="cb-next-selection-main">
+            Who should play <strong>${esc(selectedPosition)}</strong>?
+          </div>
+          <div class="cb-next-selection-sub">
+            Tap a player on the field or bench.
+          </div>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary mt-2"
+            data-next-cancel
+          >Cancel move</button>
+        </div>`;
+    }
+
+    return `
+      <div class="cb-next-selection quiet">
+        <div class="cb-next-step">STEP 1</div>
+        <div class="cb-next-selection-main">
+          Tap the player you want to move.
+        </div>
+      </div>`;
+  }
+
+  function fieldSpot(pos, left, top) {
+    const name = draft?.[pos] || '';
+    const isOpen = !name;
+
+    const selectedHere =
+      (
+        selected &&
+        selected.source === pos &&
+        selected.name === name
+      ) ||
+      selectedPosition === pos;
+
+    const isDestination =
+      Boolean(selected) &&
+      selected.source !== pos;
+
+    return `
+      <button
+        type="button"
+        class="cb-qd-spot cb-next-spot
+          ${pos === 'P' ? 'pitcher' : ''}
+          ${isOpen ? 'cb-next-open' : ''}
+          ${selectedHere ? 'cb-next-selected' : ''}
+          ${isDestination ? 'cb-next-destination' : ''}"
+        style="left:${left}%;top:${top}%"
+        data-next-position="${esc(pos)}"
+        data-next-player="${esc(name)}"
+        aria-label="${esc(
+          isOpen
+            ? `${pos} open`
+            : `${playerLabel(name)} at ${pos}`
+        )}"
+      >
+        <span class="cb-qd-pos">${esc(pos)}</span>
+        <span class="cb-qd-name">
+          ${esc(isOpen ? 'OPEN' : playerLabel(name))}
+        </span>
+      </button>`;
+  }
+
+  function fieldMarkup() {
+    return `
+      <div class="cb-qd-field cb-next-field">
+        <svg
+          class="cb-qd-field-art"
+          viewBox="0 0 100 88"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M7 57 Q9 13 50 6 Q91 13 93 57"
+            fill="none"
+            stroke="rgba(245,245,220,.38)"
+            stroke-width="1.2"
+          />
+          <path
+            d="M50 84 L8 38 M50 84 L92 38"
+            fill="none"
+            stroke="rgba(255,255,255,.88)"
+            stroke-width=".7"
+          />
+          <polygon
+            points="50,75 27,54 50,32 73,54"
+            fill="#cfa56c"
+            opacity=".95"
+          />
+          <polygon
+            points="50,68 34,54 50,40 66,54"
+            fill="#438f58"
+          />
+          <circle cx="50" cy="61" r="4.8" fill="#cfa56c"/>
+          <circle cx="50" cy="81" r="6.2" fill="#cfa56c"/>
+        </svg>
+
+        ${spots().map(
+          ([pos, left, top]) => fieldSpot(pos, left, top)
+        ).join('')}
+      </div>`;
+  }
+
+  function benchMarkup() {
+    const bench = benchPlayers();
+
+    return `
+      <div class="cb-next-bench ${selected ? 'destination-active' : ''}">
+        <div class="cb-next-bench-head">
+          <strong>Bench · ${bench.length}</strong>
+          <span>
+            ${
+              selected
+                ? 'Bench is also a destination'
+                : 'Tap a bench player to move them'
+            }
+          </span>
+        </div>
+
+        ${
+          selected && selected.source !== 'BENCH'
+            ? `
+              <button
+                type="button"
+                class="cb-next-send-bench"
+                data-next-bench-selected
+              >
+                SEND ${esc(playerLabel(selected.name))} TO BENCH
+              </button>
+            `
+            : ''
+        }
+
+        <div class="cb-next-bench-chips">
+          ${
+            bench.length
+              ? bench.map(player => `
+                  <button
+                    type="button"
+                    class="cb-next-bench-player
+                      ${
+                        selected?.source === 'BENCH' &&
+                        selected?.name === player.name
+                          ? 'selected'
+                          : ''
+                      }"
+                    data-next-bench-player="${esc(player.name)}"
+                  >
+                    ${esc(playerLabel(player.name))}
+                  </button>
+                `).join('')
+              : '<span class="small text-muted">Nobody on the bench.</span>'
+          }
+        </div>
+      </div>`;
+  }
+
+  function installStyles() {
+    if ($(STYLE_ID)) return;
+
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      #${SWITCH_ID}{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:4px;
+        padding:4px;
+        margin:0 0 8px;
+        border:1px solid #d7dde5;
+        border-radius:12px;
+        background:#e9edf2;
+      }
+
+      #${SWITCH_ID} .btn{
+        min-height:42px;
+        border:0!important;
+        border-radius:9px!important;
+        background:transparent;
+        color:#475467;
+        font-weight:900;
+        box-shadow:none!important;
+      }
+
+      #${SWITCH_ID} .btn.active{
+        background:#172033!important;
+        color:#fff!important;
+      }
+
+      #${CARD_ID}{
+        border:1.5px solid #cfd6df;
+        border-radius:14px;
+        background:#fff;
+        overflow:hidden;
+        margin:0 0 10px;
+        box-shadow:0 2px 7px rgba(16,24,40,.08);
+      }
+
+      #${CARD_ID}[hidden]{
+        display:none!important;
+      }
+
+      #${CARD_ID} .cb-next-head{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:10px;
+        padding:11px 12px 9px;
+        border-bottom:1px solid #e7ebef;
+      }
+
+      #${CARD_ID} .cb-next-kicker{
+        color:#667085;
+        font-size:.6rem;
+        font-weight:900;
+        text-transform:uppercase;
+        letter-spacing:.09em;
+      }
+
+      #${CARD_ID} .cb-next-title{
+        color:#172033;
+        font-size:1.05rem;
+        line-height:1.15;
+        font-weight:900;
+      }
+
+      #${CARD_ID} .cb-next-sub{
+        margin-top:2px;
+        color:#667085;
+        font-size:.67rem;
+      }
+
+      #${CARD_ID} .cb-next-save{
+        flex:0 0 auto;
+        min-height:30px;
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        padding:5px 8px;
+        border:1px solid #b8ddc4;
+        border-radius:999px;
+        background:#edf8f1;
+        color:#176b38;
+        font-size:.62rem;
+        font-weight:850;
+      }
+
+      #${CARD_ID} .cb-next-save.saving{
+        border-color:#bdd0ea;
+        background:#f2f6fc;
+        color:#315d98;
+      }
+
+      #${CARD_ID} .cb-next-save.error{
+        border-color:#efb5ae;
+        background:#fff1ef;
+        color:#a12d26;
+      }
+
+      #${CARD_ID} .cb-next-body{
+        padding:10px 11px 11px;
+      }
+
+      #${CARD_ID} .cb-next-selection{
+        min-height:42px;
+        margin-bottom:8px;
+        padding:9px 10px;
+        border:1px solid #b9cbea;
+        border-radius:10px;
+        background:#f3f7fd;
+        color:#344054;
+        font-size:.72rem;
+      }
+
+      #${CARD_ID} .cb-next-selection.active{
+        border:2px solid #315d98;
+        background:#eef4ff;
+        box-shadow:0 0 0 3px rgba(49,93,152,.12);
+      }
+
+      #${CARD_ID} .cb-next-selection.quiet{
+        border-color:#e3e7ec;
+        background:#fafbfc;
+        color:#667085;
+      }
+
+      #${CARD_ID} .cb-next-step{
+        color:#315d98;
+        font-size:.59rem;
+        font-weight:950;
+        letter-spacing:.08em;
+        text-transform:uppercase;
+      }
+
+      #${CARD_ID} .cb-next-selection-main{
+        margin-top:2px;
+        color:#172033;
+        font-size:.79rem;
+        font-weight:850;
+      }
+
+      #${CARD_ID} .cb-next-selection-sub{
+        margin-top:2px;
+        color:#667085;
+        font-size:.66rem;
+      }
+
+      #${CARD_ID} .cb-next-field{
+        width:min(100%,760px);
+        min-height:0;
+        margin-inline:auto;
+        aspect-ratio:1.28/1;
+      }
+
+      #${CARD_ID} .cb-next-open .cb-qd-name{
+        border:2px dashed #b5473d!important;
+        background:#fff3f1!important;
+        color:#9b2c24!important;
+        font-weight:950!important;
+      }
+
+      #${CARD_ID} .cb-next-selected .cb-qd-name{
+        outline:4px solid rgba(23,59,120,.32);
+        border-color:#173b78!important;
+        background:#eaf1ff!important;
+      }
+
+      #${CARD_ID} .cb-next-destination .cb-qd-name{
+        border:2px solid #4d75b3!important;
+        box-shadow:
+          0 0 0 3px rgba(77,117,179,.15),
+          0 2px 5px rgba(16,24,40,.12)!important;
+      }
+
+      #${CARD_ID} .cb-next-destination .cb-qd-pos::after{
+        content:" · TAP HERE";
+        color:#fff;
+      }
+
+      #${CARD_ID} .cb-next-bench{
+        margin-top:8px;
+        padding:8px;
+        border:1px solid #e2e6eb;
+        border-radius:10px;
+        background:#f8fafc;
+      }
+
+      #${CARD_ID} .cb-next-bench-head{
+        display:flex;
+        justify-content:space-between;
+        gap:8px;
+        align-items:baseline;
+        margin-bottom:6px;
+      }
+
+      #${CARD_ID} .cb-next-bench-head strong{
+        color:#253047;
+        font-size:.72rem;
+      }
+
+      #${CARD_ID} .cb-next-bench-head span{
+        color:#7b8492;
+        font-size:.59rem;
+      }
+
+      #${CARD_ID} .cb-next-bench-chips{
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px;
+      }
+
+      #${CARD_ID} .cb-next-bench-player{
+        min-height:38px;
+        border:1px solid #cfd5dd;
+        border-radius:9px;
+        background:#fff;
+        color:#253047;
+        padding:6px 8px;
+        font-size:.68rem;
+        font-weight:800;
+        touch-action:manipulation;
+      }
+
+      #${CARD_ID} .cb-next-bench-player.selected{
+        border-color:#173b78;
+        background:#173b78;
+        color:#fff;
+      }
+
+      #${CARD_ID} .cb-next-bench.destination-active{
+        border:2px solid #4d75b3;
+        background:#f3f7fd;
+      }
+
+      #${CARD_ID} .cb-next-send-bench{
+        width:100%;
+        min-height:44px;
+        margin:0 0 8px;
+        border:2px dashed #b5473d;
+        border-radius:9px;
+        background:#fff3f1;
+        color:#912d28;
+        font-size:.68rem;
+        font-weight:900;
+        letter-spacing:.02em;
+        touch-action:manipulation;
+      }
+
+      #${CARD_ID} .cb-next-tools{
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px;
+        align-items:center;
+        margin-top:8px;
+      }
+
+      #${CARD_ID} .cb-next-tools .btn{
+        min-height:38px;
+        border-radius:9px;
+        font-size:.68rem;
+        font-weight:820;
+      }
+
+      #${CARD_ID} .cb-next-warnings{
+        margin-top:8px;
+        display:grid;
+        gap:5px;
+      }
+
+      #${CARD_ID} .cb-next-warning,
+      #${CARD_ID} .cb-next-ready{
+        border-radius:8px;
+        padding:7px 8px;
+        font-size:.68rem;
+        font-weight:780;
+      }
+
+      #${CARD_ID} .cb-next-warning{
+        border:1px solid #e6ca82;
+        background:#fff8e6;
+        color:#775a10;
+      }
+
+      #${CARD_ID} .cb-next-warning.danger{
+        border-color:#efb5ae;
+        background:#fff1ef;
+        color:#912d28;
+      }
+
+      #${CARD_ID} .cb-next-ready{
+        border:1px solid #b8ddc4;
+        background:#edf8f1;
+        color:#176b38;
+      }
+
+      #${CARD_ID} .cb-next-error{
+        margin-top:8px;
+        border:1px solid #efb5ae;
+        border-radius:8px;
+        background:#fff1ef;
+        color:#912d28;
+        padding:7px 8px;
+        font-size:.68rem;
+        font-weight:750;
+      }
+
+      #live-up-next-v2,
+      #next-inning-adjust-modal{
+        display:none!important;
+      }
+
+      @media(max-width:575.98px){
+        #${CARD_ID} .cb-next-head{
+          padding:8px 9px 7px;
+        }
+
+        #${CARD_ID} .cb-next-body{
+          padding:7px;
+        }
+
+        #${CARD_ID} .cb-next-field{
+          width:100%;
+          min-height:0;
+          aspect-ratio:1.36/1;
+        }
+
+        #${CARD_ID} .cb-qd-spot{
+          width:clamp(54px,17vw,66px)!important;
+        }
+
+        #${CARD_ID} .cb-qd-name{
+          font-size:.56rem!important;
+          padding:3px 4px!important;
+        }
+
+        #${CARD_ID} .cb-next-bench-player{
+          min-height:36px;
+          padding:5px 7px;
+          font-size:.64rem;
+        }
+
+        #${CARD_ID} .cb-next-selection{
+          margin-bottom:6px;
+        }
+      }
+
+      @media(min-width:576px) and (max-width:899.98px){
+        #${CARD_ID} .cb-next-field{
+          width:min(100%,680px);
+        }
+      }
+
+      @media(
+        min-width:700px
+      ) and (
+        min-height:500px
+      ) and (
+        orientation:landscape
+      ){
+        #${CARD_ID} .cb-next-field{
+          width:min(
+            100%,
+            760px,
+            calc(60dvh * 1.28)
+          );
+        }
+
+        #${CARD_ID} .cb-next-head{
+          padding-top:8px;
+          padding-bottom:7px;
+        }
+
+        #${CARD_ID} .cb-next-selection{
+          min-height:38px;
+          padding:7px 9px;
+        }
+
+        #${CARD_ID} .cb-next-bench{
+          margin-top:6px;
+          padding:7px;
+        }
+      }
+
+      @media(min-width:1200px){
+        #${CARD_ID} .cb-next-field{
+          width:min(100%,720px);
+        }
+      }
+
+      /*
+       * FINAL portrait-tablet override.
+       *
+       * Keep this AFTER every other field-width rule so an older
+       * 744/768/820px iPad cannot fall back to the generic tablet
+       * width after portrait sizing has been calculated.
+       *
+       * Use both viewport width and viewport height. This makes the
+       * live board adapt to the usable screen rather than an iPad model.
+       */
+      @media(
+        orientation:portrait
+      ) and (
+        min-width:600px
+      ){
+        #${CARD_ID} .cb-next-field{
+          width:clamp(
+            500px,
+            min(82vw, calc(36vh * 1.28)),
+            600px
+          );
+          margin-inline:auto;
+        }
+
+        #${CARD_ID} .cb-next-body{
+          padding-top:8px;
+          padding-bottom:9px;
+        }
+
+        #${CARD_ID} .cb-next-bench{
+          margin-top:7px;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  async function api(method = 'GET', body = null) {
+    const response = await fetch(
+      `/api/live-game/${gameId}/next-inning-prep`,
+      {
+        method,
+        headers: body
+          ? {'Content-Type': 'application/json'}
+          : undefined,
+        body: body
+          ? JSON.stringify(body)
+          : undefined,
+        cache: 'no-store',
+      }
+    );
+
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.status === 'error') throw new Error(data.message || `Unable to set the next defense (${response.status}).`);
+
+    if (!response.ok || data.status === 'error') {
+      throw new Error(
+        data.message ||
+        `Unable to save NEXT (${response.status}).`
+      );
+    }
+
     return data;
   }
 
-  function toast(message, kind='success') {
-    let host = document.getElementById('next-defense-toast');
-    if (!host) {
-      host = document.createElement('div');
-      host.id = 'next-defense-toast';
-      host.className = 'toast-container position-fixed top-0 end-0 p-3';
-      host.style.zIndex = '4500';
-      document.body.appendChild(host);
-    }
-    const el = document.createElement('div');
-    el.className = `toast text-bg-${kind} border-0`;
-    el.innerHTML = `<div class="d-flex"><div class="toast-body fw-semibold">${esc(message)}</div><button class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
-    host.appendChild(el);
-    const instance = bootstrap.Toast.getOrCreateInstance(el,{delay:2200});
-    el.addEventListener('hidden.bs.toast',()=>el.remove(),{once:true});
-    instance.show();
-  }
+  function ensureSurface() {
+    const shell = document.querySelector(
+      '#live-game-overlay .coach-live-shell'
+    );
 
-  function announce(data) {
-    document.dispatchEvent(new CustomEvent('coachboard:next-defense-set', { detail:{ data } }));
-  }
+    const now = $('cbQuickDefense');
 
-  async function confirmMode(mode, quiet=false) {
-    if (busy) return null;
-    busy = true;
-    try {
-      const data = await api('POST',{mode});
-      lastSignature = '';
-      render(data);
-      announce(data);
-      if (!quiet) toast(mode === 'current' ? 'Same defense set.' : 'Planned defense set.');
-      return data;
-    } catch (err) {
-      toast(err.message,'danger');
-      return null;
-    } finally {
-      busy = false;
-    }
-  }
-
-  async function confirmPregame(quiet=false) {
-    const candidate = pregameCandidate(latest);
-    if (!candidate) {
-      if (!quiet) toast('Use New Defense to set this inning.','danger');
+    if (!shell || !now) {
       return null;
     }
-    if (busy) return null;
-    busy = true;
-    try {
-      const data = await api('POST',{mode:'custom', alignment:candidate});
-      lastSignature = '';
-      render(data);
-      announce(data);
-      if (!quiet) toast('Planned defense set.');
-      return data;
-    } catch (err) {
-      toast(err.message,'danger');
-      return null;
-    } finally {
-      busy = false;
-    }
-  }
 
-  function wireActions(card) {
-    card.querySelector('[data-bp-action="current"]')?.addEventListener('click',()=>confirmMode('current'));
-    card.querySelector('[data-bp-action="planned"]')?.addEventListener('click',()=>confirmPregame());
-    card.querySelector('[data-bp-action="adjust"]')?.addEventListener('click',openAdjust);
-  }
+    let switcher = $(SWITCH_ID);
 
-  function syncAdjustHeader(modal = document.getElementById(MODAL_ID)) {
-    if (!modal) return;
-    const inning = String(latest?.next_inning || '').trim();
-    const title = modal.querySelector('.modal-title');
-    const subtitle = title?.parentElement?.querySelector('.small.text-muted');
-    if (title) {
-      title.textContent = inning
-        ? `Plan Inning ${inning} Defense`
-        : 'Plan Next Defense';
-    }
-    if (subtitle) {
-      subtitle.textContent = inning
-        ? `This plans Inning ${inning} only. It does not change the live field.`
-        : 'This plans the next inning only. It does not change the live field.';
-    }
-  }
-
-  function ensureAdjustModal() {
-    let modal = document.getElementById(MODAL_ID);
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = MODAL_ID;
-      modal.className = 'modal fade';
-      modal.tabIndex = -1;
-      modal.setAttribute('data-bs-backdrop','static');
-      modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Set Defense</h5><div class="small text-muted">Choose who takes the field next inning.</div></div><button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body" id="${BODY_ID}"></div></div></div>`;
-      document.body.appendChild(modal);
-      modal.addEventListener('hide.bs.modal', () => {
-        const active = document.activeElement;
-        if (modal.contains(active) && typeof active?.blur === 'function') active.blur();
-      });
-      modal.addEventListener('hidden.bs.modal', () => {
-        selectedPosition = '';
-        if (skipHiddenRefresh) {
-          skipHiddenRefresh = false;
-          return;
-        }
-        window.setTimeout(refresh,80);
-      });
-    }
-    syncAdjustHeader(modal);
-    guardModalOwnership();
-    return modal;
-  }
-
-  function guardModalOwnership() {
-    const body = document.getElementById(BODY_ID);
-    if (!body || bodyObserver) return;
-    bodyObserver = new MutationObserver(() => {
-      const modal = document.getElementById(MODAL_ID);
-      if (!modal?.classList.contains('show')) return;
-      [...body.children].forEach(child => {
-        if (child.id !== OWNED_ID) child.remove();
-      });
-    });
-    bodyObserver.observe(body,{childList:true});
-  }
-
-  function draftBenchPlayers() {
-    const assigned = new Set(Object.values(draft || {}).filter(Boolean));
-    return (latest?.roster || [])
-      .filter(player => !assigned.has(player.name))
-      .sort((a,b)=>a.name.localeCompare(b.name));
-  }
-
-  function findDraftPosition(name) {
-    return positions(latest?.outfielder_count).find(pos => draft?.[pos] === name) || '';
-  }
-
-  function fallbackField() {
-    const field = document.createElement('div');
-    field.className = 'cb-qd-field';
-    const four = Number(latest?.outfielder_count) === 4;
-    const outfield = four
-      ? [['LF',10,24],['LCF',37,14],['RCF',63,14],['RF',90,24]]
-      : [['LF',14,22],['CF',50,11],['RF',86,22]];
-    const spots = [...outfield,['3B',18,57],['SS',38,43],['2B',62,43],['1B',82,57],['P',50,61],['C',50,84]];
-    field.innerHTML = `<svg class="cb-qd-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true"><path d="M7 57 Q9 13 50 6 Q91 13 93 57" fill="none" stroke="rgba(245,245,220,.38)" stroke-width="1.2"/><path d="M50 84 L8 38 M50 84 L92 38" fill="none" stroke="rgba(255,255,255,.88)" stroke-width=".7"/><polygon points="50,75 27,54 50,32 73,54" fill="#cfa56c" opacity=".95"/><polygon points="50,68 34,54 50,40 66,54" fill="#438f58"/><circle cx="50" cy="61" r="4.8" fill="#cfa56c"/><circle cx="50" cy="81" r="6.2" fill="#cfa56c"/></svg>${spots.map(([pos,left,top])=>`<button type="button" class="cb-qd-spot ${pos === 'P' ? 'pitcher' : ''}" style="left:${left}%;top:${top}%" data-cb-position="${pos}"><span class="cb-qd-pos">${pos}</span><span class="cb-qd-name"></span></button>`).join('')}`;
-    return field;
-  }
-
-  function nextField() {
-    const liveField = document.querySelector('#cbQuickDefense .cb-qd-field');
-    const field = liveField ? liveField.cloneNode(true) : fallbackField();
-    field.removeAttribute('id');
-    field.querySelectorAll('[data-cb-move-player]').forEach(el => el.removeAttribute('data-cb-move-player'));
-    field.querySelectorAll('.cb-qd-spot').forEach(spot => {
-      const pos = String(spot.dataset.cbPosition || '').trim();
-      const name = draft?.[pos] || '';
-      spot.dataset.niPos = pos;
-      spot.removeAttribute('disabled');
-      spot.classList.toggle(
-        'ni-selected-spot',
-        selectedPosition === pos
+    if (!switcher) {
+      switcher = document.createElement('div');
+      switcher.id = SWITCH_ID;
+      switcher.setAttribute(
+        'role',
+        'group'
       );
-      if (pos === 'P') {
-        spot.disabled = true;
-        spot.setAttribute('aria-label', `${playerLabel(name)} stays at pitcher`);
+      switcher.setAttribute(
+        'aria-label',
+        'Current and next defense'
+      );
+
+      switcher.innerHTML = `
+        <button
+          type="button"
+          class="btn"
+          data-now-next="now"
+        >NOW</button>
+        <button
+          type="button"
+          class="btn"
+          data-now-next="next"
+        >NEXT</button>`;
+
+      now.insertAdjacentElement(
+        'beforebegin',
+        switcher
+      );
+
+      switcher.addEventListener(
+        'click',
+        event => {
+          const button = event.target.closest(
+            '[data-now-next]'
+          );
+
+          if (!button) return;
+
+          activeView =
+            button.dataset.nowNext === 'next'
+              ? 'next'
+              : 'now';
+
+          applyView();
+        }
+      );
+    }
+
+    let card = $(CARD_ID);
+
+    if (!card) {
+      card = document.createElement('div');
+      card.id = CARD_ID;
+
+      now.insertAdjacentElement(
+        'afterend',
+        card
+      );
+    }
+
+    $('live-up-next-v2')?.remove();
+    $('next-inning-adjust-modal')?.remove();
+
+    applyView();
+
+    return card;
+  }
+
+  function syncLiveActions() {
+    const changePitcher = $('liveChangePitcherBtn');
+    const undo = $('liveUndoBtn');
+
+    // NEXT edits pitcher directly on the defensive board.
+    if (changePitcher) {
+      if (activeView === 'next') {
+        changePitcher.style.setProperty(
+          'display',
+          'none',
+          'important'
+        );
       } else {
-        spot.setAttribute('aria-label', name ? `${playerLabel(name)} at ${pos}` : `${pos} open`);
+        changePitcher.style.removeProperty('display');
       }
-      const label = spot.querySelector('.cb-qd-name');
-      if (label) label.textContent = playerLabel(name);
-      const posLabel = spot.querySelector('.cb-qd-pos');
-      if (posLabel) posLabel.textContent = pos;
-    });
-    return field;
+    }
+
+    // Keep the canonical Undo button in its original DOM location.
+    // NEXT only controls whether that button can currently be used.
+    if (undo) {
+      undo.disabled =
+        activeView === 'next'
+          ? busy || !undoStack.length
+          : false;
+    }
   }
 
-  function choosePosition(pos) {
-    if (!draft || !pos || pos === 'P') return;
+  function applyView() {
+    const switcher = $(SWITCH_ID);
+    const now = $('cbQuickDefense');
+    const next = $(CARD_ID);
 
-    selectedPosition = pos;
-    renderAdjust();
+    switcher
+      ?.querySelectorAll('[data-now-next]')
+      .forEach(button => {
+        const isActive =
+          button.dataset.nowNext === activeView;
+
+        button.classList.toggle(
+          'active',
+          isActive
+        );
+
+        button.setAttribute(
+          'aria-pressed',
+          isActive ? 'true' : 'false'
+        );
+      });
+
+    if (now) {
+      now.hidden = activeView !== 'now';
+    }
+
+    if (next) {
+      next.hidden = activeView !== 'next';
+    }
+
+    syncLiveActions();
   }
 
-  function assignPlayer(name) {
+  function renderCard() {
+    const card = ensureSurface();
+
+    if (!card || !latest) return;
+
+    const inning = String(
+      latest.next_inning || ''
+    );
+
+    card.innerHTML = `
+      <div class="cb-next-head">
+        <div>
+          <div class="cb-next-kicker">
+            NEXT · INNING ${esc(inning)}
+          </div>
+          <div class="cb-next-title">
+            Next Defense
+          </div>
+          <div class="cb-next-sub">
+            ${esc(planStateText())}
+          </div>
+        </div>
+
+        <div class="cb-next-save ${esc(saveMode)}">
+          ${esc(saveMessage)}
+        </div>
+      </div>
+
+      <div class="cb-next-body">
+        ${selectionHelp()}
+
+        ${fieldMarkup()}
+
+        ${benchMarkup()}
+
+        <div class="cb-next-tools">
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            data-next-use-current
+            ${busy ? 'disabled' : ''}
+          >
+            Use current defense
+          </button>
+
+        </div>
+
+        <div class="cb-next-warnings">
+          ${nextWarningsMarkup()}
+        </div>
+
+        ${
+          errorMessage
+            ? `
+              <div class="cb-next-error">
+                ${esc(errorMessage)}
+              </div>
+            `
+            : ''
+        }
+      </div>`;
+
+    card
+      .querySelectorAll('[data-next-position]')
+      .forEach(button => {
+        button.addEventListener(
+          'click',
+          () => {
+            const pos =
+              button.dataset.nextPosition || '';
+
+            const name =
+              button.dataset.nextPlayer || '';
+
+            if (busy) return;
+
+            if (selected) {
+              movePlayer(
+                selected.name,
+                selected.source,
+                pos
+              );
+              return;
+            }
+
+            if (selectedPosition && name) {
+              movePlayer(
+                name,
+                pos,
+                selectedPosition
+              );
+              return;
+            }
+
+            if (name) {
+              selected = {
+                name,
+                source: pos,
+              };
+              selectedPosition = '';
+            } else {
+              selected = null;
+              selectedPosition = pos;
+            }
+
+            renderCard();
+          }
+        );
+      });
+
+    card
+      .querySelectorAll('[data-next-bench-player]')
+      .forEach(button => {
+        button.addEventListener(
+          'click',
+          () => {
+            if (busy) return;
+
+            const name =
+              button.dataset.nextBenchPlayer || '';
+
+            if (!name) return;
+
+            if (selectedPosition) {
+              movePlayer(
+                name,
+                'BENCH',
+                selectedPosition
+              );
+              return;
+            }
+
+            selected = {
+              name,
+              source: 'BENCH',
+            };
+            selectedPosition = '';
+            renderCard();
+          }
+        );
+      });
+
+    card
+      .querySelector('[data-next-cancel]')
+      ?.addEventListener(
+        'click',
+        () => {
+          selected = null;
+          selectedPosition = '';
+          renderCard();
+        }
+      );
+
+    card
+      .querySelector('[data-next-use-current]')
+      ?.addEventListener(
+        'click',
+        useCurrentDefense
+      );
+
+    card
+      .querySelector('[data-next-bench-selected]')
+      ?.addEventListener(
+        'click',
+        () => {
+          if (!selected) return;
+
+          const next = snapshot();
+
+          if (
+            selected.source !== 'BENCH'
+          ) {
+            next[selected.source] = '';
+          }
+
+          saveAlignment(
+            next,
+            {
+              successMessage:
+                `${playerLabel(selected.name)} → BENCH`,
+            }
+          );
+        }
+      );
+
+    applyView();
+  }
+
+  async function saveAlignment(
+    next,
+    {
+      mode = 'custom',
+      pushUndo = true,
+      successMessage = 'NEXT saved ✓',
+    } = {}
+  ) {
+    if (busy) return null;
+
+    const before = snapshot();
+
+    busy = true;
+    saveMode = 'saving';
+    saveMessage = 'Saving…';
+    errorMessage = '';
+    draft = normalize(next);
+
+    renderCard();
+
+    try {
+      const data = await api(
+        'POST',
+        mode === 'current'
+          ? {mode: 'current'}
+          : {
+              mode: 'custom',
+              alignment: draft,
+            }
+      );
+
+      if (pushUndo) {
+        undoStack.push(before);
+
+        if (undoStack.length > 12) {
+          undoStack.shift();
+        }
+      }
+
+      latest = data;
+      draft = normalize(
+        data?.confirmed?.alignment ||
+        draft
+      );
+
+      selected = null;
+      selectedPosition = '';
+
+      saveMode = 'saved';
+      saveMessage = successMessage;
+      errorMessage = '';
+      lastSignature = JSON.stringify(data);
+
+      renderCard();
+
+      document.dispatchEvent(
+        new CustomEvent(
+          'coachboard:next-defense-set',
+          {detail: {data}}
+        )
+      );
+
+      return data;
+    } catch (error) {
+      draft = before;
+
+      selected = null;
+      selectedPosition = '';
+
+      saveMode = 'error';
+      saveMessage = 'Not saved';
+      errorMessage =
+        error.message ||
+        'Unable to save NEXT.';
+
+      renderCard();
+
+      return null;
+    } finally {
+      busy = false;
+      renderCard();
+    }
+  }
+
+  function movePlayer(
+    name,
+    source,
+    target
+  ) {
     if (
-      !draft ||
-      !selectedPosition ||
-      selectedPosition === 'P' ||
-      !name
+      busy ||
+      !name ||
+      !target ||
+      source === target
+    ) {
+      selected = null;
+      selectedPosition = '';
+      renderCard();
+      return;
+    }
+
+    const next = snapshot();
+    const occupant = next[target] || '';
+
+    if (
+      source &&
+      source !== 'BENCH'
+    ) {
+      next[source] = '';
+    }
+
+    next[target] = name;
+
+    if (
+      occupant &&
+      occupant !== name
+    ) {
+      if (
+        target !== 'P' &&
+        source &&
+        source !== 'BENCH'
+      ) {
+        // Normal field-to-field move:
+        // true two-player swap.
+        next[source] = occupant;
+      }
+
+      // Bench -> field sends the old occupant to the bench.
+      // Moving someone to P also sends the old pitcher to the bench.
+    }
+
+    saveAlignment(
+      next,
+      {
+        successMessage:
+          `${playerLabel(name)} → ${target} ✓`,
+      }
+    );
+  }
+
+  async function useCurrentDefense() {
+    if (busy || !latest) return;
+
+    const next = normalize(
+      latest.current_alignment || {}
+    );
+
+    await saveAlignment(
+      next,
+      {
+        mode: 'current',
+        successMessage:
+          'Current defense copied to NEXT ✓',
+      }
+    );
+  }
+
+  async function undoNext() {
+    if (busy || !undoStack.length) return;
+
+    const previous = undoStack.pop();
+    const current = snapshot();
+
+    busy = true;
+    saveMode = 'saving';
+    saveMessage = 'Undoing…';
+    errorMessage = '';
+    draft = normalize(previous);
+
+    renderCard();
+
+    try {
+      const data = await api(
+        'POST',
+        {
+          mode: 'custom',
+          alignment: draft,
+        }
+      );
+
+      latest = data;
+      draft = normalize(
+        data?.confirmed?.alignment ||
+        draft
+      );
+
+      selected = null;
+      selectedPosition = '';
+
+      saveMode = 'saved';
+      saveMessage = 'NEXT restored ✓';
+      lastSignature = JSON.stringify(data);
+
+      renderCard();
+
+      document.dispatchEvent(
+        new CustomEvent(
+          'coachboard:next-defense-set',
+          {detail: {data}}
+        )
+      );
+    } catch (error) {
+      undoStack.push(previous);
+      draft = current;
+
+      saveMode = 'error';
+      saveMessage = 'Undo failed';
+      errorMessage =
+        error.message ||
+        'Unable to undo NEXT.';
+
+      renderCard();
+    } finally {
+      busy = false;
+      renderCard();
+    }
+  }
+
+  function showError(message) {
+    errorMessage = String(
+      message || ''
+    );
+
+    if (errorMessage) {
+      activeView = 'next';
+    }
+
+    renderCard();
+  }
+
+  function clearError() {
+    errorMessage = '';
+    renderCard();
+  }
+
+  function hydrate(data) {
+    latest = data;
+
+    if (
+      !data ||
+      data.status === 'inactive' ||
+      data.is_live === false
+    ) {
+      $(SWITCH_ID)?.remove();
+      $(CARD_ID)?.remove();
+
+      const now = $('cbQuickDefense');
+
+      if (now) {
+        now.hidden = false;
+      }
+
+      return false;
+    }
+
+    draft = normalize(
+      data?.confirmed?.alignment ||
+      data?.current_alignment ||
+      {}
+    );
+
+    selected = null;
+    selectedPosition = '';
+
+    if (saveMode !== 'error') {
+      saveMode = 'saved';
+      saveMessage = 'Saved ✓';
+    }
+
+    renderCard();
+
+    return true;
+  }
+
+  async function refresh({
+    force = false,
+  } = {}) {
+    if (busy) return null;
+
+    try {
+      const data = await api('GET');
+      const signature = JSON.stringify(data);
+
+      if (
+        force ||
+        signature !== lastSignature ||
+        !$(CARD_ID)
+      ) {
+        lastSignature = signature;
+        hydrate(data);
+      } else {
+        ensureSurface();
+      }
+
+      return data;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function afterAdvance() {
+    activeView = 'now';
+    selected = null;
+    selectedPosition = '';
+    undoStack = [];
+    errorMessage = '';
+    lastSignature = '';
+    applyView();
+
+    window.setTimeout(
+      () => refresh({force: true}),
+      120
+    );
+  }
+
+  function bindSocket() {
+    if (socketBound) return;
+
+    const socket =
+      window.__cbLiveGameSocket;
+
+    if (
+      !socket ||
+      typeof socket.on !== 'function'
     ) {
       return;
     }
 
-    const target = selectedPosition;
-    const occupant = draft[target] || '';
+    socketBound = true;
 
-    if (name === occupant) {
-      selectedPosition = '';
-      renderAdjust();
-      return;
-    }
-
-    const source = findDraftPosition(name);
-
-    if (source && source !== 'P') {
-      // Planning the next inning is easier when we follow the vacancy
-      // instead of silently swapping two fielders.
-      //
-      // Example:
-      //   Declan RF -> 2B
-      //   current 2B -> Bench
-      //   RF becomes the next position CoachBoard asks the coach to fill.
-      delete draft[source];
-      draft[target] = name;
-
-      selectedPosition = source;
-      renderAdjust();
-      return;
-    }
-
-    if (!source) {
-      // A bench player closes the vacancy. The current occupant of the
-      // target position becomes benched automatically.
-      draft[target] = name;
-    }
-
-    selectedPosition = '';
-    renderAdjust();
-  }
-
-  function playerChooserMarkup() {
-    if (!selectedPosition) {
-      return `
-        <div class="ni-selected">
-          <strong>Tap the position you want to change.</strong><br>
-          Then choose the player who should play there.
-          If you move a fielder, CoachBoard follows the open position.
-        </div>`;
-    }
-
-    const target = selectedPosition;
-    const currentName = draft?.[target] || '';
-    const pitcher = draft?.P || '';
-
-    const choices = (latest?.roster || [])
-      .filter(player => (
-        player?.name &&
-        player.name !== currentName &&
-        player.name !== pitcher
-      ))
-      .map(player => ({
-        ...player,
-        currentPosition:
-          findDraftPosition(player.name) || 'BENCH',
-      }))
-      .filter(player => player.currentPosition !== 'P');
-
-    const fieldChoices = choices
-      .filter(player => player.currentPosition !== 'BENCH')
-      .sort((a, b) => (
-        a.currentPosition.localeCompare(b.currentPosition) ||
-        a.name.localeCompare(b.name)
-      ));
-
-    const benchChoices = choices
-      .filter(player => player.currentPosition === 'BENCH')
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    const button = player => `
-      <button
-        type="button"
-        class="btn btn-outline-primary ni-player-choice"
-        data-ni-player="${esc(player.name)}"
-      >
-        ${esc(playerLabel(player.name))}
-        <small>
-          ${esc(player.currentPosition)} → ${esc(target)}
-        </small>
-      </button>`;
-
-    return `
-      <div class="ni-player-chooser">
-        <div class="ni-player-head">
-          <div>
-            <strong>Who plays ${esc(target)}?</strong>
-            <span>
-              Current:
-              ${esc(currentName ? playerLabel(currentName) : 'Open')}
-            </span>
-          </div>
-          <button
-            type="button"
-            class="btn btn-outline-secondary ni-player-cancel"
-            data-ni-cancel-position
-          >
-            Cancel
-          </button>
-        </div>
-
-        ${fieldChoices.length ? `
-          <div class="ni-label">Already on the field</div>
-          <div class="ni-player-grid mb-2">
-            ${fieldChoices.map(button).join('')}
-          </div>
-        ` : ''}
-
-        <div class="ni-label">On the bench</div>
-        <div class="ni-player-grid">
-          ${
-            benchChoices.length
-              ? benchChoices.map(button).join('')
-              : '<div class="small text-muted">Nobody on the bench.</div>'
-          }
-        </div>
-      </div>`;
-  }
-
-  function renderAdjust() {
-    const body = document.getElementById(BODY_ID);
-    if (!body || !latest || !draft) return;
-    syncAdjustHeader();
-
-    const pitcher =
-      latest.current_alignment?.P ||
-      draft.P ||
-      '';
-
-    if (pitcher) draft.P = pitcher;
-
-    const posList = positions(latest.outfielder_count);
-    const holes = posList.filter(pos => !draft[pos]);
-    const bench = draftBenchPlayers();
-    const inning = String(latest.next_inning || '').trim();
-    const saveLabel = inning
-      ? `Set Inning ${inning} Defense`
-      : 'Set Defense';
-
-    const benchLabel = inning
-      ? `Bench for Inning ${inning}`
-      : 'Bench for next inning';
-
-    body.innerHTML = `
-      <div id="${OWNED_ID}">
-        ${playerChooserMarkup()}
-
-        <div class="ni-field-wrap" data-ni-field></div>
-
-        <div class="ni-label">${esc(benchLabel)}</div>
-        <div class="ni-bench">
-          ${
-            bench.length
-              ? bench.map(player => `
-                  <span class="ni-bench-player">
-                    ${esc(playerLabel(player.name))}
-                  </span>
-                `).join('')
-              : '<span class="small text-muted">Nobody</span>'
-          }
-        </div>
-
-        <div class="ni-pitcher-note">
-          ${
-            pitcher
-              ? `${esc(playerLabel(pitcher))} stays at P. Use Change Pitcher for the mound.`
-              : 'Pitcher stays the same.'
-          }
-        </div>
-
-        <div class="ni-footer">
-          <div class="me-auto">
-            ${
-              holes.length
-                ? `<div class="ni-warning">Fill ${esc(holes.join(', '))}.</div>`
-                : ''
-            }
-          </div>
-          <button
-            class="btn btn-outline-secondary"
-            data-bs-dismiss="modal"
-          >
-            Cancel
-          </button>
-          <button
-            class="btn btn-dark"
-            id="save-next-inning-adjust"
-            ${holes.length ? 'disabled' : ''}
-          >
-            ${esc(saveLabel)}
-          </button>
-        </div>
-      </div>`;
-
-    body.querySelector('[data-ni-field]')
-      ?.appendChild(nextField());
-
-    body.querySelectorAll('[data-ni-pos]')
-      .forEach(spot => {
-        spot.addEventListener(
-          'click',
-          () => choosePosition(spot.dataset.niPos),
-        );
-      });
-
-    body.querySelectorAll('[data-ni-player]')
-      .forEach(button => {
-        button.addEventListener(
-          'click',
-          () => assignPlayer(
-            button.dataset.niPlayer || ''
-          ),
-        );
-      });
-
-    body.querySelector('[data-ni-cancel-position]')
-      ?.addEventListener('click', () => {
-        selectedPosition = '';
-        renderAdjust();
-      });
-
-    document.getElementById('save-next-inning-adjust')
-      ?.addEventListener('click', saveAdjust);
-
-    if (selectedPosition) {
-      body.scrollTop = 0;
-    }
-  }
-
-  function openAdjust() {
-    if (!latest) return;
-    const source = latest.confirmed?.alignment || latest.current_alignment || {};
-    draft = {};
-    positions(latest.outfielder_count).forEach(pos => { draft[pos] = source[pos] || ''; });
-    if (latest.current_alignment?.P) draft.P = latest.current_alignment.P;
-    selectedPosition = '';
-    ensureAdjustModal();
-    renderAdjust();
-    bootstrap.Modal.getOrCreateInstance(document.getElementById(MODAL_ID)).show();
-  }
-
-  async function saveAdjust() {
-    if (busy || !draft) return;
-    busy = true;
-    const button = document.getElementById('save-next-inning-adjust');
-    if (button) { button.disabled = true; button.textContent = 'Saving…'; }
-    try {
-      const data = await api('POST',{mode:'custom', alignment:draft});
-      skipHiddenRefresh = true;
-      const modal = document.getElementById(MODAL_ID);
-      const active = document.activeElement;
-      if (modal?.contains(active) && typeof active?.blur === 'function') active.blur();
-      bootstrap.Modal.getOrCreateInstance(modal).hide();
-      lastSignature = '';
-      render(data);
-      announce(data);
-      toast(`Inning ${data.next_inning} defense set.`);
-    } catch (err) {
-      toast(err.message,'danger');
-      const inning = String(latest?.next_inning || '').trim();
-      if (button) { button.disabled = false; button.textContent = inning ? `Set Inning ${inning} Defense` : 'Set Defense'; }
-    } finally {
-      busy = false;
-    }
-  }
-
-  function modalOpen() {
-    return Boolean(document.getElementById(MODAL_ID)?.classList.contains('show'));
-  }
-
-  async function refresh() {
-    if (busy || modalOpen()) return;
-    try {
-      const data = await api('GET');
-      latest = data;
-      const signature = JSON.stringify(data);
-      if (signature !== lastSignature || !document.getElementById(CARD_ID)) {
-        if (render(data)) lastSignature = signature;
+    socket.on(
+      'next_inning_prep_update',
+      payload => {
+        if (
+          Number(payload?.game_id) === gameId
+        ) {
+          lastSignature = '';
+          refresh({force: true});
+        }
       }
-    } catch (_) {
-      document.getElementById(CARD_ID)?.remove();
-    }
-  }
-
-  async function syncSamePointer() {
-    if (latest?.confirmed?.source !== 'current') return latest?.confirmed || null;
-    return confirmMode('current', true);
+    );
   }
 
   window.CBNextDefense = {
-    openNew: openAdjust,
-    useSame: () => confirmMode('current', true),
-    usePregame: () => confirmPregame(true),
-    refresh,
-    syncSamePointer,
+    refresh: () => refresh({force: true}),
+    useSame: useCurrentDefense,
+    undo: undoNext,
+    getAlignment: () => snapshot(),
+    showError,
+    clearError,
+    afterAdvance,
+    showNext: () => {
+      activeView = 'next';
+      applyView();
+    },
+    showNow: () => {
+      activeView = 'now';
+      applyView();
+    },
   };
 
   installStyles();
+
   const start = () => {
-    setTimeout(refresh,120);
-    window.setInterval(refresh,3500);
+    $('next-inning-adjust-modal')?.remove();
+
+    window.setTimeout(
+      () => refresh({force: true}),
+      140
+    );
+
+    window.setInterval(
+      () => refresh(),
+      3500
+    );
+
+    window.setInterval(
+      bindSocket,
+      1500
+    );
+
+    document.addEventListener(
+      'coachboard:test2-inning-started',
+      afterAdvance
+    );
+
+    window.addEventListener(
+      'click',
+      event => {
+        const undo = event.target.closest?.(
+          '#liveUndoBtn'
+        );
+
+        if (
+          !undo ||
+          activeView !== 'next'
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        if (!busy && undoStack.length) {
+          undoNext();
+        }
+      },
+      true
+    );
   };
+
   document.readyState === 'loading'
-    ? document.addEventListener('DOMContentLoaded',start,{once:true})
+    ? document.addEventListener(
+        'DOMContentLoaded',
+        start,
+        {once: true}
+      )
     : start();
 })();

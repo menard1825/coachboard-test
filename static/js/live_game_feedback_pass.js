@@ -83,10 +83,7 @@
     if (!data) return state;
     state = data;
     stateLoadedAt = Date.now();
-    lastSequence = Math.max(
-      lastSequence,
-      sequenceFromState(data)
-    );
+    lastSequence = sequenceFromState(data);
 
     queuePatch();
 
@@ -105,6 +102,48 @@
 
   function applyDelta(delta) {
     if (!delta || Number(delta.game_id) !== gameId) return;
+
+    const incomingEventId =
+      Number(delta.event?.id) || 0;
+
+    const incomingSequence =
+      Number(delta.event?.sequence) ||
+      Number(delta.sequence) ||
+      0;
+
+    const matchesRevertedEvent =
+      Array.isArray(state?.rotation_events) &&
+      state.rotation_events.some(existing => {
+        if (!existing?.reverted) return false;
+
+        const existingId =
+          Number(existing?.id) || 0;
+
+        const existingSequence =
+          Number(existing?.sequence) || 0;
+
+        if (
+          incomingEventId &&
+          existingId === incomingEventId
+        ) {
+          return true;
+        }
+
+        if (
+          !incomingEventId &&
+          incomingSequence &&
+          existingSequence === incomingSequence
+        ) {
+          return true;
+        }
+
+        return false;
+      });
+
+    if (matchesRevertedEvent) {
+      return;
+    }
+
     const sequence = Number(delta.sequence) || 0;
     if (sequence && sequence < lastSequence) return;
     if (
@@ -205,24 +244,14 @@
     const pitcher = document.getElementById('live-current-pitcher');
     if (pitcher && alignment.P && pitcher.textContent.trim() !== alignment.P) pitcher.textContent = alignment.P;
 
-    document.querySelectorAll('#cbQuickDefense .cb-qd-spot[data-cb-position]').forEach(spot => {
-      const pos = spot.dataset.cbPosition;
-      const name = alignment[pos] || '';
-      const label = spot.querySelector('.cb-qd-name');
-      if (label) label.textContent = name ? playerLabel(name) : 'Open';
-      spot.dataset.cbMovePlayer = name || 'Open';
-      spot.disabled = !name;
-    });
-
-    const assigned = new Set(Object.values(alignment).filter(Boolean));
-    const benchPlayers = (state.roster || []).filter(player => !assigned.has(player.name));
-    const bench = document.querySelector('#cbQuickDefense .cb-qd-bench');
-    if (bench) {
-      const wanted = benchPlayers.length
-        ? benchPlayers.map(player => `<button type="button" class="cb-qd-bench-player" data-cb-move-player="${esc(player.name)}"><span>${esc(playerLabel(player.name))}</span><span class="cb-bench-note">Bench now</span></button>`).join('')
-        : '<span class="small text-muted">No players are on the bench.</span>';
-      if (bench.innerHTML !== wanted) bench.innerHTML = wanted;
-    }
+    /*
+     * #cbQuickDefense has exactly one renderer:
+     * live_game_dugout_mode.js.
+     *
+     * This sync module owns transport/state recovery only. Writing
+     * directly into the NOW field here creates two independent DOM
+     * painters and can resurrect stale pre-Undo player names.
+     */
 
     ['desktop','mobile'].forEach(mode => {
       positions().forEach(pos => {
@@ -252,9 +281,36 @@
     note.innerHTML = '<strong>First-pitch essentials are ready.</strong>Batting order is optional and can be added later.';
   }
 
+  function applySharedLiveState(event) {
+    const detail = event?.detail || {};
+
+    if (Number(detail.game_id) !== gameId) {
+      return;
+    }
+
+    const next = detail.state;
+
+    if (
+      !next ||
+      Number(next?.game?.id) !== gameId
+    ) {
+      return;
+    }
+
+    state = next;
+    stateLoadedAt = Date.now();
+    lastSequence = sequenceFromState(next);
+    queuePatch();
+  }
+
   const observer = new MutationObserver(queuePatch);
   const start = () => {
     installSharedGameModalStyles();
+
+    document.addEventListener(
+      'coachboard:live-state',
+      applySharedLiveState
+    );
     observer.observe(document.body, {childList:true, subtree:true});
     loadState(true, 'initial').catch(() => {});
     queuePatch();

@@ -11,8 +11,7 @@
   const storedMode = window.sessionStorage.getItem(MODE_KEY);
   let mode = storedMode === 'first-pitch' ? 'first-pitch' : 'full-plan';
   let queued = false;
-  let huddleBusy = false;
-  let huddlePrep = null;
+  let inningAdvanceBusy = false;
   let recoveryNoticeTimer = null;
 
   const $ = id => document.getElementById(id);
@@ -240,100 +239,57 @@
     }, 0);
   }
 
-  function locationMap(alignment, roster) {
-    const map = new Map();
-    Object.entries(alignment || {}).forEach(([position, name]) => { if (name) map.set(name, position); });
-    (roster || []).forEach(player => { if (!map.has(player.name)) map.set(player.name, 'BENCH'); });
-    return map;
-  }
-
-  function movesBetween(current, next, roster) {
-    const before = locationMap(current, roster);
-    const after = locationMap(next, roster);
-    return [...new Set([...before.keys(), ...after.keys()])]
-      .map(name => ({name, from:before.get(name) || 'BENCH', to:after.get(name) || 'BENCH'}))
-      .filter(move => move.from !== move.to)
-      .sort((a, b) => {
-        if (a.to === 'P') return -1;
-        if (b.to === 'P') return 1;
-        if (a.to === 'BENCH' && b.to !== 'BENCH') return 1;
-        if (b.to === 'BENCH' && a.to !== 'BENCH') return -1;
-        return a.to.localeCompare(b.to) || a.name.localeCompare(b.name);
-      });
-  }
-
-  function confirmedAlignment(prep) {
-    if (!prep?.confirmed) return null;
-    return prep.confirmed.source === 'current'
-      ? {...(prep.current_alignment || {})}
-      : {...(prep.confirmed.alignment || {})};
-  }
-
-  function plannedCandidate(prep) {
-    const planned = {...(prep?.planned_alignment || {})};
-    const pitcher = prep?.current_alignment?.P || '';
-    if (!pitcher || !Object.values(planned).some(Boolean)) return null;
-    const conflict = Object.entries(planned).find(([position, name]) => position !== 'P' && name === pitcher);
-    if (conflict) return null;
-    planned.P = pitcher;
-    return planned;
-  }
-
   async function waitForQuickFieldSave() {
     for (let attempt = 0; attempt < 60; attempt += 1) {
-      const badge = document.querySelector('#cbQuickDefense .cb-save-state');
-      if (!badge || !badge.classList.contains('saving')) return;
+      const badge = document.querySelector(
+        '#cbQuickDefense .cb-save-state'
+      );
+
+      if (
+        !badge ||
+        !badge.classList.contains('saving')
+      ) {
+        return;
+      }
+
       await sleep(100);
     }
-    throw new Error('Quick Field is still saving. Try End Inning again after Saved ✓ appears.');
+
+    throw new Error(
+      'Current defense is still saving. ' +
+      'Try End Inning again after Saved ✓ appears.'
+    );
   }
 
   async function waitForLiveWritesToSettle() {
     await waitForQuickFieldSave();
+
     let previous = null;
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      const state = await getJson(`/api/live-game/${gameId}/state`);
-      const signature = `${state.current_inning || ''}:${sequenceFromState(state)}`;
-      if (signature === previous) return state;
+
+    for (
+      let attempt = 0;
+      attempt < 12;
+      attempt += 1
+    ) {
+      const state = await getJson(
+        `/api/live-game/${gameId}/state`
+      );
+
+      const signature =
+        `${state.current_inning || ''}:` +
+        `${sequenceFromState(state)}`;
+
+      if (signature === previous) {
+        return state;
+      }
+
       previous = signature;
       await sleep(120);
     }
-    return getJson(`/api/live-game/${gameId}/state`);
-  }
 
-  function ensureHuddle() {
-    let modal = $(HUDDLE_ID);
-    if (modal) return modal;
-    modal = document.createElement('div');
-    modal.id = HUDDLE_ID;
-    modal.className = 'modal fade';
-    modal.tabIndex = -1;
-    modal.setAttribute('data-bs-backdrop', 'static');
-    modal.innerHTML = `
-      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
-        <div class="modal-content">
-          <div class="modal-header"><div><div class="cb-t2-huddle-kicker">Between innings</div><h5 class="modal-title mb-0">End Inning</h5><div class="cb-t2-huddle-sub"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Back to game"></button></div>
-          <div class="modal-body"><div data-cb-t2-huddle-body></div><div class="cb-t2-error" data-cb-t2-huddle-error></div></div>
-          <div class="cb-t2-start"><button type="button" class="btn btn-dark" data-cb-t2-start-inning disabled>Start Inning</button></div>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-    modal.addEventListener('click', event => {
-      const choice = event.target.closest('[data-cb-t2-choice]');
-      if (choice) chooseNextDefense(choice.dataset.cbT2Choice);
-      const plan = event.target.closest('[data-cb-t2-plan]');
-      if (plan) returnToNextPlan();
-      const start = event.target.closest('[data-cb-t2-start-inning]');
-      if (start) startNextInning();
-    });
-    return modal;
-  }
-
-  function showHuddleError(message) {
-    const box = ensureHuddle().querySelector('[data-cb-t2-huddle-error]');
-    if (!box) return;
-    setText(box, message || '');
-    box.classList.toggle('show', Boolean(message));
+    return getJson(
+      `/api/live-game/${gameId}/state`
+    );
   }
 
   function showInningRecoveryNotice(inning) {
@@ -343,39 +299,60 @@
       notice = document.createElement('div');
       notice.id = 'cb-test2-inning-recovery';
       notice.setAttribute('role', 'status');
-      notice.setAttribute('aria-live', 'polite');
+      notice.setAttribute(
+        'aria-live',
+        'polite'
+      );
       document.body.appendChild(notice);
     }
 
     setText(
       notice,
-      `Another coach already started Inning ${inning}. Live Game is updated.`
+      `Another coach already started Inning ${inning}. ` +
+      'Live Game is updated.'
     );
 
     notice.classList.add('show');
 
     if (recoveryNoticeTimer) {
-      window.clearTimeout(recoveryNoticeTimer);
+      window.clearTimeout(
+        recoveryNoticeTimer
+      );
     }
 
-    recoveryNoticeTimer = window.setTimeout(() => {
-      notice.classList.remove('show');
-    }, 4500);
+    recoveryNoticeTimer =
+      window.setTimeout(
+        () => {
+          notice.classList.remove('show');
+        },
+        4500
+      );
   }
 
   function stateAsLiveDelta(value) {
-    const events = Array.isArray(value?.rotation_events)
-      ? value.rotation_events.filter(event => !event?.reverted)
+    const events = Array.isArray(
+      value?.rotation_events
+    )
+      ? value.rotation_events.filter(
+          event => !event?.reverted
+        )
       : [];
 
-    const latestEvent = events.reduce((latest, event) => {
-      if (!latest) return event;
+    const latestEvent = events.reduce(
+      (latest, event) => {
+        if (!latest) return event;
 
-      return Number(event?.sequence || 0) >
-        Number(latest?.sequence || 0)
-        ? event
-        : latest;
-    }, null);
+        return Number(
+          event?.sequence || 0
+        ) >
+        Number(
+          latest?.sequence || 0
+        )
+          ? event
+          : latest;
+      },
+      null
+    );
 
     const alignment = {
       ...(value?.current_alignment || {}),
@@ -400,7 +377,10 @@
         Number(value?.sequence) ||
         Number(latestEvent?.sequence) ||
         sequenceFromState(value),
-      event: value?.event || latestEvent || undefined,
+      event:
+        value?.event ||
+        latestEvent ||
+        undefined,
     };
   }
 
@@ -416,318 +396,226 @@
 
     if (!inning) return;
 
-    huddlePrep = null;
-
-    const modal = $(HUDDLE_ID);
-    if (modal) {
-      try {
-        window.bootstrap?.Modal
-          ?.getOrCreateInstance(modal)
-          ?.hide();
-      } catch (_) {}
-    }
+    $(HUDDLE_ID)?.remove();
 
     if (publish) {
       document.dispatchEvent(
-        new CustomEvent('coachboard:live-delta', {
-          detail: stateAsLiveDelta(liveState),
-        })
+        new CustomEvent(
+          'coachboard:live-delta',
+          {
+            detail:
+              stateAsLiveDelta(
+                liveState
+              ),
+          }
+        )
       );
     }
 
-    window.CBNextDefense?.refresh?.();
-    showInningRecoveryNotice(inning);
+    window.CBNextDefense
+      ?.afterAdvance?.();
 
-    window.setTimeout(() => {
-      $('cbQuickDefense')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    }, 180);
+    showInningRecoveryNotice(
+      inning
+    );
   }
 
-  function renderHuddle(prep) {
-    huddlePrep = prep;
-    const modal = ensureHuddle();
-    const next = String(prep?.next_inning || '');
-    const current = String(prep?.current_inning || '');
-    const body = modal.querySelector('[data-cb-t2-huddle-body]');
-    const subtitle = modal.querySelector('.cb-t2-huddle-sub');
-    const start = modal.querySelector('[data-cb-t2-start-inning]');
-    setText(subtitle, `Inning ${current} is over. Check the next defense before sending the team out.`);
+  async function endInningFromNext() {
+    if (inningAdvanceBusy) return;
 
-    const target = confirmedAlignment(prep);
-    const roster = prep?.roster || [];
-    const planned = plannedCandidate(prep);
-    if (target) {
-      const moves = movesBetween(prep.current_alignment || {}, target, roster);
-      const moveMarkup = moves.length
-        ? `<div class="cb-t2-moves">${moves.map(move => `<div class="cb-t2-move"><div><strong>${esc(move.name)}</strong><small>${esc(move.from)} → ${esc(move.to)}</small></div><div class="cb-t2-dest ${move.to === 'BENCH' ? 'bench' : ''}">${esc(move.to)}</div></div>`).join('')}</div>`
-        : '<div class="cb-t2-huddle-status ready"><strong>Same defense</strong><span>The same players and positions are going back out.</span></div>';
-      body.innerHTML = `<div class="cb-t2-huddle-status ready"><strong>Inning ${esc(next)} defense is ready</strong><span>${moves.length ? 'Make these moves, then start the inning.' : 'No defensive moves are needed.'} Current pitcher stays unless you use Change Pitcher.</span></div>${moveMarkup}<div class="cb-t2-huddle-actions"><button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Change next defense</button></div>`;
-      start.disabled = false;
-      setText(start, `Start Inning ${next}`);
-      showHuddleError('');
+    const button =
+      $('liveEndInningBtn');
+
+    if (!button || button.disabled) {
       return;
     }
 
-    body.innerHTML = `
-      <div class="cb-t2-huddle-status"><strong>Choose the Inning ${esc(next)} defense</strong><span>Pick who goes out next, then start the inning. Current pitcher stays; use Change Pitcher separately.</span></div>
-      <div class="cb-t2-huddle-actions ${planned ? 'two' : ''}">
-        <button type="button" class="btn btn-outline-dark" data-cb-t2-choice="current">Same Defense</button>
-        ${planned ? '<button type="button" class="btn btn-outline-primary" data-cb-t2-choice="planned">Use Planned Defense</button>' : ''}
-        <button type="button" class="btn btn-outline-secondary" data-cb-t2-plan>Change next defense</button>
-      </div>`;
-    start.disabled = true;
-    setText(start, `Start Inning ${next}`);
-    showHuddleError('');
-  }
+    inningAdvanceBusy = true;
 
-  async function refreshHuddle() {
-    const prep = await getJson(`/api/live-game/${gameId}/next-inning-prep`);
-    renderHuddle(prep);
-    return prep;
-  }
+    const wasDisabled =
+      button.disabled;
 
-  async function chooseNextDefense(choice) {
-    if (huddleBusy) return;
-    huddleBusy = true;
-    showHuddleError('');
-    try {
-      let data;
-      if (choice === 'planned') {
-        const candidate = plannedCandidate(huddlePrep);
-        if (!candidate) throw new Error('The planned defense is not ready to use. Review the Next Inning plan first.');
-        if (window.CBNextDefense?.usePregame) data = await window.CBNextDefense.usePregame();
-        else data = await postJson(`/api/live-game/${gameId}/next-inning-prep`, {mode:'custom', alignment:candidate});
-      } else {
-        if (window.CBNextDefense?.useSame) data = await window.CBNextDefense.useSame();
-        else data = await postJson(`/api/live-game/${gameId}/next-inning-prep`, {mode:'current'});
-      }
-      if (!data) data = await getJson(`/api/live-game/${gameId}/next-inning-prep`);
-      renderHuddle(data);
-    } catch (error) {
-      showHuddleError(error.message || 'Unable to set the next defense.');
-    } finally {
-      huddleBusy = false;
-    }
-  }
+    button.disabled = true;
 
-  function returnToNextPlan() {
-    const modal = ensureHuddle();
-    window.bootstrap?.Modal?.getOrCreateInstance(modal)?.hide();
-    window.setTimeout(() => {
-      const board = $('live-board-prep-v3');
-      board?.scrollIntoView({behavior:'smooth', block:'start'});
-      board?.classList.add('cb-board-flash');
-      window.setTimeout(() => board?.classList.remove('cb-board-flash'), 1500);
-    }, 180);
-  }
-
-  async function startNextInning() {
-    if (huddleBusy) return;
-
-    huddleBusy = true;
-    showHuddleError('');
-
-    const modal = ensureHuddle();
-    const button = modal.querySelector(
-      '[data-cb-t2-start-inning]'
-    );
-
-    const expectedInning = String(
-      huddlePrep?.current_inning || ''
-    );
-
-    if (button) button.disabled = true;
+    window.CBNextDefense
+      ?.clearError?.();
 
     try {
       await waitForLiveWritesToSettle();
 
-      const [prep, liveState] = await Promise.all([
-        getJson(
-          `/api/live-game/${gameId}/next-inning-prep`
-        ),
-        getJson(
-          `/api/live-game/${gameId}/state`
-        ),
-      ]);
+      const [prep, liveState] =
+        await Promise.all([
+          getJson(
+            `/api/live-game/${gameId}/next-inning-prep`
+          ),
+          getJson(
+            `/api/live-game/${gameId}/state`
+          ),
+        ]);
 
-      const liveInning = String(
-        liveState.current_inning || ''
+      const currentInning = String(
+        liveState?.current_inning ||
+        ''
       );
 
-      // The huddle may have been opened for Inning 1 while another
-      // coach already started Inning 2. Do not turn the now-current
-      // Inning 2 prep into an error screen. Close the stale huddle
-      // and put this phone on the authoritative live inning instead.
       if (
-        expectedInning &&
-        liveInning &&
-        liveInning !== expectedInning
+        currentInning !==
+        String(prep?.current_inning || '')
       ) {
-        recoverAdvancedInning(liveState);
-        return;
-      }
-
-      if (
-        String(liveState.current_inning || '') !==
-        String(prep.current_inning || '')
-      ) {
-        recoverAdvancedInning(liveState);
-        return;
-      }
-
-      const alignment = confirmedAlignment(prep);
-
-      if (!alignment) {
-        throw new Error(
-          'Lock the next defense before starting the inning.'
+        recoverAdvancedInning(
+          liveState
         );
+        return;
+      }
+
+      const alignment = {
+        ...(prep?.confirmed?.alignment || {}),
+      };
+
+      if (!alignment.P) {
+        throw new Error(
+          'Set a pitcher for the next inning.'
+        );
+      }
+
+      const assigned = new Map();
+
+      for (
+        const [position, rawName]
+        of Object.entries(alignment)
+      ) {
+        const name = String(
+          rawName || ''
+        ).trim();
+
+        if (!name) continue;
+
+        if (assigned.has(name)) {
+          const firstPosition =
+            assigned.get(name);
+
+          throw new Error(
+            `${name} is assigned to both ` +
+            `${firstPosition} and ${position}. ` +
+            'Fix NEXT before ending the inning.'
+          );
+        }
+
+        assigned.set(name, position);
       }
 
       const result = await postJson(
         `/api/live-game/${gameId}/advance-inning`,
         {
           alignment,
-          base_sequence: sequenceFromState(liveState),
+          base_sequence:
+            sequenceFromState(
+              liveState
+            ),
         }
       );
 
-      window.bootstrap?.Modal
-        ?.getOrCreateInstance(modal)
-        ?.hide();
+      if (result?.delta) {
+        document.dispatchEvent(
+          new CustomEvent(
+            'coachboard:live-delta',
+            {
+              detail: result.delta,
+            }
+          )
+        );
+      }
 
       document.dispatchEvent(
         new CustomEvent(
           'coachboard:test2-inning-started',
-          {detail: {result}}
+          {
+            detail: {
+              result,
+            },
+          }
         )
       );
 
-      window.CBNextDefense?.refresh?.();
+      window.CBNextDefense
+        ?.afterAdvance?.();
 
-      window.setTimeout(
-        () => $('cbQuickDefense')?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        }),
-        180
-      );
     } catch (error) {
-      // A second coach can advance in the small window between our
-      // state read and POST. One fresh read distinguishes that safe
-      // race from a real error.
       try {
         const fresh = await getJson(
           `/api/live-game/${gameId}/state`
         );
 
-        const freshInning = String(
-          fresh.current_inning || ''
+        const nextInning = Number(
+          fresh?.current_inning
+        );
+
+        const oldInning = Number(
+          $('live-inning-display')
+            ?.textContent
         );
 
         if (
-          expectedInning &&
-          freshInning &&
-          freshInning !== expectedInning
+          Number.isFinite(nextInning) &&
+          Number.isFinite(oldInning) &&
+          nextInning > oldInning
         ) {
-          recoverAdvancedInning(fresh);
+          recoverAdvancedInning(
+            fresh
+          );
           return;
         }
       } catch (_) {}
 
-      showHuddleError(
-        error.message ||
-        'Unable to start the next inning.'
-      );
+      const message =
+        error?.message ||
+        'Unable to end inning.';
 
-      try {
-        await refreshHuddle();
-      } catch (_) {}
-    } finally {
-      huddleBusy = false;
-
-      if (
-        button?.isConnected &&
-        confirmedAlignment(huddlePrep)
-      ) {
-        button.disabled = false;
-      }
-    }
-  }
-
-  async function openHuddle() {
-    if (huddleBusy) return;
-    huddleBusy = true;
-    const modal = ensureHuddle();
-    showHuddleError('');
-    const body = modal.querySelector('[data-cb-t2-huddle-body]');
-    if (body) body.innerHTML = '<div class="cb-t2-huddle-status"><strong>Checking next inning…</strong><span>CoachBoard is making sure the current defense is saved.</span></div>';
-    modal.querySelector('[data-cb-t2-start-inning]').disabled = true;
-    window.bootstrap?.Modal?.getOrCreateInstance(modal)?.show();
-    try {
-      await waitForLiveWritesToSettle();
-      await refreshHuddle();
-    } catch (error) {
-      showHuddleError(error.message || 'Unable to prepare the next inning.');
-    } finally {
-      huddleBusy = false;
-    }
-  }
-
-  document.addEventListener(
-    'coachboard:live-delta',
-    event => {
-      const delta = event?.detail;
-
-      if (
-        !delta ||
-        Number(delta.game_id) !== gameId ||
-        !huddlePrep
-      ) {
-        return;
-      }
-
-      const modal = $(HUDDLE_ID);
-
-      if (!modal?.classList.contains('show')) {
-        return;
-      }
-
-      const expected = String(
-        huddlePrep.current_inning || ''
-      );
-
-      const current = String(
-        delta.current_inning || ''
-      );
-
-      if (
-        expected &&
-        current &&
-        expected !== current
-      ) {
-        recoverAdvancedInning(
-          delta,
-          {publish: false}
+      window.CBNextDefense
+        ?.showError?.(
+          message
         );
+
+      window.CBNextDefense
+        ?.showNext?.();
+
+    } finally {
+      inningAdvanceBusy = false;
+
+      if (button?.isConnected) {
+        button.disabled =
+          wasDisabled;
       }
     }
-  );
+  }
 
-  window.addEventListener('click', event => {
-    const button = event.target.closest?.('#liveEndInningBtn');
-    if (!button || button.disabled) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    openHuddle();
-  }, true);
+  window.addEventListener(
+    'click',
+    event => {
+      const button =
+        event.target.closest?.(
+          '#liveEndInningBtn'
+        );
+
+      if (
+        !button ||
+        button.disabled
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      endInningFromNext();
+    },
+    true
+  );
 
   window.CBTest2Contract = {
     setMode,
-    openHuddle,
+    endInning: endInningFromNext,
     apply: applyContract,
   };
 

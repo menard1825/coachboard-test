@@ -124,17 +124,61 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         expect(phone.locator('#live-inning-display')).to_have_text('1')
         expect(ipad.locator('#live-inning-display')).to_have_text('1')
 
-        prep = phone.request.get(f'{coachboard_url}/api/live-game/{game_id}/next-inning-prep').json()
-        assert prep['confirmed'] is None
+        # NEXT is automatically seeded when Live Game starts.
+        #
+        # With an Inning 2 pregame defense available, the automatic NEXT
+        # draft should already contain that planned defense. The coach can
+        # edit it immediately; no separate lock/confirm step is required.
+        prep = phone.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/next-inning-prep'
+        ).json()
+
         assert prep['planned_alignment']
+        assert prep['confirmed'] is not None
+        assert prep['confirmed']['inning'] == '2'
+        assert prep['confirmed']['source'] == 'planned'
+        assert prep['confirmed']['alignment']
+
+        # End Inning now applies the prepared NEXT defense directly.
+        # There is no separate huddle / Start Inning confirmation.
+        next_alignment = dict(prep['confirmed']['alignment'])
+
         phone.locator('#liveEndInningBtn').click()
-        huddle = phone.locator('#cb-test2-huddle-modal')
-        expect(huddle).to_be_visible(timeout=10_000)
-        expect(huddle.locator('[data-cb-t2-choice="planned"]')).to_be_visible()
-        expect(huddle.locator('[data-cb-t2-start-inning]')).to_be_disabled()
-        expect(phone.locator('#cb-live-field-editor')).to_have_count(0)
-        huddle.get_by_role('button', name='Back to game').click()
-        expect(huddle).not_to_be_visible(timeout=10_000)
+
+        expect(
+            phone.locator('#live-inning-display')
+        ).to_have_text(
+            '2',
+            timeout=15_000,
+        )
+
+        expect(
+            ipad.locator('#live-inning-display')
+        ).to_have_text(
+            '2',
+            timeout=15_000,
+        )
+
+        expect(
+            phone.locator('#cb-test2-huddle-modal')
+        ).to_have_count(0)
+
+        expect(
+            phone.locator('#cb-live-field-editor')
+        ).to_have_count(0)
+
+        phone_after_advance = phone.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        ipad_after_advance = ipad.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        assert phone_after_advance['current_inning'] == '2'
+        assert ipad_after_advance['current_inning'] == '2'
+        assert phone_after_advance['current_alignment'] == next_alignment
+        assert ipad_after_advance['current_alignment'] == next_alignment
 
         quick = phone.locator('#cbQuickDefense')
         quick.locator('[data-cb-position="SS"]').click()
@@ -144,10 +188,23 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         expect(move).not_to_be_visible(timeout=10_000)
         expect(quick.locator('.cb-save-state')).to_contain_text('Saved', timeout=10_000)
         phone.locator('#liveUndoBtn').click()
-        phone.locator('#liveEndInningBtn').click()
-        expect(huddle).to_be_visible(timeout=10_000)
-        expect(phone.locator('#cb-live-field-editor')).to_have_count(0)
-        huddle.get_by_role('button', name='Back to game').click()
+
+        # Undo must restore the authoritative Inning 2 alignment without
+        # invoking any retired huddle/editor workflow.
+        expect(
+            phone.locator('#live-inning-display')
+        ).to_have_text(
+            '2',
+            timeout=10_000,
+        )
+
+        expect(
+            phone.locator('#cb-test2-huddle-modal')
+        ).to_have_count(0)
+
+        expect(
+            phone.locator('#cb-live-field-editor')
+        ).to_have_count(0)
 
         state = phone.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
         inflight = dict(state['current_alignment'])
@@ -173,7 +230,7 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         ipad_state = ipad.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
         assert phone_state['game']['is_live'] is True
         assert ipad_state['game']['is_live'] is True
-        assert phone_state['current_inning'] == ipad_state['current_inning'] == '1'
+        assert phone_state['current_inning'] == ipad_state['current_inning'] == '2'
         assert phone_state['current_alignment'] == ipad_state['current_alignment']
 
         incomplete_id = create_game(phone, coachboard_url, 'Test 2 Incomplete Opponent', complete=False)

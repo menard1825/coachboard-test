@@ -9,6 +9,7 @@
     let socket = null;
     let connected = false;
     let actionBusy = false;
+    let liveSequence = 0;
 
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -16,7 +17,7 @@
 
     const byId = (id) => document.getElementById(id);
 
-    function sequenceFromState(value = liveState) {
+    function sequenceFromEvents(value = liveState) {
         return (value?.rotation_events || []).reduce(
             (max, event) => {
                 if (event?.reverted) return max;
@@ -26,6 +27,13 @@
                 );
             },
             0,
+        );
+    }
+
+    function sequenceFromState(value = liveState) {
+        return Math.max(
+            liveSequence,
+            sequenceFromEvents(value),
         );
     }
 
@@ -96,14 +104,32 @@
                 `Request failed (${response.status})`
             );
         }
-        if (data.state) applyState(data.state);
+        if (data.state) {
+            applyState(
+                data.state,
+                {
+                    allowSequenceRollback:
+                        path === '/undo',
+                    source:
+                        path === '/undo'
+                            ? 'undo'
+                            : 'api',
+                }
+            );
+        }
+
         return data;
     }
 
     async function fetchState() {
         const response = await fetch(`/api/live-game/${gameId}/state`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`Unable to load live game state (${response.status}).`);
-        applyState(await response.json());
+        applyState(
+            await response.json(),
+            {
+                source: 'live-v2-fetch',
+            }
+        );
     }
 
     function roleRank(role) {
@@ -236,17 +262,67 @@
         if (isLive) {
             const inning = byId('live-inning-display');
             if (inning) inning.textContent = liveState.current_inning || '1';
+
+            /*
+             * NOW/NEXT and Dugout own the live defensive surfaces.
+             *
+             * Do not rebuild the legacy diamond, legacy Up Next card, or
+             * live pitching board every time authoritative state arrives.
+             * Those DOM writes were redundant with the current Live Game
+             * workspace and made the transition into Live Game busier.
+             */
             renderPitcherSummary();
-            renderUpNext();
-            renderDiamondAndBench();
             setSyncStatus(connected ? 'synced' : 'reconnecting');
+        } else {
+            /*
+             * Keep the pitching-plan board available before the game.
+             * GameChanger is the pitch book once Live Game begins.
+             */
+            renderPitchingBoard();
         }
-        renderPitchingBoard();
     }
 
-    function applyState(state) {
+    function applyState(
+        state,
+        {
+            allowSequenceRollback = false,
+            source = 'live-v2',
+        } = {}
+    ) {
         liveState = state;
+
+        const nextSequence =
+            sequenceFromEvents(state);
+
+        liveSequence =
+            allowSequenceRollback
+                ? nextSequence
+                : Math.max(
+                    liveSequence,
+                    nextSequence,
+                );
+
         renderLifecycle();
+
+        /*
+         * Publish the established shared-state contract.
+         *
+         * Dugout consumes detail.game_id and detail.state.
+         * Publishing the raw state here caused successful NOW
+         * Undo responses to be ignored by the visible field.
+         */
+        document.dispatchEvent(
+            new CustomEvent(
+                'coachboard:live-state',
+                {
+                    detail: {
+                        game_id: gameId,
+                        state,
+                        source,
+                    },
+                }
+            )
+        );
     }
 
     function modalShell(id, title) {
@@ -568,9 +644,36 @@
             connected = false;
             if (liveState?.game?.is_live) setSyncStatus('offline');
         });
-        socket.on('game_state_update', state => applyState(state));
+        socket.on(
+            'game_state_update',
+            state => applyState(
+                state,
+                {
+                    source: 'live-v2-socket',
+                }
+            )
+        );
         window.addEventListener('beforeunload', () => socket?.emit('leave_game_room', { game_id: gameId }));
     }
+
+    document.addEventListener(
+        'coachboard:live-delta',
+        event => {
+            const delta = event.detail || {};
+
+            if (
+                Number(delta.game_id) !== gameId
+            ) {
+                return;
+            }
+
+            liveSequence = Math.max(
+                liveSequence,
+                Number(delta.sequence) || 0,
+                Number(delta.event?.sequence) || 0,
+            );
+        }
+    );
 
     document.addEventListener('click', handleCapturedEvent, true);
     document.addEventListener('change', event => {

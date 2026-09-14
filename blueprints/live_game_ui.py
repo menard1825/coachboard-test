@@ -87,6 +87,68 @@ def _clean_complete_alignment(candidate, game, team):
     return cleaned, None
 
 
+def _clean_draft_alignment(candidate, game, team):
+    """Validate a NEXT draft without requiring every position to be filled."""
+    if not isinstance(candidate, dict):
+        return None, 'A defensive alignment is required.'
+
+    allowed = _allowed_positions(team)
+    unknown = [pos for pos in candidate if pos not in allowed]
+    if unknown:
+        return None, f'Invalid defensive position: {unknown[0]}.'
+
+    present = _present_players(game, team.id)
+    present_names = {player.name for player in present}
+
+    cleaned = {
+        pos: candidate.get(pos) or ''
+        for pos in allowed
+    }
+
+    invalid = sorted({
+        name
+        for name in cleaned.values()
+        if name and name not in present_names
+    })
+
+    if invalid:
+        return None, (
+            f'{invalid[0]} is not available for this game.'
+        )
+
+    # A NEXT draft is intentionally allowed to be incomplete or temporarily
+    # contain the same player twice. The coach can fix that directly on NEXT.
+    # End Inning performs the final physically-valid check.
+    return cleaned, None
+
+
+def _seed_next_alignment(current_alignment, planned_alignment, team):
+    """Build the automatic NEXT board for the upcoming inning."""
+    allowed = _allowed_positions(team)
+    current = current_alignment or {}
+    planned = planned_alignment or {}
+
+    has_plan = any(planned.get(pos) for pos in allowed)
+
+    if has_plan:
+        seeded = {
+            pos: planned.get(pos) or ''
+            for pos in allowed
+        }
+
+        # A specifically planned pitcher wins. Only carry the current
+        # pitcher when the written next-inning plan leaves P blank.
+        if not seeded.get('P'):
+            seeded['P'] = current.get('P') or ''
+
+        return seeded, 'planned'
+
+    return {
+        pos: current.get(pos) or ''
+        for pos in allowed
+    }, 'current'
+
+
 def _prep_dict(prep):
     if not prep:
         return None
@@ -116,8 +178,15 @@ def _next_inning_context(game, team):
     rotation, actual_rotation, _ = _actual_rotation(game, team.id)
     current_inning = str(game.live_current_inning or '1')
     next_inning = _next_inning_key(current_inning)
-    current_alignment = deepcopy(actual_rotation.get(current_inning, {}) or {})
-    planned_alignment = deepcopy((rotation.innings or {}).get(next_inning, {}) if rotation and next_inning else {})
+    current_alignment = deepcopy(
+        actual_rotation.get(current_inning, {}) or {}
+    )
+    planned_alignment = deepcopy(
+        (rotation.innings or {}).get(next_inning, {})
+        if rotation and next_inning
+        else {}
+    )
+
     prep = _prep_for_game(game.id, team.id)
 
     if prep and prep.inning != next_inning:
@@ -125,7 +194,32 @@ def _next_inning_context(game, team):
         db.session.commit()
         prep = None
 
-    return current_inning, next_inning, current_alignment, planned_alignment, prep
+    if not prep and next_inning:
+        seeded, source = _seed_next_alignment(
+            current_alignment,
+            planned_alignment,
+            team,
+        )
+
+        prep = GameNextInningPrep(
+            game_id=game.id,
+            team_id=team.id,
+            inning=next_inning,
+            alignment=seeded,
+            source=source,
+            updated_by='Auto',
+            updated_at=datetime.utcnow(),
+        )
+        db.session.add(prep)
+        db.session.commit()
+
+    return (
+        current_inning,
+        next_inning,
+        current_alignment,
+        planned_alignment,
+        prep,
+    )
 
 
 def _end_inning_with_confirmed_prep():
@@ -222,53 +316,67 @@ def next_inning_prep(game_id):
 
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
-        mode = (data.get('mode') or '').lower()
+        mode = (data.get('mode') or 'custom').lower()
 
         if mode == 'current':
-            candidate = current_alignment
+            candidate = deepcopy(current_alignment)
             source = 'current'
+
         elif mode == 'planned':
-            if not planned_alignment:
-                return jsonify({'status': 'error', 'message': f'No pregame defense is saved for Inning {next_inning}.'}), 409
-            candidate = deepcopy(planned_alignment)
-            source = 'planned'
-            if not candidate.get('P'):
-                current_pitcher = current_alignment.get('P')
-                if not current_pitcher:
-                    return jsonify({
-                        'status': 'error',
-                        'message': 'The pregame pitcher is TBD. Set the next-inning pitcher before using the pregame defense.'
-                    }), 409
-                planned_position = next((
-                    pos for pos, name in candidate.items()
-                    if pos != 'P' and name == current_pitcher
-                ), None)
-                if planned_position:
-                    return jsonify({
-                        'status': 'error',
-                        'message': f'{current_pitcher} is pitching now but is slated for {planned_position} next inning. Set the next-inning defense to resolve the move.'
-                    }), 409
-                candidate['P'] = current_pitcher
-                source = 'planned_current_pitcher'
+            candidate, source = _seed_next_alignment(
+                current_alignment,
+                planned_alignment,
+                team,
+            )
+
         elif mode == 'custom':
             candidate = data.get('alignment')
             source = 'custom'
+
         else:
-            return jsonify({'status': 'error', 'message': 'Choose Keep Same Defense, Pregame Defense, or Set New Defense.'}), 400
+            return jsonify({
+                'status': 'error',
+                'message': 'Unknown NEXT defense action.',
+            }), 400
 
-        cleaned, message = _clean_complete_alignment(candidate, game, team)
-        if not cleaned:
-            return jsonify({'status': 'error', 'message': message}), 409
+        cleaned, message = _clean_draft_alignment(
+            candidate,
+            game,
+            team,
+        )
 
-        prep = prep or GameNextInningPrep(game_id=game.id, team_id=team.id)
+        if cleaned is None:
+            return jsonify({
+                'status': 'error',
+                'message': message,
+            }), 409
+
+        prep = prep or GameNextInningPrep(
+            game_id=game.id,
+            team_id=team.id,
+        )
+
         prep.inning = next_inning
         prep.alignment = cleaned
         prep.source = source
-        prep.updated_by = session.get('full_name') or user.full_name or user.username
+        prep.updated_by = (
+            session.get('full_name')
+            or user.full_name
+            or user.username
+        )
         prep.updated_at = datetime.utcnow()
+
         db.session.add(prep)
         db.session.commit()
-        socketio.emit('next_inning_prep_update', {'game_id': game.id, 'inning': next_inning}, room=f'team_{team.id}_game_{game.id}')
+
+        socketio.emit(
+            'next_inning_prep_update',
+            {
+                'game_id': game.id,
+                'inning': next_inning,
+            },
+            room=f'team_{team.id}_game_{game.id}',
+        )
 
     return jsonify({
         'status': 'success',
@@ -278,7 +386,14 @@ def next_inning_prep(game_id):
         'current_alignment': current_alignment,
         'planned_alignment': planned_alignment,
         'confirmed': _prep_dict(prep),
-        'roster': [{'id': player.id, 'name': player.name} for player in _present_players(game, team.id)],
+        'roster': [
+            {
+                'id': player.id,
+                'name': player.name,
+                'number': getattr(player, 'number', None),
+            }
+            for player in _present_players(game, team.id)
+        ],
         'outfielder_count': team.outfielder_count,
     })
 

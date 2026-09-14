@@ -411,9 +411,62 @@ def advance_inning(game_id):
     if stale:
         return stale
 
-    after, present_players, message = _validate_complete_alignment(data.get('alignment'), game, team)
-    if not after:
-        return jsonify({'status': 'error', 'message': message}), 409
+    proposed = data.get('alignment')
+
+    if not isinstance(proposed, dict):
+        return jsonify({
+            'status': 'error',
+            'message': 'A NEXT defensive alignment is required.',
+        }), 400
+
+    allowed = _allowed_positions(team)
+
+    unknown_positions = [
+        pos
+        for pos in proposed
+        if pos not in allowed
+    ]
+
+    if unknown_positions:
+        return jsonify({
+            'status': 'error',
+            'message': (
+                f'Invalid defensive position: '
+                f'{unknown_positions[0]}.'
+            ),
+        }), 400
+
+    present_players = _present_players(game, team.id)
+    present_names = {
+        player.name
+        for player in present_players
+    }
+
+    # OPEN positions are allowed when advancing an inning.
+    # P is the only required defensive spot.
+    after = {
+        pos: proposed.get(pos)
+        for pos in allowed
+        if proposed.get(pos)
+    }
+
+    if not after.get('P'):
+        return jsonify({
+            'status': 'error',
+            'code': 'next_pitcher_required',
+            'message': 'Set a pitcher for the next inning.',
+        }), 409
+
+    valid, message = _validate_alignment(
+        after,
+        present_names,
+    )
+
+    if not valid:
+        return jsonify({
+            'status': 'error',
+            'message': message,
+        }), 409
 
     _, actual_rotation, _ = _actual_rotation(game, team.id)
     current = str(game.live_current_inning or '1')
@@ -431,19 +484,9 @@ def advance_inning(game_id):
     old_pitcher_id = _player_id_by_name(old_pitcher, team.id)
     new_pitcher_id = _player_id_by_name(new_pitcher, team.id)
 
-    if new_pitcher and new_pitcher != old_pitcher:
-        present_names = {player.name for player in present_players}
-        if new_pitcher not in present_names:
-            return jsonify({'status': 'error', 'message': 'The next pitcher is not available for this game.'}), 409
-        state = get_authoritative_live_state(game.id, team.id) or {}
-        pitcher_summary = (state.get('pitch_count_summary') or {}).get(new_pitcher, {})
-        if _pitcher_status_blocks_change(pitcher_summary):
-            status = pitcher_summary.get('status') or 'not available'
-            detail = pitcher_summary.get('status_detail') or pitcher_summary.get('next_available')
-            error = f'{new_pitcher} cannot start Inning {next_inning}: {status}.'
-            if detail:
-                error += f' {detail}'
-            return jsonify({'status': 'error', 'message': error}), 409
+    # CoachBoard is the defensive whiteboard during a live game.
+    # Pitching status can be advisory, but it does not block putting the
+    # planned pitcher on the field for the next inning.
 
     event = _event(
         game,

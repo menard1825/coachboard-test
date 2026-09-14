@@ -1,12 +1,15 @@
 """Disposable CoachBoard server used only by the Playwright test suite."""
 
 import os
+import sqlite3
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import eventlet
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 eventlet.monkey_patch()
 
@@ -14,6 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import app as app_module
 from app import create_app
 from db import db
 from extensions import socketio
@@ -37,6 +41,39 @@ from models import (
     User,
 )
 from werkzeug.security import generate_password_hash
+
+
+# The normal application SQLite connection hook enables WAL and durable
+# settings appropriate for real multi-coach use. Playwright creates a
+# disposable database from scratch for every test session, where those
+# durability settings make schema creation unnecessarily slow on this host.
+#
+# Replace the normal SQLite hook only inside this E2E server process.
+event.remove(
+    Engine,
+    'connect',
+    app_module._configure_sqlite_connection,
+)
+
+
+@event.listens_for(Engine, 'connect')
+def _configure_e2e_sqlite_connection(dbapi_connection, connection_record):
+    if not isinstance(dbapi_connection, sqlite3.Connection):
+        return
+
+    cursor = dbapi_connection.cursor()
+
+    try:
+        cursor.execute('PRAGMA foreign_keys=ON')
+        cursor.execute('PRAGMA busy_timeout=5000')
+
+        cursor.execute('PRAGMA journal_mode=MEMORY')
+        cursor.fetchone()
+
+        cursor.execute('PRAGMA synchronous=OFF')
+        cursor.execute('PRAGMA temp_store=MEMORY')
+    finally:
+        cursor.close()
 
 
 TEST_USERNAME = 'playwright-coach'

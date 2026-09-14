@@ -142,11 +142,29 @@ def test_bench_report_shows_actual_and_future_planned_sits(page: Page, coachboar
         modal.get_by_role('button', name='Back to Game').click()
         expect(modal).to_be_hidden()
 
+        switcher = page.locator('#cb-now-next-switch')
+        expect(switcher).to_be_visible(timeout=10_000)
+        switcher.locator('[data-now-next="next"]').click()
+
         next_board = page.locator('#live-board-prep-v3')
         expect(next_board).to_be_visible(timeout=10_000)
-        expect(next_board).to_contain_text('Your planned Inning 2 defense is ready.')
-        expect(next_board).to_contain_text('Pregame Defense')
-        expect(next_board.get_by_role('button', name='Use Planned Defense')).to_be_enabled()
+        expect(next_board).to_contain_text('NEXT · INNING 2')
+        expect(next_board).to_contain_text('Loaded from your pregame plan')
+        expect(
+            next_board.locator('[data-next-position="C"]')
+        ).to_contain_text(BENCH_NAME)
+        expect(
+            next_board.get_by_role(
+                'button',
+                name='Use current defense',
+            )
+        ).to_be_visible()
+        expect(
+            next_board.get_by_role(
+                'button',
+                name='Use Planned Defense',
+            )
+        ).to_have_count(0)
     finally:
         state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
         if state_response.ok and state_response.json().get('game', {}).get('is_live'):

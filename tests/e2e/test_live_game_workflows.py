@@ -195,18 +195,17 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     assert state['game']['is_live'] is True
     assert state['current_alignment']['P'] == 'Pitcher Pat'
 
-    # The next-defense board is now an explicit coaching decision instead of
-    # silently loading a pregame inning. Current Defense remains authoritative;
-    # the coach can choose Same Defense, Pregame Defense, or New Defense.
+    # NEXT exists immediately and is automatically seeded from
+    # the Inning 2 pregame defense.
+    switcher = page.locator('#cb-now-next-switch')
+    expect(switcher).to_be_visible(timeout=15_000)
+
+    switcher.locator('[data-now-next="next"]').click()
+
     next_board = page.locator('#live-board-prep-v3')
     expect(next_board).to_be_visible(timeout=15_000)
-    expect(next_board).to_contain_text(re.compile(r"Who['’]s Going Out Next\?"))
-    expect(next_board).to_contain_text('Pregame Defense')
-
-    field_toggle = page.locator('[data-coach-defense-view="field"]')
-    if field_toggle.count():
-        field_toggle.first.click()
-        expect(page.locator('#coach-current-defense .coach-field')).to_be_visible(timeout=10_000)
+    expect(next_board).to_contain_text('NEXT · INNING 2')
+    expect(next_board).to_contain_text('Loaded from your pregame plan')
 
     viewports = (
         {'width': 390, 'height': 844},
@@ -214,17 +213,25 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
         {'width': 1180, 'height': 820},
         {'width': 1440, 'height': 900},
     )
+
     for viewport in viewports:
         page.set_viewport_size(viewport)
         page.wait_for_timeout(180)
+
         expect(next_board).to_be_visible()
-        next_field_names = next_board.locator('.bp-field-spot .name')
-        if next_field_names.count():
-            assert_player_names_are_fully_visible(next_field_names)
-        current_field_names = page.locator('#coach-current-defense .coach-field-spot span')
-        if current_field_names.count():
-            assert_player_names_are_fully_visible(current_field_names)
-        assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
+
+        next_field_names = next_board.locator(
+            '.cb-next-spot .cb-qd-name'
+        )
+
+        assert_player_names_are_fully_visible(
+            next_field_names
+        )
+
+        assert page.evaluate(
+            'document.documentElement.scrollWidth '
+            '<= document.documentElement.clientWidth + 2'
+        )
 
     clock = get_json(page, coachboard_url, f'/api/live-game/{game_id}/clock')
     assert clock['clock']['is_live'] is True

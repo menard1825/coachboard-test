@@ -224,8 +224,20 @@
         }));
       }
 
-      if (draft === savedDraft) draft = null;
-      document.querySelector('#cbQuickDefense .cb-main-draft-banner')?.remove();
+      if (draft === savedDraft) {
+        clearDraft();
+      } else {
+        document.querySelector(
+          '#cbQuickDefense .cb-main-draft-banner'
+        )?.remove();
+
+        document.querySelectorAll(
+          '#cbQuickDefense .cb-main-open'
+        ).forEach(
+          element => element.classList.remove('cb-main-open')
+        );
+      }
+
       setSaveBadge('', 'Saved ✓');
     } catch (error) {
       if (draft === savedDraft) {
@@ -384,6 +396,23 @@
     enhanceQueued = true;
     window.requestAnimationFrame(enhanceQuickDefense);
   }
+
+  document.addEventListener(
+    'coachboard:live-state',
+    event => {
+      const detail = event?.detail || {};
+
+      if (
+        Number(detail.game_id) !== gameId ||
+        String(detail.source || '') !== 'undo'
+      ) {
+        return;
+      }
+
+      cancelDrag();
+      clearDraft({restore: false});
+    }
+  );
 
   document.addEventListener('pointerdown', beginDrag, {capture: true, passive: true});
   document.addEventListener('pointermove', moveDrag, {capture: true, passive: false});

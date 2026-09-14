@@ -230,8 +230,94 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         modal.get_by_role('button', name='Close').click()
         expect(modal).not_to_be_visible(timeout=10_000)
 
-        next_board = page.locator('#live-board-prep-v3')
-        expect(next_board).to_be_visible()
+        # Regression: canonical NOW Undo must restore the authoritative
+        # defensive state AND repaint Quick Field without a page reload.
+        #
+        # The most recent saved change replaced Catcher Cole with
+        # Center Casey at C. Undo should put Catcher Cole back at C
+        # and return Center Casey to the bench immediately.
+        page.locator('#liveUndoBtn').click()
+
+        expect(
+            quick.locator('[data-cb-position="C"]')
+        ).to_contain_text(
+            'Catcher Cole',
+            timeout=10_000,
+        )
+
+        expect(
+            quick.locator(
+                '[data-cb-move-player="Center Casey"]'
+            )
+        ).to_be_visible(
+            timeout=10_000,
+        )
+
+        # Regression: Safari/live overlays continue mutating after Undo.
+        # Force body DOM churn and two animation frames so every
+        # MutationObserver painter gets a chance to run.
+        page.evaluate(
+            """
+            () => new Promise(resolve => {
+                const marker = document.createElement('div');
+                marker.id = 'cb-post-undo-dom-churn';
+                document.body.appendChild(marker);
+                marker.remove();
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(resolve);
+                });
+            })
+            """
+        )
+
+        expect(
+            quick.locator('[data-cb-position="C"]')
+        ).to_contain_text(
+            'Catcher Cole',
+            timeout=10_000,
+        )
+
+        expect(
+            quick.locator(
+                '[data-cb-move-player="Center Casey"]'
+            )
+        ).to_be_visible(
+            timeout=10_000,
+        )
+
+        state = get_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/state',
+        )
+
+        assert (
+            state['current_alignment']['C']
+            == 'Catcher Cole'
+        )
+        assert (
+            'Center Casey'
+            not in state['current_alignment'].values()
+        )
+
+        # NOW and NEXT are alternate views. NEXT must stay hidden
+        # while NOW is selected, then become visible after one tap.
+        next_board = page.locator(
+            '#live-board-prep-v3'
+        )
+
+        expect(next_board).to_be_hidden()
+
+        page.locator(
+            '[data-now-next="next"]'
+        ).click()
+
+        expect(
+            next_board
+        ).to_be_visible(
+            timeout=10_000,
+        )
     finally:
         state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')
         if state_response.ok and state_response.json().get('game', {}).get('is_live'):
