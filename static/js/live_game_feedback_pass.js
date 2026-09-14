@@ -146,6 +146,19 @@
 
     const sequence = Number(delta.sequence) || 0;
     if (sequence && sequence < lastSequence) return;
+
+    /*
+     * A live delta proves that any /state GET which began before this
+     * delta may describe an older live-game version.
+     *
+     * Do not let later callers (notably Quick Field drag/drop) reuse
+     * that older in-flight response. The original request may finish
+     * normally for its original consumer; new callers must perform a
+     * fresh authoritative GET.
+     */
+    stateInflight = null;
+    stateInflightUntil = 0;
+
     if (
       sequence &&
       lastSequence &&

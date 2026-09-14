@@ -211,7 +211,23 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.status === 'error') {
-        throw new Error(data.message || `Unable to save defense (${response.status}).`);
+        const saveError = new Error(
+          data.message ||
+          `Unable to save defense (${response.status}).`
+        );
+
+        // Preserve authoritative conflict details so the catch block can
+        // repaint from the server instead of restoring a stale local draft.
+        saveError.code = String(data.code || '');
+        saveError.currentAlignment =
+          data.current_alignment &&
+          typeof data.current_alignment === 'object'
+            ? {...data.current_alignment}
+            : null;
+        saveError.currentSequence =
+          Number(data.current_sequence) || 0;
+
+        throw saveError;
       }
 
       // Keep the tap-based Quick Field controller on the exact same live
@@ -243,7 +259,40 @@
       if (draft === savedDraft) {
         setSaveBadge('error', 'Not saved');
         window.alert(`Defense was not saved. ${error.message}`);
-        clearDraft({restore: true});
+
+        if (
+          error?.code === 'stale_live_state' &&
+          error?.currentAlignment
+        ) {
+          /*
+           * Another coach won the optimistic-concurrency race.
+           *
+           * The 409 response already contains the authoritative field.
+           * Paint that immediately. Restoring savedDraft.baseAlignment here
+           * would briefly show the older defense until the next socket/state
+           * refresh arrives.
+           *
+           * Do NOT merge or retry the rejected drag automatically; the other
+           * coach's change remains authoritative and the coach can retry from
+           * the updated field.
+           */
+          savedDraft.baseAlignment = {
+            ...error.currentAlignment,
+          };
+          savedDraft.alignment = {
+            ...error.currentAlignment,
+          };
+
+          if (error.currentSequence) {
+            savedDraft.baseSequence =
+              error.currentSequence;
+          }
+
+          renderDraft();
+          clearDraft({restore: false});
+        } else {
+          clearDraft({restore: true});
+        }
       }
     } finally {
       saveBusy = false;

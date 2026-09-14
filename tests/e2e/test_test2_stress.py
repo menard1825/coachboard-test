@@ -1,5 +1,6 @@
 """Locked Test 2 iPhone + iPad stress pass across live-game race conditions."""
 
+import json
 import os
 import re
 from datetime import date, timedelta
@@ -484,3 +485,651 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
 
         coach_a_context.close()
         coach_b_context.close()
+
+
+def test_test2_drag_survives_remote_live_redraw(
+    browser: Browser,
+    coachboard_url: str,
+):
+    """
+    Concurrent Quick Field regression.
+
+    A coach begins dragging SS while another coach saves a real live
+    defensive change.
+
+    Either concurrency outcome is valid:
+
+    * the drag rebases on current state and saves, preserving both changes; or
+    * optimistic concurrency rejects the drag with stale_live_state.
+
+    What must never happen is for the phone to visually roll the field back
+    to the older alignment after it has already rendered the newer remote
+    defense.
+    """
+    phone_context = browser.new_context(
+        viewport={'width': 390, 'height': 844}
+    )
+    ipad_context = browser.new_context(
+        viewport={'width': 768, 'height': 1024}
+    )
+
+    phone = phone_context.new_page()
+    ipad = ipad_context.new_page()
+
+    game_id = None
+    mouse_down = False
+    dialogs = []
+
+    phone.on(
+        'dialog',
+        lambda dialog: (
+            dialogs.append(dialog.message),
+            dialog.dismiss(),
+        ),
+    )
+
+    try:
+        login(phone, coachboard_url)
+        login(ipad, coachboard_url)
+
+        game_id = create_game(
+            phone,
+            coachboard_url,
+            'Test 2 Drag Redraw Race Opponent',
+        )
+
+        started = phone.request.post(
+            f'{coachboard_url}/api/live-game/{game_id}/start',
+            data={},
+        )
+
+        assert started.status == 200, started.text()
+        assert started.json().get('status') == 'success'
+
+        phone.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        ipad.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        phone_quick = phone.locator('#cbQuickDefense')
+        ipad_quick = ipad.locator('#cbQuickDefense')
+
+        expect(phone_quick).to_be_visible(timeout=15_000)
+        expect(ipad_quick).to_be_visible(timeout=15_000)
+
+        expect(
+            phone.locator('#live-sync-status-v2')
+        ).to_contain_text(
+            'SYNCED',
+            timeout=10_000,
+        )
+
+        expect(
+            ipad.locator('#live-sync-status-v2')
+        ).to_contain_text(
+            'SYNCED',
+            timeout=10_000,
+        )
+
+        source = phone_quick.locator(
+            '[data-cb-position="SS"]'
+        )
+
+        expect(source).to_contain_text(
+            'Shortstop Shawn'
+        )
+
+        expect(source).to_be_visible(
+            timeout=10_000,
+        )
+
+        source.scroll_into_view_if_needed()
+
+        source_box = None
+
+        for _ in range(20):
+            source_box = source.bounding_box()
+
+            if source_box is not None:
+                break
+
+            phone.wait_for_timeout(50)
+
+        assert source_box is not None
+
+        source_x = (
+            source_box['x'] +
+            source_box['width'] / 2
+        )
+        source_y = (
+            source_box['y'] +
+            source_box['height'] / 2
+        )
+
+        phone.evaluate(
+            """
+            () => {
+                const source = document.querySelector(
+                    '#cbQuickDefense [data-cb-position="SS"]'
+                );
+                source.dataset.cbRaceToken = 'held-before-redraw';
+            }
+            """
+        )
+
+        phone.mouse.move(
+            source_x,
+            source_y,
+        )
+
+        phone.mouse.down()
+        mouse_down = True
+
+        # Stay below the 8px drag threshold.
+        phone.mouse.move(
+            source_x + 4,
+            source_y,
+        )
+
+        remote_before_response = ipad.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        )
+
+        assert remote_before_response.status == 200
+
+        remote_before = remote_before_response.json()
+
+        original_alignment = dict(
+            remote_before['current_alignment']
+        )
+
+        remote_alignment = dict(
+            original_alignment
+        )
+
+        remote_alignment['1B'], remote_alignment['3B'] = (
+            remote_alignment['3B'],
+            remote_alignment['1B'],
+        )
+
+        remote_write = ipad.request.post(
+            f'{coachboard_url}/api/live-game/'
+            f'{game_id}/defense-edit',
+            data={
+                'alignment': remote_alignment,
+                'base_sequence': current_sequence(
+                    remote_before
+                ),
+            },
+        )
+
+        assert remote_write.status == 200, (
+            remote_write.text()
+        )
+
+        remote_payload = remote_write.json()
+
+        assert (
+            remote_payload.get('status')
+            == 'success'
+        ), remote_payload
+
+        # The phone has definitely rendered the newer remote defense.
+        expect(
+            phone_quick.locator(
+                '[data-cb-position="1B"]'
+            )
+        ).to_contain_text(
+            remote_alignment['1B'],
+            timeout=10_000,
+        )
+
+        expect(
+            phone_quick.locator(
+                '[data-cb-position="3B"]'
+            )
+        ).to_contain_text(
+            remote_alignment['3B'],
+            timeout=10_000,
+        )
+
+        # Prove the redraw replaced the element that received pointerdown.
+        assert (
+            phone_quick.locator(
+                '[data-cb-position="SS"]'
+            ).get_attribute(
+                'data-cb-race-token'
+            )
+            is None
+        )
+
+        destination = phone_quick.locator(
+            '[data-cb-position="2B"]'
+        )
+
+        expect(destination).to_be_visible(
+            timeout=10_000,
+        )
+
+        destination_box = None
+
+        for _ in range(20):
+            destination_box = destination.bounding_box()
+
+            if destination_box is not None:
+                break
+
+            phone.wait_for_timeout(50)
+
+        assert destination_box is not None
+
+        destination_x = (
+            destination_box['x'] +
+            destination_box['width'] / 2
+        )
+        destination_y = (
+            destination_box['y'] +
+            destination_box['height'] / 2
+        )
+
+        # Start an rAF sampler BEFORE pointerup. From this moment forward,
+        # 1B/3B must never revert to the pre-iPad alignment.
+        phone.evaluate(
+            """
+            () => {
+                const read = position => (
+                    document.querySelector(
+                        `#cbQuickDefense `
+                        + `[data-cb-position="${position}"]`
+                    )?.dataset?.cbMovePlayer || null
+                );
+
+                window.__cbConcurrencySamples = [];
+
+                const started = performance.now();
+
+                const sample = () => {
+                    window.__cbConcurrencySamples.push({
+                        elapsed: performance.now() - started,
+                        oneB: read('1B'),
+                        twoB: read('2B'),
+                        threeB: read('3B'),
+                        ss: read('SS'),
+                    });
+
+                    if (performance.now() - started < 1500) {
+                        requestAnimationFrame(sample);
+                    }
+                };
+
+                sample();
+            }
+            """
+        )
+
+        phone.mouse.move(
+            destination_x,
+            destination_y,
+        )
+
+        endpoint = (
+            f'/api/live-game/{game_id}/defense-edit'
+        )
+
+        with phone.expect_response(
+            lambda response: (
+                endpoint in response.url
+                and response.request.method == 'POST'
+            ),
+            timeout=10_000,
+        ) as save_response_info:
+            phone.mouse.up()
+            mouse_down = False
+
+        save_response = save_response_info.value
+        save_payload = save_response.json()
+
+        # Allow the sampler to span the full stale-error recovery window.
+        phone.wait_for_timeout(1700)
+
+        samples = phone.evaluate(
+            "() => window.__cbConcurrencySamples || []"
+        )
+
+        assert samples
+
+        stale_visual_samples = [
+            sample
+            for sample in samples
+            if (
+                sample.get('oneB')
+                == original_alignment['1B']
+                and sample.get('threeB')
+                == original_alignment['3B']
+            )
+        ]
+
+        assert not stale_visual_samples, (
+            'Quick Field visually rolled back to the stale '
+            'pre-remote defense after already showing the '
+            'newer coach change. Samples: '
+            f'{stale_visual_samples[:10]}'
+        )
+
+        final_state_response = phone.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        )
+
+        assert final_state_response.status == 200
+
+        final_state = final_state_response.json()
+
+        if save_response.status == 200:
+            assert save_payload.get('status') == 'success'
+
+            # Remote 1B/3B edit and local SS/2B drag both survived.
+            assert (
+                final_state['current_alignment']['1B']
+                == remote_alignment['1B']
+            )
+            assert (
+                final_state['current_alignment']['3B']
+                == remote_alignment['3B']
+            )
+            assert (
+                final_state['current_alignment']['2B']
+                == 'Shortstop Shawn'
+            )
+            assert (
+                final_state['current_alignment']['SS']
+                == 'Second Sam'
+            )
+
+            expect(
+                phone_quick.locator('.cb-save-state')
+            ).to_contain_text(
+                'Saved',
+                timeout=10_000,
+            )
+
+        else:
+            # First accepted coach wins. The rejected drag must not be
+            # automatically merged/retried over newer authoritative state.
+            assert save_response.status == 409
+            assert (
+                save_payload.get('code')
+                == 'stale_live_state'
+            )
+
+            authoritative = dict(
+                save_payload['current_alignment']
+            )
+
+            assert (
+                authoritative
+                == remote_alignment
+            )
+
+            assert (
+                final_state['current_alignment']
+                == remote_alignment
+            )
+
+            assert dialogs
+            assert any(
+                'not saved' in message.lower()
+                for message in dialogs
+            )
+
+            # The visible field must already be the authoritative winner.
+            for position in ('1B', '2B', '3B', 'SS'):
+                assert (
+                    phone_quick.locator(
+                        f'[data-cb-position="{position}"]'
+                    ).get_attribute(
+                        'data-cb-move-player'
+                    )
+                    == remote_alignment[position]
+                )
+
+    finally:
+        if mouse_down:
+            try:
+                phone.mouse.up()
+            except Exception:
+                pass
+
+        if game_id is not None:
+            cleanup_game(
+                phone,
+                coachboard_url,
+                game_id,
+            )
+
+        phone_context.close()
+        ipad_context.close()
+
+
+def test_test2_end_inning_uses_latest_remote_next_prep(
+    browser: Browser,
+    coachboard_url: str,
+):
+    """
+    Regression probe for multi-coach NEXT ownership.
+
+    Deliberately keep the phone's local NEXT board stale while another
+    coach changes the server-side NEXT prep. End Inning must perform its
+    authoritative GET and advance using the newest server prep, not the
+    stale in-memory phone draft.
+    """
+    phone_context = browser.new_context(
+        viewport={'width': 390, 'height': 844}
+    )
+    ipad_context = browser.new_context(
+        viewport={'width': 768, 'height': 1024}
+    )
+
+    phone = phone_context.new_page()
+    ipad = ipad_context.new_page()
+
+    game_id = None
+    stale_route = None
+
+    try:
+        login(phone, coachboard_url)
+        login(ipad, coachboard_url)
+
+        game_id = create_game(
+            phone,
+            coachboard_url,
+            'Test 2 Latest NEXT Opponent',
+        )
+
+        started = phone.request.post(
+            f'{coachboard_url}/api/live-game/{game_id}/start',
+            data={},
+        )
+
+        assert started.status == 200, started.text()
+        assert started.json().get('status') == 'success'
+
+        phone.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        ipad.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            phone.locator('#cbQuickDefense')
+        ).to_be_visible(
+            timeout=15_000,
+        )
+
+        expect(
+            ipad.locator('#cbQuickDefense')
+        ).to_be_visible(
+            timeout=15_000,
+        )
+
+        phone.locator(
+            '[data-now-next="next"]'
+        ).click()
+
+        next_board = phone.locator(
+            '#live-board-prep-v3'
+        )
+
+        expect(next_board).to_be_visible(
+            timeout=10_000,
+        )
+
+        stale_prep = phone.request.get(
+            f'{coachboard_url}/api/live-game/'
+            f'{game_id}/next-inning-prep'
+        ).json()
+
+        assert stale_prep['confirmed']
+        stale_alignment = dict(
+            stale_prep['confirmed']['alignment']
+        )
+
+        # Disconnect the phone's socket and freeze periodic NEXT GETs
+        # at the old response. This deliberately creates the situation
+        # Claude was concerned about: the visible phone copy is stale.
+        phone.evaluate(
+            """
+            () => {
+                window.__cbLiveGameSocket?.disconnect?.();
+            }
+            """
+        )
+
+        stale_route = (
+            f'**/api/live-game/'
+            f'{game_id}/next-inning-prep'
+        )
+
+        phone.route(
+            stale_route,
+            lambda route: route.fulfill(
+                status=200,
+                content_type='application/json',
+                body=json.dumps(stale_prep),
+            ),
+        )
+
+        remote_alignment = dict(
+            stale_alignment
+        )
+
+        remote_alignment['C'], remote_alignment['1B'] = (
+            remote_alignment['1B'],
+            remote_alignment['C'],
+        )
+
+        remote_save = ipad.request.post(
+            f'{coachboard_url}/api/live-game/'
+            f'{game_id}/next-inning-prep',
+            data={
+                'mode': 'custom',
+                'alignment': remote_alignment,
+            },
+        )
+
+        assert remote_save.status == 200, (
+            remote_save.text()
+        )
+
+        remote_payload = remote_save.json()
+
+        assert (
+            remote_payload.get('status')
+            == 'success'
+        ), remote_payload
+
+        assert (
+            remote_payload['confirmed']['alignment']
+            == remote_alignment
+        )
+
+        phone.wait_for_timeout(500)
+
+        # The phone really is still displaying/holding the old NEXT.
+        local_alignment = phone.evaluate(
+            """
+            () => (
+                window.CBNextDefense?.getAlignment?.()
+                || null
+            )
+            """
+        )
+
+        assert local_alignment == stale_alignment
+        assert local_alignment != remote_alignment
+
+        # Release the artificial stale GET before End Inning.
+        # test2_game_contract.js must now fetch the authoritative server
+        # prep and use that rather than CBNextDefense.getAlignment().
+        phone.unroute(stale_route)
+        stale_route = None
+
+        phone.locator(
+            '#liveEndInningBtn'
+        ).click()
+
+        expect(
+            phone.locator(
+                '#live-inning-display'
+            )
+        ).to_have_text(
+            '2',
+            timeout=15_000,
+        )
+
+        final_state = phone.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        assert final_state['current_inning'] == '2'
+
+        assert (
+            final_state['current_alignment']
+            == remote_alignment
+        )
+
+        # Specifically prove the remote coach's NEXT swap won.
+        assert (
+            final_state['current_alignment']['C']
+            == stale_alignment['1B']
+        )
+
+        assert (
+            final_state['current_alignment']['1B']
+            == stale_alignment['C']
+        )
+
+    finally:
+        if stale_route is not None:
+            try:
+                phone.unroute(stale_route)
+            except Exception:
+                pass
+
+        if game_id is not None:
+            cleanup_game(
+                phone,
+                coachboard_url,
+                game_id,
+            )
+
+        phone_context.close()
+        ipad_context.close()
