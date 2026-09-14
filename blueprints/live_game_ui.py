@@ -222,62 +222,6 @@ def _next_inning_context(game, team):
     )
 
 
-def _end_inning_with_confirmed_prep():
-    try:
-        game_id = int((request.view_args or {}).get('game_id'))
-    except (TypeError, ValueError):
-        return jsonify({'status': 'error', 'message': 'Invalid game.'}), 400
-
-    user, team, game = _authorized_context(game_id)
-    if not game:
-        return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
-    if not game.is_live:
-        return jsonify({'status': 'error', 'message': 'Game is not live.'}), 409
-
-    _, next_inning, before, _, prep = _next_inning_context(game, team)
-    if not next_inning:
-        return jsonify({'status': 'error', 'message': 'Current inning is invalid.'}), 409
-    if not prep or prep.inning != next_inning:
-        return jsonify({
-            'status': 'error',
-            'message': f'Set the Inning {next_inning} defense before ending the inning.'
-        }), 409
-
-    after, message = _clean_complete_alignment(prep.alignment, game, team)
-    if not after:
-        return jsonify({'status': 'error', 'message': message}), 409
-
-    old_pitcher = before.get('P')
-    new_pitcher = after.get('P')
-    if new_pitcher and new_pitcher != old_pitcher:
-        state = get_authoritative_live_state(game.id, team.id) or {}
-        summary = (state.get('pitch_count_summary') or {}).get(new_pitcher, {})
-        status = str(summary.get('status') or '').lower()
-        if any(term in status for term in ('rest', 'unavailable', 'ineligible', 'incomplete', 'restriction', 'verify')):
-            return jsonify({
-                'status': 'error',
-                'message': f'{new_pitcher} cannot start the next inning right now: {summary.get("status") or "not available"}.'
-            }), 409
-
-    old_pitcher_id = _player_id_by_name(old_pitcher, team.id)
-    new_pitcher_id = _player_id_by_name(new_pitcher, team.id)
-    _event(
-        game,
-        team.id,
-        'End Inning',
-        next_inning,
-        before,
-        after,
-        old_pitcher_id=old_pitcher_id if old_pitcher_id != new_pitcher_id else None,
-        new_pitcher_id=new_pitcher_id if old_pitcher_id != new_pitcher_id else None,
-    )
-    game.live_current_inning = next_inning
-    db.session.delete(prep)
-    db.session.commit()
-    state = _broadcast_state(game.id, team.id)
-    return jsonify({'status': 'success', 'state': state})
-
-
 @live_game_ui_bp.route('/api/live-game/<int:game_id>/next-inning-prep', methods=['GET', 'POST', 'DELETE'])
 def next_inning_prep(game_id):
     user, team, game = _authorized_context(game_id)
@@ -416,8 +360,9 @@ def protect_live_game_workflows():
             'status': 'error',
             'code': 'legacy_live_write_disabled',
             'message': (
-                'This End Inning action is no longer supported. '
-                'Use the current End Inning huddle and Start Inning button.'
+                'This End Inning action is no longer available from here. '
+                'Use End Inning on the live game screen — it applies the '
+                'prepared NEXT defense and advances the inning immediately.'
             ),
         }), 409
 

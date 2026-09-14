@@ -570,9 +570,9 @@ def end_inning(game_id):
         'status': 'error',
         'code': 'legacy_live_write_disabled',
         'message': (
-            'This End Inning action is no longer supported. '
-            'Use End Inning, review the huddle, then '
-            'use Start Inning.'
+            'This End Inning action is no longer available from here. '
+            'Use End Inning on the live game screen — it applies the '
+            'prepared NEXT defense and advances the inning immediately.'
         ),
     }), 409
 
