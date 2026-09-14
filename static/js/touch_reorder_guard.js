@@ -3,6 +3,26 @@
 
   if (window.location.pathname !== '/') return;
 
+  function loadMobileGameDayFields() {
+    if (!window.matchMedia('(max-width: 991.98px)').matches) return;
+    if (document.querySelector('script[data-cb-mobile-game-day-fields]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/mobile_game_day_fields.js?v=20260822-3';
+    script.dataset.cbMobileGameDayFields = 'true';
+    document.head.appendChild(script);
+  }
+
+  function loadGettingStartedHome() {
+    if (document.querySelector('script[data-cb-getting-started-home]')) return;
+    const script = document.createElement('script');
+    script.src = '/static/js/getting_started_home.js?v=20260822-2';
+    script.dataset.cbGettingStartedHome = 'true';
+    document.head.appendChild(script);
+  }
+
+  loadMobileGameDayFields();
+  loadGettingStartedHome();
+
   const touchDevice = window.matchMedia?.('(pointer: coarse)').matches || Number(navigator.maxTouchPoints || 0) > 0;
   if (!touchDevice) return;
 

@@ -4,7 +4,6 @@
   if (window.location.pathname !== '/game-day') return;
 
   let optionsConfig = null;
-  const gameRuleCache = new Map();
   let loadingOptions = false;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -14,13 +13,11 @@
   const RULE_INFO = {
     'MLB Pitch Smart': {
       label: 'Pitch Count Limits',
-      short: 'Pitch count',
       description: 'Tracks pitches thrown and required rest.',
       reference: 'MLB Pitch Smart',
     },
     'USSSA': {
       label: 'Innings Limits',
-      short: 'Innings',
       description: 'Tracks innings and outs pitched across game days.',
       reference: 'USSSA',
     },
@@ -28,10 +25,9 @@
 
   function infoFor(name) {
     return RULE_INFO[name] || {
-      label: name || 'Unknown rule type',
-      short: name || 'Unknown',
+      label: name || 'Pitching limits',
       description: 'Uses the configured pitching eligibility rules.',
-      reference: name || 'Unknown',
+      reference: name || 'Team rules',
     };
   }
 
@@ -45,8 +41,6 @@
     const style = document.createElement('style');
     style.id = 'game-day-pitching-rules-styles';
     style.textContent = `
-      .gd-rule-meta{font-size:.65rem;color:#667085;font-weight:700}
-      .gd-rule-meta.override{color:#8b5c00}
       #gd-add-pitching-rules{min-height:46px;border-radius:10px;font-weight:700}
       .gd-rule-help{font-size:.66rem;color:#667085;margin-top:4px;line-height:1.35}
       .gd-rule-explain{margin-top:7px;padding:8px 9px;border:1px solid #e4e7ec;border-radius:9px;background:#f8fafc}
@@ -55,24 +49,6 @@
       .gd-rule-explain .gd-rule-ref{color:#8a94a3}
     `;
     document.head.appendChild(style);
-  }
-
-  async function loadOptions() {
-    if (optionsConfig || loadingOptions) return optionsConfig;
-    loadingOptions = true;
-    try {
-      const response = await fetch('/api/game-day/pitching-rule-options', {cache:'no-store'});
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to load pitching rules.');
-      optionsConfig = data;
-      patchAddGameModal();
-      return data;
-    } catch (error) {
-      console.error('Unable to load Game Day pitching rule options:', error);
-      return null;
-    } finally {
-      loadingOptions = false;
-    }
   }
 
   function updateAddGameExplanation(field) {
@@ -110,68 +86,32 @@
     updateAddGameExplanation(field);
   }
 
-  async function rulesForGame(gameId) {
-    if (gameRuleCache.has(gameId)) return gameRuleCache.get(gameId);
+  async function loadOptions() {
+    if (optionsConfig || loadingOptions) return optionsConfig;
+    loadingOptions = true;
     try {
-      const response = await fetch(`/api/game-day/${gameId}/pitching-rules`, {cache:'no-store'});
+      const response = await fetch('/api/game-day/pitching-rule-options', {cache:'no-store'});
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.status === 'error') return null;
-      gameRuleCache.set(gameId, data);
+      if (!response.ok || data.status === 'error') throw new Error(data.message || 'Unable to load pitching rules.');
+      optionsConfig = data;
+      patchAddGameModal();
       return data;
-    } catch (_) {
+    } catch (error) {
+      console.error('Unable to load Game Day pitching rule options:', error);
       return null;
+    } finally {
+      loadingOptions = false;
     }
   }
 
-  async function decorateGameCard(card) {
-    if (card.dataset.pitchingRulesDecorated === '1') return;
-    const gameId = Number(card.dataset.gameId || 0);
-    if (!gameId) return;
-    card.dataset.pitchingRulesDecorated = '1';
-    const data = await rulesForGame(gameId);
-    const meta = card.querySelector('.gd-meta');
-    if (!data || !meta || meta.querySelector('.gd-rule-meta')) return;
-    const info = infoFor(data.effective);
-    const span = document.createElement('span');
-    span.className = `gd-rule-meta ${data.source === 'game' ? 'override' : ''}`;
-    span.textContent = `Pitching: ${info.short}${data.source === 'game' ? ' · game override' : ''}`;
-    span.title = `${info.label} — ${info.reference}`;
-    meta.appendChild(span);
-  }
-
-  async function decorateScheduleRow(row) {
-    if (row.dataset.pitchingRulesDecorated === '1') return;
-    const gameId = Number(row.dataset.gameId || 0);
-    if (!gameId) return;
-    row.dataset.pitchingRulesDecorated = '1';
-    const data = await rulesForGame(gameId);
-    if (!data) return;
-    const info = infoFor(data.effective);
-    let detail = row.querySelector('.gd-up-loc');
-    if (!detail) {
-      detail = document.createElement('div');
-      detail.className = 'gd-up-loc';
-      row.querySelector('.gd-up-name')?.parentElement?.appendChild(detail);
-    }
-    if (detail && !detail.querySelector('.gd-rule-meta')) {
-      const existing = detail.textContent.trim();
-      detail.innerHTML = `${existing ? `${esc(existing)} · ` : ''}<span class="gd-rule-meta ${data.source === 'game' ? 'override' : ''}" title="${esc(info.label)} — ${esc(info.reference)}">Pitching: ${esc(info.short)}${data.source === 'game' ? ' · game override' : ''}</span>`;
-    }
-  }
-
-  function patchVisible() {
-    patchAddGameModal();
-    document.querySelectorAll('.gd-game[data-game-id]').forEach(decorateGameCard);
-    document.querySelectorAll('.gd-up-row[data-game-id]').forEach(decorateScheduleRow);
-  }
-
-  installStyles();
-  const observer = new MutationObserver(() => window.requestAnimationFrame(patchVisible));
-  const start = () => {
-    observer.observe(document.body, {childList:true, subtree:true});
+  function start() {
+    installStyles();
     loadOptions();
-    patchVisible();
-  };
+    document.addEventListener('shown.bs.modal', event => {
+      if (event.target?.id === 'game-day-add-modal') patchAddGameModal();
+    });
+  }
+
   document.readyState === 'loading'
     ? document.addEventListener('DOMContentLoaded', start, {once:true})
     : start();

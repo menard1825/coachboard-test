@@ -1,5 +1,13 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
-from models import Player, PlayerPitchingProfile, User, TeamMembership
+from models import (
+    Game,
+    LineupEntry,
+    Player,
+    PlayerGameAbsence,
+    PlayerPitchingProfile,
+    User,
+    TeamMembership,
+)
 from db import db
 from extensions import socketio
 import json
@@ -36,8 +44,82 @@ def get_player_order_as_list(player_order_data):
     return []
 
 
+def _active_live_game_for_team(team_id):
+    if not team_id:
+        return None
+
+    return db.session.query(Game).filter_by(
+        team_id=team_id,
+        is_live=True,
+    ).order_by(Game.id.desc()).first()
+
+
+def _live_roster_lock_message(game):
+    opponent = str(getattr(game, 'opponent', '') or '').strip()
+
+    if opponent:
+        return (
+            f'Roster changes are locked while the game vs {opponent} is live. '
+            'End the live game before changing players or Guest status.'
+        )
+
+    return (
+        'Roster changes are locked while a game is live. '
+        'End the live game before changing players or Guest status.'
+    )
+
+
+def _mark_guest_out_for_future_games(player):
+    """Guest players opt in per game; future games default them to Out."""
+    if not player or not player.is_guest:
+        return
+
+    start_today = datetime.now().replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+
+    game_ids = [
+        game_id
+        for (game_id,) in db.session.query(Game.id).filter(
+            Game.team_id == player.team_id,
+            Game.date >= start_today,
+            Game.is_live.is_(False),
+        ).all()
+    ]
+
+    if not game_ids:
+        return
+
+    existing_game_ids = {
+        game_id
+        for (game_id,) in db.session.query(PlayerGameAbsence.game_id).filter(
+            PlayerGameAbsence.team_id == player.team_id,
+            PlayerGameAbsence.player_id == player.id,
+            PlayerGameAbsence.game_id.in_(game_ids),
+        ).all()
+    }
+
+    db.session.add_all([
+        PlayerGameAbsence(
+            player_id=player.id,
+            game_id=game_id,
+            team_id=player.team_id,
+        )
+        for game_id in game_ids
+        if game_id not in existing_game_ids
+    ])
+
+
 @roster_bp.route('/add_player', methods=['POST'])
 def add_player():
+    live_game = _active_live_game_for_team(session.get('team_id'))
+    if live_game:
+        flash(_live_roster_lock_message(live_game), 'warning')
+        return redirect(url_for('home', _anchor='roster'))
+
     name = request.form.get('name')
     if not name:
         flash('Player name is required.', 'danger')
@@ -61,10 +143,14 @@ def add_player():
         has_lessons="No",
         notes_author=session['username'],
         notes_timestamp=datetime.now(),
+        is_guest=request.form.get('roster_status', 'regular') == 'guest',
         team_id=session['team_id']
     )
     db.session.add(new_player)
     db.session.flush()
+
+    if new_player.is_guest:
+        _mark_guest_out_for_future_games(new_player)
 
     for membership in db.session.query(TeamMembership).filter_by(team_id=session['team_id']).all():
         current_order = get_player_order_as_list(membership.player_order)
@@ -84,6 +170,14 @@ def add_player():
 
 @roster_bp.route('/update_player_inline/<int:player_id>', methods=['POST'])
 def update_player_inline(player_id):
+    live_game = _active_live_game_for_team(session.get('team_id'))
+    if live_game:
+        return jsonify({
+            'status': 'error',
+            'code': 'live_roster_locked',
+            'message': _live_roster_lock_message(live_game),
+        }), 409
+
     player_to_edit = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
     if not player_to_edit:
         return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
@@ -92,6 +186,22 @@ def update_player_inline(player_id):
     new_name = request.form.get('name', original_name)
     if new_name != original_name and db.session.query(Player).filter_by(name=new_name, team_id=session['team_id']).first():
         return jsonify({'status': 'error', 'message': f'Player name "{new_name}" already exists.'}), 400
+
+    was_guest = bool(player_to_edit.is_guest)
+    if 'roster_status' in request.form:
+        player_to_edit.is_guest = request.form.get('roster_status') == 'guest'
+        if player_to_edit.is_guest and not was_guest:
+            _mark_guest_out_for_future_games(player_to_edit)
+
+    if new_name != original_name:
+        linked_entries = db.session.query(LineupEntry).filter_by(player_id=player_to_edit.id).all()
+        for entry in linked_entries:
+            entry.player_name_snapshot = new_name
+            legacy_names = list(entry.lineup.lineup_positions or [])
+            entry.lineup.lineup_positions = [
+                new_name if name == original_name else name
+                for name in legacy_names
+            ]
 
     player_to_edit.name = new_name
     player_to_edit.number = request.form.get('number', player_to_edit.number)
@@ -178,6 +288,19 @@ def update_pitching_profile(player_id):
 
 @roster_bp.route('/delete_player/<int:player_id>')
 def delete_player(player_id):
+    live_game = _active_live_game_for_team(session.get('team_id'))
+    if live_game:
+        flash(_live_roster_lock_message(live_game), 'warning')
+        return redirect(
+            url_for(
+                'home',
+                _anchor=request.args.get(
+                    'active_tab',
+                    'roster',
+                ).lstrip('#'),
+            )
+        )
+
     player_to_delete = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
     if player_to_delete:
         player_name = player_to_delete.name
@@ -204,6 +327,14 @@ def delete_player(player_id):
 
 @roster_bp.route('/save_player_order', methods=['POST'])
 def save_player_order():
+    live_game = _active_live_game_for_team(session.get('team_id'))
+    if live_game:
+        return jsonify({
+            'status': 'error',
+            'code': 'live_roster_locked',
+            'message': _live_roster_lock_message(live_game),
+        }), 409
+
     user = db.session.query(User).filter_by(username=session['username']).first()
     if not user:
         return jsonify({'status': 'error', 'message': 'User not found'}), 404

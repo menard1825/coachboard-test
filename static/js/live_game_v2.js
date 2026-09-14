@@ -9,6 +9,7 @@
     let socket = null;
     let connected = false;
     let actionBusy = false;
+    let liveSequence = 0;
 
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -16,11 +17,30 @@
 
     const byId = (id) => document.getElementById(id);
 
+    function sequenceFromEvents(value = liveState) {
+        return (value?.rotation_events || []).reduce(
+            (max, event) => {
+                if (event?.reverted) return max;
+                return Math.max(
+                    max,
+                    Number(event?.sequence) || 0,
+                );
+            },
+            0,
+        );
+    }
+
+    function sequenceFromState(value = liveState) {
+        return Math.max(
+            liveSequence,
+            sequenceFromEvents(value),
+        );
+    }
+
     function isLiveActionTarget(target) {
         return target?.closest?.([
             '#startLiveGameBtnAction', '#liveGameModeToggle', '#liveChangePitcherBtn',
-            '#liveDefensiveChangeBtn', '#liveEndInningBtn', '#liveUndoBtn',
-            '#liveEndGameBtn', '#confirmFinalCountsBtn'
+            '#liveUndoBtn', '#liveEndGameBtn', '#confirmFinalCountsBtn'
         ].join(','));
     }
 
@@ -70,16 +90,46 @@
         let data = {};
         try { data = await response.json(); } catch (_) {}
         if (!response.ok || data.status === 'error') {
-            throw new Error(data.message || `Request failed (${response.status})`);
+            if (
+                data.code === 'stale_live_state' ||
+                data.code === 'missing_live_state_version'
+            ) {
+                try {
+                    await fetchState();
+                } catch (_) {}
+            }
+
+            throw new Error(
+                data.message ||
+                `Request failed (${response.status})`
+            );
         }
-        if (data.state) applyState(data.state);
+        if (data.state) {
+            applyState(
+                data.state,
+                {
+                    allowSequenceRollback:
+                        path === '/undo',
+                    source:
+                        path === '/undo'
+                            ? 'undo'
+                            : 'api',
+                }
+            );
+        }
+
         return data;
     }
 
     async function fetchState() {
         const response = await fetch(`/api/live-game/${gameId}/state`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`Unable to load live game state (${response.status}).`);
-        applyState(await response.json());
+        applyState(
+            await response.json(),
+            {
+                source: 'live-v2-fetch',
+            }
+        );
     }
 
     function roleRank(role) {
@@ -212,17 +262,67 @@
         if (isLive) {
             const inning = byId('live-inning-display');
             if (inning) inning.textContent = liveState.current_inning || '1';
+
+            /*
+             * NOW/NEXT and Dugout own the live defensive surfaces.
+             *
+             * Do not rebuild the legacy diamond, legacy Up Next card, or
+             * live pitching board every time authoritative state arrives.
+             * Those DOM writes were redundant with the current Live Game
+             * workspace and made the transition into Live Game busier.
+             */
             renderPitcherSummary();
-            renderUpNext();
-            renderDiamondAndBench();
             setSyncStatus(connected ? 'synced' : 'reconnecting');
+        } else {
+            /*
+             * Keep the pitching-plan board available before the game.
+             * GameChanger is the pitch book once Live Game begins.
+             */
+            renderPitchingBoard();
         }
-        renderPitchingBoard();
     }
 
-    function applyState(state) {
+    function applyState(
+        state,
+        {
+            allowSequenceRollback = false,
+            source = 'live-v2',
+        } = {}
+    ) {
         liveState = state;
+
+        const nextSequence =
+            sequenceFromEvents(state);
+
+        liveSequence =
+            allowSequenceRollback
+                ? nextSequence
+                : Math.max(
+                    liveSequence,
+                    nextSequence,
+                );
+
         renderLifecycle();
+
+        /*
+         * Publish the established shared-state contract.
+         *
+         * Dugout consumes detail.game_id and detail.state.
+         * Publishing the raw state here caused successful NOW
+         * Undo responses to be ignored by the visible field.
+         */
+        document.dispatchEvent(
+            new CustomEvent(
+                'coachboard:live-state',
+                {
+                    detail: {
+                        game_id: gameId,
+                        state,
+                        source,
+                    },
+                }
+            )
+        );
     }
 
     function modalShell(id, title) {
@@ -237,6 +337,90 @@
         }
         el.querySelector('.modal-title').textContent = title;
         return el;
+    }
+
+    let pitcherChangeControllerPromise = null;
+
+    function ensurePitcherChangeController() {
+        const existing = window.CBPitcherChangeComplete;
+
+        if (existing?.version === 3 && typeof existing.open === 'function') {
+            return Promise.resolve(existing);
+        }
+
+        if (pitcherChangeControllerPromise) {
+            return pitcherChangeControllerPromise;
+        }
+
+        pitcherChangeControllerPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src =
+                '/static/js/live_game_pitcher_change_complete.js' +
+                '?v=single-pitcher-path-v1';
+            script.dataset.cbPitcherChangeController = 'true';
+
+            script.addEventListener('load', () => {
+                const controller =
+                    window.CBPitcherChangeComplete;
+
+                if (
+                    controller?.version === 3 &&
+                    typeof controller.open === 'function'
+                ) {
+                    resolve(controller);
+                    return;
+                }
+
+                pitcherChangeControllerPromise = null;
+                reject(
+                    new Error(
+                        'Pitcher change controls did not initialize. ' +
+                        'Refresh this Live Game screen and try again.'
+                    )
+                );
+            }, { once: true });
+
+            script.addEventListener('error', () => {
+                pitcherChangeControllerPromise = null;
+                reject(
+                    new Error(
+                        'Unable to load pitcher change controls. ' +
+                        'Check your connection and try again.'
+                    )
+                );
+            }, { once: true });
+
+            document.head.appendChild(script);
+        });
+
+        return pitcherChangeControllerPromise;
+    }
+
+    async function openCompletePitcherChange(
+        pickerModal,
+        playerId
+    ) {
+        const controller =
+            await ensurePitcherChangeController();
+
+        const instance =
+            bootstrap.Modal.getOrCreateInstance(pickerModal);
+
+        const openFinish = () => {
+            controller.open(playerId);
+        };
+
+        if (pickerModal.classList.contains('show')) {
+            pickerModal.addEventListener(
+                'hidden.bs.modal',
+                openFinish,
+                { once: true },
+            );
+            instance.hide();
+            return;
+        }
+
+        openFinish();
     }
 
     function showPitcherPicker() {
@@ -278,84 +462,35 @@
             const btn = e.target.closest('[data-need]');
             if (btn) renderList(btn.dataset.need);
         });
-        body.querySelector('#pitcher-list-v2').addEventListener('click', e => {
+        body.querySelector('#pitcher-list-v2').addEventListener('click', async e => {
             const btn = e.target.closest('.pitcher-choice-v2');
-            if (btn && !btn.disabled) {
-                bootstrap.Modal.getOrCreateInstance(modal).hide();
-                showPitcherDestination(Number(btn.dataset.playerId));
-            }
-        });
-        bootstrap.Modal.getOrCreateInstance(modal).show();
-    }
-
-    function showPitcherDestination(newPitcherId) {
-        const incoming = (liveState.roster || []).find(p => Number(p.id) === Number(newPitcherId));
-        if (!incoming) return;
-        const alignment = currentAlignment();
-        const oldPitcher = alignment.P || 'current pitcher';
-        const incomingPosition = Object.entries(alignment).find(([, name]) => name === incoming.name)?.[0] || null;
-        const positions = ['BENCH','C','1B','2B','3B','SS','LF', ...(liveState.outfielder_count === 4 ? ['LCF','RCF'] : ['CF']), 'RF'];
-        const modal = modalShell('live-pitcher-destination-v2', `${incoming.name} → P`);
-        const body = modal.querySelector('.modal-body');
-        body.innerHTML = `<p class="fw-semibold">Where does ${esc(oldPitcher)} go?</p><div class="row g-2">${positions.map(pos => {
-            const occupant = alignment[pos];
-            const usable = pos === 'BENCH' || !occupant || pos === incomingPosition;
-            return `<div class="col-6 col-md-4"><button type="button" class="btn ${usable ? 'btn-outline-primary' : 'btn-outline-secondary'} w-100 py-3 destination-v2" data-destination="${pos}" ${usable ? '' : 'disabled'}>${esc(pos)}${occupant && pos !== incomingPosition ? `<div class="small">${esc(occupant)}</div>` : ''}</button></div>`;
-        }).join('')}</div>`;
-        body.addEventListener('click', async e => {
-            const btn = e.target.closest('.destination-v2');
             if (!btn || btn.disabled || actionBusy) return;
+
+            const playerId = Number(btn.dataset.playerId);
+            if (!Number.isFinite(playerId)) return;
+
             actionBusy = true;
+            btn.disabled = true;
+
+            // There is only one pitcher-change completion flow:
+            // live_game_pitcher_change_complete.js.
+            //
+            // The old #live-pitcher-destination-v2 surface is retired.
+            byId('live-pitcher-destination-v2')?.remove();
+
             try {
-                await api('/change-pitcher', { method: 'POST', body: JSON.stringify({ new_pitcher_id: newPitcherId, outgoing_destination: btn.dataset.destination }) });
-                bootstrap.Modal.getOrCreateInstance(modal).hide();
-                toast(`✓ ${incoming.name} → P • Saved & Synced`);
+                await openCompletePitcherChange(
+                    modal,
+                    playerId,
+                );
             } catch (err) {
                 toast(err.message, 'danger');
-            } finally { actionBusy = false; }
-        }, { once: false });
-        bootstrap.Modal.getOrCreateInstance(modal).show();
-    }
-
-    function showDefensiveChange() {
-        const modal = modalShell('live-defense-v2', 'Defensive Change');
-        const body = modal.querySelector('.modal-body');
-        const alignment = currentAlignment();
-        const assigned = new Set(Object.values(alignment).filter(Boolean));
-        const field = Object.entries(alignment).filter(([, name]) => name);
-        const bench = (liveState.roster || []).filter(p => !assigned.has(p.name));
-        body.innerHTML = `<div class="small text-uppercase text-muted fw-bold mb-2">Who are you moving?</div><div class="list-group">${field.map(([pos, name]) => {
-            const p = liveState.roster.find(x => x.name === name);
-            return p ? `<button type="button" class="list-group-item list-group-item-action defense-player-v2" data-player-id="${p.id}"><strong>${esc(pos)}</strong> — ${esc(name)}</button>` : '';
-        }).join('')}<div class="list-group-item bg-light fw-bold small">BENCH</div>${bench.map(p => `<button type="button" class="list-group-item list-group-item-action defense-player-v2" data-player-id="${p.id}">${esc(p.name)}</button>`).join('')}</div>`;
-        body.addEventListener('click', e => {
-            const btn = e.target.closest('.defense-player-v2');
-            if (!btn) return;
-            bootstrap.Modal.getOrCreateInstance(modal).hide();
-            showDefensiveDestination(Number(btn.dataset.playerId));
-        });
-        bootstrap.Modal.getOrCreateInstance(modal).show();
-    }
-
-    function showDefensiveDestination(playerId) {
-        const player = liveState.roster.find(p => Number(p.id) === Number(playerId));
-        if (!player) return;
-        const alignment = currentAlignment();
-        const currentPos = Object.entries(alignment).find(([, name]) => name === player.name)?.[0] || 'BENCH';
-        const positions = ['BENCH','P','C','1B','2B','3B','SS','LF', ...(liveState.outfielder_count === 4 ? ['LCF','RCF'] : ['CF']), 'RF'];
-        const modal = modalShell('live-defense-destination-v2', `Move ${player.name}`);
-        const body = modal.querySelector('.modal-body');
-        body.innerHTML = `<p class="text-muted">Currently: ${esc(currentPos)}</p><div class="row g-2">${positions.filter(p => p !== currentPos).map(pos => `<div class="col-6 col-md-4"><button type="button" class="btn btn-outline-primary w-100 py-3 defense-destination-v2" data-destination="${pos}">${esc(pos)}${alignment[pos] ? `<div class="small">Swap with ${esc(alignment[pos])}</div>` : ''}</button></div>`).join('')}</div>`;
-        body.addEventListener('click', async e => {
-            const btn = e.target.closest('.defense-destination-v2');
-            if (!btn || actionBusy) return;
-            actionBusy = true;
-            try {
-                await api('/defensive-change', { method: 'POST', body: JSON.stringify({ player_id: playerId, destination_position: btn.dataset.destination }) });
-                bootstrap.Modal.getOrCreateInstance(modal).hide();
-                toast(`✓ ${player.name} → ${btn.dataset.destination} • Saved & Synced`);
-            } catch (err) { toast(err.message, 'danger'); }
-            finally { actionBusy = false; }
+                if (document.body.contains(btn)) {
+                    btn.disabled = false;
+                }
+            } finally {
+                actionBusy = false;
+            }
         });
         bootstrap.Modal.getOrCreateInstance(modal).show();
     }
@@ -441,7 +576,7 @@
             else hit.checked = false;
             return;
         }
-        if (actionBusy && id !== 'liveChangePitcherBtn' && id !== 'liveDefensiveChangeBtn') return;
+        if (actionBusy && id !== 'liveChangePitcherBtn') return;
 
         try {
             if (id === 'startLiveGameBtnAction') {
@@ -450,16 +585,14 @@
                 toast('✓ Live Game started • Saved & Synced');
             } else if (id === 'liveChangePitcherBtn') {
                 showPitcherPicker();
-            } else if (id === 'liveDefensiveChangeBtn') {
-                showDefensiveChange();
-            } else if (id === 'liveEndInningBtn') {
-                if (!confirm('End this inning and load the planned next inning?')) return;
-                actionBusy = true;
-                await api('/end-inning', { method: 'POST', body: '{}' });
-                toast('✓ Inning advanced • Saved & Synced');
             } else if (id === 'liveUndoBtn') {
                 actionBusy = true;
-                await api('/undo', { method: 'POST', body: '{}' });
+                await api('/undo', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        base_sequence: sequenceFromState(),
+                    }),
+                });
                 toast('✓ Last live change undone • Saved & Synced');
             } else if (id === 'liveEndGameBtn') {
                 const pitched = new Set();
@@ -485,6 +618,11 @@
     }
 
     function connectSocket() {
+        if (typeof io !== 'function') {
+            connected = false;
+            setSyncStatus(liveState?.game?.is_live ? 'offline' : 'synced');
+            return;
+        }
         socket = io();
         socket.on('connect', async () => {
             connected = true;
@@ -506,9 +644,36 @@
             connected = false;
             if (liveState?.game?.is_live) setSyncStatus('offline');
         });
-        socket.on('game_state_update', state => applyState(state));
+        socket.on(
+            'game_state_update',
+            state => applyState(
+                state,
+                {
+                    source: 'live-v2-socket',
+                }
+            )
+        );
         window.addEventListener('beforeunload', () => socket?.emit('leave_game_room', { game_id: gameId }));
     }
+
+    document.addEventListener(
+        'coachboard:live-delta',
+        event => {
+            const delta = event.detail || {};
+
+            if (
+                Number(delta.game_id) !== gameId
+            ) {
+                return;
+            }
+
+            liveSequence = Math.max(
+                liveSequence,
+                Number(delta.sequence) || 0,
+                Number(delta.event?.sequence) || 0,
+            );
+        }
+    );
 
     document.addEventListener('click', handleCapturedEvent, true);
     document.addEventListener('change', event => {

@@ -1,0 +1,20 @@
+{# Shared display formatters for coach-facing templates. #}
+{% macro game_time(value) -%}
+  {% set raw = (value or '')|string|trim %}
+  {% if raw %}
+    {% set upper = raw|upper %}
+    {% if 'AM' in upper or 'PM' in upper %}
+      {{ raw }}
+    {% else %}
+      {% set parts = raw.split(':') %}
+      {% if parts|length >= 2 %}
+        {% set hour24 = parts[0]|int %}
+        {% set minute = parts[1][0:2] %}
+        {% set hour12 = hour24 % 12 %}
+        {{ 12 if hour12 == 0 else hour12 }}:{{ minute }} {{ 'PM' if hour24 >= 12 else 'AM' }}
+      {% else %}
+        {{ raw }}
+      {% endif %}
+    {% endif %}
+  {% endif %}
+{%- endmacro %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% from '_coachboard_formatters.html' import game_time %}
+{% block title %}Edit Game - vs {{ game.opponent }}{% endblock %}
+
+{% block head %}
+<style>
+  .pgc-shell{max-width:1080px;margin:0 auto;padding-bottom:72px}.pgc-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin:4px 0 14px}.pgc-kicker{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}.pgc-head h1{font-size:1.45rem;font-weight:850;color:#172033;margin:2px 0}.pgc-meta{font-size:.76rem;color:#667085}.pgc-safe{border:1px solid #b9dcc4;background:#f3fbf5;color:#22543d;border-radius:11px;padding:10px 12px;margin-bottom:14px;font-size:.74rem;line-height:1.45}.pgc-grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:14px}.pgc-card{border:1px solid #e2e6eb;border-radius:14px;background:#fff;overflow:hidden;margin-bottom:14px}.pgc-card-head{padding:11px 13px;border-bottom:1px solid #edf0f3;display:flex;align-items:center;justify-content:space-between;gap:10px}.pgc-card-head strong{font-size:.84rem;color:#1d2939}.pgc-card-body{padding:12px 13px}.pgc-help{font-size:.68rem;color:#667085;margin-top:2px}.pgc-lineup{display:grid;gap:6px}.pgc-lineup-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:8px;border:1px solid #e5e8ed;border-radius:9px;padding:7px 8px;background:#fafbfc}.pgc-order{font-size:.73rem;font-weight:900;color:#667085;text-align:center}.pgc-player{font-size:.76rem;font-weight:780;color:#1d2939}.pgc-row-actions{display:flex;gap:4px}.pgc-row-actions .btn{min-width:34px;min-height:34px;padding:4px 6px}.pgc-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-top:9px}.pgc-add .form-select,.pgc-add .btn{min-height:42px}.pgc-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:10px}.pgc-actions .btn{font-weight:780}.pgc-innings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.pgc-inning{border:1px solid #e4e7ec;border-radius:10px;background:#fafbfc;padding:9px}.pgc-inning.unrecorded{border-style:dashed;background:#fff}.pgc-inning-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px}.pgc-inning-head strong{font-size:.74rem}.pgc-badge{font-size:.54rem;font-weight:850;border-radius:999px;padding:3px 6px;background:#eef1f5;color:#475467}.pgc-pos{display:grid;grid-template-columns:34px minmax(0,1fr);gap:5px;font-size:.67rem;margin:2px 0}.pgc-pos b{color:#667085}.pgc-inning .btn{width:100%;margin-top:7px;min-height:38px;font-weight:760}.pgc-link-card{display:grid;gap:8px}.pgc-link-card .btn{min-height:44px;font-weight:780}.pgc-message{display:none;border-radius:9px;padding:8px 10px;margin-bottom:10px;font-size:.72rem;font-weight:700}.pgc-message.show{display:block}.pgc-message.success{background:#edf8f1;color:#176b38;border:1px solid #b7dcc3}.pgc-message.error{background:#fff2f0;color:#b42318;border:1px solid #edb8b2}.pgc-defense-list{display:grid;gap:8px}.pgc-defense-row{display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;gap:8px}.pgc-defense-row label{font-size:.72rem;font-weight:850;color:#475467}.pgc-defense-row .form-select{min-height:43px}.pgc-warning{font-size:.69rem;color:#a32929;font-weight:750;margin-top:8px}.pgc-footer{display:flex;justify-content:space-between;gap:8px;margin-top:12px}.pgc-footer .btn{min-height:46px;font-weight:800}
+  @media(max-width:767.98px){.pgc-head{display:block}.pgc-head .btn{margin-top:10px;width:100%}.pgc-grid{grid-template-columns:1fr}.pgc-innings{grid-template-columns:1fr 1fr}.pgc-shell{padding-bottom:84px}.pgc-card-body{padding:10px}.pgc-row-actions .btn{min-width:36px}.pgc-footer{position:sticky;bottom:0;background:#fff;padding:9px 0 calc(9px + env(safe-area-inset-bottom));z-index:2}}
+  @media(max-width:390px){.pgc-innings{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pgc-shell">
+  <div class="pgc-head">
+    <div>
+      <div class="pgc-kicker">Postgame correction</div>
+      <h1>Edit Game · vs {{ game.opponent }}</h1>
+      <div class="pgc-meta">{{ game.date.strftime('%A, %m/%d/%Y') }}{% if game.start_time %} · {{ game_time(game.start_time) }}{% endif %}{% if game.location %} · {{ game.location }}{% endif %}</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('game_day.game_report', game_id=game.id) }}"><i class="bi bi-arrow-left me-1"></i>Back to Report</a>
+  </div>
+
+  <div class="pgc-safe"><strong>This does not reopen Live Game.</strong> Corrections update the saved historical record only. The live clock, inning state, and game session stay ended.</div>
+  <div id="pgcMessage" class="pgc-message" role="status" aria-live="polite"></div>
+
+  <div class="pgc-grid">
+    <div>
+      <section class="pgc-card">
+        <div class="pgc-card-head"><div><strong>Batting Order</strong><div class="pgc-help">Correct the order that was actually used.</div></div></div>
+        <div class="pgc-card-body">
+          <div id="pgcLineupList" class="pgc-lineup"></div>
+          <div class="pgc-add">
+            <select id="pgcAddPlayer" class="form-select" aria-label="Add player to batting order"></select>
+            <button id="pgcAddPlayerBtn" type="button" class="btn btn-outline-primary">Add</button>
+          </div>
+          <div class="pgc-actions"><button id="pgcSaveLineup" type="button" class="btn btn-primary">Save Batting Order</button></div>
+        </div>
+      </section>
+
+      <section class="pgc-card">
+        <div class="pgc-card-head"><div><strong>Pitching & Notes</strong><div class="pgc-help">Use the existing postgame tools for GameChanger numbers and coaching notes.</div></div></div>
+        <div class="pgc-card-body pgc-link-card">
+          <a class="btn btn-outline-primary" href="{{ url_for('gameday.game_management', game_id=game.id, pitching=1) }}"><i class="bi bi-bullseye me-1"></i>Edit GameChanger Pitching</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('game_day.game_report', game_id=game.id) }}#game-notes"><i class="bi bi-journal-text me-1"></i>Edit Game Notes</a>
+        </div>
+      </section>
+    </div>
+
+    <section class="pgc-card">
+      <div class="pgc-card-head"><div><strong>Defense by Inning</strong><div class="pgc-help">Correct who actually played each position. Who Sat is recalculated automatically from these innings.</div></div></div>
+      <div class="pgc-card-body">
+        <div class="pgc-innings">
+          {% for inn in correction.innings %}
+          <div class="pgc-inning {% if not inn.recorded %}unrecorded{% endif %}" data-pgc-inning="{{ inn.inning }}">
+            <div class="pgc-inning-head"><strong>Inning {{ inn.inning }}</strong>{% if not inn.recorded %}<span class="pgc-badge">Not recorded</span>{% endif %}</div>
+            <div data-pgc-inning-summary>
+              {% for pos in correction.positions %}
+                {% if inn.display_alignment.get(pos) %}<div class="pgc-pos"><b>{{ pos }}</b><span>{{ inn.display_alignment.get(pos) }}</span></div>{% endif %}
+              {% endfor %}
+              {% if not inn.alignment %}<div class="small text-muted">No defense recorded.</div>{% endif %}
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm" data-pgc-edit-defense="{{ inn.inning }}">Edit Inning {{ inn.inning }}</button>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="modal fade" id="pgcDefenseModal" tabindex="-1" data-bs-backdrop="static" aria-labelledby="pgcDefenseTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><div><h5 class="modal-title" id="pgcDefenseTitle">Edit Defense</h5><div class="small text-muted" id="pgcDefenseSubtitle"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body"><div id="pgcDefenseList" class="pgc-defense-list"></div><div id="pgcDefenseWarning" class="pgc-warning"></div></div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" id="pgcSaveDefense">Save Correction</button></div>
+    </div>
+  </div>
+</div>
+
+<script id="pgcCorrectionData" type="application/json">{{ correction|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/postgame_correction.js') }}"></script>
+{% endblock %}

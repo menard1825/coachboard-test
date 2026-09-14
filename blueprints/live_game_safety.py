@@ -4,7 +4,7 @@ from copy import deepcopy
 from flask import Blueprint, jsonify, request
 
 from db import db
-from models import Player, PlayerGameAbsence, Rotation
+from models import Player, PlayerGameAbsence
 from blueprints.live_game_api import _authorized_context, get_authoritative_live_state
 
 
@@ -59,21 +59,6 @@ def _game_id_from_request():
         return int((request.view_args or {}).get('game_id'))
     except (TypeError, ValueError):
         return None
-
-
-def _guard_start(game, team):
-    rotation = db.session.query(Rotation).filter_by(
-        associated_game_id=game.id,
-        team_id=team.id,
-    ).first()
-    inning_one = deepcopy((rotation.innings or {}).get('1', {}) if rotation else {})
-    problem = _alignment_problem(inning_one, game, team)
-    if problem:
-        return jsonify({
-            'status': 'error',
-            'message': f'Complete the Inning 1 defense before starting Live Game. {problem}'
-        }), 409
-    return None
 
 
 def _guard_quick_change(game, team, data):
@@ -167,9 +152,11 @@ def protect_complete_live_defense():
     if request.method != 'POST':
         return None
 
+    # Starting Live Game has one owner: live_game_api.start, which calls the
+    # shared can_start_game() contract. Keep this safety layer focused on live
+    # defensive mutations so it cannot return a competing start-readiness 409.
     endpoint = request.endpoint
     if endpoint not in {
-        'live_game_api.start',
         'live_game_api.defensive_change',
         'live_game_api.change_pitcher',
     }:
@@ -182,9 +169,6 @@ def protect_complete_live_defense():
     user, team, game = _authorized_context(game_id)
     if not game:
         return None
-
-    if endpoint == 'live_game_api.start':
-        return _guard_start(game, team)
 
     if not game.is_live:
         return None

@@ -3,12 +3,12 @@
   "name": "CoachBoard Planner",
   "icons": [
     {
-      "src": "/static/logo.png",
-      "type": "image/png",
-      "sizes": "192x192"
+      "src": "/static/coachboard-icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
     }
   ],
   "start_url": "/",
   "display": "standalone",
-  "theme_color": "#c8102e"
+  "theme_color": "#172033"
 }
