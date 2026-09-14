@@ -12,11 +12,6 @@ from models import Game, Player, PlayerGameAbsence, Rotation
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
-    _broadcast_state,
-    _event,
-    _player_id_by_name,
-    _validate_alignment,
-    get_authoritative_live_state,
 )
 
 
@@ -65,26 +60,6 @@ def _present_players(game, team_id):
         for player in db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
         if player.id not in absent_ids
     ]
-
-
-def _clean_complete_alignment(candidate, game, team):
-    if not isinstance(candidate, dict):
-        return None, 'A defensive alignment is required.'
-
-    allowed = _allowed_positions(team)
-    present = _present_players(game, team.id)
-    present_names = {player.name for player in present}
-    cleaned = {pos: candidate.get(pos) or '' for pos in allowed}
-
-    missing = [pos for pos in allowed if not cleaned.get(pos)]
-    if missing:
-        return None, f"Fill {', '.join(missing)} before setting the next-inning defense."
-
-    valid, message = _validate_alignment(cleaned, present_names)
-    if not valid:
-        return None, message
-
-    return cleaned, None
 
 
 def _clean_draft_alignment(candidate, game, team):
