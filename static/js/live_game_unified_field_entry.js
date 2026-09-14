@@ -30,7 +30,8 @@
       #cbQuickDefense .cb-qd-bench-player:active{cursor:grabbing}
       #cbQuickDefense .cb-qd-spot.cb-main-drag-over .cb-qd-name{outline:4px solid rgba(16,42,102,.25);border-color:#102a66;background:#f4f7ff}
       #cbQuickDefense .cb-qd-bench-wrap.cb-main-drag-over{outline:4px solid rgba(22,107,56,.22);border-color:#5b9b70;background:#f0f8f2}
-      #cbQuickDefense .cb-main-open .cb-qd-name{border:2px dashed #d49a22;background:#fff8e7;color:#8b5c00;font-weight:850}
+      #cbQuickDefense .cb-main-open .cb-qd-name,
+      #cbQuickDefense .cb-authoritative-open .cb-qd-name{border:2px dashed #d49a22;background:#fff8e7;color:#8b5c00;font-weight:850}
       #cbQuickDefense .cb-main-draft-banner{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:9px 0 0;padding:8px 9px;border:1px solid #e4c46d;border-radius:10px;background:#fff9e9;color:#755100;font-size:.66rem;font-weight:720}
       #cbQuickDefense .cb-main-draft-banner .btn{min-height:34px;font-size:.65rem;font-weight:800;white-space:nowrap}
       .cb-main-drag-ghost{position:fixed;z-index:8000;pointer-events:none;transform:translate(-50%,-50%) scale(1.04);max-width:160px;border:2px solid #102a66;background:#fff;color:#172033;border-radius:10px;padding:8px 10px;font-size:.7rem;font-weight:850;text-align:center;box-shadow:0 12px 28px rgba(16,24,40,.24)}
@@ -110,6 +111,10 @@
         const name = draft.alignment[pos] || '';
         button.dataset.cbMovePlayer = name || 'Open';
         button.disabled = false;
+
+        // Authoritative-open is a visual-only marker, not draft ownership.
+        // A real draft render always takes over from it.
+        button.classList.remove('cb-authoritative-open');
         button.classList.toggle('cb-main-open', !name);
         const label = button.querySelector('.cb-qd-name');
         const desiredLabel = name ? rosterLabel(name) : 'Open — choose player';
@@ -152,10 +157,7 @@
     }
   }
 
-  function clearDraft({
-    restore = false,
-    preserveOpen = false,
-  } = {}) {
+  function clearDraft({restore = false} = {}) {
     if (restore && draft) {
       draft.alignment = {...draft.baseAlignment};
       renderDraft();
@@ -165,15 +167,17 @@
       '#cbQuickDefense .cb-main-draft-banner'
     )?.remove();
 
-    if (!preserveOpen) {
-      document.querySelectorAll(
-        '#cbQuickDefense .cb-main-open'
-      ).forEach(
-        element => element.classList.remove(
-          'cb-main-open'
-        )
-      );
-    }
+    // `.cb-main-open` is the cross-module signal that a local draft owns
+    // #cbQuickDefense (see live_game_dugout_mode.js and
+    // live_game_feedback_pass.js, which both refuse to repaint while it is
+    // present). It must never outlive the draft that set it.
+    document.querySelectorAll(
+      '#cbQuickDefense .cb-main-open'
+    ).forEach(
+      element => element.classList.remove(
+        'cb-main-open'
+      )
+    );
 
     draft = null;
 
@@ -308,10 +312,22 @@
           }
 
           renderDraft();
-          clearDraft({
-            restore: false,
-            preserveOpen: true,
+
+          // Keep the authoritative Open look, but hand it off to a
+          // visual-only class before clearDraft() strips `.cb-main-open`.
+          // `.cb-main-open` must stay a pure "draft in progress" signal —
+          // see clearDraft() — or the guards in live_game_dugout_mode.js
+          // and live_game_feedback_pass.js will keep treating this
+          // authoritative, no-longer-draft position as an active draft and
+          // stop repainting #cbQuickDefense on later socket updates.
+          document.querySelectorAll(
+            '#cbQuickDefense .cb-main-open'
+          ).forEach(element => {
+            element.classList.add('cb-authoritative-open');
+            element.disabled = true;
           });
+
+          clearDraft({restore: false});
         } else {
           clearDraft({restore: true});
         }

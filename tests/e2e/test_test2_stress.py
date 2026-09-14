@@ -1133,3 +1133,246 @@ def test_test2_end_inning_uses_latest_remote_next_prep(
 
         phone_context.close()
         ipad_context.close()
+
+
+def test_test2_stale_recovery_authoritative_open_does_not_freeze_quick_field(
+    browser: Browser,
+    coachboard_url: str,
+):
+    """
+    Regression for the `.cb-main-open` / authoritative-open interaction.
+
+    When a drag loses the optimistic-concurrency race and the authoritative
+    alignment the server returns has a genuinely open position, Quick Field
+    may keep showing that position as open. It must NOT reuse `.cb-main-open`
+    to do it: live_game_dugout_mode.js and live_game_feedback_pass.js both
+    treat the presence of `.cb-main-open` anywhere in #cbQuickDefense as "a
+    local draft owns this DOM, do not repaint" and will otherwise stay
+    frozen indefinitely, since draft is null and nothing else clears it.
+
+    This proves the open marker survives as a visual-only class and that a
+    later real remote defensive change still repaints the phone normally.
+    """
+    phone_context = browser.new_context(
+        viewport={'width': 390, 'height': 844}
+    )
+    ipad_context = browser.new_context(
+        viewport={'width': 768, 'height': 1024}
+    )
+
+    phone = phone_context.new_page()
+    ipad = ipad_context.new_page()
+
+    game_id = None
+    stale_route = None
+    mouse_down = False
+    dialogs = []
+
+    phone.on(
+        'dialog',
+        lambda dialog: (
+            dialogs.append(dialog.message),
+            dialog.dismiss(),
+        ),
+    )
+
+    try:
+        login(phone, coachboard_url)
+        login(ipad, coachboard_url)
+
+        game_id = create_game(
+            phone,
+            coachboard_url,
+            'Test 2 Authoritative Open Opponent',
+        )
+
+        started = phone.request.post(
+            f'{coachboard_url}/api/live-game/{game_id}/start',
+            data={},
+        )
+
+        assert started.status == 200, started.text()
+        assert started.json().get('status') == 'success'
+
+        phone.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        ipad.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        phone_quick = phone.locator('#cbQuickDefense')
+
+        expect(phone_quick).to_be_visible(timeout=15_000)
+        expect(ipad.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
+
+        expect(
+            phone.locator('#live-sync-status-v2')
+        ).to_contain_text('SYNCED', timeout=10_000)
+
+        expect(
+            ipad.locator('#live-sync-status-v2')
+        ).to_contain_text('SYNCED', timeout=10_000)
+
+        before_response = phone.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        )
+        assert before_response.status == 200
+        before = before_response.json()
+
+        # Simulate a rejected save whose authoritative alignment leaves
+        # 1B genuinely open (e.g. an ejected/absent fielder not yet
+        # replaced), which is exactly the case the preserveOpen fix targets.
+        authoritative_open = dict(before['current_alignment'])
+        authoritative_open['1B'] = ''
+
+        stale_route = f'**/api/live-game/{game_id}/defense-edit'
+
+        def stale_drag_response(route):
+            if route.request.method != 'POST':
+                route.continue_()
+                return
+            route.fulfill(
+                status=409,
+                content_type='application/json',
+                body=json.dumps({
+                    'status': 'error',
+                    'code': 'stale_live_state',
+                    'message': (
+                        'Another coach changed the live game first. '
+                        'Review the updated field before saving.'
+                    ),
+                    'current_sequence': current_sequence(before) + 1,
+                    'current_inning': before.get('current_inning') or '1',
+                    'current_alignment': authoritative_open,
+                }),
+            )
+
+        phone.route(stale_route, stale_drag_response)
+
+        source = phone_quick.locator('[data-cb-position="SS"]')
+        destination = phone_quick.locator('[data-cb-position="2B"]')
+
+        expect(source).to_be_visible(timeout=10_000)
+        expect(destination).to_be_visible(timeout=10_000)
+
+        source.scroll_into_view_if_needed()
+
+        source_box = None
+        destination_box = None
+        for _ in range(20):
+            source_box = source.bounding_box()
+            destination_box = destination.bounding_box()
+            if source_box is not None and destination_box is not None:
+                break
+            phone.wait_for_timeout(50)
+
+        assert source_box is not None
+        assert destination_box is not None
+
+        source_x = source_box['x'] + source_box['width'] / 2
+        source_y = source_box['y'] + source_box['height'] / 2
+        destination_x = destination_box['x'] + destination_box['width'] / 2
+        destination_y = destination_box['y'] + destination_box['height'] / 2
+
+        phone.mouse.move(source_x, source_y)
+        phone.mouse.down()
+        mouse_down = True
+        phone.mouse.move(destination_x, destination_y, steps=4)
+
+        endpoint = f'/api/live-game/{game_id}/defense-edit'
+        with phone.expect_response(
+            lambda response: (
+                endpoint in response.url
+                and response.request.method == 'POST'
+            ),
+            timeout=10_000,
+        ) as response_info:
+            phone.mouse.up()
+            mouse_down = False
+
+        stale_response = response_info.value
+        assert stale_response.status == 409
+        assert stale_response.json().get('code') == 'stale_live_state'
+
+        phone.unroute(stale_route)
+        stale_route = None
+
+        open_spot = phone_quick.locator('[data-cb-position="1B"]')
+
+        expect(open_spot).to_contain_text(
+            'Open — choose player', timeout=10_000,
+        )
+        expect(open_spot).to_be_disabled()
+
+        assert open_spot.evaluate(
+            "el => el.classList.contains('cb-authoritative-open')"
+        )
+        assert not open_spot.evaluate(
+            "el => el.classList.contains('cb-main-open')"
+        )
+
+        expect(
+            phone_quick.locator('.cb-main-draft-banner')
+        ).to_have_count(0)
+
+        assert dialogs
+        assert any('not saved' in message.lower() for message in dialogs)
+
+        # This is the regression assertion: a real remote defensive change
+        # must still repaint the phone's Quick Field normally. Before the
+        # fix, the lingering `.cb-main-open` from the stale-recovery path
+        # made live_game_dugout_mode.js's and live_game_feedback_pass.js's
+        # "a draft owns this DOM" guards refuse to repaint forever.
+        remote_state_response = ipad.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        )
+        assert remote_state_response.status == 200
+        remote_state = remote_state_response.json()
+
+        remote_alignment = dict(remote_state['current_alignment'])
+        remote_alignment['3B'], remote_alignment['C'] = (
+            remote_alignment['C'],
+            remote_alignment['3B'],
+        )
+
+        remote_write = ipad.request.post(
+            f'{coachboard_url}/api/live-game/{game_id}/defense-edit',
+            data={
+                'alignment': remote_alignment,
+                'base_sequence': current_sequence(remote_state),
+            },
+        )
+
+        assert remote_write.status == 200, remote_write.text()
+        assert remote_write.json().get('status') == 'success'
+
+        expect(
+            phone_quick.locator('[data-cb-position="3B"]')
+        ).to_contain_text(remote_alignment['3B'], timeout=10_000)
+
+        expect(
+            phone_quick.locator('[data-cb-position="C"]')
+        ).to_contain_text(remote_alignment['C'], timeout=10_000)
+
+    finally:
+        if mouse_down:
+            try:
+                phone.mouse.up()
+            except Exception:
+                pass
+
+        if stale_route is not None:
+            try:
+                phone.unroute(stale_route)
+            except Exception:
+                pass
+
+        if game_id is not None:
+            cleanup_game(phone, coachboard_url, game_id)
+
+        phone_context.close()
+        ipad_context.close()
