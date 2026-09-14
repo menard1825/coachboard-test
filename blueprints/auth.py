@@ -4,8 +4,10 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from sqlalchemy import func, or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from auth_rate_limit import RateLimitStorageError, clear_bucket, get_limit, release, reserve, resolve_client_ip
 from blueprints.security_guard import normalize_timezone_name, normalize_utc_offset_minutes, record_activity
 from db import db
+from extensions import socketio
 from models import Team, TeamMembership, User, utcnow_naive
 from password_recovery import (
     email_delivery_configured,
@@ -20,7 +22,42 @@ from permissions import ASSISTANT_COACH, GAME_CHANGER, HEAD_COACH, SUPER_ADMIN
 
 MIN_PASSWORD_LENGTH = 8
 
+# Used to run a real (if pointless) PBKDF2 verification when the submitted
+# identity doesn't resolve to a user, so login's response timing doesn't
+# reveal whether an account exists. Computed once per process, not per
+# request -- the value itself is never checked against anything.
+_DUMMY_PASSWORD_HASH = generate_password_hash('coachboard-constant-time-dummy-password')
+
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
+
+_TOO_MANY_ATTEMPTS_MESSAGE = 'Too many attempts. Please wait a bit and try again.'
+_SERVICE_UNAVAILABLE_MESSAGE = 'CoachBoard is temporarily unavailable. Please try again in a moment.'
+
+
+def _service_unavailable(template_name, **context):
+    """A rate-limit storage failure (RateLimitStorageError) fails closed:
+    no authentication, no account creation, no recovery email. This is
+    deliberately a 503, never a 429 -- a 429 means the limiter is working
+    and the caller is over a real limit; this means the limiter itself
+    could not be consulted at all."""
+    flash(_SERVICE_UNAVAILABLE_MESSAGE, 'danger')
+    return render_template(template_name, **context), 503
+
+
+def _best_effort_release(scope, subject, window_start):
+    """Try to give back a reservation after a LATER step in the same
+    request failed, so a caller that already decided to fail closed (503)
+    doesn't also leave a stray provisional reservation behind. This is
+    best-effort only: whether or not this succeeds, the caller still
+    returns 503 -- a failure here must never be allowed to continue
+    authentication/email work, and a success here must never turn a 503
+    back into a 200."""
+    try:
+        release(scope, subject, window_start)
+    except RateLimitStorageError:
+        current_app.logger.exception(
+            'auth rate limiter: compensating release failed for scope=%s (already failing closed)', scope,
+        )
 
 
 def get_player_order_as_list(player_order_data):
@@ -134,42 +171,117 @@ def login():
         return redirect(_signed_in_destination(session.get('role')))
 
     if request.method == 'POST':
+        # Step 1: gather submitted credentials.
         identity = request.form.get('identity') or request.form.get('username')
         password = request.form.get('password') or ''
+
+        # Step 2: resolve the client IP and take a provisional reservation
+        # against its bucket, atomically, before any account lookup or
+        # password hashing. reserve() both increments and decides "is this
+        # (also) over the limit" in one DB statement, so there is no gap
+        # between checking and counting for a concurrent request to land
+        # in -- unlike a separate check-then-increment pair.
+        client_ip = resolve_client_ip()
+        ip_max, ip_window = get_limit('login_ip')
+        try:
+            ip_reservation = reserve('login_ip', client_ip, ip_max, ip_window)
+        except RateLimitStorageError:
+            return _service_unavailable('login.html', identity=identity)
+
+        if not ip_reservation.admitted:
+            flash(_TOO_MANY_ATTEMPTS_MESSAGE, 'danger')
+            return render_template('login.html', identity=identity), 429
+
+        # Step 3: look up the account. Canonicalize the account-bucket
+        # subject to the user's id when the identity resolves, so the same
+        # account is always throttled under one key no matter which alias
+        # (username or email) was submitted.
         user = _find_user_by_identity(identity)
+        account_subject = user.id if user else f'unknown:{str(identity or "").strip().lower()}'
+        account_max, account_window = get_limit('login_account')
+        try:
+            account_reservation = reserve('login_account', account_subject, account_max, account_window)
+        except RateLimitStorageError:
+            # The IP reservation above already succeeded -- give it back
+            # (best-effort; either way this still fails closed) rather than
+            # leaving a stray provisional reservation behind.
+            _best_effort_release('login_ip', client_ip, ip_reservation.window_start)
+            return _service_unavailable('login.html', identity=identity)
 
-        if user and check_password_hash(user.password_hash, password):
-            primary_membership = _latest_membership(user)
-            if not primary_membership:
-                flash('Your CoachBoard account is not assigned to a team yet. Ask your Head Coach for access.', 'danger')
-                return render_template('login.html', identity=identity)
+        # Step 4: if the account dimension is already over its limit, this
+        # attempt never gets far enough to touch a password hash. Give back
+        # the IP reservation this request just took -- for the EXACT window
+        # it was taken in, per ip_reservation.window_start, never a freshly
+        # recomputed "current" window, which could belong to a different
+        # request if the clock has crossed a window boundary since. An
+        # attacker hammering one already-blocked account shouldn't also
+        # burn down the shared IP budget for everyone else on that network.
+        if not account_reservation.admitted:
+            try:
+                release('login_ip', client_ip, ip_reservation.window_start)
+            except RateLimitStorageError:
+                return _service_unavailable('login.html', identity=identity)
+            flash(_TOO_MANY_ATTEMPTS_MESSAGE, 'danger')
+            return render_template('login.html', identity=identity), 429
 
-            # Store login timestamps consistently in UTC. The audit/user UI
-            # converts them to the active team's timezone for display.
-            user.last_login = utcnow_naive()
-            db.session.commit()
+        # Step 5: run exactly one password-hash verification every request,
+        # whether or not the account exists, so response timing doesn't
+        # leak account existence.
+        if user:
+            password_ok = check_password_hash(user.password_hash, password)
+        else:
+            check_password_hash(_DUMMY_PASSWORD_HASH, password)
+            password_ok = False
 
-            session['logged_in'] = True
-            session['username'] = user.username
-            session['full_name'] = user.full_name or ''
-            session['role'] = primary_membership.role
-            session['team_id'] = primary_membership.team_id
-            session['player_order'] = get_player_order_as_list(primary_membership.player_order)
-            session.permanent = True
-            _capture_submitted_client_context()
+        # Step 6: a failed attempt (missing account or wrong password)
+        # keeps both reservations taken above -- that is the recorded
+        # failure. Nothing further to do here.
+        if not password_ok:
+            flash('That username/email and password combination did not match.', 'danger')
+            return render_template('login.html', identity=identity)
 
-            team = db.session.get(Team, primary_membership.team_id)
-            record_activity(
-                'login',
-                user=user,
-                team_id=primary_membership.team_id,
-                role=primary_membership.role,
-                detail=f"Signed in to {team.team_name if team else 'team'}.",
-            )
-            return redirect(_signed_in_destination(primary_membership.role))
+        # Step 7: successful login -- forgive prior failed attempts against
+        # this specific account outright, and give back this request's own
+        # IP reservation (a real, successful attempt shouldn't count as
+        # abuse), by its exact window token, but deliberately leave the IP
+        # bucket's existing history alone -- other bad actors sharing that
+        # network should still be throttled.
+        try:
+            clear_bucket('login_account', account_subject)
+            release('login_ip', client_ip, ip_reservation.window_start)
+        except RateLimitStorageError:
+            return _service_unavailable('login.html', identity=identity)
 
-        flash('That username/email and password combination did not match.', 'danger')
-        return render_template('login.html', identity=identity)
+        primary_membership = _latest_membership(user)
+        if not primary_membership:
+            flash('Your CoachBoard account is not assigned to a team yet. Ask your Head Coach for access.', 'danger')
+            return render_template('login.html', identity=identity)
+
+        # Step 8: establish the session exactly as before.
+        # Store login timestamps consistently in UTC. The audit/user UI
+        # converts them to the active team's timezone for display.
+        user.last_login = utcnow_naive()
+        db.session.commit()
+
+        session['logged_in'] = True
+        session['username'] = user.username
+        session['full_name'] = user.full_name or ''
+        session['role'] = primary_membership.role
+        session['team_id'] = primary_membership.team_id
+        session['player_order'] = get_player_order_as_list(primary_membership.player_order)
+        session.permanent = True
+        _capture_submitted_client_context()
+
+        team = db.session.get(Team, primary_membership.team_id)
+        record_activity(
+            'login',
+            user=user,
+            team_id=primary_membership.team_id,
+            role=primary_membership.role,
+            detail=f"Signed in to {team.team_name if team else 'team'}.",
+        )
+        # Step 9: redirect to the role-appropriate destination.
+        return redirect(_signed_in_destination(primary_membership.role))
 
     return render_template('login.html')
 
@@ -231,6 +343,25 @@ def register():
         password = request.form.get('password') or ''
         reg_code = str(request.form.get('registration_code') or '').strip()
 
+        # Step 1: IP volumetric limit, consumed before any lookup work --
+        # including the registration-code lookup below -- so a flood of
+        # otherwise-invalid submissions can't dodge throttling by failing
+        # validation early.
+        client_ip = resolve_client_ip()
+        ip_max, ip_window = get_limit('register_ip')
+        try:
+            ip_reservation = reserve('register_ip', client_ip, ip_max, ip_window)
+        except RateLimitStorageError:
+            return _service_unavailable('register.html', registration_code=reg_code, form=request.form)
+
+        if not ip_reservation.admitted:
+            flash(_TOO_MANY_ATTEMPTS_MESSAGE, 'danger')
+            return render_template('register.html', registration_code=reg_code, form=request.form), 429
+
+        # Step 2: basic field validation. These messages aren't
+        # enumeration-sensitive (they don't depend on whether any account
+        # already exists), so their position relative to the checks below
+        # doesn't affect privacy.
         if not all([username, email, full_name, password, reg_code]):
             flash('Name, username, email, password, and team registration code are required.', 'danger')
             return render_template('register.html', registration_code=reg_code, form=request.form)
@@ -240,18 +371,32 @@ def register():
         if len(password) < MIN_PASSWORD_LENGTH:
             flash(f'Password must be at least {MIN_PASSWORD_LENGTH} characters long.', 'danger')
             return render_template('register.html', registration_code=reg_code, form=request.form)
-        if db.session.query(User).filter(func.lower(User.username) == func.lower(username)).first():
-            flash('That username is already taken. Please choose another.', 'danger')
-            return render_template('register.html', registration_code=reg_code, form=request.form)
-        if not _email_available(email):
-            flash('That email is already connected to a CoachBoard account. Try signing in or use Forgot Password.', 'danger')
-            return render_template('register.html', registration_code=reg_code, form=request.form)
 
+        # Step 3: the registration code must resolve to a real team BEFORE
+        # any uniqueness check runs. Team codes are real secrets
+        # (secrets.token_urlsafe(9)), so this closes the fully-anonymous
+        # enumeration oracle -- without a valid code, nobody learns
+        # anything about which usernames/emails already exist.
         team = db.session.query(Team).filter_by(registration_code=reg_code).first()
         if not team:
             flash('That team registration code was not recognized.', 'danger')
             return render_template('register.html', registration_code=reg_code, form=request.form)
 
+        # Step 4: one combined uniqueness query, one generic message. A
+        # caller who does hold a valid code can still learn *that* some
+        # combination collides, but never which field or with what value.
+        duplicate = db.session.query(User).filter(
+            or_(func.lower(User.username) == username.lower(), func.lower(User.email) == email)
+        ).first()
+        if duplicate:
+            flash(
+                "That username or email is already registered. Try signing in, or use Forgot Password if you "
+                "can't find your login.",
+                'danger',
+            )
+            return render_template('register.html', registration_code=reg_code, form=request.form)
+
+        # Step 5: create the account and establish the session.
         is_first_user = db.session.query(TeamMembership).filter_by(team_id=team.id).count() == 0
         user_role = HEAD_COACH if is_first_user else ASSISTANT_COACH
         default_tab_keys = ['roster', 'player_development', 'games', 'pitching', 'practice_plan', 'collaboration']
@@ -304,6 +449,25 @@ def register():
     return render_template('register.html', registration_code=registration_code, form={})
 
 
+def _deliver_password_reset_email(app, user_id, reset_url):
+    """Background worker: does the real (slow) SMTP I/O off the request
+    thread. Re-queries the user by primitive id inside a fresh app context
+    rather than receiving a request-bound ORM object. A None user_id/
+    reset_url (the nonexistent-account case) is a deliberate no-op, so this
+    function always gets scheduled the same way regardless of whether the
+    submitted identity resolved to a real account."""
+    if not user_id or not reset_url:
+        return
+    with app.app_context():
+        user = db.session.get(User, user_id)
+        if not user or not user.email:
+            return
+        try:
+            send_password_reset_email(user, reset_url)
+        except Exception:
+            app.logger.exception('Unable to send CoachBoard password reset email for user id %s', user_id)
+
+
 @auth_bp.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     submitted = False
@@ -312,13 +476,64 @@ def forgot_password():
     if request.method == 'POST':
         submitted = True
         identity = str(request.form.get('identity') or '').strip()
+
+        client_ip = resolve_client_ip()
+        ip_max, ip_window = get_limit('forgot_password_ip')
+        try:
+            ip_reservation = reserve('forgot_password_ip', client_ip, ip_max, ip_window)
+        except RateLimitStorageError:
+            return _service_unavailable('forgot_password.html', submitted=False, email_delivery_enabled=email_available)
+
+        if not ip_reservation.admitted:
+            flash(_TOO_MANY_ATTEMPTS_MESSAGE, 'danger')
+            return render_template(
+                'forgot_password.html', submitted=False, email_delivery_enabled=email_available,
+            ), 429
+
+        # Every submission consumes a reservation on both buckets, whether
+        # or not the identity resolves -- this endpoint has no notion of a
+        # "failed" attempt distinct from a "successful" one from the
+        # caller's view, so both dimensions are simple volumetric limits.
         user = _find_user_by_identity(identity)
+        account_subject = user.id if user else f'unknown:{identity.lower()}'
+        account_max, account_window = get_limit('forgot_password_account')
+        try:
+            account_reservation = reserve('forgot_password_account', account_subject, account_max, account_window)
+        except RateLimitStorageError:
+            # The IP reservation above already succeeded -- give it back
+            # (best-effort; either way this still fails closed) rather than
+            # leaving a stray provisional reservation behind.
+            _best_effort_release('forgot_password_ip', client_ip, ip_reservation.window_start)
+            return _service_unavailable('forgot_password.html', submitted=False, email_delivery_enabled=email_available)
+
+        if not account_reservation.admitted:
+            # This is an ordinary over-limit on the account dimension, not
+            # a storage failure -- the IP reservation stands. It was still
+            # a real POST and must keep counting against the volumetric IP
+            # bucket exactly as designed; only a RateLimitStorageError
+            # above triggers a compensating release.
+            flash(_TOO_MANY_ATTEMPTS_MESSAGE, 'danger')
+            return render_template(
+                'forgot_password.html', submitted=False, email_delivery_enabled=email_available,
+            ), 429
+
+        # password_reset_url() needs the active request context (it calls
+        # url_for), so it must be resolved synchronously here -- but it's
+        # cheap (an itsdangerous sign, no I/O), so doing it inline doesn't
+        # reintroduce a timing signal. Only compute it when there's really
+        # somewhere to send it.
+        reset_user_id = None
+        reset_url = None
         if user and user.email and email_available:
-            try:
-                reset_url = password_reset_url(user)
-                send_password_reset_email(user, reset_url)
-            except Exception:
-                current_app.logger.exception('Unable to send CoachBoard password reset email for user id %s', user.id)
+            reset_user_id = user.id
+            reset_url = password_reset_url(user)
+
+        # Always schedule exactly one background task, with the same shape
+        # of arguments either way, so scheduling itself is never an
+        # observable signal. The real SMTP I/O only ever happens off the
+        # request thread, closing the synchronous-SMTP timing side channel.
+        app_obj = current_app._get_current_object()
+        socketio.start_background_task(_deliver_password_reset_email, app_obj, reset_user_id, reset_url)
 
     return render_template(
         'forgot_password.html',
