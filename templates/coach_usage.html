@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Coach Usage - {{ current_team.team_name }}{% endblock %}
+{% block bottom_nav %}{% endblock %}
+
+{% block head %}
+<style>
+  .usage-shell{max-width:1180px;margin:0 auto;padding-bottom:42px}
+  .usage-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin:8px 0 16px}
+  .usage-kicker{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}
+  .usage-head h1{font-size:1.55rem;font-weight:850;margin:2px 0;color:#172033}
+  .usage-sub{color:#667085;font-size:.8rem;margin:0;max-width:760px}
+  .usage-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:14px}
+  .usage-metric{background:#fff;border:1px solid #e4e7ec;border-radius:12px;padding:11px 12px}
+  .usage-metric strong{display:block;font-size:1.25rem;color:#172033;line-height:1}.usage-metric span{font-size:.65rem;color:#667085;font-weight:750}
+  .usage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-bottom:16px}
+  .usage-coach{background:#fff;border:1px solid #e4e7ec;border-radius:13px;padding:12px}
+  .usage-coach-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .usage-name{font-size:.86rem;font-weight:850;color:#1d2939}.usage-role{font-size:.65rem;color:#667085;margin-top:2px}
+  .usage-status{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;font-size:.6rem;font-weight:850;white-space:nowrap}
+  .usage-status.active{background:#eaf8ee;color:#176b38}.usage-status.recent{background:#fff6dd;color:#805710}.usage-status.offline{background:#f2f4f7;color:#667085}
+  .usage-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .usage-details{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
+  .usage-detail{min-width:0}.usage-detail label{display:block;font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;color:#98a2b3;font-weight:850}.usage-detail div{font-size:.68rem;color:#344054;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .usage-card{background:#fff;border:1px solid #e4e7ec;border-radius:13px;overflow:hidden}
+  .usage-card-head{padding:10px 12px;border-bottom:1px solid #edf0f3;background:#fbfcfd;font-size:.76rem;font-weight:850;color:#344054}
+  .usage-table{margin:0}.usage-table th{font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:#667085;background:#f8fafc;white-space:nowrap}.usage-table td{font-size:.7rem;vertical-align:top}
+  .usage-action{font-weight:800;color:#344054}.usage-detail-text{color:#667085;margin-top:2px}.usage-device{font-size:.62rem;color:#667085}
+  .usage-note{margin-top:10px;font-size:.62rem;color:#667085}
+  @media(max-width:767.98px){
+    .usage-head{display:block}.usage-head .btn{margin-top:10px}.usage-summary{grid-template-columns:repeat(3,1fr)}
+    .usage-metric{padding:9px}.usage-metric strong{font-size:1.05rem}.usage-metric span{font-size:.55rem}
+    .usage-grid{grid-template-columns:1fr}.usage-table thead{display:none}.usage-table tr{display:block;padding:9px 11px;border-top:1px solid #eef1f4}.usage-table tr:first-child{border-top:0}.usage-table td{display:block;border:0;padding:2px 0}.usage-table td[data-label]::before{content:attr(data-label) ': ';font-size:.57rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:#98a2b3}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="usage-shell">
+  <div class="usage-head">
+    <div>
+      <div class="usage-kicker">Owner-only testing view</div>
+      <h1>Coach Usage</h1>
+      <p class="usage-sub">See when coaches sign in and whether they are actively using CoachBoard. Presence updates about once a minute while the app is visible; only meaningful area changes are added to history.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('security_guard.activity_log') }}"><i class="bi bi-clock-history me-1"></i>Coach Activity</a>
+      <button class="btn btn-sm btn-primary" type="button" onclick="window.location.reload()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+    </div>
+  </div>
+
+  <div class="usage-summary">
+    <div class="usage-metric"><strong>{{ active_count }}</strong><span>Active now</span></div>
+    <div class="usage-metric"><strong>{{ recent_count }}</strong><span>Active / recent</span></div>
+    <div class="usage-metric"><strong>{{ used_24h_count }}</strong><span>Used app in 24h</span></div>
+  </div>
+
+  <div class="usage-grid">
+    {% for item in coaches %}
+    <div class="usage-coach">
+      <div class="usage-coach-top">
+        <div>
+          <div class="usage-name">{{ item.user.full_name or item.user.username }}</div>
+          <div class="usage-role">{{ item.role }} · @{{ item.user.username }}</div>
+        </div>
+        <span class="usage-status {{ item.status_class }}"><span class="usage-dot"></span>{{ item.status }}</span>
+      </div>
+      <div class="usage-details">
+        <div class="usage-detail"><label>Last Active</label><div>{% if item.presence %}{{ item.presence.last_seen_at|format_audit_datetime }}{% else %}Never recorded{% endif %}</div></div>
+        <div class="usage-detail"><label>Current / Last Area</label><div title="{{ item.presence.current_area if item.presence else '' }}">{{ item.presence.current_area if item.presence else '—' }}</div></div>
+        <div class="usage-detail"><label>Device</label><div title="{{ item.presence.user_agent if item.presence else '' }}">{{ item.device }}</div></div>
+        <div class="usage-detail"><label>Active Time</label><div>{{ item.active_time }}{% if item.active_sessions > 1 %} · {{ item.active_sessions }} devices{% endif %}</div></div>
+        <div class="usage-detail"><label>Last Login</label><div>{% if item.latest_login %}{{ item.latest_login.created_at|format_audit_datetime }}{% elif item.user.last_login %}{{ item.user.last_login|format_audit_datetime }}{% else %}Never{% endif %}</div></div>
+        <div class="usage-detail"><label>Path</label><div title="{{ item.presence.current_path if item.presence else '' }}">{{ item.presence.current_path if item.presence else '—' }}</div></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="usage-card">
+    <div class="usage-card-head">Recent login & app usage</div>
+    {% if events %}
+    <div class="table-responsive">
+      <table class="table table-hover usage-table align-middle">
+        <thead><tr><th>When</th><th>Coach</th><th>Activity</th><th>Device / Context</th></tr></thead>
+        <tbody>
+        {% for row in events %}
+          <tr>
+            <td data-label="When">{{ row.created_at|format_audit_datetime }}</td>
+            <td data-label="Coach"><strong>{{ row.full_name_snapshot or row.username_snapshot }}</strong><div class="text-muted">{{ row.role_snapshot or 'Coach' }}</div></td>
+            <td data-label="Activity"><div class="usage-action">{{ row.action|replace('_',' ')|title }}</div>{% if row.detail %}<div class="usage-detail-text">{{ row.detail }}</div>{% endif %}</td>
+            <td data-label="Device"><div class="usage-device">{{ row.ip_address or '—' }}{% if row.client_timezone %} · {{ row.client_timezone }}{% endif %}</div></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="p-4 text-center text-muted small">No usage activity has been recorded yet.</div>
+    {% endif %}
+  </div>
+  <div class="usage-note"><i class="bi bi-shield-check me-1"></i>This view tracks signed-in presence and major CoachBoard areas. It does not record form values, typed notes, or every tap. Auto-refreshes every {{ refresh_seconds }} seconds while visible.</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(() => {
+  const delay = {{ refresh_seconds|int }} * 1000;
+  window.setInterval(() => {
+    if (!document.hidden) window.location.reload();
+  }, delay);
+})();
+</script>
+{% endblock %}

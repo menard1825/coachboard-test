@@ -248,11 +248,28 @@ body {
 .pos-4-RF { top: 18%; left: 85%; }
 
 /* Inning selector styles */
-#inning-btn-group .btn-check:checked+.btn-outline-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-    color: white;
+#inning-btn-group .btn-check:checked + .btn-outline-primary,
+#rotation-card-container #inning-btn-group .btn-check:checked + label.btn {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: #fff !important;
+    --bs-btn-color: #fff;
+    --bs-btn-active-color: #fff;
 }
+
+/* Make it clear that the preset is optional, not the defense itself. */
+#rotation-card-container .gm-preset-label {
+    font-size: 0 !important;
+}
+#rotation-card-container .gm-preset-label::after {
+    content: "Starting Defense Preset (Optional)";
+    font-size: .62rem;
+    line-height: 1.1;
+    font-weight: 850;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
 .copy-mode #inning-btn-group,
 .copy-mode #copyInningBtn,
 .copy-mode .d-flex.gap-2 {
@@ -372,7 +389,7 @@ body {
         overflow: hidden;
     }
     
-    /* --- NEW: Mobile Fixed Bottom Navigation Bar --- */
+    /* --- NEW: Mobile Fixed Bottom Navigation Bar */
     .bottom-nav-fixed {
         background-color: var(--card-bg);
         border-top: 1px solid var(--card-border-color);

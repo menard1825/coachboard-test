@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -35,6 +36,39 @@ def _parse_date(value):
 
 def _game_date(game):
     return game.date.date() if game and game.date else None
+
+
+def _apply_pitch_completeness(dashboard, selected_outings):
+    """Never present a partial known pitch sum as a complete season total."""
+    by_player = defaultdict(list)
+    for outing in selected_outings:
+        by_player[outing.player_id].append(outing)
+
+    team_known_pitches = 0
+    team_complete = True
+    for row in dashboard.get('pitching_usage', []):
+        player_outings = by_player.get(row.get('player_id'), [])
+        known_pitches = sum(int(o.pitches) for o in player_outings if o.pitches is not None)
+        complete = bool(player_outings) and all(o.pitches is not None for o in player_outings)
+        row['known_pitches'] = known_pitches
+        row['pitch_history_complete'] = complete
+        row['total_pitches'] = known_pitches if complete else None
+        if not complete:
+            row['pitches_per_appearance'] = None
+            row['pitch_share_pct'] = None
+            team_complete = False
+        team_known_pitches += known_pitches
+
+    summary = dashboard.setdefault('summary', {})
+    summary['known_team_pitching_pitches'] = team_known_pitches
+    summary['pitch_history_complete'] = team_complete
+    summary['team_pitching_pitches'] = team_known_pitches if team_complete else None
+
+    # A percentage of pitches is not meaningful if some team pitch counts are
+    # unknown. Keep outs share available as the independent fallback.
+    if not team_complete:
+        for row in dashboard.get('pitching_usage', []):
+            row['pitch_share_pct'] = None
 
 
 @stats_dashboard_bp.route('/stats-dashboard')
@@ -151,6 +185,9 @@ def stats_dashboard():
             )
         )
     ]
+
+    _apply_pitch_completeness(dashboard, selected_outings)
+
     raw_pitching = {
         player.name: calculate_cumulative_pitching_stats(player.id, selected_outings)
         for player in roster

@@ -62,6 +62,7 @@
     list.dataset.pdeClarifying = '1';
     try {
       const clearChoice = choices.find(button => button.dataset.clear);
+      const hasOccupant = Boolean(clearChoice);
       const playerChoices = choices.filter(button => button.dataset.player);
       const benchChoices = [];
       const fieldChoices = [];
@@ -74,7 +75,7 @@
         } else if (/^Currently at /i.test(detail)) {
           // The player already occupying the target spot does not need to appear
           // as a selectable choice: closing the modal simply keeps him there.
-          if (/will become open/i.test(detail)) {
+          if (/will become open|swaps with/i.test(detail)) {
             button.classList.add('pde-field-choice');
             fieldChoices.push(button);
           }
@@ -98,38 +99,24 @@
       }
 
       if (fieldChoices.length) {
-        const toggle = document.createElement('button');
-        toggle.type = 'button';
-        toggle.className = 'btn btn-outline-secondary pde-field-move-toggle';
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.innerHTML = `<i class="bi bi-arrow-left-right me-1"></i>Move someone already on field <span class="badge text-bg-light border ms-1">${fieldChoices.length}</span>`;
+        list.appendChild(
+          sectionLabel(
+            hasOccupant
+              ? 'Already On Field — Tap to Swap'
+              : 'Already On Field — Move to This Spot'
+          )
+        );
 
-        const wrap = document.createElement('div');
-        wrap.className = 'pde-field-move-wrap d-none';
-        wrap.appendChild(sectionLabel('Already On Field — Moving Opens Old Spot'));
         fieldChoices
           .sort((a, b) => (a.dataset.player || '').localeCompare(b.dataset.player || ''))
-          .forEach(button => wrap.appendChild(button));
-
-        toggle.addEventListener('click', () => {
-          const opening = wrap.classList.contains('d-none');
-          wrap.classList.toggle('d-none', !opening);
-          toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
-          toggle.innerHTML = opening
-            ? '<i class="bi bi-chevron-up me-1"></i>Hide on-field players'
-            : `<i class="bi bi-arrow-left-right me-1"></i>Move someone already on field <span class="badge text-bg-light border ms-1">${fieldChoices.length}</span>`;
-        });
-
-        list.appendChild(toggle);
-        list.appendChild(wrap);
+          .forEach(button => list.appendChild(button));
       }
 
       const help = document.getElementById('pde-help');
       if (help) {
-        const hasOccupant = Boolean(clearChoice);
         help.textContent = hasOccupant
-          ? 'Choose a player from the bench. To move someone already on the field, use the option below.'
-          : 'Choose from players still available on the bench. On-field players are hidden unless you choose to move one.';
+          ? 'Choose a bench player to replace the current fielder, or tap an on-field player below to swap positions.'
+          : 'Choose a bench player, or move an on-field player into this open position.';
       }
     } finally {
       // Leave this marker in place until the base picker replaces innerHTML on

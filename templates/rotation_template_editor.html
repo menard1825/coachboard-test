@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% set starting_defense = editor_data.template_kind == 'starting_defense' %}
 
-{% block title %}Rotation Template - {{ current_team.team_name }}{% endblock %}
+{% block title %}{% if starting_defense %}Starting Defense{% else %}Rotation Template{% endif %} - {{ current_team.team_name }}{% endblock %}
 
 {% block head %}
 <style>
@@ -17,11 +18,12 @@
   .rte-field-card{border:1px solid #d6e2d4;border-radius:14px;overflow:hidden}.rte-field-cap{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #e4e9e4}.rte-field-cap strong{font-size:.72rem;color:#344054}.rte-field-cap span{font-size:.62rem;color:#98a2b3}
   .rte-field{position:relative;height:clamp(350px,50vw,500px);overflow:hidden;background:repeating-linear-gradient(90deg,#3c8a50 0,#3c8a50 12.5%,#438f56 12.5%,#438f56 25%)}.rte-field-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .rte-spot{position:absolute;transform:translate(-50%,-50%);width:clamp(76px,12vw,118px);min-height:46px;border:1px solid rgba(220,225,229,.98);border-radius:9px;background:rgba(255,255,255,.96);box-shadow:0 2px 5px rgba(16,24,40,.12);padding:5px 6px;text-align:center;z-index:2;cursor:pointer;color:#172033}.rte-spot:hover,.rte-spot:focus-visible{border-color:#667f9e;box-shadow:0 0 0 3px rgba(55,91,135,.14);outline:0}.rte-spot.open{background:#fff5f5;border-color:#d99a9a}.rte-pos{display:block;font-size:.5rem;font-weight:900;color:#667085;line-height:1;margin-bottom:3px}.rte-player{display:block;font-size:.67rem;line-height:1.08;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rte-spot.open .rte-player{color:#a63d3d}
+  .rte-spot.optional{background:#fff8e8;border-color:#d6aa55}.rte-spot.optional .rte-player{color:#795000}.rte-start-note{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 13px;border-bottom:1px solid #edf0f3;background:#fff9ec}.rte-start-note strong{font-size:.74rem;color:#5f4300}.rte-start-note span{font-size:.66rem;color:#795000}
   .rte-bench{padding:9px 10px 10px;border-top:1px solid #e4e9e4;background:#fff}.rte-label{font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin-bottom:6px}.rte-chips{display:flex;gap:5px;flex-wrap:wrap}.rte-chips span{font-size:.64rem;border:1px solid #dde2e7;background:#f8f9fb;border-radius:999px;padding:4px 7px;color:#475467;font-weight:650}
   .rte-status{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;border-top:1px solid #eef1f4;background:#fafbfc;font-size:.66rem;color:#667085}.rte-status strong{color:#172033}.rte-status .bad{color:#a63d3d}
   .rte-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px}.rte-summary-player{border:1px solid #e3e7eb;border-radius:9px;padding:8px 9px;background:#fafbfc}.rte-summary-player strong{font-size:.7rem;color:#172033}.rte-summary-player div{font-size:.61rem;color:#667085;margin-top:2px}
   #rtePlayerModal .modal-content{border:0;border-radius:16px;overflow:hidden}#rtePlayerChoices .list-group-item{padding:11px 13px}.rte-choice-name{font-size:.78rem;font-weight:800}.rte-choice-detail{font-size:.62rem;color:#667085;margin-top:2px}
-  @media(max-width:575.98px){.rte-shell{padding-bottom:92px}.rte-head{display:block}.rte-head-actions{margin-top:10px;justify-content:stretch}.rte-head-actions .btn{flex:1}.rte-card-body{padding:10px}.rte-name-row{grid-template-columns:1fr}.rte-innings-bar{padding:9px 10px}.rte-tools{grid-template-columns:1fr 1fr}.rte-tools select{grid-column:1/-1}.rte-field{height:305px}.rte-spot{width:66px;min-height:41px;padding:4px}.rte-player{font-size:.57rem}.rte-pos{font-size:.44rem}.rte-status{align-items:flex-start}.rte-max-note{display:none}}
+  @media(max-width:575.98px){.rte-shell{padding-bottom:92px}.rte-head{display:block}.rte-head-actions{margin-top:10px;justify-content:stretch}.rte-head-actions .btn{flex:1}.rte-card-body{padding:10px}.rte-name-row{grid-template-columns:1fr}.rte-innings-bar{padding:9px 10px}.rte-start-note{display:block}.rte-start-note span{display:block;margin-top:3px}.rte-tools{grid-template-columns:1fr 1fr}.rte-tools select{grid-column:1/-1}.rte-field{height:305px}.rte-spot{width:66px;min-height:41px;padding:4px}.rte-player{font-size:.57rem}.rte-pos{font-size:.44rem}.rte-status{align-items:flex-start}.rte-max-note{display:none}}
   @media(min-width:576px) and (orientation:portrait){.rte-field{height:clamp(390px,59vw,500px)}.rte-spot{width:clamp(80px,14vw,112px)}}
   @media(min-width:768px) and (orientation:landscape){.rte-shell{max-width:1220px}.rte-field{height:clamp(340px,38vw,455px)}.rte-spot{width:clamp(82px,10vw,112px)}.rte-tools{grid-template-columns:minmax(260px,1fr) auto auto}}
 </style>
@@ -31,13 +33,13 @@
 <div class="rte-shell">
   <div class="rte-head">
     <div>
-      <div class="rte-kicker">Full-Game Rotation Template</div>
-      <h1 id="rtePageTitle">{% if editor_data.rotation.id %}Edit Rotation Template{% else %}New Rotation Template{% endif %}</h1>
-      <p>Build the reusable {{ editor_data.regulation_innings }}-inning regulation defense here, inning by inning. Extra innings are handled during the live game if needed.</p>
+      <div class="rte-kicker">{% if starting_defense %}Game Day Planning Template{% else %}Full-Game Rotation Template{% endif %}</div>
+      <h1 id="rtePageTitle">{% if starting_defense %}{% if editor_data.rotation.id %}Edit Starting Defense{% else %}New Starting Defense{% endif %}{% else %}{% if editor_data.rotation.id %}Edit Rotation Template{% else %}New Rotation Template{% endif %}{% endif %}</h1>
+      <p>{% if starting_defense %}Reusable starting defense for Game Day. Pitcher can remain open.{% else %}Build the reusable {{ editor_data.regulation_innings }}-inning regulation defense here, inning by inning. Extra innings are handled during the live game if needed.{% endif %}</p>
     </div>
     <div class="rte-head-actions">
       <a class="btn btn-outline-secondary" href="{{ url_for('home') }}#rotations">Back to Templates</a>
-      <button type="button" class="btn btn-primary" id="rteSaveTop">Save Template</button>
+      <button type="button" class="btn btn-primary" id="rteSaveTop">{{ editor_data.save_button_label }}</button>
     </div>
   </div>
 
@@ -46,7 +48,7 @@
       <div class="rte-name-row">
         <div>
           <label class="form-label mb-1" for="rteTemplateName">Template Name</label>
-          <input type="text" class="form-control" id="rteTemplateName" maxlength="120" placeholder="e.g. Pool Play, Bracket Play, Sunday Defense">
+          <input type="text" class="form-control" id="rteTemplateName" maxlength="120" placeholder="{% if starting_defense %}e.g. Starting Defense{% else %}e.g. Pool Play, Bracket Play, Sunday Defense{% endif %}">
         </div>
         <div class="small text-muted pb-2" id="rteSaveState">Not saved yet</div>
       </div>
@@ -54,20 +56,27 @@
   </section>
 
   <section class="rte-card">
+    {% if starting_defense %}
+    <div class="rte-start-note"><strong>Pitcher is optional</strong><span>Leave P open to choose the game’s pitcher during Game Day planning.</span></div>
+    {% else %}
     <div class="rte-innings-bar">
       <div class="rte-tabs" id="rteInningTabs"></div>
       <span class="rte-max-note">{{ editor_data.regulation_innings }} regulation innings · {% if editor_data.regulation_innings_override is none %}Auto for {{ editor_data.age_group }}{% else %}Team override{% endif %}</span>
     </div>
+    {% endif %}
     <div class="rte-card-body">
+      {% if not starting_defense %}
       <div class="rte-tools">
-        <select class="form-select" id="rtePresetSelect"><option value="">Defense Preset…</option></select>
+        <select class="form-select" id="rtePresetSelect"><option value="">Starting Defense Template…</option></select>
         <button type="button" class="btn btn-outline-primary" id="rteApplyPreset" disabled>Apply to This Inning</button>
         <button type="button" class="btn btn-outline-secondary" id="rteCopyPrevious">Copy Previous</button>
       </div>
+      {% endif %}
       <div id="rteFieldHost"></div>
     </div>
   </section>
 
+  {% if not starting_defense %}
   <section class="rte-card">
     <div class="rte-card-body">
       <div class="mb-2">
@@ -77,13 +86,14 @@
       <div class="rte-summary-grid" id="rteSummaryGrid"></div>
     </div>
   </section>
+  {% endif %}
 </div>
 
 <div class="modal fade" id="rtePlayerModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <div><h5 class="modal-title mb-0" id="rtePlayerTitle">Choose Player</h5><div class="small text-muted" id="rtePlayerHelp">Selecting a player already on the field opens his old position. Nothing auto-swaps.</div></div>
+        <div><h5 class="modal-title mb-0" id="rtePlayerTitle">Choose Player</h5><div class="small text-muted" id="rtePlayerHelp">Moving an assigned player opens his previous position.</div></div>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body p-0"><div class="list-group list-group-flush" id="rtePlayerChoices"></div></div>

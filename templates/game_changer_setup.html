@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}GameChanger Setup - {{ current_team.team_name }}{% endblock %}
+
+{% block head %}
+<style>
+  .gc-shell{max-width:1120px;margin:0 auto;padding-bottom:72px}
+  .gc-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin:5px 0 16px}
+  .gc-kicker{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}
+  .gc-head h1{font-size:1.55rem;font-weight:850;margin:2px 0;color:#172033}
+  .gc-meta{font-size:.78rem;color:#667085;display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .gc-readonly{border:1px solid #cbd5e1;background:#f8fafc;border-radius:10px;padding:8px 10px;font-size:.68rem;font-weight:750;color:#475569}
+  .gc-grid{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.5fr);gap:14px}
+  .gc-card{border:1px solid #e4e7ec;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 1px 4px rgba(16,24,40,.04)}
+  .gc-card-head{padding:11px 13px;border-bottom:1px solid #eef1f4;background:#fafbfc;display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .gc-card-title{font-size:.8rem;font-weight:850;color:#1d2939}.gc-card-sub{font-size:.63rem;color:#667085}
+  .gc-body{padding:12px 13px}.gc-lineup{display:grid;gap:5px}.gc-lineup-row{display:grid;grid-template-columns:28px 48px minmax(0,1fr) auto;gap:7px;align-items:center;padding:7px 8px;border:1px solid #eef1f4;border-radius:8px}
+  .gc-order{font-size:.7rem;font-weight:900;color:#667085;text-align:center}.gc-number{font-size:.72rem;font-weight:850;color:#344054}.gc-name{font-size:.78rem;font-weight:800;color:#1d2939}.gc-out{font-size:.58rem;font-weight:850;color:#a32929;background:#feecec;border-radius:999px;padding:3px 6px}
+  .gc-roster{display:flex;flex-wrap:wrap;gap:5px}.gc-chip{font-size:.65rem;border:1px solid #e4e7ec;border-radius:999px;padding:5px 8px;background:#fff;color:#475467}.gc-chip.out{background:#fff5f5;border-color:#f1c8c8;color:#9b2c2c}
+  .gc-rotation-wrap{overflow:auto}.gc-rotation{width:100%;min-width:720px;border-collapse:separate;border-spacing:0}.gc-rotation th,.gc-rotation td{border-bottom:1px solid #eef1f4;border-right:1px solid #eef1f4;padding:7px 8px;text-align:center;font-size:.68rem;white-space:nowrap}.gc-rotation th:first-child,.gc-rotation td:first-child{position:sticky;left:0;background:#fff;z-index:1;text-align:left;font-weight:850}.gc-rotation thead th{background:#f8fafc;font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;color:#667085}.gc-rotation tr:last-child td{border-bottom:0}.gc-rotation td:last-child,.gc-rotation th:last-child{border-right:0}.gc-bench{font-size:.62rem;color:#667085;margin-top:4px}.gc-warning{color:#9a6700;font-weight:750}
+  .gc-empty{padding:18px;text-align:center;color:#667085;font-size:.75rem}
+  @media(max-width:767.98px){.gc-head{display:block}.gc-head .btn{margin-top:10px}.gc-grid{grid-template-columns:1fr}.gc-card{border-radius:12px}.gc-lineup-row{grid-template-columns:26px 42px minmax(0,1fr) auto}}
+  @media print{nav,.btn,.gc-readonly{display:none!important}.gc-shell{max-width:none;padding:0}.gc-grid{display:block}.gc-card{box-shadow:none;margin-bottom:10px;break-inside:avoid}.gc-rotation{min-width:0}.gc-rotation-wrap{overflow:visible}main{margin:0!important}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gc-shell">
+  <div class="gc-head">
+    <div>
+      <div class="gc-kicker">GameChanger Pregame Setup</div>
+      <h1>vs {{ game.opponent }}</h1>
+      <div class="gc-meta">
+        <span>{{ game.date.strftime('%A, %B %-d, %Y') }}</span>
+        {% if game.start_time %}<span>{{ game.start_time }}</span>{% endif %}
+        {% if game.location %}<span>{{ game.location }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <div class="gc-readonly"><i class="bi bi-eye me-1"></i>Read-only</div>
+      <button class="btn btn-sm btn-outline-secondary" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-arrow-left me-1"></i>Game Day</a>
+    </div>
+  </div>
+
+  <div class="alert alert-light border small mb-3">
+    Copy the planned lineup, availability, and defense into GameChanger. This page is read-only.
+  </div>
+
+  <div class="gc-grid">
+    <div class="d-grid gap-3">
+      <section class="gc-card">
+        <div class="gc-card-head"><div><div class="gc-card-title">Batting Order</div><div class="gc-card-sub">Planned lineup for this game</div></div><span class="badge text-bg-light border">{{ lineup_rows|length }} hitters</span></div>
+        {% if lineup_rows %}
+        <div class="gc-body gc-lineup">
+          {% for row in lineup_rows %}
+          <div class="gc-lineup-row">
+            <div class="gc-order">{{ row.order }}</div>
+            <div class="gc-number">{% if row.number %}#{{ row.number }}{% else %}—{% endif %}</div>
+            <div class="gc-name">{{ row.name }}</div>
+            {% if not row.available %}<span class="gc-out">OUT</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}<div class="gc-empty">Batting order not set.</div>{% endif %}
+      </section>
+
+      <section class="gc-card">
+        <div class="gc-card-head"><div><div class="gc-card-title">Availability</div><div class="gc-card-sub">Available roster for GameChanger</div></div><span class="badge text-bg-light border">{{ available_roster|length }} available</span></div>
+        <div class="gc-body">
+          <div class="gc-roster">
+            {% for player in available_roster %}<span class="gc-chip">{% if player.number %}#{{ player.number }} {% endif %}{{ player.name }}</span>{% endfor %}
+          </div>
+          {% if absent_roster %}
+          <div class="small fw-bold text-muted mt-3 mb-1">OUT</div>
+          <div class="gc-roster">{% for player in absent_roster %}<span class="gc-chip out">{% if player.number %}#{{ player.number }} {% endif %}{{ player.name }}</span>{% endfor %}</div>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+
+    <section class="gc-card">
+      <div class="gc-card-head"><div><div class="gc-card-title">Defensive Rotation</div><div class="gc-card-sub">Starting defense and planned changes by inning</div></div><span class="badge text-bg-light border">{{ rotation_rows|length }} innings</span></div>
+      {% if rotation_rows %}
+      <div class="gc-rotation-wrap">
+        <table class="gc-rotation">
+          <thead><tr><th>Inning</th>{% for pos in positions %}<th>{{ pos }}</th>{% endfor %}<th>Bench</th></tr></thead>
+          <tbody>
+            {% for row in rotation_rows %}
+            <tr>
+              <td>Inning {{ row.inning }}{% if row.has_unavailable_assignment %}<div class="gc-warning">Check availability</div>{% endif %}</td>
+              {% for pos in positions %}<td>{{ row.assignments.get(pos) or '—' }}</td>{% endfor %}
+              <td>{% if row.bench %}{{ row.bench|map(attribute='name')|join(', ') }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<div class="gc-empty">Defensive rotation not set.</div>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block bottom_nav %}{% endblock %}

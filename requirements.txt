@@ -10,3 +10,5 @@ eventlet==0.35.2
 SQLAlchemy==2.0.30
 Flask-Migrate
 Flask-SQLAlchemy
+python-dotenv==1.0.1
+Pillow==12.3.0

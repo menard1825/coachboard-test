@@ -12,11 +12,6 @@ from models import Game, Player, PlayerGameAbsence, Rotation
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
-    _broadcast_state,
-    _event,
-    _player_id_by_name,
-    _validate_alignment,
-    get_authoritative_live_state,
 )
 
 
@@ -67,24 +62,66 @@ def _present_players(game, team_id):
     ]
 
 
-def _clean_complete_alignment(candidate, game, team):
+def _clean_draft_alignment(candidate, game, team):
+    """Validate a NEXT draft without requiring every position to be filled."""
     if not isinstance(candidate, dict):
         return None, 'A defensive alignment is required.'
 
     allowed = _allowed_positions(team)
+    unknown = [pos for pos in candidate if pos not in allowed]
+    if unknown:
+        return None, f'Invalid defensive position: {unknown[0]}.'
+
     present = _present_players(game, team.id)
     present_names = {player.name for player in present}
-    cleaned = {pos: candidate.get(pos) or '' for pos in allowed}
 
-    missing = [pos for pos in allowed if not cleaned.get(pos)]
-    if missing:
-        return None, f"Choose a player for {', '.join(missing)} before confirming the next inning."
+    cleaned = {
+        pos: candidate.get(pos) or ''
+        for pos in allowed
+    }
 
-    valid, message = _validate_alignment(cleaned, present_names)
-    if not valid:
-        return None, message
+    invalid = sorted({
+        name
+        for name in cleaned.values()
+        if name and name not in present_names
+    })
 
+    if invalid:
+        return None, (
+            f'{invalid[0]} is not available for this game.'
+        )
+
+    # A NEXT draft is intentionally allowed to be incomplete or temporarily
+    # contain the same player twice. The coach can fix that directly on NEXT.
+    # End Inning performs the final physically-valid check.
     return cleaned, None
+
+
+def _seed_next_alignment(current_alignment, planned_alignment, team):
+    """Build the automatic NEXT board for the upcoming inning."""
+    allowed = _allowed_positions(team)
+    current = current_alignment or {}
+    planned = planned_alignment or {}
+
+    has_plan = any(planned.get(pos) for pos in allowed)
+
+    if has_plan:
+        seeded = {
+            pos: planned.get(pos) or ''
+            for pos in allowed
+        }
+
+        # A specifically planned pitcher wins. Only carry the current
+        # pitcher when the written next-inning plan leaves P blank.
+        if not seeded.get('P'):
+            seeded['P'] = current.get('P') or ''
+
+        return seeded, 'planned'
+
+    return {
+        pos: current.get(pos) or ''
+        for pos in allowed
+    }, 'current'
 
 
 def _prep_dict(prep):
@@ -116,8 +153,15 @@ def _next_inning_context(game, team):
     rotation, actual_rotation, _ = _actual_rotation(game, team.id)
     current_inning = str(game.live_current_inning or '1')
     next_inning = _next_inning_key(current_inning)
-    current_alignment = deepcopy(actual_rotation.get(current_inning, {}) or {})
-    planned_alignment = deepcopy((rotation.innings or {}).get(next_inning, {}) if rotation and next_inning else {})
+    current_alignment = deepcopy(
+        actual_rotation.get(current_inning, {}) or {}
+    )
+    planned_alignment = deepcopy(
+        (rotation.innings or {}).get(next_inning, {})
+        if rotation and next_inning
+        else {}
+    )
+
     prep = _prep_for_game(game.id, team.id)
 
     if prep and prep.inning != next_inning:
@@ -125,63 +169,32 @@ def _next_inning_context(game, team):
         db.session.commit()
         prep = None
 
-    return current_inning, next_inning, current_alignment, planned_alignment, prep
+    if not prep and next_inning:
+        seeded, source = _seed_next_alignment(
+            current_alignment,
+            planned_alignment,
+            team,
+        )
 
+        prep = GameNextInningPrep(
+            game_id=game.id,
+            team_id=team.id,
+            inning=next_inning,
+            alignment=seeded,
+            source=source,
+            updated_by='Auto',
+            updated_at=datetime.utcnow(),
+        )
+        db.session.add(prep)
+        db.session.commit()
 
-def _end_inning_with_confirmed_prep():
-    try:
-        game_id = int((request.view_args or {}).get('game_id'))
-    except (TypeError, ValueError):
-        return jsonify({'status': 'error', 'message': 'Invalid game.'}), 400
-
-    user, team, game = _authorized_context(game_id)
-    if not game:
-        return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
-    if not game.is_live:
-        return jsonify({'status': 'error', 'message': 'Game is not live.'}), 409
-
-    _, next_inning, before, _, prep = _next_inning_context(game, team)
-    if not next_inning:
-        return jsonify({'status': 'error', 'message': 'Current inning is invalid.'}), 409
-    if not prep or prep.inning != next_inning:
-        return jsonify({
-            'status': 'error',
-            'message': f'Confirm the Inning {next_inning} setup in Physical Board Prep before ending the inning.'
-        }), 409
-
-    after, message = _clean_complete_alignment(prep.alignment, game, team)
-    if not after:
-        return jsonify({'status': 'error', 'message': message}), 409
-
-    old_pitcher = before.get('P')
-    new_pitcher = after.get('P')
-    if new_pitcher and new_pitcher != old_pitcher:
-        state = get_authoritative_live_state(game.id, team.id) or {}
-        summary = (state.get('pitch_count_summary') or {}).get(new_pitcher, {})
-        status = str(summary.get('status') or '').lower()
-        if any(term in status for term in ('rest', 'unavailable', 'ineligible', 'incomplete', 'restriction', 'verify')):
-            return jsonify({
-                'status': 'error',
-                'message': f'{new_pitcher} cannot start the next inning right now: {summary.get("status") or "not available"}.'
-            }), 409
-
-    old_pitcher_id = _player_id_by_name(old_pitcher, team.id)
-    new_pitcher_id = _player_id_by_name(new_pitcher, team.id)
-    _event(
-        game,
-        team.id,
-        'End Inning',
+    return (
+        current_inning,
         next_inning,
-        before,
-        after,
-        old_pitcher_id=old_pitcher_id if old_pitcher_id != new_pitcher_id else None,
-        new_pitcher_id=new_pitcher_id if old_pitcher_id != new_pitcher_id else None,
+        current_alignment,
+        planned_alignment,
+        prep,
     )
-    game.live_current_inning = next_inning
-    db.session.delete(prep)
-    db.session.commit()
-    state = _broadcast_state(game.id, team.id)
-    return jsonify({'status': 'success', 'state': state})
 
 
 @live_game_ui_bp.route('/api/live-game/<int:game_id>/next-inning-prep', methods=['GET', 'POST', 'DELETE'])
@@ -222,53 +235,67 @@ def next_inning_prep(game_id):
 
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
-        mode = (data.get('mode') or '').lower()
+        mode = (data.get('mode') or 'custom').lower()
 
         if mode == 'current':
-            candidate = current_alignment
+            candidate = deepcopy(current_alignment)
             source = 'current'
+
         elif mode == 'planned':
-            if not planned_alignment:
-                return jsonify({'status': 'error', 'message': f'No pregame defense is saved for Inning {next_inning}.'}), 409
-            candidate = deepcopy(planned_alignment)
-            source = 'planned'
-            if not candidate.get('P'):
-                current_pitcher = current_alignment.get('P')
-                if not current_pitcher:
-                    return jsonify({
-                        'status': 'error',
-                        'message': 'The pregame pitcher is TBD and there is no current pitcher to carry forward. Choose the next pitcher in Adjust Defense.'
-                    }), 409
-                planned_position = next((
-                    pos for pos, name in candidate.items()
-                    if pos != 'P' and name == current_pitcher
-                ), None)
-                if planned_position:
-                    return jsonify({
-                        'status': 'error',
-                        'message': f'{current_pitcher} is the current pitcher but is planned at {planned_position} next inning. Use Choose Pitcher / Adjust to resolve that move.'
-                    }), 409
-                candidate['P'] = current_pitcher
-                source = 'planned_current_pitcher'
+            candidate, source = _seed_next_alignment(
+                current_alignment,
+                planned_alignment,
+                team,
+            )
+
         elif mode == 'custom':
             candidate = data.get('alignment')
             source = 'custom'
+
         else:
-            return jsonify({'status': 'error', 'message': 'Choose Current Defense, Pregame Plan, or a custom setup.'}), 400
+            return jsonify({
+                'status': 'error',
+                'message': 'Unknown NEXT defense action.',
+            }), 400
 
-        cleaned, message = _clean_complete_alignment(candidate, game, team)
-        if not cleaned:
-            return jsonify({'status': 'error', 'message': message}), 409
+        cleaned, message = _clean_draft_alignment(
+            candidate,
+            game,
+            team,
+        )
 
-        prep = prep or GameNextInningPrep(game_id=game.id, team_id=team.id)
+        if cleaned is None:
+            return jsonify({
+                'status': 'error',
+                'message': message,
+            }), 409
+
+        prep = prep or GameNextInningPrep(
+            game_id=game.id,
+            team_id=team.id,
+        )
+
         prep.inning = next_inning
         prep.alignment = cleaned
         prep.source = source
-        prep.updated_by = session.get('username')
+        prep.updated_by = (
+            session.get('full_name')
+            or user.full_name
+            or user.username
+        )
         prep.updated_at = datetime.utcnow()
+
         db.session.add(prep)
         db.session.commit()
-        socketio.emit('next_inning_prep_update', {'game_id': game.id, 'inning': next_inning}, room=f'team_{team.id}_game_{game.id}')
+
+        socketio.emit(
+            'next_inning_prep_update',
+            {
+                'game_id': game.id,
+                'inning': next_inning,
+            },
+            room=f'team_{team.id}_game_{game.id}',
+        )
 
     return jsonify({
         'status': 'success',
@@ -278,7 +305,14 @@ def next_inning_prep(game_id):
         'current_alignment': current_alignment,
         'planned_alignment': planned_alignment,
         'confirmed': _prep_dict(prep),
-        'roster': [{'id': player.id, 'name': player.name} for player in _present_players(game, team.id)],
+        'roster': [
+            {
+                'id': player.id,
+                'name': player.name,
+                'number': getattr(player, 'number', None),
+            }
+            for player in _present_players(game, team.id)
+        ],
         'outfielder_count': team.outfielder_count,
     })
 
@@ -297,10 +331,20 @@ def _versioned_static(filename):
 def protect_live_game_workflows():
     """Protect the pregame plan and require an explicit next-inning decision."""
     if request.method == 'POST' and request.endpoint == 'live_game_api.end_inning':
-        return _end_inning_with_confirmed_prep()
+        return jsonify({
+            'status': 'error',
+            'code': 'legacy_live_write_disabled',
+            'message': (
+                'This End Inning action is no longer available from here. '
+                'Use End Inning on the live game screen — it applies the '
+                'prepared NEXT defense and advances the inning immediately.'
+            ),
+        }), 409
 
+    # Start readiness belongs exclusively to live_game_api.start via
+    # can_start_game(). This compatibility layer only clears staged next-inning
+    # prep when a game is actually being finalized.
     if request.method == 'POST' and request.endpoint in {
-        'live_game_api.start',
         'live_game_api.end_game',
         'live_game_pitching.end_with_pitching',
     }:
@@ -310,24 +354,6 @@ def protect_live_game_workflows():
             game_id = None
         if game_id:
             user, team, game = _authorized_context(game_id)
-            if game and request.endpoint == 'live_game_api.start':
-                rotation = db.session.query(Rotation).filter_by(
-                    associated_game_id=game.id,
-                    team_id=team.id,
-                ).first()
-                inning_one = deepcopy((rotation.innings or {}).get('1', {}) if rotation else {})
-                if not inning_one.get('P'):
-                    return jsonify({
-                        'status': 'error',
-                        'message': 'Choose the starting pitcher for Inning 1 before starting Live Game.'
-                    }), 409
-                cleaned, message = _clean_complete_alignment(inning_one, game, team)
-                if not cleaned:
-                    return jsonify({
-                        'status': 'error',
-                        'message': f'Finish the Inning 1 defense before starting Live Game. {message}'
-                    }), 409
-
             if game and _clear_prep(game.id, team.id):
                 db.session.commit()
 
@@ -363,7 +389,7 @@ def protect_live_game_workflows():
     if game and game.is_live:
         return jsonify({
             'status': 'error',
-            'message': 'The planned defensive rotation is locked while this game is live. Use Live Game changes instead.'
+            'message': 'Pregame defense is locked while the game is live. Use Live Game controls.'
         }), 409
 
     return None

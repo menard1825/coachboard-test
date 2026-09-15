@@ -13,7 +13,16 @@ from game_pitching_rules import (
     install_request_rule_adapters,
     rule_settings_payload,
 )
-from models import Game, Lineup, PlayerPitchTarget, Rotation, Team
+from game_start_readiness import can_start_game
+from models import (
+    Game,
+    Lineup,
+    Player,
+    PlayerGameAbsence,
+    PlayerPitchTarget,
+    Rotation,
+    Team,
+)
 
 
 game_day_bp = Blueprint('game_day', __name__)
@@ -75,21 +84,26 @@ def game_day_home():
         Game.date < next_day,
     ).order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).all()
 
-    focus_games = todays_games
+    # Calculate today's readiness once so the same-day history section can tell
+    # the difference between an upcoming/current game and one that has actually
+    # been played. Previously a completed game stayed only under "Today's Games"
+    # until midnight, which made Past Games appear to disappear on game day.
+    todays_cards = [
+        {'game': game, 'readiness': _readiness_for_game(game, team)}
+        for game in todays_games
+    ]
+
+    game_cards = todays_cards
     focus_label = "Today's Games"
-    if not focus_games:
+    if not game_cards:
         next_game = db.session.query(Game).filter(
             Game.team_id == team.id,
             Game.date >= next_day,
         ).order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).first()
-        focus_games = [next_game] if next_game else []
+        game_cards = [
+            {'game': next_game, 'readiness': _readiness_for_game(next_game, team)}
+        ] if next_game else []
         focus_label = 'Next Game'
-
-    game_cards = [
-        {'game': game, 'readiness': _readiness_for_game(game, team)}
-        for game in focus_games
-        if game is not None
-    ]
 
     focus_ids = {item['game'].id for item in game_cards}
 
@@ -108,6 +122,7 @@ def game_day_home():
             followup_cards.append({'game': game, 'readiness': readiness})
         if len(followup_cards) >= 6:
             break
+    followup_ids = {item['game'].id for item in followup_cards}
 
     # Game Day doubles as the schedule manager. Keep a useful upcoming window
     # here instead of forcing coaches back to the legacy home-page Games tab.
@@ -119,6 +134,28 @@ def game_day_home():
         upcoming_query = upcoming_query.filter(~Game.id.in_(focus_ids))
     upcoming = upcoming_query.order_by(Game.date.asc(), Game.start_time.asc(), Game.id.asc()).limit(12).all()
 
+    # Preserve schedule history. Include games from earlier dates plus games from
+    # today that have actually reached postgame/completion. A game that still has
+    # postgame work stays only in Postgame Follow-Up until that work is complete,
+    # so the same game is never rendered twice on Game Day.
+    historical_games = db.session.query(Game).filter(
+        Game.team_id == team.id,
+        Game.date < day_start,
+    ).order_by(Game.date.desc(), Game.start_time.desc(), Game.id.desc()).all()
+
+    same_day_history = []
+    for item in todays_cards:
+        readiness = item['readiness']
+        if readiness.get('has_end_game') or readiness.get('status') in {
+            'COMPLETE', 'GC STATS PENDING', 'NEEDS POSTGAME'
+        }:
+            same_day_history.append(item['game'])
+
+    past_games = [
+        game for game in [*same_day_history, *historical_games]
+        if game.id not in focus_ids and game.id not in followup_ids
+    ]
+
     return render_template(
         'game_day.html',
         current_team=team,
@@ -127,6 +164,7 @@ def game_day_home():
         focus_label=focus_label,
         local_now=now,
         upcoming=upcoming,
+        past_games=past_games,
     )
 
 
@@ -215,6 +253,24 @@ def add_game():
     db.session.add(game)
     db.session.flush()
 
+    # Guest players are opt-in for every game. Keep Game Day game creation
+    # consistent with the legacy /add_game route by defaulting every guest Out.
+    guest_player_ids = [
+        player_id
+        for (player_id,) in db.session.query(Player.id).filter_by(
+            team_id=team.id,
+            is_guest=True,
+        ).all()
+    ]
+    db.session.add_all([
+        PlayerGameAbsence(
+            player_id=player_id,
+            game_id=game.id,
+            team_id=team.id,
+        )
+        for player_id in guest_player_ids
+    ])
+
     if requested_rule:
         db.session.add(GamePitchingRule(
             game_id=game.id,
@@ -228,24 +284,33 @@ def add_game():
     return redirect(url_for('gameday.game_management', game_id=game.id))
 
 
-@game_day_bp.route('/game-day/<int:game_id>/delete', methods=['POST'])
-def delete_game(game_id):
-    """Delete a scheduled/test game from Game Day without allowing live-game loss."""
-    team = _team_context()
-    if not team or 'logged_in' not in session:
-        return jsonify({'status': 'error', 'message': 'Unauthorized.'}), 401
+def delete_game_and_related(game, team):
+    """Authoritative cleanup for a permanently deleted game.
 
-    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
-    if not game:
-        return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
+    This is CoachBoard's one canonical game-deletion implementation. Every
+    caller (dashboard, Game Day) must route through this function so the
+    cleanup list cannot drift between two independent implementations again.
+
+    Refuses to delete a live game and mutates nothing in that case. This is
+    the one place that rule is enforced, so any future caller inherits it
+    automatically instead of depending on the calling route remembering to
+    check game.is_live itself.
+
+    Lineup/Rotation/PlayerPitchTarget/GamePitchingRule/GameNextInningPrep use
+    integer game ids rather than an ORM relationship with cascade, so they are
+    removed explicitly here. PlayerGameAbsence, PitchingOuting,
+    GameRotationEvent, and GamePitchingPlan already cascade via the Game
+    model's own relationships; GameClockState cascades at the database level.
+    Deleting a game's PitchingOuting history along with it is existing,
+    intentional behavior and is not changed here.
+
+    Returns True if the game was deleted, False if it was live and nothing
+    was mutated. Callers are responsible for the team-scoped lookup and for
+    committing afterward so the whole operation stays one transaction.
+    """
     if game.is_live:
-        return jsonify({
-            'status': 'error',
-            'message': 'A live game cannot be deleted. End the game first.',
-        }), 409
+        return False
 
-    # Planning records use integer game ids rather than ORM relationships, so
-    # remove them explicitly before deleting the game.
     db.session.query(Lineup).filter_by(
         associated_game_id=game.id,
         team_id=team.id,
@@ -271,8 +336,28 @@ def delete_game(game_id):
         team_id=team.id,
     ).delete(synchronize_session=False)
 
-    opponent = game.opponent
     db.session.delete(game)
+    return True
+
+
+@game_day_bp.route('/game-day/<int:game_id>/delete', methods=['POST'])
+def delete_game(game_id):
+    """Delete a scheduled/test game from Game Day without allowing live-game loss."""
+    team = _team_context()
+    if not team or 'logged_in' not in session:
+        return jsonify({'status': 'error', 'message': 'Unauthorized.'}), 401
+
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
+    if not game:
+        return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
+
+    opponent = game.opponent
+    if not delete_game_and_related(game, team):
+        return jsonify({
+            'status': 'error',
+            'message': 'A live game cannot be deleted. End the game first.',
+        }), 409
+
     db.session.commit()
     socketio.emit('data_updated', {'message': f'Game vs {opponent} deleted.'})
     return jsonify({
@@ -289,7 +374,13 @@ def readiness_api(game_id):
     game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
     if not game:
         return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
-    return jsonify({'status': 'success', 'readiness': _readiness_for_game(game, team)})
+
+    start_readiness = can_start_game(game, team)
+    return jsonify({
+        'status': 'success',
+        **start_readiness,
+        'readiness': _readiness_for_game(game, team),
+    })
 
 
 @game_day_bp.route('/game-day/<int:game_id>/report')
