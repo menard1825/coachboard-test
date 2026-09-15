@@ -19,7 +19,6 @@
   const setHtml = (element, value) => {
     if (element && element.innerHTML !== value) element.innerHTML = value;
   };
-  const sleep = (ms) => new Promise(resolve => window.setTimeout(resolve, ms));
 
   function installStyles() {
     if (document.getElementById('game-management-coach-simplify-styles')) return;
@@ -694,78 +693,42 @@
     if (action?.tagName === 'A') event.preventDefault();
   }
 
-  async function fetchLatestRotationUntil(inningKey, attempts = 16) {
-    let lastData = null;
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
-      const response = await fetch(`/api/game_data/${gameId}?_=${Date.now()}`, {cache:'no-store'});
-      if (!response.ok) throw new Error('Could not read the latest defense plan.');
-      lastData = await response.json();
-      let innings = lastData?.rotation?.innings || {};
-      if (typeof innings === 'string') {
-        try { innings = JSON.parse(innings); } catch (_) { innings = {}; }
-      }
-      if (Object.prototype.hasOwnProperty.call(innings, inningKey)) {
-        lastData.rotation.innings = innings;
-        return lastData;
-      }
-      await sleep(180);
-    }
-    return lastData;
-  }
-
-  async function removeCurrentMidInningChange() {
+  function removeCurrentMidInningChange() {
     const raw = currentInning();
     if (!isSubInning(raw)) return;
     const base = String(Math.floor(Number.parseFloat(raw)));
     const display = shortInningLabel(raw);
     if (!window.confirm(`Remove planned change ${display}?\n\nThe normal Inning ${base} defense will stay in place.`)) return;
 
-    const removeButton = document.getElementById('gmRemoveCurrentSubInning');
-    if (removeButton) {
-      removeButton.disabled = true;
-      removeButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Removing…';
+    // Mutate the ONE canonical CBPregameRotation rotation object in place
+    // and save through its shared queue — the same object and queue every
+    // other pregame writer (the tap field, game_logic.js's inning
+    // toolbar) uses. A second, independent /save_rotation POST built from
+    // a separately re-fetched snapshot could race with the shared queue's
+    // own in-flight save and resurrect this planned change once that
+    // older save's stale full-rotation payload landed afterward.
+    const rotation = window.CBPregameRotation.getRotation('Rotation');
+    if (!Object.prototype.hasOwnProperty.call(rotation.innings, raw)) {
+      toast('That planned change was not found. Refresh the page and try again.', 'danger');
+      return;
     }
 
-    try {
-      document.getElementById('saveRotationBtn')?.click();
-      const data = await fetchLatestRotationUntil(raw);
-      if (!data?.rotation) throw new Error('Could not find the current defense plan.');
+    delete rotation.innings[raw];
 
-      let innings = data.rotation.innings || {};
-      if (typeof innings === 'string') innings = JSON.parse(innings);
-      if (!Object.prototype.hasOwnProperty.call(innings, raw)) {
-        throw new Error('That planned change was not found. Refresh the page and try again.');
-      }
+    // Firing this click's native 'change' event runs game_logic.js's own
+    // radio listener (state.currentInning = base; renderRotationEditor()),
+    // which rebuilds #inning-btn-group from the rotation object just
+    // mutated above — so the removed change's radio is already gone by
+    // the time this re-render runs.
+    document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`)?.click();
 
-      document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`)?.click();
+    // Persistence, retry-on-failure, and the persistent Saving/Saved/Failed
+    // indicator are all handled by the shared queue from here — same as
+    // every other inning-toolbar action.
+    window.CBPregameRotation.commitLocalChange('Rotation', false);
 
-      delete innings[raw];
-      const response = await fetch('/save_rotation', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          id:data.rotation.id,
-          title:data.rotation.title || `Rotation for game ${gameId}`,
-          innings,
-          associated_game_id:gameId,
-        }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Could not remove that planned change.');
-
-      toast(`Removed planned change ${display}.`);
-      window.setTimeout(() => {
-        document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`)?.click();
-        queuePatch();
-      }, 250);
-    } catch (error) {
-      toast(error.message || 'Could not remove that planned change.', 'danger');
-    } finally {
-      if (removeButton?.isConnected) {
-        removeButton.disabled = false;
-        removeButton.innerHTML = '<i class="bi bi-trash me-2"></i>Remove This Planned Change';
-      }
-    }
+    toast(`Removed planned change ${display}.`);
+    queuePatch();
   }
 
   function simplifyHeader() {

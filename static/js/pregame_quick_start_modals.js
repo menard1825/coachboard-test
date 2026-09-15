@@ -331,26 +331,21 @@
     stepBusy = true;
     if (button) button.disabled = true;
     try {
-      const data = await getJson(`/api/game_data/${gameId}?_=${Date.now()}`);
-      const rotation = data.rotation || {};
-      const innings = parseInnings(rotation.innings);
+      // Mutate the ONE canonical CBPregameRotation rotation object and
+      // save through its shared queue, instead of a second independent
+      // /save_rotation POST built from a separately re-fetched snapshot —
+      // that snapshot can already be stale relative to an edit the shared
+      // queue is still saving (or already saved) elsewhere on this page.
+      const rotation = window.CBPregameRotation.getRotation('Rotation');
+      const innings = rotation.innings;
       if (!innings['1'] || typeof innings['1'] !== 'object') innings['1'] = {};
       Object.keys(innings['1']).forEach(position => {
         if (position !== 'P' && innings['1'][position] === playerName) delete innings['1'][position];
       });
       innings['1'].P = playerName;
-      const response = await fetch('/save_rotation', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          id:rotation.id || null,
-          title:rotation.title || `Rotation for vs ${data.game?.opponent || 'Opponent'}`,
-          innings,
-          associated_game_id:gameId,
-        }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || result.status === 'error') throw new Error(result.message || 'Unable to save the starting pitcher.');
+      // Persistence, retry-on-failure, and the persistent Saving/Saved/
+      // Failed indicator are all handled by the shared queue from here.
+      window.CBPregameRotation.commitLocalChange(rotation.title, false);
       window.bootstrap?.Modal?.getOrCreateInstance(ensureStepModal()).hide();
     } catch (error) {
       window.alert(error.message || 'Unable to save the starting pitcher.');

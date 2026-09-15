@@ -152,24 +152,6 @@
     return response.json();
   }
 
-  async function saveRotation(data, innings) {
-    const rotation = data.rotation || {};
-    const response = await fetch('/save_rotation', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        id: rotation.id || null,
-        title: rotation.title || `Rotation for vs ${data.game?.opponent || 'Opponent'}`,
-        innings,
-        associated_game_id: gameId,
-      }),
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.status === 'error') {
-      throw new Error(result.message || 'Unable to apply the starting defense.');
-    }
-  }
-
   async function applyStartingDefenseToGame() {
     if (applying) return;
     const select = document.getElementById('pde-preset');
@@ -189,8 +171,25 @@
       const label = presetLabel(preset) || 'Starting Defense';
       const sourceInnings = parseInnings(preset.innings);
       const source = sourceInnings['1'] || Object.values(sourceInnings).find(value => value && typeof value === 'object') || {};
-      const innings = parseInnings(data.rotation?.innings);
-      const targetKeys = wholeInningKeys(innings);
+
+      // Read the ONE canonical CBPregameRotation rotation object, not a
+      // freshly re-fetched /api/game_data snapshot: that snapshot can
+      // already be stale relative to an edit the shared queue is still
+      // saving (or already saved), and building this game-wide payload
+      // from it — rather than from the current shared state — could
+      // silently overwrite that edit once this save lands.
+      //
+      // The proposed change is built on a DETACHED deep copy
+      // (proposedInnings), never on the canonical rotation.innings object
+      // itself, until the coach actually confirms it below. Mutating the
+      // canonical object before this confirm() would leave a canceled
+      // Starting Defense sitting in shared state, ready to be persisted
+      // by the next unrelated save.
+      const rotation = window.CBPregameRotation.getRotation(
+        `Rotation for vs ${data.game?.opponent || 'Opponent'}`
+      );
+      const proposedInnings = JSON.parse(JSON.stringify(rotation.innings));
+      const targetKeys = wholeInningKeys(proposedInnings);
       if (!targetKeys.length) targetKeys.push('1');
 
       const absent = new Set((data.absent_player_ids || []).map(Number));
@@ -200,7 +199,7 @@
       const unavailable = new Set();
 
       targetKeys.forEach(key => {
-        const existing = innings[key] && typeof innings[key] === 'object' ? innings[key] : {};
+        const existing = proposedInnings[key] && typeof proposedInnings[key] === 'object' ? proposedInnings[key] : {};
         const next = {};
 
         // Starting Defense is a field-position base, not a pitching plan.
@@ -214,7 +213,7 @@
           if (available.has(playerName)) next[position] = playerName;
           else unavailable.add(playerName);
         });
-        innings[key] = next;
+        proposedInnings[key] = next;
       });
 
       const inningRange = targetKeys.length === 1
@@ -228,14 +227,19 @@
         'Non-pitcher positions in those innings will be replaced. Existing pitcher assignments will stay unchanged.' +
         warning
       );
+      // Cancel leaves the canonical rotation completely untouched — only
+      // the detached proposedInnings copy was ever built above.
       if (!confirmed) return;
 
-      await saveRotation(data, innings);
-
-      // The existing pregame editor owns its local state. Reload once after this
-      // game-wide operation so every inning selector immediately reflects the
-      // saved server state instead of maintaining a second competing state owner.
-      window.location.reload();
+      // Apply the confirmed proposal to the canonical rotation object now
+      // (the object reference itself stays the same; only its innings are
+      // replaced) and save through the shared queue. Persistence,
+      // retry-on-failure, and the persistent Saving/Saved/Failed indicator
+      // are all handled from here — no reload needed: live_game_board_prep.js's
+      // own onChange listener already re-renders the visible field for
+      // every inning this touched.
+      rotation.innings = proposedInnings;
+      window.CBPregameRotation.commitLocalChange(rotation.title, false);
     } catch (error) {
       window.alert(error.message || 'Unable to apply the Starting Defense.');
     } finally {

@@ -7,12 +7,23 @@ const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;',
 
 function initializeGameManagement(gameData) {
 
+    // The rotation itself and its /save_rotation queue live in the shared
+    // CBPregameRotation store, not in this file's own state — the
+    // #pregame-defense-editor-v3 tap field (static/js/live_game_board_prep.js)
+    // mutates the exact same object and shares the same queue, so a save
+    // built by either module always reflects every edit made by both,
+    // never a stale per-module snapshot.
+    function defaultRotationTitle() {
+        return `Rotation for vs ${gameData.game.opponent}`;
+    }
+    window.CBPregameRotation.setFromServer(gameData.rotation, defaultRotationTitle());
+
     // --- Page-Specific State ---
     // All data for this page is stored in a local 'state' object.
     const state = {
         roster: (gameData.roster || []).filter(p => !(gameData.absent_player_ids || []).includes(p.id)),
         lineup: gameData.lineup || { id: null, title: `Lineup for vs ${gameData.game.opponent}`, lineup_positions: [], associated_game_id: gameData.game.id },
-        rotation: gameData.rotation || { id: null, title: `Rotation for vs ${gameData.game.opponent}`, innings: { '1': {} }, associated_game_id: gameData.game.id },
+        rotation: window.CBPregameRotation.getRotation(defaultRotationTitle()),
         game: gameData.game,
         lineup_templates: gameData.lineup_templates || [],
         previous_lineup: gameData.previous_lineup || null,
@@ -25,16 +36,6 @@ function initializeGameManagement(gameData) {
         copiedInningData: null,
         sortableInstances: {}
     };
-
-    // ADD THIS BLOCK TO FIX THE INNINGS BUG
-    if (state.rotation && typeof state.rotation.innings === 'string') {
-        try {
-            state.rotation.innings = JSON.parse(state.rotation.innings);
-        } catch (e) {
-            console.error("Error parsing rotation.innings JSON:", e);
-            state.rotation.innings = { '1': {} }; // Default to a valid object on failure
-        }
-    }
 
     // --- Live Mode Authoritative Syncing ---
     // The server API now provides actual_rotation fully computed.
@@ -517,64 +518,105 @@ function applyOutOfPositionIndicators() {
         }
     }
     
-    let autosaveTimer = null;
-    function triggerAutosave() {
-        if (autosaveTimer) clearTimeout(autosaveTimer);
+    // --- Rotation save queue -----------------------------------------------
+    // The rotation object and its /save_rotation queue live in the shared
+    // CBPregameRotation store (static/js/pregame_rotation_sync.js), not
+    // here: the #pregame-defense-editor-v3 tap field mutates the exact
+    // same object and shares the same queue, so a payload built by either
+    // module always reflects every edit made by both — never a stale
+    // per-module snapshot that could overwrite the other's change.
+    function setRotationSaveStatus(status, error, wasManual) {
         const btnDesktop = document.getElementById('saveRotationBtn');
         const btnMobile = document.getElementById('saveRotationBtnMobile');
 
-        const indicatingHtml = '<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>';
-        if (btnDesktop && !btnDesktop.disabled) btnDesktop.innerHTML = indicatingHtml + ' Saving...';
-        if (btnMobile && !btnMobile.disabled) btnMobile.innerHTML = indicatingHtml;
+        const setDisabled = (btn, disabled) => {
+            if (!btn) return;
+            if ('disabled' in btn) btn.disabled = disabled;
+            btn.classList.toggle('disabled', disabled);
+            btn.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        };
 
-        autosaveTimer = setTimeout(() => {
-            saveRotation(true);
-        }, 2000);
+        if (status === 'saving') {
+            setDisabled(btnDesktop, true);
+            setDisabled(btnMobile, true);
+            if (btnDesktop) btnDesktop.innerHTML = '<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Saving...';
+            if (btnMobile) btnMobile.innerHTML = '<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>';
+            return;
+        }
+
+        setDisabled(btnDesktop, false);
+        setDisabled(btnMobile, false);
+
+        if (status === 'failed') {
+            // A failure stays visible and retryable instead of silently
+            // resetting after two seconds.
+            if (btnDesktop) btnDesktop.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i> Save Failed — Retry';
+            if (btnMobile) btnMobile.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Retry';
+            if (wasManual) {
+                alert('Error saving rotation: ' + (error?.message || 'Unknown error'));
+            }
+            return;
+        }
+
+        if (status === 'saved') {
+            if (btnDesktop) btnDesktop.innerHTML = '<i class="bi bi-check"></i> Saved!';
+            if (btnMobile) btnMobile.innerHTML = '<i class="bi bi-check"></i>';
+            return;
+        }
+
+        // idle
+        if (btnDesktop) btnDesktop.innerHTML = '<i class="bi bi-save me-1"></i> Save Rotation';
+        if (btnMobile) btnMobile.innerHTML = '<i class="bi bi-save"></i> Save';
     }
 
-    async function saveRotation(isAutosave = false) {
-        const btnDesktop = document.getElementById('saveRotationBtn');
-        const btnMobile = document.getElementById('saveRotationBtnMobile');
+    window.CBPregameRotation.onStatusChange(setRotationSaveStatus);
 
-        if (!isAutosave) {
-            if (btnDesktop) { btnDesktop.disabled = true; btnDesktop.textContent = 'Saving...'; }
-            if (btnMobile) { btnMobile.disabled = true; btnMobile.textContent = 'Saving...'; }
-        }
+    // Keep state.rotation pointing at the shared store's current object at
+    // all times. setFromServer() (triggered by either module's background
+    // refresh) replaces that object outright rather than mutating it in
+    // place, and this module's own toolbar handlers (Add/Remove/Clear
+    // Inning, Copy Previous, Paste, ...) mutate state.rotation.innings[...]
+    // directly. Without this resync, a refresh applied via the tap field
+    // (live_game_board_prep.js) could leave those handlers mutating an
+    // abandoned, detached snapshot that the shared save queue never reads
+    // again — silently losing the structural change.
+    window.CBPregameRotation.onChange(() => {
+        state.rotation = window.CBPregameRotation.getRotation(defaultRotationTitle());
+    });
 
-        const payload = {
-            id: state.rotation.id,
-            title: state.rotation.title || `Rotation for vs ${state.game.opponent}`,
-            innings: state.rotation.innings,
-            associated_game_id: state.game.id
-        };
-        try {
-            const response = await fetch('/save_rotation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error('Failed to save rotation.');
-            const result = await response.json();
-            if (result.status === 'success') {
-                if (result.new_id) state.rotation.id = result.new_id;
+    function triggerAutosave() {
+        window.CBPregameRotation.commitLocalChange(defaultRotationTitle(), false);
+    }
 
-                if (btnDesktop) btnDesktop.innerHTML = '<i class="bi bi-check"></i> Saved!';
-                if (btnMobile) btnMobile.innerHTML = '<i class="bi bi-check"></i>';
-
-                if (!isAutosave || !state.rotation.id) {
-                     renderRotationEditor();
-                }
-            } else { throw new Error(result.message); }
-        } catch (error) {
-            if (!isAutosave) alert('Error saving rotation: ' + error.message);
-            if (btnDesktop) btnDesktop.textContent = 'Save Failed';
-            if (btnMobile) btnMobile.textContent = 'Error';
-        } finally {
-            setTimeout(() => {
-                if (btnDesktop) { btnDesktop.disabled = false; btnDesktop.innerHTML = '<i class="bi bi-save me-1"></i> Save Rotation'; }
-                if (btnMobile) { btnMobile.disabled = false; btnMobile.innerHTML = '<i class="bi bi-save"></i> Save'; }
-            }, 2000);
-        }
+    function saveRotation(isAutosave = false) {
+        window.CBPregameRotation.commitLocalChange(defaultRotationTitle(), !isAutosave);
     }
 
     async function fetchLatestGameData() {
         if (!state.game || !state.game.id) return;
+
+        // Captured at request start, not response time. Several socket
+        // events (data_updated, lineup_add/update, roster_update,
+        // game_updated, pitching_update) call this unconditionally, so a
+        // rotation save from either module can already be in flight when
+        // the fetch below begins. Checking only at response time is not
+        // enough: that in-flight save can complete successfully while this
+        // request is still outstanding, so by the time the response
+        // arrives every check available then (not in flight, revision
+        // unchanged, nothing unsynced) looks perfectly safe even though
+        // the snapshot was captured before that save landed and is now
+        // stale relative to it.
+        const rotationSafeAtStart = !window.CBPregameRotation.isSaveInFlightOrQueued()
+            && !window.CBPregameRotation.hasUnsyncedLocalState();
+        const rotationRevisionAtStart = window.CBPregameRotation.getLocalRevision();
+        // A separate, later-started refresh (this module's own next call,
+        // or live_game_board_prep.js's refresh()) can return and apply
+        // before this one does. Local-edit revision checks alone don't
+        // change when a SERVER snapshot is accepted, so they can't detect
+        // that case; the shared token orders server refreshes against
+        // each other — across both modules — regardless of arrival order.
+        const rotationRefreshToken = window.CBPregameRotation.beginServerRefresh();
+
         try {
             const res = await fetch(`/api/game_data/${state.game.id}`);
             if (!res.ok) throw new Error("Failed to fetch game data.");
@@ -585,16 +627,19 @@ function applyOutOfPositionIndicators() {
             state.roster = (newData.roster || []).filter(p => !(newData.absent_player_ids || []).includes(p.id));
             state.lineup = newData.lineup || { id: null, title: `Lineup for vs ${newData.game.opponent}`, lineup_positions: [], associated_game_id: newData.game.id };
 
-            // Ensure rotation innings is an object
-            let parsedRotation = newData.rotation || { id: null, title: `Rotation for vs ${newData.game.opponent}`, innings: { '1': {} }, associated_game_id: newData.game.id };
-            if (typeof parsedRotation.innings === 'string') {
-                try {
-                    parsedRotation.innings = JSON.parse(parsedRotation.innings);
-                } catch (e) {
-                    parsedRotation.innings = { '1': {} };
-                }
+            // Only apply the server's rotation snapshot when it was safe to
+            // refresh both at request start AND still is right now (no
+            // edit — from this module's own toolbar or the tap field —
+            // landed or is still in flight in between), AND no later-started
+            // refresh (from either module) has already applied a newer
+            // snapshot. Everything else in newData is applied unconditionally
+            // below; only the rotation portion is gated, so an edit in
+            // progress never suppresses an otherwise-unrelated
+            // roster/lineup/pitching refresh.
+            if (rotationSafeAtStart && window.CBPregameRotation.canApplyRefresh(rotationRevisionAtStart, rotationRefreshToken)) {
+                window.CBPregameRotation.setFromServer(newData.rotation, `Rotation for vs ${newData.game.opponent}`, rotationRefreshToken);
             }
-            state.rotation = parsedRotation;
+            state.rotation = window.CBPregameRotation.getRotation(`Rotation for vs ${newData.game.opponent}`);
 
             state.lineup_templates = newData.lineup_templates || [];
             state.previous_lineup = newData.previous_lineup || null;
@@ -684,7 +729,15 @@ function applyOutOfPositionIndicators() {
             socket.on('data_updated', fetchLatestGameData);
             socket.on('lineup_add', fetchLatestGameData);
             socket.on('lineup_update', fetchLatestGameData);
-            socket.on('rotation_save', fetchLatestGameData);
+            socket.on('rotation_save', () => {
+                // Don't clobber a local edit (from this module's toolbar or
+                // the tap field) that is still saving, queued, or failed to
+                // save; refresh once local saving has settled.
+                if (window.CBPregameRotation.isSaveInFlightOrQueued() || window.CBPregameRotation.hasUnsyncedLocalState()) {
+                    return;
+                }
+                fetchLatestGameData();
+            });
             socket.on('roster_update', fetchLatestGameData);
             socket.on('game_updated', fetchLatestGameData);
             socket.on('pitching_update', fetchLatestGameData);
@@ -749,8 +802,14 @@ function applyOutOfPositionIndicators() {
             feedback.className = skippedNames.length ? 'alert alert-warning py-2' : 'alert alert-info py-2';
             feedback.textContent = `Applied ${source.title || 'lineup'}. ${skippedNames.length ? `Skipped unavailable: ${skippedNames.join(', ')}. ` : ''}${benchCount} available player${benchCount === 1 ? '' : 's'} remain on the bench.`;
         });
-        document.getElementById('saveRotationBtn')?.addEventListener('click', saveRotation);
-        document.getElementById('saveRotationBtnMobile')?.addEventListener('click', saveRotation); // Add mobile listener
+        document.getElementById('saveRotationBtn')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            void saveRotation(false);
+        });
+        document.getElementById('saveRotationBtnMobile')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            void saveRotation(false);
+        });
         document.getElementById('printCardBtn')?.addEventListener('click', printLineupCard);
 
         // Live Game start/change/end actions are owned by live_game_v2.js so the

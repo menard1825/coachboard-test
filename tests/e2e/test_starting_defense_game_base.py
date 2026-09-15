@@ -132,10 +132,11 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
         expect(page.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as assigned')
 
         page.once('dialog', lambda dialog: dialog.accept())
-        # Applying to the entire game saves asynchronously and then reloads the
-        # current game page. Wait for that navigation before checking the DB.
-        with page.expect_navigation(wait_until='domcontentloaded'):
-            apply_to_game.click()
+        # Applying to the entire game mutates the canonical CBPregameRotation
+        # rotation and saves through the shared queue (no page reload): wait
+        # for the persistent save-status indicator instead of a navigation.
+        apply_to_game.click()
+        expect(page.locator('#pregame-defense-editor-v3 #pde-save-status')).to_contain_text('Saved', timeout=10_000)
 
         updated_response = page.request.get(f'{coachboard_url}/api/game_data/{game_id}')
         assert updated_response.ok

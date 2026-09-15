@@ -1,0 +1,385 @@
+"""Regression coverage for a render-side-effect bug in
+static/js/live_game_board_prep.js found in an independent review of the
+cross-module CBPregameRotation architecture (see
+tests/e2e/test_pregame_rotation_cross_module_race.py for that
+architecture's own coverage).
+
+`ensureRotation()` used to silently recreate the currently-selected inning
+(`rotation.innings[inning] = {}`) whenever it was missing — including when
+it was missing because it had just been legitimately removed by
+game_logic.js's Remove Last Inning, or because a fresh server snapshot no
+longer contained it. `CBPregameRotation.commitLocalChange()` (and
+`setFromServer()`) call `notifyChange()` before this module's own explicit
+reconciliation of its local `inning` selection has a chance to run, and
+this module's `onChange` listener calls `render()` immediately — which
+reads `alignment()` -> `ensureRotation()`. That resurrected the removed
+inning into the CANONICAL shared rotation object, so a later save (the one
+that just ran, or any later unrelated one) could persist the removed
+inning right back into the DB.
+
+The fix makes `ensureRotation()` (via `reconcileInningSelection()`)
+side-effect free with respect to the canonical rotation structure: it only
+ever moves the local `inning` selection to an existing key, never creates
+one. These tests attack the two structurally distinct triggers named in
+the review — a structural toolbar action (Remove Last Inning) and a
+server-refresh snapshot that no longer contains the viewed inning — plus a
+third real-world path (applying a full-game defense plan) that replaces
+the whole inning set the same way.
+"""
+
+import copy
+import json
+import os
+import re
+from datetime import date, timedelta
+from pathlib import Path
+
+import pytest
+
+
+pytestmark = pytest.mark.e2e
+
+if os.environ.get('COACHBOARD_E2E') != '1':
+    pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
+
+from playwright.sync_api import Page, expect
+
+
+TEST_USERNAME = 'playwright-coach'
+TEST_PASSWORD = 'playwright-password'
+
+_VENDOR_DIR = Path(os.environ['COACHBOARD_E2E_CDN_VENDOR_DIR']) if os.environ.get('COACHBOARD_E2E_CDN_VENDOR_DIR') else None
+
+
+def _install_cdn_vendor_routes(page: Page):
+    if not _VENDOR_DIR or not _VENDOR_DIR.is_dir():
+        return
+
+    def handler(route):
+        name = route.request.url.rsplit('/', 1)[-1].split('?')[0]
+        local = _VENDOR_DIR / name
+        if local.is_file():
+            content_type = 'application/javascript' if name.endswith('.js') else 'text/css'
+            route.fulfill(status=200, content_type=content_type, body=local.read_bytes())
+        else:
+            route.continue_()
+
+    page.route(re.compile(r'^https://cdn\.jsdelivr\.net/'), handler)
+    page.route(re.compile(r'^https://cdn\.socket\.io/'), handler)
+
+
+@pytest.fixture(autouse=True)
+def _vendor_cdns(page: Page):
+    _install_cdn_vendor_routes(page)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _dialogs(page: Page):
+    """Remove Last Inning has no confirm(); applying a full-game plan does.
+    Accept every dialog by default so these flows can proceed unattended."""
+    seen = []
+
+    def on_dialog(dialog):
+        seen.append((dialog.type, dialog.message))
+        dialog.accept()
+
+    page.on('dialog', on_dialog)
+    yield seen
+
+
+def login(page: Page, coachboard_url: str):
+    page.goto(f'{coachboard_url}/login')
+    page.get_by_label('Username or email').fill(TEST_USERNAME)
+    page.locator('#password').fill(TEST_PASSWORD)
+    page.get_by_role('button', name='Sign In').click()
+    expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#(?:overview|games))?$'))
+
+
+def create_planning_game(page: Page, coachboard_url: str, opponent: str, days_offset: int = 10) -> int:
+    """Default (future-dated) games are used here deliberately: the
+    prepare_regulation_innings_for_game_management before_request hook
+    (blueprints/rotation_templates.py) auto-provisions a Rotation row with
+    the team's full set of regulation-inning slots the moment such a
+    game's /game/<id> is loaded — giving these tests a known,
+    multi-inning starting rotation with no extra setup."""
+    created = page.request.post(
+        f'{coachboard_url}/game-day/add',
+        form={
+            'game_date': (date.today() + timedelta(days=days_offset)).isoformat(),
+            'game_start_time': '15:00',
+            'game_opponent': opponent,
+            'game_location': 'Inning Selection Integrity Field',
+            'game_notes': 'Disposable inning-selection-integrity test',
+            'pitching_rule_set': 'USSSA',
+        },
+        max_redirects=0,
+    )
+    assert created.status in {302, 303}, created.text()
+    match = re.search(r'/game/(\d+)', created.headers.get('location') or '')
+    assert match
+    return int(match.group(1))
+
+
+def cleanup(page: Page, coachboard_url: str, game_id: int):
+    page.request.post(f'{coachboard_url}/game-day/{game_id}/delete', headers={'Accept': 'application/json'})
+
+
+def panel(page: Page):
+    return page.locator('#pregame-defense-editor-v3')
+
+
+def choose_player(page: Page, position: str, player_name: str):
+    panel(page).locator(f'[data-pde-pos="{position}"]').click()
+    modal = page.locator('#pde-player-modal')
+    expect(modal).to_be_visible(timeout=10_000)
+    modal.locator(f'.pde-choice[data-player="{player_name}"]').click()
+    expect(modal).not_to_be_visible(timeout=10_000)
+
+
+def save_status(page: Page):
+    return panel(page).locator('#pde-save-status')
+
+
+def displayed_inning(page: Page) -> str:
+    return page.locator('#pregame-defense-editor-v3 .pde-inning strong').inner_text()
+
+
+def get_game_data(page: Page, coachboard_url: str, game_id: int):
+    response = page.request.get(f'{coachboard_url}/api/game_data/{game_id}')
+    assert response.ok, response.text()
+    return response.json()
+
+
+def canonical_inning_keys(page: Page):
+    """Read the CBPregameRotation store's own in-memory rotation directly,
+    bypassing this module's `state.rotation` reference, to prove the
+    canonical object itself was never resurrected — not merely that the
+    UI's own copy looks right."""
+    return page.evaluate("Object.keys(window.CBPregameRotation.getRotation('x').innings || {})")
+
+
+def click_hidden(page: Page, element_id: str):
+    """Fire a real click on a legacy element that
+    game_management_coach_simplify.js hides visually but forwards real
+    clicks to (document.getElementById(id).click(), the same mechanism
+    its own 'Add Another Inning' / 'Remove Last Inning' actions use)."""
+    page.evaluate(f"document.getElementById('{element_id}')?.click()")
+
+
+def select_inning(page: Page, inning_key: str):
+    page.locator(f'label[for="inning-{inning_key}"]').click()
+
+
+def test_remove_current_last_inning_does_not_resurrect_it(page: Page, coachboard_url: str):
+    """Select the actual last inning in the modern pregame editor, then use
+    the real user-facing Remove Last Inning action (game_management_coach_simplify.js
+    forwards it to #removeInningBtn). The removed inning must not
+    reappear — not immediately, and not after further normal
+    refresh/socket activity settles."""
+    login(page, coachboard_url)
+    game_id = create_planning_game(page, coachboard_url, 'Remove Last Inning Opponent')
+    try:
+        page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
+        expect(panel(page)).to_be_visible(timeout=15_000)
+
+        baseline = get_game_data(page, coachboard_url, game_id)
+        inning_keys = sorted(baseline['rotation']['innings'].keys(), key=float)
+        assert len(inning_keys) >= 2, 'expected the auto-provisioned rotation to have at least two regulation innings'
+        removed_inning = inning_keys[-1]
+        expected_new_last = inning_keys[-2]
+
+        select_inning(page, removed_inning)
+        expect(panel(page).locator('.pde-inning strong')).to_have_text(removed_inning, timeout=10_000)
+
+        click_hidden(page, 'removeInningBtn')
+        expect(save_status(page)).to_contain_text('Saved', timeout=10_000)
+
+        data = get_game_data(page, coachboard_url, game_id)
+        assert removed_inning not in data['rotation']['innings'], (
+            'the removed inning must be gone from the DB immediately after the save'
+        )
+        assert set(data['rotation']['innings'].keys()) == set(inning_keys[:-1])
+
+        # The modern editor must have moved off the removed inning to a
+        # valid remaining one, not silently kept showing/recreating it.
+        assert displayed_inning(page) == expected_new_last
+        assert removed_inning not in canonical_inning_keys(page), (
+            "the removed inning must not exist in CBPregameRotation's own canonical rotation"
+        )
+
+        # Wait through normal refresh/socket activity (the same debounced
+        # refresh the inning toolbar triggers elsewhere on the page), which
+        # is exactly the onChange -> render() -> ensureRotation() path the
+        # bug lived in.
+        page.locator('#rotationTemplateSelect').dispatch_event('change')
+        page.wait_for_timeout(1200)
+        assert removed_inning not in canonical_inning_keys(page), (
+            'a background refresh must not have resurrected the removed inning into the canonical rotation'
+        )
+
+        # A further, unrelated edit + save must not silently resurrect and
+        # persist the removed inning either.
+        choose_player(page, 'SS', 'Shortstop Shawn')
+        expect(save_status(page)).to_contain_text('Saved', timeout=10_000)
+
+        data = get_game_data(page, coachboard_url, game_id)
+        assert removed_inning not in data['rotation']['innings'], (
+            'the removed inning reappeared in the DB after further normal activity'
+        )
+        assert data['rotation']['innings'][expected_new_last]['SS'] == 'Shortstop Shawn'
+    finally:
+        cleanup(page, coachboard_url, game_id)
+
+
+def test_server_refresh_removing_current_inning_does_not_resurrect_it(page: Page, coachboard_url: str):
+    """Have the modern editor viewing an inning, then let a legitimate
+    server snapshot (as if another coach's device already removed that
+    inning) arrive via the real refresh path. The UI must move to an
+    existing inning, CBPregameRotation must not recreate the removed one,
+    and a later normal edit/save must not persist it either."""
+    login(page, coachboard_url)
+    game_id = create_planning_game(page, coachboard_url, 'Server Refresh Removes Inning Opponent')
+    try:
+        page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
+        expect(panel(page)).to_be_visible(timeout=15_000)
+
+        baseline = get_game_data(page, coachboard_url, game_id)
+        inning_keys = sorted(baseline['rotation']['innings'].keys(), key=float)
+        assert len(inning_keys) >= 2, 'expected the auto-provisioned rotation to have at least two regulation innings'
+        viewed_inning = inning_keys[-1]
+
+        select_inning(page, viewed_inning)
+        expect(panel(page).locator('.pde-inning strong')).to_have_text(viewed_inning, timeout=10_000)
+
+        # Simulate the authoritative server snapshot no longer containing
+        # the inning this panel is currently viewing.
+        modified_snapshot = copy.deepcopy(baseline)
+        del modified_snapshot['rotation']['innings'][viewed_inning]
+
+        def serve_modified(route):
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(modified_snapshot))
+
+        page.route(f'**/api/game_data/{game_id}', serve_modified)
+
+        # The real refresh path: the same debounced scheduleRefresh() the
+        # inning toolbar triggers elsewhere on the page.
+        page.locator('#rotationTemplateSelect').dispatch_event('change')
+        page.wait_for_timeout(1200)
+
+        page.unroute(f'**/api/game_data/{game_id}')
+
+        remaining_keys = set(modified_snapshot['rotation']['innings'].keys())
+        assert displayed_inning(page) != viewed_inning
+        assert displayed_inning(page) in remaining_keys
+
+        assert viewed_inning not in canonical_inning_keys(page), (
+            'the removed inning must not have been recreated in CBPregameRotation by the refresh'
+        )
+
+        # A later, real edit/save (against the real, unmocked endpoint from
+        # here on) must not resurrect and persist the removed inning.
+        choose_player(page, 'SS', 'Shortstop Shawn')
+        expect(save_status(page)).to_contain_text('Saved', timeout=10_000)
+
+        data = get_game_data(page, coachboard_url, game_id)
+        assert viewed_inning not in data['rotation']['innings'], (
+            'the server-removed inning reappeared in the DB after a later normal edit'
+        )
+    finally:
+        page.unroute(f'**/api/game_data/{game_id}')
+        cleanup(page, coachboard_url, game_id)
+
+
+def test_applying_full_game_plan_missing_current_inning_does_not_resurrect_it(page: Page, coachboard_url: str):
+    """Same structural class of issue via a third real path: applying a
+    full-game defense plan (game_logic.js's #rotationTemplateSelect
+    'change' handler) replaces the whole inning set outright. If the
+    modern editor is currently viewing an inning absent from the applied
+    plan, that inning must not be resurrected."""
+    login(page, coachboard_url)
+    game_id = create_planning_game(page, coachboard_url, 'Full Game Plan Missing Inning Opponent')
+    try:
+        # A first visit is required before the rotation exists at all: the
+        # regulation-inning auto-provisioning hook only fires on loading
+        # /game/<id> itself, not on the JSON API.
+        page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
+        expect(panel(page)).to_be_visible(timeout=15_000)
+
+        baseline = get_game_data(page, coachboard_url, game_id)
+        regulation_keys = sorted(baseline['rotation']['innings'].keys(), key=float)
+        assert len(regulation_keys) >= 2
+
+        # A full-game plan built from exactly the regulation innings —
+        # created before the extra inning below exists, so it genuinely
+        # lacks it (the save endpoint pads UP to the regulation count but
+        # never removes/adds beyond what's submitted).
+        created = page.request.post(
+            f'{coachboard_url}/api/rotation-template/save',
+            data=json.dumps({
+                'title': 'Bonus Inning Integrity Full Game Plan',
+                'innings': {key: {} for key in regulation_keys},
+            }),
+            headers={'Content-Type': 'application/json'},
+        )
+        assert created.ok, created.text()
+        template = created.json()
+        template_id = template['id']
+
+        try:
+            # Load the page fresh now so the template is present in the
+            # initial gameData.rotation_templates the #rotationTemplateSelect
+            # dropdown is built from.
+            page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
+            expect(panel(page)).to_be_visible(timeout=15_000)
+
+            extra_inning = str(int(regulation_keys[-1]) + 1)
+            click_hidden(page, 'addInningBtn')
+            expect(save_status(page)).to_contain_text('Saved', timeout=10_000)
+
+            # Add Inning's own render already leaves the new inning's radio
+            # checked (game_logic.js's own doing), but only a genuine click
+            # transition fires the 'change' event this module listens for
+            # to move its own local `inning` selection — clicking an
+            # already-checked radio is a browser no-op. Select a different
+            # inning first so the click onto extra_inning is a real
+            # transition.
+            select_inning(page, regulation_keys[0])
+            expect(panel(page).locator('.pde-inning strong')).to_have_text(regulation_keys[0], timeout=10_000)
+            select_inning(page, extra_inning)
+            expect(panel(page).locator('.pde-inning strong')).to_have_text(extra_inning, timeout=10_000)
+
+            defense_options = page.get_by_role('button', name=re.compile('Defense Options'))
+            expect(defense_options).to_be_visible(timeout=10_000)
+            defense_options.click()
+            select = page.locator('#rotationTemplateSelect')
+            expect(select).to_be_visible(timeout=10_000)
+            select.select_option(value=str(template_id))
+
+            expect(save_status(page)).to_contain_text('Saved', timeout=10_000)
+
+            data = get_game_data(page, coachboard_url, game_id)
+            assert set(data['rotation']['innings'].keys()) == set(regulation_keys), (
+                'applying the full-game plan must replace the inning set with exactly the plan\'s innings'
+            )
+            assert extra_inning not in data['rotation']['innings']
+
+            assert displayed_inning(page) != extra_inning
+            assert displayed_inning(page) in set(regulation_keys)
+            assert extra_inning not in canonical_inning_keys(page), (
+                'the inning absent from the applied plan must not be recreated in CBPregameRotation'
+            )
+
+            page.locator('#rotationTemplateSelect').dispatch_event('change')
+            page.wait_for_timeout(1200)
+            choose_player(page, 'SS', 'Shortstop Shawn')
+            expect(save_status(page)).to_contain_text('Saved', timeout=10_000)
+
+            data = get_game_data(page, coachboard_url, game_id)
+            assert extra_inning not in data['rotation']['innings'], (
+                'the inning absent from the applied plan reappeared in the DB after further normal activity'
+            )
+        finally:
+            page.request.get(f'{coachboard_url}/delete_rotation/{template_id}')
+    finally:
+        cleanup(page, coachboard_url, game_id)

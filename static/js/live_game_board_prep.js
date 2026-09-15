@@ -15,6 +15,16 @@
   let busy = false;
   let refreshTimer = null;
 
+  // The rotation itself (id/title/innings/associated_game_id) and its save
+  // queue live in the shared CBPregameRotation store, not here — game_logic.js
+  // (Add/Remove/Clear Inning, Copy Previous, Paste, templates, the manual
+  // Save Rotation buttons) mutates the exact same object and shares the
+  // same queue, so a /save_rotation payload built by either module always
+  // reflects every edit made by both, never a stale per-module snapshot.
+  function defaultRotationTitle() {
+    return `Rotation for vs ${state?.game?.opponent || 'Opponent'}`;
+  }
+
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[ch]));
@@ -41,20 +51,47 @@
       .sort((a, b) => presetName(a).localeCompare(presetName(b)));
   }
 
+  // Reads the canonical rotation and keeps the locally-selected `inning`
+  // pointed at a real key — but never mutates the canonical structure to
+  // make that true. `notifyChange()` (from either module's edits, or from
+  // a fresh server snapshot) can fire, and this render path run, at any
+  // point relative to an inning having just been removed elsewhere; a
+  // stale `inning` here must be re-pointed at an existing inning, never
+  // used as an excuse to silently recreate the one that was removed.
+  // Creating a new inning key is exclusively an explicit user action
+  // (Add Inning/Sub-Inning in game_logic.js, or a real tap-to-assign edit
+  // once `inning` already names an existing key).
   function ensureRotation() {
-    if (!state.rotation) {
-      state.rotation = {
-        id: null,
-        title: `Rotation for vs ${state.game?.opponent || 'Opponent'}`,
-        innings: {'1': {}},
-        associated_game_id: gameId,
-      };
+    state.rotation = window.CBPregameRotation.getRotation(defaultRotationTitle());
+    reconcileInningSelection();
+  }
+
+  function reconcileInningSelection() {
+    const keys = Object.keys(state.rotation.innings || {});
+    if (!keys.length || keys.includes(inning)) return;
+
+    const checked = document.querySelector('input[name="inning-radio"]:checked')?.value;
+    if (checked && keys.includes(checked)) {
+      inning = checked;
+      return;
     }
-    if (typeof state.rotation.innings !== 'object' || !state.rotation.innings) {
-      state.rotation.innings = {'1': {}};
+
+    // Prefer the nearest remaining inning at or below the one that
+    // disappeared (e.g. Remove Last Inning should land one inning back),
+    // falling back to the earliest remaining inning.
+    const numericKeys = keys
+      .map(Number)
+      .filter((value) => Number.isFinite(value))
+      .sort((a, b) => a - b);
+    const target = Number(inning);
+    const atOrBelow = numericKeys.filter((value) => value <= target);
+    if (atOrBelow.length) {
+      inning = String(atOrBelow[atOrBelow.length - 1]);
+    } else if (numericKeys.length) {
+      inning = String(numericKeys[0]);
+    } else {
+      inning = keys[0];
     }
-    if (!Object.keys(state.rotation.innings).length) state.rotation.innings['1'] = {};
-    if (!state.rotation.innings[inning]) state.rotation.innings[inning] = {};
   }
 
   function alignment() {
@@ -154,6 +191,12 @@
       #${PANEL_ID} .pde-inning{background:#172033;color:#fff;border-radius:10px;min-width:68px;text-align:center;padding:7px 9px;flex:0 0 auto}
       #${PANEL_ID} .pde-inning small{display:block;font-size:.53rem;letter-spacing:.08em;opacity:.75;font-weight:750}
       #${PANEL_ID} .pde-inning strong{display:block;font-size:1.4rem;line-height:1.05}
+      #${PANEL_ID} .pde-save-status{display:none;align-items:center;font-size:.65rem;font-weight:800;margin-top:6px;color:#667085}
+      #${PANEL_ID} .pde-save-status[data-status="saving"],
+      #${PANEL_ID} .pde-save-status[data-status="saved"],
+      #${PANEL_ID} .pde-save-status[data-status="failed"]{display:flex}
+      #${PANEL_ID} .pde-save-status[data-status="saved"]{color:#176b38}
+      #${PANEL_ID} .pde-save-status[data-status="failed"]{color:#a63d3d;cursor:pointer;text-decoration:underline}
       #${PANEL_ID} .pde-body{padding:13px 16px 15px;background:#fff}
       #${PANEL_ID} .pde-tools{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;margin-bottom:12px}
       #${PANEL_ID} .pde-tools .btn,#${PANEL_ID} .pde-tools .form-select{min-height:42px;border-radius:9px}
@@ -357,6 +400,7 @@
           <div class="pde-kicker">Pregame Defense</div>
           <div class="pde-title">Set Inning ${esc(inning)}</div>
           <div class="pde-help">Tap a position to assign a player.</div>
+          <div class="pde-save-status" id="pde-save-status" data-status="idle"></div>
         </div>
         <div class="pde-inning"><small>INNING</small><strong>${esc(inning)}</strong></div>
       </div>
@@ -391,6 +435,11 @@
     presetSelect.addEventListener('change', () => { applyButton.disabled = !presetSelect.value; });
     applyButton.addEventListener('click', applyPreset);
     $('pde-save').addEventListener('click', openPresetModal);
+
+    $('pde-save-status')?.addEventListener('click', () => {
+      if (window.CBPregameRotation.getStatus() === 'failed') retryRotationSave();
+    });
+    applySaveStatusToDom();
   }
 
   function playerModal() {
@@ -415,7 +464,6 @@
   }
 
   function choosePlayer(pos) {
-    if (busy) return;
     const modal = playerModal();
     const source = alignment();
     const occupant = source[pos] || '';
@@ -449,9 +497,9 @@
               : 'On bench this inning'}</small>
         </button>`).join('')}`;
 
-    list.onclick = async (event) => {
+    list.onclick = (event) => {
       const choice = event.target.closest('.pde-choice');
-      if (!choice || busy) return;
+      if (!choice) return;
 
       const next = {...alignment()};
       let message = '';
@@ -493,44 +541,49 @@
       state.rotation.innings[inning] = next;
       bootstrap.Modal.getOrCreateInstance(modal).hide();
       render();
-      try {
-        await saveRotation();
-        toast(message);
-      } catch (error) {
-        toast(error.message, 'danger');
-        await refresh();
-      }
+      // Optimistic: describe the local change now rather than waiting on the
+      // network. Save outcome (including failure) is reported by the
+      // persistent save-status indicator, not by this toast.
+      toast(message);
+      saveRotation();
     };
 
     bootstrap.Modal.getOrCreateInstance(modal).show();
   }
 
-  async function saveRotation() {
-    if (busy) return;
-    busy = true;
-    try {
-      ensureRotation();
-      const response = await fetch('/save_rotation', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          id: state.rotation.id,
-          title: state.rotation.title || `Rotation for vs ${state.game?.opponent || 'Opponent'}`,
-          innings: state.rotation.innings,
-          associated_game_id: gameId,
-        }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || result.status === 'error') throw new Error(result.message || 'Unable to save defense.');
-      if (result.new_id) state.rotation.id = result.new_id;
-    } finally {
-      busy = false;
+  function applySaveStatusToDom() {
+    const el = $('pde-save-status');
+    if (!el) return;
+    const status = window.CBPregameRotation.getStatus();
+    const error = window.CBPregameRotation.getLastError();
+    el.dataset.status = status;
+    if (status === 'saving') {
+      el.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Saving…';
+    } else if (status === 'saved') {
+      el.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Saved';
+    } else if (status === 'failed') {
+      const detail = error?.message ? `: ${esc(error.message)}` : '';
+      el.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>Save failed${detail} — tap to retry`;
+    } else {
+      el.innerHTML = '';
     }
   }
 
-  async function applyPreset() {
+  // saveRotation()/retryRotationSave() both delegate to the shared store so
+  // the payload they send is always built from the one canonical rotation
+  // object game_logic.js's inning-structure toolbar mutates too — never a
+  // stale per-module snapshot.
+  function saveRotation() {
+    window.CBPregameRotation.commitLocalChange(defaultRotationTitle(), false);
+  }
+
+  function retryRotationSave() {
+    window.CBPregameRotation.retry(defaultRotationTitle(), false);
+  }
+
+  function applyPreset() {
     const select = $('pde-preset');
-    if (!select?.value || busy) return;
+    if (!select?.value) return;
     const preset = presets().find((item) => String(item.id) === String(select.value));
     const name = presetName(preset);
     if (!preset || !confirm(`Apply “${name}” to Inning ${inning}? Only this inning will be replaced.`)) return;
@@ -549,18 +602,13 @@
 
     state.rotation.innings[inning] = next;
     render();
-    try {
-      await saveRotation();
-      toast(
-        unavailable.length
-          ? `Preset applied. Open spots remain because ${[...new Set(unavailable)].join(', ')} is unavailable.`
-          : next.P ? `${name} applied to Inning ${inning}.` : `${name} applied. Choose the pitcher for Inning ${inning}.`,
-        unavailable.length ? 'warning' : 'success'
-      );
-    } catch (error) {
-      toast(error.message, 'danger');
-      await refresh();
-    }
+    toast(
+      unavailable.length
+        ? `Preset applied. Open spots remain because ${[...new Set(unavailable)].join(', ')} is unavailable.`
+        : next.P ? `${name} applied to Inning ${inning}.` : `${name} applied. Choose the pitcher for Inning ${inning}.`,
+      unavailable.length ? 'warning' : 'success'
+    );
+    saveRotation();
   }
 
   function presetModal() {
@@ -643,15 +691,48 @@
   }
 
   async function refresh() {
+    if (window.CBPregameRotation.isSaveInFlightOrQueued()) {
+      // A local defensive/structural edit (from either module) is still
+      // saving or queued to save; a stale server refresh right now would
+      // clobber it. Try again shortly once local saving has settled.
+      scheduleRefresh(300);
+      return;
+    }
+    if (window.CBPregameRotation.hasUnsyncedLocalState()) {
+      // The last edit failed to save. Stay put rather than discarding it —
+      // and do NOT reschedule ourselves here, or a permanently-failed save
+      // would poll forever. The save-status "tap to retry" control (or a
+      // further edit, which re-enters the queue above) is what moves this
+      // forward next, not this refresh.
+      return;
+    }
+
+    const revisionAtStart = window.CBPregameRotation.getLocalRevision();
+    // A separate, later-started refresh (from either module — a second
+    // scheduleRefresh() here, or game_logic.js's fetchLatestGameData())
+    // can return and apply before this one does. Local-edit revision
+    // checks alone don't change when a SERVER snapshot is accepted, so
+    // they can't detect that case; the shared token orders server
+    // refreshes against each other regardless of arrival order.
+    const refreshToken = window.CBPregameRotation.beginServerRefresh();
+
     try {
       const response = await fetch(`/api/game_data/${gameId}`, {cache: 'no-store'});
       if (!response.ok) throw new Error(`Unable to load defense (${response.status})`);
-      const previousInning = inning;
-      state = await response.json();
-      if (state.rotation && typeof state.rotation.innings === 'string') {
-        try { state.rotation.innings = JSON.parse(state.rotation.innings); }
-        catch (_) { state.rotation.innings = {'1': {}}; }
+      const freshState = await response.json();
+
+      // Re-validate right before applying: a save can have started, queued,
+      // failed, or a further edit (from either module) can have landed
+      // while this request was in flight. Any of those makes this response
+      // stale — discard it rather than clobbering whatever local state
+      // exists now. canApplyRefresh() also rejects this response if a
+      // refresh that started later has already been applied.
+      if (!window.CBPregameRotation.canApplyRefresh(revisionAtStart, refreshToken)) {
+        return;
       }
+
+      state = freshState;
+      window.CBPregameRotation.setFromServer(freshState.rotation, defaultRotationTitle(), refreshToken);
 
       if (isLiveNow()) {
         $(PANEL_ID)?.remove();
@@ -659,12 +740,10 @@
         return;
       }
 
+      // ensureRotation() (via reconcileInningSelection()) moves `inning` to
+      // a valid remaining key if the server's rotation no longer has the
+      // one this panel was viewing — without recreating it.
       ensureRotation();
-      const innings = Object.keys(state.rotation.innings).sort((a, b) => parseFloat(a) - parseFloat(b));
-      const checked = document.querySelector('input[name="inning-radio"]:checked')?.value;
-      inning = checked && innings.includes(checked)
-        ? checked
-        : (innings.includes(previousInning) ? previousInning : (innings[0] || '1'));
       filterWholeGameTemplates();
       render();
     } catch (error) {
@@ -678,6 +757,15 @@
   }
 
   function wire() {
+    // The shared rotation store notifies on every local edit from EITHER
+    // module (e.g. game_logic.js's Add Inning) and on every save-status
+    // change, so this panel stays in sync without waiting on a network
+    // refresh for either.
+    window.CBPregameRotation.onChange(() => {
+      if (!isLiveNow()) render();
+    });
+    window.CBPregameRotation.onStatusChange(() => applySaveStatusToDom());
+
     document.addEventListener('change', (event) => {
       const radio = event.target.closest?.('input[name="inning-radio"]');
       if (radio && !isLiveNow()) {
