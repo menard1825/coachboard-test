@@ -1,8 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, session, jsonify
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from werkzeug.security import generate_password_hash
-from werkzeug.utils import secure_filename
 import uuid
 import os
 import random
@@ -13,7 +12,7 @@ from functools import wraps
 from db import db
 from models import User, Team
 from extensions import socketio
-from utils import PITCHING_RULES, allowed_file
+from utils import PITCHING_RULES, LogoUploadRejected, MAX_LOGO_REQUEST_BYTES, read_and_validate_logo_upload
 
 # Define role constants
 SUPER_ADMIN = 'Super Admin'
@@ -471,7 +470,18 @@ def upload_logo():
     if not team:
         flash('Your team could not be found.', 'danger')
         return redirect(url_for('.admin_settings'))
-    
+
+    # Lightweight early check on the whole request's Content-Length, before
+    # touching request.files at all, so an obviously oversized multipart
+    # request can be rejected without parsing the form. This is a courtesy
+    # short-circuit, not the authoritative limit: it does nothing when
+    # Content-Length is absent, and the actual per-file byte limit is
+    # always enforced by the bounded stream read inside
+    # read_and_validate_logo_upload() regardless of this check.
+    if request.content_length is not None and request.content_length > MAX_LOGO_REQUEST_BYTES:
+        flash('That logo file is too large. The maximum size is 5 MB.', 'danger')
+        return redirect(url_for('.admin_settings'))
+
     if 'logo' not in request.files:
         flash('No file part in the request.', 'danger')
         return redirect(url_for('.admin_settings'))
@@ -481,30 +491,74 @@ def upload_logo():
         flash('No selected file.', 'danger')
         return redirect(url_for('.admin_settings'))
 
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        unique_id = uuid.uuid4().hex
-        file_ext = filename.rsplit('.', 1)[1].lower()
-        new_filename = f"{team.id}_{unique_id}.{file_ext}"
+    # Validate the upload completely before touching the existing logo file
+    # or team.logo_path -- a rejected/malformed upload must leave both
+    # exactly as they were.
+    try:
+        data, stored_ext = read_and_validate_logo_upload(file)
+    except LogoUploadRejected as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('.admin_settings'))
 
-        upload_folder = os.path.join('static', 'uploads', 'logos')
+    upload_folder = os.path.join('static', 'uploads', 'logos')
+    new_filename = f"{team.id}_{uuid.uuid4().hex}.{stored_ext}"
+    new_file_path = os.path.join(upload_folder, new_filename)
+    previous_logo_path = team.logo_path
+
+    # Directory creation and the write itself share one failure handler: if
+    # either step fails partway (e.g. disk full mid-write, leaving a
+    # partially written file on disk), best-effort remove whatever was
+    # created so a failed upload never leaves stray bytes behind. The old
+    # logo and team.logo_path are never touched by this block either way.
+    try:
         os.makedirs(upload_folder, exist_ok=True)
-        
-        if team.logo_path:
-            old_logo_path = os.path.join(upload_folder, team.logo_path)
-            if os.path.exists(old_logo_path):
-                os.remove(old_logo_path)
-        
-        file_path = os.path.join(upload_folder, new_filename)
-        file.save(file_path)
+        with open(new_file_path, 'wb') as new_file:
+            new_file.write(data)
+    except OSError:
+        current_app.logger.exception('Unable to save uploaded logo for team id %s', team.id)
+        if os.path.exists(new_file_path):
+            try:
+                os.remove(new_file_path)
+            except OSError:
+                current_app.logger.exception(
+                    'Unable to clean up a partially written logo upload for team id %s', team.id
+                )
+        flash('CoachBoard could not save that logo. Please try again.', 'danger')
+        return redirect(url_for('.admin_settings'))
+
+    try:
         team.logo_path = new_filename
         db.session.commit()
+    except Exception:
+        db.session.rollback()
+        if os.path.exists(new_file_path):
+            try:
+                os.remove(new_file_path)
+            except OSError:
+                current_app.logger.exception('Unable to clean up unsaved logo upload for team id %s', team.id)
+        current_app.logger.exception('Unable to record uploaded logo for team id %s', team.id)
+        flash('CoachBoard could not save that logo. Please try again.', 'danger')
+        return redirect(url_for('.admin_settings'))
 
-        flash('Team logo uploaded successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Team logo updated.'})
-    else:
-        flash('Invalid file type. Allowed types are: png, jpg, jpeg, gif, svg.', 'danger')
+    # Only remove the previous logo now that the new one is fully saved and
+    # committed -- never before, so a failure above always leaves the old
+    # logo intact. rollover_season() intentionally copies logo_path onto a
+    # newly created team, so multiple Team rows can legitimately share one
+    # physical logo file; only delete it if this was the last reference.
+    # An unlink failure here is best-effort and must not undo the
+    # already-successful replacement.
+    if previous_logo_path and previous_logo_path != new_filename:
+        still_referenced = db.session.query(Team).filter(Team.logo_path == previous_logo_path).first() is not None
+        if not still_referenced:
+            old_logo_path = os.path.join(upload_folder, previous_logo_path)
+            if os.path.exists(old_logo_path):
+                try:
+                    os.remove(old_logo_path)
+                except OSError:
+                    current_app.logger.exception('Unable to remove previous logo for team id %s', team.id)
 
+    flash('Team logo uploaded successfully!', 'success')
+    socketio.emit('data_updated', {'message': 'Team logo updated.'})
     return redirect(url_for('.admin_settings'))
 
 @admin_bp.route('/create_team', methods=['POST'])

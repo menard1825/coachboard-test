@@ -19,7 +19,7 @@ from models import (
 from extensions import socketio, migrate
 
 from utils import (
-    get_pitching_rules_for_team, calculate_cumulative_pitching_stats,
+    ALLOWED_LOGO_EXTENSIONS, get_pitching_rules_for_team, calculate_cumulative_pitching_stats,
     calculate_cumulative_position_stats, calculate_pitch_count_summary
 )
 
@@ -96,7 +96,7 @@ def create_app():
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_SECURE'] = _env_bool('SESSION_COOKIE_SECURE', runtime in {'production', 'prod'})
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
-    app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+    app.config['ALLOWED_EXTENSIONS'] = ALLOWED_LOGO_EXTENSIONS
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or (
         'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
     )

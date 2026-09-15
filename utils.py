@@ -1,9 +1,62 @@
 from datetime import date, timedelta, datetime
+import io
 import logging
+import warnings
 import zoneinfo
+
+from PIL import Image
+from werkzeug.utils import secure_filename
 
 
 logger = logging.getLogger(__name__)
+
+# --- Team logo upload validation -------------------------------------------
+#
+# This is the single authoritative source for which logo file types
+# CoachBoard accepts. app.py's ALLOWED_EXTENSIONS config is derived from
+# this set rather than hardcoding its own copy, so the two can never
+# disagree. SVG is intentionally excluded: a same-origin uploaded SVG is
+# served with Content-Type image/svg+xml, and a browser that navigates to
+# it directly (not just via <img>) will execute any embedded <script> --
+# a stored-XSS path that also bypasses this app's same-origin CSRF check.
+ALLOWED_LOGO_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+
+# Extension -> the Pillow format name the decoded bytes must match. Both
+# .jpg and .jpeg map to Pillow's 'JPEG'; there is deliberately no format
+# that maps from an extension we don't accept (svg, gif, ...).
+_LOGO_EXTENSION_TO_PILLOW_FORMAT = {'png': 'PNG', 'jpg': 'JPEG', 'jpeg': 'JPEG'}
+
+# Passed as Image.open(..., formats=...) on every open below, so Pillow
+# never even attempts to sniff/dispatch to any other registered plugin
+# (PSD, FITS, TIFF, EPS, GIF, WebP, ...) before CoachBoard's own format
+# check runs -- the decoder itself is restricted to what this app accepts,
+# not just the result checked afterward.
+_ALLOWED_PILLOW_FORMATS = ('PNG', 'JPEG')
+
+# Pillow format -> the canonical extension CoachBoard stores it under. The
+# original filename's extension is never used for the stored basename.
+_LOGO_PILLOW_FORMAT_TO_STORED_EXTENSION = {'PNG': 'png', 'JPEG': 'jpg'}
+
+MAX_LOGO_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MiB
+MAX_LOGO_DIMENSION = 4096
+MAX_LOGO_DECODED_PIXELS = 16_777_216  # 4096 * 4096
+
+# A lightweight early check on the *whole request's* Content-Length, used
+# by the route before it even touches request.files, so an obviously
+# oversized multipart request can be rejected without parsing the form at
+# all. This is not the authoritative limit -- it allows headroom for
+# multipart boundary/header overhead on top of the actual file, and it
+# does nothing when Content-Length is absent (e.g. chunked requests). The
+# real limit is the bounded stream read inside
+# read_and_validate_logo_upload(), which enforces MAX_LOGO_UPLOAD_BYTES
+# against the file's own bytes regardless of how the request got there.
+MAX_LOGO_REQUEST_BYTES = MAX_LOGO_UPLOAD_BYTES + 64 * 1024  # + multipart overhead headroom
+
+
+class LogoUploadRejected(Exception):
+    """Raised when an uploaded team logo fails validation. The message is
+    written to be shown to the end user as-is: never a filesystem path or
+    a library exception's internal text."""
 
 
 def model_to_dict(obj):
@@ -85,8 +138,72 @@ PITCHING_RULES = {
 
 
 def allowed_file(filename):
-    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_LOGO_EXTENSIONS
+
+
+def read_and_validate_logo_upload(file_storage):
+    """Validate an uploaded team logo end-to-end and return (data, stored_extension).
+
+    The submitted filename and the browser-supplied MIME type are never
+    trusted as the security decision -- the extension is only checked for
+    agreement with what the bytes actually decode as via Pillow. Reads at
+    most MAX_LOGO_UPLOAD_BYTES + 1 bytes so an oversized upload is rejected
+    without ever buffering it in full.
+
+    Raises LogoUploadRejected (safe to show directly to the user) on any
+    failure. The caller must not touch the existing logo file or
+    team.logo_path until this has returned successfully.
+    """
+    filename = file_storage.filename or ''
+    safe_name = secure_filename(filename)
+    if not safe_name or not allowed_file(safe_name):
+        raise LogoUploadRejected('Invalid file type. Allowed types are: png, jpg, jpeg.')
+
+    submitted_ext = safe_name.rsplit('.', 1)[1].lower()
+    expected_format = _LOGO_EXTENSION_TO_PILLOW_FORMAT[submitted_ext]
+
+    data = file_storage.stream.read(MAX_LOGO_UPLOAD_BYTES + 1)
+    if not data:
+        raise LogoUploadRejected('No file was uploaded.')
+    if len(data) > MAX_LOGO_UPLOAD_BYTES:
+        raise LogoUploadRejected('That logo file is too large. The maximum size is 5 MB.')
+
+    # Cheap header-only parse first: get the claimed format and dimensions
+    # without decoding any pixel data, so an oversized image is rejected
+    # before any expensive/memory-risky full decode is ever attempted.
+    try:
+        with Image.open(io.BytesIO(data), formats=_ALLOWED_PILLOW_FORMATS) as probe:
+            decoded_format = probe.format
+            width, height = probe.size
+    except Exception:
+        raise LogoUploadRejected('That file is not a valid PNG or JPEG image.')
+
+    if decoded_format not in _LOGO_PILLOW_FORMAT_TO_STORED_EXTENSION:
+        raise LogoUploadRejected('Only PNG and JPEG logos are supported.')
+    if decoded_format != expected_format:
+        raise LogoUploadRejected('The file contents do not match its file extension.')
+    if width > MAX_LOGO_DIMENSION or height > MAX_LOGO_DIMENSION or width * height > MAX_LOGO_DECODED_PIXELS:
+        raise LogoUploadRejected(
+            f'That image is too large. Maximum size is {MAX_LOGO_DIMENSION}x{MAX_LOGO_DIMENSION} pixels.'
+        )
+
+    # Only now -- once the claimed dimensions are already known to be
+    # within limits -- force a full decode to catch truncation/corruption
+    # that a header-only parse can miss. Pillow's own decompression-bomb
+    # protection is a Python warning by default; escalate it to an
+    # exception so it fails closed here too, even though our explicit
+    # dimension/pixel checks above are what actually keep this call safe.
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(data), formats=_ALLOWED_PILLOW_FORMATS) as verify_image:
+                verify_image.verify()
+            with Image.open(io.BytesIO(data), formats=_ALLOWED_PILLOW_FORMATS) as load_image:
+                load_image.load()
+    except Exception:
+        raise LogoUploadRejected('That file is not a valid PNG or JPEG image.')
+
+    return data, _LOGO_PILLOW_FORMAT_TO_STORED_EXTENSION[decoded_format]
 
 
 def get_pitching_rules_for_team(team):

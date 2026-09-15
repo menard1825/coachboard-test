@@ -171,7 +171,7 @@
                     <p>Current Logo:</p>
                     {% if settings.logo_path %}<img src="{{ url_for('static', filename='uploads/logos/' + settings.logo_path) }}" alt="Team Logo" class="img-thumbnail mb-3" style="max-height: 150px;">{% else %}<p class="text-muted">No custom logo uploaded.</p>{% endif %}
                     <form action="{{ url_for('admin.upload_logo') }}" method="POST" enctype="multipart/form-data">
-                        <div class="mb-3"><label for="logo" class="form-label">Upload New Logo</label><input class="form-control" type="file" id="logo" name="logo" required><div class="form-text">Allowed types: png, jpg, gif, svg.</div></div>
+                        <div class="mb-3"><label for="logo" class="form-label">Upload New Logo</label><input class="form-control" type="file" id="logo" name="logo" required><div class="form-text">Allowed types: png, jpg, jpeg.</div></div>
                         <button type="submit" class="btn btn-primary w-100">Upload Logo</button>
                     </form>
                 </div>
