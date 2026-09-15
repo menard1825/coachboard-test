@@ -174,8 +174,12 @@ def test_legacy_refresh_stale_response_does_not_overwrite_successful_edit(page: 
         assert not baseline['rotation']['innings']['1'].get('SS')
 
         held_routes = []
+        auto_continue = {'flag': False}
 
         def hold_game_data(route):
+            if auto_continue['flag']:
+                route.continue_()
+                return
             # Leave unresolved until released below; blocking here would
             # stall Playwright's single callback-dispatch thread.
             held_routes.append(route)
@@ -191,17 +195,35 @@ def test_legacy_refresh_stale_response_does_not_overwrite_successful_edit(page: 
                 'expected the real data_updated socket event to have started a held /api/game_data request'
             )
 
+            # The one route captured before the edit — this is specifically
+            # what a request that started before the edit would have
+            # actually received, and the only one this test means to feed
+            # the stale snapshot to.
+            first_stale_route = held_routes[0]
+
             # A real field edit, made and fully saved while that fetch is
             # still outstanding.
             choose_player(page, 'SS', 'Shortstop Shawn')
             expect(save_status(page)).to_contain_text('Saved', timeout=10_000)
 
-            # Release the held response(s) now, with the OLD (pre-edit)
-            # snapshot captured above — exactly what a request that
-            # started before the edit would have actually received.
-            page.unroute(f'**/api/game_data/{game_id}')
-            for route in held_routes:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(baseline))
+            # That save's own success broadcasts a global 'rotation_save'
+            # socket event; game_logic.js's guarded handler for it can
+            # start a SECOND, entirely legitimate refresh once nothing is
+            # in flight — which lands in held_routes too. Switch the
+            # handler to auto-continue anything arriving from here on
+            # BEFORE resolving anything (unrouting first would let
+            # Playwright auto-continue still-pending routes on its own,
+            # racing an explicit resolve and risking "Route is already
+            # handled"), pass any such extra already-captured route
+            # through with the real current server response, and feed the
+            # stale snapshot to exactly the one route captured before the
+            # edit — never to a route that started after it.
+            extra_routes = [route for route in held_routes if route is not first_stale_route]
+            auto_continue['flag'] = True
+            for route in extra_routes:
+                response = route.fetch()
+                route.fulfill(response=response)
+            first_stale_route.fulfill(status=200, content_type='application/json', body=json.dumps(baseline))
             page.wait_for_timeout(800)
 
             assert canonical_innings(page)['1'].get('SS') == 'Shortstop Shawn', (
@@ -256,8 +278,12 @@ def test_legacy_refresh_started_during_inflight_save_does_not_overwrite_it(page:
         assert held_save['route'] is not None, 'expected the field edit to have started a held /save_rotation request'
 
         held_game_data = []
+        auto_continue_game_data = {'flag': False}
 
         def hold_game_data(route):
+            if auto_continue_game_data['flag']:
+                route.continue_()
+                return
             held_game_data.append(route)
 
         page.route(f'**/api/game_data/{game_id}', hold_game_data)
@@ -273,18 +299,38 @@ def test_legacy_refresh_started_during_inflight_save_does_not_overwrite_it(page:
             assert held_game_data, (
                 'expected data_updated to have started a held /api/game_data request while the save was in flight'
             )
+            # The one route captured while the save was still in flight —
+            # the only one this test means to feed the stale snapshot to.
+            first_stale_route = held_game_data[0]
 
             # Now let the in-flight save complete successfully — by the
             # time the held game-data response is released below, every
             # response-time-only check (not in flight, revision unchanged,
-            # nothing unsynced) would look safe again.
-            page.unroute('**/save_rotation')
+            # nothing unsynced) would look safe again. hold_save() already
+            # auto-continues anything else via its own else-branch, so no
+            # unroute is needed before this resolve.
             held_save['route'].continue_()
             expect(save_status(page)).to_contain_text('Saved', timeout=10_000)
 
-            page.unroute(f'**/api/game_data/{game_id}')
-            for route in held_game_data:
-                route.fulfill(status=200, content_type='application/json', body=json.dumps(baseline))
+            # That save's own success broadcasts a global 'rotation_save'
+            # socket event; game_logic.js's guarded handler for it can
+            # start a SECOND, entirely legitimate refresh once nothing is
+            # in flight — which lands in held_game_data too. Switch the
+            # handler to auto-continue anything arriving from here on
+            # BEFORE resolving anything (unrouting first would let
+            # Playwright auto-continue still-pending routes on its own,
+            # racing an explicit resolve and risking "Route is already
+            # handled"), pass any such extra already-captured route
+            # through with the real current server response, and feed the
+            # stale snapshot to exactly the one route captured while the
+            # save was in flight — never to a route that started after it
+            # completed.
+            extra_routes = [route for route in held_game_data if route is not first_stale_route]
+            auto_continue_game_data['flag'] = True
+            for route in extra_routes:
+                response = route.fetch()
+                route.fulfill(response=response)
+            first_stale_route.fulfill(status=200, content_type='application/json', body=json.dumps(baseline))
             page.wait_for_timeout(800)
 
             assert canonical_innings(page)['1'].get('SS') == 'Shortstop Shawn', (

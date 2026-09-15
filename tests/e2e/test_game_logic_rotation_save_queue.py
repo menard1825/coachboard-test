@@ -346,7 +346,11 @@ def test_rotation_save_socket_refresh_ignored_during_inflight_then_resumes(page:
         # Still saving (not reset by a socket-triggered refresh mid-flight).
         expect(page.locator('#saveRotationBtn')).to_contain_text('Saving')
 
-        page.unroute('**/save_rotation')
+        # Resolve the already-captured route while its handler is still
+        # installed (it already auto-continues anything else via the
+        # else-branch above) — unrouting first would let Playwright
+        # auto-continue this pending route on its own, racing the explicit
+        # continue_() below and risking "Route is already handled".
         held['route'].continue_()
         expect(page.locator('#saveRotationBtn')).to_contain_text('Saved', timeout=15_000)
     finally:
