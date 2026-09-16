@@ -327,3 +327,92 @@ def test_roster_api_exposes_guest_status(monkeypatch):
     )
 
     assert guest['is_guest'] is True
+
+
+def test_add_player_ajax_returns_json_when_live_game_locks_roster(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game, Player
+
+    with app.app_context():
+        db.session.add(Game(
+            date=datetime.now(),
+            opponent='Live Opponent',
+            is_live=True,
+            team_id=1,
+        ))
+        db.session.commit()
+
+    response = client.post(
+        '/add_player',
+        data={
+            'name': 'Blocked AJAX Player',
+            'number': '99',
+            'pitcher_role': 'Not a Pitcher',
+            'roster_status': 'regular',
+        },
+        headers={'X-Requested-With': 'XMLHttpRequest'},
+    )
+
+    assert response.status_code == 409
+    assert response.is_json
+    assert response.get_json() == {
+        'status': 'error',
+        'code': 'live_roster_locked',
+        'message': (
+            'Roster changes are locked while the game vs Live Opponent is live. '
+            'End the live game before changing players or Guest status.'
+        ),
+    }
+
+    with app.app_context():
+        assert db.session.query(Player).filter_by(
+            team_id=1,
+            name='Blocked AJAX Player',
+        ).count() == 0
+
+
+def test_add_player_normal_submit_keeps_redirect_when_live_game_locks_roster(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import Game, Player
+
+    with app.app_context():
+        db.session.add(Game(
+            date=datetime.now(),
+            opponent='Live Opponent',
+            is_live=True,
+            team_id=1,
+        ))
+        db.session.commit()
+
+    response = client.post('/add_player', data={
+        'name': 'Blocked Form Player',
+        'number': '98',
+        'pitcher_role': 'Not a Pitcher',
+        'roster_status': 'regular',
+    })
+
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith('/#roster')
+
+    with client.session_transaction() as flask_session:
+        flashes = flask_session.get('_flashes', [])
+
+    assert flashes == [(
+        'warning',
+        'Roster changes are locked while the game vs Live Opponent is live. '
+        'End the live game before changing players or Guest status.',
+    )]
+
+    with app.app_context():
+        assert db.session.query(Player).filter_by(
+            team_id=1,
+            name='Blocked Form Player',
+        ).count() == 0
