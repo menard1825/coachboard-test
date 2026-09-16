@@ -138,6 +138,35 @@ def open_live_game(page: Page, coachboard_url: str, game_id: int):
     expect(page.locator(SWITCHER)).to_be_visible(timeout=15_000)
 
 
+def cleanup_game(page: Page, coachboard_url: str, game_id: int):
+    """End and delete the game this test started.
+
+    Every test in this file puts a game live, and one live game anywhere on
+    the team locks the roster for the whole session: roster.py add_player
+    checks _active_live_game_for_team() before it checks X-Requested-With, so
+    it answers AJAX callers with a redirect to the home page instead of JSON.
+    A game left live here therefore breaks unrelated tests that add players.
+    """
+    state = page.request.get(
+        f'{coachboard_url}/api/live-game/{game_id}/state'
+    )
+
+    if state.ok and state.json().get('game', {}).get('is_live'):
+        page.request.post(
+            f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
+            data={
+                'defer_pitching': True,
+                'end_reason': 'manual',
+                'current_inning_played': True,
+            },
+        )
+
+    page.request.post(
+        f'{coachboard_url}/game-day/{game_id}/delete',
+        headers={'Accept': 'application/json'},
+    )
+
+
 def tab(page: Page, name: str):
     return page.locator(SWITCHER).locator(f'[data-now-next="{name}"]')
 
@@ -147,30 +176,33 @@ def test_pregame_plan_tab_renders_every_planned_inning(page: Page, coachboard_ur
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
 
-    open_live_game(page, coachboard_url, game_id)
+    try:
+        open_live_game(page, coachboard_url, game_id)
 
-    expect(tab(page, 'plan')).to_have_text('Pregame Plan')
-    tab(page, 'plan').click()
+        expect(tab(page, 'plan')).to_have_text('Pregame Plan')
+        tab(page, 'plan').click()
 
-    plan = page.locator(PLAN_CARD)
-    expect(plan).to_be_visible(timeout=10_000)
-    expect(plan).to_contain_text('Pregame Defense')
-    expect(plan).to_contain_text('Reference only')
+        plan = page.locator(PLAN_CARD)
+        expect(plan).to_be_visible(timeout=10_000)
+        expect(plan).to_contain_text('Pregame Defense')
+        expect(plan).to_contain_text('Reference only')
 
-    innings = plan.locator('.cb-plan-inning')
-    expect(innings).to_have_count(3)
-    expect(innings.nth(0)).to_contain_text('Inning 1')
-    expect(innings.nth(1)).to_contain_text('Inning 2')
-    expect(innings.nth(2)).to_contain_text('Inning 3')
+        innings = plan.locator('.cb-plan-inning')
+        expect(innings).to_have_count(3)
+        expect(innings.nth(0)).to_contain_text('Inning 1')
+        expect(innings.nth(1)).to_contain_text('Inning 2')
+        expect(innings.nth(2)).to_contain_text('Inning 3')
 
-    # The plan as written, not the live alignment: inning 2 planned Second Sam
-    # on the mound and Pitcher Pat at second.
-    expect(innings.nth(1)).to_contain_text('Second Sam')
-    expect(innings.nth(1)).to_contain_text('Pitcher Pat')
+        # The plan as written, not the live alignment: inning 2 planned
+        # Second Sam on the mound and Pitcher Pat at second.
+        expect(innings.nth(1)).to_contain_text('Second Sam')
+        expect(innings.nth(1)).to_contain_text('Pitcher Pat')
 
-    # The inning actually being played is called out.
-    expect(innings.nth(0)).to_contain_text('On now')
-    expect(innings.nth(1)).not_to_contain_text('On now')
+        # The inning actually being played is called out.
+        expect(innings.nth(0)).to_contain_text('On now')
+        expect(innings.nth(1)).not_to_contain_text('On now')
+    finally:
+        cleanup_game(page, coachboard_url, game_id)
 
 
 def test_pregame_plan_tab_offers_no_way_to_edit(page: Page, coachboard_url: str):
@@ -178,26 +210,29 @@ def test_pregame_plan_tab_offers_no_way_to_edit(page: Page, coachboard_url: str)
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
 
-    open_live_game(page, coachboard_url, game_id)
-    tab(page, 'plan').click()
+    try:
+        open_live_game(page, coachboard_url, game_id)
+        tab(page, 'plan').click()
 
-    plan = page.locator(PLAN_CARD)
-    expect(plan).to_be_visible(timeout=10_000)
+        plan = page.locator(PLAN_CARD)
+        expect(plan).to_be_visible(timeout=10_000)
 
-    for selector in (
-        'button',
-        'input',
-        'select',
-        'textarea',
-        '[contenteditable="true"]',
-        '[data-next-position]',
-        '[data-next-player]',
-        '[data-pde-pos]',
-    ):
-        expect(plan.locator(selector)).to_have_count(0)
+        for selector in (
+            'button',
+            'input',
+            'select',
+            'textarea',
+            '[contenteditable="true"]',
+            '[data-next-position]',
+            '[data-next-player]',
+            '[data-pde-pos]',
+        ):
+            expect(plan.locator(selector)).to_have_count(0)
 
-    # The live Undo control cannot act while a reference view is open.
-    expect(page.locator('#liveUndoBtn')).to_be_disabled()
+        # The live Undo control cannot act while a reference view is open.
+        expect(page.locator('#liveUndoBtn')).to_be_disabled()
+    finally:
+        cleanup_game(page, coachboard_url, game_id)
 
 
 def test_visiting_pregame_plan_leaves_the_other_boards_untouched(page: Page, coachboard_url: str):
@@ -205,45 +240,48 @@ def test_visiting_pregame_plan_leaves_the_other_boards_untouched(page: Page, coa
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
 
-    open_live_game(page, coachboard_url, game_id)
+    try:
+        open_live_game(page, coachboard_url, game_id)
 
-    # Settle the prep row first, so the comparison below is not just picking
-    # up the row this endpoint creates on its own first read.
-    get_prep(page, coachboard_url, game_id)
+        # Settle the prep row first, so the comparison below is not just
+        # picking up the row this endpoint creates on its own first read.
+        get_prep(page, coachboard_url, game_id)
 
-    tab(page, 'next').click()
-    next_board = page.locator(NEXT_CARD)
-    expect(next_board).to_be_visible(timeout=10_000)
-    next_before = next_board.inner_html()
+        tab(page, 'next').click()
+        next_board = page.locator(NEXT_CARD)
+        expect(next_board).to_be_visible(timeout=10_000)
+        next_before = next_board.inner_html()
 
-    tab(page, 'now').click()
-    field_board = page.locator('#cbQuickDefense')
-    expect(field_board).to_be_visible(timeout=10_000)
-    field_before = field_board.inner_html()
+        tab(page, 'now').click()
+        field_board = page.locator('#cbQuickDefense')
+        expect(field_board).to_be_visible(timeout=10_000)
+        field_before = field_board.inner_html()
 
-    prep_before = get_prep(page, coachboard_url, game_id)
+        prep_before = get_prep(page, coachboard_url, game_id)
 
-    tab(page, 'plan').click()
-    expect(page.locator(PLAN_CARD)).to_be_visible(timeout=10_000)
-    expect(field_board).to_be_hidden()
-    expect(next_board).to_be_hidden()
+        tab(page, 'plan').click()
+        expect(page.locator(PLAN_CARD)).to_be_visible(timeout=10_000)
+        expect(field_board).to_be_hidden()
+        expect(next_board).to_be_hidden()
 
-    tab(page, 'now').click()
-    expect(field_board).to_be_visible(timeout=10_000)
-    assert field_board.inner_html() == field_before, (
-        'On the Field changed after a visit to Pregame Plan'
-    )
+        tab(page, 'now').click()
+        expect(field_board).to_be_visible(timeout=10_000)
+        assert field_board.inner_html() == field_before, (
+            'On the Field changed after a visit to Pregame Plan'
+        )
 
-    tab(page, 'next').click()
-    expect(next_board).to_be_visible(timeout=10_000)
-    assert next_board.inner_html() == next_before, (
-        'Next Inning changed after a visit to Pregame Plan'
-    )
+        tab(page, 'next').click()
+        expect(next_board).to_be_visible(timeout=10_000)
+        assert next_board.inner_html() == next_before, (
+            'Next Inning changed after a visit to Pregame Plan'
+        )
 
-    # Viewing a reference tab must not have written anything.
-    prep_after = get_prep(page, coachboard_url, game_id)
-    assert prep_after['confirmed'] == prep_before['confirmed']
-    assert prep_after['pregame_rotation'] == prep_before['pregame_rotation']
+        # Viewing a reference tab must not have written anything.
+        prep_after = get_prep(page, coachboard_url, game_id)
+        assert prep_after['confirmed'] == prep_before['confirmed']
+        assert prep_after['pregame_rotation'] == prep_before['pregame_rotation']
+    finally:
+        cleanup_game(page, coachboard_url, game_id)
 
 
 def test_pregame_plan_tab_shows_an_empty_state_without_a_saved_plan(page: Page, coachboard_url: str):
@@ -279,6 +317,7 @@ def test_pregame_plan_tab_shows_an_empty_state_without_a_saved_plan(page: Page, 
         expect(plan.locator('.cb-plan-inning')).to_have_count(0)
     finally:
         page.unroute('**/next-inning-prep')
+        cleanup_game(page, coachboard_url, game_id)
 
 
 def test_three_tab_switcher_fits_a_phone_without_clipping(page: Page, coachboard_url: str):
@@ -289,49 +328,52 @@ def test_three_tab_switcher_fits_a_phone_without_clipping(page: Page, coachboard
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
 
-    open_live_game(page, coachboard_url, game_id)
+    try:
+        open_live_game(page, coachboard_url, game_id)
 
-    for name in ('now', 'next', 'plan'):
-        expect(tab(page, name)).to_be_visible()
+        for name in ('now', 'next', 'plan'):
+            expect(tab(page, name)).to_be_visible()
 
-    measurements = page.locator(SWITCHER).evaluate(
-        """
-        (switcher) => {
-            const doc = document.documentElement;
-            return {
-                horizontalOverflow: doc.scrollWidth > doc.clientWidth,
-                buttons: [...switcher.querySelectorAll('[data-now-next]')].map((button) => {
-                    const range = document.createRange();
-                    range.selectNodeContents(button);
-                    return {
-                        label: button.textContent.trim(),
-                        lineCount: range.getClientRects().length,
-                        overflows: button.scrollWidth > button.clientWidth + 1,
-                        height: Math.round(button.getBoundingClientRect().height),
-                    };
-                }),
-            };
-        }
-        """
-    )
-
-    labels = [button['label'] for button in measurements['buttons']]
-    assert labels == ['On the Field', 'Next Inning', 'Pregame Plan'], labels
-
-    for button in measurements['buttons']:
-        assert button['lineCount'] == 1, (
-            f"{button['label']!r} wrapped onto {button['lineCount']} lines at 390px"
-        )
-        assert not button['overflows'], (
-            f"{button['label']!r} overflows its button at 390px"
-        )
-        assert button['height'] >= 42, (
-            f"{button['label']!r} tap target shrank to {button['height']}px"
+        measurements = page.locator(SWITCHER).evaluate(
+            """
+            (switcher) => {
+                const doc = document.documentElement;
+                return {
+                    horizontalOverflow: doc.scrollWidth > doc.clientWidth,
+                    buttons: [...switcher.querySelectorAll('[data-now-next]')].map((button) => {
+                        const range = document.createRange();
+                        range.selectNodeContents(button);
+                        return {
+                            label: button.textContent.trim(),
+                            lineCount: range.getClientRects().length,
+                            overflows: button.scrollWidth > button.clientWidth + 1,
+                            height: Math.round(button.getBoundingClientRect().height),
+                        };
+                    }),
+                };
+            }
+            """
         )
 
-    assert not measurements['horizontalOverflow'], (
-        'the switcher pushed the page into horizontal scrolling at 390px'
-    )
+        labels = [button['label'] for button in measurements['buttons']]
+        assert labels == ['On the Field', 'Next Inning', 'Pregame Plan'], labels
+
+        for button in measurements['buttons']:
+            assert button['lineCount'] == 1, (
+                f"{button['label']!r} wrapped onto {button['lineCount']} lines at 390px"
+            )
+            assert not button['overflows'], (
+                f"{button['label']!r} overflows its button at 390px"
+            )
+            assert button['height'] >= 42, (
+                f"{button['label']!r} tap target shrank to {button['height']}px"
+            )
+
+        assert not measurements['horizontalOverflow'], (
+            'the switcher pushed the page into horizontal scrolling at 390px'
+        )
+    finally:
+        cleanup_game(page, coachboard_url, game_id)
 
 
 def test_on_the_field_and_next_inning_still_work_alongside_the_new_tab(page: Page, coachboard_url: str):
@@ -339,19 +381,22 @@ def test_on_the_field_and_next_inning_still_work_alongside_the_new_tab(page: Pag
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
 
-    open_live_game(page, coachboard_url, game_id)
+    try:
+        open_live_game(page, coachboard_url, game_id)
 
-    expect(page.locator(SWITCHER).locator('[data-now-next]')).to_have_count(3)
+        expect(page.locator(SWITCHER).locator('[data-now-next]')).to_have_count(3)
 
-    expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=10_000)
+        expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=10_000)
 
-    tab(page, 'next').click()
-    next_board = page.locator(NEXT_CARD)
-    expect(next_board).to_be_visible(timeout=10_000)
-    expect(next_board).to_contain_text('NEXT INNING · 2')
-    expect(page.locator(PLAN_CARD)).to_be_hidden()
+        tab(page, 'next').click()
+        next_board = page.locator(NEXT_CARD)
+        expect(next_board).to_be_visible(timeout=10_000)
+        expect(next_board).to_contain_text('NEXT INNING · 2')
+        expect(page.locator(PLAN_CARD)).to_be_hidden()
 
-    tab(page, 'now').click()
-    expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=10_000)
-    expect(next_board).to_be_hidden()
-    expect(page.locator(PLAN_CARD)).to_be_hidden()
+        tab(page, 'now').click()
+        expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=10_000)
+        expect(next_board).to_be_hidden()
+        expect(page.locator(PLAN_CARD)).to_be_hidden()
+    finally:
+        cleanup_game(page, coachboard_url, game_id)
