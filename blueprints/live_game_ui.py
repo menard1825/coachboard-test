@@ -188,12 +188,18 @@ def _next_inning_context(game, team):
         db.session.add(prep)
         db.session.commit()
 
+    # pregame_rotation is the plan as it was written before first pitch.
+    # _planned_rotation already hands _actual_rotation its own deep copy to
+    # apply events onto, so rotation.innings here is still pristine; copying
+    # again keeps the response from aliasing the ORM attribute either way.
     return (
         current_inning,
         next_inning,
         current_alignment,
         planned_alignment,
         prep,
+        deepcopy(rotation.innings or {}) if rotation else {},
+        deepcopy(actual_rotation),
     )
 
 
@@ -216,13 +222,23 @@ def next_inning_prep(game_id):
                 'next_inning': _next_inning_key(game.live_current_inning or '1'),
                 'current_alignment': {},
                 'planned_alignment': {},
+                'pregame_rotation': {},
+                'actual_rotation': {},
                 'confirmed': None,
                 'roster': [],
                 'outfielder_count': team.outfielder_count,
             })
         return jsonify({'status': 'error', 'message': 'Game is not live.'}), 409
 
-    current_inning, next_inning, current_alignment, planned_alignment, prep = _next_inning_context(game, team)
+    (
+        current_inning,
+        next_inning,
+        current_alignment,
+        planned_alignment,
+        prep,
+        pregame_rotation,
+        actual_rotation,
+    ) = _next_inning_context(game, team)
     if not next_inning:
         return jsonify({'status': 'error', 'message': 'Current inning is invalid.'}), 409
 
@@ -303,7 +319,11 @@ def next_inning_prep(game_id):
         'current_inning': current_inning,
         'next_inning': next_inning,
         'current_alignment': current_alignment,
+        # planned_alignment stays the plan for the upcoming inning only.
+        # The two below are whole-game reference data for Pregame Plan.
         'planned_alignment': planned_alignment,
+        'pregame_rotation': pregame_rotation,
+        'actual_rotation': actual_rotation,
         'confirmed': _prep_dict(prep),
         'roster': [
             {

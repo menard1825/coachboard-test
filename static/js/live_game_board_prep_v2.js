@@ -7,6 +7,7 @@
   const gameId = Number(match[1]);
 
   const CARD_ID = 'live-board-prep-v3';
+  const PLAN_CARD_ID = 'live-board-pregame-plan';
   const SWITCH_ID = 'cb-now-next-switch';
   const STYLE_ID = 'live-next-defense-styles';
 
@@ -378,7 +379,7 @@
     style.textContent = `
       #${SWITCH_ID}{
         display:grid;
-        grid-template-columns:1fr 1fr;
+        grid-template-columns:1fr 1fr 1fr;
         gap:4px;
         padding:4px;
         margin:0 0 8px;
@@ -387,19 +388,167 @@
         background:#e9edf2;
       }
 
+      /* Three labelled tabs are much tighter than the old two, so the
+         buttons give back some horizontal padding and a little type size
+         to keep "On the Field" on one line at phone width. */
       #${SWITCH_ID} .btn{
         min-height:42px;
+        padding:6px 6px;
         border:0!important;
         border-radius:9px!important;
         background:transparent;
         color:#475467;
+        font-size:.85rem;
         font-weight:900;
+        line-height:1.2;
         box-shadow:none!important;
       }
 
       #${SWITCH_ID} .btn.active{
         background:#172033!important;
         color:#fff!important;
+      }
+
+      #${PLAN_CARD_ID}{
+        border:1.5px solid #cfd6df;
+        border-radius:14px;
+        background:#fff;
+        overflow:hidden;
+        margin:0 0 10px;
+        box-shadow:0 2px 7px rgba(16,24,40,.08);
+      }
+
+      #${PLAN_CARD_ID}[hidden]{
+        display:none!important;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-head{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:10px;
+        padding:11px 12px 9px;
+        border-bottom:1px solid #e7ebef;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-kicker{
+        color:#667085;
+        font-size:.6rem;
+        font-weight:900;
+        text-transform:uppercase;
+        letter-spacing:.09em;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-title{
+        color:#172033;
+        font-size:1.05rem;
+        line-height:1.15;
+        font-weight:900;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-sub{
+        margin-top:2px;
+        color:#667085;
+        font-size:.67rem;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-readonly{
+        flex:0 0 auto;
+        padding:5px 9px;
+        border:1px solid #e4c46d;
+        border-radius:999px;
+        background:#fff8e7;
+        color:#8b5c00;
+        font-size:.62rem;
+        font-weight:850;
+        white-space:nowrap;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-body{
+        padding:10px 11px 11px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-empty{
+        padding:18px 12px;
+        border:1px dashed #d6dce4;
+        border-radius:10px;
+        background:#fafbfc;
+        color:#667085;
+        font-size:.8rem;
+        text-align:center;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning{
+        margin-bottom:9px;
+        padding:9px 10px 10px;
+        border:1px solid #e3e7ec;
+        border-radius:10px;
+        background:#fafbfc;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning:last-child{
+        margin-bottom:0;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning.current{
+        border:2px solid #315d98;
+        background:#f3f7fd;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-head{
+        display:flex;
+        align-items:baseline;
+        gap:8px;
+        margin-bottom:7px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-no{
+        color:#172033;
+        font-size:.86rem;
+        font-weight:900;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-now{
+        padding:2px 7px;
+        border-radius:999px;
+        background:#172033;
+        color:#fff;
+        font-size:.56rem;
+        font-weight:900;
+        letter-spacing:.07em;
+        text-transform:uppercase;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-grid{
+        display:grid;
+        grid-template-columns:repeat(auto-fill,minmax(94px,1fr));
+        gap:6px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-slot{
+        padding:5px 7px;
+        border:1px solid #dce1e5;
+        border-radius:8px;
+        background:#fff;
+        min-width:0;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-pos{
+        display:block;
+        color:#7b8492;
+        font-size:.55rem;
+        font-weight:900;
+        letter-spacing:.06em;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-name{
+        display:block;
+        margin-top:1px;
+        color:#172033;
+        font-size:.68rem;
+        font-weight:800;
+        line-height:1.12;
+        overflow-wrap:anywhere;
       }
 
       #${CARD_ID}{
@@ -849,7 +998,7 @@
       );
       switcher.setAttribute(
         'aria-label',
-        'Defense on the field and next inning'
+        'Defense on the field, next inning, and the pregame plan'
       );
 
       switcher.innerHTML = `
@@ -862,7 +1011,12 @@
           type="button"
           class="btn"
           data-now-next="next"
-        >Next Inning</button>`;
+        >Next Inning</button>
+        <button
+          type="button"
+          class="btn"
+          data-now-next="plan"
+        >Pregame Plan</button>`;
 
       now.insertAdjacentElement(
         'beforebegin',
@@ -878,11 +1032,15 @@
 
           if (!button) return;
 
+          const requested = button.dataset.nowNext;
+
           activeView =
-            button.dataset.nowNext === 'next'
-              ? 'next'
+            requested === 'next' || requested === 'plan'
+              ? requested
               : 'now';
 
+          // Only toggles visibility. Pregame Plan is reference data that is
+          // already in `latest`, so opening it must never fetch or save.
           applyView();
         }
       );
@@ -900,6 +1058,15 @@
       );
     }
 
+    if (!$(PLAN_CARD_ID)) {
+      const planCard = document.createElement('div');
+      planCard.id = PLAN_CARD_ID;
+      card.insertAdjacentElement(
+        'afterend',
+        planCard
+      );
+    }
+
     $('live-up-next-v2')?.remove();
     $('next-inning-adjust-modal')?.remove();
 
@@ -912,9 +1079,10 @@
     const changePitcher = $('liveChangePitcherBtn');
     const undo = $('liveUndoBtn');
 
-    // NEXT edits pitcher directly on the defensive board.
+    // NEXT edits pitcher directly on the defensive board, and Pregame Plan
+    // is a reference view that must offer no way to change anything.
     if (changePitcher) {
-      if (activeView === 'next') {
+      if (activeView === 'next' || activeView === 'plan') {
         changePitcher.style.setProperty(
           'display',
           'none',
@@ -926,12 +1094,17 @@
     }
 
     // Keep the canonical Undo button in its original DOM location.
-    // NEXT only controls whether that button can currently be used.
+    // NEXT only controls whether that button can currently be used;
+    // Pregame Plan has nothing of its own to undo.
     if (undo) {
-      undo.disabled =
-        activeView === 'next'
-          ? busy || !undoStack.length
-          : false;
+      if (activeView === 'plan') {
+        undo.disabled = true;
+      } else {
+        undo.disabled =
+          activeView === 'next'
+            ? busy || !undoStack.length
+            : false;
+      }
     }
   }
 
@@ -939,6 +1112,7 @@
     const switcher = $(SWITCH_ID);
     const now = $('cbQuickDefense');
     const next = $(CARD_ID);
+    const plan = $(PLAN_CARD_ID);
 
     switcher
       ?.querySelectorAll('[data-now-next]')
@@ -965,13 +1139,106 @@
       next.hidden = activeView !== 'next';
     }
 
+    if (plan) {
+      plan.hidden = activeView !== 'plan';
+    }
+
     syncLiveActions();
+  }
+
+  function planInnings() {
+    const plan = latest?.pregame_rotation || {};
+
+    return Object.keys(plan)
+      .map(key => ({
+        key,
+        sort: Number.parseFloat(key),
+        alignment: plan[key] || {},
+      }))
+      .filter(entry =>
+        Number.isFinite(entry.sort) &&
+        Object.values(entry.alignment).some(name => name)
+      )
+      .sort((a, b) => a.sort - b.sort);
+  }
+
+  function renderPlanCard() {
+    const card = $(PLAN_CARD_ID);
+
+    if (!card) return;
+
+    const innings = planInnings();
+
+    if (!innings.length) {
+      card.innerHTML = `
+        <div class="cb-plan-head">
+          <div>
+            <div class="cb-plan-kicker">PREGAME PLAN</div>
+            <div class="cb-plan-title">Pregame Defense</div>
+          </div>
+          <div class="cb-plan-readonly">Reference only</div>
+        </div>
+        <div class="cb-plan-body">
+          <div class="cb-plan-empty">
+            No pregame defensive plan was saved for this game.
+          </div>
+        </div>`;
+
+      return;
+    }
+
+    const currentInning = String(latest?.current_inning || '');
+    const order = positions(latest?.outfielder_count);
+
+    const blocks = innings.map(entry => {
+      const isCurrent = entry.key === currentInning;
+
+      const slots = order.map(pos => {
+        const name = entry.alignment[pos] || '';
+
+        return `
+          <div class="cb-plan-slot">
+            <span class="cb-plan-pos">${esc(pos)}</span>
+            <span class="cb-plan-name">${
+              esc(name ? playerLabel(name) : '—')
+            }</span>
+          </div>`;
+      }).join('');
+
+      return `
+        <section class="cb-plan-inning${isCurrent ? ' current' : ''}">
+          <div class="cb-plan-inning-head">
+            <span class="cb-plan-inning-no">Inning ${esc(entry.key)}</span>
+            ${isCurrent ? '<span class="cb-plan-now">On now</span>' : ''}
+          </div>
+          <div class="cb-plan-grid">${slots}</div>
+        </section>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="cb-plan-head">
+        <div>
+          <div class="cb-plan-kicker">
+            PREGAME PLAN · ${esc(String(innings.length))} ${
+              innings.length === 1 ? 'INNING' : 'INNINGS'
+            }
+          </div>
+          <div class="cb-plan-title">Pregame Defense</div>
+          <div class="cb-plan-sub">
+            What you set before first pitch. Nothing here changes the live game.
+          </div>
+        </div>
+        <div class="cb-plan-readonly">Reference only</div>
+      </div>
+      <div class="cb-plan-body">${blocks}</div>`;
   }
 
   function renderCard() {
     const card = ensureSurface();
 
     if (!card || !latest) return;
+
+    renderPlanCard();
 
     const inning = String(
       latest.next_inning || ''
@@ -1401,6 +1668,7 @@
     ) {
       $(SWITCH_ID)?.remove();
       $(CARD_ID)?.remove();
+      $(PLAN_CARD_ID)?.remove();
 
       const now = $('cbQuickDefense');
 
