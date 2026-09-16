@@ -254,8 +254,12 @@ def test_observer_stays_armed_and_catches_a_same_page_game_start(page: Page, coa
     try:
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
-        start_button = page.locator('#startLiveGameBtnAction')
+        # Tablet/compact Game Management intentionally hides the canonical
+        # start button and exposes a visible proxy that delegates back to it.
+        # Exercise the control the coach actually sees at 1024x768.
+        start_button = page.locator('#gm-mobile-start-game')
         expect(start_button).to_be_visible(timeout=15_000)
+        expect(page.locator('#startLiveGameBtnAction')).to_be_hidden()
 
         # Not live yet: nothing to switch between.
         expect(page.locator(SWITCHER)).to_have_count(0)
