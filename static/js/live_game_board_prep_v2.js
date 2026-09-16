@@ -849,7 +849,7 @@
       );
       switcher.setAttribute(
         'aria-label',
-        'Current and next defense'
+        'Defense on the field and next inning'
       );
 
       switcher.innerHTML = `
@@ -857,12 +857,12 @@
           type="button"
           class="btn"
           data-now-next="now"
-        >NOW</button>
+        >On the Field</button>
         <button
           type="button"
           class="btn"
           data-now-next="next"
-        >NEXT</button>`;
+        >Next Inning</button>`;
 
       now.insertAdjacentElement(
         'beforebegin',
@@ -981,7 +981,7 @@
       <div class="cb-next-head">
         <div>
           <div class="cb-next-kicker">
-            NEXT · INNING ${esc(inning)}
+            NEXT INNING · ${esc(inning)}
           </div>
           <div class="cb-next-title">
             Next Defense

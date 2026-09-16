@@ -204,7 +204,7 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
 
     next_board = page.locator('#live-board-prep-v3')
     expect(next_board).to_be_visible(timeout=15_000)
-    expect(next_board).to_contain_text('NEXT · INNING 2')
+    expect(next_board).to_contain_text('NEXT INNING · 2')
     expect(next_board).to_contain_text('Loaded from your pregame plan')
 
     viewports = (

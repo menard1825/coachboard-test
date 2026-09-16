@@ -148,7 +148,7 @@ def test_bench_report_shows_actual_and_future_planned_sits(page: Page, coachboar
 
         next_board = page.locator('#live-board-prep-v3')
         expect(next_board).to_be_visible(timeout=10_000)
-        expect(next_board).to_contain_text('NEXT · INNING 2')
+        expect(next_board).to_contain_text('NEXT INNING · 2')
         expect(next_board).to_contain_text('Loaded from your pregame plan')
         expect(
             next_board.locator('[data-next-position="C"]')
