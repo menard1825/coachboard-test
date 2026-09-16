@@ -142,10 +142,10 @@ def cleanup_game(page: Page, coachboard_url: str, game_id: int):
     """End and delete the game this test started.
 
     Every test in this file puts a game live, and one live game anywhere on
-    the team locks the roster for the whole session: roster.py add_player
-    checks _active_live_game_for_team() before it checks X-Requested-With, so
-    it answers AJAX callers with a redirect to the home page instead of JSON.
-    A game left live here therefore breaks unrelated tests that add players.
+    the team locks the roster for the whole session. AJAX roster helpers now
+    receive a structured 409 ``live_roster_locked`` response instead of an
+    HTML redirect, but leaving a game live here would still break unrelated
+    tests that add players and can mask the test's real intent.
     """
     state = page.request.get(
         f'{coachboard_url}/api/live-game/{game_id}/state'
