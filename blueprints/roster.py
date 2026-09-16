@@ -117,7 +117,15 @@ def _mark_guest_out_for_future_games(player):
 def add_player():
     live_game = _active_live_game_for_team(session.get('team_id'))
     if live_game:
-        flash(_live_roster_lock_message(live_game), 'warning')
+        message = _live_roster_lock_message(live_game)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'status': 'error',
+                'code': 'live_roster_locked',
+                'message': message,
+            }), 409
+
+        flash(message, 'warning')
         return redirect(url_for('home', _anchor='roster'))
 
     name = request.form.get('name')
