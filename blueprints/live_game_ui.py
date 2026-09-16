@@ -419,6 +419,118 @@ def inject_live_game_assets(response):
         else:
             html = first_paint + html
 
+    # The style above hides the overlay until live_game_coach_ui.js polishes
+    # it, so the reveal is what keeps a coach from staring at nothing when
+    # that script never arrives. It is injected on its own, guarded by its own
+    # marker: it used to ride along with the board assets below, which meant a
+    # page that already carried those assets shipped no reveal at all and left
+    # the overlay hidden for the whole session.
+    if 'coach-live-boot-reveal' not in html:
+        boot_reveal = '''
+<script id="coach-live-boot-reveal">
+  (function () {
+    var GRACE_MS = 400;
+    var CEILING_MS = 2500;
+    var settled = false;
+    var pending = false;
+    var observer = null;
+
+    function overlay() {
+      return document.getElementById('live-game-overlay');
+    }
+
+    function has(node, name) {
+      return node.classList.contains(name);
+    }
+
+    function stopWatching() {
+      if (!observer) return;
+      observer.disconnect();
+      observer = null;
+    }
+
+    // The lifecycle is over: either the coach UI polished the overlay or the
+    // fallback took the gate off. Nothing left to watch or wait for.
+    function finish() {
+      settled = true;
+      pending = false;
+      stopWatching();
+    }
+
+    function reveal() {
+      // Whatever queued this attempt has now been spent, so a later visible
+      // transition is free to arm a fresh one.
+      pending = false;
+      if (settled) return;
+      var node = overlay();
+      if (!node) return;
+      if (has(node, 'coach-live-polished')) {
+        finish();
+        return;
+      }
+      // d-none means the overlay is deliberately off screen, so the gate is
+      // not what is hiding it. Stripping the gate here would only spend it
+      // early and let the raw board flash when the overlay is shown later.
+      // Deliberately does not settle: the watcher stays armed for the show.
+      if (has(node, 'd-none')) return;
+      finish();
+      node.classList.add('coach-live-boot-fallback');
+    }
+
+    // The coach UI polishes on DOMContentLoaded, so an overlay still
+    // unpolished once every resource has settled is never getting polished --
+    // no reason to make the dugout wait out the ceiling below.
+    window.addEventListener('load', reveal);
+    // Ceiling for the case where a hung request means load never fires.
+    window.setTimeout(reveal, CEILING_MS);
+
+    // An overlay left d-none above is shown later by the live game
+    // controller, and the coach UI polishes it from its own class observer
+    // within a frame. If that never happens the overlay would sit invisible
+    // behind the gate with nothing left to reveal it, so watch for the
+    // transition and fall back once a grace window has passed.
+    function watch() {
+      if (settled || !window.MutationObserver) return;
+      var node = overlay();
+      if (!node) return;
+      observer = new window.MutationObserver(function () {
+        if (settled) {
+          stopWatching();
+          return;
+        }
+        var current = overlay();
+        if (!current) return;
+        // The coach UI won the race, so settle here rather than holding the
+        // observer open until some later mutation happens to re-enter it.
+        if (has(current, 'coach-live-polished')) {
+          finish();
+          return;
+        }
+        if (has(current, 'd-none')) return;
+        // One grace timer at a time. Class churn on the overlay would
+        // otherwise queue a fresh one per mutation.
+        if (pending) return;
+        pending = true;
+        window.setTimeout(reveal, GRACE_MS);
+      });
+      observer.observe(node, {attributes: true, attributeFilter: ['class']});
+    }
+
+    // This script runs in <head>, before the overlay has been parsed. The
+    // ceiling can also beat a slow parse, hence the settled guard in watch().
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', watch);
+    } else {
+      watch();
+    }
+  })();
+</script>
+'''
+        if '</head>' in html:
+            html = html.replace('</head>', boot_reveal + '</head>', 1)
+        else:
+            html = boot_reveal + html
+
     # This controller must register before live_game_v2.js so it owns the End
     # Game click and prevents the old pitch-count-only finalization workflow.
     if 'live_game_pitching_finalize.js' not in html:
@@ -433,14 +545,6 @@ def inject_live_game_assets(response):
 
     if 'live_game_board_prep_v2.js' not in html:
         assets = f'''
-<script>
-  window.setTimeout(function () {{
-    var overlay = document.getElementById('live-game-overlay');
-    if (overlay && !overlay.classList.contains('coach-live-polished')) {{
-      overlay.classList.add('coach-live-boot-fallback');
-    }}
-  }}, 2500);
-</script>
 <script src="{_versioned_static('js/live_game_pitcher_change_complete.js')}"></script>
 <script src="{_versioned_static('js/live_game_board_prep_v2.js')}"></script>
 <script src="{_versioned_static('js/live_game_postgame_cleanup.js')}"></script>
