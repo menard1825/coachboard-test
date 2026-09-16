@@ -133,8 +133,16 @@
       .cb-dh-btn{min-height:40px!important;border-radius:9px!important;font-weight:750!important}
       .cb-dh-title{margin-top:6px;color:#cbd5e1;font-size:.67rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       body.cb-clock-paused #cbDugoutHeader{border-bottom-color:#f5b942!important}
-      body.cb-clock-paused #cbDugoutHeader .cb-dh-dot{background:#f5b942!important}
       body.cb-clock-paused #cbDugoutHeader .cb-dh-time{color:#ffd166!important}
+      /* The dot carries connection health, so a paused clock only tints it
+         while the connection is healthy -- a pause must never make a broken
+         connection look fine. Pause stays legible either way through the
+         clock label ("Paused · Elapsed") and the header border. */
+      body.cb-clock-paused #cbDugoutHeader[data-cb-sync="synced"] .cb-dh-dot{background:#f5b942!important}
+      #cbDugoutHeader[data-cb-sync="reconnecting"] .cb-dh-dot{background:#f5b942!important}
+      #cbDugoutHeader[data-cb-sync="offline"] .cb-dh-dot{background:#e5484d!important}
+      #cbDugoutHeader[data-cb-sync="reconnecting"] .cb-dh-live{color:#ffd166!important}
+      #cbDugoutHeader[data-cb-sync="offline"] .cb-dh-live{color:#ff9ea1!important}
 
       #cbCoachBoardNavModal .modal-content{border:0;border-radius:15px;overflow:hidden}
       #cbCoachBoardNavModal .cb-nav-safe{border:1px solid #b9dcc4;background:#f4fbf6;color:#22543d;border-radius:10px;padding:9px 10px;font-size:.75rem;line-height:1.4;margin-bottom:12px}
@@ -292,6 +300,27 @@
     return value;
   }
 
+  const SYNC_LABELS = {
+    synced: 'Live · Synced',
+    reconnecting: 'Reconnecting…',
+    offline: 'Not Synced',
+  };
+
+  function readSyncState() {
+    // The badge live_game_v2 maintains stays in the DOM as the state carrier
+    // even though Dugout Mode no longer shows it. Order matters: "NOT SYNCED"
+    // also contains "SYNCED", so the failure states are tested first.
+    const text = $('live-sync-status-v2')?.textContent || '';
+
+    if (/reconnecting/i.test(text)) return 'reconnecting';
+    if (/not\s*synced/i.test(text)) return 'offline';
+    if (/synced/i.test(text)) return 'synced';
+
+    // No badge yet: live_game_v2 has not reported a state, so claiming a
+    // healthy connection would be a guess.
+    return 'reconnecting';
+  }
+
   function clockInfo() {
     const current = elapsed();
     const limit = Number(clock?.time_limit_minutes || 0);
@@ -346,12 +375,17 @@
     const info = clockInfo();
     const inning = state?.current_inning || clock?.current_inning || '1';
     const pitcher = state?.current_pitcher || state?.current_alignment?.P || 'None';
-    const sync = $('live-sync-status-v2')?.textContent || '';
-    const synced = /synced/i.test(sync) && !/not synced|reconnecting/i.test(sync);
-    const paused = Boolean(clock?.is_paused);
+    // live_game_v2 owns the authoritative sync state and writes it into
+    // #live-sync-status-v2; this header is the only thing that shows it in
+    // Dugout Mode. Pause is deliberately NOT folded into this label -- it is
+    // already carried by the clock ("Paused · Elapsed") and the header
+    // border, and letting it replace the label would hide a dead connection
+    // behind the word "Paused".
+    const syncState = readSyncState();
+    header.dataset.cbSync = syncState;
     setText(
       header.querySelector('[data-cb-live-label]'),
-      paused ? 'Paused' : (synced ? 'Live · Synced' : 'Live')
+      SYNC_LABELS[syncState]
     );
     setText(header.querySelector('[data-cb-inning]'), String(inning));
     setText(header.querySelector('[data-cb-clock-label]'), info.label);

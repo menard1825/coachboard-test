@@ -12,8 +12,12 @@
     style.textContent = `
       #live-sync-status-v2.cb-command-sync{display:block!important;text-align:left!important;margin:5px 0 0!important;line-height:1!important}
       #live-sync-status-v2.cb-command-sync .badge{font-size:.55rem!important;padding:4px 7px!important;letter-spacing:.02em}
-      body.cb-dugout #live-sync-status-v2.cb-command-sync{margin:0 0 7px!important;padding:0 2px!important}
       @media(max-width:575.98px){#live-sync-status-v2.cb-command-sync .badge{font-size:.52rem!important;padding:4px 6px!important}}
+      /* Dugout Mode shows connection health in #cbDugoutHeader instead. The
+         badge stays in the DOM because live_game_v2 writes the authoritative
+         state into it and the header reads it back, but it must not render a
+         second status row of its own. */
+      body.cb-dugout #live-sync-status-v2{display:none!important}
     `;
     document.head.appendChild(style);
   }
@@ -25,15 +29,11 @@
 
     status.classList.add('cb-command-sync');
 
-    // Dugout mode hides .coach-live-head, so keep the real sync badge on the
-    // visible live surface instead of placing it inside that legacy header.
-    const dugoutHeader = shell.querySelector('#cbDugoutHeader');
-    if (document.body.classList.contains('cb-dugout') && dugoutHeader) {
-      if (status.previousElementSibling !== dugoutHeader || status.parentElement !== shell) {
-        dugoutHeader.insertAdjacentElement('afterend', status);
-      }
-      return;
-    }
+    // Dugout Mode presents connection health in #cbDugoutHeader, which reads
+    // this element's text. Placing it here as well produced a second visible
+    // status row directly beneath that header, so the badge is left where it
+    // is and hidden by CSS rather than relocated.
+    if (document.body.classList.contains('cb-dugout')) return;
 
     const head = shell.querySelector('.coach-live-head');
     const context = head?.firstElementChild;
@@ -53,12 +53,14 @@
   installStyles();
 
   // Only two things can affect placement: the live overlay being rebuilt and
-  // entering/leaving dugout mode on the body. Avoid observing class changes on
-  // every descendant in the document while the game clock and modals update.
+  // entering/leaving dugout mode on the body. The shell is appended directly
+  // to the overlay, so watching the overlay's own children is enough --
+  // subtree:true additionally fired on every clock tick and board re-render
+  // for a placement that could not have changed.
   const liveOverlay = document.getElementById('live-game-overlay');
   if (liveOverlay) {
     const overlayObserver = new MutationObserver(queuePlacement);
-    overlayObserver.observe(liveOverlay, {childList:true, subtree:true});
+    overlayObserver.observe(liveOverlay, {childList:true});
   }
 
   const bodyObserver = new MutationObserver(queuePlacement);
