@@ -102,12 +102,12 @@
           gap: 12px 14px !important;
           align-items: start !important;
         }
+        /* Placement only. The field's width, aspect ratio and min-height are
+           owned by live_game_board_prep_v2.js, which sizes both live fields
+           from the viewport height -- this rule sized it from the width alone
+           and pushed End Inning off a 1024x768 screen. */
         html body.cb-dugout #cbQuickDefense .cb-qd-field {
           grid-area: field !important;
-          width: min(100%, 690px) !important;
-          min-height: 0 !important;
-          aspect-ratio: 1.28 / 1 !important;
-          margin: 0 auto !important;
         }
         html body.cb-dugout #cbQuickDefense .cb-qd-bench-wrap {
           grid-area: bench !important;

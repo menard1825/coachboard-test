@@ -874,37 +874,6 @@
         }
       }
 
-      @media(
-        min-width:700px
-      ) and (
-        min-height:500px
-      ) and (
-        orientation:landscape
-      ){
-        #${CARD_ID} .cb-next-field{
-          width:min(
-            100%,
-            760px,
-            calc(60dvh * 1.28)
-          );
-        }
-
-        #${CARD_ID} .cb-next-head{
-          padding-top:8px;
-          padding-bottom:7px;
-        }
-
-        #${CARD_ID} .cb-next-selection{
-          min-height:38px;
-          padding:7px 9px;
-        }
-
-        #${CARD_ID} .cb-next-bench{
-          margin-top:6px;
-          padding:7px;
-        }
-      }
-
       @media(min-width:1200px){
         #${CARD_ID} .cb-next-field{
           width:min(100%,720px);
@@ -920,6 +889,11 @@
        *
        * Use both viewport width and viewport height. This makes the
        * live board adapt to the usable screen rather than an iPad model.
+       *
+       * The landscape owner blocks below are the one thing that follows it.
+       * A viewport cannot be portrait and landscape at once, so they never
+       * compete; they are last so that they outrank the generic width rules
+       * above them, min-width:1200px included.
        */
       @media(
         orientation:portrait
@@ -942,6 +916,145 @@
 
         #${CARD_ID} .cb-next-bench{
           margin-top:7px;
+        }
+      }
+
+      /*
+       * LANDSCAPE OWNER -- NEXT INNING FIELD.
+       *
+       * Landscape is a vertical-budget problem, not a width problem: at
+       * 1024x768 a width-derived field pushed End Inning and Change Pitcher
+       * below the fold. Size from the viewport height instead.
+       *
+       * Next Inning gets a smaller cap than On the Field on purpose. It
+       * carries its own heading, save chip and STEP instruction above the
+       * field, so the same field height does not leave the same room.
+       *
+       * The bench, tools and warnings move beside the field here, mirroring
+       * what Quick Field already does in landscape. That is what buys the
+       * field its height back rather than shrinking it further -- stacking
+       * them under the field cost roughly 135px that landscape does not have.
+       */
+      @media(
+        min-width:700px
+      ) and (
+        min-height:500px
+      ) and (
+        orientation:landscape
+      ){
+        #${CARD_ID} .cb-next-body{
+          display:grid;
+          grid-template-columns:minmax(0,1.5fr) minmax(220px,.8fr);
+          grid-template-areas:
+            "selection selection"
+            "field bench"
+            "field tools"
+            "field warnings"
+            "error error";
+          gap:8px 12px;
+          align-items:start;
+          padding:9px 11px 11px;
+        }
+
+        #${CARD_ID} .cb-next-selection{
+          grid-area:selection;
+          min-height:38px;
+          margin-bottom:0;
+          padding:7px 9px;
+        }
+
+        #${CARD_ID} .cb-next-field{
+          grid-area:field;
+          width:min(
+            100%,
+            690px,
+            calc(46dvh * 1.28)
+          );
+          min-height:0;
+          aspect-ratio:1.28/1;
+          margin:0 auto;
+        }
+
+        #${CARD_ID} .cb-next-bench{
+          grid-area:bench;
+          margin-top:0;
+          padding:7px;
+        }
+
+        #${CARD_ID} .cb-next-tools{
+          grid-area:tools;
+          margin-top:0;
+        }
+
+        #${CARD_ID} .cb-next-warnings{
+          grid-area:warnings;
+          margin-top:0;
+        }
+
+        #${CARD_ID} .cb-next-error{
+          grid-area:error;
+          margin-top:0;
+        }
+
+        #${CARD_ID} .cb-next-head{
+          padding-top:8px;
+          padding-bottom:7px;
+        }
+
+        /*
+         * Markers are a share of the field, so nine of them sit at the same
+         * density whatever the field measures. The floor keeps them tappable
+         * at the smallest landscape field the cap above can produce.
+         */
+        #${CARD_ID} .cb-next-field .cb-qd-spot{
+          width:clamp(56px,17%,112px);
+          min-height:44px;
+        }
+      }
+
+      /*
+       * LANDSCAPE OWNER -- ON THE FIELD (Quick Field).
+       *
+       * This is the same media range live_game_sync_status.js uses for its
+       * landscape two-column layout, which keeps the grid and the field
+       * sizing switching on together. Sizing used to be set in three places
+       * at once -- sync_status (width:min(100%,690px)), field_realism
+       * (width:min(100%,665px)) and the .cb-qd-field base min-height:330px --
+       * all of them width-only. Those now defer to this block; see the notes
+       * left in each file.
+       *
+       * html + body.cb-dugout + #cbQuickDefense is what it takes to outrank
+       * the rules this replaces, which are themselves !important.
+       */
+      @media(
+        min-width:760px
+      ) and (
+        min-height:600px
+      ) and (
+        orientation:landscape
+      ){
+        html body.cb-dugout #cbQuickDefense .cb-qd-field{
+          width:min(
+            100%,
+            690px,
+            calc(50dvh * 1.28)
+          )!important;
+          min-height:0!important;
+          aspect-ratio:1.28/1!important;
+          margin:0 auto!important;
+        }
+
+        html body.cb-dugout #cbQuickDefense .cb-qd-spot{
+          width:clamp(56px,17%,112px)!important;
+          min-height:44px!important;
+        }
+
+        html body.cb-dugout #cbQuickDefense .cb-qd-head{
+          padding:8px 12px 7px!important;
+        }
+
+        html body.cb-dugout #cbQuickDefense .cb-qd-help{
+          font-size:.66rem!important;
         }
       }
     `;
