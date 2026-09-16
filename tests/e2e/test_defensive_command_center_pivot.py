@@ -133,14 +133,27 @@ def test_first_pitch_launches_quick_field_command_center(page: Page, coachboard_
         expect(page.locator('#liveEndInningBtn')).to_be_visible()
         expect(page.locator('#liveUndoBtn')).to_be_visible()
 
+        # Dugout Mode presents connection health exactly once, in the dugout
+        # header. The badge live_game_v2 maintains stays in the DOM as the
+        # state carrier that header reads, but no longer renders a second
+        # visible status row of its own.
         sync_status = page.locator('#live-sync-status-v2')
-        expect(sync_status).to_be_visible(timeout=10_000)
-        expect(sync_status).to_contain_text('SYNCED')
+        expect(sync_status).to_have_count(1)
+        expect(sync_status).to_be_hidden()
 
+        live_label = page.locator('#cbDugoutHeader [data-cb-live-label]')
+        expect(live_label).to_be_visible(timeout=10_000)
+        expect(live_label).to_have_text('Live · Synced', timeout=10_000)
+
+        # Losing and regaining the connection still has to reach the coach --
+        # now through the header rather than the badge.
         page.context.set_offline(True)
-        expect(sync_status).to_contain_text(re.compile(r'RECONNECTING|NOT SYNCED'), timeout=10_000)
+        expect(live_label).to_have_text(
+            re.compile(r'Reconnecting…|Not Synced'),
+            timeout=10_000,
+        )
         page.context.set_offline(False)
-        expect(sync_status).to_contain_text('SYNCED', timeout=15_000)
+        expect(live_label).to_have_text('Live · Synced', timeout=15_000)
     finally:
         page.context.set_offline(False)
         state_response = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state')

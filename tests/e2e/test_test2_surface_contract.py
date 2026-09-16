@@ -258,8 +258,21 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
             timeout=10_000,
         )
 
+        # Pausing the clock must not take over the connection-health label.
+        # It used to read bare "Paused", which hid a dead connection behind a
+        # word that says nothing about sync. Pause has its own affordances.
         expect(live_status).to_have_text(
+            'Live · Synced',
+            timeout=10_000,
+        )
+
+        # ...and the paused state is still plainly visible, independently.
+        expect(header.locator('[data-cb-clock-label]')).to_contain_text(
             'Paused',
+            timeout=10_000,
+        )
+        expect(page.locator('body')).to_have_class(
+            re.compile(r'\bcb-clock-paused\b'),
             timeout=10_000,
         )
 

@@ -256,24 +256,50 @@ def test_not_synced_is_explicit_in_the_header(page: Page, coachboard_url: str):
 
 def test_paused_does_not_conceal_a_failed_connection(page: Page, coachboard_url: str):
     """The old label collapsed to plain "Paused", which hid a dead connection.
-    Pause has its own affordances; it must not take over the health label."""
+
+    Pause is driven through the real header control and confirmed against the
+    clock API rather than by toggling the presentation class by hand -- the
+    body class is an effect of pausing, so setting it directly would prove
+    nothing about what a coach actually does.
+    """
     page.set_viewport_size({'width': 1024, 'height': 768})
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
 
     try:
         open_dugout(page, coachboard_url, game_id)
+
+        pause = page.locator(f'{HEADER} [data-cb-clock]')
+        expect(pause).to_have_text('Pause', timeout=10_000)
+        pause.click()
+        expect(pause).to_have_text('Resume', timeout=10_000)
+
+        # The server agrees the game is genuinely paused.
+        clock = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/clock'
+        ).json()['clock']
+        assert clock['is_paused'] is True, clock
+
+        # The paused presentation is active...
+        expect(page.locator('body')).to_have_class(
+            re.compile(r'\bcb-clock-paused\b'), timeout=10_000
+        )
+        expect(
+            page.locator(f'{HEADER} [data-cb-clock-label]')
+        ).to_contain_text('Paused', timeout=10_000)
+
+        # ...and now the connection dies while still paused. The health label
+        # must report it rather than continue saying "Paused".
         set_sync(page, 'offline')
-        page.evaluate("() => document.body.classList.add('cb-clock-paused')")
 
         expect(page.locator(HEADER_LABEL)).to_have_text('Not Synced', timeout=10_000)
         expect(page.locator(HEADER)).to_have_attribute('data-cb-sync', 'offline')
 
-        # Pause remains legible through its own treatment rather than the
-        # health label: a paused clock still reads "Paused · ...".
-        expect(
-            page.locator('#cbDugoutHeader [data-cb-clock-label]')
-        ).to_contain_text('Paused', timeout=10_000)
+        # Pause is still independently visible; neither state hides the other.
+        expect(page.locator('body')).to_have_class(
+            re.compile(r'\bcb-clock-paused\b')
+        )
+        expect(pause).to_have_text('Resume')
     finally:
         cleanup_game(page, coachboard_url, game_id)
 
