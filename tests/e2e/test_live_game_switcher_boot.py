@@ -106,6 +106,30 @@ def create_game(page: Page, coachboard_url: str):
     assert match
     game_id = int(match.group(1))
 
+    # A real same-page Start Game requires both a batting lineup and a
+    # defensive rotation. The original B1 fixture only saved the rotation,
+    # leaving the UI correctly blocked with "Lineup needed".
+    post_json(
+        page,
+        coachboard_url,
+        '/add_lineup',
+        {
+            'title': 'Switcher Boot Lineup',
+            'lineup_data': [
+                'Pitcher Pat',
+                'Catcher Cole',
+                'First Frank',
+                'Second Sam',
+                'Third Theo',
+                'Shortstop Shawn',
+                'Left Lee',
+                'Center Casey',
+                'Right Riley',
+            ],
+            'associated_game_id': game_id,
+        },
+    )
+
     post_json(
         page,
         coachboard_url,

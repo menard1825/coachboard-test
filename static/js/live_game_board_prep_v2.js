@@ -976,7 +976,7 @@
     return data;
   }
 
-  function ensureSurface() {
+  function ensureSwitcher() {
     const shell = document.querySelector(
       '#live-game-overlay .coach-live-shell'
     );
@@ -1044,6 +1044,19 @@
           applyView();
         }
       );
+    }
+
+    applyView();
+
+    return switcher;
+  }
+
+  function ensureSurface() {
+    const switcher = ensureSwitcher();
+    const now = $('cbQuickDefense');
+
+    if (!switcher || !now) {
+      return null;
     }
 
     let card = $(CARD_ID);
@@ -1787,10 +1800,10 @@
 
   installStyles();
 
-  // ensureSurface() needs the live shell and Quick Field, and both are
+  // ensureSwitcher() needs the live shell and Quick Field, and both are
   // mounted by other modules -- live_game_dugout_mode in particular is loaded
   // dynamically, so #cbQuickDefense normally appears after this module has
-  // started. ensureSurface() simply returns null when they are missing, and
+  // started. ensureSwitcher() simply returns null when they are missing, and
   // the only thing that tried again was the 3500ms refresh interval, so the
   // tabs could sit invisible for several seconds while a coach had no way to
   // reach Next Inning or the pregame plan.
@@ -1812,7 +1825,7 @@
     if ($(SWITCH_ID)) return;
 
     if (liveSurfaceReady()) {
-      ensureSurface();
+      ensureSwitcher();
       return;
     }
 
@@ -1827,9 +1840,9 @@
       // without reloading the page.
       if (!liveSurfaceReady()) return;
 
-      // One shot: disconnect the moment the surface is built, so this stops
+      // One shot: disconnect the moment the switcher is built, so this stops
       // running for the rest of the game.
-      if (ensureSurface()) observer.disconnect();
+      if (ensureSwitcher()) observer.disconnect();
     });
 
     observer.observe(target, {childList: true, subtree: true});
