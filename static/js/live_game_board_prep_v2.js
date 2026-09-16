@@ -1787,8 +1787,60 @@
 
   installStyles();
 
+  // ensureSurface() needs the live shell and Quick Field, and both are
+  // mounted by other modules -- live_game_dugout_mode in particular is loaded
+  // dynamically, so #cbQuickDefense normally appears after this module has
+  // started. ensureSurface() simply returns null when they are missing, and
+  // the only thing that tried again was the 3500ms refresh interval, so the
+  // tabs could sit invisible for several seconds while a coach had no way to
+  // reach Next Inning or the pregame plan.
+  function liveSurfaceReady() {
+    const overlay = $('live-game-overlay');
+
+    // A non-live game keeps the overlay in d-none and never grows a shell,
+    // so this doubles as the liveness gate: no API round trip required, and
+    // no chance of flashing a bogus switcher onto a game that is not live.
+    return Boolean(
+      overlay &&
+      !overlay.classList.contains('d-none') &&
+      overlay.querySelector('.coach-live-shell') &&
+      $('cbQuickDefense')
+    );
+  }
+
+  function bootSurfaceWhenReady() {
+    if ($(SWITCH_ID)) return;
+
+    if (liveSurfaceReady()) {
+      ensureSurface();
+      return;
+    }
+
+    if (!window.MutationObserver) return;
+
+    const target = $('live-game-overlay') || document.body;
+
+    const observer = new window.MutationObserver(() => {
+      // Do nothing at all until the surface this needs actually exists. A
+      // game that is never started simply leaves the observer armed, which
+      // is what makes the tabs appear promptly when a coach starts a game
+      // without reloading the page.
+      if (!liveSurfaceReady()) return;
+
+      // One shot: disconnect the moment the surface is built, so this stops
+      // running for the rest of the game.
+      if (ensureSurface()) observer.disconnect();
+    });
+
+    observer.observe(target, {childList: true, subtree: true});
+  }
+
   const start = () => {
     $('next-inning-adjust-modal')?.remove();
+
+    // Build the tabs from the DOM alone, without waiting on the first
+    // next-inning response. NEXT and Pregame Plan hydrate afterwards.
+    bootSurfaceWhenReady();
 
     window.setTimeout(
       () => refresh({force: true}),
