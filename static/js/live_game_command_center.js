@@ -128,7 +128,10 @@
           head.appendChild(tools);
         }
       }
-      if (undo) {
+      // Dugout Mode presents Undo in the dark #cbDugoutHeader. Pinning it here
+      // as well meant .coach-live-head had to be un-hidden for it, which cost a
+      // standalone control row above the tabs. Leave placement to the header.
+      if (undo && !document.body.classList.contains('cb-dugout')) {
         const undoMarkup = '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="cb-undo-text">Undo last change</span>';
         if (undo.className !== 'btn cb-command-undo') undo.className = 'btn cb-command-undo';
         if (undo.title !== 'Undo the last live-game change') undo.title = 'Undo the last live-game change';

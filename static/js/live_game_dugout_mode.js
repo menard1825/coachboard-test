@@ -120,7 +120,7 @@
       body.cb-dugout #coach-pitcher-slot{display:none!important}
 
       #cbDugoutHeader{position:sticky;top:0;z-index:1040;margin:0 -10px 12px;padding:9px 12px;background:#101828;color:#fff;border-bottom:3px solid var(--primary-color,#102a66);box-shadow:0 4px 14px rgba(16,24,40,.2)}
-      .cb-dh-main{display:grid;grid-template-columns:auto auto minmax(0,1fr) minmax(0,auto) auto auto;align-items:center;gap:10px}
+      .cb-dh-main{display:grid;grid-template-columns:auto auto minmax(0,1fr) minmax(0,auto) auto auto auto;align-items:center;gap:10px}
       .cb-dh-live{display:flex;gap:6px;align-items:center;font-size:.66rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
       .cb-dh-dot{width:8px;height:8px;border-radius:50%;background:#2dd36f}
       .cb-dh-inning{min-width:58px;text-align:center;border-inline:1px solid #ffffff2e;padding:0 10px}
@@ -131,6 +131,21 @@
       .cb-dh-pitcher{text-align:right;min-width:0}
       .cb-dh-name{font-size:.88rem;font-weight:800;max-width:230px;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.05}
       .cb-dh-btn{min-height:40px!important;border-radius:9px!important;font-weight:750!important}
+      /* Undo lives in this header. It used to be pinned into .coach-live-head,
+         which Dugout Mode otherwise hides, so gameday_pitching_steppers.js had
+         to un-hide that row purely to keep one button reachable -- a whole
+         control row of vertical space for a single 46px control. These
+         selectors carry two ids so they outrank every earlier placement rule
+         (#liveUndoBtn.cb-command-undo, body.cb-dugout #liveUndoBtn) wherever
+         those modules still load. */
+      body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;min-width:40px!important;min-height:40px!important;height:40px!important;width:auto!important;margin:0!important;padding:0 10px!important;border:1px solid #ffffff5c!important;border-radius:9px!important;background:transparent!important;color:#fff!important;box-shadow:none!important;font-size:.7rem!important;font-weight:800!important;line-height:1!important;letter-spacing:.02em;flex:none!important;touch-action:manipulation}
+      body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo i{display:inline-block!important;margin:0!important;font-size:1rem!important}
+      body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo:disabled{opacity:.42!important;cursor:not-allowed!important}
+      body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo[hidden]{display:none!important}
+      /* The button is adopted from #coach-action-slot, where live_game_coach_ui
+         first places it. Hide it there so it never flashes as a third action
+         tile in the frame before this header claims it. */
+      body.cb-dugout #coach-action-slot #liveUndoBtn{display:none!important}
       .cb-dh-title{margin-top:6px;color:#cbd5e1;font-size:.67rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       body.cb-clock-paused #cbDugoutHeader{border-bottom-color:#f5b942!important}
       body.cb-clock-paused #cbDugoutHeader .cb-dh-time{color:#ffd166!important}
@@ -222,7 +237,7 @@
       }
       @media(max-width:575.98px){
         #cbDugoutHeader{margin:0 -10px 10px;padding:8px 9px}
-        .cb-dh-main{grid-template-columns:auto auto minmax(56px,.8fr) minmax(64px,1fr) auto auto;gap:4px}
+        .cb-dh-main{grid-template-columns:auto auto minmax(56px,.8fr) minmax(64px,1fr) auto auto auto;gap:4px}
         .cb-dh-live{display:flex;font-size:.5rem;letter-spacing:.04em;gap:3px}
         .cb-dh-dot{width:7px;height:7px}
         .cb-dh-pitcher{display:block!important;text-align:left}
@@ -231,6 +246,8 @@
         .cb-dh-time{font-size:.84rem}
         .cb-dh-name{font-size:.68rem;max-width:none}
         .cb-dh-btn{font-size:.65rem!important;padding:5px 6px!important}
+        body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{width:40px!important;padding:0!important;gap:0!important}
+        body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo .cb-dh-undo-text{display:none!important}
         .cb-dh-title{display:none}
         body.cb-dugout .coach-actions>.btn{min-height:70px!important}
         .cb-qd-field{min-height:232px}
@@ -241,7 +258,7 @@
         #cbCoachBoardNavModal .cb-app-grid{grid-template-columns:1fr 1fr}
       }
       @media(max-width:374.98px){
-        .cb-dh-main{grid-template-columns:auto auto minmax(50px,.7fr) minmax(58px,.85fr) auto auto;gap:2px}
+        .cb-dh-main{grid-template-columns:auto auto minmax(50px,.7fr) minmax(58px,.85fr) auto auto auto;gap:2px}
         .cb-dh-live{font-size:.47rem;letter-spacing:.02em}
         .cb-dh-btn{font-size:.58rem!important;padding:4px 5px!important}
         .cb-qd-spot{width:61px}
@@ -359,12 +376,72 @@
   }
   window.openCoachBoardLiveMenu = openAppMenu;
 
+  // #liveUndoBtn is a template control (templates/_rotation_editor.html) that
+  // live_game_coach_ui drops into #coach-action-slot and live_game_command_center
+  // then moves into .coach-live-head. Dugout Mode hides that head, so the only
+  // way it stayed reachable was gameday_pitching_steppers.js un-hiding the row
+  // for it. Presenting it in this header instead removes that row entirely.
+  // The button itself is never cloned or rebuilt -- it is the same element, so
+  // the delegated /undo handler in live_game_v2 keeps working and
+  // live_game_board_prep_v2's disabled toggling still lands on it.
+  const UNDO_MARKUP =
+    '<i class="bi bi-arrow-90deg-left" aria-hidden="true"></i>'
+    + '<span class="cb-dh-undo-text">Undo</span>';
+  let undoOrigin = null;
+
+  function adoptUndo(header) {
+    const undo = $('liveUndoBtn');
+    const slot = header.querySelector('.cb-dh-undo-slot');
+    if (!undo || !slot) return;
+
+    if (!undoOrigin) {
+      undoOrigin = {
+        className: undo.className,
+        innerHTML: undo.innerHTML,
+        title: undo.title,
+        label: undo.getAttribute('aria-label'),
+      };
+    }
+
+    if (undo.className !== 'btn cb-dh-undo') undo.className = 'btn cb-dh-undo';
+    if (undo.innerHTML !== UNDO_MARKUP) undo.innerHTML = UNDO_MARKUP;
+    if (undo.title !== 'Undo the last live-game change') {
+      undo.title = 'Undo the last live-game change';
+    }
+    if (undo.getAttribute('aria-label') !== 'Undo last change') {
+      undo.setAttribute('aria-label', 'Undo last change');
+    }
+    if (undo.parentElement !== slot) slot.appendChild(undo);
+  }
+
+  function releaseUndo() {
+    // The header is about to be removed. Undo is a template element, so it has
+    // to go back to the page rather than be destroyed with its host.
+    const undo = $('liveUndoBtn');
+    const header = $('cbDugoutHeader');
+    if (!undo || !header || !header.contains(undo)) return;
+
+    if (undoOrigin) {
+      undo.className = undoOrigin.className;
+      undo.innerHTML = undoOrigin.innerHTML;
+      undo.title = undoOrigin.title;
+      if (undoOrigin.label === null) undo.removeAttribute('aria-label');
+      else undo.setAttribute('aria-label', undoOrigin.label);
+    }
+
+    const home =
+      document.querySelector('#live-game-overlay #coach-action-slot')
+      || document.querySelector('#live-game-overlay .coach-live-shell')
+      || $('live-game-overlay');
+    home?.appendChild(undo);
+  }
+
   function renderHeader(shell) {
     let header = $('cbDugoutHeader');
     if (!header) {
       header = document.createElement('div');
       header.id = 'cbDugoutHeader';
-      header.innerHTML = '<div class="cb-dh-main"><div class="cb-dh-live"><span class="cb-dh-dot"></span><span data-cb-live-label>Live Game</span></div><div class="cb-dh-inning"><small>Inning</small><strong data-cb-inning>1</strong></div><div class="cb-dh-clock"><small data-cb-clock-label>Elapsed</small><div class="cb-dh-time" data-cb-clock-time>—</div></div><div class="cb-dh-pitcher"><small>Pitcher</small><div class="cb-dh-name" data-cb-pitcher>None</div></div><button class="btn btn-outline-light btn-sm cb-dh-btn" data-cb-clock><i class="bi bi-clock me-1"></i>Clock</button><button class="btn btn-outline-light btn-sm cb-dh-btn" data-cb-menu aria-label="Open CoachBoard menu without ending the game"><i class="bi bi-grid me-1"></i>Menu</button></div><div class="cb-dh-title" data-cb-title></div>';
+      header.innerHTML = '<div class="cb-dh-main"><div class="cb-dh-live"><span class="cb-dh-dot"></span><span data-cb-live-label>Live Game</span></div><div class="cb-dh-inning"><small>Inning</small><strong data-cb-inning>1</strong></div><div class="cb-dh-clock"><small data-cb-clock-label>Elapsed</small><div class="cb-dh-time" data-cb-clock-time>—</div></div><div class="cb-dh-pitcher"><small>Pitcher</small><div class="cb-dh-name" data-cb-pitcher>None</div></div><span class="cb-dh-undo-slot"></span><button class="btn btn-outline-light btn-sm cb-dh-btn" data-cb-clock><i class="bi bi-clock me-1"></i>Clock</button><button class="btn btn-outline-light btn-sm cb-dh-btn" data-cb-menu aria-label="Open CoachBoard menu without ending the game"><i class="bi bi-grid me-1"></i>Menu</button></div><div class="cb-dh-title" data-cb-title></div>';
       shell.prepend(header);
       header.addEventListener('click', event => {
         if (event.target.closest('[data-cb-clock]')) document.querySelector('#cbLiveGameClock .cb-clock-config')?.click();
@@ -395,6 +472,7 @@
     time?.classList.toggle('danger', info.tone === 'danger');
     setText(header.querySelector('[data-cb-pitcher]'), displayName(pitcher));
     setText(header.querySelector('[data-cb-title]'), title());
+    adoptUndo(header);
   }
 
   function positions() {
@@ -1096,6 +1174,7 @@
     document.body.classList.toggle('cb-dugout', live);
     document.body.classList.toggle('cb-clock-paused', live && Boolean(clock?.is_paused));
     if (!live) {
+      releaseUndo();
       $('cbDugoutHeader')?.remove();
       $('cbQuickDefense')?.remove();
       quickDefenseSignature = '';

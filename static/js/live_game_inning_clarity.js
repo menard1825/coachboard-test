@@ -113,9 +113,9 @@
       body.cb-dugout #cbQuickDefense .cb-bench-note{display:none!important}
       body.cb-dugout #coach-action-slot.coach-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
       body.cb-dugout #liveChangePitcherBtn,body.cb-dugout #liveEndInningBtn{min-height:62px!important}
-      body.cb-dugout #liveUndoBtn{grid-column:1/-1!important;width:auto!important;min-height:28px!important;justify-self:center!important;border:0!important;background:transparent!important;color:#667085!important;padding:3px 10px!important;box-shadow:none!important}
-      body.cb-dugout #liveUndoBtn .coach-action-title{font-size:.74rem!important;text-decoration:underline;text-underline-offset:2px}
-      body.cb-dugout #liveUndoBtn .coach-action-note{display:none!important}
+      /* Undo is presented in the dark #cbDugoutHeader, not as a row inside
+         #coach-action-slot, so the grid-column/underlined-link treatment that
+         used to live here no longer has a subject. */
       body.cb-dugout #liveChangePitcherBtn .coach-action-note,body.cb-dugout #liveEndInningBtn .coach-action-note{font-size:0!important;opacity:.78!important}
       body.cb-dugout #liveChangePitcherBtn .coach-action-note::after{content:'This inning';font-size:.67rem}
       body.cb-dugout #liveEndInningBtn .coach-action-note::after{content:'Send next defense out';font-size:.67rem}

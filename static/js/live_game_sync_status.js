@@ -42,8 +42,11 @@
         html body.cb-dugout #cbDugoutHeader .cb-dh-live {
           display: none !important;
         }
+        /* .cb-dh-live is hidden just above, leaving inning, clock, pitcher,
+           the Undo slot and the two buttons -- six columns. Undercounting
+           wraps the header onto a second row and costs 46px. */
         html body.cb-dugout #cbDugoutHeader .cb-dh-main {
-          grid-template-columns: auto minmax(74px,.8fr) minmax(92px,1.15fr) auto auto !important;
+          grid-template-columns: auto minmax(74px,.8fr) minmax(92px,1.15fr) auto auto auto !important;
           gap: 6px !important;
         }
         html body.cb-dugout #cbDugoutHeader .cb-dh-pitcher {

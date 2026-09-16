@@ -42,37 +42,13 @@
     const style = document.createElement('style');
     style.id = 'cb-command-center-dugout-compat';
     style.textContent = `
-      body.cb-dugout .coach-live-head.cb-command-head {
-        display:flex!important;
-        justify-content:flex-end!important;
-        align-items:center!important;
-        min-height:46px!important;
-        margin:0 0 8px!important;
-      }
-      body.cb-dugout .coach-live-head.cb-command-head > :first-child,
-      body.cb-dugout .coach-live-head.cb-command-head .coach-inning-pill {
-        display:none!important;
-      }
-      body.cb-dugout .coach-live-head.cb-command-head .cb-command-head-tools {
-        display:flex!important;
-        align-items:center!important;
-        justify-content:flex-end!important;
-        width:100%!important;
-      }
-      body.cb-dugout .coach-live-head.cb-command-head #liveUndoBtn.cb-command-undo {
-        display:inline-flex!important;
-        width:46px!important;
-        height:46px!important;
-        min-width:46px!important;
-        min-height:46px!important;
-        padding:0!important;
-        border:1px solid #d6dae1!important;
-        border-radius:10px!important;
-        background:#fff!important;
-        color:#475467!important;
-        align-items:center!important;
-        justify-content:center!important;
-      }
+      /* This block used to re-show .coach-live-head in Dugout Mode -- which
+         live_game_dugout_mode.js deliberately hides -- for the single reason
+         that live_game_command_center.js parked #liveUndoBtn inside it. The
+         result was a 46px row plus margin that carried nothing but Undo,
+         directly above the On the Field / Next Inning / Pregame Plan tabs.
+         Undo is now presented in the dark #cbDugoutHeader, so the head stays
+         hidden and that row is gone. */
       @media(max-width:767.98px) {
         /* Quick Start uses a fixed Start Game action on phones. Keep its
            clearance inside the scrolling main content instead of padding the
@@ -83,17 +59,6 @@
         }
         html body.coach-game-page:not(.cb-dugout) main.container-fluid {
           padding-bottom:calc(90px + env(safe-area-inset-bottom, 0px))!important;
-        }
-      }
-      @media(max-width:575.98px) {
-        body.cb-dugout .coach-live-head.cb-command-head {
-          min-height:44px!important;
-        }
-        body.cb-dugout .coach-live-head.cb-command-head #liveUndoBtn.cb-command-undo {
-          width:44px!important;
-          height:44px!important;
-          min-width:44px!important;
-          min-height:44px!important;
         }
       }
     `;
