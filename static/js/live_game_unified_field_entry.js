@@ -25,7 +25,7 @@
     style.id = 'cb-main-field-drag-styles';
     style.textContent = `
       #cbQuickDefense .cb-qd-spot:not(.pitcher),
-      #cbQuickDefense .cb-qd-bench-player{touch-action:none;cursor:grab}
+      #cbQuickDefense .cb-qd-bench-player{touch-action:manipulation;cursor:grab}
       #cbQuickDefense .cb-qd-spot:not(.pitcher):active,
       #cbQuickDefense .cb-qd-bench-player:active{cursor:grabbing}
       #cbQuickDefense .cb-qd-spot.cb-main-drag-over .cb-qd-name{outline:4px solid rgba(16,42,102,.25);border-color:#102a66;background:#f4f7ff}
@@ -410,6 +410,11 @@
   }
 
   function beginDrag(event) {
+    // Finger and pen gestures belong to normal tap/scroll behavior.
+    // Drag stays available to mouse/trackpad users while we design
+    // the shared mobile drag contract for both live boards.
+    if (event.pointerType !== 'mouse') return;
+
     if (saveBusy || (event.button !== undefined && event.button !== 0)) return;
     const source = dragSourceFromEvent(event);
     if (!source) return;

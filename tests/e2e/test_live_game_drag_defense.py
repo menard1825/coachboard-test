@@ -473,3 +473,168 @@ def test_phone_quick_field_swaps_two_fielders_without_second_editor(page: Page, 
         )
     finally:
         cleanup(page, coachboard_url, game_id, None)
+
+
+def test_phone_quick_field_touch_swipe_does_not_drag_player(
+    page: Page,
+    coachboard_url: str,
+):
+    """A finger swipe on On the Field must never move a player."""
+
+    page.set_viewport_size({
+        'width': 430,
+        'height': 932,
+    })
+
+    login(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        quick = page.locator('#cbQuickDefense')
+        expect(quick).to_be_visible(timeout=15_000)
+
+        ss = quick.locator(
+            '[data-cb-position="SS"]'
+        )
+        bench = quick.locator(
+            '.cb-qd-bench-wrap'
+        )
+
+        expect(ss).to_contain_text(
+            'Shortstop Shawn'
+        )
+
+        source_box = ss.bounding_box()
+        target_box = bench.bounding_box()
+
+        assert source_box and target_box
+
+        sx = (
+            source_box['x']
+            + source_box['width'] / 2
+        )
+        sy = (
+            source_box['y']
+            + source_box['height'] / 2
+        )
+        tx = (
+            target_box['x']
+            + target_box['width'] / 2
+        )
+        ty = (
+            target_box['y']
+            + min(target_box['height'] / 2, 30)
+        )
+
+        # This represents a finger gesture beginning directly
+        # on a live field marker and travelling far enough to
+        # cross the old 8px drag threshold.
+        #
+        # Touch must belong to normal tap/scroll behavior.
+        # It must never initiate the live drag controller.
+        page.evaluate(
+            """([sx, sy, tx, ty]) => {
+                const source =
+                    document.elementFromPoint(sx, sy);
+
+                source.dispatchEvent(
+                    new PointerEvent(
+                        'pointerdown',
+                        {
+                            bubbles: true,
+                            cancelable: true,
+                            pointerId: 91,
+                            pointerType: 'touch',
+                            isPrimary: true,
+                            button: 0,
+                            buttons: 1,
+                            clientX: sx,
+                            clientY: sy,
+                        }
+                    )
+                );
+
+                document.dispatchEvent(
+                    new PointerEvent(
+                        'pointermove',
+                        {
+                            bubbles: true,
+                            cancelable: true,
+                            pointerId: 91,
+                            pointerType: 'touch',
+                            isPrimary: true,
+                            button: 0,
+                            buttons: 1,
+                            clientX: tx,
+                            clientY: ty,
+                        }
+                    )
+                );
+
+                document.dispatchEvent(
+                    new PointerEvent(
+                        'pointerup',
+                        {
+                            bubbles: true,
+                            cancelable: true,
+                            pointerId: 91,
+                            pointerType: 'touch',
+                            isPrimary: true,
+                            button: 0,
+                            buttons: 0,
+                            clientX: tx,
+                            clientY: ty,
+                        }
+                    )
+                );
+            }""",
+            [sx, sy, tx, ty],
+        )
+
+        # Give the old async live-save path enough time to
+        # expose an accidental mutation.
+        page.wait_for_timeout(750)
+
+        # SAFETY CONTRACT:
+        # A touch swipe must leave the live defense unchanged.
+        expect(ss).to_contain_text(
+            'Shortstop Shawn',
+            timeout=2_000,
+        )
+
+        assert (
+            page.locator(
+                '.cb-main-drag-ghost'
+            ).count()
+            == 0
+        )
+
+        state = page.request.get(
+            f'{coachboard_url}/api/live-game/'
+            f'{game_id}/state'
+        ).json()
+
+        assert (
+            state['current_alignment']['SS']
+            == 'Shortstop Shawn'
+        )
+
+    finally:
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+            None,
+        )
