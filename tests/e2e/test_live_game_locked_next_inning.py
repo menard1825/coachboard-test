@@ -315,6 +315,333 @@ def test_next_inning_supports_drag_and_drop(
         )
 
 
+
+def test_next_touch_swipe_does_not_drag_player(
+    page: Page,
+    coachboard_url: str,
+):
+    page.set_viewport_size({
+        'width': 430,
+        'height': 932,
+    })
+
+    login(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        switcher = page.locator('#cb-now-next-switch')
+        expect(switcher).to_be_visible(timeout=15_000)
+
+        switcher.locator(
+            '[data-now-next="next"]'
+        ).click()
+
+        board = page.locator('#live-board-prep-v3')
+        expect(board).to_be_visible(timeout=10_000)
+
+        catcher = board.locator(
+            '[data-next-position="C"]'
+        )
+        first_base = board.locator(
+            '[data-next-position="1B"]'
+        )
+
+        expect(catcher).to_contain_text('Catcher Cole')
+        expect(first_base).to_contain_text('First Frank')
+
+        source_box = catcher.bounding_box()
+        target_box = first_base.bounding_box()
+
+        assert source_box and target_box
+
+        sx = source_box['x'] + source_box['width'] / 2
+        sy = source_box['y'] + source_box['height'] / 2
+        tx = target_box['x'] + target_box['width'] / 2
+        ty = target_box['y'] + target_box['height'] / 2
+
+        # Simulate a finger gesture that travels far enough to trigger
+        # the old 8px drag threshold. Touch must not own drag anymore.
+        page.evaluate(
+            """([sx, sy, tx, ty]) => {
+                const source = document.elementFromPoint(sx, sy);
+
+                source.dispatchEvent(new PointerEvent(
+                    'pointerdown',
+                    {
+                        bubbles: true,
+                        cancelable: true,
+                        pointerId: 71,
+                        pointerType: 'touch',
+                        isPrimary: true,
+                        button: 0,
+                        buttons: 1,
+                        clientX: sx,
+                        clientY: sy,
+                    }
+                ));
+
+                document.dispatchEvent(new PointerEvent(
+                    'pointermove',
+                    {
+                        bubbles: true,
+                        cancelable: true,
+                        pointerId: 71,
+                        pointerType: 'touch',
+                        isPrimary: true,
+                        button: 0,
+                        buttons: 1,
+                        clientX: tx,
+                        clientY: ty,
+                    }
+                ));
+
+                document.dispatchEvent(new PointerEvent(
+                    'pointerup',
+                    {
+                        bubbles: true,
+                        cancelable: true,
+                        pointerId: 71,
+                        pointerType: 'touch',
+                        isPrimary: true,
+                        button: 0,
+                        buttons: 0,
+                        clientX: tx,
+                        clientY: ty,
+                    }
+                ));
+            }""",
+            [sx, sy, tx, ty],
+        )
+
+        # Touch movement must leave the NEXT defense unchanged.
+        expect(catcher).to_contain_text(
+            'Catcher Cole',
+            timeout=2_000,
+        )
+        expect(first_base).to_contain_text(
+            'First Frank',
+            timeout=2_000,
+        )
+
+        assert page.locator(
+            '.cb-next-drag-ghost'
+        ).count() == 0
+
+        prep = get_prep(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+        assert (
+            prep['confirmed']['alignment']['C']
+            == 'Catcher Cole'
+        )
+        assert (
+            prep['confirmed']['alignment']['1B']
+            == 'First Frank'
+        )
+
+    finally:
+        state_response = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        )
+
+        if (
+            state_response.ok
+            and state_response.json()
+            .get('game', {})
+            .get('is_live')
+        ):
+            page.request.post(
+                f'{coachboard_url}/api/live-game/'
+                f'{game_id}/end-with-pitching',
+                data={
+                    'defer_pitching': True,
+                    'end_reason': 'manual',
+                    'current_inning_played': True,
+                },
+            )
+
+        page.request.post(
+            f'{coachboard_url}/game-day/{game_id}/delete',
+            headers={'Accept': 'application/json'},
+        )
+
+
+def test_next_refresh_cancels_active_mouse_drag(
+    page: Page,
+    coachboard_url: str,
+):
+    page.set_viewport_size({
+        'width': 1024,
+        'height': 768,
+    })
+
+    login(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        switcher = page.locator('#cb-now-next-switch')
+        expect(switcher).to_be_visible(timeout=15_000)
+
+        switcher.locator(
+            '[data-now-next="next"]'
+        ).click()
+
+        board = page.locator('#live-board-prep-v3')
+        expect(board).to_be_visible(timeout=10_000)
+
+        catcher = board.locator(
+            '[data-next-position="C"]'
+        )
+
+        box = catcher.bounding_box()
+        assert box
+
+        sx = box['x'] + box['width'] / 2
+        sy = box['y'] + box['height'] / 2
+
+        # Start, but do not finish, a mouse drag.
+        page.evaluate(
+            """([x, y]) => {
+                const source = document.elementFromPoint(x, y);
+
+                source.dispatchEvent(new PointerEvent(
+                    'pointerdown',
+                    {
+                        bubbles: true,
+                        cancelable: true,
+                        pointerId: 81,
+                        pointerType: 'mouse',
+                        isPrimary: true,
+                        button: 0,
+                        buttons: 1,
+                        clientX: x,
+                        clientY: y,
+                    }
+                ));
+
+                document.dispatchEvent(new PointerEvent(
+                    'pointermove',
+                    {
+                        bubbles: true,
+                        cancelable: true,
+                        pointerId: 81,
+                        pointerType: 'mouse',
+                        isPrimary: true,
+                        button: 0,
+                        buttons: 1,
+                        clientX: x + 30,
+                        clientY: y + 30,
+                    }
+                ));
+            }""",
+            [sx, sy],
+        )
+
+        ghost = page.locator('.cb-next-drag-ghost')
+        expect(ghost).to_have_count(1)
+
+        # Any authoritative/forced refresh must abandon the stale
+        # in-progress gesture before rerendering NEXT.
+        page.evaluate(
+            "() => window.CBNextDefense.refresh()"
+        )
+
+        expect(
+            page.locator('.cb-next-drag-ghost')
+        ).to_have_count(
+            0,
+            timeout=2_000,
+        )
+
+        # A later pointer-up from the abandoned pointer must not save.
+        page.evaluate(
+            """() => {
+                document.dispatchEvent(new PointerEvent(
+                    'pointerup',
+                    {
+                        bubbles: true,
+                        cancelable: true,
+                        pointerId: 81,
+                        pointerType: 'mouse',
+                        isPrimary: true,
+                        button: 0,
+                        buttons: 0,
+                        clientX: 1,
+                        clientY: 1,
+                    }
+                ));
+            }"""
+        )
+
+        prep = get_prep(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+        assert (
+            prep['confirmed']['alignment']['C']
+            == 'Catcher Cole'
+        )
+        assert (
+            prep['confirmed']['alignment']['1B']
+            == 'First Frank'
+        )
+
+    finally:
+        state_response = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        )
+
+        if (
+            state_response.ok
+            and state_response.json()
+            .get('game', {})
+            .get('is_live')
+        ):
+            page.request.post(
+                f'{coachboard_url}/api/live-game/'
+                f'{game_id}/end-with-pitching',
+                data={
+                    'defer_pitching': True,
+                    'end_reason': 'manual',
+                    'current_inning_played': True,
+                },
+            )
+
+        page.request.post(
+            f'{coachboard_url}/game-day/{game_id}/delete',
+            headers={'Accept': 'application/json'},
+        )
+
+
 def test_now_next_first_slice(
     page: Page,
     coachboard_url: str,

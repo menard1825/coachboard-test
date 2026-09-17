@@ -234,7 +234,7 @@
       <div class="cb-next-selection quiet">
         <div class="cb-next-step">STEP 1</div>
         <div class="cb-next-selection-main">
-          Tap or drag the player you want to move.
+          Tap a player to move them. Mouse or trackpad users can also drag.
         </div>
       </div>`;
   }
@@ -680,7 +680,7 @@
 
       #${CARD_ID} .cb-next-spot,
       #${CARD_ID} .cb-next-bench-player{
-        touch-action:none;
+        touch-action:manipulation;
         cursor:grab;
       }
 
@@ -1863,6 +1863,13 @@
   }
 
   function beginNextDrag(event) {
+    // Finger and pen gestures belong to normal tap/scroll behavior.
+    // Drag is deliberately limited to mouse-like pointers so a coach
+    // cannot accidentally move a player while trying to scroll.
+    if (event.pointerType !== 'mouse') {
+      return;
+    }
+
     if (
       event.button !== undefined &&
       event.button !== 0
@@ -2152,6 +2159,12 @@
         signature !== lastSignature ||
         !$(CARD_ID)
       ) {
+        // A changed/forced authoritative refresh makes any active drag
+        // stale. Cancel it before hydrate() replaces the NEXT card DOM.
+        if (nextDrag) {
+          cancelNextDrag();
+        }
+
         lastSignature = signature;
         hydrate(data);
       } else {
