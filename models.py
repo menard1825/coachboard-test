@@ -1,6 +1,6 @@
 # menard1825/coachboard-test/coachboard-test-structure-overhaul/models.py
 # models.py
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float, DateTime, JSON
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Float, DateTime, JSON, Index
 from sqlalchemy.orm import relationship
 from db import db
 import json
@@ -61,6 +61,10 @@ class User(db.Model):
 class TeamMembership(db.Model):
     """Maps a user to a team, storing their role and preferences specific to that team."""
     __tablename__ = 'team_memberships'
+    __table_args__ = (
+        Index('idx_team_memberships_user_team', 'user_id', 'team_id'),
+        Index('idx_team_memberships_team', 'team_id'),
+    )
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
@@ -72,6 +76,9 @@ class TeamMembership(db.Model):
 
 class Player(db.Model):
     __tablename__ = 'players'
+    __table_args__ = (
+        Index('idx_players_team_name', 'team_id', 'name'),
+    )
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     number = Column(String)
@@ -109,6 +116,9 @@ class Player(db.Model):
 
 class Lineup(db.Model):
     __tablename__ = 'lineups'
+    __table_args__ = (
+        Index('idx_lineups_team_game', 'team_id', 'associated_game_id'),
+    )
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     lineup_positions = Column(JSON) # Changed to JSON
@@ -146,6 +156,15 @@ class LineupEntry(db.Model):
 
 class PitchingOuting(db.Model):
     __tablename__ = 'pitching_outings'
+    __table_args__ = (
+        Index('idx_pitching_outings_game', 'game_id'),
+        Index(
+            'idx_pitching_outings_team_player_date',
+            'team_id',
+            'player_id',
+            'date',
+        ),
+    )
     id = Column(Integer, primary_key=True)
     date = Column(DateTime, nullable=False)
     opponent = Column(String)
@@ -194,6 +213,9 @@ class ScoutedPlayer(db.Model):
 
 class Rotation(db.Model):
     __tablename__ = 'rotations'
+    __table_args__ = (
+        Index('idx_rotations_team_game', 'team_id', 'associated_game_id'),
+    )
     id = Column(Integer, primary_key=True)
     title = Column(String, nullable=False)
     innings = Column(JSON) # Changed to JSON
@@ -202,10 +224,18 @@ class Rotation(db.Model):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     team = relationship("Team", back_populates="rotations")
 
-from sqlalchemy import Index
-
 class Game(db.Model):
     __tablename__ = 'games'
+    __table_args__ = (
+        Index('idx_games_team_live_id', 'team_id', 'is_live', 'id'),
+        Index(
+            'idx_games_team_date_start_id',
+            'team_id',
+            'date',
+            'start_time',
+            'id',
+        ),
+    )
     id = Column(Integer, primary_key=True)
     date = Column(DateTime, nullable=False) # Changed to DateTime
     start_time = Column(String, nullable=True) # Optional e.g. "09:00 AM"
@@ -260,6 +290,21 @@ class GamePitchingPlan(db.Model):
 
 class GameRotationEvent(db.Model):
     __tablename__ = 'game_rotation_events'
+    __table_args__ = (
+        Index(
+            'idx_game_rotation_events_team_game_sequence_id',
+            'team_id',
+            'game_id',
+            'sequence',
+            'id',
+        ),
+        Index(
+            'idx_game_rotation_events_game_sequence_id',
+            'game_id',
+            'sequence',
+            'id',
+        ),
+    )
     id = Column(Integer, primary_key=True)
     inning = Column(String, nullable=False)
     sequence = Column(Integer, nullable=False)
@@ -299,6 +344,7 @@ class PlayerPitchTarget(db.Model):
     __table_args__ = (
         Index('idx_unique_daily_target', 'team_id', 'player_id', 'local_date', unique=True, sqlite_where=Column('game_id').is_(None)),
         Index('idx_unique_game_target', 'team_id', 'player_id', 'local_date', 'game_id', unique=True, sqlite_where=Column('game_id').is_not(None)),
+        Index('idx_player_pitch_targets_team', 'team_id'),
     )
 
 class CollaborationNote(db.Model):
@@ -371,6 +417,14 @@ class Sign(db.Model):
 
 class PlayerGameAbsence(db.Model):
     __tablename__ = 'player_game_absences'
+    __table_args__ = (
+        Index(
+            'idx_player_game_absences_team_game_player',
+            'team_id',
+            'game_id',
+            'player_id',
+        ),
+    )
     id = Column(Integer, primary_key=True)
 
     player_id = Column(Integer, ForeignKey('players.id'), nullable=False)
