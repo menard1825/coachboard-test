@@ -139,14 +139,15 @@
       if (benchTitle && benchTitle.textContent !== benchTitleText) benchTitle.textContent = benchTitleText;
 
       const missing = fieldPositions().filter(pos => !draft.alignment[pos]);
+      const blockingMissing = missing.filter(pos => pos === 'P');
       let banner = card.querySelector('.cb-main-draft-banner');
-      if (missing.length) {
+      if (blockingMissing.length) {
         if (!banner) {
           banner = document.createElement('div');
           banner.className = 'cb-main-draft-banner';
           card.querySelector('.cb-qd-bench-wrap')?.insertAdjacentElement('afterend', banner);
         }
-        const bannerHtml = `<span><strong>${esc(missing.join(', '))} open.</strong> Keep dragging players until every position is filled; CoachBoard will save automatically.</span><button type="button" class="btn btn-sm btn-outline-secondary" data-cb-cancel-main-draft>Cancel</button>`;
+        const bannerHtml = `<span><strong>${esc(blockingMissing.join(', '))} open.</strong> The pitcher position must be filled before CoachBoard can save.</span><button type="button" class="btn btn-sm btn-outline-secondary" data-cb-cancel-main-draft>Cancel</button>`;
         if (banner.innerHTML !== bannerHtml) banner.innerHTML = bannerHtml;
         setSaveBadge('saving', 'Finish defense');
       } else if (banner) {
@@ -208,7 +209,11 @@
   async function saveCompletedDraft() {
     if (!draft || saveBusy) return;
     const missing = fieldPositions().filter(pos => !draft.alignment[pos]);
-    if (missing.length) {
+
+    // An intentionally OPEN non-pitcher position is a valid live-game
+    // state and must be persisted immediately so every connected coach
+    // sees the same field. P remains protected and cannot be saved OPEN.
+    if (missing.includes('P')) {
       renderDraft();
       return;
     }

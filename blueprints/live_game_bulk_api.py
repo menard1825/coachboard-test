@@ -176,7 +176,13 @@ def _fast_success(game, team, event, alignment, *, prep_changed=False):
     return jsonify({'status': 'success', 'delta': delta})
 
 
-def _validate_complete_alignment(proposed, game, team):
+def _validate_complete_alignment(
+    proposed,
+    game,
+    team,
+    *,
+    allow_open_non_pitcher=False,
+):
     if not isinstance(proposed, dict):
         return None, None, 'A complete defensive alignment is required.'
 
@@ -197,7 +203,23 @@ def _validate_complete_alignment(proposed, game, team):
 
     missing = _missing_positions(after, allowed)
     if missing:
-        return None, None, f"Finish the defense before saving. Missing: {', '.join(missing)}."
+        if not allow_open_non_pitcher:
+            return (
+                None,
+                None,
+                f"Finish the defense before saving. Missing: {', '.join(missing)}.",
+            )
+
+        # Live-game defense may intentionally leave a non-pitcher
+        # position OPEN. The pitcher is the one position that must
+        # remain populated because pitcher safety/workload state is
+        # tied to the authoritative live alignment.
+        if 'P' in missing:
+            return (
+                None,
+                None,
+                'The live pitcher position cannot be left open.',
+            )
 
     valid, message = _validate_alignment(after, present_names)
     if not valid:
@@ -386,7 +408,12 @@ def defense_edit(game_id):
     if stale:
         return stale
 
-    after, _, message = _validate_complete_alignment(data.get('alignment'), game, team)
+    after, _, message = _validate_complete_alignment(
+        data.get('alignment'),
+        game,
+        team,
+        allow_open_non_pitcher=True,
+    )
     if not after:
         return jsonify({'status': 'error', 'message': message}), 409
 

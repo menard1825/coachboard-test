@@ -142,6 +142,65 @@ def test_defense_edit_saves_one_event_and_returns_light_delta(monkeypatch):
         assert events[0].after_alignment['RF'] == 'Jack'
 
 
+
+def test_defense_edit_allows_open_non_pitcher_and_broadcasts_it(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    # Start with the exact live Inning 2 defense, then intentionally
+    # send the shortstop to the bench without replacing the position.
+    #
+    # Live defense may have an OPEN non-pitcher position. That open
+    # position must become authoritative so every connected coach sees
+    # the same field.
+    alignment = _inning_two_with_jack_in_right()
+    alignment['RF'] = 'Isaac'
+    alignment.pop('SS')
+
+    response = client.post(
+        '/api/live-game/70/defense-edit',
+        json={
+            'base_sequence': 0,
+            'alignment': alignment,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+
+    assert payload['status'] == 'success'
+    assert 'delta' in payload
+
+    live_alignment = payload['delta']['current_alignment']
+
+    assert live_alignment.get('P') == 'Aiden'
+    assert 'SS' not in live_alignment
+    assert live_alignment['RF'] == 'Isaac'
+
+    bench_names = {
+        player['name']
+        for player in payload['delta']['bench']
+    }
+
+    assert {'Finn', 'Jack'}.issubset(bench_names)
+
+    from db import db
+    from models import GameRotationEvent
+
+    with app.app_context():
+        events = (
+            db.session.query(GameRotationEvent)
+            .filter_by(game_id=70, team_id=1)
+            .all()
+        )
+
+        assert len(events) == 1
+        assert events[0].event_type == 'Bulk Defensive Change'
+        assert events[0].before_alignment['SS'] == 'Finn'
+        assert 'SS' not in events[0].after_alignment
+        assert events[0].after_alignment['P'] == 'Aiden'
+
 def test_stale_second_coach_edit_is_rejected_without_overwriting_first(monkeypatch):
     app = _build_app(monkeypatch)
     first_client = app.test_client()

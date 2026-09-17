@@ -107,44 +107,258 @@ def cleanup(page: Page, coachboard_url: str, game_id: int, player_id):
         page.request.get(f'{coachboard_url}/delete_player/{player_id}')
 
 
-def test_phone_quick_field_stages_bench_move_then_saves_complete_defense(page: Page, coachboard_url: str):
+def test_phone_quick_field_bench_drop_saves_open_spot_immediately(
+    page: Page,
+    coachboard_url: str,
+):
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
     player_id = add_bench_player(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
+
     try:
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
-        page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
+        post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
 
         quick = page.locator('#cbQuickDefense')
         expect(quick).to_be_visible(timeout=15_000)
-        expect(quick.locator('.cb-qd-help')).to_contain_text('field and bench')
-        expect(page.locator('#liveDefensiveChangeBtn')).to_have_count(0)
-        expect(page.locator('#cb-live-field-editor')).to_have_count(0)
 
         ss = quick.locator('[data-cb-position="SS"]')
         bench = quick.locator('.cb-qd-bench-wrap')
+
+        expect(ss).to_contain_text('Shortstop Shawn')
+
+        # Sending a non-pitcher directly to the bench is itself a
+        # completed live-game action. It must save the OPEN position
+        # immediately rather than becoming a device-local draft.
         drag(page, ss, bench)
-        expect(ss).to_contain_text('Open — choose player', timeout=10_000)
-        expect(quick.locator('.cb-main-draft-banner')).to_contain_text('SS open')
 
-        server_before = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
-        assert server_before['current_alignment']['SS'] == 'Shortstop Shawn'
+        expect(ss).to_contain_text(
+            'Open',
+            timeout=10_000,
+        )
 
-        bench_player = quick.locator(f'[data-cb-move-player="{BENCH_NAME}"]')
-        expect(bench_player).to_be_visible()
-        drag(page, bench_player, ss)
-        expect(quick.locator('.cb-main-draft-banner')).not_to_be_visible(timeout=10_000)
-        expect(quick.locator('.cb-save-state')).to_contain_text('Saved', timeout=10_000)
+        expect(
+            quick.locator('.cb-save-state')
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
 
-        state = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
-        assert state['current_alignment']['SS'] == BENCH_NAME
-        events = [e for e in state.get('rotation_events', []) if not e.get('reverted') and e.get('event_type') == 'Bulk Defensive Change']
+        expect(
+            quick.locator('.cb-main-draft-banner')
+        ).to_have_count(0)
+
+        state = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        assert 'SS' not in state['current_alignment']
+        assert state['current_alignment']['P'] == 'Pitcher Pat'
+
+        bench_names = {
+            player['name']
+            for player in state.get('bench', [])
+        }
+
+        assert 'Shortstop Shawn' in bench_names
+        assert BENCH_NAME in bench_names
+
+        events = [
+            event
+            for event in state.get('rotation_events', [])
+            if (
+                not event.get('reverted')
+                and event.get('event_type')
+                == 'Bulk Defensive Change'
+            )
+        ]
+
         assert len(events) == 1
-        assert events[0]['before_alignment']['SS'] == 'Shortstop Shawn'
-        assert events[0]['after_alignment']['SS'] == BENCH_NAME
+        assert (
+            events[0]['before_alignment']['SS']
+            == 'Shortstop Shawn'
+        )
+        assert 'SS' not in events[0]['after_alignment']
+
     finally:
-        cleanup(page, coachboard_url, game_id, player_id)
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+            player_id,
+        )
+
+
+
+def test_phone_quick_field_open_spot_syncs_to_second_client_without_poll(
+    page: Page,
+    coachboard_url: str,
+):
+    page.set_viewport_size(
+        {
+            'width': 390,
+            'height': 844,
+        }
+    )
+
+    login(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+    second = None
+
+    try:
+        post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        first_quick = page.locator(
+            '#cbQuickDefense'
+        )
+
+        expect(
+            first_quick
+        ).to_be_visible(
+            timeout=15_000
+        )
+
+        first_ss = first_quick.locator(
+            '[data-cb-position="SS"]'
+        )
+
+        expect(
+            first_ss
+        ).to_contain_text(
+            'Shortstop Shawn'
+        )
+
+        # A second independent page represents another coach/device.
+        # It gets the authoritative starting state first.
+        second = page.context.new_page()
+
+        second.set_viewport_size(
+            {
+                'width': 390,
+                'height': 844,
+            }
+        )
+
+        second.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        second_quick = second.locator(
+            '#cbQuickDefense'
+        )
+
+        expect(
+            second_quick
+        ).to_be_visible(
+            timeout=15_000
+        )
+
+        second_ss = second_quick.locator(
+            '[data-cb-position="SS"]'
+        )
+
+        expect(
+            second_ss
+        ).to_contain_text(
+            'Shortstop Shawn'
+        )
+
+        # Once the second screen has its initial authoritative state,
+        # block every later HTTP /state read. This makes the socket/delta
+        # path the only way that screen can learn about the open SS within
+        # the assertion window below.
+        second.route(
+            f'**/api/live-game/{game_id}/state',
+            lambda route: route.abort(),
+        )
+
+        bench = first_quick.locator(
+            '.cb-qd-bench-wrap'
+        )
+
+        drag(
+            page,
+            first_ss,
+            bench,
+        )
+
+        # First client saves the open spot authoritatively.
+        expect(
+            first_ss
+        ).to_contain_text(
+            'Open',
+            timeout=10_000,
+        )
+
+        expect(
+            first_quick.locator(
+                '.cb-save-state'
+            )
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        state = page.request.get(
+            f'{coachboard_url}/api/live-game/'
+            f'{game_id}/state'
+        ).json()
+
+        assert 'SS' not in state[
+            'current_alignment'
+        ]
+
+        # This is the original real-world bug:
+        # the second device must clear SS too.
+        #
+        # Timeout is intentionally below the normal 5-second poll
+        # interval, and HTTP /state is blocked above.
+        expect(
+            second_ss
+        ).to_contain_text(
+            'Open',
+            timeout=2_500,
+        )
+
+        expect(
+            second_quick.locator(
+                '[data-cb-move-player="Shortstop Shawn"]'
+            )
+        ).to_be_visible(
+            timeout=2_500,
+        )
+
+    finally:
+        if second is not None:
+            second.close()
+
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+            None,
+        )
 
 
 def test_phone_quick_field_swaps_two_fielders_without_second_editor(page: Page, coachboard_url: str):

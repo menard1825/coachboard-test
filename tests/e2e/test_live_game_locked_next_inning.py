@@ -127,6 +127,25 @@ def create_game(page: Page, coachboard_url: str):
     return game_id
 
 
+
+def drag(page: Page, source, target):
+    source_box = source.bounding_box()
+    target_box = target.bounding_box()
+
+    assert source_box and target_box
+
+    page.mouse.move(
+        source_box['x'] + source_box['width'] / 2,
+        source_box['y'] + source_box['height'] / 2,
+    )
+    page.mouse.down()
+    page.mouse.move(
+        target_box['x'] + target_box['width'] / 2,
+        target_box['y'] + target_box['height'] / 2,
+        steps=12,
+    )
+    page.mouse.up()
+
 def get_prep(page: Page, coachboard_url: str, game_id: int):
     response = page.request.get(
         f'{coachboard_url}/api/live-game/'
@@ -143,6 +162,157 @@ def nonblank(alignment_value):
         for key, value in alignment_value.items()
         if value
     }
+
+
+
+def test_next_inning_supports_drag_and_drop(
+    page: Page,
+    coachboard_url: str,
+):
+    page.set_viewport_size(
+        {
+            'width': 430,
+            'height': 932,
+        }
+    )
+
+    login(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        switcher = page.locator('#cb-now-next-switch')
+
+        expect(
+            switcher
+        ).to_be_visible(
+            timeout=15_000
+        )
+
+        switcher.locator(
+            '[data-now-next="next"]'
+        ).click()
+
+        next_board = page.locator(
+            '#live-board-prep-v3'
+        )
+
+        expect(
+            next_board
+        ).to_be_visible(
+            timeout=10_000
+        )
+
+        catcher = next_board.locator(
+            '[data-next-position="C"]'
+        )
+
+        first_base = next_board.locator(
+            '[data-next-position="1B"]'
+        )
+
+        expect(catcher).to_contain_text('Catcher Cole')
+        expect(first_base).to_contain_text('First Frank')
+
+        # Dragging must perform the same authoritative NEXT move as
+        # the existing tap-source / tap-destination workflow.
+        drag(
+            page,
+            catcher,
+            first_base,
+        )
+
+        expect(
+            first_base
+        ).to_contain_text(
+            'Catcher Cole',
+            timeout=10_000,
+        )
+
+        expect(
+            catcher
+        ).to_contain_text(
+            'First Frank',
+            timeout=10_000,
+        )
+
+        save_chip = next_board.locator(
+            '.cb-next-save'
+        )
+
+        expect(
+            save_chip
+        ).to_have_class(
+            re.compile(r'\bsaved\b'),
+            timeout=10_000,
+        )
+
+        expect(
+            save_chip
+        ).to_contain_text(
+            'Catcher Cole',
+            timeout=10_000,
+        )
+
+        expect(
+            save_chip
+        ).to_contain_text(
+            '→ 1B',
+            timeout=10_000,
+        )
+
+        prep = get_prep(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+        assert (
+            prep['confirmed']['alignment']['1B']
+            == 'Catcher Cole'
+        )
+
+        assert (
+            prep['confirmed']['alignment']['C']
+            == 'First Frank'
+        )
+
+    finally:
+        state_response = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        )
+
+        if (
+            state_response.ok
+            and state_response.json()
+            .get('game', {})
+            .get('is_live')
+        ):
+            page.request.post(
+                f'{coachboard_url}/api/live-game/'
+                f'{game_id}/end-with-pitching',
+                data={
+                    'defer_pitching': True,
+                    'end_reason': 'manual',
+                    'current_inning_played': True,
+                },
+            )
+
+        page.request.post(
+            f'{coachboard_url}/game-day/{game_id}/delete',
+            headers={'Accept': 'application/json'},
+        )
 
 
 def test_now_next_first_slice(

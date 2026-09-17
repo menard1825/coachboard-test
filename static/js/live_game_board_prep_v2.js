@@ -23,6 +23,8 @@
   let errorMessage = '';
   let undoStack = [];
   let socketBound = false;
+  let nextDrag = null;
+  let suppressNextClickUntil = 0;
 
   const $ = id => document.getElementById(id);
 
@@ -232,7 +234,7 @@
       <div class="cb-next-selection quiet">
         <div class="cb-next-step">STEP 1</div>
         <div class="cb-next-selection-main">
-          Tap the player you want to move.
+          Tap or drag the player you want to move.
         </div>
       </div>`;
   }
@@ -674,6 +676,46 @@
         min-height:0;
         margin-inline:auto;
         aspect-ratio:1.28/1;
+      }
+
+      #${CARD_ID} .cb-next-spot,
+      #${CARD_ID} .cb-next-bench-player{
+        touch-action:none;
+        cursor:grab;
+      }
+
+      #${CARD_ID} .cb-next-spot:active,
+      #${CARD_ID} .cb-next-bench-player:active{
+        cursor:grabbing;
+      }
+
+      #${CARD_ID} .cb-next-spot.cb-next-drag-over .cb-qd-name{
+        outline:4px solid rgba(49,93,152,.24);
+        border-color:#315d98!important;
+        background:#eef4ff!important;
+      }
+
+      #${CARD_ID} .cb-next-bench.cb-next-drag-over{
+        outline:4px solid rgba(23,107,56,.18);
+        border-color:#5b9b70;
+        background:#f0f8f2;
+      }
+
+      .cb-next-drag-ghost{
+        position:fixed;
+        z-index:8000;
+        pointer-events:none;
+        transform:translate(-50%,-50%) scale(1.04);
+        max-width:170px;
+        padding:8px 10px;
+        border:2px solid #315d98;
+        border-radius:10px;
+        background:#fff;
+        color:#172033;
+        box-shadow:0 12px 28px rgba(16,24,40,.24);
+        font-size:.7rem;
+        font-weight:850;
+        text-align:center;
       }
 
       #${CARD_ID} .cb-next-open .cb-qd-name{
@@ -1528,20 +1570,9 @@
         () => {
           if (!selected) return;
 
-          const next = snapshot();
-
-          if (
-            selected.source !== 'BENCH'
-          ) {
-            next[selected.source] = '';
-          }
-
-          saveAlignment(
-            next,
-            {
-              successMessage:
-                `${playerLabel(selected.name)} → BENCH`,
-            }
+          movePlayerToBench(
+            selected.name,
+            selected.source
           );
         }
       );
@@ -1633,6 +1664,34 @@
     }
   }
 
+  function movePlayerToBench(
+    name,
+    source
+  ) {
+    if (
+      busy ||
+      !name ||
+      !source ||
+      source === 'BENCH'
+    ) {
+      selected = null;
+      selectedPosition = '';
+      renderCard();
+      return;
+    }
+
+    const next = snapshot();
+    next[source] = '';
+
+    saveAlignment(
+      next,
+      {
+        successMessage:
+          `${playerLabel(name)} → BENCH`,
+      }
+    );
+  }
+
   function movePlayer(
     name,
     source,
@@ -1687,6 +1746,261 @@
           `${playerLabel(name)} → ${target} ✓`,
       }
     );
+  }
+
+  function nextDragSource(event) {
+    if (
+      activeView !== 'next' ||
+      busy
+    ) {
+      return null;
+    }
+
+    const field = event.target.closest?.(
+      `#${CARD_ID} [data-next-position]`
+    );
+
+    if (field) {
+      const name =
+        field.dataset.nextPlayer || '';
+
+      const source =
+        field.dataset.nextPosition || '';
+
+      if (!name || !source) return null;
+
+      return {
+        element: field,
+        name,
+        source,
+      };
+    }
+
+    const bench = event.target.closest?.(
+      `#${CARD_ID} [data-next-bench-player]`
+    );
+
+    if (bench) {
+      const name =
+        bench.dataset.nextBenchPlayer || '';
+
+      if (!name) return null;
+
+      return {
+        element: bench,
+        name,
+        source: 'BENCH',
+      };
+    }
+
+    return null;
+  }
+
+  function nextDropDestination(
+    clientX,
+    clientY
+  ) {
+    const element =
+      document.elementFromPoint(
+        clientX,
+        clientY
+      );
+
+    const field = element?.closest?.(
+      `#${CARD_ID} [data-next-position]`
+    );
+
+    if (field) {
+      return (
+        field.dataset.nextPosition || ''
+      );
+    }
+
+    if (
+      element?.closest?.(
+        `#${CARD_ID} .cb-next-bench`
+      )
+    ) {
+      return 'BENCH';
+    }
+
+    return '';
+  }
+
+  function clearNextDragHighlight() {
+    document
+      .querySelectorAll(
+        `#${CARD_ID} .cb-next-drag-over`
+      )
+      .forEach(element => {
+        element.classList.remove(
+          'cb-next-drag-over'
+        );
+      });
+  }
+
+  function highlightNextDropTarget(
+    clientX,
+    clientY
+  ) {
+    clearNextDragHighlight();
+
+    const element =
+      document.elementFromPoint(
+        clientX,
+        clientY
+      );
+
+    const target =
+      element?.closest?.(
+        `#${CARD_ID} [data-next-position], ` +
+        `#${CARD_ID} .cb-next-bench`
+      );
+
+    target?.classList.add(
+      'cb-next-drag-over'
+    );
+  }
+
+  function beginNextDrag(event) {
+    if (
+      event.button !== undefined &&
+      event.button !== 0
+    ) {
+      return;
+    }
+
+    const source =
+      nextDragSource(event);
+
+    if (!source) return;
+
+    nextDrag = {
+      pointerId: event.pointerId,
+      name: source.name,
+      source: source.source,
+      element: source.element,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+      ghost: null,
+    };
+  }
+
+  function moveNextDrag(event) {
+    if (
+      !nextDrag ||
+      event.pointerId !==
+        nextDrag.pointerId
+    ) {
+      return;
+    }
+
+    const distance = Math.hypot(
+      event.clientX -
+        nextDrag.startX,
+      event.clientY -
+        nextDrag.startY
+    );
+
+    if (
+      !nextDrag.active &&
+      distance < 8
+    ) {
+      return;
+    }
+
+    if (!nextDrag.active) {
+      nextDrag.active = true;
+
+      suppressNextClickUntil =
+        Date.now() + 700;
+
+      const ghost =
+        document.createElement('div');
+
+      ghost.className =
+        'cb-next-drag-ghost';
+
+      ghost.textContent =
+        playerLabel(nextDrag.name);
+
+      document.body.appendChild(
+        ghost
+      );
+
+      nextDrag.ghost = ghost;
+    }
+
+    event.preventDefault();
+
+    if (nextDrag.ghost) {
+      nextDrag.ghost.style.left =
+        `${event.clientX}px`;
+
+      nextDrag.ghost.style.top =
+        `${event.clientY}px`;
+    }
+
+    highlightNextDropTarget(
+      event.clientX,
+      event.clientY
+    );
+  }
+
+  function finishNextDrag(event) {
+    if (
+      !nextDrag ||
+      event.pointerId !==
+        nextDrag.pointerId
+    ) {
+      return;
+    }
+
+    const completed = nextDrag;
+    nextDrag = null;
+
+    clearNextDragHighlight();
+    completed.ghost?.remove();
+
+    if (!completed.active) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    suppressNextClickUntil =
+      Date.now() + 700;
+
+    const destination =
+      nextDropDestination(
+        event.clientX,
+        event.clientY
+      );
+
+    if (!destination) return;
+
+    selected = null;
+    selectedPosition = '';
+
+    if (destination === 'BENCH') {
+      movePlayerToBench(
+        completed.name,
+        completed.source
+      );
+      return;
+    }
+
+    movePlayer(
+      completed.name,
+      completed.source,
+      destination
+    );
+  }
+
+  function cancelNextDrag() {
+    clearNextDragHighlight();
+    nextDrag?.ghost?.remove();
+    nextDrag = null;
   }
 
   async function useCurrentDefense() {
@@ -1988,9 +2302,58 @@
       afterAdvance
     );
 
+    document.addEventListener(
+      'pointerdown',
+      beginNextDrag,
+      {
+        capture: true,
+        passive: true,
+      }
+    );
+
+    document.addEventListener(
+      'pointermove',
+      moveNextDrag,
+      {
+        capture: true,
+        passive: false,
+      }
+    );
+
+    document.addEventListener(
+      'pointerup',
+      finishNextDrag,
+      {
+        capture: true,
+        passive: false,
+      }
+    );
+
+    document.addEventListener(
+      'pointercancel',
+      cancelNextDrag,
+      {
+        capture: true,
+        passive: true,
+      }
+    );
+
     window.addEventListener(
       'click',
       event => {
+        if (
+          Date.now() <
+            suppressNextClickUntil &&
+          event.target.closest?.(
+            `#${CARD_ID}`
+          )
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          return;
+        }
+
         const undo = event.target.closest?.(
           '#liveUndoBtn'
         );
