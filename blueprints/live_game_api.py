@@ -237,9 +237,19 @@ def _pitching_log_for_game(game, team_id):
     ).all()
 
 
-def get_authoritative_live_state(game_id, team_id):
+def get_authoritative_live_state(game_id, team_id, game=None):
     team = db.session.get(Team, team_id)
-    game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
+
+    if game is None:
+        game = db.session.query(Game).filter_by(
+            id=game_id,
+            team_id=team_id,
+        ).first()
+    elif game.id != game_id or game.team_id != team_id:
+        # A supplied Game is only reusable when it is exactly the row the
+        # caller requested. Fall closed rather than trusting mismatched state.
+        return None
+
     if not team or not game:
         return None
 
@@ -392,7 +402,13 @@ def state(game_id):
     user, team, game = _authorized_context(game_id)
     if not game:
         return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
-    return jsonify(get_authoritative_live_state(game.id, team.id))
+    return jsonify(
+        get_authoritative_live_state(
+            game.id,
+            team.id,
+            game=game,
+        )
+    )
 
 
 @live_game_api_bp.route('/<int:game_id>/start', methods=['POST'])
