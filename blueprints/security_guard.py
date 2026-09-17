@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 import zoneinfo
 
-from flask import Blueprint, current_app, flash, has_request_context, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, g, has_request_context, jsonify, redirect, render_template, request, session, url_for
 
 from db import db
 from models import (
@@ -285,6 +285,12 @@ def _validate_session_membership():
     membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=team_id).first()
     if not membership:
         return False
+
+    # Cache the authorization objects only for this Flask request. Downstream
+    # helpers may reuse them, but they remain free to query when the cache is
+    # absent or does not match the current session.
+    g.coachboard_user = user
+    g.coachboard_membership = membership
 
     # Keep permissions current without marking every read-only request as a
     # session write. Reissuing stale signed cookies from concurrent API calls
