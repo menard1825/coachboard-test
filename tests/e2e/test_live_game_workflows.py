@@ -17,12 +17,19 @@ from playwright.sync_api import Page, expect
 
 TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
+ASSISTANT_USERNAME = 'playwright-assistant'
+ASSISTANT_PASSWORD = 'playwright-assistant-password'
 
 
-def login(page: Page, coachboard_url: str):
+def login(
+    page: Page,
+    coachboard_url: str,
+    username=TEST_USERNAME,
+    password=TEST_PASSWORD,
+):
     page.goto(f'{coachboard_url}/login')
-    page.get_by_label('Username or email').fill(TEST_USERNAME)
-    page.locator('#password').fill(TEST_PASSWORD)
+    page.get_by_label('Username or email').fill(username)
+    page.locator('#password').fill(password)
     page.get_by_role('button', name='Sign In').click()
     expect(page).to_have_url(re.compile(rf'^{re.escape(coachboard_url)}/?(?:#(?:games|overview))?$'))
 
@@ -364,6 +371,85 @@ def test_game_day_planning_live_game_and_postgame_lifecycle(page: Page, coachboa
     deleted = post_json(page, coachboard_url, f'/game-day/{game_id}/delete', {})
     assert 'Automation Live Opponent' in deleted['message']
     assert get_json(page, coachboard_url, f'/api/game_data/{game_id}', expected_status=404)['error']
+
+
+def test_secondary_coach_uses_live_state_for_postgame_transition(
+    browser,
+    coachboard_url: str,
+):
+    primary_context = browser.new_context()
+    assistant_context = browser.new_context()
+
+    try:
+        primary = primary_context.new_page()
+        assistant = assistant_context.new_page()
+
+        login(primary, coachboard_url)
+        login(
+            assistant,
+            coachboard_url,
+            username=ASSISTANT_USERNAME,
+            password=ASSISTANT_PASSWORD,
+        )
+
+        game_id, _, _ = create_game_with_plan(
+            primary,
+            coachboard_url,
+        )
+
+        primary.goto(f'{coachboard_url}/game/{game_id}')
+
+        start_button = primary.locator(
+            '#startLiveGameBtnAction'
+        )
+        expect(start_button).to_be_visible()
+        start_button.click()
+
+        expect(
+            primary.locator('#live-game-overlay')
+        ).to_be_visible(timeout=15_000)
+
+        # The assistant coach joins the same active Live Game and must observe
+        # a live state before the other coach ends it.
+        assistant.goto(f'{coachboard_url}/game/{game_id}')
+
+        expect(
+            assistant.locator('#live-game-overlay')
+        ).to_be_visible(timeout=15_000)
+
+        # Once the assistant has observed the live game, block future HTTP
+        # state polls. The postgame transition below must therefore come from
+        # the Socket.IO -> applyState -> coachboard:live-state path, not from
+        # the 5-second polling fallback.
+        assistant.route(
+            f'**/api/live-game/{game_id}/state',
+            lambda route: route.abort(),
+        )
+
+        finalized = post_json(
+            primary,
+            coachboard_url,
+            f'/api/live-game/{game_id}/end-with-pitching',
+            {
+                'defer_pitching': True,
+                'end_reason': 'manual',
+                'current_inning_played': True,
+            },
+        )
+
+        assert finalized['state']['game']['is_live'] is False
+
+        expect(assistant).to_have_url(
+            re.compile(
+                rf'^{re.escape(coachboard_url)}'
+                rf'/game-day/{game_id}/report$'
+            ),
+            timeout=2_500,
+        )
+
+    finally:
+        assistant_context.close()
+        primary_context.close()
 
 
 def test_live_game_validation_legacy_client_and_cross_site_safety(page: Page, coachboard_url: str):

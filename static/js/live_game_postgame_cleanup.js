@@ -249,26 +249,42 @@
     });
   }
 
+  function handleObservedState(state) {
+    if (!state) return;
+
+    latestState = state;
+
+    const isLive = Boolean(state?.game?.is_live);
+
+    if (isLive) {
+      seenLive = true;
+      enhanceAdjustModal(state);
+      return;
+    }
+
+    if (seenLive && !reloading) {
+      reloading = true;
+      // A completed game belongs in the actual-usage flow, not back in the
+      // pregame planner. This also moves secondary coaches when another coach
+      // ends it.
+      window.location.assign(`/game-day/${gameId}/report`);
+    }
+  }
+
   async function checkState() {
     if (checking || reloading) return;
+
     checking = true;
+
     try {
-      const response = await fetch(`/api/live-game/${gameId}/state`, {cache:'no-store'});
+      const response = await fetch(
+        `/api/live-game/${gameId}/state`,
+        {cache:'no-store'}
+      );
+
       if (!response.ok) return;
-      const state = await response.json();
-      latestState = state;
-      const isLive = Boolean(state?.game?.is_live);
-      if (isLive) {
-        seenLive = true;
-        enhanceAdjustModal(state);
-        return;
-      }
-      if (seenLive) {
-        reloading = true;
-        // A completed game belongs in the actual-usage flow, not back in the
-        // pregame planner. This also moves secondary coaches when another coach ends it.
-        window.location.assign(`/game-day/${gameId}/report`);
-      }
+
+      handleObservedState(await response.json());
     } catch (_) {
       // The main Live Game controller owns user-facing sync errors.
     } finally {
@@ -279,7 +295,21 @@
   document.addEventListener('DOMContentLoaded', () => {
     installBenchStyles();
     checkState();
-    setInterval(checkState, 1000);
+    // Slow HTTP polling is only the fallback when shared live updates are
+    // unavailable. Normal postgame transitions arrive through live-state.
+    setInterval(checkState, 5000);
+  });
+
+  document.addEventListener('coachboard:live-state', event => {
+    const detail = event.detail || {};
+
+    if (Number(detail.game_id) !== gameId) return;
+
+    // Unlike the other live-state subscribers, this one may navigate away
+    // when a game ends. Do not filter on detail.source: socket, initial fetch,
+    // and future authoritative state sources must all be allowed to drive the
+    // lifecycle transition.
+    handleObservedState(detail.state);
   });
 
   document.addEventListener('shown.bs.modal', event => {
