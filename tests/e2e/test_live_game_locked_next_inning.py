@@ -713,17 +713,27 @@ def test_next_socket_update_cancels_active_mouse_drag(
         # Startup/hydration is complete. Now disable only NEXT's
         # 3500ms fallback poll. Any later refresh inside our short
         # assertion window must come from the socket event.
-        page.evaluate(
+        cleared = page.evaluate(
             """() => {
+                let cleared = 0;
+
                 for (
                     const item
                     of window.__cbTestIntervals || []
                 ) {
                     if (item.delay === 3500) {
                         window.clearInterval(item.id);
+                        cleared += 1;
                     }
                 }
+
+                return cleared;
             }"""
+        )
+
+        assert cleared >= 1, (
+            'fallback poll was not disabled; '
+            'socket isolation is not proven'
         )
 
         # Wait until the shared live-game socket exists, then allow the
