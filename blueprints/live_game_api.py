@@ -1,7 +1,7 @@
 from copy import deepcopy
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, g, jsonify, request, session
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload
 
@@ -38,13 +38,43 @@ def _authorized_context(game_id):
     if not username or not team_id:
         return None, None, None
 
-    user = db.session.query(User).filter(db.func.lower(User.username) == username.lower()).first()
-    if not user:
-        return None, None, None
+    cached_user = getattr(g, 'coachboard_user', None)
+    cached_membership = getattr(
+        g,
+        'coachboard_membership',
+        None,
+    )
 
-    membership = db.session.query(TeamMembership).filter_by(user_id=user.id, team_id=team_id).first()
-    if not membership:
-        return None, None, None
+    cache_matches = (
+        cached_user is not None
+        and cached_membership is not None
+        and str(cached_user.username).lower()
+        == str(username).lower()
+        and cached_membership.user_id == cached_user.id
+        and cached_membership.team_id == team_id
+    )
+
+    if cache_matches:
+        user = cached_user
+        membership = cached_membership
+    else:
+        # Keep this fallback: _authorized_context() can be called from a
+        # request path where the security guard cache was not populated.
+        user = db.session.query(User).filter(
+            db.func.lower(User.username)
+            == username.lower()
+        ).first()
+        if not user:
+            return None, None, None
+
+        membership = db.session.query(
+            TeamMembership
+        ).filter_by(
+            user_id=user.id,
+            team_id=team_id,
+        ).first()
+        if not membership:
+            return None, None, None
 
     team = db.session.get(Team, team_id)
     game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
