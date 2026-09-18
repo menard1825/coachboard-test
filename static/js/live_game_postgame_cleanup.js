@@ -262,11 +262,19 @@
       return;
     }
 
-    if (seenLive && !reloading) {
+    const hasEndGame = (
+      Array.isArray(state?.rotation_events) &&
+      state.rotation_events.some(event => (
+        event?.event_type === 'End Game' &&
+        !event?.reverted
+      ))
+    );
+
+    if (seenLive && hasEndGame && !reloading) {
       reloading = true;
       // A completed game belongs in the actual-usage flow, not back in the
-      // pregame planner. This also moves secondary coaches when another coach
-      // ends it.
+      // pregame planner. Require the durable End Game marker so an older
+      // pre-start is_live=false response cannot masquerade as completion.
       window.location.assign(`/game-day/${gameId}/report`);
     }
   }
