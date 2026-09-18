@@ -5,8 +5,7 @@
   if (!match) return;
 
   const gameId = Number(match[1]);
-  let suppressClickUntil = 0;
-  let drag = null;
+  let dragSurface = null;
   let draft = null;
   let saveBusy = false;
   let enhanceQueued = false;
@@ -28,13 +27,12 @@
       #cbQuickDefense .cb-qd-bench-player{touch-action:manipulation;cursor:grab}
       #cbQuickDefense .cb-qd-spot:not(.pitcher):active,
       #cbQuickDefense .cb-qd-bench-player:active{cursor:grabbing}
-      #cbQuickDefense .cb-qd-spot.cb-main-drag-over .cb-qd-name{outline:4px solid rgba(16,42,102,.25);border-color:#102a66;background:#f4f7ff}
-      #cbQuickDefense .cb-qd-bench-wrap.cb-main-drag-over{outline:4px solid rgba(22,107,56,.22);border-color:#5b9b70;background:#f0f8f2}
+      #cbQuickDefense .cb-qd-spot.cb-drag-over .cb-qd-name{outline:4px solid rgba(16,42,102,.25);border-color:#102a66;background:#f4f7ff}
+      #cbQuickDefense .cb-qd-bench-wrap.cb-drag-over{outline:4px solid rgba(22,107,56,.22);border-color:#5b9b70;background:#f0f8f2}
       #cbQuickDefense .cb-main-open .cb-qd-name,
       #cbQuickDefense .cb-authoritative-open .cb-qd-name{border:2px dashed #d49a22;background:#fff8e7;color:#8b5c00;font-weight:850}
       #cbQuickDefense .cb-main-draft-banner{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:9px 0 0;padding:8px 9px;border:1px solid #e4c46d;border-radius:10px;background:#fff9e9;color:#755100;font-size:.66rem;font-weight:720}
       #cbQuickDefense .cb-main-draft-banner .btn{min-height:34px;font-size:.65rem;font-weight:800;white-space:nowrap}
-      .cb-main-drag-ghost{position:fixed;z-index:8000;pointer-events:none;transform:translate(-50%,-50%) scale(1.04);max-width:160px;border:2px solid #102a66;background:#fff;color:#172033;border-radius:10px;padding:8px 10px;font-size:.7rem;font-weight:850;text-align:center;box-shadow:0 12px 28px rgba(16,24,40,.24)}
     `;
     document.head.appendChild(style);
   }
@@ -380,97 +378,55 @@
     }
   }
 
-  function dragSourceFromEvent(event) {
-    const source = event.target.closest?.('#cbQuickDefense [data-cb-move-player]');
-    if (!source || source.disabled) return null;
-    const name = source.dataset.cbMovePlayer;
-    if (!name || name === 'Open') return null;
-    const pos = String(source.dataset.cbPosition || '').toUpperCase();
-    if (pos === 'P') return null;
-    return source;
-  }
+  /**
+   * On the Field's half of the shared drag contract.
+   *
+   * The manager (live_game_drag_controller.js) owns every gesture
+   * mechanic. What stays here is what only this board can answer:
+   * who may be picked up, what a drop point means, and what a drop
+   * does. The P and Open refusals below are live-game rules -- the
+   * pitcher changes through Change Pitcher, and an empty position is
+   * a destination, not a thing to carry -- and they deliberately do
+   * not match Next Inning's.
+   */
+  function registerDragSurface() {
+    if (dragSurface || !window.CoachBoardDrag) return;
 
-  function dropDestination(clientX, clientY) {
-    const element = document.elementFromPoint(clientX, clientY);
-    const spot = element?.closest?.('#cbQuickDefense [data-cb-position]');
-    if (spot) return String(spot.dataset.cbPosition || '').toUpperCase();
-    if (element?.closest?.('#cbQuickDefense .cb-qd-bench-wrap')) return 'BENCH';
-    return null;
-  }
+    dragSurface = window.CoachBoardDrag.registerSurface({
+      id: 'on-field',
+      root: () => document.getElementById('cbQuickDefense'),
+      canStart: () => !saveBusy,
+      sourceSelector: '#cbQuickDefense [data-cb-move-player]',
+      targetSelector: '#cbQuickDefense [data-cb-position], #cbQuickDefense .cb-qd-bench-wrap',
 
-  function clearDropHighlight() {
-    document.querySelectorAll('#cbQuickDefense .cb-main-drag-over').forEach(el => el.classList.remove('cb-main-drag-over'));
-  }
+      resolveSource: node => {
+        if (node.disabled) return null;
+        const name = node.dataset.cbMovePlayer;
+        if (!name || name === 'Open') return null;
+        if (String(node.dataset.cbPosition || '').toUpperCase() === 'P') return null;
+        return {
+          kind: node.classList.contains('cb-qd-bench-player') ? 'chip' : 'marker',
+          key: name,
+          name,
+          label: node.querySelector('.cb-qd-name, span')?.textContent?.trim() || name,
+        };
+      },
 
-  function highlightDropTarget(clientX, clientY) {
-    clearDropHighlight();
-    const element = document.elementFromPoint(clientX, clientY);
-    const target = element?.closest?.('#cbQuickDefense [data-cb-position], #cbQuickDefense .cb-qd-bench-wrap');
-    target?.classList.add('cb-main-drag-over');
-  }
+      // Called fresh on every move and never cached, so the manager can
+      // tell a live source from one a rerender has already replaced
+      // without knowing anything about how this board marks players.
+      findSource: source => document.querySelector(
+        `#cbQuickDefense [data-cb-move-player="${CSS.escape(source.name)}"]`
+      ),
 
-  function beginDrag(event) {
-    // Finger and pen gestures belong to normal tap/scroll behavior.
-    // Drag stays available to mouse/trackpad users while we design
-    // the shared mobile drag contract for both live boards.
-    if (event.pointerType !== 'mouse') return;
+      resolveTarget: node => ({
+        position: node.dataset.cbPosition
+          ? String(node.dataset.cbPosition).toUpperCase()
+          : 'BENCH',
+      }),
 
-    if (saveBusy || (event.button !== undefined && event.button !== 0)) return;
-    const source = dragSourceFromEvent(event);
-    if (!source) return;
-    drag = {
-      pointerId: event.pointerId,
-      source,
-      name: source.dataset.cbMovePlayer,
-      startX: event.clientX,
-      startY: event.clientY,
-      active: false,
-      ghost: null,
-    };
-  }
-
-  function moveDrag(event) {
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
-    if (!drag.active && distance < 8) return;
-
-    if (!drag.active) {
-      drag.active = true;
-      suppressClickUntil = Date.now() + 700;
-      const ghost = document.createElement('div');
-      ghost.className = 'cb-main-drag-ghost';
-      ghost.textContent = drag.source.querySelector('.cb-qd-name, span')?.textContent?.trim() || drag.name;
-      document.body.appendChild(ghost);
-      drag.ghost = ghost;
-    }
-
-    event.preventDefault();
-    if (drag.ghost) {
-      drag.ghost.style.left = `${event.clientX}px`;
-      drag.ghost.style.top = `${event.clientY}px`;
-    }
-    highlightDropTarget(event.clientX, event.clientY);
-  }
-
-  function finishDrag(event) {
-    if (!drag || event.pointerId !== drag.pointerId) return;
-    const completed = drag;
-    drag = null;
-    clearDropHighlight();
-    completed.ghost?.remove();
-    if (!completed.active) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    suppressClickUntil = Date.now() + 700;
-    const destination = dropDestination(event.clientX, event.clientY);
-    if (destination) handleDrop(completed.name, destination);
-  }
-
-  function cancelDrag() {
-    clearDropHighlight();
-    drag?.ghost?.remove();
-    drag = null;
+      onDrop: (source, target) => handleDrop(source.name, target.position),
+    });
   }
 
   function enhanceQuickDefense() {
@@ -499,22 +455,15 @@
     event => {
       const detail = event?.detail || {};
 
-      if (
-        Number(detail.game_id) !== gameId ||
-        String(detail.source || '') !== 'undo'
-      ) {
-        return;
-      }
+      if (Number(detail.game_id) !== gameId) return;
 
-      cancelDrag();
+      dragSurface?.cancel();
+
+      if (String(detail.source || '') !== 'undo') return;
+
       clearDraft({restore: false});
     }
   );
-
-  document.addEventListener('pointerdown', beginDrag, {capture: true, passive: true});
-  document.addEventListener('pointermove', moveDrag, {capture: true, passive: false});
-  document.addEventListener('pointerup', finishDrag, {capture: true, passive: false});
-  document.addEventListener('pointercancel', cancelDrag, {capture: true, passive: true});
 
   document.addEventListener('click', event => {
     const cancel = event.target.closest?.('[data-cb-cancel-main-draft]');
@@ -523,18 +472,12 @@
       event.stopPropagation();
       event.stopImmediatePropagation();
       clearDraft({restore: true});
-      return;
-    }
-
-    if (Date.now() < suppressClickUntil && event.target.closest?.('#cbQuickDefense')) {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
     }
   }, true);
 
   document.addEventListener('DOMContentLoaded', () => {
     installStyles();
+    registerDragSurface();
     queueEnhance();
     quickDefenseOverlay = document.getElementById('live-game-overlay');
     if (quickDefenseOverlay) {

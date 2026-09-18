@@ -23,8 +23,7 @@
   let errorMessage = '';
   let undoStack = [];
   let socketBound = false;
-  let nextDrag = null;
-  let suppressNextClickUntil = 0;
+  let dragSurface = null;
 
   const $ = id => document.getElementById(id);
 
@@ -689,34 +688,18 @@
         cursor:grabbing;
       }
 
-      #${CARD_ID} .cb-next-spot.cb-next-drag-over .cb-qd-name{
+      #${CARD_ID} .cb-next-spot.cb-drag-over .cb-qd-name{
         outline:4px solid rgba(49,93,152,.24);
         border-color:#315d98!important;
         background:#eef4ff!important;
       }
 
-      #${CARD_ID} .cb-next-bench.cb-next-drag-over{
+      #${CARD_ID} .cb-next-bench.cb-drag-over{
         outline:4px solid rgba(23,107,56,.18);
         border-color:#5b9b70;
         background:#f0f8f2;
       }
 
-      .cb-next-drag-ghost{
-        position:fixed;
-        z-index:8000;
-        pointer-events:none;
-        transform:translate(-50%,-50%) scale(1.04);
-        max-width:170px;
-        padding:8px 10px;
-        border:2px solid #315d98;
-        border-radius:10px;
-        background:#fff;
-        color:#172033;
-        box-shadow:0 12px 28px rgba(16,24,40,.24);
-        font-size:.7rem;
-        font-weight:850;
-        text-align:center;
-      }
 
       #${CARD_ID} .cb-next-open .cb-qd-name{
         border:2px dashed #b5473d!important;
@@ -1748,266 +1731,75 @@
     );
   }
 
-  function nextDragSource(event) {
-    if (
-      activeView !== 'next' ||
-      busy
-    ) {
-      return null;
-    }
+  /**
+   * Next Inning's half of the shared drag contract.
+   *
+   * Deliberately different from On the Field: the pitcher IS a valid
+   * source here, because the next inning's defense is a plan and the
+   * coach edits the mound directly on the board. movePlayer() keeps its
+   * asymmetric handling of a move onto P (the outgoing pitcher is
+   * benched rather than swapped back), which is why the drop semantics
+   * stay in this file rather than in the shared manager.
+   */
+  function registerDragSurface() {
+    if (dragSurface || !window.CoachBoardDrag) return;
 
-    const field = event.target.closest?.(
-      `#${CARD_ID} [data-next-position]`
-    );
+    dragSurface = window.CoachBoardDrag.registerSurface({
+      id: 'next',
+      root: () => $(CARD_ID),
+      canStart: () => activeView === 'next' && !busy,
+      sourceSelector:
+        `#${CARD_ID} [data-next-position], #${CARD_ID} [data-next-bench-player]`,
+      targetSelector:
+        `#${CARD_ID} [data-next-position], #${CARD_ID} .cb-next-bench`,
 
-    if (field) {
-      const name =
-        field.dataset.nextPlayer || '';
+      resolveSource: node => {
+        const benched = node.dataset.nextBenchPlayer;
+        if (benched) {
+          return {
+            kind: 'chip',
+            key: `BENCH:${benched}`,
+            name: benched,
+            from: 'BENCH',
+            label: playerLabel(benched),
+          };
+        }
+        const name = node.dataset.nextPlayer || '';
+        const from = node.dataset.nextPosition || '';
+        if (!name || !from) return null;
+        return {
+          kind: 'marker',
+          key: from,
+          name,
+          from,
+          label: playerLabel(name),
+        };
+      },
 
-      const source =
-        field.dataset.nextPosition || '';
+      findSource: source => (
+        source.from === 'BENCH'
+          ? document.querySelector(
+              `#${CARD_ID} [data-next-bench-player="${CSS.escape(source.name)}"]`
+            )
+          : document.querySelector(
+              `#${CARD_ID} [data-next-position="${CSS.escape(source.from)}"]`
+            )
+      ),
 
-      if (!name || !source) return null;
+      resolveTarget: node => ({
+        position: node.dataset.nextPosition || 'BENCH',
+      }),
 
-      return {
-        element: field,
-        name,
-        source,
-      };
-    }
-
-    const bench = event.target.closest?.(
-      `#${CARD_ID} [data-next-bench-player]`
-    );
-
-    if (bench) {
-      const name =
-        bench.dataset.nextBenchPlayer || '';
-
-      if (!name) return null;
-
-      return {
-        element: bench,
-        name,
-        source: 'BENCH',
-      };
-    }
-
-    return null;
-  }
-
-  function nextDropDestination(
-    clientX,
-    clientY
-  ) {
-    const element =
-      document.elementFromPoint(
-        clientX,
-        clientY
-      );
-
-    const field = element?.closest?.(
-      `#${CARD_ID} [data-next-position]`
-    );
-
-    if (field) {
-      return (
-        field.dataset.nextPosition || ''
-      );
-    }
-
-    if (
-      element?.closest?.(
-        `#${CARD_ID} .cb-next-bench`
-      )
-    ) {
-      return 'BENCH';
-    }
-
-    return '';
-  }
-
-  function clearNextDragHighlight() {
-    document
-      .querySelectorAll(
-        `#${CARD_ID} .cb-next-drag-over`
-      )
-      .forEach(element => {
-        element.classList.remove(
-          'cb-next-drag-over'
-        );
-      });
-  }
-
-  function highlightNextDropTarget(
-    clientX,
-    clientY
-  ) {
-    clearNextDragHighlight();
-
-    const element =
-      document.elementFromPoint(
-        clientX,
-        clientY
-      );
-
-    const target =
-      element?.closest?.(
-        `#${CARD_ID} [data-next-position], ` +
-        `#${CARD_ID} .cb-next-bench`
-      );
-
-    target?.classList.add(
-      'cb-next-drag-over'
-    );
-  }
-
-  function beginNextDrag(event) {
-    // Finger and pen gestures belong to normal tap/scroll behavior.
-    // Drag is deliberately limited to mouse-like pointers so a coach
-    // cannot accidentally move a player while trying to scroll.
-    if (event.pointerType !== 'mouse') {
-      return;
-    }
-
-    if (
-      event.button !== undefined &&
-      event.button !== 0
-    ) {
-      return;
-    }
-
-    const source =
-      nextDragSource(event);
-
-    if (!source) return;
-
-    nextDrag = {
-      pointerId: event.pointerId,
-      name: source.name,
-      source: source.source,
-      element: source.element,
-      startX: event.clientX,
-      startY: event.clientY,
-      active: false,
-      ghost: null,
-    };
-  }
-
-  function moveNextDrag(event) {
-    if (
-      !nextDrag ||
-      event.pointerId !==
-        nextDrag.pointerId
-    ) {
-      return;
-    }
-
-    const distance = Math.hypot(
-      event.clientX -
-        nextDrag.startX,
-      event.clientY -
-        nextDrag.startY
-    );
-
-    if (
-      !nextDrag.active &&
-      distance < 8
-    ) {
-      return;
-    }
-
-    if (!nextDrag.active) {
-      nextDrag.active = true;
-
-      suppressNextClickUntil =
-        Date.now() + 700;
-
-      const ghost =
-        document.createElement('div');
-
-      ghost.className =
-        'cb-next-drag-ghost';
-
-      ghost.textContent =
-        playerLabel(nextDrag.name);
-
-      document.body.appendChild(
-        ghost
-      );
-
-      nextDrag.ghost = ghost;
-    }
-
-    event.preventDefault();
-
-    if (nextDrag.ghost) {
-      nextDrag.ghost.style.left =
-        `${event.clientX}px`;
-
-      nextDrag.ghost.style.top =
-        `${event.clientY}px`;
-    }
-
-    highlightNextDropTarget(
-      event.clientX,
-      event.clientY
-    );
-  }
-
-  function finishNextDrag(event) {
-    if (
-      !nextDrag ||
-      event.pointerId !==
-        nextDrag.pointerId
-    ) {
-      return;
-    }
-
-    const completed = nextDrag;
-    nextDrag = null;
-
-    clearNextDragHighlight();
-    completed.ghost?.remove();
-
-    if (!completed.active) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    suppressNextClickUntil =
-      Date.now() + 700;
-
-    const destination =
-      nextDropDestination(
-        event.clientX,
-        event.clientY
-      );
-
-    if (!destination) return;
-
-    selected = null;
-    selectedPosition = '';
-
-    if (destination === 'BENCH') {
-      movePlayerToBench(
-        completed.name,
-        completed.source
-      );
-      return;
-    }
-
-    movePlayer(
-      completed.name,
-      completed.source,
-      destination
-    );
-  }
-
-  function cancelNextDrag() {
-    clearNextDragHighlight();
-    nextDrag?.ghost?.remove();
-    nextDrag = null;
+      onDrop: (source, target) => {
+        selected = null;
+        selectedPosition = '';
+        if (target.position === 'BENCH') {
+          movePlayerToBench(source.name, source.from);
+          return;
+        }
+        movePlayer(source.name, source.from, target.position);
+      },
+    });
   }
 
   async function useCurrentDefense() {
@@ -2161,9 +1953,7 @@
       ) {
         // A changed/forced authoritative refresh makes any active drag
         // stale. Cancel it before hydrate() replaces the NEXT card DOM.
-        if (nextDrag) {
-          cancelNextDrag();
-        }
+        dragSurface?.cancel();
 
         lastSignature = signature;
         hydrate(data);
@@ -2315,58 +2105,11 @@
       afterAdvance
     );
 
-    document.addEventListener(
-      'pointerdown',
-      beginNextDrag,
-      {
-        capture: true,
-        passive: true,
-      }
-    );
-
-    document.addEventListener(
-      'pointermove',
-      moveNextDrag,
-      {
-        capture: true,
-        passive: false,
-      }
-    );
-
-    document.addEventListener(
-      'pointerup',
-      finishNextDrag,
-      {
-        capture: true,
-        passive: false,
-      }
-    );
-
-    document.addEventListener(
-      'pointercancel',
-      cancelNextDrag,
-      {
-        capture: true,
-        passive: true,
-      }
-    );
+    registerDragSurface();
 
     window.addEventListener(
       'click',
       event => {
-        if (
-          Date.now() <
-            suppressNextClickUntil &&
-          event.target.closest?.(
-            `#${CARD_ID}`
-          )
-        ) {
-          event.preventDefault();
-          event.stopPropagation();
-          event.stopImmediatePropagation();
-          return;
-        }
-
         const undo = event.target.closest?.(
           '#liveUndoBtn'
         );

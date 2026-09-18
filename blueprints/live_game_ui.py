@@ -551,6 +551,18 @@ def inject_live_game_assets(response):
         else:
             html = boot_reveal + html
 
+    # The shared drag manager must be defined before either live board
+    # registers a surface with it. The two boards load by different
+    # routes -- On the Field from the template, Next Inning injected
+    # before </body> below -- so </head> is the only point that precedes
+    # both.
+    if 'live_game_drag_controller.js' not in html:
+        drag_asset = f'<script src="{_versioned_static("js/live_game_drag_controller.js")}"></script>\n'
+        if '</head>' in html:
+            html = html.replace('</head>', drag_asset + '</head>', 1)
+        else:
+            html = drag_asset + html
+
     # This controller must register before live_game_v2.js so it owns the End
     # Game click and prevents the old pitch-count-only finalization workflow.
     if 'live_game_pitching_finalize.js' not in html:
