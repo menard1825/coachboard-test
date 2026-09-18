@@ -237,11 +237,19 @@
       }
       @media(max-width:575.98px){
         #cbDugoutHeader{margin:0 -10px 10px;padding:8px 9px}
-        .cb-dh-main{grid-template-columns:auto auto minmax(56px,.8fr) minmax(64px,1fr) auto auto auto;gap:4px}
-        .cb-dh-live{display:flex;font-size:.5rem;letter-spacing:.04em;gap:3px}
+        /* The phone header has seven useful pieces of information/control.
+           Keeping all seven in one row makes long elapsed times collide with
+           the pitcher name. Put connection health on a slim status row, then
+           give the game state and controls six explicit tracks below it. */
+        .cb-dh-main{grid-template-columns:auto minmax(56px,.8fr) minmax(64px,1fr) auto auto auto;grid-template-areas:"live live live live live live" "inning clock pitcher undo clockbtn menu";gap:3px 4px}
+        .cb-dh-live{grid-area:live;display:flex;font-size:.5rem;letter-spacing:.04em;gap:3px}
         .cb-dh-dot{width:7px;height:7px}
-        .cb-dh-pitcher{display:block!important;text-align:left}
-        .cb-dh-inning{min-width:43px;padding:0 5px;border-left:0}
+        .cb-dh-inning{grid-area:inning;min-width:43px;padding:0 5px;border-left:0}
+        .cb-dh-clock{grid-area:clock;min-width:0}
+        .cb-dh-pitcher{grid-area:pitcher;display:block!important;text-align:left;min-width:0}
+        .cb-dh-undo-slot{grid-area:undo}
+        .cb-dh-main>[data-cb-clock]{grid-area:clockbtn}
+        .cb-dh-main>[data-cb-menu]{grid-area:menu}
         .cb-dh-inning strong{font-size:1.12rem}
         .cb-dh-time{font-size:.84rem}
         .cb-dh-name{font-size:.68rem;max-width:none}
@@ -258,8 +266,11 @@
         #cbCoachBoardNavModal .cb-app-grid{grid-template-columns:1fr 1fr}
       }
       @media(max-width:374.98px){
-        .cb-dh-main{grid-template-columns:auto auto minmax(50px,.7fr) minmax(58px,.85fr) auto auto auto;gap:2px}
+        .cb-dh-main{grid-template-columns:auto minmax(52px,.75fr) minmax(52px,.85fr) auto auto auto;gap:2px}
         .cb-dh-live{font-size:.47rem;letter-spacing:.02em}
+        .cb-dh-inning{min-width:38px;padding:0 4px}
+        .cb-dh-time{font-size:.78rem}
+        .cb-dh-name{font-size:.64rem}
         .cb-dh-btn{font-size:.58rem!important;padding:4px 5px!important}
         .cb-qd-spot{width:61px}
         .cb-qd-name{font-size:.55rem}

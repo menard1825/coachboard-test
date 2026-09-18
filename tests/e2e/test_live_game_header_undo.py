@@ -220,6 +220,57 @@ def test_phone_header_still_shows_undo_without_a_row(page: Page, coachboard_url:
             'document.documentElement.scrollWidth'
             ' <= document.documentElement.clientWidth + 2'
         )
+
+        # Reproduce the real-device case that exposed the old seven-column
+        # phone layout: a long paused elapsed clock beside a numbered,
+        # two-word pitcher name.
+        page.evaluate(
+            '''() => {
+              document.querySelector('[data-cb-clock-label]').textContent =
+                'Paused · Elapsed';
+              document.querySelector('[data-cb-clock-time]').textContent =
+                '51:54:05';
+              document.querySelector('[data-cb-pitcher]').textContent =
+                '#7 Jack Fordice';
+            }'''
+        )
+        page.wait_for_timeout(50)
+
+        geometry = page.evaluate(
+            '''() => {
+              const time = document
+                .querySelector('[data-cb-clock-time]')
+                .getBoundingClientRect();
+              const pitcher = document
+                .querySelector('.cb-dh-pitcher')
+                .getBoundingClientRect();
+              const name = document
+                .querySelector('[data-cb-pitcher]')
+                .getBoundingClientRect();
+              const undo = document
+                .querySelector('#cbDugoutHeader #liveUndoBtn')
+                .getBoundingClientRect();
+
+              return {
+                timeRight: time.right,
+                pitcherLeft: pitcher.left,
+                nameRight: name.right,
+                undoLeft: undo.left,
+                scrollWidth: document.documentElement.scrollWidth,
+                clientWidth: document.documentElement.clientWidth,
+              };
+            }'''
+        )
+
+        assert geometry['timeRight'] <= geometry['pitcherLeft'] + 1, (
+            f'clock overlaps pitcher on phone: {geometry}'
+        )
+        assert geometry['nameRight'] <= geometry['undoLeft'] + 1, (
+            f'pitcher overlaps Undo on phone: {geometry}'
+        )
+        assert geometry['scrollWidth'] <= geometry['clientWidth'] + 2, (
+            f'long header content pushes page sideways: {geometry}'
+        )
     finally:
         cleanup_game(page, coachboard_url, game_id)
 
