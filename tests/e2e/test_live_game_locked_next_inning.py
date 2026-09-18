@@ -436,7 +436,7 @@ def test_next_touch_swipe_does_not_drag_player(
         )
 
         assert page.locator(
-            '.cb-next-drag-ghost'
+            '.cb-drag-ghost'
         ).count() == 0
 
         prep = get_prep(
@@ -564,7 +564,7 @@ def test_next_refresh_cancels_active_mouse_drag(
             [sx, sy],
         )
 
-        ghost = page.locator('.cb-next-drag-ghost')
+        ghost = page.locator('.cb-drag-ghost')
         expect(ghost).to_have_count(1)
 
         # Any authoritative/forced refresh must abandon the stale
@@ -574,7 +574,7 @@ def test_next_refresh_cancels_active_mouse_drag(
         )
 
         expect(
-            page.locator('.cb-next-drag-ghost')
+            page.locator('.cb-drag-ghost')
         ).to_have_count(
             0,
             timeout=2_000,
@@ -797,7 +797,7 @@ def test_next_socket_update_cancels_active_mouse_drag(
         )
 
         expect(
-            page.locator('.cb-next-drag-ghost')
+            page.locator('.cb-drag-ghost')
         ).to_have_count(1)
 
         # Coach/device B performs a real authoritative NEXT write.
@@ -815,7 +815,7 @@ def test_next_socket_update_cancels_active_mouse_drag(
         # With the 3500ms fallback poll disabled above, this must be
         # the socket path cancelling the stale drag and rehydrating.
         expect(
-            page.locator('.cb-next-drag-ghost')
+            page.locator('.cb-drag-ghost')
         ).to_have_count(
             0,
             timeout=2_500,
@@ -986,7 +986,7 @@ def test_next_pointercancel_clears_mouse_drag_without_save(
         )
 
         expect(
-            page.locator('.cb-next-drag-ghost')
+            page.locator('.cb-drag-ghost')
         ).to_have_count(1)
 
         page.evaluate(
@@ -1009,7 +1009,7 @@ def test_next_pointercancel_clears_mouse_drag_without_save(
         )
 
         expect(
-            page.locator('.cb-next-drag-ghost')
+            page.locator('.cb-drag-ghost')
         ).to_have_count(
             0,
             timeout=2_000,

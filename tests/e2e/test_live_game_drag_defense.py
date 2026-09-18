@@ -616,7 +616,7 @@ def test_phone_quick_field_touch_swipe_does_not_drag_player(
 
         assert (
             page.locator(
-                '.cb-main-drag-ghost'
+                '.cb-drag-ghost'
             ).count()
             == 0
         )
