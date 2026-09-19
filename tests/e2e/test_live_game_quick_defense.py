@@ -451,6 +451,30 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
             picker
         ).to_be_visible(timeout=10_000)
 
+        # Live Change Pitcher is an execution screen, not a
+        # situational decision worksheet.
+        expect(
+            picker.locator('#pitcher-need-v2')
+        ).to_have_count(0)
+
+        expect(
+            picker
+        ).not_to_contain_text(
+            'What do we need?'
+        )
+
+        expect(
+            picker
+        ).to_contain_text(
+            'Current:'
+        )
+
+        expect(
+            picker
+        ).to_contain_text(
+            'Pitcher Pat'
+        )
+
         relief_choice = picker.locator(
             '.pitcher-choice-v2',
             has_text=relief_name,
@@ -459,6 +483,18 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
         expect(
             relief_choice
         ).to_be_visible()
+
+        expect(
+            relief_choice
+        ).to_contain_text(
+            'Ready'
+        )
+
+        expect(
+            relief_choice
+        ).to_contain_text(
+            '2B'
+        )
 
         page.evaluate(
             "window.__pitcherChangeStayedOnPage = 'yes'"
@@ -485,7 +521,7 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
         assert page.evaluate(
             """
             () => (
-                window.CBPitcherChangeComplete?.version === 5 &&
+                window.CBPitcherChangeComplete?.version === 6 &&
                 typeof window.CBPitcherChangeComplete?.open ===
                     'function'
             )
@@ -547,7 +583,7 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
 
         # The short confirmation explains what just happened.
         toast = page.locator(
-            '#pitcher-change-toast-v5 .toast-body'
+            '#pitcher-change-toast-v6 .toast-body'
         )
 
         expect(
@@ -621,6 +657,194 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
         assert (
             restored['current_alignment']['2B']
             == relief_name
+        )
+
+        # Force only the browser's displayed live summary into a
+        # warning state. The backend contract is independently
+        # covered by the server regression test above.
+        warning_url = (
+            f'**/api/live-game/{game_id}/state'
+        )
+
+        def force_pitcher_warning(route):
+            response = route.fetch()
+            payload = response.json()
+
+            summary = (
+                payload
+                .setdefault(
+                    'pitch_count_summary',
+                    {},
+                )
+                .setdefault(
+                    relief_name,
+                    {},
+                )
+            )
+
+            summary['status'] = 'Needs Rest'
+            summary['daily'] = 42
+            summary['status_detail'] = (
+                'Pitched yesterday'
+            )
+
+            route.fulfill(
+                status=response.status,
+                headers=response.headers,
+                json=payload,
+            )
+
+        page.route(
+            warning_url,
+            force_pitcher_warning,
+        )
+
+        pitch_change_posts = []
+
+        def capture_pitch_change(route):
+            pitch_change_posts.append(
+                route.request.post_data or ''
+            )
+            route.continue_()
+
+        page.route(
+            f'**/api/live-game/{game_id}'
+            '/complete-pitcher-change',
+            capture_pitch_change,
+        )
+
+        page.reload(
+            wait_until='domcontentloaded'
+        )
+
+        expect(
+            page.locator('#cbQuickDefense')
+        ).to_be_visible(timeout=15_000)
+
+        page.locator(
+            '#liveChangePitcherBtn'
+        ).click()
+
+        picker = page.locator(
+            '#live-pitcher-picker-v2'
+        )
+
+        expect(
+            picker
+        ).to_be_visible(timeout=10_000)
+
+        warned_choice = picker.locator(
+            '.pitcher-choice-v2',
+            has_text=relief_name,
+        )
+
+        expect(
+            warned_choice
+        ).to_contain_text(
+            'Needs Rest'
+        )
+
+        expect(
+            warned_choice
+        ).to_contain_text(
+            '42 pitches today'
+        )
+
+        expect(
+            warned_choice
+        ).to_contain_text(
+            'Pitch Anyway'
+        )
+
+        warned_choice.click()
+
+        expect(
+            picker
+        ).to_contain_text(
+            f'Pitch {relief_name}?'
+        )
+
+        expect(
+            picker
+        ).to_contain_text(
+            'Needs Rest'
+        )
+
+        expect(
+            picker
+        ).to_contain_text(
+            '42 pitches today'
+        )
+
+        expect(
+            picker
+        ).to_contain_text(
+            'Pitched yesterday'
+        )
+
+        expect(
+            picker
+        ).not_to_contain_text(
+            'CoachBoard says'
+        )
+
+        expect(
+            picker.get_by_role(
+                'button',
+                name='Go Back',
+            )
+        ).to_be_visible()
+
+        expect(
+            picker.get_by_role(
+                'button',
+                name='Yes, Pitch Relief',
+            )
+        ).to_be_visible()
+
+        # Go Back returns to the compact pitcher list without
+        # changing the game.
+        picker.get_by_role(
+            'button',
+            name='Go Back',
+        ).click()
+
+        expect(
+            warned_choice
+        ).to_be_visible()
+
+        warned_choice.click()
+
+        picker.get_by_role(
+            'button',
+            name='Yes, Pitch Relief',
+        ).click()
+
+        expect(
+            picker
+        ).not_to_be_visible(timeout=10_000)
+
+        expect(
+            page.locator(
+                '#cbQuickDefense '
+                '[data-cb-position="P"]'
+            )
+        ).to_contain_text(
+            relief_name,
+            timeout=10_000,
+        )
+
+        assert pitch_change_posts
+
+        normalized_post = (
+            pitch_change_posts[-1]
+            .replace(' ', '')
+            .lower()
+        )
+
+        assert (
+            '"pitch_anyway":true'
+            in normalized_post
         )
 
     finally:

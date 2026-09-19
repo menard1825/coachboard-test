@@ -8,7 +8,7 @@
 
   // Idempotent: older enhancement loaders may request this file more
   // than once. Only one two-tap pitcher-change controller may exist.
-  if (window.CBPitcherChangeComplete?.version === 5) {
+  if (window.CBPitcherChangeComplete?.version === 6) {
     return;
   }
 
@@ -42,12 +42,12 @@
 
   function toast(message, kind = 'success') {
     let host = document.getElementById(
-      'pitcher-change-toast-v5'
+      'pitcher-change-toast-v6'
     );
 
     if (!host) {
       host = document.createElement('div');
-      host.id = 'pitcher-change-toast-v5';
+      host.id = 'pitcher-change-toast-v6';
       host.className =
         'toast-container position-fixed top-0 end-0 p-3';
       host.style.zIndex = '5000';
@@ -110,6 +110,7 @@
     incoming,
     alignment,
     successMessage,
+    pitchAnyway = false,
   ) {
     const response = await fetch(
       `/api/live-game/${gameId}/complete-pitcher-change`,
@@ -123,6 +124,7 @@
           alignment,
           base_sequence: sequenceFromState(),
           fast: true,
+          pitch_anyway: Boolean(pitchAnyway),
         }),
       },
     );
@@ -167,10 +169,13 @@
     return data;
   }
 
-  async function open(playerId) {
+  async function open(playerId, options = {}) {
     if (busy) return;
 
     busy = true;
+
+    const pitchAnyway =
+      options?.pitchAnyway === true;
 
     try {
       state = await loadState();
@@ -246,6 +251,7 @@
         incoming,
         alignment,
         messageParts.join(' · '),
+        pitchAnyway,
       );
     } catch (err) {
       toast(
@@ -260,7 +266,7 @@
 
   window.CBPitcherChangeComplete =
     Object.freeze({
-      version: 5,
+      version: 6,
       open,
     });
 })();

@@ -390,6 +390,21 @@
 
   function decorateLivePitcherPicker() {
     if (!pitchingState) return;
+
+    const picker = document.getElementById(
+      'live-pitcher-picker-v2'
+    );
+
+    // The v6 live picker owns Ready/warning presentation and
+    // intentionally keeps warned pitchers tappable so the coach
+    // can choose "Pitch Anyway". Preserve this legacy decorator
+    // for older picker surfaces only.
+    if (
+      picker?.dataset.cbPitcherPickerOwner === 'live-v6'
+    ) {
+      return;
+    }
+
     document.querySelectorAll('#live-pitcher-picker-v2 .pitcher-choice-v2').forEach((button) => {
       if (button.dataset.cbPitchStatus === '1') return;
       button.dataset.cbPitchStatus = '1';

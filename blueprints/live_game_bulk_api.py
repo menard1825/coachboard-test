@@ -270,9 +270,22 @@ def complete_pitcher_change(game_id):
     if old_pitcher_name == new_pitcher.name:
         return jsonify({'status': 'error', 'message': 'That player is already pitching.'}), 409
 
-    blocked, message = _pitcher_eligibility_block(game, team, new_pitcher.name)
-    if blocked:
-        return jsonify({'status': 'error', 'message': message}), 409
+    blocked, message = _pitcher_eligibility_block(
+        game,
+        team,
+        new_pitcher.name,
+    )
+
+    # A warned pitcher remains blocked unless the coach explicitly
+    # confirmed "Pitch Anyway" for this specific mound change.
+    # This does not change the calculated eligibility status.
+    pitch_anyway = data.get('pitch_anyway') is True
+
+    if blocked and not pitch_anyway:
+        return jsonify({
+            'status': 'error',
+            'message': message,
+        }), 409
 
     after = {}
     for pos in allowed:

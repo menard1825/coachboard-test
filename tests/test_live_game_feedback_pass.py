@@ -518,6 +518,93 @@ def test_complete_pitcher_change_blocks_via_shared_helper(monkeypatch, pitch_cou
         assert db.session.query(GameRotationEvent).filter_by(game_id=70, team_id=1).count() == 0
 
 
+
+def test_complete_pitcher_change_pitch_anyway_allows_warned_pitcher(
+    monkeypatch,
+):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from blueprints import live_game_bulk_api as bulk_module
+
+    monkeypatch.setattr(
+        bulk_module,
+        'get_authoritative_live_state',
+        lambda game_id, team_id: {
+            'pitch_count_summary': {
+                'Carter': {
+                    'status': 'Needs Rest',
+                    'daily': 42,
+                    'status_detail': 'Pitched yesterday',
+                },
+            },
+        },
+    )
+
+    # Carter moves from 1B to P. The outgoing pitcher sits and
+    # 1B intentionally remains open for On the Field.
+    proposed = {
+        'P': 'Carter',
+        'C': 'Bennett',
+        '2B': 'Drew',
+        '3B': 'Eli',
+        'SS': 'Finn',
+        'LF': 'Gavin',
+        'CF': 'Hudson',
+        'RF': 'Isaac',
+    }
+
+    response = client.post(
+        '/api/live-game/70/complete-pitcher-change',
+        json={
+            'base_sequence': 0,
+            'fast': True,
+            'new_pitcher_id': 3,
+            'alignment': proposed,
+            'pitch_anyway': True,
+        },
+    )
+
+    assert response.status_code == 200
+
+    payload = response.get_json()
+
+    assert (
+        payload['delta']['current_alignment']['P']
+        == 'Carter'
+    )
+
+    assert (
+        '1B'
+        not in payload['delta']['current_alignment']
+    )
+
+    assert 'Aiden' in {
+        player['name']
+        for player in payload['delta']['bench']
+    }
+
+    assert (
+        payload['delta']['event']['event_type']
+        == 'Pitcher Change'
+    )
+
+    from db import db
+    from models import GameRotationEvent
+
+    with app.app_context():
+        assert (
+            db.session.query(GameRotationEvent)
+            .filter_by(
+                game_id=70,
+                team_id=1,
+            )
+            .count()
+            == 1
+        )
+
+
 def test_field_player_can_take_mound_without_benching_outgoing_pitcher(monkeypatch):
     app = _build_app(monkeypatch)
     client = app.test_client()

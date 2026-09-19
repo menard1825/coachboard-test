@@ -344,7 +344,7 @@
     function ensurePitcherChangeController() {
         const existing = window.CBPitcherChangeComplete;
 
-        if (existing?.version === 5 && typeof existing.open === 'function') {
+        if (existing?.version === 6 && typeof existing.open === 'function') {
             return Promise.resolve(existing);
         }
 
@@ -356,7 +356,7 @@
             const script = document.createElement('script');
             script.src =
                 '/static/js/live_game_pitcher_change_complete.js' +
-                '?v=two-tap-v1';
+                '?v=simple-live-picker-v1';
             script.dataset.cbPitcherChangeController = 'true';
 
             script.addEventListener('load', () => {
@@ -364,7 +364,7 @@
                     window.CBPitcherChangeComplete;
 
                 if (
-                    controller?.version === 5 &&
+                    controller?.version === 6 &&
                     typeof controller.open === 'function'
                 ) {
                     resolve(controller);
@@ -398,13 +398,16 @@
 
     async function openCompletePitcherChange(
         pickerModal,
-        playerId
+        playerId,
+        options = {},
     ) {
         const controller =
             await ensurePitcherChangeController();
 
         const instance =
-            bootstrap.Modal.getOrCreateInstance(pickerModal);
+            bootstrap.Modal.getOrCreateInstance(
+                pickerModal
+            );
 
         if (pickerModal.classList.contains('show')) {
             await new Promise(resolve => {
@@ -417,82 +420,482 @@
             });
         }
 
-        // Selecting the pitcher is the final pitching-change action.
-        // The controller saves immediately; there is no destination
-        // questionnaire or second pitcher-change modal.
-        await controller.open(playerId);
+        // Selecting a Ready pitcher is the final action.
+        // A warned pitcher reaches here only after the coach
+        // explicitly chose "Pitch Anyway".
+        await controller.open(
+            playerId,
+            options,
+        );
     }
 
     function showPitcherPicker() {
         if (!liveState) return;
-        const modal = modalShell('live-pitcher-picker-v2', 'Change Pitcher');
-        const body = modal.querySelector('.modal-body');
-        const currentPitcher = liveState.current_pitcher;
-        const players = [...(liveState.roster || [])]
-            .filter(p => p.name !== currentPitcher)
+
+        const modal = modalShell(
+            'live-pitcher-picker-v2',
+            'Change Pitcher',
+        );
+
+        // This picker owns its own Ready / warning presentation
+        // and the coach-facing "Pitch Anyway" confirmation.
+        // Legacy availability decorators must not disable its rows.
+        modal.dataset.cbPitcherPickerOwner = 'live-v6';
+
+        const body =
+            modal.querySelector('.modal-body');
+
+        const currentPitcher =
+            liveState.current_pitcher || 'None';
+
+        const alignment =
+            currentAlignment();
+
+        const players = [
+            ...(liveState.roster || []),
+        ]
+            .filter(
+                player =>
+                    player.name !== currentPitcher
+            )
             .sort((a, b) => {
-                const sa = summaryFor(a), sb = summaryFor(b);
-                const ua = officialUnavailable(sa), ub = officialUnavailable(sb);
-                if (ua !== ub) return ua ? 1 : -1;
-                return roleRank(planFor(a.id)?.role) - roleRank(planFor(b.id)?.role) || a.name.localeCompare(b.name);
-            });
-        body.innerHTML = `<div class="mb-3"><div class="small text-uppercase text-muted fw-bold mb-2">What do we need?</div><div class="d-flex flex-wrap gap-2" id="pitcher-need-v2">${['Show All','Need Strikes','Velocity','Change of Pace','Different Look','Miss Bats','Ground Ball','Hold Runners','Protect Lead'].map(x => `<button type="button" class="btn btn-sm btn-outline-secondary" data-need="${esc(x)}">${esc(x)}</button>`).join('')}</div></div><div id="pitcher-list-v2"></div>`;
+                const aStatus = String(
+                    summaryFor(a)?.status || ''
+                ).trim();
 
-        const renderList = (need = 'Show All') => {
-            const list = byId('pitcher-list-v2');
-            const normalizedNeed = need.toLowerCase();
-            const ranked = [...players].sort((a, b) => {
-                if (need === 'Show All') return 0;
-                const ta = (profileFor(a.id)?.traits || []).join(' ').toLowerCase();
-                const tb = (profileFor(b.id)?.traits || []).join(' ').toLowerCase();
-                const aliases = normalizedNeed === 'need strikes' ? ['strike', 'command'] : [normalizedNeed.replace('need ', '')];
-                const ma = aliases.some(term => ta.includes(term));
-                const mb = aliases.some(term => tb.includes(term));
-                return Number(mb) - Number(ma);
+                const bStatus = String(
+                    summaryFor(b)?.status || ''
+                ).trim();
+
+                const aReady =
+                    aStatus === 'Available';
+
+                const bReady =
+                    bStatus === 'Available';
+
+                if (aReady !== bReady) {
+                    return aReady ? -1 : 1;
+                }
+
+                return a.name.localeCompare(
+                    b.name
+                );
             });
-            list.innerHTML = ranked.map(p => {
-                const s = summaryFor(p), plan = planFor(p.id), profile = profileFor(p.id);
-                const unavailable = officialUnavailable(s);
-                const traits = (profile?.traits || []).slice(0, 4).join(' • ');
-                return `<button type="button" class="list-group-item list-group-item-action mb-2 border rounded p-3 pitcher-choice-v2" data-player-id="${p.id}" ${unavailable ? 'disabled' : ''}><div class="d-flex justify-content-between"><strong>${esc(p.name)}</strong><span class="${unavailable ? 'text-danger' : 'text-success'}">${esc(s.status || 'Available')}</span></div><div class="small text-muted mt-1">${esc(todayText(s))}${s.coach_target != null ? ` • Coach target: ${esc(s.coach_target)}` : ''}${plan?.role ? ` • ${esc(plan.role)}` : ''}</div>${traits ? `<div class="small mt-1">${esc(traits)}</div>` : ''}${plan?.coach_note ? `<div class="small fst-italic mt-1">${esc(plan.coach_note)}</div>` : ''}</button>`;
-            }).join('');
+
+        const currentSpot = playerName => {
+            const entry =
+                Object.entries(alignment).find(
+                    ([position, name]) =>
+                        position !== 'P' &&
+                        name === playerName
+                );
+
+            return entry?.[0] || 'Bench';
         };
-        renderList();
-        body.querySelector('#pitcher-need-v2').addEventListener('click', e => {
-            const btn = e.target.closest('[data-need]');
-            if (btn) renderList(btn.dataset.need);
-        });
-        body.querySelector('#pitcher-list-v2').addEventListener('click', async e => {
-            const btn = e.target.closest('.pitcher-choice-v2');
-            if (!btn || btn.disabled || actionBusy) return;
 
-            const playerId = Number(btn.dataset.playerId);
-            if (!Number.isFinite(playerId)) return;
+        const statusLabel = summary => {
+            const status = String(
+                summary?.status || ''
+            ).trim();
+
+            if (status === 'Available') {
+                return 'Ready';
+            }
+
+            if (!status) {
+                return 'Status Unknown';
+            }
+
+            const lower =
+                status.toLowerCase();
+
+            if (
+                lower.includes('pitch') &&
+                lower.includes('limit')
+            ) {
+                return 'At Pitch Limit';
+            }
+
+            return status;
+        };
+
+        const isReady = summary =>
+            String(
+                summary?.status || ''
+            ).trim() === 'Available';
+
+        const pitchesToday = summary => {
+            const value =
+                summary?.daily;
+
+            if (
+                value === null ||
+                value === undefined
+            ) {
+                return 'Pitches today unknown';
+            }
+
+            const count = Number(value);
+            const noun =
+                count === 1
+                    ? 'pitch'
+                    : 'pitches';
+
+            return `${value} ${noun} today`;
+        };
+
+        const warningDetail = summary => {
+            const value =
+                summary?.status_detail ||
+                summary?.next_available ||
+                '';
+
+            return String(value).trim();
+        };
+
+        const renderList = () => {
+            body.innerHTML = `
+                <div class="small text-muted mb-3">
+                    Current:
+                    <strong>
+                        ${esc(currentPitcher)}
+                    </strong>
+                </div>
+
+                <div
+                    class="list-group"
+                    id="pitcher-list-v2"
+                >
+                    ${players.map(player => {
+                        const summary =
+                            summaryFor(player);
+
+                        const ready =
+                            isReady(summary);
+
+                        const status =
+                            statusLabel(summary);
+
+                        const spot =
+                            currentSpot(
+                                player.name
+                            );
+
+                        return `
+                            <button
+                                type="button"
+                                class="
+                                    list-group-item
+                                    list-group-item-action
+                                    pitcher-choice-v2
+                                    py-3
+                                "
+                                data-player-id="${player.id}"
+                            >
+                                <div
+                                    class="
+                                        d-flex
+                                        justify-content-between
+                                        align-items-center
+                                        gap-3
+                                    "
+                                >
+                                    <div
+                                        class="text-start"
+                                    >
+                                        <div
+                                            class="fw-bold"
+                                        >
+                                            ${esc(
+                                                player.name
+                                            )}
+                                        </div>
+
+                                        <div
+                                            class="
+                                                small
+                                                text-muted
+                                                mt-1
+                                            "
+                                        >
+                                            ${esc(spot)}
+                                            ·
+                                            ${esc(
+                                                pitchesToday(
+                                                    summary
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="
+                                            text-end
+                                            flex-shrink-0
+                                        "
+                                    >
+                                        <div
+                                            class="
+                                                fw-semibold
+                                                ${
+                                                    ready
+                                                        ? 'text-success'
+                                                        : 'text-danger'
+                                                }
+                                            "
+                                        >
+                                            ${esc(status)}
+                                        </div>
+
+                                        ${
+                                            ready
+                                                ? ''
+                                                : `
+                                                    <div
+                                                        class="
+                                                            small
+                                                            fw-semibold
+                                                            text-primary
+                                                            mt-1
+                                                        "
+                                                    >
+                                                        Pitch Anyway
+                                                    </div>
+                                                `
+                                        }
+                                    </div>
+                                </div>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        };
+
+        const renderWarning = player => {
+            const summary =
+                summaryFor(player);
+
+            const firstName =
+                String(player.name)
+                    .trim()
+                    .split(/\s+/)[0] ||
+                player.name;
+
+            const detail =
+                warningDetail(summary);
+
+            body.innerHTML = `
+                <div class="small text-muted mb-2">
+                    Current:
+                    <strong>
+                        ${esc(currentPitcher)}
+                    </strong>
+                </div>
+
+                <h5 class="mb-3">
+                    Pitch ${esc(player.name)}?
+                </h5>
+
+                <div
+                    class="
+                        border
+                        rounded
+                        p-3
+                        mb-4
+                    "
+                >
+                    <div
+                        class="
+                            fw-bold
+                            text-danger
+                        "
+                    >
+                        ${esc(
+                            statusLabel(summary)
+                        )}
+                    </div>
+
+                    <div
+                        class="
+                            text-muted
+                            mt-1
+                        "
+                    >
+                        ${esc(
+                            pitchesToday(summary)
+                        )}
+                        ${
+                            detail
+                                ? ` · ${esc(detail)}`
+                                : ''
+                        }
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button
+                        type="button"
+                        class="
+                            btn
+                            btn-primary
+                            btn-lg
+                        "
+                        data-pitch-anyway-confirm="${player.id}"
+                    >
+                        Yes, Pitch ${esc(firstName)}
+                    </button>
+
+                    <button
+                        type="button"
+                        class="
+                            btn
+                            btn-outline-secondary
+                        "
+                        data-pitch-anyway-back
+                    >
+                        Go Back
+                    </button>
+                </div>
+            `;
+        };
+
+        const makeChange = async (
+            playerId,
+            pitchAnyway,
+            trigger,
+        ) => {
+            if (actionBusy) return;
 
             actionBusy = true;
-            btn.disabled = true;
 
-            // There is only one pitcher-change completion flow:
-            // live_game_pitcher_change_complete.js.
-            //
-            // The old #live-pitcher-destination-v2 surface is retired.
-            byId('live-pitcher-destination-v2')?.remove();
+            if (trigger) {
+                trigger.disabled = true;
+            }
+
+            // Retired pitcher destination editor must
+            // never return.
+            byId(
+                'live-pitcher-destination-v2'
+            )?.remove();
 
             try {
                 await openCompletePitcherChange(
                     modal,
                     playerId,
+                    {
+                        pitchAnyway:
+                            pitchAnyway === true,
+                    },
                 );
             } catch (err) {
-                toast(err.message, 'danger');
-                if (document.body.contains(btn)) {
-                    btn.disabled = false;
+                toast(
+                    err.message,
+                    'danger',
+                );
+
+                if (
+                    trigger &&
+                    document.body.contains(
+                        trigger
+                    )
+                ) {
+                    trigger.disabled = false;
                 }
             } finally {
                 actionBusy = false;
             }
-        });
-        bootstrap.Modal.getOrCreateInstance(modal).show();
+        };
+
+        body.onclick = async event => {
+            const back =
+                event.target.closest(
+                    '[data-pitch-anyway-back]'
+                );
+
+            if (back) {
+                renderList();
+                return;
+            }
+
+            const confirm =
+                event.target.closest(
+                    '[data-pitch-anyway-confirm]'
+                );
+
+            if (confirm) {
+                const playerId =
+                    Number(
+                        confirm.dataset
+                            .pitchAnywayConfirm
+                    );
+
+                if (
+                    Number.isFinite(playerId)
+                ) {
+                    await makeChange(
+                        playerId,
+                        true,
+                        confirm,
+                    );
+                }
+
+                return;
+            }
+
+            const choice =
+                event.target.closest(
+                    '.pitcher-choice-v2'
+                );
+
+            if (
+                !choice ||
+                choice.disabled ||
+                actionBusy
+            ) {
+                return;
+            }
+
+            const playerId =
+                Number(
+                    choice.dataset.playerId
+                );
+
+            if (
+                !Number.isFinite(playerId)
+            ) {
+                return;
+            }
+
+            const player =
+                players.find(
+                    item =>
+                        Number(item.id) ===
+                        playerId
+                );
+
+            if (!player) return;
+
+            const summary =
+                summaryFor(player);
+
+            if (!isReady(summary)) {
+                renderWarning(player);
+                return;
+            }
+
+            await makeChange(
+                playerId,
+                false,
+                choice,
+            );
+        };
+
+        renderList();
+
+        bootstrap.Modal
+            .getOrCreateInstance(modal)
+            .show();
     }
 
     function renderPitchingBoard() {
