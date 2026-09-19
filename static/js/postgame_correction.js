@@ -160,8 +160,14 @@
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.status === 'error') throw new Error(result.message || 'Unable to save defense correction.');
-      bootstrap.Modal.getOrCreateInstance(document.getElementById('pgcDefenseModal')).hide();
-      window.location.reload();
+      bootstrap.Modal.getOrCreateInstance(
+        document.getElementById('pgcDefenseModal')
+      ).hide();
+
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete('inning');
+      nextUrl.hash = 'defense';
+      window.location.assign(nextUrl.toString());
     } catch (error) {
       const warning = document.getElementById('pgcDefenseWarning');
       if (warning) warning.textContent = error.message || 'Unable to save defense correction.';
@@ -202,4 +208,17 @@
   });
 
   renderLineup();
+
+  const requestedInning = new URLSearchParams(
+    window.location.search
+  ).get('inning');
+
+  if (requestedInning && inningData(requestedInning)) {
+    window.setTimeout(() => {
+      document.getElementById('defense')?.scrollIntoView({
+        block: 'start',
+      });
+      openDefense(requestedInning);
+    }, 0);
+  }
 })();

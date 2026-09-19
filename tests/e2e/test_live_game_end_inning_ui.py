@@ -371,3 +371,168 @@ def test_phone_next_inning_uses_bottom_dock_without_covering_content(
                 'Accept': 'application/json',
             },
         )
+
+
+def test_end_inning_warns_but_can_continue_with_open_position(
+    page: Page,
+    coachboard_url: str,
+):
+    page.set_viewport_size(
+        {
+            'width': 390,
+            'height': 844,
+        }
+    )
+
+    login(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        start = page.locator('#gm-mobile-start-game')
+        expect(start).to_be_visible(timeout=15_000)
+        start.click()
+
+        expect(
+            page.locator('#live-game-overlay')
+        ).to_be_visible(timeout=15_000)
+
+        state = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        sequence = max(
+            [
+                int(event.get('sequence') or 0)
+                for event in state.get(
+                    'rotation_events',
+                    [],
+                )
+                if not event.get('reverted')
+            ]
+            or [0]
+        )
+
+        incomplete = dict(
+            state['current_alignment']
+        )
+        incomplete.pop('2B')
+
+        edited = page.request.post(
+            f'{coachboard_url}/api/live-game/'
+            f'{game_id}/defense-edit',
+            data={
+                'alignment': incomplete,
+                'base_sequence': sequence,
+            },
+        )
+
+        assert edited.status == 200, edited.text()
+
+        page.reload(
+            wait_until='domcontentloaded'
+        )
+
+        expect(
+            page.locator('#liveEndInningBtn')
+        ).to_be_visible(timeout=15_000)
+
+        page.locator(
+            '#liveEndInningBtn'
+        ).click()
+
+        warning = page.locator(
+            '#cbOpenDefenseEndModal'
+        )
+
+        expect(
+            warning
+        ).to_be_visible(timeout=10_000)
+
+        expect(
+            warning
+        ).to_contain_text(
+            '2B is still Open.'
+        )
+
+        expect(
+            warning.get_by_role(
+                'button',
+                name='Go Back',
+            )
+        ).to_be_visible()
+
+        expect(
+            warning.get_by_role(
+                'button',
+                name='End Inning Anyway',
+            )
+        ).to_be_visible()
+
+        warning.get_by_role(
+            'button',
+            name='Go Back',
+        ).click()
+
+        expect(
+            warning
+        ).not_to_be_visible(timeout=10_000)
+
+        state = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+
+        assert state['current_inning'] == '1'
+
+        page.locator(
+            '#liveEndInningBtn'
+        ).click()
+
+        expect(
+            warning
+        ).to_be_visible(timeout=10_000)
+
+        warning.get_by_role(
+            'button',
+            name='End Inning Anyway',
+        ).click()
+
+        expect(
+            page.locator('#live-inning-display')
+        ).to_have_text(
+            '2',
+            timeout=10_000,
+        )
+
+    finally:
+        state_response = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        )
+
+        if (
+            state_response.ok
+            and state_response.json()
+            .get('game', {})
+            .get('is_live')
+        ):
+            page.request.post(
+                f'{coachboard_url}/api/live-game/'
+                f'{game_id}/end-with-pitching',
+                data={
+                    'defer_pitching': True,
+                    'end_reason': 'manual',
+                    'current_inning_played': True,
+                },
+            )
+
+        page.request.post(
+            f'{coachboard_url}/game-day/'
+            f'{game_id}/delete',
+            headers={
+                'Accept': 'application/json',
+            },
+        )

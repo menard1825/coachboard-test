@@ -420,7 +420,188 @@
     );
   }
 
-  async function endInningFromNext() {
+  function requiredDefensePositions(
+    liveState
+  ) {
+    return Number(
+      liveState?.outfielder_count
+    ) === 4
+      ? [
+          'P', 'C', '1B', '2B', '3B',
+          'SS', 'LF', 'LCF', 'RCF', 'RF',
+        ]
+      : [
+          'P', 'C', '1B', '2B', '3B',
+          'SS', 'LF', 'CF', 'RF',
+        ];
+  }
+
+  function openCurrentDefensePositions(
+    liveState
+  ) {
+    const alignment =
+      liveState?.current_alignment || {};
+
+    return requiredDefensePositions(
+      liveState
+    ).filter(
+      position =>
+        !String(
+          alignment[position] || ''
+        ).trim()
+    );
+  }
+
+  function openDefenseMessage(open) {
+    if (open.length === 1) {
+      return `${open[0]} is still Open.`;
+    }
+
+    if (open.length === 2) {
+      return (
+        `${open[0]} and ${open[1]} ` +
+        'are still Open.'
+      );
+    }
+
+    return (
+      `${open.slice(0, -1).join(', ')}, ` +
+      `and ${open[open.length - 1]} ` +
+      'are still Open.'
+    );
+  }
+
+  function ensureOpenDefenseEndModal() {
+    let modal =
+      $('cbOpenDefenseEndModal');
+
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'cbOpenDefenseEndModal';
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.setAttribute(
+      'aria-hidden',
+      'true'
+    );
+
+    modal.innerHTML = `
+      <div
+        class="
+          modal-dialog
+          modal-dialog-centered
+        "
+      >
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              Defense still open
+            </h5>
+
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+
+          <div class="modal-body">
+            <div
+              class="fw-semibold"
+              data-cb-open-defense-message
+            ></div>
+
+            <div
+              class="
+                small
+                text-muted
+                mt-2
+              "
+            >
+              Fix the position on On the Field,
+              or end the inning anyway. You can
+              also correct this inning from the
+              Game Report after the game.
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="
+                btn
+                btn-outline-secondary
+              "
+              data-bs-dismiss="modal"
+            >
+              Go Back
+            </button>
+
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-cb-end-inning-anyway
+            >
+              End Inning Anyway
+            </button>
+          </div>
+        </div>
+      </div>`;
+
+    document.body.appendChild(modal);
+
+    return modal;
+  }
+
+  function warnOpenCurrentDefense(
+    open
+  ) {
+    const modal =
+      ensureOpenDefenseEndModal();
+
+    const message =
+      modal.querySelector(
+        '[data-cb-open-defense-message]'
+      );
+
+    if (message) {
+      message.textContent =
+        openDefenseMessage(open);
+    }
+
+    const confirm =
+      modal.querySelector(
+        '[data-cb-end-inning-anyway]'
+      );
+
+    confirm.onclick = () => {
+      const instance =
+        bootstrap.Modal
+          .getOrCreateInstance(modal);
+
+      modal.addEventListener(
+        'hidden.bs.modal',
+        () => {
+          endInningFromNext(true);
+        },
+        {
+          once: true,
+        }
+      );
+
+      instance.hide();
+    };
+
+    bootstrap.Modal
+      .getOrCreateInstance(modal)
+      .show();
+  }
+
+  async function endInningFromNext(
+    allowOpenCurrent = false
+  ) {
     if (inningAdvanceBusy) return;
 
     const button =
@@ -457,6 +638,21 @@
         liveState?.current_inning ||
         ''
       );
+
+      const openCurrent =
+        openCurrentDefensePositions(
+          liveState
+        );
+
+      if (
+        openCurrent.length &&
+        !allowOpenCurrent
+      ) {
+        warnOpenCurrentDefense(
+          openCurrent
+        );
+        return;
+      }
 
       if (
         currentInning !==

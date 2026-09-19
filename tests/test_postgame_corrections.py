@@ -159,6 +159,53 @@ def test_postgame_defense_correction_updates_historical_report_without_reopening
     assert '#2 Cody' in report
 
 
+
+def test_incomplete_final_defense_is_explained_and_links_to_exact_inning(
+    monkeypatch,
+):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import GameRotationEvent
+
+    with app.app_context():
+        end_event = (
+            db.session.query(GameRotationEvent)
+            .filter_by(
+                game_id=1,
+                team_id=1,
+                event_type='End Game',
+                reverted=False,
+            )
+            .one()
+        )
+
+        incomplete = dict(end_event.after_alignment)
+        incomplete.pop('2B')
+
+        end_event.after_alignment = incomplete
+        db.session.commit()
+
+    report = client.get(
+        '/game-day/1/report'
+    )
+
+    assert report.status_code == 200
+
+    html = report.get_data(as_text=True)
+
+    assert 'Incomplete defense' in html
+    assert (
+        '2B was left open at the end of the inning.'
+        in html
+    )
+    assert 'This inning wasn&#39;t recorded' not in html
+    assert 'Edit positions' in html
+    assert '/game-day/1/correct?inning=1#defense' in html
+
+
 def test_postgame_lineup_correction_changes_report_order(monkeypatch):
     app = _build_app(monkeypatch)
     client = app.test_client()
