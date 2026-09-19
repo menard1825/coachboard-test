@@ -1,6 +1,10 @@
 (() => {
   'use strict';
 
+  // Authoritative client contract for the live-game workflow, including
+  // End Inning. Historical cb-test2 DOM/storage names remain temporarily
+  // for compatibility, but this file is not Test App 2-only.
+
   const route = window.location.pathname.match(/^\/game\/(\d+)\/?$/);
   if (!route) return;
 
@@ -809,11 +813,19 @@
     true
   );
 
-  window.CBTest2Contract = {
+  const liveGameContract = {
     setMode,
     endInning: endInningFromNext,
     apply: applyContract,
   };
+
+  window.CBLiveGameContract =
+    liveGameContract;
+
+  // Temporary compatibility alias for any cached/helper code that still
+  // references the historical name.
+  window.CBTest2Contract =
+    liveGameContract;
 
   function start() {
     installStyles();

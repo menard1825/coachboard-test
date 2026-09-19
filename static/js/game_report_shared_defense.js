@@ -109,6 +109,23 @@
       strong.textContent = 'Bench: ';
       benchEl.appendChild(strong);
       benchEl.append(document.createTextNode(bench.length ? bench.map(labelPlayer).join(', ') : 'None'));
+
+      if (card.dataset.shortHanded === '1') {
+        const missing = String(
+          card.dataset.missing || ''
+        )
+          .split(',')
+          .map(value => value.trim())
+          .filter(Boolean);
+
+        if (missing.length) {
+          benchEl.append(
+            document.createTextNode(
+              ` · Open: ${missing.join(', ')} (short-handed)`
+            )
+          );
+        }
+      }
     }
 
     return {

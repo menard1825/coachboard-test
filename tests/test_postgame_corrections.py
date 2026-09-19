@@ -206,6 +206,275 @@ def test_incomplete_final_defense_is_explained_and_links_to_exact_inning(
     assert '/game-day/1/correct?inning=1#defense' in html
 
 
+
+def test_normal_roster_open_position_remains_incomplete_and_cannot_be_saved(
+    monkeypatch,
+):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    incomplete = {
+        'P':'Ace', 'C':'Cody', '1B':'Finn',
+        '3B':'Hank', 'SS':'Ivan',
+        'LF':'Jake', 'CF':'Kyle', 'RF':'Liam',
+    }
+
+    response = client.post(
+        '/api/game-day/1/corrections/defense',
+        json={
+            'inning':'1',
+            'alignment':incomplete,
+        },
+    )
+
+    assert response.status_code == 409
+    assert (
+        'Fill every defensive position before saving.'
+        in response.get_json()['message']
+    )
+
+
+def test_short_handed_open_position_is_reliable_and_editable(
+    monkeypatch,
+):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from models import (
+        GameRotationEvent,
+        Player,
+        PlayerGameAbsence,
+    )
+
+    with app.app_context():
+        liam = (
+            db.session.query(Player)
+            .filter_by(
+                team_id=1,
+                name='Liam',
+            )
+            .one()
+        )
+
+        db.session.add(
+            PlayerGameAbsence(
+                player_id=liam.id,
+                game_id=1,
+                team_id=1,
+            )
+        )
+
+        end_event = (
+            db.session.query(GameRotationEvent)
+            .filter_by(
+                game_id=1,
+                team_id=1,
+                event_type='End Game',
+                reverted=False,
+            )
+            .one()
+        )
+
+        short_handed = dict(
+            end_event.after_alignment
+        )
+        short_handed.pop('RF')
+
+        end_event.after_alignment = (
+            short_handed
+        )
+
+        db.session.commit()
+
+    report = client.get(
+        '/game-day/1/report'
+    )
+
+    assert report.status_code == 200
+
+    html = report.get_data(as_text=True)
+
+    assert 'Short-handed' in html
+    assert 'Open: RF (short-handed)' in html
+    assert 'Incomplete defense' not in html
+
+    corrected = dict(short_handed)
+    corrected['C'], corrected['1B'] = (
+        corrected['1B'],
+        corrected['C'],
+    )
+
+    response = client.post(
+        '/api/game-day/1/corrections/defense',
+        json={
+            'inning':'1',
+            'alignment':corrected,
+        },
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.get_json()['status']
+        == 'success'
+    )
+
+    with app.app_context():
+        correction = (
+            db.session.query(GameRotationEvent)
+            .filter_by(
+                game_id=1,
+                team_id=1,
+                event_type='Postgame Correction',
+            )
+            .one()
+        )
+
+        assert correction.after_alignment['RF'] == ''
+        assert correction.after_alignment['C'] == 'Finn'
+        assert correction.after_alignment['1B'] == 'Cody'
+
+
+def test_postgame_correction_recalculates_bench_totals(
+    monkeypatch,
+):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    from db import db
+    from game_day_helpers import build_actual_game_report
+    from models import Game, Player, Team
+
+    with app.app_context():
+        db.session.add(
+            Player(
+                name='Milo',
+                number='10',
+                team_id=1,
+            )
+        )
+        db.session.commit()
+
+        team = db.session.get(Team, 1)
+        game = db.session.get(Game, 1)
+
+        before = build_actual_game_report(
+            game,
+            team,
+        )
+
+        before_rows = {
+            row['name']: row
+            for row in before['bench_rows']
+        }
+
+        assert before_rows['Milo']['innings'] == ['1']
+        assert before_rows['Liam']['innings'] == []
+
+    corrected = {
+        'P':'Ace', 'C':'Cody', '1B':'Finn',
+        '2B':'Gabe', '3B':'Hank', 'SS':'Ivan',
+        'LF':'Jake', 'CF':'Kyle', 'RF':'Milo',
+    }
+
+    response = client.post(
+        '/api/game-day/1/corrections/defense',
+        json={
+            'inning':'1',
+            'alignment':corrected,
+        },
+    )
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        team = db.session.get(Team, 1)
+        game = db.session.get(Game, 1)
+
+        after = build_actual_game_report(
+            game,
+            team,
+        )
+
+        after_rows = {
+            row['name']: row
+            for row in after['bench_rows']
+        }
+
+        assert after_rows['Milo']['innings'] == []
+        assert after_rows['Liam']['innings'] == ['1']
+
+
+def test_resume_uses_postgame_corrected_final_inning_alignment(
+    monkeypatch,
+):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    corrected = {
+        'P':'Ace', 'C':'Finn', '1B':'Cody',
+        '2B':'Gabe', '3B':'Hank', 'SS':'Ivan',
+        'LF':'Jake', 'CF':'Kyle', 'RF':'Liam',
+    }
+
+    correction = client.post(
+        '/api/game-day/1/corrections/defense',
+        json={
+            'inning':'1',
+            'alignment':corrected,
+        },
+    )
+
+    assert correction.status_code == 200
+
+    resumed = client.post(
+        '/game-day/1/resume',
+        follow_redirects=False,
+    )
+
+    assert resumed.status_code in {302, 303}
+
+    from db import db
+    from game_day_helpers import actual_game_rotation
+    from models import Game, GameRotationEvent
+
+    with app.app_context():
+        game = db.session.get(Game, 1)
+
+        assert game.is_live is True
+
+        _, actual, _, _ = actual_game_rotation(
+            game,
+            1,
+        )
+
+        assert actual['1'] == corrected
+
+        resume_event = (
+            db.session.query(GameRotationEvent)
+            .filter_by(
+                game_id=1,
+                team_id=1,
+                event_type='Resume Game',
+                reverted=False,
+            )
+            .one()
+        )
+
+        assert (
+            resume_event.before_alignment
+            == corrected
+        )
+        assert (
+            resume_event.after_alignment
+            == corrected
+        )
+
+
 def test_postgame_lineup_correction_changes_report_order(monkeypatch):
     app = _build_app(monkeypatch)
     client = app.test_client()

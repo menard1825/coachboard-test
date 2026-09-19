@@ -855,28 +855,6 @@ function applyOutOfPositionIndicators() {
              assignPlayerModal.show();
         });
 
-        document.getElementById('liveEndInningBtn')?.addEventListener('click', () => {
-             if (confirm("End current inning and advance to the next?")) {
-                 const beforeAlign = { ...state.actual_rotation[state.currentInning] };
-
-                 const nextInning = Math.floor(parseFloat(state.currentInning)) + 1;
-                 const nextInningStr = String(nextInning);
-
-                 let afterAlign = {};
-
-                 // Determine what the initial alignment of the next inning should be
-                 if (state.rotation.innings && state.rotation.innings[nextInningStr]) {
-                     afterAlign = JSON.parse(JSON.stringify(state.rotation.innings[nextInningStr]));
-                 } else {
-                     afterAlign = { ...beforeAlign }; // Carry over actuals if no plan
-                 }
-
-                 // We don't manually mutate state.currentInning anymore;
-                 // logLiveEvent with 'End Inning' tells the server, which updates the game pointer
-                 logLiveEvent('End Inning', beforeAlign, afterAlign, null, null);
-             }
-        });
-
         document.getElementById('liveUndoBtn')?.addEventListener('click', () => {
              if (state.rotation_events.length > 0) {
                  const unrevertedEvents = state.rotation_events.filter(e => !e.reverted);

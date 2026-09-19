@@ -22,7 +22,6 @@
   let stateBusy = false;
   let clockBusy = false;
   let queued = false;
-  let endInningFrom = null;
   let moveBusy = false;
   let lastFailedMove = null;
   let saveMode = 'saved';
@@ -1229,10 +1228,6 @@
 
       quickDefenseSignature = '';
       queue();
-      if (endInningFrom && String(next.current_inning) !== String(endInningFrom)) {
-        endInningFrom = null;
-        setTimeout(focusBoard, 220);
-      }
     } catch (_) {
     } finally {
       stateBusy = false;
@@ -1269,15 +1264,6 @@
       applySharedLiveDelta
     );
 
-    document.addEventListener('click', event => {
-      const button = event.target.closest('#liveEndInningBtn');
-      if (!button || button.disabled) return;
-      endInningFrom = String(state?.current_inning || $('live-inning-display')?.textContent || '');
-      // The End Inning request and Socket.IO broadcast normally update the page.
-      // One delayed state read is enough as a network fallback; the old three-read
-      // sequence made the dugout feel busier on phones and tablets.
-      setTimeout(getState, 700);
-    }, true);
     const liveOverlay = $('live-game-overlay');
     if (liveOverlay) {
       // Watch only the live-game surface. Observing the entire document — including

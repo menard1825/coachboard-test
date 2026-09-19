@@ -1077,7 +1077,7 @@ def test_test2_end_inning_uses_latest_remote_next_prep(
         assert local_alignment != remote_alignment
 
         # Release the artificial stale GET before End Inning.
-        # test2_game_contract.js must now fetch the authoritative server
+        # live_game_contract.js must now fetch the authoritative server
         # prep and use that rather than CBNextDefense.getAlignment().
         phone.unroute(stale_route)
         stale_route = None

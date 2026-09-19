@@ -95,31 +95,111 @@
   }
 
   function validateDefenseDraft() {
-    const positions = Array.isArray(data.positions) ? data.positions : [];
-    const missing = positions.filter(pos => !String(defenseDraft[pos] || '').trim());
-    const names = positions.map(pos => String(defenseDraft[pos] || '').trim()).filter(Boolean);
-    const duplicate = names.find((name, index) => names.indexOf(name) !== index) || '';
-    const warning = document.getElementById('pgcDefenseWarning');
-    const save = document.getElementById('pgcSaveDefense');
+    const positions =
+      Array.isArray(data.positions)
+        ? data.positions
+        : [];
+
+    const missing =
+      positions.filter(
+        pos =>
+          !String(
+            defenseDraft[pos] || ''
+          ).trim()
+      );
+
+    const names =
+      positions
+        .map(
+          pos =>
+            String(
+              defenseDraft[pos] || ''
+            ).trim()
+        )
+        .filter(Boolean);
+
+    const duplicate =
+      names.find(
+        (name, index) =>
+          names.indexOf(name) !== index
+      ) || '';
+
+    const allowedOpenSlots =
+      Math.max(
+        0,
+        positions.length - players.length
+      );
+
+    const shortHandedValid = Boolean(
+      allowedOpenSlots > 0 &&
+      missing.length === allowedOpenSlots &&
+      names.length === players.length &&
+      !duplicate
+    );
+
+    const invalidMissing = Boolean(
+      missing.length &&
+      !shortHandedValid
+    );
+
+    const warning =
+      document.getElementById(
+        'pgcDefenseWarning'
+      );
+
+    const save =
+      document.getElementById(
+        'pgcSaveDefense'
+      );
 
     if (warning) {
-      warning.textContent = missing.length
-        ? `Fill ${missing.join(', ')} before saving.`
-        : duplicate
-          ? `${duplicate} is assigned to more than one position.`
-          : '';
+      if (duplicate) {
+        warning.textContent =
+          `${duplicate} is assigned to more than one position.`;
+      } else if (invalidMissing) {
+        warning.textContent =
+          allowedOpenSlots > 0
+            ? (
+                `Short-handed defense may leave ` +
+                `${allowedOpenSlots} ` +
+                `position${allowedOpenSlots === 1 ? '' : 's'} Open, ` +
+                `but every available player must be assigned. ` +
+                `Open now: ${missing.join(', ')}.`
+              )
+            : `Fill ${missing.join(', ')} before saving.`;
+      } else if (shortHandedValid) {
+        warning.textContent =
+          `Short-handed: ${missing.join(', ')} will stay Open.`;
+      } else {
+        warning.textContent = '';
+      }
     }
-    if (save) save.disabled = busy || Boolean(missing.length || duplicate);
-    return !missing.length && !duplicate;
+
+    if (save) {
+      save.disabled =
+        busy ||
+        Boolean(duplicate) ||
+        invalidMissing;
+    }
+
+    return (
+      !duplicate &&
+      !invalidMissing
+    );
   }
 
   function renderDefenseEditor() {
     const list = document.getElementById('pgcDefenseList');
     if (!list) return;
     const positions = Array.isArray(data.positions) ? data.positions : [];
+    const emptyLabel =
+      players.length < positions.length
+        ? 'Open / no fielder'
+        : 'Choose player…';
+
     list.innerHTML = positions.map(pos => {
       const current = String(defenseDraft[pos] || '');
-      return `<div class="pgc-defense-row"><label for="pgc-defense-${esc(pos)}">${esc(pos)}</label><select class="form-select" id="pgc-defense-${esc(pos)}" data-pgc-defense-pos="${esc(pos)}"><option value="">Choose player…</option>${players.map(player => `<option value="${esc(player.name)}" ${player.name === current ? 'selected' : ''}>${esc(labelFor(player))}</option>`).join('')}</select></div>`;
+      return `<div class="pgc-defense-row"><label for="pgc-defense-${esc(pos)}">${esc(pos)}</label><select class="form-select" id="pgc-defense-${esc(pos)}" data-pgc-defense-pos="${esc(pos)}"><option value="">${esc(emptyLabel)}</option>${players.map(player => `<option value="${esc(player.name)}" ${player.name === current ? 'selected' : ''}>${esc(labelFor(player))}</option>`).join('')}</select></div>`;
     }).join('');
     list.querySelectorAll('[data-pgc-defense-pos]').forEach(select => {
       select.addEventListener('change', () => {

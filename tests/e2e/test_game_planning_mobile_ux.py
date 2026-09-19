@@ -59,7 +59,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         # after a deployment.
         for filename in (
             'game_prep_readiness.js',
-            'test2_game_contract.js',
+            'live_game_contract.js',
         ):
             direct_script = page.locator(
                 f'script[src*="{filename}"]'

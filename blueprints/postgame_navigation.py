@@ -3,7 +3,12 @@ from copy import deepcopy
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 
 from db import db
-from game_day_helpers import actual_game_rotation, build_game_readiness, required_positions
+from game_day_helpers import (
+    _complete_alignment,
+    actual_game_rotation,
+    build_game_readiness,
+    required_positions,
+)
 from lineup_service import lineup_to_dict, sync_lineup
 from models import (
     Game,
@@ -204,24 +209,43 @@ def resume_game(game_id):
         return redirect(url_for('game_day.game_report', game_id=game.id))
 
     latest_end = end_events[0]
+    resume_inning = str(
+        game.live_current_inning
+        or latest_end.inning
+        or '1'
+    )
+
+    # Resolve the historical record before reverting End Game. This includes
+    # any later Postgame Correction event, so resuming cannot silently restore
+    # the stale pre-correction final-inning defense.
+    _, actual_before_resume, _, _ = actual_game_rotation(
+        game,
+        team.id,
+    )
+    resume_alignment = deepcopy(
+        actual_before_resume.get(resume_inning)
+        or latest_end.after_alignment
+        or latest_end.before_alignment
+        or {}
+    )
+
     for event in end_events:
         event.reverted = True
 
     game.is_live = True
     if not game.live_current_inning:
-        game.live_current_inning = str(latest_end.inning or '1')
+        game.live_current_inning = resume_inning
 
     # Import locally to avoid making the postgame blueprint part of the clock
     # model's startup dependency chain.
     from blueprints.live_game_api import _broadcast_state, _event
     from blueprints.live_game_clock import GameClockState, _emit_clock, _utcnow_naive
 
-    resume_alignment = deepcopy(latest_end.after_alignment or latest_end.before_alignment or {})
     _event(
         game,
         team.id,
         'Resume Game',
-        str(game.live_current_inning or latest_end.inning or '1'),
+        resume_inning,
         resume_alignment,
         resume_alignment,
     )
@@ -299,20 +323,61 @@ def correct_defense(game_id):
     positions = required_positions(team)
     present = _present_players(game, team.id)
     present_names = {player.name for player in present}
-    cleaned = {pos: str(proposed.get(pos) or '').strip() for pos in positions}
-    missing = [pos for pos in positions if not cleaned[pos]]
-    if missing:
+    cleaned = {
+        pos: str(proposed.get(pos) or '').strip()
+        for pos in positions
+    }
+
+    names = [
+        name
+        for name in cleaned.values()
+        if name
+    ]
+
+    if len(names) != len(set(names)):
         return jsonify({
             'status': 'error',
-            'message': f"Fill every defensive position before saving. Missing: {', '.join(missing)}.",
+            'message': 'A player cannot occupy more than one defensive position.',
         }), 409
 
-    names = list(cleaned.values())
-    if len(names) != len(set(names)):
-        return jsonify({'status': 'error', 'message': 'A player cannot occupy more than one defensive position.'}), 409
-    invalid = [name for name in names if name not in present_names]
+    invalid = [
+        name
+        for name in names
+        if name not in present_names
+    ]
     if invalid:
-        return jsonify({'status': 'error', 'message': f'{invalid[0]} is not available for this game.'}), 409
+        return jsonify({
+            'status': 'error',
+            'message': f'{invalid[0]} is not available for this game.',
+        }), 409
+
+    reliable, missing = _complete_alignment(
+        cleaned,
+        positions,
+        present_names,
+    )
+
+    if not reliable:
+        if missing and len(present_names) < len(positions):
+            allowed_open = len(positions) - len(present_names)
+            message = (
+                f'Short-handed defense may leave {allowed_open} '
+                f'position{"s" if allowed_open != 1 else ""} Open, '
+                'but every available player must be assigned. '
+                f'Open now: {", ".join(missing)}.'
+            )
+        elif missing:
+            message = (
+                'Fill every defensive position before saving. '
+                f'Missing: {", ".join(missing)}.'
+            )
+        else:
+            message = 'The defensive alignment is not valid.'
+
+        return jsonify({
+            'status': 'error',
+            'message': message,
+        }), 409
 
     _, actual, _, reached = actual_game_rotation(game, team.id)
     regulation = int(build_game_readiness(game, team).get('regulation_innings') or 6)

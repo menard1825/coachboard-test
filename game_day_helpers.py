@@ -41,11 +41,34 @@ def _complete_alignment(alignment, required, present_names, optional_positions=N
     missing = [pos for pos in required if not alignment.get(pos)]
     positions_to_validate = list(dict.fromkeys([*required, *optional_positions]))
     names = [alignment.get(pos) for pos in positions_to_validate if alignment.get(pos)]
-    valid = (
-        not missing
-        and len(names) == len(set(names))
+    required_names = [
+        alignment.get(pos)
+        for pos in required
+        if alignment.get(pos)
+    ]
+    unique_and_present = (
+        len(names) == len(set(names))
         and all(name in present_names for name in names)
     )
+
+    # A defense can still be historically reliable when the team was
+    # legitimately short-handed. Example: eight available players for
+    # nine defensive positions, eight unique available players assigned,
+    # and exactly one position left Open.
+    short_handed_open_slots = max(
+        0,
+        len(required) - len(present_names),
+    )
+    accounted_for = (
+        not missing
+        or (
+            short_handed_open_slots > 0
+            and len(missing) == short_handed_open_slots
+            and len(required_names) == len(present_names)
+        )
+    )
+
+    valid = unique_and_present and accounted_for
     return valid, missing
 
 
@@ -470,6 +493,7 @@ def build_actual_game_report(game, team):
             'bench': bench,
             'display_bench': [player_label(name) for name in bench] if bench is not None else None,
             'reliable': reliable,
+            'short_handed': bool(reliable and missing),
             'missing': missing,
         })
 
