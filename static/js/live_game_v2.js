@@ -344,7 +344,7 @@
     function ensurePitcherChangeController() {
         const existing = window.CBPitcherChangeComplete;
 
-        if (existing?.version === 3 && typeof existing.open === 'function') {
+        if (existing?.version === 4 && typeof existing.open === 'function') {
             return Promise.resolve(existing);
         }
 
@@ -356,7 +356,7 @@
             const script = document.createElement('script');
             script.src =
                 '/static/js/live_game_pitcher_change_complete.js' +
-                '?v=single-pitcher-path-v1';
+                '?v=explicit-outgoing-v1';
             script.dataset.cbPitcherChangeController = 'true';
 
             script.addEventListener('load', () => {
@@ -364,7 +364,7 @@
                     window.CBPitcherChangeComplete;
 
                 if (
-                    controller?.version === 3 &&
+                    controller?.version === 4 &&
                     typeof controller.open === 'function'
                 ) {
                     resolve(controller);

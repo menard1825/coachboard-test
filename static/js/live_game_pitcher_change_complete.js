@@ -7,9 +7,9 @@
   const gameId = Number(match[1]);
 
   // Idempotent: some older enhancement loaders may still request this
-  // file. Once the v3 controller exists, a duplicate script load does
+  // file. Once the v4 controller exists, a duplicate script load does
   // nothing.
-  if (window.CBPitcherChangeComplete?.version === 3) {
+  if (window.CBPitcherChangeComplete?.version === 4) {
     return;
   }
 
@@ -96,140 +96,11 @@
     return modal;
   }
 
-  function playerPositionInDraft(draft, name) {
-    return Object.entries(draft || {})
-      .find(([, assigned]) => assigned === name)?.[0] || 'BENCH';
-  }
-
   function baseDraft() {
     const draft = {...(before || {})};
     if (incomingPosition) delete draft[incomingPosition];
     draft.P = incoming.name;
     return draft;
-  }
-
-  function renderVacancy(draft, vacancy, lockedNames) {
-    const modal = ensureModal();
-    const body = modal.querySelector('[data-pc-body]');
-    if (!body || !incoming || !vacancy) return;
-
-    const choices = (state?.roster || [])
-      .filter(player => (
-        player?.name &&
-        !lockedNames.has(player.name)
-      ))
-      .map(player => ({
-        ...player,
-        currentPosition: playerPositionInDraft(
-          draft,
-          player.name
-        ),
-      }))
-      .filter(player => player.currentPosition !== 'P');
-
-    const fieldChoices = choices
-      .filter(player => player.currentPosition !== 'BENCH')
-      .sort((a, b) => (
-        a.currentPosition.localeCompare(b.currentPosition) ||
-        a.name.localeCompare(b.name)
-      ));
-
-    const benchChoices = choices
-      .filter(player => player.currentPosition === 'BENCH')
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    const choiceButton = player => {
-      const number = String(player.number ?? '').trim();
-      const label = number
-        ? `#${number} ${player.name}`
-        : player.name;
-
-      return `
-        <button
-          type="button"
-          class="btn btn-outline-primary"
-          data-pc-chain-player="${esc(player.name)}"
-          data-pc-chain-from="${esc(player.currentPosition)}"
-        >
-          <span>${esc(label)}</span>
-          <small>
-            ${esc(player.currentPosition)} → ${esc(vacancy)}
-          </small>
-        </button>`;
-    };
-
-    body.innerHTML = `
-      <div class="pc-summary">
-        <strong>${esc(incoming.name)}</strong> → P<br>
-        <span class="text-muted">
-          ${esc(oldPitcher)} → Bench
-        </span>
-      </div>
-
-      <div class="pc-vacancy-note">
-        <strong>Who takes ${esc(vacancy)}?</strong><br>
-        Pick a fielder or bench player.
-        If you move a fielder, CoachBoard will follow
-        the open position automatically.
-      </div>
-
-      ${fieldChoices.length ? `
-        <div class="pc-label">On the field</div>
-        <div class="pc-replacements">
-          ${fieldChoices.map(choiceButton).join('')}
-        </div>
-      ` : ''}
-
-      <div class="pc-label">On the bench</div>
-      <div class="pc-replacements">
-        ${
-          benchChoices.length
-            ? benchChoices.map(choiceButton).join('')
-            : '<div class="small text-muted">No bench player is available.</div>'
-        }
-      </div>`;
-
-    body.querySelectorAll('[data-pc-chain-player]')
-      .forEach(button => {
-        button.addEventListener('click', () => {
-          const replacementName =
-            button.dataset.pcChainPlayer || '';
-          const fromPosition =
-            button.dataset.pcChainFrom || 'BENCH';
-
-          const replacement = choices.find(
-            player => player.name === replacementName
-          );
-
-          if (!replacement) return;
-
-          if (fromPosition !== 'BENCH') {
-            delete draft[fromPosition];
-          }
-
-          draft[vacancy] = replacement.name;
-
-          // A bench player closes the final vacancy. Save the whole
-          // defensive alignment plus pitcher change as one transaction.
-          if (fromPosition === 'BENCH') {
-            save(
-              draft,
-              `${incoming.name} in at P · ${oldPitcher} to bench`
-            );
-            return;
-          }
-
-          // A fielder moved into the vacancy. Their old position is now
-          // open, so keep walking the coach through the chain.
-          lockedNames.add(replacement.name);
-
-          renderVacancy(
-            draft,
-            fromPosition,
-            lockedNames
-          );
-        });
-      });
   }
 
   function render() {
@@ -249,7 +120,7 @@
           </button>
           <button type="button" class="btn btn-outline-secondary pc-action" data-pc-bench-old>
             ${esc(oldPitcher)} → Bench
-            <small>Choose who fills ${esc(incomingPosition)}.</small>
+            <small>Leave ${esc(incomingPosition)} OPEN. Fix it on On the Field.</small>
           </button>
         </div>`;
     } else {
@@ -271,21 +142,14 @@
     });
 
     body.querySelector('[data-pc-bench-old]')?.addEventListener('click', () => {
-      if (incomingPosition && oldPitcher) {
-        const draft = baseDraft();
+      const openNote = incomingPosition
+        ? ` · ${incomingPosition} OPEN`
+        : '';
 
-        renderVacancy(
-          draft,
-          incomingPosition,
-          new Set([
-            incoming.name,
-            oldPitcher,
-          ]),
-        );
-        return;
-      }
-
-      save(baseDraft(), `${incoming.name} in at P`);
+      save(
+        baseDraft(),
+        `${incoming.name} in at P · ${oldPitcher || 'current pitcher'} to bench${openNote}`
+      );
     });
   }
 
@@ -365,7 +229,7 @@
   }
 
   window.CBPitcherChangeComplete = Object.freeze({
-    version: 3,
+    version: 4,
     open,
   });
 

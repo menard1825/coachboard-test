@@ -285,13 +285,10 @@ def complete_pitcher_change(game_id):
     if after.get('P') != new_pitcher.name:
         return jsonify({'status': 'error', 'message': f'{new_pitcher.name} must be assigned to P for this pitching change.'}), 409
 
-    missing_positions = _missing_positions(after, allowed)
-    if missing_positions:
-        return jsonify({
-            'status': 'error',
-            'message': f"Finish the defense before saving. {', '.join(missing_positions)} still needs a player.",
-        }), 409
-
+    # Change Pitcher owns only the mound change and the outgoing
+    # pitcher's destination. Non-P positions may intentionally remain
+    # OPEN so the coach can finish the defense on On the Field.
+    # P itself is enforced above as the selected incoming pitcher.
     valid, message = _validate_alignment(after, present_names)
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
