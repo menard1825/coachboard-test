@@ -336,8 +336,7 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         if bench_player_id:
             page.request.get(f'{coachboard_url}/delete_player/{bench_player_id}')
 
-
-def test_pitcher_change_uses_explicit_outgoing_choice(
+def test_pitcher_change_is_two_tap_and_leaves_defense_open(
     page: Page,
     coachboard_url: str,
 ):
@@ -360,9 +359,9 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
         },
         headers={'X-Requested-With': 'XMLHttpRequest'},
     )
+
     assert add.status == 200, add.text()
-    add_payload = add.json()
-    assert add_payload['status'] == 'success'
+    assert add.json()['status'] == 'success'
 
     try:
         response = page.request.post(
@@ -372,32 +371,38 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
                     date.today() + timedelta(days=17)
                 ).isoformat(),
                 'game_start_time': '15:00',
-                'game_opponent': 'Pitcher Chain Opponent',
-                'game_location': 'Pitcher Chain Field',
-                'game_notes': 'Disposable pitcher chain test',
+                'game_opponent': 'Two Tap Pitcher Opponent',
+                'game_location': 'Two Tap Pitcher Field',
+                'game_notes': (
+                    'Disposable two-tap pitcher test'
+                ),
                 'pitching_rule_set': 'USSSA',
             },
             max_redirects=0,
         )
+
         assert response.status in {302, 303}
 
         match = re.search(
             r'/game/(\d+)',
             response.headers.get('location') or '',
         )
+
         assert match
         game_id = int(match.group(1))
 
-        chain_alignment = alignment()
-        chain_alignment['2B'] = relief_name
+        starting_alignment = alignment()
+        starting_alignment['2B'] = relief_name
 
         post_json(
             page,
             coachboard_url,
             '/save_rotation',
             {
-                'title': 'Pitcher Chain Rotation',
-                'innings': {'1': chain_alignment},
+                'title': 'Two Tap Pitcher Rotation',
+                'innings': {
+                    '1': starting_alignment,
+                },
                 'associated_game_id': game_id,
             },
         )
@@ -408,13 +413,18 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
             f'/api/live-game/{game_id}/start',
             {},
         )
-        assert started['state']['current_alignment']['2B'] == relief_name
+
+        assert (
+            started['state']['current_alignment']['2B']
+            == relief_name
+        )
 
         relief_player = next(
             player
             for player in started['state']['roster']
             if player['name'] == relief_name
         )
+
         relief_id = int(relief_player['id'])
 
         page.goto(
@@ -422,27 +432,52 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
             wait_until='domcontentloaded',
         )
 
+        quick = page.locator('#cbQuickDefense')
+
         expect(
-            page.locator('#cbQuickDefense')
+            quick
         ).to_be_visible(timeout=15_000)
 
-        page.locator('#liveChangePitcherBtn').click()
+        # Tap 1: Change Pitcher.
+        page.locator(
+            '#liveChangePitcherBtn'
+        ).click()
 
-        picker = page.locator('#live-pitcher-picker-v2')
-        expect(picker).to_be_visible(timeout=10_000)
+        picker = page.locator(
+            '#live-pitcher-picker-v2'
+        )
+
+        expect(
+            picker
+        ).to_be_visible(timeout=10_000)
 
         relief_choice = picker.locator(
             '.pitcher-choice-v2',
             has_text=relief_name,
         )
-        expect(relief_choice).to_be_visible()
+
+        expect(
+            relief_choice
+        ).to_be_visible()
+
+        page.evaluate(
+            "window.__pitcherChangeStayedOnPage = 'yes'"
+        )
+
+        # Tap 2: choose the new pitcher.
+        #
+        # This is the final pitching-change decision.
+        # There must be no destination questionnaire.
         relief_choice.click()
 
-        finish = page.locator('#live-pitcher-finish-v3')
-        expect(finish).to_be_visible(timeout=10_000)
+        expect(
+            picker
+        ).not_to_be_visible(timeout=10_000)
 
-        # Single-path contract:
-        # the retired v2 destination editor must never be created.
+        expect(
+            page.locator('#live-pitcher-finish-v3')
+        ).to_have_count(0)
+
         expect(
             page.locator('#live-pitcher-destination-v2')
         ).to_have_count(0)
@@ -450,49 +485,12 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
         assert page.evaluate(
             """
             () => (
-                window.CBPitcherChangeComplete?.version === 4 &&
-                typeof window.CBPitcherChangeComplete?.open === 'function'
+                window.CBPitcherChangeComplete?.version === 5 &&
+                typeof window.CBPitcherChangeComplete?.open ===
+                    'function'
             )
             """
         )
-
-        expect(finish).to_contain_text(f'{relief_name} → P')
-        expect(finish).to_contain_text('Pitcher Pat')
-
-        # Change Pitcher now makes exactly one additional decision:
-        # where the outgoing pitcher goes.
-        swap_choice = finish.locator('[data-pc-swap]')
-        bench_choice = finish.locator('[data-pc-bench-old]')
-
-        expect(swap_choice).to_be_visible()
-        expect(swap_choice).to_contain_text(
-            'Pitcher Pat → 2B'
-        )
-
-        expect(bench_choice).to_be_visible()
-        expect(bench_choice).to_contain_text(
-            'Pitcher Pat → Bench'
-        )
-        expect(bench_choice).to_contain_text(
-            'Leave 2B OPEN'
-        )
-
-        # The old automatic vacancy-following UI is gone.
-        expect(
-            finish.locator('[data-pc-chain-player]')
-        ).to_have_count(0)
-
-        page.evaluate(
-            "window.__pitcherChangeStayedOnPage = 'yes'"
-        )
-
-        # PATH 1:
-        # Incoming 2B goes to P.
-        # Outgoing pitcher explicitly sits.
-        # 2B intentionally stays OPEN.
-        bench_choice.click()
-
-        expect(finish).not_to_be_visible(timeout=10_000)
 
         assert (
             page.evaluate(
@@ -501,8 +499,7 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
             == 'yes'
         )
 
-        quick = page.locator('#cbQuickDefense')
-
+        # Incoming 2B is immediately the pitcher.
         expect(
             quick.locator('[data-cb-position="P"]')
         ).to_contain_text(
@@ -510,18 +507,27 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
             timeout=10_000,
         )
 
-        open_2b = quick.locator('[data-cb-position="2B"]')
+        # Their old defensive position becomes OPEN.
+        open_2b = quick.locator(
+            '[data-cb-position="2B"]'
+        )
 
-        expect(open_2b).to_have_attribute(
+        expect(
+            open_2b
+        ).to_have_attribute(
             'data-cb-move-player',
             'Open',
             timeout=10_000,
         )
-        expect(open_2b).to_contain_text(
+
+        expect(
+            open_2b
+        ).to_contain_text(
             'Open',
             timeout=10_000,
         )
 
+        # The outgoing pitcher is temporarily on the bench.
         expect(
             quick.locator('.cb-qd-bench')
         ).to_contain_text(
@@ -529,6 +535,7 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
             timeout=10_000,
         )
 
+        # Header updates on the same page.
         expect(
             page.locator(
                 '#cbDugoutHeader [data-cb-pitcher]'
@@ -538,27 +545,53 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
             timeout=10_000,
         )
 
-        open_state = get_json(
+        # The short confirmation explains what just happened.
+        toast = page.locator(
+            '#pitcher-change-toast-v5 .toast-body'
+        )
+
+        expect(
+            toast
+        ).to_contain_text(
+            f'{relief_name} is pitching',
+            timeout=10_000,
+        )
+
+        expect(
+            toast
+        ).to_contain_text(
+            'Pitcher Pat to Bench',
+        )
+
+        expect(
+            toast
+        ).to_contain_text(
+            '2B Open',
+        )
+
+        state = get_json(
             page,
             coachboard_url,
             f'/api/live-game/{game_id}/state',
         )
 
         assert (
-            open_state['current_alignment']['P']
+            state['current_alignment']['P']
             == relief_name
         )
 
-        assert not open_state['current_alignment'].get(
-            '2B'
-        )
+        assert not state[
+            'current_alignment'
+        ].get('2B')
 
         assert 'Pitcher Pat' not in (
-            open_state['current_alignment'].values()
+            state['current_alignment'].values()
         )
 
-        # Undo restores the exact pre-change defense.
-        page.locator('#liveUndoBtn').click()
+        # Undo is the safety valve for an accidental pitcher tap.
+        page.locator(
+            '#liveUndoBtn'
+        ).click()
 
         expect(
             quick.locator('[data-cb-position="P"]')
@@ -590,74 +623,13 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
             == relief_name
         )
 
-        # PATH 2:
-        # Reopen Change Pitcher and explicitly send the outgoing
-        # pitcher to the incoming pitcher's vacated 2B spot.
-        page.locator('#liveChangePitcherBtn').click()
-
-        picker = page.locator('#live-pitcher-picker-v2')
-        expect(picker).to_be_visible(timeout=10_000)
-
-        relief_choice = picker.locator(
-            '.pitcher-choice-v2',
-            has_text=relief_name,
-        )
-
-        expect(relief_choice).to_be_visible()
-        relief_choice.click()
-
-        finish = page.locator('#live-pitcher-finish-v3')
-        expect(finish).to_be_visible(timeout=10_000)
-
-        expect(
-            finish.locator('[data-pc-chain-player]')
-        ).to_have_count(0)
-
-        expect(
-            finish.locator('[data-pc-swap]')
-        ).to_contain_text(
-            'Pitcher Pat → 2B'
-        )
-
-        finish.locator('[data-pc-swap]').click()
-
-        expect(finish).not_to_be_visible(timeout=10_000)
-
-        expect(
-            quick.locator('[data-cb-position="P"]')
-        ).to_contain_text(
-            relief_name,
-            timeout=10_000,
-        )
-
-        expect(
-            quick.locator('[data-cb-position="2B"]')
-        ).to_contain_text(
-            'Pitcher Pat',
-            timeout=10_000,
-        )
-
-        final_state = get_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/state',
-        )
-
-        assert (
-            final_state['current_alignment']['P']
-            == relief_name
-        )
-
-        assert (
-            final_state['current_alignment']['2B']
-            == 'Pitcher Pat'
-        )
-
     finally:
         if game_id is not None:
             state_response = page.request.get(
-                f'{coachboard_url}/api/live-game/{game_id}/state'
+                f'{coachboard_url}'
+                f'/api/live-game/{game_id}/state'
             )
+
             if (
                 state_response.ok
                 and state_response.json()
@@ -665,7 +637,9 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
                 .get('is_live')
             ):
                 page.request.post(
-                    f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
+                    f'{coachboard_url}'
+                    f'/api/live-game/{game_id}'
+                    '/end-with-pitching',
                     data={
                         'defer_pitching': True,
                         'end_reason': 'manual',
@@ -674,11 +648,15 @@ def test_pitcher_change_uses_explicit_outgoing_choice(
                 )
 
             page.request.post(
-                f'{coachboard_url}/game-day/{game_id}/delete',
-                headers={'Accept': 'application/json'},
+                f'{coachboard_url}'
+                f'/game-day/{game_id}/delete',
+                headers={
+                    'Accept': 'application/json'
+                },
             )
 
         if relief_id is not None:
             page.request.get(
-                f'{coachboard_url}/delete_player/{relief_id}'
+                f'{coachboard_url}'
+                f'/delete_player/{relief_id}'
             )

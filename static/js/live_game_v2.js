@@ -344,7 +344,7 @@
     function ensurePitcherChangeController() {
         const existing = window.CBPitcherChangeComplete;
 
-        if (existing?.version === 4 && typeof existing.open === 'function') {
+        if (existing?.version === 5 && typeof existing.open === 'function') {
             return Promise.resolve(existing);
         }
 
@@ -356,7 +356,7 @@
             const script = document.createElement('script');
             script.src =
                 '/static/js/live_game_pitcher_change_complete.js' +
-                '?v=explicit-outgoing-v1';
+                '?v=two-tap-v1';
             script.dataset.cbPitcherChangeController = 'true';
 
             script.addEventListener('load', () => {
@@ -364,7 +364,7 @@
                     window.CBPitcherChangeComplete;
 
                 if (
-                    controller?.version === 4 &&
+                    controller?.version === 5 &&
                     typeof controller.open === 'function'
                 ) {
                     resolve(controller);
@@ -406,21 +406,21 @@
         const instance =
             bootstrap.Modal.getOrCreateInstance(pickerModal);
 
-        const openFinish = () => {
-            controller.open(playerId);
-        };
-
         if (pickerModal.classList.contains('show')) {
-            pickerModal.addEventListener(
-                'hidden.bs.modal',
-                openFinish,
-                { once: true },
-            );
-            instance.hide();
-            return;
+            await new Promise(resolve => {
+                pickerModal.addEventListener(
+                    'hidden.bs.modal',
+                    resolve,
+                    { once: true },
+                );
+                instance.hide();
+            });
         }
 
-        openFinish();
+        // Selecting the pitcher is the final pitching-change action.
+        // The controller saves immediately; there is no destination
+        // questionnaire or second pitcher-change modal.
+        await controller.open(playerId);
     }
 
     function showPitcherPicker() {

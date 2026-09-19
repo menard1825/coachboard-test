@@ -6,30 +6,31 @@
 
   const gameId = Number(match[1]);
 
-  // Idempotent: some older enhancement loaders may still request this
-  // file. Once the v4 controller exists, a duplicate script load does
-  // nothing.
-  if (window.CBPitcherChangeComplete?.version === 4) {
+  // Idempotent: older enhancement loaders may request this file more
+  // than once. Only one two-tap pitcher-change controller may exist.
+  if (window.CBPitcherChangeComplete?.version === 5) {
     return;
   }
 
-  const MODAL_ID = 'live-pitcher-finish-v3';
   let state = null;
-  let incoming = null;
-  let before = null;
-  let oldPitcher = '';
-  let incomingPosition = null;
   let busy = false;
 
-  const $ = id => document.getElementById(id);
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
-    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
-  }[ch]));
+  const esc = value => String(value ?? '').replace(
+    /[&<>"']/g,
+    ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]),
+  );
 
   function sequenceFromState(value = state) {
     return (value?.rotation_events || []).reduce(
       (max, event) => {
         if (event?.reverted) return max;
+
         return Math.max(
           max,
           Number(event?.sequence) || 0,
@@ -39,199 +40,227 @@
     );
   }
 
-  function installStyles() {
-    if ($('pitcher-change-simple-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'pitcher-change-simple-styles';
-    style.textContent = `
-      #${MODAL_ID} .modal-content{border:0;border-radius:15px;overflow:hidden}
-      #${MODAL_ID} .pc-summary{border:1px solid #dfe4ea;background:#f8fafc;border-radius:10px;padding:10px 11px;margin-bottom:12px;color:#344054;font-size:.8rem}
-      #${MODAL_ID} .pc-actions{display:grid;gap:9px}
-      #${MODAL_ID} .pc-action{min-height:58px;border-radius:11px;font-weight:850;text-align:left;padding:9px 11px}
-      #${MODAL_ID} .pc-action small{display:block;margin-top:2px;font-size:.67rem;font-weight:550;opacity:.78}
-      #${MODAL_ID} .pc-replacements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
-      #${MODAL_ID} .pc-replacements .btn{min-height:52px;border-radius:9px;font-weight:750;text-align:left}
-      #${MODAL_ID} .pc-replacements .btn small{display:block;margin-top:3px;font-size:.64rem;font-weight:550;opacity:.72}
-      #${MODAL_ID} .pc-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin:12px 0 6px}
-      #${MODAL_ID} .pc-vacancy-note{border:1px solid #dfe4ea;background:#f8fafc;border-radius:10px;padding:9px 10px;margin-bottom:9px;font-size:.75rem;color:#475467}
-      @media(max-width:575.98px){#${MODAL_ID} .modal-dialog{margin:.5rem}}
-    `;
-    document.head.appendChild(style);
-  }
+  function toast(message, kind = 'success') {
+    let host = document.getElementById(
+      'pitcher-change-toast-v5'
+    );
 
-  function toast(message, kind='success') {
-    let host = $('pitcher-change-toast-v3');
     if (!host) {
       host = document.createElement('div');
-      host.id = 'pitcher-change-toast-v3';
-      host.className = 'toast-container position-fixed top-0 end-0 p-3';
+      host.id = 'pitcher-change-toast-v5';
+      host.className =
+        'toast-container position-fixed top-0 end-0 p-3';
       host.style.zIndex = '5000';
       document.body.appendChild(host);
     }
+
     const el = document.createElement('div');
-    el.className = `toast text-bg-${kind} border-0`;
-    el.innerHTML = `<div class="d-flex"><div class="toast-body fw-semibold">${esc(message)}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+    el.className =
+      `toast text-bg-${kind} border-0`;
+
+    el.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body fw-semibold">
+          ${esc(message)}
+        </div>
+        <button
+          type="button"
+          class="btn-close btn-close-white me-2 m-auto"
+          data-bs-dismiss="toast"
+        ></button>
+      </div>`;
+
     host.appendChild(el);
-    const instance = bootstrap.Toast.getOrCreateInstance(el,{delay:2400});
-    el.addEventListener('hidden.bs.toast',()=>el.remove(),{once:true});
+
+    const instance =
+      bootstrap.Toast.getOrCreateInstance(
+        el,
+        {delay: 2600},
+      );
+
+    el.addEventListener(
+      'hidden.bs.toast',
+      () => el.remove(),
+      {once: true},
+    );
+
     instance.show();
   }
 
   async function loadState() {
-    const response = await fetch(`/api/live-game/${gameId}/state`,{cache:'no-store'});
-    const data = await response.json().catch(()=>({}));
-    if (!response.ok) throw new Error(data.message || `Unable to load game (${response.status}).`);
+    const response = await fetch(
+      `/api/live-game/${gameId}/state`,
+      {cache: 'no-store'},
+    );
+
+    const data =
+      await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+        `Unable to load game (${response.status}).`
+      );
+    }
+
     return data;
   }
 
-  function ensureModal() {
-    let modal = $(MODAL_ID);
-    if (modal) return modal;
-    modal = document.createElement('div');
-    modal.id = MODAL_ID;
-    modal.className = 'modal fade';
-    modal.tabIndex = -1;
-    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Pitching Change</h5><div class="small text-muted">Who’s coming in, and where does the old pitcher go?</div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body" data-pc-body></div></div></div>`;
-    document.body.appendChild(modal);
-    return modal;
-  }
+  async function save(
+    incoming,
+    alignment,
+    successMessage,
+  ) {
+    const response = await fetch(
+      `/api/live-game/${gameId}/complete-pitcher-change`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          new_pitcher_id: Number(incoming.id),
+          alignment,
+          base_sequence: sequenceFromState(),
+          fast: true,
+        }),
+      },
+    );
 
-  function baseDraft() {
-    const draft = {...(before || {})};
-    if (incomingPosition) delete draft[incomingPosition];
-    draft.P = incoming.name;
-    return draft;
-  }
+    const data =
+      await response.json().catch(() => ({}));
 
-  function render() {
-    const modal = ensureModal();
-    const body = modal.querySelector('[data-pc-body]');
-    if (!body || !incoming) return;
+    if (
+      !response.ok ||
+      data.status === 'error'
+    ) {
+      if (
+        data.code === 'stale_live_state' ||
+        data.code === 'missing_live_state_version'
+      ) {
+        try {
+          state = await loadState();
+        } catch (_) {}
+      }
 
-    const oldName = oldPitcher || 'Current pitcher';
-    let actions = '';
-
-    if (incomingPosition && oldPitcher) {
-      actions = `
-        <div class="pc-actions">
-          <button type="button" class="btn btn-primary pc-action" data-pc-swap>
-            ${esc(oldPitcher)} → ${esc(incomingPosition)}
-            <small>Straight swap. Everyone else stays put.</small>
-          </button>
-          <button type="button" class="btn btn-outline-secondary pc-action" data-pc-bench-old>
-            ${esc(oldPitcher)} → Bench
-            <small>Leave ${esc(incomingPosition)} OPEN. Fix it on On the Field.</small>
-          </button>
-        </div>`;
-    } else {
-      actions = `
-        <div class="pc-actions">
-          <button type="button" class="btn btn-primary pc-action" data-pc-bench-old>
-            ${oldPitcher ? `${esc(oldPitcher)} → Bench` : 'Make Pitching Change'}
-            <small>Everyone else stays put.</small>
-          </button>
-        </div>`;
+      throw new Error(
+        data.message ||
+        `Unable to change pitcher (${response.status}).`
+      );
     }
 
-    body.innerHTML = `<div class="pc-summary"><strong>${esc(incoming.name)}</strong> → P<br><span class="text-muted">Where does ${esc(oldName)} go?</span></div>${actions}`;
-
-    body.querySelector('[data-pc-swap]')?.addEventListener('click', () => {
-      const draft = baseDraft();
-      draft[incomingPosition] = oldPitcher;
-      save(draft, `${incoming.name} in at P · ${oldPitcher} to ${incomingPosition}`);
-    });
-
-    body.querySelector('[data-pc-bench-old]')?.addEventListener('click', () => {
-      const openNote = incomingPosition
-        ? ` · ${incomingPosition} OPEN`
-        : '';
-
-      save(
-        baseDraft(),
-        `${incoming.name} in at P · ${oldPitcher || 'current pitcher'} to bench${openNote}`
+    // Apply the same authoritative delta sent to every other
+    // connected coach so this device updates immediately.
+    if (data.delta) {
+      document.dispatchEvent(
+        new CustomEvent(
+          'coachboard:live-delta',
+          {
+            detail: data.delta,
+          },
+        ),
       );
-    });
+    }
+
+    toast(successMessage);
+
+    return data;
   }
 
-  async function save(alignment, successMessage) {
+  async function open(playerId) {
     if (busy) return;
+
     busy = true;
-    const modal = ensureModal();
-    modal.querySelectorAll('button').forEach(button => { if (!button.classList.contains('btn-close')) button.disabled = true; });
+
     try {
-      const response = await fetch(`/api/live-game/${gameId}/complete-pitcher-change`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          new_pitcher_id:Number(incoming.id),
-          alignment,
-          base_sequence:sequenceFromState(),
-          fast:true,
-        })
-      });
-      const data = await response.json().catch(()=>({}));
-      if (!response.ok || data.status === 'error') {
-        if (
-          data.code === 'stale_live_state' ||
-          data.code === 'missing_live_state_version'
-        ) {
-          try {
-            state = await loadState();
-          } catch (_) {}
+      state = await loadState();
 
-          bootstrap.Modal
-            .getOrCreateInstance(modal)
-            .hide();
-        }
+      if (!state?.game?.is_live) {
+        throw new Error('Game is not live.');
+      }
 
+      const incoming =
+        (state.roster || []).find(
+          player =>
+            Number(player.id) === Number(playerId)
+        );
+
+      if (!incoming) {
         throw new Error(
-          data.message ||
-          `Unable to change pitcher (${response.status}).`
+          'Pitcher is not available.'
         );
       }
 
-      // The fast pitcher-change response contains the same
-      // authoritative live delta broadcast to the other coaches.
-      // Apply it locally immediately so the coach who made the
-      // change sees the header AND Quick Field update together.
-      if (data.delta) {
-        document.dispatchEvent(
-          new CustomEvent('coachboard:live-delta', {
-            detail: data.delta,
-          })
+      const before = {
+        ...(state.current_alignment || {}),
+      };
+
+      const oldPitcher =
+        before.P || '';
+
+      const incomingPosition =
+        Object.entries(before).find(
+          ([position, name]) =>
+            position !== 'P' &&
+            name === incoming.name
+        )?.[0] || null;
+
+      /*
+       * Two-tap contract:
+       *
+       * 1. Coach taps Change Pitcher.
+       * 2. Coach taps the new pitcher.
+       *
+       * That player becomes P immediately.
+       * The outgoing pitcher becomes unassigned (Bench).
+       * If the incoming pitcher was in the field, that non-P
+       * position becomes OPEN.
+       *
+       * On the Field owns every defensive move after that.
+       */
+      const alignment = {...before};
+
+      if (incomingPosition) {
+        delete alignment[incomingPosition];
+      }
+
+      alignment.P = incoming.name;
+
+      const messageParts = [
+        `${incoming.name} is pitching`,
+      ];
+
+      if (oldPitcher) {
+        messageParts.push(
+          `${oldPitcher} to Bench`
         );
       }
 
-      bootstrap.Modal.getOrCreateInstance(modal).hide();
-      toast(successMessage);
+      if (incomingPosition) {
+        messageParts.push(
+          `${incomingPosition} Open`
+        );
+      }
+
+      await save(
+        incoming,
+        alignment,
+        messageParts.join(' · '),
+      );
     } catch (err) {
-      toast(err.message,'danger');
-      modal.querySelectorAll('button').forEach(button => { button.disabled = false; });
+      toast(
+        err.message ||
+        'Unable to change pitcher.',
+        'danger',
+      );
     } finally {
       busy = false;
     }
   }
 
-  async function open(playerId) {
-    try {
-      state = await loadState();
-      if (!state?.game?.is_live) throw new Error('Game is not live.');
-      incoming = (state.roster || []).find(player => Number(player.id) === Number(playerId));
-      if (!incoming) throw new Error('Pitcher is not available.');
-      before = {...(state.current_alignment || {})};
-      oldPitcher = before.P || '';
-      incomingPosition = Object.entries(before).find(([pos,name]) => pos !== 'P' && name === incoming.name)?.[0] || null;
-      render();
-      bootstrap.Modal.getOrCreateInstance(ensureModal()).show();
-    } catch (err) {
-      toast(err.message,'danger');
-    }
-  }
-
-  window.CBPitcherChangeComplete = Object.freeze({
-    version: 4,
-    open,
-  });
-
-  installStyles();
+  window.CBPitcherChangeComplete =
+    Object.freeze({
+      version: 5,
+      open,
+    });
 })();
