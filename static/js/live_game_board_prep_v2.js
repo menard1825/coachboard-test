@@ -1229,6 +1229,15 @@
   function syncLiveActions() {
     const changePitcher = $('liveChangePitcherBtn');
     const undo = $('liveUndoBtn');
+    const actionSlot = $('coach-action-slot');
+
+    // On the Field owns two live actions. NEXT and Pregame Plan hide
+    // Change Pitcher, so their phone dock should become one full-width
+    // End Inning action instead of leaving an empty grid column.
+    actionSlot?.classList.toggle(
+      'cb-single-live-action',
+      activeView === 'next' || activeView === 'plan'
+    );
 
     // NEXT edits pitcher directly on the defensive board, and Pregame Plan
     // is a reference view that must offer no way to change anything.

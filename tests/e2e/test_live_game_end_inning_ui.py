@@ -220,3 +220,154 @@ def test_end_inning_is_one_tap_and_carries_current_when_no_plan(
                 'Accept': 'application/json',
             },
         )
+
+def test_phone_next_inning_uses_bottom_dock_without_covering_content(
+    page: Page,
+    coachboard_url: str,
+):
+    page.set_viewport_size(
+        {
+            'width': 390,
+            'height': 844,
+        }
+    )
+
+    login(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        start = page.locator('#gm-mobile-start-game')
+        expect(start).to_be_visible(timeout=15_000)
+        start.click()
+
+        expect(
+            page.locator('#live-game-overlay')
+        ).to_be_visible(timeout=15_000)
+
+        expect(
+            page.locator('#cb-now-next-switch')
+        ).to_be_visible(timeout=15_000)
+
+        page.locator(
+            '#cb-now-next-switch [data-now-next="next"]'
+        ).click()
+
+        expect(
+            page.locator('#live-board-prep-v3')
+        ).to_be_visible(timeout=10_000)
+
+        expect(
+            page.locator('#liveEndInningBtn')
+        ).to_be_visible()
+
+        page.wait_for_timeout(100)
+
+        expect(
+            page.locator('#coach-action-slot')
+        ).to_have_class(
+            re.compile(r'\bcb-single-live-action\b')
+        )
+
+        page.evaluate(
+            'window.scrollTo(0, document.documentElement.scrollHeight)'
+        )
+        page.wait_for_timeout(100)
+
+        geometry = page.evaluate(
+            '''() => {
+              const dock = document
+                .querySelector('#coach-action-slot')
+                .getBoundingClientRect();
+
+              const end = document
+                .querySelector('#liveEndInningBtn')
+                .getBoundingClientRect();
+
+              const next = document
+                .querySelector('#live-board-prep-v3')
+                .getBoundingClientRect();
+
+              const shell = document
+                .querySelector('.coach-live-shell');
+
+              const shellStyle = getComputedStyle(shell);
+              const dockStyle = getComputedStyle(
+                document.querySelector('#coach-action-slot')
+              );
+
+              return {
+                dockTop: dock.top,
+                dockBottom: dock.bottom,
+                dockPosition: dockStyle.position,
+                endWidth: end.width,
+                nextBottom: next.bottom,
+                viewportWidth: window.innerWidth,
+                viewportHeight: window.innerHeight,
+                shellPaddingBottom:
+                  parseFloat(shellStyle.paddingBottom) || 0,
+                scrollWidth:
+                  document.documentElement.scrollWidth,
+                clientWidth:
+                  document.documentElement.clientWidth,
+              };
+            }'''
+        )
+
+        assert geometry['dockPosition'] == 'fixed', geometry
+
+        assert abs(
+            geometry['dockBottom']
+            - geometry['viewportHeight']
+        ) <= 2, geometry
+
+        # Nearly full phone width with normal page gutters.
+        assert geometry['endWidth'] >= (
+            geometry['viewportWidth'] - 30
+        ), geometry
+
+        # Reserved bottom clearance lets all Next Inning content move
+        # completely above the dock instead of being covered by it.
+        assert geometry['shellPaddingBottom'] >= 90, geometry
+
+        assert geometry['nextBottom'] <= (
+            geometry['dockTop'] + 2
+        ), geometry
+
+        assert geometry['scrollWidth'] <= (
+            geometry['clientWidth'] + 2
+        ), geometry
+
+    finally:
+        state_response = page.request.get(
+            f'{coachboard_url}/api/live-game/'
+            f'{game_id}/state'
+        )
+
+        if (
+            state_response.ok
+            and state_response.json()
+            .get('game', {})
+            .get('is_live')
+        ):
+            page.request.post(
+                f'{coachboard_url}/api/live-game/'
+                f'{game_id}/end-with-pitching',
+                data={
+                    'defer_pitching': True,
+                    'end_reason': 'manual',
+                    'current_inning_played': True,
+                },
+            )
+
+        page.request.post(
+            f'{coachboard_url}/game-day/'
+            f'{game_id}/delete',
+            headers={
+                'Accept': 'application/json',
+            },
+        )
