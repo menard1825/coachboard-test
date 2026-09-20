@@ -460,10 +460,10 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
 
         defense_options = page.get_by_role('button', name=re.compile('Plan Options'))
         defense_options.click()
-        expect(page.locator('#gmFullGamePlanHeader')).to_contain_text('Full-game defense plan · all innings')
+        expect(page.locator('#gmFullGamePlanHeader')).to_contain_text('Saved plans')
         rotation_template = page.locator('#rotationTemplateSelect')
         expect(rotation_template).to_be_visible()
-        expect(rotation_template.locator('option').first).to_have_text('Load full-game defense plan (all innings)…')
+        expect(rotation_template.locator('option').first).to_have_text('Load saved defense plan…')
         defense_options.click()
 
         preset = defense.locator('#pde-preset')
@@ -485,20 +485,45 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         choose_innings = page.locator('#gmChooseDefenseInningsBtn')
 
         expect(apply_all).to_be_visible()
-        expect(apply_all).to_have_text(re.compile('Apply to All Innings'))
+        expect(apply_all).to_have_text(
+            re.compile('Apply to All Innings')
+        )
+
         expect(apply_remaining).to_be_visible()
+        expect(apply_remaining).to_have_text(
+            re.compile('Apply to Later Innings')
+        )
+
         expect(choose_innings).to_be_visible()
+        expect(choose_innings).to_have_text(
+            re.compile('Pick Innings')
+        )
 
         expect(
             page.locator('.gm-legacy-inning-actions')
         ).to_be_hidden()
 
         # Copy the actual Inning 1 defense to the rest of the plan.
-        page.once(
-            'dialog',
-            lambda dialog: dialog.accept(),
-        )
+        # This is deliberately one tap: no native browser confirmation
+        # should cover the coaching workspace.
         apply_all.click()
+
+        copy_toast = page.locator(
+            '#gm-coach-toast-holder .toast.show'
+        ).last
+
+        expect(
+            copy_toast
+        ).to_contain_text(
+            'Copied Inning 1'
+        )
+
+        expect(
+            copy_toast.get_by_role(
+                'button',
+                name='Undo',
+            )
+        ).to_be_visible()
 
         inning_2 = page.locator(
             '#inning-btn-group label.btn'
@@ -559,53 +584,76 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             )
         )
 
-        # Choose Innings stays available when the coach wants something
-        # more selective than All or Remaining.
+        # Pick Innings opens a CoachBoard sheet instead of exposing the
+        # legacy inline copy controls.
         choose_innings.click()
 
-        apply_picker = page.locator(
-            '#inning-paste-controls'
+        picker = page.locator(
+            '#gmPickInningsModal'
         )
 
         expect(
-            apply_picker
+            picker
         ).to_be_visible()
 
         expect(
-            apply_picker
-        ).to_contain_text(
-            'Apply defense from Inning 2'
+            picker.locator(
+                '.modal-title'
+            )
+        ).to_have_text(
+            'Copy Inning 2'
         )
 
-        # The current/source inning must not be offered as a destination.
         expect(
-            apply_picker.get_by_role(
-                'checkbox',
+            picker
+        ).to_contain_text(
+            'Which innings should use this defense?'
+        )
+
+        expect(
+            picker
+        ).to_contain_text(
+            'Planned mid-inning changes stay as-is.'
+        )
+
+        # Current/source inning is intentionally not offered.
+        expect(
+            picker.get_by_role(
+                'button',
                 name='2',
+                exact=True,
             )
         ).to_have_count(0)
 
-        inning_3_checkbox = (
-            apply_picker.get_by_role(
-                'checkbox',
+        inning_3_choice = (
+            picker.get_by_role(
+                'button',
                 name='3',
+                exact=True,
             )
         )
 
         expect(
-            inning_3_checkbox
+            inning_3_choice
         ).to_be_visible()
 
-        inning_3_checkbox.check()
+        inning_3_choice.click()
 
-        apply_picker.get_by_role(
+        expect(
+            inning_3_choice
+        ).to_have_attribute(
+            'aria-pressed',
+            'true',
+        )
+
+        picker.get_by_role(
             'button',
             name='Apply Defense',
         ).click()
 
         expect(
-            apply_picker
-        ).to_be_hidden()
+            picker
+        ).not_to_be_visible()
 
         inning_3 = page.locator(
             '#inning-btn-group label.btn'

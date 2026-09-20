@@ -77,6 +77,79 @@
         white-space:normal;
       }
 
+
+      #gm-coach-toast-holder .gm-toast-action{
+        flex:0 0 auto;
+        align-self:center;
+        font-weight:850;
+      }
+
+      .gm-coach-sheet .modal-content{
+        border:0;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 18px 48px rgba(16,24,40,.22);
+      }
+
+      .gm-coach-sheet .modal-header{
+        border-bottom:1px solid #e7ebef;
+      }
+
+      .gm-coach-sheet .modal-footer{
+        border-top:1px solid #e7ebef;
+      }
+
+      #gmPickInningsModal .gm-pick-inning-grid{
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:8px;
+        margin:12px 0;
+      }
+
+      #gmPickInningsModal .gm-pick-inning-choice{
+        min-height:48px;
+        border-radius:10px;
+        font-size:1rem;
+        font-weight:900;
+      }
+
+      #gmPickInningsModal .gm-pick-note{
+        color:#667085;
+        font-size:.75rem;
+        line-height:1.35;
+      }
+
+      @media(max-width:575.98px){
+        .gm-coach-sheet .modal-dialog{
+          min-height:100%;
+          margin:0;
+          align-items:flex-end;
+        }
+
+        .gm-coach-sheet .modal-content{
+          width:100%;
+          max-height:calc(100dvh - 72px);
+          border-radius:18px 18px 0 0;
+          padding-bottom:env(safe-area-inset-bottom);
+        }
+
+        #gmPickInningsModal .gm-pick-inning-grid{
+          grid-template-columns:repeat(3,minmax(0,1fr));
+        }
+
+        #gm-coach-toast-holder{
+          top:auto!important;
+          bottom:calc(env(safe-area-inset-bottom) + 8px)!important;
+          left:10px!important;
+          right:10px!important;
+          padding:0!important;
+        }
+
+        #gm-coach-toast-holder .toast{
+          width:100%;
+        }
+      }
+
       #rotation-card-container #inning-paste-controls.gm-apply-picker{
         margin:8px 0 10px!important;
         border:1px solid #b9d1ec;
@@ -710,23 +783,515 @@
     return `Inning ${base} · Planned Mid-Inning Change ${letter}`;
   }
 
-  function toast(message, kind = 'success') {
-    let holder = document.getElementById('gm-coach-toast-holder');
+  function toast(
+    message,
+    kind = 'success',
+    action = null
+  ) {
+    let holder =
+      document.getElementById(
+        'gm-coach-toast-holder'
+      );
+
     if (!holder) {
-      holder = document.createElement('div');
-      holder.id = 'gm-coach-toast-holder';
-      holder.className = 'toast-container position-fixed top-0 end-0 p-3';
+      holder =
+        document.createElement('div');
+
+      holder.id =
+        'gm-coach-toast-holder';
+
+      holder.className =
+        'toast-container position-fixed top-0 end-0 p-3';
+
       holder.style.zIndex = '6000';
-      document.body.appendChild(holder);
+
+      document.body.appendChild(
+        holder
+      );
     }
-    const el = document.createElement('div');
-    el.className = `toast text-bg-${kind} border-0`;
-    el.innerHTML = `<div class="d-flex"><div class="toast-body fw-semibold"></div><button class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
-    el.querySelector('.toast-body').textContent = message;
+
+    const el =
+      document.createElement('div');
+
+    el.className =
+      `toast text-bg-${kind} border-0`;
+
+    el.innerHTML = `
+      <div class="d-flex align-items-center">
+        <div class="toast-body fw-semibold"></div>
+        ${
+          action
+            ? '<button type="button" class="btn btn-sm btn-light me-2 gm-toast-action"></button>'
+            : ''
+        }
+        <button
+          type="button"
+          class="btn-close btn-close-white me-2"
+          data-bs-dismiss="toast"
+          aria-label="Close"
+        ></button>
+      </div>
+    `;
+
+    el.querySelector(
+      '.toast-body'
+    ).textContent = message;
+
+    const actionButton =
+      el.querySelector(
+        '.gm-toast-action'
+      );
+
+    if (
+      actionButton &&
+      action?.label &&
+      typeof action?.onClick === 'function'
+    ) {
+      actionButton.textContent =
+        action.label;
+
+      actionButton.addEventListener(
+        'click',
+        () => {
+          bootstrap.Toast
+            .getOrCreateInstance(el)
+            .hide();
+
+          action.onClick();
+        },
+        {once:true}
+      );
+    }
+
     holder.appendChild(el);
-    const instance = bootstrap.Toast.getOrCreateInstance(el, {delay: 2600});
-    el.addEventListener('hidden.bs.toast', () => el.remove(), {once:true});
+
+    const instance =
+      bootstrap.Toast.getOrCreateInstance(
+        el,
+        {
+          delay: action
+            ? 6000
+            : 2600,
+        }
+      );
+
+    el.addEventListener(
+      'hidden.bs.toast',
+      () => el.remove(),
+      {once:true}
+    );
+
     instance.show();
+  }
+
+
+  function ensureCoachConfirmModal() {
+    let modal =
+      document.getElementById(
+        'gmCoachConfirmModal'
+      );
+
+    if (modal) return modal;
+
+    modal =
+      document.createElement('div');
+
+    modal.id =
+      'gmCoachConfirmModal';
+
+    modal.className =
+      'modal fade gm-coach-sheet';
+
+    modal.tabIndex = -1;
+
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title mb-0"></h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+
+          <div class="modal-body">
+            <p class="gm-confirm-message mb-0"></p>
+          </div>
+
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-gm-confirm-action
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(
+      modal
+    );
+
+    modal
+      .querySelector(
+        '[data-gm-confirm-action]'
+      )
+      ?.addEventListener(
+        'click',
+        () => {
+          const action =
+            modal._gmConfirmAction;
+
+          const instance =
+            bootstrap.Modal
+              .getOrCreateInstance(
+                modal
+              );
+
+          modal.addEventListener(
+            'hidden.bs.modal',
+            () => {
+              if (
+                typeof action ===
+                'function'
+              ) {
+                action();
+              }
+            },
+            {once:true}
+          );
+
+          instance.hide();
+        }
+      );
+
+    return modal;
+  }
+
+
+  function showCoachConfirm({
+    title,
+    message,
+    confirmLabel = 'Continue',
+    danger = false,
+    onConfirm,
+  }) {
+    const modal =
+      ensureCoachConfirmModal();
+
+    setText(
+      modal.querySelector(
+        '.modal-title'
+      ),
+      title
+    );
+
+    setText(
+      modal.querySelector(
+        '.gm-confirm-message'
+      ),
+      message
+    );
+
+    const confirm =
+      modal.querySelector(
+        '[data-gm-confirm-action]'
+      );
+
+    if (confirm) {
+      confirm.textContent =
+        confirmLabel;
+
+      confirm.classList.toggle(
+        'btn-danger',
+        danger
+      );
+
+      confirm.classList.toggle(
+        'btn-primary',
+        !danger
+      );
+    }
+
+    modal._gmConfirmAction =
+      onConfirm;
+
+    bootstrap.Modal
+      .getOrCreateInstance(
+        modal
+      )
+      .show();
+  }
+
+
+  function ensurePickInningsModal() {
+    let modal =
+      document.getElementById(
+        'gmPickInningsModal'
+      );
+
+    if (modal) return modal;
+
+    modal =
+      document.createElement('div');
+
+    modal.id =
+      'gmPickInningsModal';
+
+    modal.className =
+      'modal fade gm-coach-sheet';
+
+    modal.tabIndex = -1;
+
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title mb-0">
+                Pick Innings
+              </h5>
+              <div class="small text-muted gm-pick-source"></div>
+            </div>
+
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+
+          <div class="modal-body">
+            <div class="fw-semibold">
+              Which innings should use this defense?
+            </div>
+
+            <div class="gm-pick-inning-grid"></div>
+
+            <div class="gm-pick-note">
+              Planned mid-inning changes stay as-is.
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-gm-pick-apply
+              disabled
+            >
+              Apply Defense
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(
+      modal
+    );
+
+    modal.addEventListener(
+      'click',
+      event => {
+        const choice =
+          event.target.closest(
+            '[data-gm-pick-inning]'
+          );
+
+        if (choice) {
+          const active =
+            choice.getAttribute(
+              'aria-pressed'
+            ) === 'true';
+
+          choice.setAttribute(
+            'aria-pressed',
+            active
+              ? 'false'
+              : 'true'
+          );
+
+          choice.classList.toggle(
+            'active',
+            !active
+          );
+
+          modal
+            .querySelector(
+              '[data-gm-pick-apply]'
+            )
+            ?.toggleAttribute(
+              'disabled',
+              !modal.querySelector(
+                '[data-gm-pick-inning][aria-pressed="true"]'
+              )
+            );
+
+          return;
+        }
+
+        const apply =
+          event.target.closest(
+            '[data-gm-pick-apply]'
+          );
+
+        if (!apply) return;
+
+        const selected =
+          Array.from(
+            modal.querySelectorAll(
+              '[data-gm-pick-inning][aria-pressed="true"]'
+            )
+          ).map(
+            button =>
+              button.dataset.gmPickInning
+          );
+
+        const expectedSource =
+          modal.dataset.gmSourceInning;
+
+        const context =
+          defenseApplyContext();
+
+        if (!context) return;
+
+        if (
+          context.current !==
+          expectedSource
+        ) {
+          bootstrap.Modal
+            .getOrCreateInstance(
+              modal
+            )
+            .hide();
+
+          toast(
+            'The selected inning changed. Open Pick Innings again.',
+            'warning'
+          );
+
+          return;
+        }
+
+        copyDefenseToTargets(
+          context,
+          selected
+        );
+
+        bootstrap.Modal
+          .getOrCreateInstance(
+            modal
+          )
+          .hide();
+      }
+    );
+
+    return modal;
+  }
+
+
+  function openPickInningsModal() {
+    const context =
+      defenseApplyContext();
+
+    if (!context) return;
+
+    const targets =
+      baseInningKeys(
+        context.rotation
+      ).filter(
+        inning =>
+          inning !== context.current
+      );
+
+    if (!targets.length) {
+      toast(
+        'There are no other innings to update.',
+        'warning'
+      );
+
+      return;
+    }
+
+    const modal =
+      ensurePickInningsModal();
+
+    modal.dataset.gmSourceInning =
+      context.current;
+
+    setText(
+      modal.querySelector(
+        '.modal-title'
+      ),
+      `Copy Inning ${context.current}`
+    );
+
+    setText(
+      modal.querySelector(
+        '.gm-pick-source'
+      ),
+      'Pick exactly where to use this defense.'
+    );
+
+    const grid =
+      modal.querySelector(
+        '.gm-pick-inning-grid'
+      );
+
+    grid.innerHTML =
+      targets
+        .map(
+          inning => `
+            <button
+              type="button"
+              class="btn btn-outline-primary gm-pick-inning-choice"
+              data-gm-pick-inning="${inning}"
+              aria-pressed="false"
+            >
+              ${inning}
+            </button>
+          `
+        )
+        .join('');
+
+    modal
+      .querySelector(
+        '[data-gm-pick-apply]'
+      )
+      ?.setAttribute(
+        'disabled',
+        ''
+      );
+
+    bootstrap.Modal
+      .getOrCreateInstance(
+        modal
+      )
+      .show();
   }
 
   function preventActionAnchorJumps(event) {
@@ -735,141 +1300,334 @@
   }
 
   function removeCurrentMidInningChange() {
-    const raw = currentInning();
+    const raw =
+      currentInning();
+
     if (!isSubInning(raw)) return;
-    const base = String(Math.floor(Number.parseFloat(raw)));
-    const display = shortInningLabel(raw);
-    if (!window.confirm(`Remove planned change ${display}?\n\nThe normal Inning ${base} defense will stay in place.`)) return;
 
-    // Mutate the ONE canonical CBPregameRotation rotation object in place
-    // and save through its shared queue — the same object and queue every
-    // other pregame writer (the tap field, game_logic.js's inning
-    // toolbar) uses. A second, independent /save_rotation POST built from
-    // a separately re-fetched snapshot could race with the shared queue's
-    // own in-flight save and resurrect this planned change once that
-    // older save's stale full-rotation payload landed afterward.
-    const rotation = window.CBPregameRotation.getRotation('Rotation');
-    if (!Object.prototype.hasOwnProperty.call(rotation.innings, raw)) {
-      toast('That planned change was not found. Refresh the page and try again.', 'danger');
-      return;
-    }
+    const base =
+      String(
+        Math.floor(
+          Number.parseFloat(raw)
+        )
+      );
 
-    delete rotation.innings[raw];
+    const display =
+      shortInningLabel(raw);
 
-    // Firing this click's native 'change' event runs game_logic.js's own
-    // radio listener (state.currentInning = base; renderRotationEditor()),
-    // which rebuilds #inning-btn-group from the rotation object just
-    // mutated above — so the removed change's radio is already gone by
-    // the time this re-render runs.
-    document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`)?.click();
+    showCoachConfirm({
+      title:
+        `Remove planned change ${display}?`,
 
-    // Persistence, retry-on-failure, and the persistent Saving/Saved/Failed
-    // indicator are all handled by the shared queue from here — same as
-    // every other inning-toolbar action.
-    window.CBPregameRotation.commitLocalChange('Rotation', false);
+      message:
+        `The normal Inning ${base} defense will stay in place.`,
 
-    toast(`Removed planned change ${display}.`);
-    queuePatch();
+      confirmLabel:
+        'Remove',
+
+      danger:
+        true,
+
+      onConfirm:
+        () => {
+          const rotation =
+            window.CBPregameRotation
+              .getRotation(
+                'Rotation'
+              );
+
+          if (
+            !Object.prototype
+              .hasOwnProperty.call(
+                rotation.innings,
+                raw
+              )
+          ) {
+            toast(
+              'That planned change was not found. Refresh the page and try again.',
+              'danger'
+            );
+
+            return;
+          }
+
+          delete rotation.innings[raw];
+
+          document.querySelector(
+            `#inning-btn-group input[name="inning-radio"][value="${CSS.escape(base)}"]`
+          )?.click();
+
+          window.CBPregameRotation
+            .commitLocalChange(
+              'Rotation',
+              false
+            );
+
+          toast(
+            `Removed planned change ${display}.`
+          );
+
+          queuePatch();
+        },
+    });
   }
 
   function simplifyHeader() {
-    const title = document.getElementById('rotation-editor-title');
-    setText(title, 'Set Defense');
+    const title =
+      document.getElementById(
+        'rotation-editor-title'
+      );
 
-    const liveToggle = document.getElementById('liveGameModeToggle');
-    const liveWrap = liveToggle?.closest('.form-check');
-    if (liveWrap && !liveWrap.classList.contains('d-none')) {
-      liveWrap.classList.add('d-none');
-      liveWrap.setAttribute('aria-hidden', 'true');
+    setText(
+      title,
+      'Set Defense'
+    );
+
+    const liveToggle =
+      document.getElementById(
+        'liveGameModeToggle'
+      );
+
+    const liveWrap =
+      liveToggle?.closest(
+        '.form-check'
+      );
+
+    if (
+      liveWrap &&
+      !liveWrap.classList.contains(
+        'd-none'
+      )
+    ) {
+      liveWrap.classList.add(
+        'd-none'
+      );
+
+      liveWrap.setAttribute(
+        'aria-hidden',
+        'true'
+      );
     }
 
-    const saveRotationDesktop = document.getElementById('saveRotationBtn');
-    const saveRotationDesktopItem = saveRotationDesktop?.closest('li');
-    if (saveRotationDesktopItem && !saveRotationDesktopItem.classList.contains('d-none')) saveRotationDesktopItem.classList.add('d-none');
-    const saveRotationMobile = document.getElementById('saveRotationBtnMobile');
-    if (saveRotationMobile && !saveRotationMobile.classList.contains('d-none')) saveRotationMobile.classList.add('d-none');
+    const saveRotationDesktop =
+      document.getElementById(
+        'saveRotationBtn'
+      );
 
-    const cardHeader = title?.closest('.card-header');
-    const menuToggle = cardHeader?.querySelector('.dropdown-toggle');
-    const menu = menuToggle?.nextElementSibling;
-    if (menuToggle && menuToggle.dataset.coachSimplified !== '1') {
-      menuToggle.dataset.coachSimplified = '1';
-      setHtml(menuToggle, '<i class="bi bi-sliders me-1"></i> Plan Options');
-      menuToggle.title = 'Defense plan tools';
+    saveRotationDesktop
+      ?.closest('li')
+      ?.classList.add(
+        'd-none'
+      );
+
+    document
+      .getElementById(
+        'saveRotationBtnMobile'
+      )
+      ?.classList.add(
+        'd-none'
+      );
+
+    const cardHeader =
+      title?.closest(
+        '.card-header'
+      );
+
+    const menuToggle =
+      cardHeader?.querySelector(
+        '.dropdown-toggle'
+      );
+
+    const menu =
+      menuToggle
+        ?.nextElementSibling;
+
+    if (
+      menuToggle &&
+      menuToggle.dataset
+        .coachSimplified !== '1'
+    ) {
+      menuToggle.dataset
+        .coachSimplified = '1';
+
+      setHtml(
+        menuToggle,
+        '<i class="bi bi-sliders me-1"></i> Plan Options'
+      );
+
+      menuToggle.title =
+        'Defense plan tools';
     }
 
-    const rotationTemplateSelect = document.getElementById('rotationTemplateSelect');
-    if (rotationTemplateSelect?.options?.length) {
-      setText(rotationTemplateSelect.options[0], 'Load full-game defense plan (all innings)…');
+    const rotationTemplateSelect =
+      document.getElementById(
+        'rotationTemplateSelect'
+      );
+
+    if (
+      rotationTemplateSelect
+        ?.options
+        ?.length
+    ) {
+      setText(
+        rotationTemplateSelect
+          .options[0],
+        'Load saved defense plan…'
+      );
     }
 
-    if (menu && rotationTemplateSelect && !document.getElementById('gmFullGamePlanHeader')) {
-      const templateItem = rotationTemplateSelect.closest('li');
+    if (
+      menu &&
+      rotationTemplateSelect &&
+      !document.getElementById(
+        'gmFullGamePlanHeader'
+      )
+    ) {
+      const templateItem =
+        rotationTemplateSelect
+          .closest('li');
+
       if (templateItem) {
-        const header = document.createElement('li');
-        header.id = 'gmFullGamePlanHeader';
-        header.innerHTML = '<div class="dropdown-header">Full-game defense plan · all innings</div>';
-        menu.insertBefore(header, templateItem);
-      }
-    }
+        const header =
+          document.createElement(
+            'li'
+          );
 
-    const saveFullTemplate = document.getElementById('saveAsTemplateBtn');
-    setHtml(saveFullTemplate, '<i class="bi bi-journal-plus me-1"></i> Save All Innings as Full-Game Plan');
+        header.id =
+          'gmFullGamePlanHeader';
 
-    const printCard = document.getElementById('printCardBtn');
-    setHtml(printCard, '<i class="bi bi-printer me-1"></i> Print Defense / Lineup Card');
+        header.innerHTML =
+          '<div class="dropdown-header">Saved plans</div>';
 
-    const deleteRotation = document.getElementById('deleteRotationBtn');
-    setHtml(deleteRotation, '<i class="bi bi-trash me-1"></i> Delete Defense Plan');
-
-    if (menu && !document.getElementById('gmSaveCurrentDefensePreset')) {
-      const divider = document.createElement('li');
-      divider.innerHTML = '<hr class="dropdown-divider">';
-      const item = document.createElement('li');
-      item.innerHTML = '<button type="button" class="dropdown-item" id="gmSaveCurrentDefensePreset"><i class="bi bi-bookmark-plus me-1"></i> Save This Inning as a Starting Defense</button>';
-      const deleteItem = deleteRotation?.closest('li');
-      if (deleteItem) {
-        menu.insertBefore(divider, deleteItem);
-        menu.insertBefore(item, deleteItem);
-      } else {
-        menu.appendChild(divider);
-        menu.appendChild(item);
-      }
-      item.querySelector('button')?.addEventListener('click', () => document.getElementById('pde-save')?.click());
-    }
-
-    if (menu && !document.getElementById('gmPlanMidInningChange')) {
-      const deleteItem = deleteRotation?.closest('li');
-      const divider = document.createElement('li');
-      divider.id = 'gmAdvancedPlanningDivider';
-      divider.innerHTML = '<hr class="dropdown-divider"><div class="dropdown-header">Advanced planning</div>';
-      const item = document.createElement('li');
-      item.innerHTML = '<button type="button" class="dropdown-item" id="gmPlanMidInningChange"><i class="bi bi-arrow-left-right me-1"></i> Plan a Change During This Inning…</button>';
-      if (deleteItem) {
-        menu.insertBefore(divider, deleteItem);
-        menu.insertBefore(item, deleteItem);
-      } else {
-        menu.appendChild(divider);
-        menu.appendChild(item);
-      }
-      item.querySelector('button')?.addEventListener('click', () => {
-        const raw = currentInning();
-        const base = Math.floor(Number.parseFloat(raw));
-        if (isSubInning(raw)) {
-          toast('You are already editing a planned change during this inning.', 'warning');
-          return;
-        }
-        const ok = window.confirm(
-          `Plan a defensive change during Inning ${base}?\n\n` +
-          'Use this only when you already know you want a substitution or defensive change during the same inning. ' +
-          'For normal inning-to-inning changes, use Add Another Inning instead.'
+        menu.insertBefore(
+          header,
+          templateItem
         );
-        if (ok) document.getElementById('addSubInningBtn')?.click();
-      });
+      }
+    }
+
+    setHtml(
+      document.getElementById(
+        'saveAsTemplateBtn'
+      ),
+      '<i class="bi bi-journal-plus me-1"></i> Save Current Plan'
+    );
+
+    setHtml(
+      document.getElementById(
+        'printCardBtn'
+      ),
+      '<i class="bi bi-printer me-1"></i> Print Defense / Lineup'
+    );
+
+    setHtml(
+      document.getElementById(
+        'deleteRotationBtn'
+      ),
+      '<i class="bi bi-trash me-1"></i> Delete Plan'
+    );
+
+    if (
+      menu &&
+      !document.getElementById(
+        'gmSaveCurrentDefensePreset'
+      )
+    ) {
+      const item =
+        document.createElement('li');
+
+      item.innerHTML = `
+        <button
+          type="button"
+          class="dropdown-item"
+          id="gmSaveCurrentDefensePreset"
+        >
+          <i class="bi bi-bookmark-plus me-1"></i>
+          Save Inning as Defense Preset
+        </button>
+      `;
+
+      menu.appendChild(item);
+
+      item.querySelector(
+        'button'
+      )?.addEventListener(
+        'click',
+        () =>
+          document
+            .getElementById(
+              'pde-save'
+            )
+            ?.click()
+      );
+    }
+
+    if (
+      menu &&
+      !document.getElementById(
+        'gmPlanMidInningChange'
+      )
+    ) {
+      const item =
+        document.createElement('li');
+
+      item.innerHTML = `
+        <button
+          type="button"
+          class="dropdown-item"
+          id="gmPlanMidInningChange"
+        >
+          <i class="bi bi-arrow-left-right me-1"></i>
+          Plan a Change During This Inning…
+        </button>
+      `;
+
+      menu.appendChild(item);
+
+      item.querySelector(
+        'button'
+      )?.addEventListener(
+        'click',
+        () => {
+          const raw =
+            currentInning();
+
+          const base =
+            Math.floor(
+              Number.parseFloat(raw)
+            );
+
+          if (isSubInning(raw)) {
+            toast(
+              'You are already editing a planned change during this inning.',
+              'warning'
+            );
+
+            return;
+          }
+
+          showCoachConfirm({
+            title:
+              `Plan a change during Inning ${base}?`,
+
+            message:
+              'Use this only for a defensive change during the same inning. Normal inning-to-inning changes do not need this.',
+
+            confirmLabel:
+              'Plan Change',
+
+            onConfirm:
+              () =>
+                document
+                  .getElementById(
+                    'addSubInningBtn'
+                  )
+                  ?.click(),
+          });
+        }
+      );
     }
   }
-
-
 
   function syncSubInningSelectorLabels(group) {
     group.querySelectorAll('input[name="inning-radio"]').forEach(input => {
@@ -913,7 +1671,7 @@
     );
   }
 
-  function applyCurrentDefense(scope) {
+  function defenseApplyContext() {
     const store =
       window.CBPregameRotation;
 
@@ -922,53 +1680,296 @@
         'Defense planner is still loading. Try again.',
         'warning'
       );
-      return;
+
+      return null;
     }
 
     const rotation =
-      store.getRotation('Rotation');
+      store.getRotation(
+        'Rotation'
+      );
 
     const current =
       currentInning();
 
     if (isSubInning(current)) {
       toast(
-        'A planned mid-inning change only applies at that point in the inning. Return to the normal inning before copying defense to other innings.',
+        'Return to the normal inning before copying this defense.',
         'warning'
       );
-      return;
+
+      return null;
     }
 
     const source =
-      rotation?.innings?.[current];
+      rotation
+        ?.innings
+        ?.[current];
 
     if (
       !source ||
-      !Object.values(source).some(Boolean)
+      !Object.values(
+        source
+      ).some(Boolean)
     ) {
       toast(
-        `Set the defense for ${fullInningLabel(current)} first.`,
+        `Set the defense for Inning ${current} first.`,
         'warning'
       );
-      return;
+
+      return null;
     }
 
-    const currentNumber =
-      Number.parseFloat(current);
+    return {
+      store,
+      rotation,
+      current,
+      source,
+    };
+  }
 
-    // "All" and "Remaining" mean normal innings only.
-    // Planned mid-inning changes (1.1, 2.1, etc.) are intentional
-    // overrides and must never be silently replaced here.
+
+  function sameDefense(
+    left,
+    right
+  ) {
+    const normalize =
+      value =>
+        Object.entries(
+          value || {}
+        ).sort(
+          ([a], [b]) =>
+            a.localeCompare(b)
+        );
+
+    return (
+      JSON.stringify(
+        normalize(left)
+      ) ===
+      JSON.stringify(
+        normalize(right)
+      )
+    );
+  }
+
+
+  function targetInningLabel(
+    targets
+  ) {
+    if (!targets.length) {
+      return 'selected innings';
+    }
+
+    if (targets.length === 1) {
+      return `Inning ${targets[0]}`;
+    }
+
+    const numbers =
+      targets.map(
+        value =>
+          Number.parseInt(
+            value,
+            10
+          )
+      );
+
+    const contiguous =
+      numbers.every(
+        (value, index) =>
+          index === 0 ||
+          value ===
+            numbers[index - 1] + 1
+      );
+
+    if (
+      contiguous &&
+      targets.length >= 3
+    ) {
+      return (
+        `Innings ${targets[0]}–`
+        + `${targets[targets.length - 1]}`
+      );
+    }
+
+    return (
+      'Innings '
+      + targets.join(', ')
+    );
+  }
+
+
+  function copyDefenseToTargets(
+    context,
+    requestedTargets
+  ) {
+    const valid =
+      new Set(
+        baseInningKeys(
+          context.rotation
+        )
+      );
+
+    const targets =
+      Array.from(
+        new Set(
+          requestedTargets
+            .map(String)
+            .filter(
+              inning =>
+                inning !==
+                  context.current &&
+                valid.has(inning)
+            )
+        )
+      ).sort(
+        (a, b) =>
+          Number.parseFloat(a) -
+          Number.parseFloat(b)
+      );
+
+    if (!targets.length) {
+      toast(
+        'Pick at least one other inning.',
+        'warning'
+      );
+
+      return false;
+    }
+
+    const before = {};
+
+    targets.forEach(
+      inning => {
+        before[inning] =
+          cloneDefense(
+            context.rotation
+              .innings[inning]
+          );
+      }
+    );
+
+    const applied =
+      cloneDefense(
+        context.source
+      );
+
+    targets.forEach(
+      inning => {
+        context.rotation
+          .innings[inning] =
+            cloneDefense(
+              context.source
+            );
+      }
+    );
+
+    context.store
+      .commitLocalChange(
+        'Rotation',
+        false
+      );
+
+    const label =
+      targetInningLabel(
+        targets
+      );
+
+    toast(
+      `Copied Inning ${context.current} to ${label}.`,
+      'success',
+      {
+        label:
+          'Undo',
+
+        onClick:
+          () => {
+            const rotation =
+              context.store
+                .getRotation(
+                  'Rotation'
+                );
+
+            const unchanged =
+              targets.every(
+                inning =>
+                  sameDefense(
+                    rotation
+                      .innings[inning],
+                    applied
+                  )
+              );
+
+            if (!unchanged) {
+              toast(
+                'Defense changed since then, so Undo was not applied.',
+                'warning'
+              );
+
+              return;
+            }
+
+            targets.forEach(
+              inning => {
+                rotation
+                  .innings[inning] =
+                    cloneDefense(
+                      before[inning]
+                    );
+              }
+            );
+
+            context.store
+              .commitLocalChange(
+                'Rotation',
+                false
+              );
+
+            toast(
+              'Defense copy undone.'
+            );
+
+            queuePatch();
+          },
+      }
+    );
+
+    queuePatch();
+
+    return true;
+  }
+
+
+  function applyCurrentDefense(
+    scope
+  ) {
+    const context =
+      defenseApplyContext();
+
+    if (!context) return;
+
+    const currentNumber =
+      Number.parseFloat(
+        context.current
+      );
+
     let targets =
-      baseInningKeys(rotation)
-        .filter(inning => inning !== current);
+      baseInningKeys(
+        context.rotation
+      ).filter(
+        inning =>
+          inning !==
+          context.current
+      );
 
     if (scope === 'remaining') {
-      targets = targets.filter(
-        inning =>
-          Number.parseFloat(inning) >
-          currentNumber
-      );
+      targets =
+        targets.filter(
+          inning =>
+            Number.parseFloat(
+              inning
+            ) >
+            currentNumber
+        );
     }
 
     if (!targets.length) {
@@ -978,45 +1979,14 @@
           : 'There are no other innings to update.',
         'warning'
       );
+
       return;
     }
 
-    const targetLabel =
+    copyDefenseToTargets(
+      context,
       targets
-        .map(fullInningLabel)
-        .join(', ');
-
-    const scopeLabel =
-      scope === 'remaining'
-        ? 'remaining innings'
-        : 'all other innings';
-
-    const ok =
-      window.confirm(
-        `Apply ${fullInningLabel(current)} defense to ${scopeLabel}?\n\n`
-        + `This will replace the defensive assignments for:\n${targetLabel}\n\n`
-        + 'Planned mid-inning changes will stay unchanged.'
-      );
-
-    if (!ok) return;
-
-    targets.forEach(inning => {
-      rotation.innings[inning] =
-        cloneDefense(source);
-    });
-
-    store.commitLocalChange(
-      'Rotation',
-      false
     );
-
-    toast(
-      scope === 'remaining'
-        ? 'Defense applied to remaining innings.'
-        : 'Defense applied to all innings.'
-    );
-
-    queuePatch();
   }
 
   function preventToolHashJump(element) {
@@ -1046,7 +2016,9 @@
     const menu =
       title
         ?.closest('.card-header')
-        ?.querySelector('.dropdown-toggle')
+        ?.querySelector(
+          '.dropdown-toggle'
+        )
         ?.nextElementSibling;
 
     if (!menu) return;
@@ -1066,63 +2038,92 @@
       header.innerHTML =
         '<div class="dropdown-header">Inning setup</div>';
 
-      const anchor =
-        document.getElementById(
-          'gmFullGamePlanHeader'
-        ) ||
-        menu.firstElementChild;
-
-      menu.insertBefore(
-        header,
-        anchor
-      );
+      menu.appendChild(header);
 
       const definitions = [
         {
-          id:'gmPlanUsePreviousInning',
-          icon:'copy',
-          label:'Use Previous Inning',
-          target:'copyPreviousInningBtn',
+          id:
+            'gmPlanUsePreviousInning',
+          icon:
+            'copy',
+          label:
+            'Use Previous Inning',
+          target:
+            'copyPreviousInningBtn',
+          hidden:
+            true,
         },
         {
-          id:'gmPlanAddInning',
-          icon:'plus-circle',
-          label:'Add Another Inning',
-          target:'addInningBtn',
+          id:
+            'gmPlanAddInning',
+          icon:
+            'plus-circle',
+          label:
+            'Add Another Inning',
+          target:
+            'addInningBtn',
         },
         {
-          id:'gmPlanRemoveLastInning',
-          icon:'dash-circle',
-          label:'Remove Last Inning',
-          target:'removeInningBtn',
-          danger:true,
+          id:
+            'gmPlanRemoveLastInning',
+          icon:
+            'dash-circle',
+          label:
+            'Remove Last Inning',
+          target:
+            'removeInningBtn',
+          danger:
+            true,
         },
         {
-          id:'gmPlanClearCurrentInning',
-          icon:'eraser',
-          label:'Clear Current Inning',
-          target:'clearInningBtn',
-          danger:true,
+          id:
+            'gmPlanClearCurrentInning',
+          icon:
+            'eraser',
+          label:
+            'Clear Current Inning',
+          target:
+            'clearInningBtn',
+          danger:
+            true,
+          hidden:
+            true,
         },
       ];
 
-      definitions.forEach(definition => {
-        const li =
-          document.createElement('li');
+      definitions.forEach(
+        definition => {
+          const li =
+            document.createElement(
+              'li'
+            );
 
-        li.innerHTML = `
-          <button
-            type="button"
-            class="dropdown-item ${definition.danger ? 'text-danger' : ''}"
-            id="${definition.id}"
-          >
-            <i class="bi bi-${definition.icon} me-2"></i>
-            ${definition.label}
-          </button>
-        `;
+          if (
+            definition.hidden
+          ) {
+            li.classList.add(
+              'd-none'
+            );
+          }
 
-        li.querySelector('button')
-          ?.addEventListener(
+          li.innerHTML = `
+            <button
+              type="button"
+              class="dropdown-item ${
+                definition.danger
+                  ? 'text-danger'
+                  : ''
+              }"
+              id="${definition.id}"
+            >
+              <i class="bi bi-${definition.icon} me-2"></i>
+              ${definition.label}
+            </button>
+          `;
+
+          li.querySelector(
+            'button'
+          )?.addEventListener(
             'click',
             () => {
               document
@@ -1133,14 +2134,14 @@
             }
           );
 
-        menu.insertBefore(
-          li,
-          anchor
-        );
-      });
+          menu.appendChild(li);
+        }
+      );
 
       const removeSub =
-        document.createElement('li');
+        document.createElement(
+          'li'
+        );
 
       removeSub.innerHTML = `
         <button
@@ -1154,50 +2155,37 @@
       `;
 
       removeSub
-        .querySelector('button')
+        .querySelector(
+          'button'
+        )
         ?.addEventListener(
           'click',
           removeCurrentMidInningChange
         );
 
-      menu.insertBefore(
-        removeSub,
-        anchor
-      );
-
-      const divider =
-        document.createElement('li');
-
-      divider.id =
-        'gmPlanInningToolsDivider';
-
-      divider.innerHTML =
-        '<hr class="dropdown-divider">';
-
-      menu.insertBefore(
-        divider,
-        anchor
+      menu.appendChild(
+        removeSub
       );
     }
 
-    const inning =
-      Number.parseFloat(
-        currentInning()
-      );
+    const sub =
+      isSubInning();
 
-    document
-      .getElementById(
-        'gmPlanUsePreviousInning'
-      )
-      ?.closest('li')
-      ?.classList.toggle(
-        'd-none',
-        isSubInning() ||
-        (
-          Number.isFinite(inning) &&
-          inning <= 1
-        )
-      );
+    [
+      'gmPlanAddInning',
+      'gmPlanRemoveLastInning',
+      'gmPlanMidInningChange',
+    ].forEach(
+      id => {
+        document
+          .getElementById(id)
+          ?.closest('li')
+          ?.classList.toggle(
+            'd-none',
+            sub
+          );
+      }
+    );
 
     document
       .getElementById(
@@ -1205,8 +2193,89 @@
       )
       ?.classList.toggle(
         'd-none',
-        !isSubInning()
+        !sub
       );
+
+    // The old Bootstrap separators are no longer useful now that the
+    // menu has two clear coach-facing sections.
+    menu
+      .querySelectorAll(
+        ':scope > li'
+      )
+      .forEach(
+        li => {
+          if (
+            li.querySelector(
+              ':scope > hr.dropdown-divider'
+            )
+          ) {
+            li.classList.add(
+              'd-none'
+            );
+          }
+        }
+      );
+
+    const visibleOrder = [
+      document.getElementById(
+        'gmPlanInningToolsHeader'
+      ),
+      document
+        .getElementById(
+          'gmPlanAddInning'
+        )
+        ?.closest('li'),
+      document
+        .getElementById(
+          'gmPlanRemoveLastInning'
+        )
+        ?.closest('li'),
+      document
+        .getElementById(
+          'gmPlanMidInningChange'
+        )
+        ?.closest('li'),
+      document
+        .getElementById(
+          'gmRemoveCurrentSubInning'
+        )
+        ?.closest('li'),
+      document.getElementById(
+        'gmFullGamePlanHeader'
+      ),
+      document
+        .getElementById(
+          'rotationTemplateSelect'
+        )
+        ?.closest('li'),
+      document
+        .getElementById(
+          'saveAsTemplateBtn'
+        )
+        ?.closest('li'),
+      document
+        .getElementById(
+          'gmSaveCurrentDefensePreset'
+        )
+        ?.closest('li'),
+      document
+        .getElementById(
+          'printCardBtn'
+        )
+        ?.closest('li'),
+      document
+        .getElementById(
+          'deleteRotationBtn'
+        )
+        ?.closest('li'),
+    ].filter(Boolean);
+
+    visibleOrder.forEach(
+      item =>
+        menu.appendChild(
+          item
+        )
+    );
   }
 
   function ensureApplyControls(
@@ -1215,9 +2284,10 @@
   ) {
     if (!pickerRow) return;
 
-    legacyActions?.classList.add(
-      'gm-legacy-inning-actions'
-    );
+    legacyActions
+      ?.classList.add(
+        'gm-legacy-inning-actions'
+      );
 
     let controls =
       document.querySelector(
@@ -1226,7 +2296,9 @@
 
     if (!controls) {
       controls =
-        document.createElement('div');
+        document.createElement(
+          'div'
+        );
 
       controls.className =
         'gm-coach-apply-actions';
@@ -1246,7 +2318,7 @@
           class="btn btn-outline-primary btn-sm"
           id="gmApplyDefenseRemainingBtn"
         >
-          Remaining Innings
+          Apply to Later Innings
         </button>
 
         <button
@@ -1254,13 +2326,10 @@
           class="btn btn-outline-secondary btn-sm"
           id="gmChooseDefenseInningsBtn"
         >
-          Choose Innings…
+          Pick Innings
         </button>
       `;
 
-      // The inning picker becomes sticky on compact landscape screens.
-      // Keep the larger Apply actions as its sibling so they neither widen
-      // the sticky row nor sit over the inning buttons while scrolling.
       pickerRow.insertAdjacentElement(
         'afterend',
         controls
@@ -1273,7 +2342,9 @@
         ?.addEventListener(
           'click',
           () =>
-            applyCurrentDefense('all')
+            applyCurrentDefense(
+              'all'
+            )
         );
 
       controls
@@ -1294,30 +2365,7 @@
         )
         ?.addEventListener(
           'click',
-          () => {
-            document
-              .getElementById(
-                'copyInningBtn'
-              )
-              ?.click();
-
-            const paste =
-              document.getElementById(
-                'inning-paste-controls'
-              );
-
-            if (paste) {
-              paste.classList.add(
-                'gm-apply-picker'
-              );
-
-              pickerRow
-                .insertAdjacentElement(
-                  'afterend',
-                  paste
-                );
-            }
-          }
+          openPickInningsModal
         );
     }
 
