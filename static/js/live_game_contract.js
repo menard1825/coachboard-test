@@ -626,6 +626,12 @@
       ?.clearError?.();
 
     try {
+      // NEXT prep is a separate persistence channel from live rotation
+      // events. Flush it explicitly before asking the server which defense
+      // should become the next inning.
+      await window.CBNextDefense
+        ?.flush?.();
+
       await waitForLiveWritesToSettle();
 
       const [prep, liveState] =
@@ -708,6 +714,9 @@
         `/api/live-game/${gameId}/advance-inning`,
         {
           alignment,
+          next_prep_id:
+            prep?.confirmed?.id ??
+            null,
           base_sequence:
             sequenceFromState(
               liveState

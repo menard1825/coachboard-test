@@ -536,6 +536,53 @@ def advance_inning(game_id):
     except (TypeError, ValueError):
         return jsonify({'status': 'error', 'message': 'Current inning is invalid.'}), 409
 
+    expected_prep_id = data.get('next_prep_id')
+
+    # Newer clients bind End Inning to the exact NEXT draft they just read.
+    # The prep id plus canonical alignment closes the normal cross-tab/device
+    # race without relying on timestamp serialization. Older API callers
+    # remain compatible because the guard is only enforced when a token is
+    # supplied.
+    if expected_prep_id is not None:
+        from blueprints.live_game_ui import GameNextInningPrep
+
+        guarded_prep = db.session.query(GameNextInningPrep).filter_by(
+            game_id=game.id,
+            team_id=team.id,
+        ).first()
+
+        def canonical_alignment(alignment):
+            return {
+                str(position).strip(): str(name).strip()
+                for position, name in (alignment or {}).items()
+                if (
+                    str(position).strip()
+                    and str(name or '').strip()
+                )
+            }
+
+        prep_changed = (
+            not guarded_prep
+            or str(guarded_prep.inning) != next_inning
+            or (
+                expected_prep_id is not None
+                and str(guarded_prep.id) != str(expected_prep_id)
+            )
+            or canonical_alignment(
+                guarded_prep.alignment
+            ) != canonical_alignment(after)
+        )
+
+        if prep_changed:
+            return jsonify({
+                'status': 'error',
+                'code': 'stale_next_inning_prep',
+                'message': (
+                    'NEXT defense changed before the inning could advance. '
+                    'Review NEXT and try End Inning again.'
+                ),
+            }), 409
+
     old_pitcher = before.get('P')
     new_pitcher = after.get('P')
 

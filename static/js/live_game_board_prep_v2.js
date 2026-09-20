@@ -17,6 +17,7 @@
   let selected = null;
   let selectedPosition = '';
   let busy = false;
+  let activeSavePromise = null;
   let lastSignature = '';
   let saveMode = 'saved';
   let saveMessage = 'Saved ✓';
@@ -1580,7 +1581,11 @@
       successMessage = 'NEXT saved ✓',
     } = {}
   ) {
-    if (busy) return null;
+    // NEXT currently blocks board interaction while a save is running, so
+    // there should only be one writer from this surface at a time. Keep the
+    // actual promise, though, so End Inning can wait for the exact write
+    // instead of merely waiting for live-game event state to look stable.
+    if (busy) return activeSavePromise;
 
     const before = snapshot();
 
@@ -1592,16 +1597,20 @@
 
     renderCard();
 
+    const request = api(
+      'POST',
+      mode === 'current'
+        ? {mode: 'current'}
+        : {
+            mode: 'custom',
+            alignment: snapshot(),
+          }
+    );
+
+    activeSavePromise = request;
+
     try {
-      const data = await api(
-        'POST',
-        mode === 'current'
-          ? {mode: 'current'}
-          : {
-              mode: 'custom',
-              alignment: draft,
-            }
-      );
+      const data = await request;
 
       if (pushUndo) {
         undoStack.push(before);
@@ -1651,9 +1660,51 @@
 
       return null;
     } finally {
+      if (activeSavePromise === request) {
+        activeSavePromise = null;
+      }
+
       busy = false;
       renderCard();
     }
+  }
+
+  async function flushPendingSave() {
+    const deadline = Date.now() + 10000;
+
+    while (busy || activeSavePromise) {
+      const pending = activeSavePromise;
+
+      if (pending) {
+        try {
+          await pending;
+        } catch (_) {
+          // saveAlignment owns the user-visible error state. Wait until its
+          // finally block has completed, then fail closed below.
+        }
+      } else {
+        await new Promise(resolve => window.setTimeout(resolve, 25));
+      }
+
+      if (Date.now() > deadline) {
+        throw new Error(
+          'NEXT defense is still saving. Try End Inning again after Saved ✓ appears.'
+        );
+      }
+    }
+
+    if (saveMode === 'error') {
+      throw new Error(
+        errorMessage ||
+        'NEXT defense has unsaved changes.'
+      );
+    }
+
+    return snapshot();
+  }
+
+  function isSaveInFlightOrQueued() {
+    return busy || Boolean(activeSavePromise);
   }
 
   function movePlayerToBench(
@@ -2024,6 +2075,8 @@
     useSame: useCurrentDefense,
     undo: undoNext,
     getAlignment: () => snapshot(),
+    flush: flushPendingSave,
+    isSaveInFlightOrQueued,
     showError,
     clearError,
     afterAdvance,
