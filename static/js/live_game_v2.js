@@ -72,10 +72,17 @@
             container.style.zIndex = '2000';
             document.body.appendChild(container);
         }
+
+        // Live confirmations are informational only. They may appear above
+        // the header visually, but must never prevent a coach from tapping
+        // Undo, End Inning, Change Pitcher, or another live control.
+        container.style.pointerEvents = 'none';
+
         const el = document.createElement('div');
         el.className = `toast align-items-center text-bg-${kind} border-0`;
         el.setAttribute('role', 'status');
-        el.innerHTML = `<div class="d-flex"><div class="toast-body fw-semibold">${esc(message)}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+        el.style.pointerEvents = 'none';
+        el.innerHTML = `<div class="d-flex"><div class="toast-body fw-semibold">${esc(message)}</div></div>`;
         container.appendChild(el);
         const instance = bootstrap.Toast.getOrCreateInstance(el, { delay: 2800 });
         el.addEventListener('hidden.bs.toast', () => el.remove(), { once: true });

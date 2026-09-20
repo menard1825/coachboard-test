@@ -335,7 +335,42 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
         ).to_be_visible(timeout=10_000)
 
         # Coach B now loses all network.
+        #
+        # Chromium's offline transition is asynchronous enough that a
+        # request fired immediately after set_offline(True) can sometimes
+        # escape before the browser has actually entered offline mode.
+        # That made this stress test nondeterministic on otherwise
+        # unchanged builds.
+        failed_defense_edits = []
+
+        coach_b.on(
+            'requestfailed',
+            lambda request: (
+                failed_defense_edits.append(request.url)
+                if (
+                    f'/api/live-game/{game_id}/defense-edit'
+                    in request.url
+                )
+                else None
+            ),
+        )
+
         coach_b_context.set_offline(True)
+
+        for _ in range(50):
+            if coach_b.evaluate(
+                'navigator.onLine === false'
+            ):
+                break
+
+            coach_b.wait_for_timeout(100)
+
+        assert coach_b.evaluate(
+            'navigator.onLine === false'
+        ), (
+            'Chromium never entered offline mode '
+            'before the defensive write.'
+        )
 
         # Trigger the already-rendered destination button directly in
         # the page. The application still executes its normal
@@ -356,6 +391,20 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
 
                 button.click();
             }"""
+        )
+
+        # Do not assert the UI error until we have independently proved
+        # that the defensive write really reached Chromium's failed-
+        # request path. This keeps the test from racing offline emulation.
+        for _ in range(50):
+            if failed_defense_edits:
+                break
+
+            coach_b.wait_for_timeout(100)
+
+        assert failed_defense_edits, (
+            'Expected the offline /defense-edit request to fail, '
+            'but Chromium reported no failed defensive write.'
         )
 
         expect(
@@ -1306,7 +1355,11 @@ def test_test2_stale_recovery_authoritative_open_does_not_freeze_quick_field(
         expect(open_spot).to_contain_text(
             'Open — choose player', timeout=10_000,
         )
-        expect(open_spot).to_be_disabled()
+
+        # An authoritative Open position is now intentionally actionable:
+        # the coach can tap it and choose a bench player. It must remain
+        # visually authoritative without becoming a frozen local draft.
+        expect(open_spot).to_be_enabled()
 
         assert open_spot.evaluate(
             "el => el.classList.contains('cb-authoritative-open')"

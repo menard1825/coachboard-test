@@ -349,7 +349,7 @@ def test_applying_full_game_plan_missing_current_inning_does_not_resurrect_it(pa
             select_inning(page, extra_inning)
             expect(panel(page).locator('.pde-inning strong')).to_have_text(extra_inning, timeout=10_000)
 
-            defense_options = page.get_by_role('button', name=re.compile('Defense Options'))
+            defense_options = page.get_by_role('button', name=re.compile('Plan Options'))
             expect(defense_options).to_be_visible(timeout=10_000)
             defense_options.click()
             select = page.locator('#rotationTemplateSelect')
@@ -383,3 +383,461 @@ def test_applying_full_game_plan_missing_current_inning_does_not_resurrect_it(pa
             page.request.get(f'{coachboard_url}/delete_rotation/{template_id}')
     finally:
         cleanup(page, coachboard_url, game_id)
+
+
+
+def test_apply_all_preserves_planned_mid_inning_changes(
+    page: Page,
+    coachboard_url: str,
+):
+    """Normal Apply-to-All works on base innings only. A deliberately
+    different planned mid-inning alignment must survive unchanged."""
+    login(page, coachboard_url)
+
+    game_id = create_planning_game(
+        page,
+        coachboard_url,
+        'Apply All Preserves Planned Change Opponent',
+    )
+
+    try:
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            panel(page)
+        ).to_be_visible(timeout=15_000)
+
+        baseline = get_game_data(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+        base_keys = sorted(
+            (
+                key
+                for key in baseline['rotation']['innings']
+                if float(key).is_integer()
+            ),
+            key=float,
+        )
+
+        base = base_keys[0]
+
+        select_inning(page, base)
+
+        choose_player(
+            page,
+            'SS',
+            'Shortstop Shawn',
+        )
+
+        choose_player(
+            page,
+            '2B',
+            'Second Sam',
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        click_hidden(
+            page,
+            'addSubInningBtn',
+        )
+
+        sub = f'{int(float(base))}.1'
+
+        expect(
+            page.locator(
+                f'label[for="inning-{sub}"]'
+            )
+        ).to_have_count(
+            1,
+            timeout=10_000,
+        )
+
+        select_inning(
+            page,
+            sub,
+        )
+
+        # The selector uses the coach-facing 1A SUB label while the
+        # compact inning badge intentionally keeps the base inning number.
+        # Verify that the planned-change state itself is selected and that
+        # the editor clearly identifies what the coach is editing.
+        expect(
+            page.locator(
+                f'input[name="inning-radio"][value="{sub}"]'
+            )
+        ).to_be_checked()
+
+        expect(
+            panel(page).locator(
+                '.pde-inning strong'
+            )
+        ).to_have_text(
+            str(int(float(base))),
+            timeout=10_000,
+        )
+
+        expect(
+            page.locator(
+                f'label[for="inning-{sub}"]'
+            )
+        ).to_contain_text(
+            '1A',
+            timeout=10_000,
+        )
+
+        # Normal inning-copy controls are intentionally unavailable while
+        # editing a planned change.
+        expect(
+            page.locator(
+                '#gmApplyDefenseAllBtn'
+            )
+        ).to_be_hidden()
+
+        expect(
+            page.locator(
+                '#gmApplyDefenseRemainingBtn'
+            )
+        ).to_be_hidden()
+
+        expect(
+            page.locator(
+                '#gmChooseDefenseInningsBtn'
+            )
+        ).to_be_hidden()
+
+        # Make 1A intentionally different from normal Inning 1.
+        page.evaluate(
+            """sub => {
+                const rotation =
+                    window.CBPregameRotation
+                        .getRotation('Rotation');
+
+                const alignment =
+                    rotation.innings[sub];
+
+                const ss = alignment.SS;
+                alignment.SS = alignment['2B'];
+                alignment['2B'] = ss;
+
+                window.CBPregameRotation
+                    .commitLocalChange(
+                        'Rotation',
+                        false
+                    );
+            }""",
+            sub,
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        planned_before = page.evaluate(
+            """sub => ({
+                ...(
+                    window.CBPregameRotation
+                        .getRotation('Rotation')
+                        .innings[sub] || {}
+                )
+            })""",
+            sub,
+        )
+
+        assert (
+            planned_before['SS']
+            == 'Second Sam'
+        )
+
+        assert (
+            planned_before['2B']
+            == 'Shortstop Shawn'
+        )
+
+        select_inning(
+            page,
+            base,
+        )
+
+        expect(
+            page.locator(
+                '#gmApplyDefenseAllBtn'
+            )
+        ).to_be_visible(
+            timeout=10_000,
+        )
+
+        page.locator(
+            '#gmApplyDefenseAllBtn'
+        ).click()
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        planned_after = page.evaluate(
+            """sub => ({
+                ...(
+                    window.CBPregameRotation
+                        .getRotation('Rotation')
+                        .innings[sub] || {}
+                )
+            })""",
+            sub,
+        )
+
+        assert planned_after == planned_before, (
+            'Apply to All must not overwrite a planned '
+            'mid-inning change'
+        )
+
+        data = get_game_data(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+        assert (
+            data['rotation']['innings'][sub]
+            == planned_before
+        )
+
+    finally:
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+
+def test_add_and_remove_base_innings_ignore_planned_changes(
+    page: Page,
+    coachboard_url: str,
+):
+    """Add Another Inning copies the previous BASE inning, not its
+    planned change; Remove Last Inning removes the base inning together
+    with any planned changes that belong to it."""
+    login(page, coachboard_url)
+
+    game_id = create_planning_game(
+        page,
+        coachboard_url,
+        'Base Inning Structure Opponent',
+    )
+
+    try:
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            panel(page)
+        ).to_be_visible(timeout=15_000)
+
+        baseline = get_game_data(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+        base_keys = sorted(
+            (
+                key
+                for key in baseline['rotation']['innings']
+                if float(key).is_integer()
+            ),
+            key=float,
+        )
+
+        last_base = base_keys[-1]
+
+        select_inning(
+            page,
+            last_base,
+        )
+
+        choose_player(
+            page,
+            'SS',
+            'Shortstop Shawn',
+        )
+
+        choose_player(
+            page,
+            '2B',
+            'Second Sam',
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        click_hidden(
+            page,
+            'addSubInningBtn',
+        )
+
+        sub = (
+            f'{int(float(last_base))}.1'
+        )
+
+        select_inning(
+            page,
+            sub,
+        )
+
+        page.evaluate(
+            """sub => {
+                const rotation =
+                    window.CBPregameRotation
+                        .getRotation('Rotation');
+
+                const alignment =
+                    rotation.innings[sub];
+
+                const ss = alignment.SS;
+                alignment.SS = alignment['2B'];
+                alignment['2B'] = ss;
+
+                window.CBPregameRotation
+                    .commitLocalChange(
+                        'Rotation',
+                        false
+                    );
+            }""",
+            sub,
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        new_base = str(
+            int(float(last_base)) + 1
+        )
+
+        # We are intentionally ON the planned change when Add is used.
+        # The new inning must still copy normal last_base, not sub.
+        click_hidden(
+            page,
+            'addInningBtn',
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        rotation = page.evaluate(
+            """() => (
+                window.CBPregameRotation
+                    .getRotation('Rotation')
+                    .innings
+            )"""
+        )
+
+        assert new_base in rotation
+
+        assert (
+            rotation[new_base]['SS']
+            == 'Shortstop Shawn'
+        )
+
+        assert (
+            rotation[new_base]['2B']
+            == 'Second Sam'
+        )
+
+        assert (
+            rotation[sub]['SS']
+            == 'Second Sam'
+        )
+
+        # First removal removes the newly-added base inning only.
+        click_hidden(
+            page,
+            'removeInningBtn',
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        keys = set(
+            canonical_inning_keys(page)
+        )
+
+        assert new_base not in keys
+        assert last_base in keys
+        assert sub in keys
+
+        # Second removal removes the old last BASE inning and every
+        # planned change belonging to it.
+        click_hidden(
+            page,
+            'removeInningBtn',
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        keys = set(
+            canonical_inning_keys(page)
+        )
+
+        assert last_base not in keys
+        assert sub not in keys
+
+        data = get_game_data(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+        assert last_base not in (
+            data['rotation']['innings']
+        )
+
+        assert sub not in (
+            data['rotation']['innings']
+        )
+
+    finally:
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+        )

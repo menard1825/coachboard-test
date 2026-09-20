@@ -387,12 +387,29 @@ function applyOutOfPositionIndicators() {
 
     function exitCopyMode() {
         state.copiedInningData = null;
-        const pasteControls = document.getElementById('inning-paste-controls');
+
+        const pasteControls = document.getElementById(
+            'inning-paste-controls'
+        );
+
         if (pasteControls) {
             pasteControls.classList.add('d-none');
-            document.getElementById('inning-paste-checkboxes').innerHTML = '';
+            document.getElementById(
+                'inning-paste-checkboxes'
+            ).innerHTML = '';
         }
-        document.getElementById('rotation-board')?.classList.remove('copy-mode');
+
+        const sourceDisplay = document.getElementById(
+            'pasting-from-inning-display'
+        );
+
+        if (sourceDisplay) {
+            sourceDisplay.textContent = '';
+        }
+
+        document
+            .getElementById('rotation-board')
+            ?.classList.remove('copy-mode');
     }
 
     function printLineupCard() {
@@ -1106,21 +1123,44 @@ function applyOutOfPositionIndicators() {
             }
         });
         document.getElementById('addInningBtn')?.addEventListener('click', () => {
-            if(!state.rotation) return;
-            const innings = Object.keys(state.rotation.innings);
-            const nextInningNum = innings.length > 0 ? Math.floor(Math.max(...innings.map(parseFloat))) + 1 : 1;
+            if (!state.rotation) return;
 
-            if (innings.length > 0) {
-                // Auto-copy the previous inning's data (find the absolute highest inning value)
-                const lastInningNum = Math.max(...innings.map(parseFloat));
-                state.rotation.innings[nextInningNum] = { ...state.rotation.innings[String(lastInningNum)] };
+            const inningKeys = Object.keys(
+                state.rotation.innings || {}
+            );
+
+            const baseKeys = inningKeys
+                .filter(key =>
+                    Number.isInteger(
+                        Number.parseFloat(key)
+                    )
+                )
+                .sort(
+                    (a, b) =>
+                        Number.parseFloat(a) -
+                        Number.parseFloat(b)
+                );
+
+            const nextInningNum = baseKeys.length
+                ? Number.parseFloat(baseKeys.at(-1)) + 1
+                : 1;
+
+            const nextKey = String(nextInningNum);
+
+            if (baseKeys.length) {
+                // A planned change like 6.1 is NOT "the previous inning".
+                // New Inning 7 starts from the normal Inning 6 defense.
+                const sourceKey = baseKeys.at(-1);
+
+                state.rotation.innings[nextKey] = {
+                    ...(state.rotation.innings[sourceKey] || {})
+                };
             } else {
-                state.rotation.innings[nextInningNum] = {};
+                state.rotation.innings[nextKey] = {};
             }
 
             renderInningSelector();
-            // Optional: Switch to the new inning to let the user edit immediately
-            state.currentInning = String(nextInningNum);
+            state.currentInning = nextKey;
             renderRotationEditor();
             triggerAutosave();
         });
@@ -1151,25 +1191,117 @@ function applyOutOfPositionIndicators() {
         });
 
         document.getElementById('removeInningBtn')?.addEventListener('click', () => {
-            if(!state.rotation) return;
-            const innings = Object.keys(state.rotation.innings);
-            if(innings.length <= 1) return alert("Cannot remove the last inning.");
-            const lastInningNum = String(Math.max(...innings.map(parseFloat)));
-            delete state.rotation.innings[lastInningNum];
-            if(String(state.currentInning) === lastInningNum) {
-                state.currentInning = String(Math.max(...Object.keys(state.rotation.innings).map(parseFloat)));
+            if (!state.rotation) return;
+
+            const inningKeys = Object.keys(
+                state.rotation.innings || {}
+            );
+
+            const baseKeys = inningKeys
+                .filter(key =>
+                    Number.isInteger(
+                        Number.parseFloat(key)
+                    )
+                )
+                .sort(
+                    (a, b) =>
+                        Number.parseFloat(a) -
+                        Number.parseFloat(b)
+                );
+
+            if (baseKeys.length <= 1) {
+                return alert(
+                    "Cannot remove the last inning."
+                );
             }
+
+            const lastBaseKey =
+                baseKeys.at(-1);
+
+            const lastBaseNumber =
+                Number.parseFloat(
+                    lastBaseKey
+                );
+
+            // Removing an inning also removes planned changes that belong
+            // to that inning (6.1, 6.2, ...). It must never remove only
+            // the planned change while leaving the base inning behind.
+            Object.keys(
+                state.rotation.innings
+            ).forEach(key => {
+                const number =
+                    Number.parseFloat(key);
+
+                if (
+                    Number.isFinite(number) &&
+                    Math.floor(number) ===
+                        lastBaseNumber
+                ) {
+                    delete state.rotation.innings[
+                        key
+                    ];
+                }
+            });
+
+            const currentNumber =
+                Number.parseFloat(
+                    state.currentInning
+                );
+
+            if (
+                Number.isFinite(currentNumber) &&
+                Math.floor(currentNumber) ===
+                    lastBaseNumber
+            ) {
+                const remainingBaseKeys =
+                    Object.keys(
+                        state.rotation.innings
+                    )
+                    .filter(key =>
+                        Number.isInteger(
+                            Number.parseFloat(key)
+                        )
+                    )
+                    .sort(
+                        (a, b) =>
+                            Number.parseFloat(a) -
+                            Number.parseFloat(b)
+                    );
+
+                state.currentInning =
+                    remainingBaseKeys.at(-1);
+            }
+
             renderRotationEditor();
             triggerAutosave();
         });
+
         document.getElementById('copyInningBtn')?.addEventListener('click', () => {
             if (!state.rotation || !state.currentInning) return;
-            state.copiedInningData = { ...state.rotation.innings[state.currentInning] };
+
+            state.copiedInningData = {
+                ...state.rotation.innings[state.currentInning]
+            };
+
+            const sourceDisplay = document.getElementById(
+                'pasting-from-inning-display'
+            );
+
+            if (sourceDisplay) {
+                sourceDisplay.textContent = state.currentInning;
+            }
+
             document.getElementById('inning-paste-controls').classList.remove('d-none');
             document.getElementById('rotation-board').classList.add('copy-mode');
             const pasteCheckboxes = document.getElementById('inning-paste-checkboxes');
             pasteCheckboxes.innerHTML = Object.keys(state.rotation.innings)
-                .filter(inn => inn != state.currentInning)
+                .filter(
+                    inn =>
+                        inn != state.currentInning &&
+                        Number.isInteger(
+                            Number.parseFloat(inn)
+                        )
+                )
                 .map(inn => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" value="${inn}" id="paste-check-${inn}"><label class="form-check-label" for="paste-check-${inn}">${inn}</label></div>`).join('');
         });
         document.getElementById('pasteToSelectedBtn')?.addEventListener('click', () => {

@@ -538,9 +538,22 @@
   function fieldSpot(pos, left, top) {
     const name = currentAlignment()?.[pos] || 'Open';
     const pitcher = pos === 'P';
+    const open = name === 'Open';
     const number = numberMap().get(name);
-    const label = number ? `#${number} ${name}` : name;
-    return `<button type="button" class="cb-qd-spot ${pitcher ? 'pitcher' : ''}" style="left:${left}%;top:${top}%" data-cb-move-player="${esc(name)}" data-cb-position="${esc(pos)}" ${name === 'Open' ? 'disabled' : ''}><span class="cb-qd-pos">${esc(pos)}</span><span class="cb-qd-name">${esc(label)}</span></button>`;
+    const label = number
+      ? `#${number} ${name}`
+      : open && !pitcher
+        ? 'Open · tap to fill'
+        : name;
+
+    return `<button type="button"
+                    class="cb-qd-spot ${pitcher ? 'pitcher' : ''} ${open ? 'cb-authoritative-open' : ''}"
+                    style="left:${left}%;top:${top}%"
+                    data-cb-move-player="${esc(name)}"
+                    data-cb-position="${esc(pos)}">
+              <span class="cb-qd-pos">${esc(pos)}</span>
+              <span class="cb-qd-name">${esc(label)}</span>
+            </button>`;
   }
 
   function saveStateMarkup() {
@@ -589,13 +602,23 @@
           return;
         }
         const player = event.target.closest('[data-cb-move-player]');
-        if (!player || player.disabled) return;
+        if (!player) return;
+
         const name = player.dataset.cbMovePlayer;
         const pos = player.dataset.cbPosition;
+
+        if (name === 'Open') {
+          openOpenPositionModal(pos);
+          return;
+        }
+
+        if (player.disabled) return;
+
         if (pos === 'P') {
           $('liveChangePitcherBtn')?.click();
           return;
         }
+
         openMoveModal(name);
       });
       card.addEventListener('keydown', event => {
@@ -630,6 +653,101 @@
     return modal;
   }
 
+  function openOpenPositionModal(position) {
+    const pos = String(position || '').toUpperCase();
+    if (!pos) return;
+
+    if (pos === 'P') {
+      $('liveChangePitcherBtn')?.click();
+      return;
+    }
+
+    const modal = ensureMoveModal();
+    const title = modal.querySelector('.modal-title');
+    const body = modal.querySelector('.modal-body');
+
+    if (title) {
+      title.textContent = `Fill ${pos}`;
+    }
+
+    const availableBench = benchPlayers();
+
+    if (!availableBench.length) {
+      body.innerHTML = `
+        <div class="cb-move-current">
+          <strong>${esc(pos)} is Open.</strong><br>
+          No bench player is available to fill it.
+        </div>
+      `;
+
+      bootstrap.Modal
+        .getOrCreateInstance(modal)
+        .show();
+
+      return;
+    }
+
+    body.innerHTML = `
+      <div class="cb-move-current">
+        <strong>${esc(pos)} is Open.</strong><br>
+        Choose a bench player to put at ${esc(pos)}.
+      </div>
+
+      <div class="cb-destination-grid">
+        ${availableBench.map(player => {
+          const number = String(
+            player.number ?? ''
+          ).trim();
+
+          const label = number
+            ? `#${number} ${player.name}`
+            : player.name;
+
+          return `
+            <button
+              type="button"
+              class="btn btn-outline-primary cb-destination"
+              data-cb-fill-open-player="${player.id}"
+            >
+              <span>${esc(label)}</span>
+              <small>Bench → ${esc(pos)}</small>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    body.querySelectorAll(
+      '[data-cb-fill-open-player]'
+    ).forEach(button => {
+      button.addEventListener(
+        'click',
+        () => {
+          const playerId = Number(
+            button.dataset.cbFillOpenPlayer
+          );
+
+          const player = availableBench.find(
+            candidate =>
+              Number(candidate.id) === playerId
+          );
+
+          if (!player) return;
+
+          saveMove(
+            player.id,
+            pos,
+            player.name
+          );
+        }
+      );
+    });
+
+    bootstrap.Modal
+      .getOrCreateInstance(modal)
+      .show();
+  }
+
   function openMoveModal(name) {
     const player = playerForName(name);
     if (!player) return;
@@ -640,7 +758,13 @@
       return;
     }
     const modal = ensureMoveModal();
+    const title = modal.querySelector('.modal-title');
     const body = modal.querySelector('.modal-body');
+
+    if (title) {
+      title.textContent = 'Move Player';
+    }
+
     const destinations = positions().filter(pos => pos !== 'P' && pos !== source);
     const sourceText = source === 'BENCH' ? `${name} is currently on the bench.` : `${name} is currently playing ${source}.`;
     const benchDestination = source === 'BENCH'

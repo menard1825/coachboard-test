@@ -624,7 +624,122 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
             state['current_alignment'].values()
         )
 
-        # Undo is the safety valve for an accidental pitcher tap.
+        # The Open position left by a pitcher change is a real tap target.
+        # A coach should not need to drag somebody from the bench.
+        expect(
+            open_2b
+        ).to_be_enabled()
+
+        open_2b.click()
+
+        fill_modal = page.locator(
+            '#cbQuickMoveModal'
+        )
+
+        expect(
+            fill_modal
+        ).to_be_visible(
+            timeout=10_000
+        )
+
+        expect(
+            fill_modal.locator(
+                '.modal-title'
+            )
+        ).to_have_text(
+            'Fill 2B'
+        )
+
+        expect(
+            fill_modal
+        ).to_contain_text(
+            '2B is Open'
+        )
+
+        pitcher_pat_choice = (
+            fill_modal.locator(
+                '[data-cb-fill-open-player]',
+                has_text='Pitcher Pat',
+            )
+        )
+
+        expect(
+            pitcher_pat_choice
+        ).to_be_visible()
+
+        pitcher_pat_choice.click()
+
+        expect(
+            fill_modal
+        ).not_to_be_visible(
+            timeout=10_000
+        )
+
+        expect(
+            open_2b
+        ).to_contain_text(
+            'Pitcher Pat',
+            timeout=10_000,
+        )
+
+        filled = get_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/state',
+        )
+
+        assert (
+            filled['current_alignment']['P']
+            == relief_name
+        )
+
+        assert (
+            filled['current_alignment']['2B']
+            == 'Pitcher Pat'
+        )
+
+        # First Undo removes only the fill action and returns 2B to Open.
+        page.locator(
+            '#liveUndoBtn'
+        ).click()
+
+        expect(
+            open_2b
+        ).to_contain_text(
+            'Open',
+            timeout=10_000,
+        )
+
+        after_fill_undo = get_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/state',
+        )
+
+        assert (
+            after_fill_undo['current_alignment']['P']
+            == relief_name
+        )
+
+        assert not after_fill_undo[
+            'current_alignment'
+        ].get('2B')
+
+        # The first Undo shows a short success toast in the same top-right
+        # area as the header Undo control. That status message must never
+        # block another live action underneath it.
+        undo_toast = page.locator(
+            '#live-toast-container-v2 .toast.show'
+        )
+
+        expect(
+            undo_toast.first
+        ).to_be_visible(
+            timeout=2_000
+        )
+
+        # Deliberately issue the second Undo while the toast is still up.
+        # This protects the real coach workflow, not merely test timing.
         page.locator(
             '#liveUndoBtn'
         ).click()

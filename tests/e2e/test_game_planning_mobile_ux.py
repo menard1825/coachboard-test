@@ -458,7 +458,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         assert abs(preset_layout['apply']['left'] - min(preset_layout['wrap']['left'], preset_layout['game']['left'])) <= 2
         assert abs(preset_layout['apply']['right'] - max(preset_layout['wrap']['right'], preset_layout['game']['right'])) <= 2
 
-        defense_options = page.get_by_role('button', name=re.compile('Defense Options'))
+        defense_options = page.get_by_role('button', name=re.compile('Plan Options'))
         defense_options.click()
         expect(page.locator('#gmFullGamePlanHeader')).to_contain_text('Full-game defense plan · all innings')
         rotation_template = page.locator('#rotationTemplateSelect')
@@ -477,6 +477,183 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         defense.locator('#pde-apply').click()
         expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
         expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
+
+        # Common inning-copy actions are visible directly instead of being
+        # split between multiple copy/apply controls.
+        apply_all = page.locator('#gmApplyDefenseAllBtn')
+        apply_remaining = page.locator('#gmApplyDefenseRemainingBtn')
+        choose_innings = page.locator('#gmChooseDefenseInningsBtn')
+
+        expect(apply_all).to_be_visible()
+        expect(apply_all).to_have_text(re.compile('Apply to All Innings'))
+        expect(apply_remaining).to_be_visible()
+        expect(choose_innings).to_be_visible()
+
+        expect(
+            page.locator('.gm-legacy-inning-actions')
+        ).to_be_hidden()
+
+        # Copy the actual Inning 1 defense to the rest of the plan.
+        page.once(
+            'dialog',
+            lambda dialog: dialog.accept(),
+        )
+        apply_all.click()
+
+        inning_2 = page.locator(
+            '#inning-btn-group label.btn'
+        ).filter(
+            has_text=re.compile(r'^2$')
+        )
+
+        inning_2.click()
+
+        expect(
+            defense.locator('.pde-title')
+        ).to_have_text(
+            'Set Defense — Inning 2'
+        )
+
+        expect(
+            defense.locator(
+                '[data-pde-pos="SS"] .pde-name'
+            )
+        ).to_have_text(
+            'Shortstop Shawn'
+        )
+
+        # Verify the actual shared rotation, not only the label shown
+        # on the field. An unassigned pitcher may be presented as OPEN
+        # or PITCHER TBD, but it must not become a fake player assignment.
+        inning_2_rotation = page.evaluate(
+            """() => {
+                const rotation =
+                    window.CBPregameRotation
+                        .getRotation('Rotation');
+
+                return {
+                    ...(rotation.innings['2'] || {})
+                };
+            }"""
+        )
+
+        assert (
+            inning_2_rotation.get('SS')
+            == 'Shortstop Shawn'
+        ), inning_2_rotation
+
+        assert not inning_2_rotation.get(
+            'P'
+        ), (
+            'Apply to All created an unexpected '
+            f'pitcher assignment: {inning_2_rotation}'
+        )
+
+        expect(
+            defense.locator(
+                '[data-pde-pos="P"] .pde-name'
+            )
+        ).to_have_text(
+            re.compile(
+                r'^(?:OPEN|PITCHER TBD)$'
+            )
+        )
+
+        # Choose Innings stays available when the coach wants something
+        # more selective than All or Remaining.
+        choose_innings.click()
+
+        apply_picker = page.locator(
+            '#inning-paste-controls'
+        )
+
+        expect(
+            apply_picker
+        ).to_be_visible()
+
+        expect(
+            apply_picker
+        ).to_contain_text(
+            'Apply defense from Inning 2'
+        )
+
+        # The current/source inning must not be offered as a destination.
+        expect(
+            apply_picker.get_by_role(
+                'checkbox',
+                name='2',
+            )
+        ).to_have_count(0)
+
+        inning_3_checkbox = (
+            apply_picker.get_by_role(
+                'checkbox',
+                name='3',
+            )
+        )
+
+        expect(
+            inning_3_checkbox
+        ).to_be_visible()
+
+        inning_3_checkbox.check()
+
+        apply_picker.get_by_role(
+            'button',
+            name='Apply Defense',
+        ).click()
+
+        expect(
+            apply_picker
+        ).to_be_hidden()
+
+        inning_3 = page.locator(
+            '#inning-btn-group label.btn'
+        ).filter(
+            has_text=re.compile(r'^3$')
+        )
+
+        inning_3.click()
+
+        expect(
+            defense.locator('.pde-title')
+        ).to_have_text(
+            'Set Defense — Inning 3'
+        )
+
+        expect(
+            defense.locator(
+                '[data-pde-pos="SS"] .pde-name'
+            )
+        ).to_have_text(
+            'Shortstop Shawn'
+        )
+
+        inning_3_rotation = page.evaluate(
+            """() => ({
+                ...(
+                    window.CBPregameRotation
+                        .getRotation('Rotation')
+                        .innings['3'] || {}
+                )
+            })"""
+        )
+
+        assert (
+            inning_3_rotation.get('SS')
+            == 'Shortstop Shawn'
+        ), inning_3_rotation
+
+        assert not inning_3_rotation.get(
+            'P'
+        ), inning_3_rotation
+
+        # Return to Inning 1 so later checks keep their original context.
+        page.locator(
+            '#inning-btn-group label.btn'
+        ).filter(
+            has_text=re.compile(r'^1$')
+        ).click()
 
         playing_time = defense.locator(
             '#pde-playing-time-summary'

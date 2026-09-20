@@ -327,7 +327,10 @@
             '#cbQuickDefense .cb-main-open'
           ).forEach(element => {
             element.classList.add('cb-authoritative-open');
-            element.disabled = true;
+
+            // Open is a destination, never a drag source, but it must remain
+            // tappable so a coach can fill the vacancy without dragging.
+            element.disabled = false;
           });
 
           clearDraft({restore: false});
