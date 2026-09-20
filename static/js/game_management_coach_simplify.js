@@ -53,6 +53,14 @@
         border-radius:9px;
         min-height:38px;
       }
+
+      /*
+       * Plan Options must paint above the sticky inning picker.
+       * The picker intentionally uses z-index:1030 on phones/tablets.
+       */
+      #rotation-card-container .gm-plan-options-menu{
+        z-index:1040!important;
+      }
       #rotation-card-container .gm-legacy-inning-actions{
         display:none!important;
       }
@@ -2073,6 +2081,10 @@
         ?.nextElementSibling;
 
     if (!menu) return;
+
+    menu.classList.add(
+      'gm-plan-options-menu'
+    );
 
     let header =
       document.getElementById(

@@ -461,6 +461,139 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         defense_options = page.get_by_role('button', name=re.compile('Plan Options'))
         defense_options.click()
         expect(page.locator('#gmFullGamePlanHeader')).to_contain_text('Saved plans')
+
+        # The sticky inning picker must never paint over Plan Options.
+        # This is especially important on phones where the picker uses
+        # z-index:1030 so it remains available while scrolling the field.
+        plan_menu = page.locator('.gm-plan-options-menu')
+        inning_picker = page.locator(
+            '#rotation-card-container .gm-coach-inning-picker'
+        )
+
+        expect(plan_menu).to_be_visible()
+        expect(inning_picker).to_be_visible()
+
+        menu_layer = plan_menu.evaluate(
+            """element => {
+                const value =
+                    getComputedStyle(element).zIndex;
+
+                return Number.parseInt(
+                    value,
+                    10
+                ) || 0;
+            }"""
+        )
+
+        picker_layer = inning_picker.evaluate(
+            """element => {
+                const value =
+                    getComputedStyle(element).zIndex;
+
+                return Number.parseInt(
+                    value,
+                    10
+                ) || 0;
+            }"""
+        )
+
+        assert menu_layer > picker_layer, {
+            'menu_z': menu_layer,
+            'picker_z': picker_layer,
+        }
+
+        layering = page.evaluate(
+            """() => {
+                const menu =
+                    document.querySelector(
+                        '.gm-plan-options-menu'
+                    );
+
+                const picker =
+                    document.querySelector(
+                        '#rotation-card-container .gm-coach-inning-picker'
+                    );
+
+                if (!menu || !picker) {
+                    return {
+                        overlaps:false,
+                        menuOwnsOverlap:false,
+                    };
+                }
+
+                const mr =
+                    menu.getBoundingClientRect();
+
+                const pr =
+                    picker.getBoundingClientRect();
+
+                const left =
+                    Math.max(
+                        mr.left,
+                        pr.left
+                    );
+
+                const right =
+                    Math.min(
+                        mr.right,
+                        pr.right
+                    );
+
+                const top =
+                    Math.max(
+                        mr.top,
+                        pr.top
+                    );
+
+                const bottom =
+                    Math.min(
+                        mr.bottom,
+                        pr.bottom
+                    );
+
+                if (
+                    right <= left ||
+                    bottom <= top
+                ) {
+                    return {
+                        overlaps:false,
+                        menuOwnsOverlap:true,
+                    };
+                }
+
+                const x =
+                    left +
+                    ((right - left) / 2);
+
+                const y =
+                    top +
+                    ((bottom - top) / 2);
+
+                const painted =
+                    document.elementFromPoint(
+                        x,
+                        y
+                    );
+
+                return {
+                    overlaps:true,
+                    menuOwnsOverlap:
+                        Boolean(
+                            painted &&
+                            menu.contains(
+                                painted
+                            )
+                        ),
+                    painted:
+                        painted
+                            ? `${painted.tagName}.${painted.className}`
+                            : null,
+                };
+            }"""
+        )
+
+        if layering['overlaps']:
+            assert layering['menuOwnsOverlap'], layering
         rotation_template = page.locator('#rotationTemplateSelect')
         expect(rotation_template).to_be_visible()
         expect(rotation_template.locator('option').first).to_have_text('Load saved defense plan…')
