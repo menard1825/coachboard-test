@@ -604,6 +604,13 @@
         const player = event.target.closest('[data-cb-move-player]');
         if (!player) return;
 
+        // While unified drag-and-drop owns a local draft, an Open marker is
+        // not authoritative yet. Do not launch the separate tap-to-fill
+        // writer against older server state. Once the draft save completes,
+        // clearDraft() removes cb-main-open and the authoritative Open spot
+        // becomes tappable normally.
+        if (player.classList.contains('cb-main-open')) return;
+
         const name = player.dataset.cbMovePlayer;
         const pos = player.dataset.cbPosition;
 

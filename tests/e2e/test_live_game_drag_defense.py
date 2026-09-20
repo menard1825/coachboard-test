@@ -638,3 +638,160 @@ def test_phone_quick_field_touch_swipe_does_not_drag_player(
             game_id,
             None,
         )
+
+
+def test_phone_draft_open_does_not_launch_authoritative_fill_modal(
+    page: Page,
+    coachboard_url: str,
+):
+    """
+    A temporary Open marker owned by the drag draft must not invoke the
+    separate authoritative tap-to-fill writer.
+
+    Once draft ownership is removed, the same Open marker becomes a normal
+    authoritative vacancy and must remain tappable.
+    """
+
+    page.set_viewport_size({
+        'width': 390,
+        'height': 844,
+    })
+
+    login(page, coachboard_url)
+    game_id = create_game(
+        page,
+        coachboard_url,
+    )
+
+    try:
+        post_json(
+            page,
+            coachboard_url,
+            f'/api/live-game/{game_id}/start',
+            {},
+        )
+
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        quick = page.locator(
+            '#cbQuickDefense'
+        )
+
+        expect(
+            quick
+        ).to_be_visible(
+            timeout=15_000,
+        )
+
+        ss = quick.locator(
+            '[data-cb-position="SS"]'
+        )
+
+        expect(
+            ss
+        ).to_contain_text(
+            'Shortstop Shawn'
+        )
+
+        # Reproduce the DOM contract used by renderDraft() while a drag save
+        # is in flight: the vacancy says Open and carries cb-main-open.
+        ss.evaluate(
+            """element => {
+                element.dataset.cbMovePlayer = 'Open';
+                element.classList.remove(
+                    'cb-authoritative-open'
+                );
+                element.classList.add(
+                    'cb-main-open'
+                );
+                element.disabled = false;
+
+                const label =
+                    element.querySelector(
+                        '.cb-qd-name'
+                    );
+
+                if (label) {
+                    label.textContent =
+                        'Open — choose player';
+                }
+            }"""
+        )
+
+        expect(
+            ss
+        ).to_have_class(
+            re.compile(
+                r'\bcb-main-open\b'
+            )
+        )
+
+        # Draft-owned Open must NOT open the authoritative Fill Position
+        # modal.
+        ss.click()
+
+        expect(
+            page.locator(
+                '#cbQuickMoveModal'
+            )
+        ).not_to_be_visible()
+
+        # Simulate the handoff after the drag save succeeds:
+        # cb-main-open is gone and this is now an authoritative vacancy.
+        ss.evaluate(
+            """element => {
+                element.classList.remove(
+                    'cb-main-open'
+                );
+                element.classList.add(
+                    'cb-authoritative-open'
+                );
+
+                const label =
+                    element.querySelector(
+                        '.cb-qd-name'
+                    );
+
+                if (label) {
+                    label.textContent =
+                        'Open · tap to fill';
+                }
+            }"""
+        )
+
+        ss.click()
+
+        modal = page.locator(
+            '#cbQuickMoveModal'
+        )
+
+        expect(
+            modal
+        ).to_be_visible(
+            timeout=10_000,
+        )
+
+        expect(
+            modal.locator(
+                '.modal-title'
+            )
+        ).to_have_text(
+            'Fill SS'
+        )
+
+        expect(
+            modal
+        ).to_contain_text(
+            'SS is Open'
+        )
+
+    finally:
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+            None,
+        )
