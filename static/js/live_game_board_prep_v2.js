@@ -1671,32 +1671,55 @@
 
   async function flushPendingSave() {
     const deadline = Date.now() + 10000;
+    const timeoutMessage =
+      'NEXT defense is still saving. Check your connection, wait for Saved ✓, then try End Inning again.';
 
     while (busy || activeSavePromise) {
       const pending = activeSavePromise;
+      const remaining = deadline - Date.now();
 
-      if (pending) {
-        try {
-          await pending;
-        } catch (_) {
-          // saveAlignment owns the user-visible error state. Wait until its
-          // finally block has completed, then fail closed below.
-        }
-      } else {
-        await new Promise(resolve => window.setTimeout(resolve, 25));
+      if (remaining <= 0) {
+        throw new Error(timeoutMessage);
       }
 
-      if (Date.now() > deadline) {
-        throw new Error(
-          'NEXT defense is still saving. Try End Inning again after Saved ✓ appears.'
+      if (pending) {
+        let timer = null;
+
+        try {
+          await Promise.race([
+            pending.then(
+              () => null,
+              () => null
+            ),
+            new Promise((_, reject) => {
+              timer = window.setTimeout(
+                () => reject(
+                  new Error(timeoutMessage)
+                ),
+                remaining
+              );
+            }),
+          ]);
+        } finally {
+          if (timer !== null) {
+            window.clearTimeout(timer);
+          }
+        }
+      } else {
+        await new Promise(resolve =>
+          window.setTimeout(
+            resolve,
+            Math.min(25, remaining)
+          )
         );
       }
     }
 
     if (saveMode === 'error') {
       throw new Error(
-        errorMessage ||
-        'NEXT defense has unsaved changes.'
+        errorMessage
+          ? `${errorMessage} Re-save NEXT, then try End Inning again.`
+          : 'NEXT defense was not saved. Re-save NEXT, then try End Inning again.'
       );
     }
 

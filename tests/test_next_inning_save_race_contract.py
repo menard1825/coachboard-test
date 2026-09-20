@@ -42,3 +42,33 @@ def test_advance_inning_rejects_stale_next_prep_version():
     assert "'code': 'stale_next_inning_prep'" in source
     assert "def canonical_alignment(alignment):" in source
     assert "canonical_alignment(" in source
+
+def test_flush_has_a_real_timeout_and_preserves_save_error():
+    board_source = BOARD.read_text()
+    contract_source = CONTRACT.read_text()
+
+    assert "await Promise.race([" in board_source
+    assert "Check your connection" in board_source
+    assert "Re-save NEXT, then try End Inning again." in board_source
+
+    end_inning_index = contract_source.index(
+        "async function endInningFromNext"
+    )
+    flush_index = contract_source.index(
+        "?.flush?.();",
+        end_inning_index,
+    )
+
+    # Preserve the real NEXT-save failure until flush() has inspected it.
+    # Clearing afterward is optional because a successful save/advance
+    # already resets the NEXT error state.
+    pre_flush = contract_source[
+        end_inning_index:flush_index
+    ]
+    assert "?.clearError?.();" not in pre_flush
+
+
+def test_prep_canonicalization_uses_current_allowed_positions():
+    source = BULK.read_text()
+
+    assert "if position in allowed and name:" in source

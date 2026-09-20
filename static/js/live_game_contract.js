@@ -622,9 +622,6 @@
 
     button.disabled = true;
 
-    window.CBNextDefense
-      ?.clearError?.();
-
     try {
       // NEXT prep is a separate persistence channel from live rotation
       // events. Flush it explicitly before asking the server which defense

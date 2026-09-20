@@ -552,14 +552,16 @@ def advance_inning(game_id):
         ).first()
 
         def canonical_alignment(alignment):
-            return {
-                str(position).strip(): str(name).strip()
-                for position, name in (alignment or {}).items()
-                if (
-                    str(position).strip()
-                    and str(name or '').strip()
-                )
-            }
+            canonical = {}
+
+            for position, name in (alignment or {}).items():
+                position = str(position).strip()
+                name = str(name or '').strip()
+
+                if position in allowed and name:
+                    canonical[position] = name
+
+            return canonical
 
         prep_changed = (
             not guarded_prep

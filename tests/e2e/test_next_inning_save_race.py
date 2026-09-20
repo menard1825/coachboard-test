@@ -424,7 +424,7 @@ def test_advance_rejects_next_changed_after_client_read(
         # By the time this code runs, End Inning has already:
         #   1. flushed NEXT
         #   2. GET /next-inning-prep
-        #   3. captured prep id + updated_at
+        #   3. captured prep id
         #
         # We now simulate another coach replacing NEXT before the original
         # advance request reaches Flask.
