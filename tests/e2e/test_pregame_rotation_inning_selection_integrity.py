@@ -841,3 +841,774 @@ def test_add_and_remove_base_innings_ignore_planned_changes(
             coachboard_url,
             game_id,
         )
+
+
+# --- planner-open-tap regression coverage ---
+
+
+def planner_rotation_snapshot(page: Page):
+    """Deep-copy the canonical client-side rotation."""
+    return page.evaluate(
+        """() => JSON.parse(JSON.stringify(
+            window.CBPregameRotation
+                .getRotation('Rotation')
+                .innings || {}
+        ))"""
+    )
+
+
+def planner_base_innings(page: Page):
+    return sorted(
+        (
+            key
+            for key in planner_rotation_snapshot(
+                page
+            )
+            if float(key).is_integer()
+        ),
+        key=float,
+    )
+
+
+def test_apply_all_undo_restores_targets_and_preserves_planned_change(
+    page: Page,
+    coachboard_url: str,
+):
+    """Undo must restore every copied base inning exactly while leaving
+    a planned mid-inning change completely untouched."""
+    login(page, coachboard_url)
+
+    game_id = create_planning_game(
+        page,
+        coachboard_url,
+        'Apply All Undo Restore Opponent',
+    )
+
+    try:
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            panel(page)
+        ).to_be_visible(
+            timeout=15_000
+        )
+
+        base_keys = planner_base_innings(
+            page
+        )
+
+        assert len(base_keys) >= 3
+
+        source = base_keys[0]
+        targets = base_keys[1:]
+
+        select_inning(
+            page,
+            source,
+        )
+
+        choose_player(
+            page,
+            'SS',
+            'Shortstop Shawn',
+        )
+
+        choose_player(
+            page,
+            '2B',
+            'Second Sam',
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        # Add a planned change for the source inning so Undo is also
+        # proven not to touch decimal/sub-innings.
+        click_hidden(
+            page,
+            'addSubInningBtn',
+        )
+
+        sub = (
+            f'{int(float(source))}.1'
+        )
+
+        expect(
+            page.locator(
+                f'input[name="inning-radio"]'
+                f'[value="{sub}"]'
+            )
+        ).to_have_count(
+            1,
+            timeout=10_000,
+        )
+
+        select_inning(
+            page,
+            sub,
+        )
+
+        # Make the planned change intentionally distinct from the
+        # normal source inning.
+        page.evaluate(
+            """sub => {
+                const rotation =
+                    window.CBPregameRotation
+                        .getRotation(
+                            'Rotation'
+                        );
+
+                const alignment =
+                    rotation.innings[sub];
+
+                const ss =
+                    alignment.SS;
+
+                alignment.SS =
+                    alignment['2B'];
+
+                alignment['2B'] =
+                    ss;
+
+                window.CBPregameRotation
+                    .commitLocalChange(
+                        'Rotation',
+                        false
+                    );
+            }""",
+            sub,
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        planned_before = (
+            planner_rotation_snapshot(
+                page
+            )[sub]
+        )
+
+        select_inning(
+            page,
+            source,
+        )
+
+        before = (
+            planner_rotation_snapshot(
+                page
+            )
+        )
+
+        target_before = {
+            inning: before[inning]
+            for inning in targets
+        }
+
+        apply_all = page.locator(
+            '#gmApplyDefenseAllBtn'
+        )
+
+        expect(
+            apply_all
+        ).to_be_visible(
+            timeout=10_000
+        )
+
+        apply_all.click()
+
+        copy_toast = (
+            page.locator(
+                '#gm-coach-toast-holder '
+                '.toast.show'
+            )
+            .filter(
+                has_text=(
+                    f'Copied Inning '
+                    f'{source}'
+                )
+            )
+            .last
+        )
+
+        expect(
+            copy_toast
+        ).to_be_visible(
+            timeout=5_000
+        )
+
+        undo = copy_toast.get_by_role(
+            'button',
+            name='Undo',
+        )
+
+        expect(
+            undo
+        ).to_be_visible()
+
+        # Prove the copy actually occurred before Undo.
+        copied = (
+            planner_rotation_snapshot(
+                page
+            )
+        )
+
+        source_alignment = copied[source]
+
+        for inning in targets:
+            assert (
+                copied[inning]
+                == source_alignment
+            ), (
+                f'Apply All did not copy '
+                f'{source} to {inning}'
+            )
+
+        assert (
+            copied[sub]
+            == planned_before
+        )
+
+        undo.click()
+
+        undone_toast = (
+            page.locator(
+                '#gm-coach-toast-holder '
+                '.toast.show'
+            )
+            .filter(
+                has_text='Defense copy undone.'
+            )
+            .last
+        )
+
+        expect(
+            undone_toast
+        ).to_be_visible(
+            timeout=5_000
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        after = planner_rotation_snapshot(
+            page
+        )
+
+        for inning in targets:
+            assert (
+                after[inning]
+                == target_before[inning]
+            ), (
+                f'Undo did not restore '
+                f'Inning {inning}'
+            )
+
+        assert (
+            after[sub]
+            == planned_before
+        ), (
+            'Undo must not alter the planned '
+            'mid-inning change'
+        )
+
+    finally:
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+
+def test_apply_all_undo_refuses_after_newer_target_edit_without_partial_restore(
+    page: Page,
+    coachboard_url: str,
+):
+    """If any copied target has changed since Apply All, Undo must
+    refuse the whole operation rather than partially restoring targets."""
+    login(page, coachboard_url)
+
+    game_id = create_planning_game(
+        page,
+        coachboard_url,
+        'Apply All Undo Stale Opponent',
+    )
+
+    try:
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            panel(page)
+        ).to_be_visible(
+            timeout=15_000
+        )
+
+        base_keys = planner_base_innings(
+            page
+        )
+
+        assert len(base_keys) >= 4
+
+        source = base_keys[0]
+        targets = base_keys[1:]
+        changed_target = targets[2]
+
+        select_inning(
+            page,
+            source,
+        )
+
+        choose_player(
+            page,
+            'SS',
+            'Shortstop Shawn',
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        page.locator(
+            '#gmApplyDefenseAllBtn'
+        ).click()
+
+        copy_toast = (
+            page.locator(
+                '#gm-coach-toast-holder '
+                '.toast.show'
+            )
+            .filter(
+                has_text=(
+                    f'Copied Inning '
+                    f'{source}'
+                )
+            )
+            .last
+        )
+
+        expect(
+            copy_toast
+        ).to_be_visible(
+            timeout=5_000
+        )
+
+        copied = planner_rotation_snapshot(
+            page
+        )
+
+        source_alignment = copied[source]
+
+        for inning in targets:
+            assert (
+                copied[inning]
+                == source_alignment
+            )
+
+        # Simulate a legitimate newer coach edit in exactly one target
+        # inning after the copy but before Undo.
+        page.evaluate(
+            """inning => {
+                const rotation =
+                    window.CBPregameRotation
+                        .getRotation(
+                            'Rotation'
+                        );
+
+                rotation
+                    .innings[inning]
+                    .SS = 'Second Sam';
+
+                window.CBPregameRotation
+                    .commitLocalChange(
+                        'Rotation',
+                        false
+                    );
+            }""",
+            changed_target,
+        )
+
+        # Do not wait for persistence here. Undo's stale check must use
+        # the live canonical store immediately.
+        copy_toast.get_by_role(
+            'button',
+            name='Undo',
+        ).click()
+
+        warning = (
+            page.locator(
+                '#gm-coach-toast-holder '
+                '.toast.show'
+            )
+            .filter(
+                has_text=(
+                    'Defense changed since then, '
+                    'so Undo was not applied.'
+                )
+            )
+            .last
+        )
+
+        expect(
+            warning
+        ).to_be_visible(
+            timeout=5_000
+        )
+
+        after = planner_rotation_snapshot(
+            page
+        )
+
+        # The newer edit survives.
+        assert (
+            after[changed_target]['SS']
+            == 'Second Sam'
+        )
+
+        # More importantly, Undo must not have restored ANY of the
+        # untouched targets either. This proves all-or-nothing behavior.
+        for inning in targets:
+            if inning == changed_target:
+                continue
+
+            assert (
+                after[inning]
+                == source_alignment
+            ), (
+                'stale Undo partially restored '
+                f'Inning {inning}'
+            )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+    finally:
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+
+def test_plan_options_reorder_settles_after_patch(
+    page: Page,
+    coachboard_url: str,
+):
+    """A normal MutationObserver-triggered patch must not keep moving
+    the Plan Options children and create a perpetual observer/rAF loop."""
+    login(page, coachboard_url)
+
+    game_id = create_planning_game(
+        page,
+        coachboard_url,
+        'Plan Options Mutation Opponent',
+    )
+
+    try:
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            panel(page)
+        ).to_be_visible(
+            timeout=15_000
+        )
+
+        expect(
+            page.get_by_role(
+                'button',
+                name=re.compile(
+                    'Plan Options'
+                ),
+            )
+        ).to_be_visible(
+            timeout=10_000
+        )
+
+        initial = page.evaluate(
+            """() => {
+                const title =
+                    document.getElementById(
+                        'rotation-editor-title'
+                    );
+
+                const menu =
+                    title
+                        ?.closest(
+                            '.card-header'
+                        )
+                        ?.querySelector(
+                            '.dropdown-toggle'
+                        )
+                        ?.nextElementSibling;
+
+                if (!menu) {
+                    throw new Error(
+                        'Plan Options menu not found'
+                    );
+                }
+
+                window.__gmMenuMutationCount =
+                    0;
+
+                window.__gmMenuMutationObserver
+                    ?.disconnect();
+
+                window.__gmMenuMutationObserver =
+                    new MutationObserver(
+                        records => {
+                            window
+                                .__gmMenuMutationCount +=
+                                records.filter(
+                                    record =>
+                                        record.type
+                                        === 'childList'
+                                ).length;
+                        }
+                    );
+
+                window
+                    .__gmMenuMutationObserver
+                    .observe(
+                        menu,
+                        {
+                            childList:true,
+                        }
+                    );
+
+                // Trigger the app's body-wide observer and therefore
+                // one normal queuePatch()/patch() cycle.
+                document.body
+                    .classList.add(
+                        'gm-test-patch-pulse'
+                    );
+
+                document.body
+                    .classList.remove(
+                        'gm-test-patch-pulse'
+                    );
+
+                return {
+                    ordered:
+                        menu.dataset.gmOrdered,
+                    childCount:
+                        menu.children.length,
+                };
+            }"""
+        )
+
+        assert (
+            initial['ordered']
+            == '1'
+        )
+
+        assert (
+            initial['childCount']
+            >= 11
+        )
+
+        page.wait_for_timeout(
+            600
+        )
+
+        mutations = page.evaluate(
+            """() => {
+                const count =
+                    window
+                        .__gmMenuMutationCount
+                    || 0;
+
+                window
+                    .__gmMenuMutationObserver
+                    ?.disconnect();
+
+                return count;
+            }"""
+        )
+
+        assert mutations == 0, (
+            'Plan Options children kept moving '
+            f'after patch settled: {mutations} '
+            'childList mutation(s)'
+        )
+
+    finally:
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+
+def test_plan_change_confirm_double_tap_creates_only_one_planned_change(
+    page: Page,
+    coachboard_url: str,
+):
+    """Two rapid taps on Plan Change during the Bootstrap fade-out must
+    execute the pending action only once."""
+    login(page, coachboard_url)
+
+    game_id = create_planning_game(
+        page,
+        coachboard_url,
+        'Plan Change Double Tap Opponent',
+    )
+
+    try:
+        page.goto(
+            f'{coachboard_url}/game/{game_id}',
+            wait_until='domcontentloaded',
+        )
+
+        expect(
+            panel(page)
+        ).to_be_visible(
+            timeout=15_000
+        )
+
+        current = page.evaluate(
+            """() =>
+                document.querySelector(
+                    'input[name="inning-radio"]:checked'
+                )?.value
+            """
+        )
+
+        assert current
+        assert float(current).is_integer()
+
+        page.get_by_role(
+            'button',
+            name=re.compile(
+                'Plan Options'
+            ),
+        ).click()
+
+        plan_change = page.get_by_role(
+            'button',
+            name=re.compile(
+                'Plan a Change During This Inning'
+            ),
+        )
+
+        expect(
+            plan_change
+        ).to_be_visible(
+            timeout=5_000
+        )
+
+        plan_change.click()
+
+        modal = page.locator(
+            '#gmCoachConfirmModal'
+        )
+
+        expect(
+            modal
+        ).to_be_visible(
+            timeout=5_000
+        )
+
+        confirm = modal.locator(
+            '[data-gm-confirm-action]'
+        )
+
+        expect(
+            confirm
+        ).to_have_text(
+            'Plan Change'
+        )
+
+        # Dispatch both clicks synchronously so both occur inside the
+        # modal fade-out window. Without the action-consumption guard,
+        # both hidden.bs.modal handlers execute the pending action.
+        # Confirm is enabled only after Bootstrap has fully shown the sheet.
+        expect(confirm).to_be_enabled(timeout=5_000)
+
+        page.evaluate(
+            """() => {
+                const button =
+                    document.querySelector(
+                        '#gmCoachConfirmModal [data-gm-confirm-action]'
+                    );
+
+                if (!button) {
+                    throw new Error(
+                        'confirm button not found'
+                    );
+                }
+
+                button.click();
+                button.click();
+            }"""
+        )
+
+        expect(
+            modal
+        ).not_to_be_visible(
+            timeout=10_000
+        )
+
+        expect(
+            save_status(page)
+        ).to_contain_text(
+            'Saved',
+            timeout=10_000,
+        )
+
+        keys = canonical_inning_keys(
+            page
+        )
+
+        base_number = int(
+            float(current)
+        )
+
+        planned = [
+            key
+            for key in keys
+            if (
+                not float(key).is_integer()
+                and int(float(key))
+                == base_number
+            )
+        ]
+
+        assert planned == [
+            f'{base_number}.1'
+        ], (
+            'rapid double tap created more than '
+            f'one planned change: {planned}'
+        )
+
+    finally:
+        cleanup(
+            page,
+            coachboard_url,
+            game_id,
+        )

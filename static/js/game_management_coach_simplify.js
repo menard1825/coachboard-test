@@ -952,9 +952,34 @@
       )
       ?.addEventListener(
         'click',
-        () => {
+        event => {
+          // Confirm is one-shot while Bootstrap is closing the sheet.
+          // A second tap must not call hide() again during the fade,
+          // because competing hide calls can leave the reusable modal
+          // stuck in its visible/transitioning state.
+          if (
+            modal.dataset
+              .gmConfirmClosing === '1'
+          ) {
+            return;
+          }
+
+          modal.dataset
+            .gmConfirmClosing = '1';
+
+          const confirmButton =
+            event.currentTarget;
+
+          confirmButton.disabled =
+            true;
+
           const action =
             modal._gmConfirmAction;
+
+          // Consume the pending action immediately as an independent
+          // guard against executing it more than once.
+          modal._gmConfirmAction =
+            null;
 
           const instance =
             bootstrap.Modal
@@ -965,6 +990,12 @@
           modal.addEventListener(
             'hidden.bs.modal',
             () => {
+              delete modal.dataset
+                .gmConfirmClosing;
+
+              confirmButton.disabled =
+                false;
+
               if (
                 typeof action ===
                 'function'
@@ -1025,10 +1056,30 @@
         'btn-primary',
         !danger
       );
+
+      // Do not allow confirmation while Bootstrap is still opening
+      // the modal. hide() can be ignored during the show transition,
+      // which would otherwise leave the one-shot closing guard stuck.
+      confirm.disabled =
+        true;
     }
+
+    delete modal.dataset
+      .gmConfirmClosing;
 
     modal._gmConfirmAction =
       onConfirm;
+
+    modal.addEventListener(
+      'shown.bs.modal',
+      () => {
+        if (confirm) {
+          confirm.disabled =
+            false;
+        }
+      },
+      {once:true}
+    );
 
     bootstrap.Modal
       .getOrCreateInstance(
@@ -2270,12 +2321,25 @@
         ?.closest('li'),
     ].filter(Boolean);
 
-    visibleOrder.forEach(
-      item =>
-        menu.appendChild(
-          item
-        )
-    );
+    // Reordering existing children creates childList mutations.
+    // Because this module observes body mutations and queues patch(),
+    // doing this on every patch creates a perpetual observer/rAF loop.
+    // Once all expected items exist, establish the coach-facing order
+    // exactly once.
+    if (
+      visibleOrder.length >= 11 &&
+      menu.dataset.gmOrdered !== '1'
+    ) {
+      visibleOrder.forEach(
+        item =>
+          menu.appendChild(
+            item
+          )
+      );
+
+      menu.dataset.gmOrdered =
+        '1';
+    }
   }
 
   function ensureApplyControls(
