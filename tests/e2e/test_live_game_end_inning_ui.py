@@ -225,10 +225,11 @@ def test_phone_next_inning_uses_bottom_dock_without_covering_content(
     page: Page,
     coachboard_url: str,
 ):
+    # Match the iPhone 16 Pro Max viewport used during manual review.
     page.set_viewport_size(
         {
-            'width': 390,
-            'height': 844,
+            'width': 440,
+            'height': 956,
         }
     )
 
@@ -253,6 +254,23 @@ def test_phone_next_inning_uses_bottom_dock_without_covering_content(
             page.locator('#cb-now-next-switch')
         ).to_be_visible(timeout=15_000)
 
+        end_inning = page.locator(
+            '#liveEndInningBtn'
+        )
+
+        # End Inning must be present on the normal On the Field screen.
+        expect(
+            end_inning
+        ).to_be_visible()
+
+        expect(
+            end_inning.locator(
+                '.coach-action-title'
+            )
+        ).to_have_text(
+            'End 1st → Start 2nd'
+        )
+
         page.locator(
             '#cb-now-next-switch [data-now-next="next"]'
         ).click()
@@ -261,9 +279,18 @@ def test_phone_next_inning_uses_bottom_dock_without_covering_content(
             page.locator('#live-board-prep-v3')
         ).to_be_visible(timeout=10_000)
 
+        # It must remain visible while viewing/editing the next inning.
         expect(
-            page.locator('#liveEndInningBtn')
+            end_inning
         ).to_be_visible()
+
+        expect(
+            end_inning.locator(
+                '.coach-action-title'
+            )
+        ).to_have_text(
+            'End 1st → Start 2nd'
+        )
 
         page.wait_for_timeout(100)
 
@@ -304,6 +331,11 @@ def test_phone_next_inning_uses_bottom_dock_without_covering_content(
                 dockTop: dock.top,
                 dockBottom: dock.bottom,
                 dockPosition: dockStyle.position,
+                dockWidth: dock.width,
+                dockPaddingLeft:
+                  parseFloat(dockStyle.paddingLeft) || 0,
+                dockPaddingRight:
+                  parseFloat(dockStyle.paddingRight) || 0,
                 endWidth: end.width,
                 nextBottom: next.bottom,
                 viewportWidth: window.innerWidth,
@@ -325,9 +357,21 @@ def test_phone_next_inning_uses_bottom_dock_without_covering_content(
             - geometry['viewportHeight']
         ) <= 2, geometry
 
-        # Nearly full phone width with normal page gutters.
+        # The fixed dock owns normal outer gutters plus its own
+        # horizontal padding. The End Inning button should fill
+        # the usable width inside that dock.
+        expected_button_width = (
+            geometry['dockWidth']
+            - geometry['dockPaddingLeft']
+            - geometry['dockPaddingRight']
+        )
+
+        assert geometry['dockWidth'] >= (
+            geometry['viewportWidth'] - 18
+        ), geometry
+
         assert geometry['endWidth'] >= (
-            geometry['viewportWidth'] - 30
+            expected_button_width - 2
         ), geometry
 
         # Reserved bottom clearance lets all Next Inning content move

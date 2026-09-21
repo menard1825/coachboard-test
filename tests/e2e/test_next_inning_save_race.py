@@ -600,14 +600,6 @@ def test_next_inning_labels_follow_authoritative_inning(
 
         expect(
             next_board.locator(
-                '.cb-next-up-pill'
-            )
-        ).to_have_text(
-            'UP NEXT'
-        )
-
-        expect(
-            next_board.locator(
                 '.cb-next-title'
             )
         ).to_have_text(
@@ -628,16 +620,14 @@ def test_next_inning_labels_follow_authoritative_inning(
                 '[data-next-use-current]'
             )
         ).to_have_text(
-            'Keep 1st Inning Defense'
+            'Use 1st Inning Defense'
         )
 
         expect(
             next_board.locator(
                 '.cb-next-ready'
             )
-        ).to_have_text(
-            '✓ 2nd inning defense ready'
-        )
+        ).to_have_count(0)
 
         # At phone width the longer tab label must still fit its tab.
         assert next_tab.evaluate(
@@ -666,15 +656,6 @@ def test_next_inning_labels_follow_authoritative_inning(
 
         expect(
             next_board.locator(
-                '.cb-next-up-pill'
-            )
-        ).to_have_text(
-            'UP NEXT',
-            timeout=10_000,
-        )
-
-        expect(
-            next_board.locator(
                 '.cb-next-title'
             )
         ).to_have_text(
@@ -695,16 +676,14 @@ def test_next_inning_labels_follow_authoritative_inning(
                 '[data-next-use-current]'
             )
         ).to_have_text(
-            'Keep 2nd Inning Defense'
+            'Use 2nd Inning Defense'
         )
 
         expect(
             next_board.locator(
                 '.cb-next-ready'
             )
-        ).to_have_text(
-            '✓ 3rd inning defense ready'
-        )
+        ).to_have_count(0)
 
     finally:
         cleanup_game(

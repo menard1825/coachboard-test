@@ -170,18 +170,6 @@
       );
     });
 
-    if (!items.length) {
-      const inningLabel = inningOrdinal(
-        latest?.next_inning || ''
-      );
-
-      items.push(
-        '<div class="cb-next-ready">' +
-        `✓ ${esc(inningLabel)} inning defense ready` +
-        '</div>'
-      );
-    }
-
     return items.join('');
   }
 
@@ -207,8 +195,8 @@
     }
 
     return nextLabel
-      ? `Defense changed for the ${nextLabel}`
-      : 'Defense changed';
+      ? `Changes saved for the ${nextLabel}`
+      : 'Changes saved';
   }
 
   function selectionHelp() {
@@ -601,24 +589,6 @@
         border-bottom:1px solid #e7ebef;
       }
 
-      #${CARD_ID} .cb-next-up-pill{
-        display:inline-flex;
-        align-items:center;
-        min-height:24px;
-        margin-bottom:4px;
-        padding:4px 8px;
-        border:1px solid #b7c8e8;
-        border-radius:999px;
-        background:#eef4ff;
-        color:#254f87;
-        font-size:.58rem;
-        font-weight:900;
-        line-height:1;
-        letter-spacing:.06em;
-        text-transform:uppercase;
-        white-space:nowrap;
-      }
-
       #${CARD_ID} .cb-next-title{
         color:#172033;
         font-size:1.05rem;
@@ -853,8 +823,7 @@
         gap:5px;
       }
 
-      #${CARD_ID} .cb-next-warning,
-      #${CARD_ID} .cb-next-ready{
+      #${CARD_ID} .cb-next-warning{
         border-radius:8px;
         padding:7px 8px;
         font-size:.68rem;
@@ -871,12 +840,6 @@
         border-color:#efb5ae;
         background:#fff1ef;
         color:#912d28;
-      }
-
-      #${CARD_ID} .cb-next-ready{
-        border:1px solid #b8ddc4;
-        background:#edf8f1;
-        color:#176b38;
       }
 
       #${CARD_ID} .cb-next-error{
@@ -927,6 +890,47 @@
 
         #${CARD_ID} .cb-next-selection{
           margin-bottom:6px;
+        }
+
+        /*
+         * Live game actions are a phone dock.
+         *
+         * Keep this owner here with the NOW/NEXT surface so the canonical
+         * End Inning button cannot disappear at larger phone widths such
+         * as the 440px iPhone 16 Pro Max viewport.
+         */
+        html body.cb-dugout .coach-live-shell{
+          padding-bottom:
+            calc(96px + env(safe-area-inset-bottom))!important;
+        }
+
+        html body.cb-dugout #coach-action-slot{
+          position:fixed!important;
+          left:8px!important;
+          right:8px!important;
+          bottom:0!important;
+          z-index:1080!important;
+          display:grid!important;
+          grid-template-columns:
+            repeat(2,minmax(0,1fr))!important;
+          gap:8px!important;
+          margin:0!important;
+          padding:
+            8px 8px
+            calc(8px + env(safe-area-inset-bottom))!important;
+          border-top:1px solid #d9dee5;
+          background:rgba(245,246,248,.98);
+          box-shadow:0 -6px 18px rgba(16,24,40,.10);
+        }
+
+        html body.cb-dugout
+        #coach-action-slot.cb-single-live-action{
+          grid-template-columns:1fr!important;
+        }
+
+        html body.cb-dugout
+        #coach-action-slot #liveEndInningBtn{
+          display:flex!important;
         }
       }
 
@@ -1357,10 +1361,20 @@
 
   function syncLiveActions() {
     const changePitcher = $('liveChangePitcherBtn');
+    const endInning = $('liveEndInningBtn');
     const undo = $('liveUndoBtn');
     const actionSlot = $('coach-action-slot');
 
     syncUpcomingInningLabels();
+
+    if (actionSlot) {
+      actionSlot.removeAttribute('hidden');
+    }
+
+    if (endInning) {
+      endInning.removeAttribute('hidden');
+      endInning.classList.remove('d-none');
+    }
 
     // On the Field owns two live actions. NEXT and Pregame Plan hide
     // Change Pitcher, so their phone dock should become one full-width
@@ -1543,9 +1557,6 @@
     card.innerHTML = `
       <div class="cb-next-head">
         <div>
-          <div class="cb-next-up-pill">
-            UP NEXT
-          </div>
           <div class="cb-next-title">
             ${esc(inningLabel)} Inning Defense
           </div>
@@ -1575,8 +1586,8 @@
           >
             ${
               currentLabel
-                ? `Keep ${esc(currentLabel)} Inning Defense`
-                : 'Keep Current Defense'
+                ? `Use ${esc(currentLabel)} Inning Defense`
+                : 'Use Current Defense'
             }
           </button>
 

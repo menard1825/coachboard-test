@@ -11,19 +11,18 @@ def test_next_inning_ux_uses_authoritative_next_inning():
     assert "latest?.next_inning" in source
     assert "function inningOrdinal(value)" in source
     assert "`${inningLabel} Inning`" in source
-    assert "UP NEXT" in source
     assert "${esc(inningLabel)} Inning Defense" in source
     assert "`End ${currentLabel} → Start ${inningLabel}`" in source
-    assert "`Keep ${esc(currentLabel)} Inning Defense`" in source
-    assert "`✓ ${esc(inningLabel)} inning defense ready`" in source
+    assert "`Use ${esc(currentLabel)} Inning Defense`" in source
 
 
-def test_next_inning_ux_has_distinct_information_pill():
+def test_next_inning_ux_avoids_redundant_status_chrome():
     source = BOARD.read_text()
 
-    assert ".cb-next-up-pill{" in source
-    assert "background:#eef4ff;" in source
-    assert "color:#254f87;" in source
+    assert 'class="cb-next-up-pill"' not in source
+    assert ".cb-next-up-pill{" not in source
+    assert "cb-next-ready" not in source
+    assert "inning defense ready" not in source
 
 def test_idle_next_board_does_not_show_step_one_instructions():
     source = BOARD.read_text()
@@ -42,10 +41,20 @@ def test_next_inning_ux_uses_baseball_language_not_next_state_language():
     source = BOARD.read_text()
 
     assert "Same defense as the ${currentLabel}" in source
-    assert "Defense changed for the ${nextLabel}" in source
+    assert "Changes saved for the ${nextLabel}" in source
     assert "Pregame plan for the ${nextLabel}" in source
 
     assert "NEXT is ready" not in source
     assert "NEXT edited" not in source
     assert "Current defense copied to NEXT" not in source
     assert "NEXT restored" not in source
+
+def test_phone_live_actions_have_an_explicit_end_inning_owner():
+    source = BOARD.read_text()
+
+    assert "#coach-action-slot{" in source
+    assert "position:fixed!important;" in source
+    assert "#coach-action-slot.cb-single-live-action{" in source
+    assert "#coach-action-slot #liveEndInningBtn{" in source
+    assert "endInning.removeAttribute('hidden')" in source
+    assert "endInning.classList.remove('d-none')" in source
