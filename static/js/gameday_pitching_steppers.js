@@ -122,7 +122,13 @@
     loadOnce('/static/js/pregame_quick_start.js', 'pregame-quick-start');
     loadOnce('/static/js/pregame_quick_start_modals.js', 'pregame-quick-start-modals');
     loadOnce('/static/js/live_game_dugout_mode.js', 'live-dugout-mode');
-    loadOnce('/static/js/live_game_clock_controls.js', 'live-clock-controls');
+    // live_game_clock_controls.js is loaded by live_game_contract.js's
+    // ensureClockControls(). Loading it here as well gave it two <script> tags:
+    // that loader looks for its own data-live-clock-controls marker, which the
+    // contract's tag does not carry, so the module executed twice and ran two
+    // five-second /clock pollers. Both files are unconditional <script> tags in
+    // game_management.html with the same /game/<id> route gate, so the
+    // contract's loader already covers every context this one did.
     loadOnce('/static/js/live_game_command_center.js', 'live-command-center');
     loadOnce('/static/js/live_game_connection_status.js', 'live-connection-status');
     installPitcherStatusStabilizer();

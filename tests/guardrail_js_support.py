@@ -350,6 +350,82 @@ def effective_url(site):
     return base
 
 
+def select_page_load_sites(sites, shells, reachable):
+    """Filter ``sites`` down to the ones that occur on one rendered page.
+
+    Pure, so it can be exercised against a synthetic graph. Each kind of load
+    site answers "is this on the page?" differently, and conflating them is a
+    real source of wrong answers:
+
+    ``template``
+        On the page only if the tag is in the rendered template or the shell
+        it extends. A tag in some other template is a different page.
+
+    ``injected``
+        Always included. Every server-side injection in this tree lives in a
+        hook gated on ``/game/<id>``, which is the page this is used for. A
+        second injector on another route would need this revisited.
+
+    ``dynamic``
+        On the page only if the *loader module* is itself reachable. Testing
+        the loaded module instead is wrong: a module reachable via one loader
+        would drag in load sites from unrelated loaders that the page never
+        runs -- e.g. an orphan module that also loads clock controls would be
+        counted against /game/<id> purely because the contract loads clock
+        controls too.
+    """
+    selected = []
+    for site in sites:
+        kind = site['kind']
+        if kind == TEMPLATE:
+            if site['loader'] in shells:
+                selected.append(site)
+        elif kind == INJECTED:
+            selected.append(site)
+        elif site['loader'] in reachable:
+            selected.append(site)
+    return selected
+
+
+def page_entry_modules(shells):
+    """Modules a page loads before any JavaScript runs."""
+    return {
+        site['module']
+        for site in template_load_sites() + injected_load_sites()
+        if site['kind'] == INJECTED or site['loader'] in shells
+    }
+
+
+def page_shells(template):
+    """``template`` plus the shell it extends, if any."""
+    shells = {template}
+    source = (TEMPLATE_DIR / template).read_text()
+    match = re.search(r"""\{%\s*extends\s*['"]([^'"]+)['"]""", source)
+    if match:
+        shells.add(match.group(1))
+    return shells
+
+
+def page_load_sites(template):
+    """Every load site that occurs when ``template`` is the rendered page."""
+    shells = page_shells(template)
+    reachable = walk(load_graph(), page_entry_modules(shells))
+    return select_page_load_sites(all_load_sites(), shells, reachable)
+
+
+def page_loader_files(template):
+    """``{module: {loader files}}`` for one rendered page.
+
+    Keyed by loader *file*: two sites inside one loader are that module's own
+    branching (an if/else, or two mutually exclusive route blocks) and are not
+    two loaders racing to put the same script on the page.
+    """
+    by_module = {}
+    for site in page_load_sites(template):
+        by_module.setdefault(site['module'], set()).add(site['loader'])
+    return by_module
+
+
 def modules_loaded_under_multiple_urls():
     """Modules whose load sites do not agree on a single URL.
 
