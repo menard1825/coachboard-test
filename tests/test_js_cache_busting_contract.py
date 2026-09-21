@@ -7,26 +7,23 @@ last week keeps running last week's copy against this week's backend. That is
 the quiet failure mode behind "the fix is deployed but the coach still sees the
 old behaviour".
 
-CoachBoard already solves this correctly in two places:
+CoachBoard now has exactly one answer. ``asset_versioning.py`` establishes the
+application asset version, ``templates/_coachboard_assets.html`` publishes it
+to the browser as ``window.CoachBoardAssets``, and all four loading
+mechanisms -- a template ``<script src>``, a runtime ``<script>`` injection, a
+``document.write`` during parse, and a server-side HTML rewrite -- build their
+URLs from it.
 
-* templates pass ``v=css_version``;
-* ``blueprints/live_game_ui.py`` injects scripts through ``_versioned_static``,
-  which versions by file mtime -- the only mechanism here that changes when the
-  file itself changes.
-
-Thirteen other load sites hardcode a date, and ten version nothing at
-all -- 23 in total.
-
-These tests do not fail the suite for the existing violations. They baseline
-them, and the baseline is enforced in *both* directions: a new violation fails,
-and a violation that gets fixed without being removed from the baseline also
-fails. That is what lets the guardrail tighten by itself as the next slice
-fixes each site, and go fully strict the moment the baseline is empty.
+``KNOWN_STALE_LOAD_SITES`` is empty. It previously held 23 entries: 13 load
+sites with a hand-typed date and 10 with no version at all. Those were
+corrected rather than excused, so the ratchet below now enforces the contract
+outright, and any regression fails immediately.
 """
 
 import pytest
 
 from guardrail_js_support import (
+    TEMPLATE_DIR,
     FROZEN,
     UNVERSIONED,
     VERSIONED,
@@ -37,41 +34,12 @@ from guardrail_js_support import (
 )
 
 
-#: Load sites that do not re-fetch when their module changes, as of
-#: 1a067777472d8fb5f3c62ca0bb024b621c6f4005.
+#: Load sites permitted not to re-fetch when their module changes.
 #:
-#: Each entry is ``(loader, module, status)``. Remove an entry when its load
-#: site is fixed -- the tests below will tell you if you forget. When this set
-#: is empty the contract is enforced strictly with no further edits.
-KNOWN_STALE_LOAD_SITES = frozenset({
-    # Hand-typed version strings, frozen at the date someone last thought
-    # about them.
-    ('coachboard_ui.js', 'fair_play_assistant.js', FROZEN),
-    ('coachboard_ui.js', 'home_dashboard.js', FROZEN),
-    ('coachboard_ui.js', 'pitching_preferences.js', FROZEN),
-    ('gameday_pitching_steppers.js', 'live_game_dugout_mode.js', FROZEN),
-    ('live_game_contract.js', 'live_game_clock_controls.js', FROZEN),
-    ('live_game_inning_clarity.js', 'live_game_feedback_pass.js', FROZEN),
-    ('live_game_sync_status.js', 'live_game_bench_report.js', FROZEN),
-    ('live_game_v2.js', 'live_game_pitcher_change_complete.js', FROZEN),
-    ('navigation_v2.js', 'live_game_sync_status.js', FROZEN),
-    ('pitching_dashboard_v3.js', 'pitching_dugout_mobile.js', FROZEN),
-    ('pitching_dashboard_v3.js', 'pitching_scan_compact.js', FROZEN),
-    ('touch_reorder_guard.js', 'getting_started_home.js', FROZEN),
-    ('touch_reorder_guard.js', 'mobile_game_day_fields.js', FROZEN),
-
-    # No version at all -- cached until the browser decides otherwise.
-    ('auth_base.html', 'client_timezone.js', UNVERSIONED),
-    ('game_correction.html', 'postgame_correction.js', UNVERSIONED),
-    ('gameday_pitching_steppers.js', 'live_game_clock_controls.js', UNVERSIONED),
-    ('gameday_pitching_steppers.js', 'live_game_command_center.js', UNVERSIONED),
-    ('gameday_pitching_steppers.js', 'live_game_connection_status.js', UNVERSIONED),
-    ('gameday_pitching_steppers.js', 'pregame_quick_start.js', UNVERSIONED),
-    ('gameday_pitching_steppers.js', 'pregame_quick_start_modals.js', UNVERSIONED),
-    ('gameday_pitching_steppers.js', 'pregame_starting_defense_scope.js', UNVERSIONED),
-    ('live_game_field_realism.js', 'live_game_pitcher_change_complete.js', UNVERSIONED),
-    ('live_game_sync_status.js', 'live_game_inning_clarity.js', UNVERSIONED),
-})
+#: Empty, and it should stay that way. Each entry would be ``(loader, module,
+#: status)``. The two tests below enforce it in both directions, so adding an
+#: entry here to silence a failure is visible in review rather than silent.
+KNOWN_STALE_LOAD_SITES = frozenset()
 
 
 def _violations():
@@ -143,18 +111,62 @@ def test_cache_busting_baseline_has_no_stale_entries():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        'Known defect at 1a06777: 23 load sites do not re-fetch when their '
-        'module changes. Scheduled for the cache-busting slice. When that '
-        'lands, empty KNOWN_STALE_LOAD_SITES and delete this xfail marker.'
-    ),
-)
 def test_every_load_site_is_versioned():
-    """The contract this suite is aiming at, recorded as a visible defect.
+    """The contract, now enforced outright.
 
-    ``strict=True`` means that if this ever passes while the marker is still
-    here, the suite fails -- so the marker cannot outlive the defect.
+    Held as a baselined xfail while 23 load sites carried hand-typed or absent
+    versions. Those were corrected in fix/asset-cache-busting-20260921 rather
+    than excused, so the baseline above is empty and this is a plain assertion.
     """
     assert not _violations()
+
+
+# --------------------------------------------------------------------------
+# The mechanism must actually reach every page
+# --------------------------------------------------------------------------
+
+def test_every_page_shell_publishes_the_asset_version():
+    """A shell that forgets the partial breaks every loader on its pages.
+
+    ``window.CoachBoardAssets`` is defined by templates/_coachboard_assets.html
+    and consumed by every dynamic loader. A new page shell that does not
+    include it would leave those loaders calling into an undefined object, so
+    this is checked rather than assumed. Shells are templates that extend
+    nothing and load scripts of their own.
+    """
+    missing = []
+
+    for path in sorted(TEMPLATE_DIR.glob('*.html')):
+        source = path.read_text()
+        if '{% extends' in source:
+            continue
+        if '<script' not in source:
+            continue  # a macro or fragment, not a page shell
+        if '_coachboard_assets.html' in source:
+            continue
+        if 'CoachBoardAssets' in source:
+            continue  # this file *is* the partial
+        missing.append(path.name)
+
+    assert not missing, (
+        'these page shells load scripts but do not include '
+        f"_coachboard_assets.html, so window.CoachBoardAssets is undefined on "
+        f'their pages: {missing}'
+    )
+
+
+def test_the_asset_partial_defines_the_helper_once():
+    """One owner, as documented in asset_versioning.py."""
+    partial = (TEMPLATE_DIR / '_coachboard_assets.html').read_text()
+
+    assert 'window.CoachBoardAssets' in partial
+    assert 'coachboard-asset-version' in partial
+
+    definitions = [
+        path.name
+        for path in TEMPLATE_DIR.glob('*.html')
+        if 'window.CoachBoardAssets =' in path.read_text()
+    ]
+    assert definitions == ['_coachboard_assets.html'], (
+        f'the asset helper is defined in more than one place: {definitions}'
+    )

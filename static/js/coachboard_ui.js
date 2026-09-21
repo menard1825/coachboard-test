@@ -48,7 +48,7 @@
     const favicon = document.querySelector('link[rel~="icon"]');
     if (!favicon) return;
     favicon.type = 'image/svg+xml';
-    favicon.href = '/static/coachboard-icon.svg?v=1';
+    favicon.href = window.CoachBoardAssets.url('/static/coachboard-icon.svg');
   }
 
   function ensureHomeNavigation() {
@@ -351,7 +351,7 @@
     if (!shouldLoad || document.querySelector('script[data-cb-fair-play]')) return;
 
     const script = document.createElement('script');
-    script.src = '/static/js/fair_play_assistant.js?v=20260819-1';
+    script.src = window.CoachBoardAssets.url('/static/js/fair_play_assistant.js');
     script.dataset.cbFairPlay = 'true';
     document.body.appendChild(script);
   }
@@ -361,7 +361,7 @@
     if (!shouldLoad || document.querySelector('script[data-cb-pitching-preferences]')) return;
 
     const script = document.createElement('script');
-    script.src = '/static/js/pitching_preferences.js?v=20260820-1';
+    script.src = window.CoachBoardAssets.url('/static/js/pitching_preferences.js');
     script.dataset.cbPitchingPreferences = 'true';
     document.body.appendChild(script);
   }
@@ -372,14 +372,14 @@
     if (!document.querySelector('link[data-cb-home-dashboard]')) {
       const style = document.createElement('link');
       style.rel = 'stylesheet';
-      style.href = '/static/css/home_dashboard.css?v=20260820-2';
+      style.href = window.CoachBoardAssets.url('/static/css/home_dashboard.css');
       style.dataset.cbHomeDashboard = 'true';
       document.head.appendChild(style);
     }
 
     if (!document.querySelector('script[data-cb-home-dashboard]')) {
       const script = document.createElement('script');
-      script.src = '/static/js/home_dashboard.js?v=20260820-2';
+      script.src = window.CoachBoardAssets.url('/static/js/home_dashboard.js');
       script.dataset.cbHomeDashboard = 'true';
       document.body.appendChild(script);
     }

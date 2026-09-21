@@ -29,24 +29,14 @@ from guardrail_js_support import (
 )
 
 
-#: Modules whose load sites disagree about the URL, as of
-#: 1a067777472d8fb5f3c62ca0bb024b621c6f4005. Each spelling is a separate
-#: browser download; whether it is also a separate *execution* depends on the
-#: module guarding itself.
-KNOWN_MULTI_URL_MODULES = frozenset({
-    # Loaded unversioned by auth_base.html and versioned by base.html.
-    'client_timezone.js',
-    # Loaded unversioned by live_game_sync_status.js and versioned by
-    # game_management.html.
-    'live_game_inning_clarity.js',
-    # Three spellings: server-injected (mtime), live_game_v2.js
-    # (?v=simple-live-picker-v1) and live_game_field_realism.js (bare). The
-    # module self-guards on window.CBPitcherChangeComplete.version === 6, so
-    # only the downloads are duplicated, not the controller.
-    'live_game_pitcher_change_complete.js',
-    # ?v=test2 from live_game_contract.js, bare from gameday_pitching_steppers.js.
-    'live_game_clock_controls.js',
-})
+#: Modules permitted to be loaded under more than one URL.
+#:
+#: Empty. It previously held four modules -- client_timezone.js,
+#: live_game_inning_clarity.js, live_game_clock_controls.js and
+#: live_game_pitcher_change_complete.js, the last reachable under three
+#: spellings. A single asset version across all four loading mechanisms means
+#: every loader now produces the same URL for a given module.
+KNOWN_MULTI_URL_MODULES = frozenset()
 
 #: Templates on disk that no view renders and no template includes.
 KNOWN_ORPHAN_TEMPLATES = frozenset({
@@ -138,22 +128,38 @@ def test_scanner_reads_a_concatenated_version_as_frozen():
     ]
 
 
-def test_scanner_recognises_a_runtime_version_helper():
-    """A loader that derives its version at runtime counts as versioned.
+def test_scanner_recognises_the_canonical_asset_helper():
+    """A URL built through window.CoachBoardAssets.url() counts as versioned.
 
-    This is the pattern navigation_v2.js uses, and the one the cleanup slice
-    should spread. The scanner resolves it through an indirection chain:
-    ``load`` versions only because it calls ``versioned``, which reads
-    ``document.currentScript``.
+    This is the one sanctioned mechanism: the version comes from the server via
+    templates/_coachboard_assets.html, so the URL changes when the deployment
+    does and is identical across every loader.
     """
     sites = scan_js_source('probe.js', """
-      function versioned(src) {
-        return src + new URL(document.currentScript.src).search;
+      var s = document.createElement('script');
+      s.src = window.CoachBoardAssets.url('/static/js/target.js');
+      document.head.appendChild(s);
+    """)
+
+    assert [(site['module'], site['status']) for site in sites] == [
+        ('target.js', VERSIONED)
+    ]
+
+
+def test_scanner_follows_a_local_wrapper_around_the_helper():
+    """Loaders that route their src through a local function still count.
+
+    Resolved to a fixpoint, so an indirection chain is followed: ``load``
+    versions only because it calls ``wrap``, which calls the canonical helper.
+    """
+    sites = scan_js_source('probe.js', """
+      function wrap(src) {
+        return window.CoachBoardAssets.url(src);
       }
 
       function load(src) {
         var s = document.createElement('script');
-        s.src = versioned(src);
+        s.src = wrap(src);
         document.head.appendChild(s);
       }
 
@@ -162,6 +168,37 @@ def test_scanner_recognises_a_runtime_version_helper():
 
     assert [(site['module'], site['status']) for site in sites] == [
         ('target.js', VERSIONED)
+    ]
+
+
+def test_scanner_reads_a_script_written_during_parse():
+    """document.write is a fourth loading mechanism and must not be invisible.
+
+    live_game_inning_clarity.js uses it while the document is still parsing. An
+    earlier version of this scan matched only ``.src =`` and loader calls, so
+    it missed that load site entirely -- and with it, one of the competing URLs
+    for live_game_feedback_pass.js.
+    """
+    sites = scan_js_source('probe.js', """
+      document.write(
+        '<script src="' +
+        window.CoachBoardAssets.url('/static/js/target.js') +
+        '" data-x="1"></' + 'script>'
+      );
+    """)
+
+    assert [(site['module'], site['status']) for site in sites] == [
+        ('target.js', VERSIONED)
+    ]
+
+
+def test_scanner_reads_an_unversioned_written_tag_as_unversioned():
+    sites = scan_js_source('probe.js', """
+      document.write('<script src="/static/js/target.js"></' + 'script>');
+    """)
+
+    assert [(site['module'], site['status']) for site in sites] == [
+        ('target.js', UNVERSIONED)
     ]
 
 
@@ -269,16 +306,11 @@ def test_multi_url_baseline_has_no_stale_entries():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        'Known defect at 1a06777: four modules are loaded under more than one '
-        'URL. Expected to resolve with the cache-busting slice, which gives '
-        'every load site the same versioning scheme. Then empty '
-        'KNOWN_MULTI_URL_MODULES and delete this marker.'
-    ),
-)
 def test_every_module_is_loaded_under_exactly_one_url():
+    """One module, one URL, one cache entry, one execution.
+
+    Held as a baselined xfail while four modules had competing spellings.
+    """
     assert not modules_loaded_under_multiple_urls()
 
 

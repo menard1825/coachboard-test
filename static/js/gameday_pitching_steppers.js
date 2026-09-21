@@ -32,7 +32,7 @@
   function loadOnce(src, datasetKey) {
     if (document.querySelector(`script[data-${datasetKey}]`)) return;
     const script = document.createElement('script');
-    script.src = src;
+    script.src = window.CoachBoardAssets.url(src);
     script.setAttribute(`data-${datasetKey}`, '1');
     document.head.appendChild(script);
   }
@@ -121,7 +121,7 @@
     loadOnce('/static/js/pregame_starting_defense_scope.js', 'starting-defense-scope');
     loadOnce('/static/js/pregame_quick_start.js', 'pregame-quick-start');
     loadOnce('/static/js/pregame_quick_start_modals.js', 'pregame-quick-start-modals');
-    loadOnce('/static/js/live_game_dugout_mode.js?v=20260914-undo-authoritative-1', 'live-dugout-mode');
+    loadOnce('/static/js/live_game_dugout_mode.js', 'live-dugout-mode');
     loadOnce('/static/js/live_game_clock_controls.js', 'live-clock-controls');
     loadOnce('/static/js/live_game_command_center.js', 'live-command-center');
     loadOnce('/static/js/live_game_connection_status.js', 'live-connection-status');

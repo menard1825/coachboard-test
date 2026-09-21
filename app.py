@@ -10,6 +10,10 @@ from sqlalchemy import event, func
 from sqlalchemy.engine import Engine
 
 # Local Imports
+from asset_versioning import (
+    CONFIG_KEY as ASSET_VERSION_CONFIG_KEY,
+    current_asset_version,
+)
 from db import db
 from models import (
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
@@ -106,7 +110,11 @@ def create_app():
         'connect_args': {'timeout': 15} if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:') else {},
     }
 
+    # One version for every static asset this instance serves. See
+    # asset_versioning.py, which owns how that value reaches templates,
+    # server-injected script tags and the browser-side loaders.
     asset_version = os.environ.get('ASSET_VERSION') or str(int(datetime.now().timestamp()))
+    app.config[ASSET_VERSION_CONFIG_KEY] = asset_version
 
     db.init_app(app)
     socketio.init_app(app)
@@ -236,14 +244,19 @@ def create_app():
         return info
 
     @app.context_processor
-    def inject_css_version():
-        return {'css_version': asset_version}
+    def inject_asset_version():
+        # Read back through asset_versioning.current_asset_version() rather
+        # than closing over the local, so app.config is the one place the
+        # version lives. Templates and asset_url() then cannot drift apart:
+        # ASSET_VERSION/fallback -> app.config -> everything else.
+        return {'asset_version': current_asset_version()}
 
     @app.context_processor
     def inject_current_year_and_timestamp():
         return {
             'current_year': datetime.now().year,
-            'current_year_timestamp': asset_version
+            # Same value, same single path through app.config.
+            'current_year_timestamp': current_asset_version(),
         }
 
     @app.route('/')

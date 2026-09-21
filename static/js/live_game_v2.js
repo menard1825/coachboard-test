@@ -361,9 +361,9 @@
 
         pitcherChangeControllerPromise = new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src =
-                '/static/js/live_game_pitcher_change_complete.js' +
-                '?v=simple-live-picker-v1';
+            script.src = window.CoachBoardAssets.url(
+                '/static/js/live_game_pitcher_change_complete.js'
+            );
             script.dataset.cbPitcherChangeController = 'true';
 
             script.addEventListener('load', () => {

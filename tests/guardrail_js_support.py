@@ -54,9 +54,14 @@ TEMPLATE = 'template'
 DYNAMIC = 'dynamic'
 INJECTED = 'injected'
 
+#: The canonical mechanism: templates/_coachboard_assets.html publishes the
+#: application asset version, and every dynamic loader builds its URL through
+#: this helper. See asset_versioning.py for the server half.
+CANONICAL_ASSET_HELPER = re.compile(r'CoachBoardAssets\s*\.\s*url\s*\(')
+
 #: Expressions that produce a version at runtime rather than from a literal.
 RUNTIME_VERSION = re.compile(
-    r'helperQuery|currentScript|\.search\b|getmtime|assetVersion|ASSET_VERSION'
+    r'CoachBoardAssets|coachboard-asset-version|getmtime|asset_version|ASSET_VERSION'
 )
 
 
@@ -168,8 +173,12 @@ def scan_js_source(name, source):
 
         statement = _statement_at(source, match.start())
         is_src_assignment = re.search(r'\.src\s*=', statement)
+        # document.write('<script src="...">') is a fourth loading mechanism,
+        # used by live_game_inning_clarity.js while the document is still
+        # parsing. An earlier version of this scan missed it entirely.
+        is_written_tag = re.search(r'src\s*=\s*[\'"\\]', statement)
         is_loader_call = bool(loader_call and loader_call.search(statement))
-        if not (is_src_assignment or is_loader_call):
+        if not (is_src_assignment or is_written_tag or is_loader_call):
             continue
 
         query = match.group('query') or ''
@@ -182,7 +191,7 @@ def scan_js_source(name, source):
 
         if query:
             status = FROZEN
-        elif any(
+        elif CANONICAL_ASSET_HELPER.search(statement) or any(
             re.search(rf'\b{re.escape(helper)}\s*\(', statement)
             for helper in versioning
         ):
@@ -253,7 +262,7 @@ def template_load_sites():
                 'loader': path.name,
                 'module': match.group('module'),
                 'query': '',
-                'status': VERSIONED if 'css_version' in match.group('rest') else UNVERSIONED,
+                'status': VERSIONED if 'asset_version' in match.group('rest') else UNVERSIONED,
                 'line': source.count('\n', 0, match.start()) + 1,
             })
     return sites
@@ -323,6 +332,24 @@ def reachable_modules():
     return walk(load_graph(), entry_modules())
 
 
+def effective_url(site):
+    """The URL a browser would request for this load site.
+
+    Every canonically versioned site resolves to the same string, whichever of
+    the four loading mechanisms produced it -- which is the whole point of the
+    mechanism, and what makes duplicate-URL detection mean something. An
+    earlier version of this helper compared (kind, status, query) instead, so
+    a module loaded by a template *and* by another module always looked like
+    two URLs even when both were spelled identically.
+    """
+    base = f"/static/js/{site['module']}"
+    if site['status'] == VERSIONED:
+        return f'{base}?v={{asset_version}}'
+    if site['status'] == FROZEN:
+        return f"{base}{site['query']}"
+    return base
+
+
 def modules_loaded_under_multiple_urls():
     """Modules whose load sites do not agree on a single URL.
 
@@ -331,9 +358,7 @@ def modules_loaded_under_multiple_urls():
     """
     spellings = {}
     for site in all_load_sites():
-        spellings.setdefault(site['module'], set()).add(
-            (site['kind'], site['status'], site['query'])
-        )
+        spellings.setdefault(site['module'], set()).add(effective_url(site))
     return {
         module: sorted(variants)
         for module, variants in spellings.items()

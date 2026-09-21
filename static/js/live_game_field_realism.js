@@ -10,7 +10,7 @@
   function loadPitcherChangeWizard() {
     if (document.querySelector('script[data-live-pitcher-change-complete]')) return;
     const script = document.createElement('script');
-    script.src = '/static/js/live_game_pitcher_change_complete.js';
+    script.src = window.CoachBoardAssets.url('/static/js/live_game_pitcher_change_complete.js');
     script.dataset.livePitcherChangeComplete = 'true';
     document.head.appendChild(script);
   }

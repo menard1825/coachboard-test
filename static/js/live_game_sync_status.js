@@ -163,7 +163,7 @@
   function loadBenchReport() {
     if (document.querySelector('script[data-live-bench-report]')) return;
     const script = document.createElement('script');
-    script.src = '/static/js/live_game_bench_report.js?v=20260914-live-cache-1';
+    script.src = window.CoachBoardAssets.url('/static/js/live_game_bench_report.js');
     script.dataset.liveBenchReport = 'true';
     document.head.appendChild(script);
   }
@@ -171,7 +171,7 @@
   function loadInningClarity() {
     if (document.querySelector('script[data-live-inning-clarity]')) return;
     const script = document.createElement('script');
-    script.src = '/static/js/live_game_inning_clarity.js';
+    script.src = window.CoachBoardAssets.url('/static/js/live_game_inning_clarity.js');
     script.dataset.liveInningClarity = 'true';
     document.head.appendChild(script);
   }

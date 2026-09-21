@@ -1,9 +1,9 @@
-import os
 import re
 from copy import deepcopy
 
-from flask import Blueprint, current_app, g, jsonify, request, url_for
+from flask import Blueprint, g, jsonify, request
 
+from asset_versioning import asset_url
 from db import db
 from extensions import socketio
 from models import GameRotationEvent, Player, PlayerGameAbsence
@@ -626,14 +626,13 @@ def advance_inning(game_id):
 
 
 def _feedback_asset_url():
-    path = os.path.join(current_app.root_path, 'static', 'js', 'live_game_feedback_pass.js')
-    try:
-        version = str(int(os.path.getmtime(path)))
-    except OSError:
-        version = None
-    return url_for('static', filename='js/live_game_feedback_pass.js', v=version) if version else url_for(
-        'static', filename='js/live_game_feedback_pass.js'
-    )
+    """The feedback-pass module's canonical URL.
+
+    Was a second, independent mtime-versioning helper. It now shares the one
+    asset version, so this tag and live_game_inning_clarity.js's dynamic load
+    of the same module resolve to the same URL.
+    """
+    return asset_url('js/live_game_feedback_pass.js')
 
 
 @live_game_bulk_bp.after_app_request

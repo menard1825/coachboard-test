@@ -101,7 +101,7 @@
   function ensureClockControls() {
     if ([...document.scripts].some(script => /\/live_game_clock_controls\.js(?:\?|$)/.test(script.src || ''))) return;
     const script = document.createElement('script');
-    script.src = '/static/js/live_game_clock_controls.js?v=test2';
+    script.src = window.CoachBoardAssets.url('/static/js/live_game_clock_controls.js');
     script.dataset.cbTest2ClockControls = 'true';
     document.head.appendChild(script);
   }

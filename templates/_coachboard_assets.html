@@ -1,0 +1,36 @@
+{#
+  Publishes the application asset version to the browser.
+
+  OWNER: this partial, together with asset_versioning.py, owns CoachBoard's
+  asset-versioning mechanism. Every dynamic <script> loader must build its URL
+  through window.CoachBoardAssets.url() rather than typing a ?v= literal, so
+  one module resolves to one URL no matter which loader asks for it.
+
+  Included from the <head> of base.html and auth_base.html, which between them
+  are the parents of every rendered template. It is inline on purpose: a
+  separate file would need loading before the loaders that depend on it, which
+  is the ordering problem this is meant to remove.
+#}
+<meta name="coachboard-asset-version" content="{{ asset_version }}">
+<script>
+  (function () {
+    'use strict';
+
+    var meta = document.querySelector('meta[name="coachboard-asset-version"]');
+    var version = (meta && meta.getAttribute('content')) || '';
+
+    window.CoachBoardAssets = {
+      version: version,
+
+      // Takes the same '/static/js/<module>.js' path the loader would
+      // otherwise have hardcoded, and returns it versioned. The full path is
+      // kept at each call site on purpose: it is what makes the set of
+      // dynamically loaded modules readable from the source.
+      url: function (path) {
+        if (!path || !version) return path;
+        if (path.indexOf('?') !== -1) return path;
+        return path + '?v=' + encodeURIComponent(version);
+      }
+    };
+  })();
+</script>

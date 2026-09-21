@@ -160,11 +160,15 @@
   function loadUnifiedFeedbackPass() {
     if ([...document.scripts].some(node => /\/static\/js\/live_game_feedback_pass\.js(?:\?|$)/.test(node.src || ''))) return;
     if (document.readyState === 'loading') {
-      document.write('<script src="/static/js/live_game_feedback_pass.js?v=20260914-quickfield-single-owner-1" data-cb-live-feedback-pass="true"></' + 'script>');
+      document.write(
+        '<script src="' +
+        window.CoachBoardAssets.url('/static/js/live_game_feedback_pass.js') +
+        '" data-cb-live-feedback-pass="true"></' + 'script>'
+      );
       return;
     }
     const script = document.createElement('script');
-    script.src = '/static/js/live_game_feedback_pass.js?v=20260914-quickfield-single-owner-1';
+    script.src = window.CoachBoardAssets.url('/static/js/live_game_feedback_pass.js');
     script.dataset.cbLiveFeedbackPass = 'true';
     document.body.appendChild(script);
   }

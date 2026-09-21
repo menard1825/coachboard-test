@@ -249,7 +249,7 @@
     if (document.getElementById('cb-pitching-scan-compact-script')) return;
     const script = document.createElement('script');
     script.id = 'cb-pitching-scan-compact-script';
-    script.src = '/static/js/pitching_scan_compact.js?v=20260825-1';
+    script.src = window.CoachBoardAssets.url('/static/js/pitching_scan_compact.js');
     script.async = false;
     document.head.appendChild(script);
   }
@@ -272,7 +272,7 @@
 
     const script = document.createElement('script');
     script.id = 'cb-pitching-dugout-mobile-script';
-    script.src = '/static/js/pitching_dugout_mobile.js?v=20260821-2';
+    script.src = window.CoachBoardAssets.url('/static/js/pitching_dugout_mobile.js');
     script.async = false;
     script.addEventListener('load', loadPitchingScanView, {once:true});
     document.head.appendChild(script);

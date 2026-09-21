@@ -1,11 +1,11 @@
-import os
 import re
 from copy import deepcopy
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, request, session, url_for
+from flask import Blueprint, jsonify, request, session
 from sqlalchemy import JSON, UniqueConstraint
 
+from asset_versioning import asset_url
 from db import db
 from extensions import socketio
 from models import Game, Player, PlayerGameAbsence, Rotation
@@ -338,13 +338,15 @@ def next_inning_prep(game_id):
 
 
 def _versioned_static(filename):
-    """Return a static URL that changes when the file changes on disk."""
-    path = os.path.join(current_app.root_path, 'static', filename)
-    try:
-        version = str(int(os.path.getmtime(path)))
-    except OSError:
-        version = None
-    return url_for('static', filename=filename, v=version) if version else url_for('static', filename=filename)
+    """Return a static URL carrying the application asset version.
+
+    This used to version by file mtime. That gave a more precise URL but a
+    different one from what the browser-side loaders produced, so a module
+    injected here and also chain-loaded by another module arrived under two
+    URLs and was downloaded twice. asset_versioning.py now owns the single
+    value all three loading routes share.
+    """
+    return asset_url(filename)
 
 
 @live_game_ui_bp.before_app_request

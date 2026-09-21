@@ -4,7 +4,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pitching_dashboard_v3.css', v=css_version) }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pitching_dashboard_v3.css', v=asset_version) }}">
 {% endblock %}
 
 {% block content %}
@@ -122,5 +122,5 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="{{ url_for('static', filename='js/pitching_dashboard_v3.js', v=css_version) }}"></script>
+<script src="{{ url_for('static', filename='js/pitching_dashboard_v3.js', v=asset_version) }}"></script>
 {% endblock %}
