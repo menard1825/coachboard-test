@@ -564,3 +564,119 @@ def test_advance_rejects_next_changed_after_client_read(
             coachboard_url,
             game_id,
         )
+
+def test_next_inning_labels_follow_authoritative_inning(
+    page: Page,
+    coachboard_url: str,
+):
+    """Upcoming-inning labels stay synchronized across an inning advance."""
+
+    page.set_viewport_size(
+        {
+            'width': 390,
+            'height': 844,
+        }
+    )
+
+    login(page, coachboard_url)
+    game_id = create_game(page, coachboard_url)
+
+    try:
+        next_board = start_live_game(
+            page,
+            coachboard_url,
+            game_id,
+        )
+
+        next_tab = page.locator(
+            '#cb-now-next-switch '
+            '[data-now-next="next"]'
+        )
+
+        expect(next_tab).to_have_text(
+            'Next Inning · 2',
+            timeout=10_000,
+        )
+
+        expect(
+            next_board.locator(
+                '.cb-next-up-pill'
+            )
+        ).to_have_text(
+            'UP NEXT: INNING 2'
+        )
+
+        expect(
+            next_board.locator(
+                '.cb-next-title'
+            )
+        ).to_have_text(
+            'Editing defense for Inning 2'
+        )
+
+        expect(
+            page.locator(
+                '#liveEndInningBtn '
+                '.coach-action-title'
+            )
+        ).to_have_text(
+            'End Inning → Start Inning 2'
+        )
+
+        # At phone width the longer tab label must still fit its tab.
+        assert next_tab.evaluate(
+            '(el) => el.scrollWidth <= el.clientWidth + 1'
+        )
+
+        page.locator(
+            '#liveEndInningBtn'
+        ).click()
+
+        expect(
+            page.locator(
+                '#live-inning-display'
+            )
+        ).to_have_text(
+            '2',
+            timeout=10_000,
+        )
+
+        expect(next_tab).to_have_text(
+            'Next Inning · 3',
+            timeout=10_000,
+        )
+
+        next_tab.click()
+
+        expect(
+            next_board.locator(
+                '.cb-next-up-pill'
+            )
+        ).to_have_text(
+            'UP NEXT: INNING 3',
+            timeout=10_000,
+        )
+
+        expect(
+            next_board.locator(
+                '.cb-next-title'
+            )
+        ).to_have_text(
+            'Editing defense for Inning 3'
+        )
+
+        expect(
+            page.locator(
+                '#liveEndInningBtn '
+                '.coach-action-title'
+            )
+        ).to_have_text(
+            'End Inning → Start Inning 3'
+        )
+
+    finally:
+        cleanup_game(
+            page,
+            coachboard_url,
+            game_id,
+        )

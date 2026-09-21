@@ -1,0 +1,23 @@
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+BOARD = ROOT / "static/js/live_game_board_prep_v2.js"
+
+
+def test_next_inning_ux_uses_authoritative_next_inning():
+    source = BOARD.read_text()
+
+    assert "latest?.next_inning" in source
+    assert "`Next Inning · ${inning}`" in source
+    assert "UP NEXT: INNING ${esc(inning)}" in source
+    assert "Editing defense for Inning ${esc(inning)}" in source
+    assert "`End Inning → Start Inning ${inning}`" in source
+
+
+def test_next_inning_ux_has_distinct_information_pill():
+    source = BOARD.read_text()
+
+    assert ".cb-next-up-pill{" in source
+    assert "background:#eef4ff;" in source
+    assert "color:#254f87;" in source

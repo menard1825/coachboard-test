@@ -411,6 +411,20 @@
         color:#fff!important;
       }
 
+      #${SWITCH_ID} [data-now-next="next"]{
+        font-size:.8rem;
+        white-space:nowrap;
+        letter-spacing:-.01em;
+      }
+
+      @media(max-width:390px){
+        #${SWITCH_ID} [data-now-next="next"]{
+          font-size:.73rem;
+          padding-left:3px;
+          padding-right:3px;
+        }
+      }
+
       #${PLAN_CARD_ID}{
         border:1.5px solid #cfd6df;
         border-radius:14px;
@@ -575,12 +589,22 @@
         border-bottom:1px solid #e7ebef;
       }
 
-      #${CARD_ID} .cb-next-kicker{
-        color:#667085;
-        font-size:.6rem;
+      #${CARD_ID} .cb-next-up-pill{
+        display:inline-flex;
+        align-items:center;
+        min-height:24px;
+        margin-bottom:4px;
+        padding:4px 8px;
+        border:1px solid #b7c8e8;
+        border-radius:999px;
+        background:#eef4ff;
+        color:#254f87;
+        font-size:.58rem;
         font-weight:900;
+        line-height:1;
+        letter-spacing:.06em;
         text-transform:uppercase;
-        letter-spacing:.09em;
+        white-space:nowrap;
       }
 
       #${CARD_ID} .cb-next-title{
@@ -1227,10 +1251,69 @@
     return card;
   }
 
+  function upcomingInning() {
+    return String(
+      latest?.next_inning || ''
+    ).trim();
+  }
+
+  function syncUpcomingInningLabels() {
+    const inning = upcomingInning();
+
+    const nextTab = $(SWITCH_ID)
+      ?.querySelector(
+        '[data-now-next="next"]'
+      );
+
+    if (nextTab) {
+      nextTab.textContent = inning
+        ? `Next Inning · ${inning}`
+        : 'Next Inning';
+    }
+
+    if (!inning) return;
+
+    const endInning =
+      $('liveEndInningBtn');
+
+    if (!endInning) return;
+
+    const title =
+      endInning.querySelector(
+        '.coach-action-title'
+      );
+
+    const note =
+      endInning.querySelector(
+        '.coach-action-note'
+      );
+
+    const buttonTitle =
+      `End Inning → Start Inning ${inning}`;
+
+    if (title) {
+      title.textContent = buttonTitle;
+    } else {
+      endInning.textContent = buttonTitle;
+    }
+
+    if (note) {
+      note.textContent =
+        `Use saved Inning ${inning} defense`;
+    }
+
+    endInning.setAttribute(
+      'aria-label',
+      `End inning and start Inning ${inning}`
+    );
+  }
+
   function syncLiveActions() {
     const changePitcher = $('liveChangePitcherBtn');
     const undo = $('liveUndoBtn');
     const actionSlot = $('coach-action-slot');
+
+    syncUpcomingInningLabels();
 
     // On the Field owns two live actions. NEXT and Pregame Plan hide
     // Change Pitcher, so their phone dock should become one full-width
@@ -1408,11 +1491,11 @@
     card.innerHTML = `
       <div class="cb-next-head">
         <div>
-          <div class="cb-next-kicker">
-            NEXT INNING · ${esc(inning)}
+          <div class="cb-next-up-pill">
+            UP NEXT: INNING ${esc(inning)}
           </div>
           <div class="cb-next-title">
-            Next Defense
+            Editing defense for Inning ${esc(inning)}
           </div>
           <div class="cb-next-sub">
             ${esc(planStateText())}
