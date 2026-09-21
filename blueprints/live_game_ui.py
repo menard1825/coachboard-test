@@ -4,6 +4,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request, session
 from sqlalchemy import JSON, UniqueConstraint
+from sqlalchemy.exc import IntegrityError
 
 from asset_versioning import asset_url
 from db import db
@@ -186,7 +187,25 @@ def _next_inning_context(game, team):
             updated_at=datetime.utcnow(),
         )
         db.session.add(prep)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            # Another request created this game's prep row between our read
+            # above and this commit. The board polls this endpoint every 3.5
+            # seconds and the GET is not covered by the live-write semaphore,
+            # so at an inning rollover several coaches race to seed the same
+            # row. uq_game_next_inning_prep is what stops a duplicate landing;
+            # losing that race is normal, not an error to show a coach.
+            #
+            # This does not inspect which constraint failed. What it
+            # guarantees is: roll back, re-read the expected prep row, adopt
+            # that row only if it exists and is for the exact inning this
+            # request computed, and otherwise re-raise the original
+            # IntegrityError unchanged.
+            db.session.rollback()
+            prep = _prep_for_game(game.id, team.id)
+            if prep is None or prep.inning != next_inning:
+                raise
 
     # pregame_rotation is the plan as it was written before first pitch.
     # _planned_rotation already hands _actual_rotation its own deep copy to

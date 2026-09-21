@@ -285,22 +285,12 @@ def test_the_stale_read_simulation_is_wired_correctly(app, monkeypatch):
         assert calls['count'] == 2
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        'PREP RACE (1 of 2): concurrent prep creation is not recovered. '
-        '_next_inning_context reads, decides prep is None, then inserts with no '
-        'handling for the row having appeared in between, so the losing request '
-        'raises IntegrityError instead of re-reading the winner row. Delete '
-        'this marker when the race is fixed.'
-    ),
-)
 def test_a_stale_first_read_recovers_the_committed_row(app, monkeypatch):
-    """The behaviour a fix should produce: find the winner's row and carry on.
+    """The losing request adopts the winning row instead of raising.
 
-    Written as the desired outcome rather than as today's failure, so it flips
-    to green the moment the race is handled -- and ``strict=True`` means the
-    marker cannot be left behind afterwards.
+    Held as a strict xfail until the IntegrityError recovery landed in
+    _next_inning_context. The row it returns must be the one already committed,
+    not a second row and not None.
     """
     from db import db
     from blueprints import live_game_ui
@@ -316,25 +306,27 @@ def test_a_stale_first_read_recovers_the_committed_row(app, monkeypatch):
         game = db.session.get(Game, GAME_ID)
         team = db.session.get(Team, TEAM_ID)
 
+        winner = _prep_rows()[0]
+        winner_id = winner.id
+
         _, next_inning, _, _, prep, _, _ = live_game_ui._next_inning_context(game, team)
 
         assert calls['count'] >= 1, 'the stale read was never consumed'
         assert next_inning == '2'
         assert prep is not None, 'the losing request produced no prep row'
-        assert len(_prep_rows()) == 1
+        assert prep.id == winner_id, (
+            'the losing request did not adopt the row the winner committed'
+        )
+        assert prep.inning == '2'
+        assert len(_prep_rows()) == 1, 'recovery created a second prep row'
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        'PREP RACE (2 of 2): the losing poll returns HTTP 500 rather than the '
-        'prep the winning request just committed. Self-healing on the next '
-        '3.5s poll, but a real failed refresh. Delete this marker when the '
-        'race is fixed.'
-    ),
-)
 def test_the_losing_poll_still_serves_the_prep(app, monkeypatch):
-    """End-to-end: the coach's poll should succeed, not error."""
+    """End-to-end: the coach's poll succeeds and serves the committed prep.
+
+    Held as a strict xfail while the losing poll returned HTTP 500. The refresh
+    a coach sees must carry the real alignment, not merely avoid erroring.
+    """
     app.config['PROPAGATE_EXCEPTIONS'] = False
 
     client = app.test_client()
@@ -347,3 +339,148 @@ def test_the_losing_poll_still_serves_the_prep(app, monkeypatch):
 
     assert calls['count'] >= 1, 'the stale read was never consumed'
     assert response.status_code == 200
+
+    payload = response.get_json()
+    assert payload['next_inning'] == '2'
+    assert payload['confirmed'], 'the poll succeeded but served no prep'
+
+    with app.app_context():
+        assert len(_prep_rows()) == 1
+
+
+# --------------------------------------------------------------------------
+# The recovery must stay narrow
+#
+# Adopting the winning row is correct only for *this* race. An IntegrityError
+# from anything else, or one after which the expected row still is not there,
+# must reach the caller untouched rather than being quietly turned into a 200.
+# --------------------------------------------------------------------------
+
+def _fail_next_commit_with(monkeypatch, app, error):
+    """Make the next db.session.commit() raise ``error``, once."""
+    from db import db
+
+    real_commit = db.session.commit
+    state = {'raised': False}
+
+    def commit_once_failing():
+        if not state['raised']:
+            state['raised'] = True
+            raise error
+        return real_commit()
+
+    monkeypatch.setattr(db.session, 'commit', commit_once_failing)
+    return state
+
+
+def test_an_unrelated_integrity_error_is_not_swallowed(app, monkeypatch):
+    """A constraint failure that leaves no recoverable row must propagate.
+
+    If the recovery caught IntegrityError broadly, this would return a prep
+    row -- or None -- instead of surfacing a real database failure.
+    """
+    from db import db
+    from blueprints import live_game_ui
+    from models import Game, Team
+
+    with app.app_context():
+        assert _prep_rows() == []
+
+        game = db.session.get(Game, GAME_ID)
+        team = db.session.get(Team, TEAM_ID)
+
+        unrelated = IntegrityError(
+            'INSERT INTO something_else', {}, Exception('FOREIGN KEY constraint failed'),
+        )
+        state = _fail_next_commit_with(monkeypatch, app, unrelated)
+
+        with pytest.raises(IntegrityError) as caught:
+            live_game_ui._next_inning_context(game, team)
+
+        assert state['raised'], 'the failing commit was never reached'
+        assert caught.value is unrelated, (
+            'a different error surfaced; the original was not re-raised intact'
+        )
+
+
+def test_a_recovered_row_for_the_wrong_inning_is_not_adopted(app, monkeypatch):
+    """Recovery only accepts a row that answers *this* request.
+
+    If the row found after the rollback is for another inning, the request has
+    not recovered -- it would otherwise serve a coach the wrong inning's
+    defense. The error propagates instead.
+    """
+    from db import db
+    from blueprints import live_game_ui
+    from blueprints.live_game_ui import GameNextInningPrep
+    from models import Game, Team
+
+    with app.app_context():
+        # A row exists, but for an inning this request is not preparing.
+        db.session.add(GameNextInningPrep(
+            game_id=GAME_ID,
+            team_id=TEAM_ID,
+            inning='3',
+            alignment={},
+            source='Auto',
+            updated_by='Auto',
+            updated_at=datetime.utcnow(),
+        ))
+        db.session.commit()
+
+        # The losing request's read misses it, so it tries to insert inning 2
+        # and trips the unique constraint on (game_id, team_id).
+        _install_stale_first_read(monkeypatch)
+
+        game = db.session.get(Game, GAME_ID)
+        team = db.session.get(Team, TEAM_ID)
+
+        with pytest.raises(IntegrityError):
+            live_game_ui._next_inning_context(game, team)
+
+    with app.app_context():
+        rows = _prep_rows()
+        assert len(rows) == 1
+        assert rows[0].inning == '3', 'the wrong-inning row was modified'
+
+
+def test_the_recovery_catches_only_integrity_errors(app, monkeypatch):
+    """A non-IntegrityError propagates even when a row could be adopted.
+
+    The recoverable row has to exist for this to mean anything. If it did not,
+    a broad ``except Exception`` would re-raise for want of something to return
+    and the test would pass against the wrong code -- which is exactly what an
+    earlier version of this test did.
+
+    Here the winning row is present and matches the requested inning, so a
+    broad catch would swallow the error and return 'successfully'. Catching
+    only IntegrityError lets the real failure through.
+    """
+    from db import db
+    from blueprints import live_game_ui
+    from models import Game, Team
+
+    client = app.test_client()
+    _login(client)
+    client.get(f'/api/live-game/{GAME_ID}/next-inning-prep')
+
+    with app.app_context():
+        assert len(_prep_rows()) == 1, 'the adoptable row was not created'
+
+        # The request misses the existing row and tries to insert its own...
+        _install_stale_first_read(monkeypatch)
+        # ...but the commit fails for a reason that is not a constraint.
+        boom = RuntimeError('database went away')
+        state = _fail_next_commit_with(monkeypatch, app, boom)
+
+        game = db.session.get(Game, GAME_ID)
+        team = db.session.get(Team, TEAM_ID)
+
+        with pytest.raises(RuntimeError) as caught:
+            live_game_ui._next_inning_context(game, team)
+
+        assert state['raised'], 'the failing commit was never reached'
+        assert caught.value is boom, (
+            'the recovery swallowed a non-IntegrityError; the except clause is '
+            'too broad'
+        )
