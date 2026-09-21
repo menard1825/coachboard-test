@@ -21,3 +21,16 @@ def test_next_inning_ux_has_distinct_information_pill():
     assert ".cb-next-up-pill{" in source
     assert "background:#eef4ff;" in source
     assert "color:#254f87;" in source
+
+def test_idle_next_board_does_not_show_step_one_instructions():
+    source = BOARD.read_text()
+
+    assert "STEP 1" not in source
+    assert (
+        "Tap a player to move them. Mouse or trackpad users can also drag."
+        not in source
+    )
+
+    # Contextual guidance remains available once a coach begins a move.
+    assert "STEP 2 · CHOOSE DESTINATION" in source
+    assert "STEP 2 · CHOOSE PLAYER" in source

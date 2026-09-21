@@ -230,13 +230,7 @@
         </div>`;
     }
 
-    return `
-      <div class="cb-next-selection quiet">
-        <div class="cb-next-step">STEP 1</div>
-        <div class="cb-next-selection-main">
-          Tap a player to move them. Mouse or trackpad users can also drag.
-        </div>
-      </div>`;
+    return '';
   }
 
   function fieldSpot(pos, left, top) {
