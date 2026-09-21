@@ -48,8 +48,19 @@ def test_flush_has_a_real_timeout_and_preserves_save_error():
     contract_source = CONTRACT.read_text()
 
     assert "await Promise.race([" in board_source
-    assert "Check your connection" in board_source
-    assert "Re-save NEXT, then try End Inning again." in board_source
+
+    # The timeout must tell the coach what to do, not just that something
+    # failed. Assert the shape of that guidance rather than its exact wording:
+    # the sentence was reworded in 33373e5 ("Use baseball language for inning
+    # defense") when NOW/NEXT became On the Field / Next Inning, which broke
+    # this test without anything functional changing.
+    timeout_message_index = board_source.index("Check your connection")
+    timeout_message = board_source[
+        board_source.rindex("'", 0, timeout_message_index) :
+        board_source.index("'", timeout_message_index)
+    ]
+    assert "saving" in timeout_message
+    assert "try" in timeout_message and "again" in timeout_message
 
     end_inning_index = contract_source.index(
         "async function endInningFromNext"
