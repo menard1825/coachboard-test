@@ -6,12 +6,13 @@ from flask import Blueprint, g, jsonify, request
 from asset_versioning import asset_url
 from db import db
 from extensions import socketio
-from models import GameRotationEvent, Player, PlayerGameAbsence
+from models import Player, PlayerGameAbsence
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
     _broadcast_state,
     _current_alignment,
+    _current_sequence,
     _event,
     _player_id_by_name,
     _room_name,
@@ -72,14 +73,6 @@ def _pitcher_eligibility_block(game, team, pitcher_name):
 
 def _missing_positions(alignment, allowed):
     return [pos for pos in allowed if not (alignment or {}).get(pos)]
-
-
-def _current_sequence(game_id, team_id):
-    last_event = db.session.query(GameRotationEvent).filter_by(
-        game_id=game_id,
-        team_id=team_id,
-    ).order_by(GameRotationEvent.sequence.desc(), GameRotationEvent.id.desc()).first()
-    return int(last_event.sequence or 0) if last_event else 0
 
 
 def _stale_write_response(data, game, team):

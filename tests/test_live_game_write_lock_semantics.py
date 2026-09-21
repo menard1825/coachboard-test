@@ -10,13 +10,19 @@ Nothing tested that. These tests do, entirely through observable behaviour:
 they exercise the sequence the bulk-write path actually computes and the 409
 that ``_stale_write_response`` returns.
 
-They are deliberately indifferent to *where* that implementation lives. At
-1a06777 ``live_game_write_lock`` rebinds ``live_game_bulk_api._current_sequence``
-at import time, and the definition written in ``live_game_bulk_api.py`` is
-shadowed and wrong. When a later slice de-shadows it -- moving the corrected
-implementation into ``live_game_bulk_api`` and deleting the patch -- every test
-here should keep passing unchanged. That is the point: the guardrail protects
-the behaviour, not the current arrangement of it.
+They are deliberately indifferent to *where* that implementation lives, and
+that indifference has already been exercised. At 1a06777 there were three
+copies of the calculation: ``live_game_api`` had a correct one,
+``live_game_bulk_api`` had one missing the reverted-event filter, and
+``live_game_write_lock`` had a third that it assigned over
+``live_game_bulk_api._current_sequence`` at import time -- so the function
+written in that file was never the one that ran.
+
+The de-shadowing slice resolved that to a single implementation:
+``live_game_api`` owns ``_current_sequence``, ``live_game_bulk_api`` imports it
+normally, and ``live_game_write_lock`` no longer rebinds anything. Every test
+below passed through that refactor unchanged, which is the point: the guardrail
+protects the behaviour, not the arrangement of it.
 """
 
 from datetime import datetime
@@ -110,10 +116,11 @@ def _effective_sequence(game_id, team_id):
     """The live version number as the bulk-write path computes it.
 
     Resolved through the module attribute rather than a direct import so these
-    tests describe behaviour, not wiring. They pass today, where
-    ``live_game_write_lock`` rebinds this name at import, and they will keep
-    passing once that patch is removed and the corrected implementation lives
-    in ``live_game_bulk_api`` directly.
+    tests describe behaviour, not wiring. ``live_game_bulk_api`` imports the
+    canonical ``_current_sequence`` from ``live_game_api``; reading it off the
+    module here means this keeps working if the helper is ever relocated
+    again, exactly as it kept working when the import-time rebinding in
+    ``live_game_write_lock`` was removed.
     """
     from blueprints import live_game_bulk_api
 
@@ -263,3 +270,77 @@ def test_missing_base_sequence_is_rejected_with_the_effective_version(app):
             payload = response.get_json()
             assert payload['code'] == 'missing_live_state_version'
             assert payload['current_sequence'] == 1
+
+
+# --------------------------------------------------------------------------
+# Structural regression
+#
+# Narrowly scoped on purpose: this is about one specific arrangement that was
+# removed, not a general rule against rebinding anywhere in CoachBoard.
+#
+# It also does not pin where the canonical implementation lives. Only that
+# importing live_game_write_lock must not change what
+# live_game_bulk_api._current_sequence refers to -- so the helper can be
+# relocated later without touching this test.
+# --------------------------------------------------------------------------
+
+def test_importing_the_write_lock_does_not_rebind_the_sequence_helper(app):
+    """live_game_write_lock must not reach into live_game_bulk_api at import.
+
+    It used to end with::
+
+        _live_game_bulk_module._current_sequence = _effective_live_sequence
+
+    so the function defined in live_game_bulk_api.py was never the one that
+    ran, and the file misdescribed its own behaviour to anyone reading it.
+    """
+    import importlib
+
+    from blueprints import live_game_bulk_api, live_game_write_lock
+
+    before = live_game_bulk_api._current_sequence
+
+    importlib.reload(live_game_write_lock)
+
+    assert live_game_bulk_api._current_sequence is before, (
+        'importing live_game_write_lock replaced '
+        'live_game_bulk_api._current_sequence. The canonical sequence helper '
+        'may live wherever it makes sense, but it must be imported normally '
+        'rather than assigned over another module at import time.'
+    )
+
+
+def test_only_one_effective_sequence_implementation_exists():
+    """No module may keep a second copy of this calculation.
+
+    Two implementations are what let them drift: before this cleanup,
+    live_game_bulk_api's copy omitted the reverted-event filter entirely.
+
+    The assertion is on the count, not the location, so the canonical
+    implementation can be moved without editing this test.
+    """
+    import ast
+
+    from guardrail_support import application_sources
+
+    definitions = []
+    for path in application_sources():
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            source = ast.get_source_segment(path.read_text(), node) or ''
+            # The calculation is recognisable by what it queries, not by name.
+            if (
+                'GameRotationEvent' in source
+                and 'reverted' in source
+                and 'sequence' in source
+                and '.first()' in source
+                and node.name.endswith('sequence')
+            ):
+                definitions.append(f'{path.name}:{node.lineno} {node.name}')
+
+    assert len(definitions) == 1, (
+        'expected exactly one effective-sequence implementation, found '
+        f'{len(definitions)}: {definitions}'
+    )
