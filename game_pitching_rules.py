@@ -289,7 +289,6 @@ def install_request_rule_adapters():
     """Rebind legacy module imports to the new competition/arm-care preference layer."""
     gameplay_modules = (
         'blueprints.live_game_api',
-        'blueprints.live_game_common',
         'blueprints.api',
         'blueprints.gameday',
         'game_day_helpers',

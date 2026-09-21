@@ -274,3 +274,54 @@ def test_source_discovery_covers_the_application_and_excludes_the_rest():
     assert 'tests' not in parts, 'the scan is reading the test suite'
     assert 'migrations' not in parts, 'the scan is reading Alembic migrations'
     assert '__pycache__' not in parts, 'the scan is reading build artefacts'
+
+
+# --------------------------------------------------------------------------
+# Dynamic module references
+#
+# game_pitching_rules.install_request_rule_adapters() imports modules by name
+# inside `except Exception: pass`. A name that no longer resolves therefore
+# fails silently on every request, which is how blueprints.live_game_common
+# stayed in that list long after nothing called it.
+#
+# Narrow on purpose: this checks one list of module names resolves. It is not
+# a general rule about dynamic imports elsewhere in CoachBoard.
+# --------------------------------------------------------------------------
+
+def test_rule_adapter_module_names_all_import():
+    """Every module named for rule-adapter patching must exist.
+
+    A stale name here is invisible at runtime: the ImportError is swallowed and
+    the adapter silently skips a module it was meant to patch.
+    """
+    import ast
+    import importlib
+
+    from guardrail_support import ROOT
+
+    source = (ROOT / 'game_pitching_rules.py').read_text()
+    tree = ast.parse(source)
+
+    names = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == 'gameplay_modules':
+                for element in getattr(node.value, 'elts', []):
+                    if isinstance(element, ast.Constant) and isinstance(element.value, str):
+                        names.append(element.value)
+
+    assert names, 'gameplay_modules was not found; this guardrail is vacuous'
+
+    unresolvable = []
+    for name in names:
+        try:
+            importlib.import_module(name)
+        except ImportError:
+            unresolvable.append(name)
+
+    assert not unresolvable, (
+        'install_request_rule_adapters() names modules that cannot be '
+        f'imported, so it silently skips them on every request: {unresolvable}'
+    )

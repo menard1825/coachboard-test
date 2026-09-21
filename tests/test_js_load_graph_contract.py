@@ -39,13 +39,12 @@ from guardrail_js_support import (
 KNOWN_MULTI_URL_MODULES = frozenset()
 
 #: Templates on disk that no view renders and no template includes.
-KNOWN_ORPHAN_TEMPLATES = frozenset({
-    '_stats_contentold.html',
-    'create_initial_team.html',
-    'development_hub.html',
-    'game_management_v2.html',
-    'stats.html',
-})
+#:
+#: Empty. It previously held five, all deleted in the dead-code slice after
+#: proving nothing rendered, extended, included or imported them, and that the
+#: one dynamic render_template() call site can only receive login.html,
+#: register.html or forgot_password.html.
+KNOWN_ORPHAN_TEMPLATES = frozenset()
 
 
 # --------------------------------------------------------------------------
