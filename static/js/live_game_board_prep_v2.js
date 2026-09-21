@@ -171,8 +171,14 @@
     });
 
     if (!items.length) {
+      const inningLabel = inningOrdinal(
+        latest?.next_inning || ''
+      );
+
       items.push(
-        '<div class="cb-next-ready">✓ NEXT is ready</div>'
+        '<div class="cb-next-ready">' +
+        `✓ ${esc(inningLabel)} inning defense ready` +
+        '</div>'
       );
     }
 
@@ -181,16 +187,28 @@
 
   function planStateText() {
     const source = latest?.confirmed?.source || '';
+    const nextLabel = inningOrdinal(
+      latest?.next_inning || ''
+    );
+    const currentLabel = inningOrdinal(
+      latest?.current_inning || ''
+    );
 
     if (source === 'planned') {
-      return 'Loaded from your pregame plan';
+      return nextLabel
+        ? `Pregame plan for the ${nextLabel}`
+        : 'Pregame defensive plan';
     }
 
     if (source === 'current') {
-      return 'Matches current defense';
+      return currentLabel
+        ? `Same defense as the ${currentLabel}`
+        : 'Same defense as this inning';
     }
 
-    return 'NEXT edited';
+    return nextLabel
+      ? `Defense changed for the ${nextLabel}`
+      : 'Defense changed';
   }
 
   function selectionHelp() {
@@ -1251,8 +1269,40 @@
     ).trim();
   }
 
+  function inningOrdinal(value) {
+    const number = Number.parseInt(
+      String(value || ''),
+      10
+    );
+
+    if (!Number.isFinite(number)) {
+      return String(value || '').trim();
+    }
+
+    const mod100 = number % 100;
+
+    if (mod100 >= 11 && mod100 <= 13) {
+      return `${number}th`;
+    }
+
+    switch (number % 10) {
+      case 1:
+        return `${number}st`;
+      case 2:
+        return `${number}nd`;
+      case 3:
+        return `${number}rd`;
+      default:
+        return `${number}th`;
+    }
+  }
+
   function syncUpcomingInningLabels() {
     const inning = upcomingInning();
+    const inningLabel = inningOrdinal(inning);
+    const currentLabel = inningOrdinal(
+      latest?.current_inning || ''
+    );
 
     const nextTab = $(SWITCH_ID)
       ?.querySelector(
@@ -1260,12 +1310,12 @@
       );
 
     if (nextTab) {
-      nextTab.textContent = inning
-        ? `Next Inning · ${inning}`
+      nextTab.textContent = inningLabel
+        ? `${inningLabel} Inning`
         : 'Next Inning';
     }
 
-    if (!inning) return;
+    if (!inningLabel) return;
 
     const endInning =
       $('liveEndInningBtn');
@@ -1282,8 +1332,9 @@
         '.coach-action-note'
       );
 
-    const buttonTitle =
-      `End Inning → Start Inning ${inning}`;
+    const buttonTitle = currentLabel
+      ? `End ${currentLabel} → Start ${inningLabel}`
+      : `Start ${inningLabel}`;
 
     if (title) {
       title.textContent = buttonTitle;
@@ -1293,12 +1344,14 @@
 
     if (note) {
       note.textContent =
-        `Use saved Inning ${inning} defense`;
+        `${inningLabel} inning defense`;
     }
 
     endInning.setAttribute(
       'aria-label',
-      `End inning and start Inning ${inning}`
+      currentLabel
+        ? `End ${currentLabel} inning and start ${inningLabel}`
+        : `Start ${inningLabel} inning`
     );
   }
 
@@ -1482,14 +1535,19 @@
       latest.next_inning || ''
     );
 
+    const inningLabel = inningOrdinal(inning);
+    const currentLabel = inningOrdinal(
+      latest.current_inning || ''
+    );
+
     card.innerHTML = `
       <div class="cb-next-head">
         <div>
           <div class="cb-next-up-pill">
-            UP NEXT: INNING ${esc(inning)}
+            UP NEXT
           </div>
           <div class="cb-next-title">
-            Editing defense for Inning ${esc(inning)}
+            ${esc(inningLabel)} Inning Defense
           </div>
           <div class="cb-next-sub">
             ${esc(planStateText())}
@@ -1515,7 +1573,11 @@
             data-next-use-current
             ${busy ? 'disabled' : ''}
           >
-            Use current defense
+            ${
+              currentLabel
+                ? `Keep ${esc(currentLabel)} Inning Defense`
+                : 'Keep Current Defense'
+            }
           </button>
 
         </div>
@@ -1655,7 +1717,7 @@
     {
       mode = 'custom',
       pushUndo = true,
-      successMessage = 'NEXT saved ✓',
+      successMessage = 'Saved ✓',
     } = {}
   ) {
     // NEXT currently blocks board interaction while a save is running, so
@@ -1731,7 +1793,7 @@
       saveMessage = 'Not saved';
       errorMessage =
         error.message ||
-        'Unable to save NEXT.';
+        'Unable to save defense.';
 
       renderCard();
 
@@ -1749,7 +1811,7 @@
   async function flushPendingSave() {
     const deadline = Date.now() + 10000;
     const timeoutMessage =
-      'NEXT defense is still saving. Check your connection, wait for Saved ✓, then try End Inning again.';
+      'Defense is still saving. Check your connection, wait for Saved ✓, then try ending the inning again.';
 
     while (busy || activeSavePromise) {
       const pending = activeSavePromise;
@@ -1795,8 +1857,8 @@
     if (saveMode === 'error') {
       throw new Error(
         errorMessage
-          ? `${errorMessage} Re-save NEXT, then try End Inning again.`
-          : 'NEXT defense was not saved. Re-save NEXT, then try End Inning again.'
+          ? `${errorMessage} Save the defense again, then try ending the inning.`
+          : 'The defense was not saved. Save it again, then try ending the inning.'
       );
     }
 
@@ -1974,7 +2036,7 @@
       {
         mode: 'current',
         successMessage:
-          'Current defense copied to NEXT ✓',
+          'Saved ✓',
       }
     );
   }
@@ -2012,7 +2074,7 @@
       selectedPosition = '';
 
       saveMode = 'saved';
-      saveMessage = 'NEXT restored ✓';
+      saveMessage = 'Restored ✓';
       lastSignature = JSON.stringify(data);
 
       renderCard();
@@ -2031,7 +2093,7 @@
       saveMessage = 'Undo failed';
       errorMessage =
         error.message ||
-        'Unable to undo NEXT.';
+        'Unable to undo change.';
 
       renderCard();
     } finally {

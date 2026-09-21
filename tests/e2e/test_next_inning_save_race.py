@@ -594,7 +594,7 @@ def test_next_inning_labels_follow_authoritative_inning(
         )
 
         expect(next_tab).to_have_text(
-            'Next Inning · 2',
+            '2nd Inning',
             timeout=10_000,
         )
 
@@ -603,7 +603,7 @@ def test_next_inning_labels_follow_authoritative_inning(
                 '.cb-next-up-pill'
             )
         ).to_have_text(
-            'UP NEXT: INNING 2'
+            'UP NEXT'
         )
 
         expect(
@@ -611,7 +611,7 @@ def test_next_inning_labels_follow_authoritative_inning(
                 '.cb-next-title'
             )
         ).to_have_text(
-            'Editing defense for Inning 2'
+            '2nd Inning Defense'
         )
 
         expect(
@@ -620,7 +620,23 @@ def test_next_inning_labels_follow_authoritative_inning(
                 '.coach-action-title'
             )
         ).to_have_text(
-            'End Inning → Start Inning 2'
+            'End 1st → Start 2nd'
+        )
+
+        expect(
+            next_board.locator(
+                '[data-next-use-current]'
+            )
+        ).to_have_text(
+            'Keep 1st Inning Defense'
+        )
+
+        expect(
+            next_board.locator(
+                '.cb-next-ready'
+            )
+        ).to_have_text(
+            '✓ 2nd inning defense ready'
         )
 
         # At phone width the longer tab label must still fit its tab.
@@ -642,7 +658,7 @@ def test_next_inning_labels_follow_authoritative_inning(
         )
 
         expect(next_tab).to_have_text(
-            'Next Inning · 3',
+            '3rd Inning',
             timeout=10_000,
         )
 
@@ -653,7 +669,7 @@ def test_next_inning_labels_follow_authoritative_inning(
                 '.cb-next-up-pill'
             )
         ).to_have_text(
-            'UP NEXT: INNING 3',
+            'UP NEXT',
             timeout=10_000,
         )
 
@@ -662,7 +678,7 @@ def test_next_inning_labels_follow_authoritative_inning(
                 '.cb-next-title'
             )
         ).to_have_text(
-            'Editing defense for Inning 3'
+            '3rd Inning Defense'
         )
 
         expect(
@@ -671,7 +687,23 @@ def test_next_inning_labels_follow_authoritative_inning(
                 '.coach-action-title'
             )
         ).to_have_text(
-            'End Inning → Start Inning 3'
+            'End 2nd → Start 3rd'
+        )
+
+        expect(
+            next_board.locator(
+                '[data-next-use-current]'
+            )
+        ).to_have_text(
+            'Keep 2nd Inning Defense'
+        )
+
+        expect(
+            next_board.locator(
+                '.cb-next-ready'
+            )
+        ).to_have_text(
+            '✓ 3rd inning defense ready'
         )
 
     finally:

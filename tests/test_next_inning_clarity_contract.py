@@ -9,10 +9,13 @@ def test_next_inning_ux_uses_authoritative_next_inning():
     source = BOARD.read_text()
 
     assert "latest?.next_inning" in source
-    assert "`Next Inning · ${inning}`" in source
-    assert "UP NEXT: INNING ${esc(inning)}" in source
-    assert "Editing defense for Inning ${esc(inning)}" in source
-    assert "`End Inning → Start Inning ${inning}`" in source
+    assert "function inningOrdinal(value)" in source
+    assert "`${inningLabel} Inning`" in source
+    assert "UP NEXT" in source
+    assert "${esc(inningLabel)} Inning Defense" in source
+    assert "`End ${currentLabel} → Start ${inningLabel}`" in source
+    assert "`Keep ${esc(currentLabel)} Inning Defense`" in source
+    assert "`✓ ${esc(inningLabel)} inning defense ready`" in source
 
 
 def test_next_inning_ux_has_distinct_information_pill():
@@ -34,3 +37,15 @@ def test_idle_next_board_does_not_show_step_one_instructions():
     # Contextual guidance remains available once a coach begins a move.
     assert "STEP 2 · CHOOSE DESTINATION" in source
     assert "STEP 2 · CHOOSE PLAYER" in source
+
+def test_next_inning_ux_uses_baseball_language_not_next_state_language():
+    source = BOARD.read_text()
+
+    assert "Same defense as the ${currentLabel}" in source
+    assert "Defense changed for the ${nextLabel}" in source
+    assert "Pregame plan for the ${nextLabel}" in source
+
+    assert "NEXT is ready" not in source
+    assert "NEXT edited" not in source
+    assert "Current defense copied to NEXT" not in source
+    assert "NEXT restored" not in source

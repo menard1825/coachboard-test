@@ -1373,18 +1373,18 @@ def test_now_next_first_slice(
             == 'Second Sam'
         )
 
-        # Use Current Defense is the optional one-tap shortcut.
-        next_board.get_by_role(
-            'button',
-            name='Use current defense',
+        # The keep-current-defense shortcut uses a stable
+        # data hook so coach-facing wording can evolve independently.
+        next_board.locator(
+            '[data-next-use-current]'
         ).click()
 
         expect(
             next_board.locator(
                 '.cb-next-save'
             )
-        ).to_contain_text(
-            'Current defense copied',
+        ).to_have_text(
+            'Saved ✓',
             timeout=10_000,
         )
 
@@ -1425,8 +1425,8 @@ def test_now_next_first_slice(
             next_board.locator(
                 '.cb-next-save'
             )
-        ).to_contain_text(
-            'NEXT restored',
+        ).to_have_text(
+            'Restored ✓',
             timeout=10_000,
         )
 
