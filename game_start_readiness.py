@@ -6,19 +6,35 @@ from game_pitching_rules import rule_settings_payload
 from models import Player, PlayerGameAbsence, Rotation
 
 
-def can_start_game(game, team):
+# Distinct from None, which is a legitimate value for a preloaded rotation: a
+# game with no rotation row queries to None, so None cannot mean "not supplied".
+_UNSET = object()
+
+
+def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSET):
     """Return the one authoritative first-pitch readiness contract.
 
     This intentionally answers a narrower question than build_game_readiness():
     can the coach safely start Live Game right now? Batting order, later innings,
     pitching plans, and fair-play planning do not block first pitch.
+
+    roster/absences/rotation are optional preloads. They exist so one caller --
+    /api/game-day/<id>/readiness -- can load these three rows once and hand the
+    same objects to this function and to build_game_readiness(), instead of each
+    querying them separately. Omit them and this function queries exactly as it
+    always has, which is what /api/live-game/<id>/start relies on.
+
+    A preloaded roster may be ordered or unordered: everything below uses it for
+    membership and set comparisons only, never for sequence.
     """
     team_id = team.id
-    roster = db.session.query(Player).filter_by(team_id=team_id).all()
-    absences = db.session.query(PlayerGameAbsence).filter_by(
-        game_id=game.id,
-        team_id=team_id,
-    ).all()
+    if roster is _UNSET:
+        roster = db.session.query(Player).filter_by(team_id=team_id).all()
+    if absences is _UNSET:
+        absences = db.session.query(PlayerGameAbsence).filter_by(
+            game_id=game.id,
+            team_id=team_id,
+        ).all()
     absent_ids = {row.player_id for row in absences}
     present = [player for player in roster if player.id not in absent_ids]
     present_names = {player.name for player in present}
@@ -27,10 +43,11 @@ def can_start_game(game, team):
     if not present:
         missing.append('Mark at least one player available for this game.')
 
-    rotation = db.session.query(Rotation).filter_by(
-        associated_game_id=game.id,
-        team_id=team_id,
-    ).first()
+    if rotation is _UNSET:
+        rotation = db.session.query(Rotation).filter_by(
+            associated_game_id=game.id,
+            team_id=team_id,
+        ).first()
     inning_one = deepcopy((rotation.innings or {}).get('1', {}) if rotation else {})
     if not isinstance(inning_one, dict):
         inning_one = {}

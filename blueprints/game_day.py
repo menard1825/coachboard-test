@@ -35,11 +35,15 @@ def _team_context():
     return db.session.get(Team, team_id)
 
 
-def _readiness_for_game(game, team):
+def _readiness_for_game(game, team, **preloads):
     # build_game_readiness still uses the established team-based rules engine.
     # Temporarily expose this game's effective rules without changing Team data.
+    #
+    # **preloads forwards the optional roster/absences/rotation arguments so
+    # readiness_api() can share one load with can_start_game(). Callers that
+    # pass nothing get the original behaviour unchanged.
     with game_rule_context(team, game):
-        return build_game_readiness(game, team)
+        return build_game_readiness(game, team, **preloads)
 
 
 @game_day_bp.before_app_request
@@ -375,11 +379,42 @@ def readiness_api(game_id):
     if not game:
         return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
 
-    start_readiness = can_start_game(game, team)
+    # can_start_game() and build_game_readiness() each used to load the roster,
+    # this game's absences and its rotation for themselves, so one request read
+    # all three twice. Load them once here and hand the same objects to both.
+    # The roster is name-ordered because build_game_readiness() needs that
+    # ordering; can_start_game() uses the roster for membership only, so the
+    # ordered list is safe for it too.
+    #
+    # These objects are request-local by construction. Nothing here is cached
+    # between requests.
+    roster = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
+    absences = db.session.query(PlayerGameAbsence).filter_by(
+        game_id=game.id,
+        team_id=team.id,
+    ).all()
+    rotation = db.session.query(Rotation).filter_by(
+        associated_game_id=game.id,
+        team_id=team.id,
+    ).first()
+
+    start_readiness = can_start_game(
+        game,
+        team,
+        roster=roster,
+        absences=absences,
+        rotation=rotation,
+    )
     return jsonify({
         'status': 'success',
         **start_readiness,
-        'readiness': _readiness_for_game(game, team),
+        'readiness': _readiness_for_game(
+            game,
+            team,
+            roster=roster,
+            absences=absences,
+            rotation=rotation,
+        ),
     })
 
 

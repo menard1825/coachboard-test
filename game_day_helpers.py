@@ -72,6 +72,11 @@ def _complete_alignment(alignment, required, present_names, optional_positions=N
     return valid, missing
 
 
+# Distinct from None, which is a legitimate value for a preloaded rotation: a
+# game with no rotation row queries to None, so None cannot mean "not supplied".
+_UNSET = object()
+
+
 def actual_game_rotation(game, team_id):
     rotation = db.session.query(Rotation).filter_by(
         team_id=team_id,
@@ -135,16 +140,30 @@ def _pitching_completion(expected_pitchers, outings):
     return not missing, missing
 
 
-def build_game_readiness(game, team):
+def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSET):
+    """Full pregame/live readiness for one game.
+
+    roster/absences/rotation are optional preloads, so a caller that also needs
+    can_start_game() can load these three rows once and pass the same objects to
+    both instead of each querying them. Callers that omit them -- Game Day's own
+    helper and postgame navigation -- query exactly as before.
+
+    The preloaded roster must be name-ordered when supplied: unlike
+    can_start_game(), the ordering here reaches the response through
+    lineup_missing_names and the pitching-alert list.
+    """
     team_id = team.id
-    roster = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
-    absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
+    if roster is _UNSET:
+        roster = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
+    if absences is _UNSET:
+        absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
     absent_ids = {row.player_id for row in absences}
     present = [player for player in roster if player.id not in absent_ids]
     present_names = {player.name for player in present}
 
     lineup = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team_id).first()
-    rotation = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team_id).first()
+    if rotation is _UNSET:
+        rotation = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team_id).first()
     plans = db.session.query(GamePitchingPlan).filter_by(game_id=game.id, team_id=team_id).all()
     events = db.session.query(GameRotationEvent).filter_by(game_id=game.id, team_id=team_id).all()
     game_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(

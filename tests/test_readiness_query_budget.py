@@ -3,12 +3,13 @@
 Modelled on tests/test_live_state_query_budget.py, which does the same job for
 the live /state endpoint.
 
-The audit measured 25 statements for the pregame-ready shape before the
-rule_settings_payload() change and 23 after. The budget is 24, not 25, on
-purpose: a ceiling of 25 would let the removed duplicate rule reads come back
-without failing anything. One statement of headroom absorbs harmless auth or
-session changes -- three of the 23 statements (users, team_memberships, teams)
-belong to login handling, not to readiness.
+The audit measured 25 statements for the pregame-ready shape. Deduplicating
+the rule queries took it to 23; sharing the roster, absence and rotation loads
+between can_start_game() and build_game_readiness() took it to 20. The budget
+is 21, not 23, on purpose: a looser ceiling would let either set of duplicate
+reads come back without failing anything. One statement of headroom absorbs
+harmless auth or session changes -- three of the 20 statements (users,
+team_memberships, teams) belong to login handling, not to readiness.
 
 The equivalence test deliberately avoids a 33-field golden file. It runs the
 endpoint twice: once as shipped, once with rule_settings_payload() monkeypatched
@@ -26,7 +27,7 @@ from sqlalchemy import event
 from werkzeug.security import generate_password_hash
 
 
-MAX_READINESS_STATEMENTS = 24
+MAX_READINESS_STATEMENTS = 21
 
 ALIGNMENT = {
     'P': 'Pitcher Pat', 'C': 'Catcher Cole', '1B': 'First Frank',
@@ -221,18 +222,23 @@ def test_readiness_stays_within_sql_statement_budget(monkeypatch, capsys):
 
 @pytest.mark.parametrize('game_id', [PREGAME_INCOMPLETE, PREGAME_READY, LIVE],
                          ids=['pregame_incomplete', 'pregame_ready', 'live'])
-def test_readiness_reads_each_rule_table_once_per_call_site(monkeypatch, game_id):
-    """The duplicate rule reads the slice removed must not come back.
+def test_readiness_does_not_reread_its_shared_inputs(monkeypatch, game_id):
+    """The duplicate reads removed by earlier slices must not come back.
 
-    This is a ceiling, not an equality. As of this slice the endpoint measures
-    two reads per rule table: one from rule_settings_payload(), one from the
-    separate effective_rule_set_name() lookup inside game_rule_context(), which
-    this slice deliberately leaves alone.
+    Every bound here is a ceiling, never an equality, so a later reduction to
+    one or zero lands without editing a regression test.
 
-    Three means the duplicate inside rule_settings_payload() has returned, and
-    that is what this guard exists to catch. One or zero must stay allowed: a
-    later slice may legitimately remove the game_rule_context() lookup as well,
-    and an improvement should not have to edit a regression test to land.
+    Current measurements and what each ceiling catches:
+
+      players               1  -- 2 means the shared roster preload was dropped
+      player_game_absences  1  -- 2 means the shared absence preload was dropped
+      rotations             2  -- one shared readiness load plus the separate
+                                  load inside actual_game_rotation(), which is
+                                  deliberately out of scope here; 3 means the
+                                  shared rotation preload was dropped
+      game_pitching_rules      2  -- rule_settings_payload + game_rule_context;
+      team_pitching_settings   2     3 means the duplicate inside
+                                     rule_settings_payload() has returned
     """
     app = _build_app(monkeypatch)
     client = app.test_client()
@@ -247,6 +253,24 @@ def test_readiness_reads_each_rule_table_once_per_call_site(monkeypatch, game_id
     counts = Counter(_table_of(s) for s in statements)
     detail = '\n'.join(f'  {n:02d} {s}' for n, s in enumerate(statements, 1))
 
+    assert counts['players'] <= 1, (
+        f'players read {counts["players"]} times; the endpoint loads the roster '
+        'once and shares it between can_start_game() and build_game_readiness(). '
+        'More than one means a shared preload was dropped.\n'
+        f'{detail}'
+    )
+    assert counts['player_game_absences'] <= 1, (
+        f'player_game_absences read {counts["player_game_absences"]} times; the '
+        'endpoint loads absences once and shares them. More than one means a '
+        'shared preload was dropped.\n'
+        f'{detail}'
+    )
+    assert counts['rotations'] <= 2, (
+        f'rotations read {counts["rotations"]} times; at most 2 are expected (the '
+        'shared readiness load plus actual_game_rotation(), which is out of '
+        'scope). More than that means the shared rotation preload was dropped.\n'
+        f'{detail}'
+    )
     assert counts['game_pitching_rules'] <= 2, (
         f'game_pitching_rules read {counts["game_pitching_rules"]} times; at most 2 '
         'are expected (rule_settings_payload + game_rule_context). More than that '
@@ -329,4 +353,109 @@ def test_readiness_response_is_unchanged_by_the_optimisation(monkeypatch, game_i
     assert len(compared) >= 32, (
         f'only {len(compared)} readiness fields compared; the nested payload '
         'should be almost entirely deterministic'
+    )
+
+
+def _ignoring_preloads(func):
+    """Wrap a readiness calculator so it discards the endpoint's preloads.
+
+    This restores the pre-shared-inputs behaviour through the real HTTP
+    endpoint: both calculators query the roster, absences and rotation for
+    themselves again. Comparing the two responses proves sharing the loads
+    changed nothing observable, without a hand-maintained golden payload.
+    """
+    def wrapper(*args, **kwargs):
+        for key in ('roster', 'absences', 'rotation'):
+            kwargs.pop(key, None)
+        return func(*args, **kwargs)
+    return wrapper
+
+
+@pytest.mark.parametrize('game_id', [PREGAME_INCOMPLETE, PREGAME_READY, LIVE],
+                         ids=['pregame_incomplete', 'pregame_ready', 'live'])
+def test_readiness_response_is_unchanged_by_sharing_the_inputs(monkeypatch, game_id):
+    import blueprints.game_day as game_day
+
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    path = f'/api/game-day/{game_id}/readiness'
+
+    shipped = client.get(path).get_json()
+
+    monkeypatch.setattr(game_day, 'can_start_game',
+                        _ignoring_preloads(game_day.can_start_game))
+    monkeypatch.setattr(game_day, 'build_game_readiness',
+                        _ignoring_preloads(game_day.build_game_readiness))
+    reference = client.get(path).get_json()
+
+    assert sorted(shipped) == ['missing', 'readiness', 'ready', 'status']
+    assert shipped['status'] == reference['status'] == 'success'
+    assert shipped['ready'] == reference['ready']
+    assert shipped['missing'] == reference['missing']
+
+    assert set(shipped['readiness']) == set(reference['readiness'])
+    for field in NON_DETERMINISTIC:
+        assert field in shipped['readiness']
+        assert re.fullmatch(r'\d{4}-\d{2}-\d{2}', shipped['readiness'][field])
+
+    compared = {k: v for k, v in shipped['readiness'].items()
+                if k not in NON_DETERMINISTIC}
+    expected = {k: v for k, v in reference['readiness'].items()
+                if k not in NON_DETERMINISTIC}
+    assert compared == expected
+    assert len(compared) >= 32, (
+        f'only {len(compared)} readiness fields compared; the nested payload '
+        'should be almost entirely deterministic'
+    )
+
+
+@pytest.mark.parametrize('game_id', [PREGAME_INCOMPLETE, PREGAME_READY, LIVE],
+                         ids=['pregame_incomplete', 'pregame_ready', 'live'])
+def test_discarding_the_preloads_makes_both_calculators_load_again(monkeypatch, game_id):
+    """Proves the equivalence oracle above really does bypass the sharing.
+
+    Without this, _ignoring_preloads() could quietly stop working and the
+    equivalence test would be comparing the new implementation against itself.
+
+    The oracle is not a byte-for-byte replay of the pre-slice endpoint: it
+    discards the preloads but the endpoint still performs its three (now
+    unused) loads, so each shared table is read three times rather than two.
+    That is exactly the signal wanted here -- the point is that both
+    calculators go back to loading for themselves.
+    """
+    import blueprints.game_day as game_day
+
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    path = f'/api/game-day/{game_id}/readiness'
+    assert client.get(path).status_code == 200
+
+    _, shared = _measure(app, client, path)
+
+    monkeypatch.setattr(game_day, 'can_start_game',
+                        _ignoring_preloads(game_day.can_start_game))
+    monkeypatch.setattr(game_day, 'build_game_readiness',
+                        _ignoring_preloads(game_day.build_game_readiness))
+    assert client.get(path).status_code == 200
+    _, unshared = _measure(app, client, path)
+
+    shared_counts = Counter(_table_of(item) for item in shared)
+    unshared_counts = Counter(_table_of(item) for item in unshared)
+
+    # One shared load each, versus one endpoint load plus one per calculator.
+    assert shared_counts['players'] == 1
+    assert unshared_counts['players'] == 3
+    assert shared_counts['player_game_absences'] == 1
+    assert unshared_counts['player_game_absences'] == 3
+    # Plus actual_game_rotation()'s own load in both cases.
+    assert shared_counts['rotations'] == 2
+    assert unshared_counts['rotations'] == 4
+
+    assert len(unshared) == len(shared) + 6, (
+        f'shared={len(shared)} unshared={len(unshared)}; discarding the preloads '
+        'should add two extra reads for each of the three shared inputs'
     )
