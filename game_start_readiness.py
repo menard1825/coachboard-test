@@ -11,18 +11,23 @@ from models import Player, PlayerGameAbsence, Rotation
 _UNSET = object()
 
 
-def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSET):
+def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSET,
+                   rule_payload=_UNSET):
     """Return the one authoritative first-pitch readiness contract.
 
     This intentionally answers a narrower question than build_game_readiness():
     can the coach safely start Live Game right now? Batting order, later innings,
     pitching plans, and fair-play planning do not block first pitch.
 
-    roster/absences/rotation are optional preloads. They exist so one caller --
-    /api/game-day/<id>/readiness -- can load these three rows once and hand the
-    same objects to this function and to build_game_readiness(), instead of each
-    querying them separately. Omit them and this function queries exactly as it
-    always has, which is what /api/live-game/<id>/start relies on.
+    roster/absences/rotation/rule_payload are optional preloads. They exist so
+    one caller -- /api/game-day/<id>/readiness -- can resolve these once and hand
+    the same objects to this function and to build_game_readiness(), instead of
+    each querying them separately. Omit them and this function queries exactly as
+    it always has, which is what /api/live-game/<id>/start relies on.
+
+    A supplied rule_payload must have been resolved for this same game: it is
+    consumed only for the 'effective' check below, and a payload from another
+    game would silently answer the first-pitch question with the wrong rules.
 
     A preloaded roster may be ordered or unordered: everything below uses it for
     membership and set comparisons only, never for sequence.
@@ -78,7 +83,8 @@ def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSE
     elif starting_pitcher not in present_names:
         missing.append('The starting pitcher must be available for this game.')
 
-    rule_payload = rule_settings_payload(team, game)
+    if rule_payload is _UNSET:
+        rule_payload = rule_settings_payload(team, game)
     if not rule_payload.get('effective'):
         missing.append('Select the game pitching rules / tracking method.')
 

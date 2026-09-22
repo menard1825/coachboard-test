@@ -7,10 +7,15 @@ The audit measured 25 statements for the pregame-ready shape. Deduplicating
 the rule queries took it to 23; sharing the roster, absence and rotation loads
 between can_start_game() and build_game_readiness() took it to 20; reusing the
 already-loaded rotation and events for the actual-game reconstruction took it
-to 18. The budget is 19, not 21, on purpose: a looser ceiling would let one of
-those duplicate reads come back without failing anything. One statement of
-headroom absorbs harmless auth or session changes -- three of the 18 statements
-(users, team_memberships, teams) belong to login handling, not to readiness.
+to 18; resolving the game's rule payload once and sharing it took it to 16.
+The budget is 17, not 19, on purpose: a looser ceiling would let one of those
+duplicate reads come back without failing anything.
+
+The one statement of headroom is accounted for rather than spare. When no
+competition rule is selected, request_aware_gameplay_rules() reads the team
+preferences a second time for the arm-care fallback, so that path measures 17.
+tests/test_readiness_rule_context_sharing.py pins both figures -- 16 selected,
+17 unselected -- so the ceiling is justified by a tested case.
 
 The equivalence test deliberately avoids a 33-field golden file. It runs the
 endpoint twice: once as shipped, once with rule_settings_payload() monkeypatched
@@ -28,7 +33,7 @@ from sqlalchemy import event
 from werkzeug.security import generate_password_hash
 
 
-MAX_READINESS_STATEMENTS = 19
+MAX_READINESS_STATEMENTS = 17
 
 ALIGNMENT = {
     'P': 'Pitcher Pat', 'C': 'Catcher Cole', '1B': 'First Frank',
@@ -238,9 +243,15 @@ def test_readiness_does_not_reread_its_shared_inputs(monkeypatch, game_id):
                                   rotation preload was dropped
       game_rotation_events  1  -- 2 means the reconstruction is re-querying
                                   events instead of reusing the loaded list
-      game_pitching_rules      2  -- rule_settings_payload + game_rule_context;
-      team_pitching_settings   2     3 means the duplicate inside
-                                     rule_settings_payload() has returned
+      game_pitching_rules   1  -- the endpoint resolves the rule payload once
+                                 and shares it; 2 means can_start_game() or
+                                 _readiness_for_game() went back to resolving
+                                 it for itself
+      team_pitching_settings 2 -- one for the shared payload, plus a second in
+                                 the unselected path only, where
+                                 request_aware_gameplay_rules() reads the
+                                 arm-care preference. Selected-rule fixtures
+                                 measure 1; the ceiling allows both.
     """
     app = _build_app(monkeypatch)
     client = app.test_client()
@@ -280,16 +291,18 @@ def test_readiness_does_not_reread_its_shared_inputs(monkeypatch, game_id):
         'reuses that list. More than one means it is re-querying them.\n'
         f'{detail}'
     )
-    assert counts['game_pitching_rules'] <= 2, (
-        f'game_pitching_rules read {counts["game_pitching_rules"]} times; at most 2 '
-        'are expected (rule_settings_payload + game_rule_context). More than that '
-        'means the duplicate read inside rule_settings_payload() is back.\n'
+    assert counts['game_pitching_rules'] <= 1, (
+        f'game_pitching_rules read {counts["game_pitching_rules"]} times; the '
+        'endpoint resolves the rule payload once and shares it between '
+        'can_start_game() and _readiness_for_game(). More than one means one of '
+        'them is resolving it again.\n'
         f'{detail}'
     )
     assert counts['team_pitching_settings'] <= 2, (
         f'team_pitching_settings read {counts["team_pitching_settings"]} times; at '
-        'most 2 are expected (rule_settings_payload + game_rule_context). More than '
-        'that means the duplicate read inside rule_settings_payload() is back.\n'
+        'most 2 are expected -- one for the shared payload, plus one more in the '
+        'unselected path where request_aware_gameplay_rules() reads the arm-care '
+        'preference. Selected-rule fixtures should measure 1.\n'
         f'{detail}'
     )
 

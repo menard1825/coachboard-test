@@ -9,6 +9,7 @@ from game_pitching_rules import (
     GamePitchingRule,
     RULE_SET_OPTIONS,
     game_rule_context,
+    rule_name_context,
     game_rule_override,
     install_request_rule_adapters,
     rule_settings_payload,
@@ -35,14 +36,31 @@ def _team_context():
     return db.session.get(Team, team_id)
 
 
-def _readiness_for_game(game, team, **preloads):
+# Distinct from None, which is a legitimate effective rule name: a team with no
+# competition rule selected resolves to None, so None cannot mean "not supplied".
+_RULE_PAYLOAD_UNSET = object()
+
+
+def _readiness_for_game(game, team, *, rule_payload=_RULE_PAYLOAD_UNSET, **preloads):
     # build_game_readiness still uses the established team-based rules engine.
     # Temporarily expose this game's effective rules without changing Team data.
     #
     # **preloads forwards the optional roster/absences/rotation arguments so
     # readiness_api() can share one load with can_start_game(). Callers that
     # pass nothing get the original behaviour unchanged.
-    with game_rule_context(team, game):
+    #
+    # rule_payload is the same optional sharing for the rule lookup.
+    # game_rule_context() resolves the effective rule name by querying
+    # game_pitching_rules and team_pitching_settings again, which readiness_api()
+    # has already read for can_start_game(). When it hands that payload over,
+    # enter the name-based context directly instead. Every other caller -- the
+    # game-day home cards, the next-game card, the follow-up history cards and
+    # the game report -- omits it and keeps game_rule_context() untouched.
+    if rule_payload is _RULE_PAYLOAD_UNSET:
+        with game_rule_context(team, game):
+            return build_game_readiness(game, team, **preloads)
+
+    with rule_name_context(team, rule_payload.get('effective')):
         return build_game_readiness(game, team, **preloads)
 
 
@@ -398,12 +416,24 @@ def readiness_api(game_id):
         team_id=team.id,
     ).first()
 
+    # Both consumers need this game's effective pitching rules, and each used to
+    # resolve them for itself: can_start_game() through rule_settings_payload()
+    # and build_game_readiness() through game_rule_context(). Resolve once here
+    # and hand the same dict to both.
+    #
+    # Request-local and game-specific by construction: a plain local, resolved
+    # from the `game` loaded above and passed straight into the two calls below.
+    # Nothing is memoized on g, the Team, the Game, a module global, or any
+    # cross-request structure.
+    rule_payload = rule_settings_payload(team, game)
+
     start_readiness = can_start_game(
         game,
         team,
         roster=roster,
         absences=absences,
         rotation=rotation,
+        rule_payload=rule_payload,
     )
     return jsonify({
         'status': 'success',
@@ -414,6 +444,7 @@ def readiness_api(game_id):
             roster=roster,
             absences=absences,
             rotation=rotation,
+            rule_payload=rule_payload,
         ),
     })
 
