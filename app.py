@@ -230,16 +230,52 @@ def create_app():
 
     @app.context_processor
     def inject_team_info():
+        """Inject the header's Team objects, refreshed from the database.
+
+        Freshness is deliberate: the chrome in base.html renders
+        current_team.team_name, its logo and its brand colors on every page,
+        and the Switch Team menus render available_teams. Those rows must
+        reflect what the database holds now, not what some earlier query in
+        this request happened to put in the identity map.
+
+        That freshness is bought at query level -- populate_existing() makes
+        exactly these two loads overwrite the Team rows they touch -- rather
+        than with a session-wide db.session.expire_all(). The blanket expire
+        this replaces also invalidated every Game, Player, Rotation and
+        Lineup the view had already loaded, so each attribute the template
+        then read cost another SELECT. On Game Day that was around a dozen
+        extra statements for a header that reads one Team; see
+        tests/test_template_context_query_budget.py for the measurements.
+
+        no_autoflush keeps the processor read-only. It runs after the view
+        function, immediately before the template executes, so an autoflush
+        here would push a view's unflushed edit to the database merely
+        because the page chrome rendered. Rendering must not write.
+        """
         info = {}
         if 'team_id' in session:
-            db.session.expire_all()
-            team = db.session.get(Team, session['team_id'])
-            info['current_team'] = team
+            with db.session.no_autoflush:
+                team = db.session.get(
+                    Team,
+                    session['team_id'],
+                    populate_existing=True,
+                )
+                info['current_team'] = team
 
-            if 'username' in session:
-                from models import TeamMembership
-                user_teams = db.session.query(Team).join(TeamMembership).join(User).filter(func.lower(User.username) == func.lower(session['username'])).all()
-                info['available_teams'] = user_teams
+                if 'username' in session:
+                    from models import TeamMembership
+                    user_teams = (
+                        db.session.query(Team)
+                        .join(TeamMembership)
+                        .join(User)
+                        .filter(
+                            func.lower(User.username)
+                            == func.lower(session['username'])
+                        )
+                        .populate_existing()
+                        .all()
+                    )
+                    info['available_teams'] = user_teams
 
         return info
 
