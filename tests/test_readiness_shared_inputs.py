@@ -317,9 +317,11 @@ def test_build_game_readiness_honours_the_same_preloads(monkeypatch):
 
     assert counts['players'] == 0, statements
     assert counts['player_game_absences'] == 0, statements
-    # actual_game_rotation() performs its own rotation load; that internal
-    # duplicate is deliberately out of scope for this slice.
-    assert counts['rotations'] == 1, statements
+    # Zero, not one: the actual-game reconstruction now reuses this preloaded
+    # rotation instead of calling actual_game_rotation(), which used to load it
+    # a second time.
+    assert counts['rotations'] == 0, statements
+    assert counts['game_rotation_events'] == 1, statements
 
 
 def test_build_game_readiness_without_preloads_queries_as_before(monkeypatch):
@@ -333,7 +335,10 @@ def test_build_game_readiness_without_preloads_queries_as_before(monkeypatch):
 
     assert counts['players'] == 1, statements
     assert counts['player_game_absences'] == 1, statements
-    assert counts['rotations'] == 2, statements
+    # One, not two: without preloads build_game_readiness() loads the rotation
+    # for itself, and the reconstruction reuses that one load.
+    assert counts['rotations'] == 1, statements
+    assert counts['game_rotation_events'] == 1, statements
 
 
 @pytest.mark.parametrize('game_id', [WITH_ROTATION, NO_ROTATION, EMPTY_ROTATION],

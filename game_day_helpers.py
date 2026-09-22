@@ -77,25 +77,66 @@ def _complete_alignment(alignment, required, present_names, optional_positions=N
 _UNSET = object()
 
 
+def _event_order_key(event):
+    """Python equivalent of ORDER BY sequence ASC, id ASC.
+
+    SQLite sorts NULLs first in an ascending clause, so a row with a missing
+    sequence or id has to sort ahead of any value rather than raising on a
+    None/int comparison. The leading 0/1 flag reproduces that, instead of
+    assuming both columns are always populated.
+    """
+    sequence = getattr(event, 'sequence', None)
+    identifier = getattr(event, 'id', None)
+    return (
+        (1, sequence) if sequence is not None else (0, 0),
+        (1, identifier) if identifier is not None else (0, 0),
+    )
+
+
+def _reconstruct_actual_game_rotation(rotation, events):
+    """Rebuild the played defense from a rotation plan plus its events.
+
+    Pure: issues no query, and mutates neither `rotation` nor `events` nor the
+    event rows. The caller's list is never sorted in place -- sorted() returns
+    a new list -- and every alignment that reaches the result is deepcopied, so
+    a caller mutating what it gets back cannot reach the ORM objects.
+
+    Ordering is load-bearing twice over, which is why this helper normalizes it
+    rather than trusting its caller: `actual[inning] = ...` is last-write-wins,
+    so the final event for an inning decides the alignment, and
+    _actual_pitcher_names() reports pitchers in first-seen order. The ordered
+    list is returned for exactly that reason.
+
+    build_game_readiness() loads its events without an ORDER BY -- that query's
+    other consumers only need bool()/any() -- and SQLite happens to return them
+    in sequence order today purely because it scans
+    idx_game_rotation_events_team_game_sequence_id. Normalizing here means the
+    reconstruction does not depend on that accident.
+    """
+    ordered_events = sorted(events or [], key=_event_order_key)
+    actual = deepcopy(rotation.innings or {}) if rotation else {}
+    reached = set()
+    for event in ordered_events:
+        if event.reverted:
+            continue
+        reached.add(str(event.inning))
+        actual[str(event.inning)] = deepcopy(event.after_alignment or {})
+    if ordered_events:
+        reached.add('1')
+    return actual, ordered_events, reached
+
+
 def actual_game_rotation(game, team_id):
     rotation = db.session.query(Rotation).filter_by(
         team_id=team_id,
         associated_game_id=game.id,
     ).first()
-    actual = deepcopy(rotation.innings or {}) if rotation else {}
     events = db.session.query(GameRotationEvent).filter_by(
         team_id=team_id,
         game_id=game.id,
     ).order_by(GameRotationEvent.sequence.asc(), GameRotationEvent.id.asc()).all()
-    reached = set()
-    for event in events:
-        if event.reverted:
-            continue
-        reached.add(str(event.inning))
-        actual[str(event.inning)] = deepcopy(event.after_alignment or {})
-    if events:
-        reached.add('1')
-    return rotation, actual, events, reached
+    actual, ordered_events, reached = _reconstruct_actual_game_rotation(rotation, events)
+    return rotation, actual, ordered_events, reached
 
 
 def _actual_pitcher_names(actual, events, reached=None):
@@ -292,7 +333,10 @@ def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation
     has_pitching = bool(game_outings)
     ready = not blockers
 
-    _, actual, actual_events, reached = actual_game_rotation(game, team_id)
+    # The rotation and events are already in hand, so reconstruct from them
+    # rather than calling actual_game_rotation(), which would re-query both.
+    # The helper normalizes the event order this path's query does not request.
+    actual, actual_events, reached = _reconstruct_actual_game_rotation(rotation, events)
     expected_pitchers = _actual_pitcher_names(actual, actual_events, reached)
     pitching_stats_complete, pitching_missing = _pitching_completion(expected_pitchers, game_outings)
     pitching_stats_pending = bool(expected_pitchers) and not pitching_stats_complete

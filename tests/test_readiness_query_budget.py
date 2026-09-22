@@ -5,11 +5,12 @@ the live /state endpoint.
 
 The audit measured 25 statements for the pregame-ready shape. Deduplicating
 the rule queries took it to 23; sharing the roster, absence and rotation loads
-between can_start_game() and build_game_readiness() took it to 20. The budget
-is 21, not 23, on purpose: a looser ceiling would let either set of duplicate
-reads come back without failing anything. One statement of headroom absorbs
-harmless auth or session changes -- three of the 20 statements (users,
-team_memberships, teams) belong to login handling, not to readiness.
+between can_start_game() and build_game_readiness() took it to 20; reusing the
+already-loaded rotation and events for the actual-game reconstruction took it
+to 18. The budget is 19, not 21, on purpose: a looser ceiling would let one of
+those duplicate reads come back without failing anything. One statement of
+headroom absorbs harmless auth or session changes -- three of the 18 statements
+(users, team_memberships, teams) belong to login handling, not to readiness.
 
 The equivalence test deliberately avoids a 33-field golden file. It runs the
 endpoint twice: once as shipped, once with rule_settings_payload() monkeypatched
@@ -27,7 +28,7 @@ from sqlalchemy import event
 from werkzeug.security import generate_password_hash
 
 
-MAX_READINESS_STATEMENTS = 21
+MAX_READINESS_STATEMENTS = 19
 
 ALIGNMENT = {
     'P': 'Pitcher Pat', 'C': 'Catcher Cole', '1B': 'First Frank',
@@ -232,10 +233,11 @@ def test_readiness_does_not_reread_its_shared_inputs(monkeypatch, game_id):
 
       players               1  -- 2 means the shared roster preload was dropped
       player_game_absences  1  -- 2 means the shared absence preload was dropped
-      rotations             2  -- one shared readiness load plus the separate
-                                  load inside actual_game_rotation(), which is
-                                  deliberately out of scope here; 3 means the
-                                  shared rotation preload was dropped
+      rotations             1  -- 2 means build_game_readiness() went back to
+                                  calling actual_game_rotation(), or the shared
+                                  rotation preload was dropped
+      game_rotation_events  1  -- 2 means the reconstruction is re-querying
+                                  events instead of reusing the loaded list
       game_pitching_rules      2  -- rule_settings_payload + game_rule_context;
       team_pitching_settings   2     3 means the duplicate inside
                                      rule_settings_payload() has returned
@@ -265,10 +267,17 @@ def test_readiness_does_not_reread_its_shared_inputs(monkeypatch, game_id):
         'shared preload was dropped.\n'
         f'{detail}'
     )
-    assert counts['rotations'] <= 2, (
-        f'rotations read {counts["rotations"]} times; at most 2 are expected (the '
-        'shared readiness load plus actual_game_rotation(), which is out of '
-        'scope). More than that means the shared rotation preload was dropped.\n'
+    assert counts['rotations'] <= 1, (
+        f'rotations read {counts["rotations"]} times; the endpoint loads the '
+        'rotation once and the actual-game reconstruction reuses it. More than '
+        'one means the preload was dropped or build_game_readiness() is calling '
+        'actual_game_rotation() again.\n'
+        f'{detail}'
+    )
+    assert counts['game_rotation_events'] <= 1, (
+        f'game_rotation_events read {counts["game_rotation_events"]} times; '
+        'build_game_readiness() loads the events once and the reconstruction '
+        'reuses that list. More than one means it is re-querying them.\n'
         f'{detail}'
     )
     assert counts['game_pitching_rules'] <= 2, (
@@ -451,9 +460,10 @@ def test_discarding_the_preloads_makes_both_calculators_load_again(monkeypatch, 
     assert unshared_counts['players'] == 3
     assert shared_counts['player_game_absences'] == 1
     assert unshared_counts['player_game_absences'] == 3
-    # Plus actual_game_rotation()'s own load in both cases.
-    assert shared_counts['rotations'] == 2
-    assert unshared_counts['rotations'] == 4
+    # The actual-game reconstruction reuses the loaded rotation in both cases,
+    # so this tracks the shared preload alone.
+    assert shared_counts['rotations'] == 1
+    assert unshared_counts['rotations'] == 3
 
     assert len(unshared) == len(shared) + 6, (
         f'shared={len(shared)} unshared={len(unshared)}; discarding the preloads '
