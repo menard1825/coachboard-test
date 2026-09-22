@@ -502,7 +502,21 @@
     observer.observe(document.body, { childList: true, subtree: true });
     queueDynamicPass();
 
-    window.setInterval(refreshReadiness, 8000);
+    // Periodic readiness now arrives from game_prep_readiness.js, which polls
+    // /api/game-day/<id>/readiness every 5s for its own pregame panel and
+    // publishes each successful response. This module deliberately has no
+    // readiness interval of its own: the removed 8s poller was a third
+    // duplicate request for the same payload.
+    //
+    // The two direct fetches below stay as independent fallbacks, so the Start
+    // Game button still converges if the owner module never loads or its
+    // publish stops arriving.
+    document.addEventListener('coachboard:readiness', (event) => {
+      const detail = event?.detail;
+      if (!detail || Number(detail.game_id) !== gameId) return;
+      applyStartReadiness(detail.response);
+    });
+
     window.setInterval(refreshPitchingState, 12000);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {

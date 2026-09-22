@@ -358,12 +358,44 @@
     });
   }
 
+  // OWNERSHIP NOTE -- read before changing this poller.
+  //
+  // This module is the periodic readiness owner for the Start Game UI.
+  // game_setup_ux.js no longer polls /api/game-day/<id>/readiness on its own
+  // timer; it subscribes to the coachboard:readiness event published below and
+  // feeds the payload straight into its existing applyStartReadiness().
+  //
+  // Consequence: stopping or gating this poller also stops periodic Start Game
+  // readiness updates. In particular, suppressing the fetch when r.is_live is
+  // true -- which looks like free savings because render() discards live
+  // payloads -- would silently leave game_setup_ux.js with no periodic source
+  // at all. Give it another periodic owner first, or do not gate this poller.
+  //
+  // game_setup_ux.js keeps direct fetches on init and on visibility resume, so
+  // it can initialize and re-sync independently, but foreground periodic
+  // updates depend on this owner.
+  function publishReadiness(data) {
+    document.dispatchEvent(new CustomEvent('coachboard:readiness', {
+      detail: {
+        game_id: gameId,
+        // The whole endpoint response, not just data.readiness: subscribers
+        // consume top-level `ready` and `missing` alongside readiness.is_live.
+        response: data,
+      },
+    }));
+  }
+
   async function refresh() {
     try {
       const response = await fetch(`/api/game-day/${gameId}/readiness`, {cache:'no-store'});
       if (!response.ok) return;
       const data = await response.json();
-      if (data?.readiness) render(data.readiness);
+      if (!data) return;
+      // Publish before rendering: coachboard:readiness is the periodic source
+      // for the Start Game UI, so a throw inside the owner panel's renderer
+      // must not withhold an otherwise valid server response from it.
+      publishReadiness(data);
+      if (data.readiness) render(data.readiness);
     } catch (_) {}
   }
 
