@@ -782,6 +782,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('overview-content-container');
         if (!container) return;
 
+        // OWNERSHIP: home_dashboard.js is the modern owner of this container on
+        // Home. It marks its claim in the DOM -- .cb-home-loading while its
+        // model is still building, .cb-home-dashboard once it has rendered --
+        // and this legacy renderer stands down for either marker.
+        //
+        // The test is deliberately the markers and not the page, the body
+        // class, or the presence of the home_dashboard script tag. Those
+        // broader signals are true even when home_dashboard.js fails to fetch
+        // or throws before it writes anything, and keeping this renderer alive
+        // in that case is what stops Home from being permanently blank.
+        //
+        // Without this guard the two renderers race on every Home load: under
+        // API latency the legacy dashboard replaced the modern one for seconds
+        // at a time. home_dashboard.js still keeps guardAgainstLegacyOverview()
+        // as its own backstop; this guard is what prevents the flash rather
+        // than repairing it afterwards.
+        if (container.querySelector('.cb-home-loading, .cb-home-dashboard')) return;
+
         // Since the data is already fetched in init(), we can access it from AppState
         const { next_game, pitchers_on_rest, recent_notes } = AppState.full_data.overview || {};
 
