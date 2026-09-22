@@ -4,7 +4,12 @@ from flask import Blueprint, flash, g, jsonify, redirect, render_template, reque
 
 from db import db
 from extensions import socketio
-from game_day_helpers import build_actual_game_report, build_game_readiness, team_now
+from game_day_helpers import (
+    build_actual_game_report,
+    build_game_followup_status,
+    build_game_readiness,
+    team_now,
+)
 from game_pitching_rules import (
     GamePitchingRule,
     RULE_SET_OPTIONS,
@@ -135,13 +140,21 @@ def game_day_home():
         Game.team_id == team.id,
         Game.date < next_day,
     ).order_by(Game.date.desc(), Game.id.desc()).limit(20).all()
+    # This loop classifies up to 20 candidates to keep at most six, so it uses
+    # build_game_followup_status() rather than _readiness_for_game(): three
+    # queries per candidate instead of twelve. The Postgame Follow-Up section
+    # of game_day.html renders only item.game.*, readiness.status and
+    # readiness.pitching_missing, which is exactly what the classifier returns.
+    #
+    # Today's games and the next-game card still get the full payload below --
+    # they render readiness detail, and there is at most a handful of them.
     followup_cards = []
     for game in followup_candidates:
         if game.id in focus_ids:
             continue
-        readiness = _readiness_for_game(game, team)
-        if readiness['status'] in {'GC STATS PENDING', 'NEEDS POSTGAME'}:
-            followup_cards.append({'game': game, 'readiness': readiness})
+        followup = build_game_followup_status(game, team.id)
+        if followup is not None:
+            followup_cards.append({'game': game, 'readiness': followup})
         if len(followup_cards) >= 6:
             break
     followup_ids = {item['game'].id for item in followup_cards}

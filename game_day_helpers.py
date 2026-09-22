@@ -181,6 +181,82 @@ def _pitching_completion(expected_pitchers, outings):
     return not missing, missing
 
 
+FOLLOWUP_STATUSES = frozenset({'GC STATS PENDING', 'NEEDS POSTGAME'})
+
+
+def build_game_followup_status(game, team_id):
+    """Postgame-follow-up classification for one game, or None.
+
+    Game Day's follow-up loop scans up to 20 candidates and keeps at most six.
+    Running build_game_readiness() on each cost 12 statements per candidate --
+    roster, absences, lineup, lineup entries, pitching plans, pitch targets and
+    a team-wide outing scan -- none of which can affect the answer.
+
+    The two follow-up statuses sit above `ready` in build_game_readiness()'s
+    status ladder and are reachable only when the game has live rotation
+    events, so lineup validation, defensive completeness, pitching plans,
+    fair-play calculations and the rule context cannot change them. The PAST
+    override cannot reach them either: it applies only when there are no
+    events. That leaves four inputs -- the Game row plus this game's rotation,
+    events and outings -- and three queries.
+
+    Returns the same 'status' and 'pitching_missing' the full payload would
+    carry, which is everything the Postgame Follow-Up template renders, or None
+    when the game does not belong in that section. Statuses outside the
+    follow-up set collapse to None rather than being reported: READY and PREP
+    genuinely need the full readiness calculation, and this helper must not
+    grow into a second readiness system.
+
+    The reconstruction and completion semantics are the shared ones, not
+    copies, so reverted events, End Game handling, same-inning last-write-wins,
+    expected-pitcher ordering and pitching_missing ordering stay identical by
+    construction rather than by parallel maintenance.
+    """
+    if game is None:
+        return None
+    if game.is_live:
+        return None
+
+    events = db.session.query(GameRotationEvent).filter_by(
+        game_id=game.id,
+        team_id=team_id,
+    ).all()
+    live_events = [event for event in events if not event.reverted]
+    if not live_events:
+        return None
+
+    has_end_game = any(event.event_type == 'End Game' for event in live_events)
+
+    rotation = db.session.query(Rotation).filter_by(
+        associated_game_id=game.id,
+        team_id=team_id,
+    ).first()
+    game_outings = db.session.query(PitchingOuting).options(
+        joinedload(PitchingOuting.player)
+    ).filter_by(
+        game_id=game.id,
+        team_id=team_id,
+    ).all()
+
+    actual, ordered_events, reached = _reconstruct_actual_game_rotation(rotation, events)
+    expected_pitchers = _actual_pitcher_names(actual, ordered_events, reached)
+    pitching_stats_complete, pitching_missing = _pitching_completion(
+        expected_pitchers, game_outings)
+    pitching_stats_pending = bool(expected_pitchers) and not pitching_stats_complete
+
+    if has_end_game and pitching_stats_pending:
+        status = 'GC STATS PENDING'
+    elif has_end_game:
+        return None
+    elif expected_pitchers and pitching_stats_complete and bool(game_outings):
+        # Legacy completed game, from before the durable End Game event.
+        return None
+    else:
+        status = 'NEEDS POSTGAME'
+
+    return {'status': status, 'pitching_missing': pitching_missing}
+
+
 def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSET):
     """Full pregame/live readiness for one game.
 
