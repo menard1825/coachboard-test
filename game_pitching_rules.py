@@ -44,7 +44,25 @@ def rule_settings_payload(team, game=None):
     override = game_rule_override(game.id, team.id) if game is not None else None
     preferences = pitching_preferences_for_team(team)
     team_default = preferences['competition_default_rule']
-    effective = effective_rule_set_name(team, game)
+
+    # Same answer as effective_rule_set_name(team, game), computed from the two
+    # rows already loaded above. Calling that helper from here re-read both
+    # game_pitching_rules and team_pitching_settings, which is why one
+    # /api/game-day/<id>/readiness request read each of those tables three
+    # times: once for this function, once for the helper it called, and once
+    # for the separate game_rule_context() lookup (which this change leaves
+    # alone). effective_rule_set_name() itself is unchanged and still has
+    # other callers.
+    #
+    # The RULE_SET_OPTIONS membership check is load-bearing, not defensive: an
+    # override row naming a rule set that no longer exists falls back to the
+    # team default for `effective` while still reporting source='game' below.
+    # That asymmetry is pre-existing behaviour and is pinned by tests.
+    if override is not None and override.rule_set in RULE_SET_OPTIONS:
+        effective = override.rule_set
+    else:
+        effective = team_default
+
     if override:
         source = 'game'
     elif team_default:
