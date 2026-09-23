@@ -315,7 +315,20 @@
       return Number.isFinite(value) ? value : 0;
     }
 
+    // render() is idempotent: the observer below watches these chips, so
+    // rewriting a chip that already reads correctly queued another render,
+    // which rewrote it again -- every frame, for as long as Home was open.
+    function metricCopyMatches(container, strong, copy) {
+      const nodes = container.childNodes;
+      return nodes.length === 2
+        && nodes[0] === strong
+        && nodes[1].nodeType === Node.ELEMENT_NODE
+        && nodes[1].classList.contains('cb-roster-metric-copy')
+        && nodes[1].textContent === copy;
+    }
+
     function replaceMetricCopy(container, strong, copy) {
+      if (metricCopyMatches(container, strong, copy)) return;
       [...container.childNodes].forEach((node) => {
         if (node !== strong) node.remove();
       });
@@ -341,7 +354,7 @@
 
       if (profileStrong) {
         if (profilesComplete) {
-          profileStrong.textContent = 'All';
+          if (profileStrong.textContent !== 'All') profileStrong.textContent = 'All';
           replaceMetricCopy(profileEl, profileStrong, ` ${total} profiles complete`);
         } else {
           replaceMetricCopy(profileEl, profileStrong, ` of ${total} profile${total === 1 ? '' : 's'} incomplete`);
