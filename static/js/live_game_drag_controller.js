@@ -81,7 +81,7 @@
           position:fixed;z-index:8000;pointer-events:none;
           transform:translate(-50%,-50%) scale(1.04);
           max-width:170px;padding:8px 10px;
-          border:2px solid #102a66;border-radius:10px;
+          border:2px solid var(--cb-primary-text,#102a66);border-radius:10px;
           background:#fff;color:#172033;
           font-size:.7rem;font-weight:850;text-align:center;
           box-shadow:0 12px 28px rgba(16,24,40,.24);

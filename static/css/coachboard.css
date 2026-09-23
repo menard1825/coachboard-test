@@ -4,6 +4,16 @@
 
 :root {
   --cb-primary: var(--primary-color, #173b6c);
+  /* Text and icons that sit on --cb-primary. base.html sets it from the team
+     color's contrast (team_theme.py): white, or dark ink on light colors. */
+  --cb-on-primary: var(--on-primary-color, #fff);
+  /* The team color drawn as text, icons or outlines on white and light
+     surfaces: the team color, or a darker shade of it when it would not read
+     there (team_theme.py). Fills keep --cb-primary. */
+  --cb-primary-text: var(--primary-text-color, var(--cb-primary));
+  /* Edge of outlined team-color controls: the lightest tint of the text color
+     that still reaches 3:1 on white and --cb-bg for any team color. */
+  --cb-primary-outline: color-mix(in srgb, var(--cb-primary-text) 72%, #d8dee7);
   --cb-accent: var(--secondary-color, #c9a227);
   --cb-bg: #f3f5f8;
   --cb-surface: #ffffff;
@@ -17,6 +27,7 @@
   --cb-success-bg: #eef9f2;
   --cb-warning: #8a5b00;
   --cb-warning-bg: #fff8e8;
+  /* Destructive actions and errors. Fixed: never derived from the team color. */
   --cb-danger: #b42318;
   --cb-danger-bg: #fff1f0;
   --cb-radius: 14px;
@@ -87,6 +98,11 @@ body.cb-ui .navbar {
   background: var(--cb-primary) !important;
   border-bottom: 3px solid var(--cb-accent);
   box-shadow: 0 2px 8px rgba(16, 24, 40, .12) !important;
+  --bs-navbar-color: color-mix(in srgb, var(--cb-on-primary) 82%, transparent);
+  --bs-navbar-hover-color: var(--cb-on-primary);
+  --bs-navbar-active-color: var(--cb-on-primary);
+  --bs-navbar-brand-color: var(--cb-on-primary);
+  --bs-navbar-brand-hover-color: var(--cb-on-primary);
 }
 
 body.cb-ui .navbar-brand-text {
@@ -107,9 +123,9 @@ body.cb-ui .coach-primary-nav .cb-nav-more {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: rgba(255,255,255,.82);
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.04);
+  color: color-mix(in srgb, var(--cb-on-primary) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cb-on-primary) 18%, transparent);
+  background: color-mix(in srgb, var(--cb-on-primary) 4%, transparent);
   text-decoration: none;
   font-size: .78rem;
   font-weight: 750;
@@ -121,9 +137,9 @@ body.cb-ui .coach-primary-nav .cb-nav-link:focus,
 body.cb-ui .coach-primary-nav .cb-nav-more:hover,
 body.cb-ui .coach-primary-nav .cb-nav-more:focus,
 body.cb-ui .coach-primary-nav .cb-nav-link.active {
-  color: #fff;
-  background: rgba(255,255,255,.14);
-  border-color: rgba(255,255,255,.34);
+  color: var(--cb-on-primary);
+  background: color-mix(in srgb, var(--cb-on-primary) 14%, transparent);
+  border-color: color-mix(in srgb, var(--cb-on-primary) 34%, transparent);
 }
 
 body.cb-ui .coach-primary-nav .dropdown-menu {
@@ -255,7 +271,7 @@ body.cb-ui .accordion-button {
 body.cb-ui .accordion-button:not(.collapsed) {
   background: color-mix(in srgb, var(--cb-primary) 7%, white) !important;
   color: var(--cb-ink) !important;
-  box-shadow: inset 3px 0 0 var(--cb-primary);
+  box-shadow: inset 3px 0 0 var(--cb-primary-text);
 }
 
 /* Buttons */
@@ -267,7 +283,15 @@ body.cb-ui .btn {
 body.cb-ui .btn-primary {
   background: var(--cb-primary) !important;
   border-color: var(--cb-primary) !important;
-  color: #fff !important;
+  color: var(--cb-on-primary) !important;
+}
+
+/* A very light team color would leave a main button with no visible edge. */
+html.cb-on-primary-dark body.cb-ui .btn-primary,
+html.cb-on-primary-dark body.cb-ui .gd-primary,
+html.cb-on-primary-dark body.cb-ui .btn-outline-primary:hover,
+html.cb-on-primary-dark body.cb-ui .btn-outline-primary:focus {
+  border-color: color-mix(in srgb, var(--cb-primary) 70%, var(--cb-on-primary)) !important;
 }
 
 body.cb-ui .btn-primary:hover,
@@ -276,14 +300,14 @@ body.cb-ui .btn-primary:focus {
 }
 
 body.cb-ui .btn-outline-primary {
-  color: var(--cb-primary) !important;
-  border-color: color-mix(in srgb, var(--cb-primary) 55%, #d8dee7) !important;
+  color: var(--cb-primary-text) !important;
+  border-color: var(--cb-primary-outline) !important;
   background: #fff;
 }
 
 body.cb-ui .btn-outline-primary:hover,
 body.cb-ui .btn-outline-primary:focus {
-  color: #fff !important;
+  color: var(--cb-on-primary) !important;
   background: var(--cb-primary) !important;
   border-color: var(--cb-primary) !important;
 }
@@ -300,6 +324,17 @@ body.cb-ui .btn-outline-danger {
   color: var(--cb-danger) !important;
   border-color: #d9a7a2 !important;
   background: #fff;
+}
+
+/* When the team color is itself close to the danger red, a solid red Delete
+   would look exactly like the team's main buttons. Keep the danger color but
+   show destructive buttons outlined, so the two stay apart. */
+html.cb-primary-near-danger body.cb-ui .btn-danger,
+html.cb-primary-near-danger body.cb-ui .btn-outline-danger:hover,
+html.cb-primary-near-danger body.cb-ui .btn-outline-danger:focus {
+  background: var(--cb-danger-bg) !important;
+  border: 2px solid var(--cb-danger) !important;
+  color: var(--cb-danger) !important;
 }
 
 /* Forms */
@@ -324,7 +359,7 @@ body.cb-ui .form-select-sm {
 body.cb-ui .form-control:focus,
 body.cb-ui .form-select:focus,
 body.cb-ui .form-check-input:focus {
-  border-color: var(--cb-primary);
+  border-color: var(--cb-primary-text);
   box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--cb-primary) 14%, transparent);
 }
 
@@ -341,6 +376,16 @@ body.cb-ui .text-muted {
 body.cb-ui .form-check-input:checked {
   background-color: var(--cb-primary);
   border-color: var(--cb-primary);
+}
+
+/* Bootstrap draws the check and switch knob in white; draw them dark on a
+   light team color. */
+html.cb-on-primary-dark body.cb-ui .form-check-input:checked[type=checkbox] {
+  --bs-form-check-bg-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23172033' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+  border-color: color-mix(in srgb, var(--cb-primary) 70%, var(--cb-on-primary));
+}
+html.cb-on-primary-dark body.cb-ui .form-switch .form-check-input:checked {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23172033'/%3e%3c/svg%3e");
 }
 
 /* Modals */
@@ -393,6 +438,7 @@ body.cb-ui .alert-danger {
 body.cb-ui .badge.bg-primary,
 body.cb-ui .badge.text-bg-primary {
   background: var(--cb-primary) !important;
+  color: var(--cb-on-primary) !important;
 }
 
 /* Tables */
@@ -549,7 +595,7 @@ body.cb-settings .card-header-tabs .nav-link {
 }
 
 body.cb-settings .card-header-tabs .nav-link.active {
-  color: var(--cb-primary);
+  color: var(--cb-primary-text);
   background: color-mix(in srgb, var(--cb-primary) 8%, white);
 }
 
@@ -563,6 +609,7 @@ body.cb-ui .rte-tab.active,
 body.cb-ui #pregame-defense-editor-v3 .pde-inning {
   background: var(--cb-primary) !important;
   border-color: var(--cb-primary) !important;
+  color: var(--cb-on-primary) !important;
 }
 
 body.cb-ui .rte-card,
@@ -597,8 +644,8 @@ body.cb-ui .gd-hero h1 {
   }
 
   body.cb-ui .bottom-nav-fixed .nav-link.active {
-    color: var(--cb-primary);
-    border-top-color: var(--cb-primary);
+    color: var(--cb-primary-text);
+    border-top-color: var(--cb-primary-text);
   }
 
   body.cb-ui .cb-page-head,

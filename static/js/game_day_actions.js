@@ -54,18 +54,16 @@
     document.head.appendChild(style);
   }
 
+  // A light team color -- white included -- is a real theme now: base.html
+  // gives it dark text (--cb-on-primary). Only a button left with no
+  // background at all needs painting, and then in the team's own colors.
   function ensurePrimaryButtonContrast() {
     document.querySelectorAll('.gd-primary').forEach(button => {
       const background = window.getComputedStyle(button).backgroundColor.replace(/\s/g, '');
-      if (
-        background === 'rgba(0,0,0,0)' ||
-        background === 'transparent' ||
-        background === 'rgb(255,255,255)' ||
-        background === 'rgba(255,255,255,1)'
-      ) {
-        button.style.backgroundColor = '#102a66';
-        button.style.borderColor = '#102a66';
-        button.style.color = '#fff';
+      if (background === 'rgba(0,0,0,0)' || background === 'transparent') {
+        button.style.backgroundColor = 'var(--cb-primary, #173b6c)';
+        button.style.borderColor = 'var(--cb-primary, #173b6c)';
+        button.style.color = 'var(--cb-on-primary, #fff)';
       }
     });
   }

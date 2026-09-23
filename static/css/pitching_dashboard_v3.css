@@ -71,7 +71,7 @@ body.cb-pitching main > .container-fluid {
   place-items: center;
   border-radius: 9px;
   background: #f1f4f8;
-  color: var(--primary-color, #102a66);
+  color: var(--cb-primary-text, #102a66);
 }
 
 .cb-pitch-rule-item span,
@@ -177,7 +177,7 @@ body.cb-pitching main > .container-fluid {
 }
 
 .cb-pitch-roster-note a {
-  color: var(--primary-color, #344054);
+  color: var(--cb-primary-text, #344054);
   font-weight: 800;
   text-decoration: none;
 }
@@ -568,13 +568,13 @@ body.cb-pitching #newPitchingOutingForm button[type="submit"] {
 
 .cb-pitch-summary-item[data-cb-pitch-filter]:hover,
 .cb-pitch-summary-item[data-cb-pitch-filter]:focus-visible {
-  border-color: color-mix(in srgb, var(--primary-color, #344054) 45%, #d8dee7);
+  border-color: color-mix(in srgb, var(--cb-primary-text, #344054) 45%, #d8dee7);
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color, #344054) 10%, transparent);
 }
 
 .cb-pitch-summary-item[data-cb-pitch-filter][aria-pressed="true"] {
-  border-color: var(--primary-color, #344054);
+  border-color: var(--cb-primary-text, #344054);
   background: color-mix(in srgb, var(--primary-color, #344054) 6%, white);
 }
 
@@ -609,7 +609,7 @@ body.cb-pitching #newPitchingOutingForm button[type="submit"] {
   border: 0;
   border-radius: 8px;
   background: #fff;
-  color: var(--primary-color, #344054);
+  color: var(--cb-primary-text, #344054);
   font-size: .66rem;
   font-weight: 800;
 }

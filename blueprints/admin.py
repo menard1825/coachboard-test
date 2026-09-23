@@ -9,6 +9,10 @@ import string
 import json
 from functools import wraps
 
+from types import SimpleNamespace
+
+from team_theme import normalize_hex, theme_for
+
 from db import db
 from models import User, Team
 from extensions import socketio
@@ -276,6 +280,15 @@ def admin_settings():
     return render_template('admin_settings.html', session=session, settings=team_settings, all_rules=PITCHING_RULES)
 
 
+@admin_bp.route('/settings/theme-preview', methods=['GET'])
+@admin_required
+def team_theme_preview():
+    """Team Settings' live preview: the theme the server would apply."""
+    preview = SimpleNamespace(primary_color=request.args.get('primary'),
+                              secondary_color=request.args.get('secondary'))
+    return jsonify(theme_for(preview))
+
+
 @admin_bp.route('/settings/update', methods=['POST'])
 @admin_required
 def update_admin_settings():
@@ -307,9 +320,10 @@ def update_admin_settings():
     team_settings.batting_order_mode = batting_order_mode
     team_settings.fixed_lineup_size = fixed_lineup_size
     
-    # ADDED: Handle the new color inputs
-    team_settings.primary_color = request.form.get('primary_color', team_settings.primary_color)
-    team_settings.secondary_color = request.form.get('secondary_color', team_settings.secondary_color)
+    # Team colors are printed into every page's <style> block: store only
+    # plain hex colors, and keep the current one when a value is not one.
+    team_settings.primary_color = normalize_hex(request.form.get('primary_color')) or team_settings.primary_color
+    team_settings.secondary_color = normalize_hex(request.form.get('secondary_color')) or team_settings.secondary_color
     team_settings.timezone = request.form.get('timezone', team_settings.timezone)
     
     db.session.commit()

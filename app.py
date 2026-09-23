@@ -15,6 +15,7 @@ from asset_versioning import (
     current_asset_version,
 )
 from db import db
+from team_theme import theme_for
 from models import (
     User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer,
     Rotation, Game, CollaborationNote, PracticePlan, PlayerDevelopmentFocus, Sign,
@@ -223,6 +224,10 @@ def create_app():
                 return redirect(url_for('auth.login'))
             return f(*args, **kwargs)
         return decorated_function
+
+    # base.html themes every page from the team's colors; team_theme validates
+    # them and picks a readable foreground. Pure computation, no queries.
+    app.jinja_env.globals['team_theme'] = theme_for
 
     @app.context_processor
     def inject_current_year():

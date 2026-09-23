@@ -78,12 +78,13 @@ body {
     border-color: var(--primary-color-hover);
 }
 
+/* Destructive actions use the fixed danger color, never the team color. */
 .btn-outline-danger { 
-    border-color: var(--primary-color); 
-    color: var(--primary-color); 
+    border-color: var(--cb-danger, #b42318); 
+    color: var(--cb-danger, #b42318); 
 }
 .btn-outline-danger:hover { 
-    background-color: var(--primary-color); 
+    background-color: var(--cb-danger, #b42318); 
     color: white; 
 }
 
@@ -92,7 +93,7 @@ body {
 }
 .accordion-button:not(.collapsed) { 
     background-color: #fcebeb; 
-    color: var(--primary-color); 
+    color: var(--cb-primary-text, var(--primary-color)); 
 }
 
 /* ==========================================================================
@@ -182,8 +183,8 @@ body {
 .position-dropzone {
     position: absolute;
     background-color: rgba(255, 255, 255, 0.7);
-    border: 2px dashed var(--primary-color);
-    color: var(--primary-color);
+    border: 2px dashed var(--cb-primary-text, var(--primary-color));
+    color: var(--cb-primary-text, var(--primary-color));
     padding: 5px;
     border-radius: 8px;
     font-weight: bold;
@@ -204,7 +205,7 @@ body {
 
 .player-tag {
     background-color: var(--primary-color);
-    color: white;
+    color: var(--cb-on-primary, #fff);
     padding: 3px 8px;
     border-radius: 4px;
     font-size: 0.9rem;
@@ -252,9 +253,9 @@ body {
 #rotation-card-container #inning-btn-group .btn-check:checked + label.btn {
     background-color: var(--primary-color) !important;
     border-color: var(--primary-color) !important;
-    color: #fff !important;
-    --bs-btn-color: #fff;
-    --bs-btn-active-color: #fff;
+    color: var(--cb-on-primary, #fff) !important;
+    --bs-btn-color: var(--cb-on-primary, #fff);
+    --bs-btn-active-color: var(--cb-on-primary, #fff);
 }
 
 /* Make it clear that the preset is optional, not the defense itself. */
@@ -300,7 +301,7 @@ body {
 /* Custom styles for SortableJS ghost element in the lineup editor */
 .lineup-ghost.sortable-ghost-custom {
     background: #fff;
-    border: 1px dashed var(--primary-color);
+    border: 1px dashed var(--cb-primary-text, var(--primary-color));
     opacity: 0.8;
 }
 
@@ -312,7 +313,7 @@ body {
 /* Style for the dynamically added position number span */
 .ghost-position-number {
     font-weight: bold;
-    color: var(--primary-color);
+    color: var(--cb-primary-text, var(--primary-color));
     margin-right: 0.5rem; /* Space between number and player name */
 }
 
@@ -427,8 +428,8 @@ body {
         margin-bottom: 2px;
     }
     .bottom-nav-fixed .nav-link.active {
-        color: var(--primary-color);
-        border-top-color: var(--primary-color);
+        color: var(--cb-primary-text, var(--primary-color));
+        border-top-color: var(--cb-primary-text, var(--primary-color));
         background-color: transparent;
     }
 }

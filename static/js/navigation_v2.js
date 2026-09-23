@@ -126,7 +126,7 @@
       #more .cb-mobile-more-card{border:1px solid #e2e6eb;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 1px 3px rgba(16,24,40,.05)}
       #more .cb-mobile-more-link{display:grid;grid-template-columns:38px minmax(0,1fr) 20px;gap:10px;align-items:center;padding:12px 13px;border:0;border-bottom:1px solid #edf0f3;text-decoration:none;color:#1d2939;background:#fff}
       #more .cb-mobile-more-link:last-child{border-bottom:0}
-      #more .cb-mobile-more-icon{width:36px;height:36px;border-radius:9px;background:#f1f4f8;color:var(--primary-color,#102a66);display:flex;align-items:center;justify-content:center;font-size:1rem}
+      #more .cb-mobile-more-icon{width:36px;height:36px;border-radius:9px;background:#f1f4f8;color:var(--cb-primary-text,#102a66);display:flex;align-items:center;justify-content:center;font-size:1rem}
       #more .cb-mobile-more-copy strong{display:block;font-size:.79rem;font-weight:800;color:#1d2939}
       #more .cb-mobile-more-copy small{display:block;font-size:.65rem;color:#7b8492;margin-top:1px;line-height:1.2}
       #more .cb-mobile-more-arrow{color:#98a2b3;font-size:.8rem;text-align:right}

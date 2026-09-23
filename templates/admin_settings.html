@@ -112,6 +112,10 @@
                                     <div class="col"><label for="primary_color" class="form-label">Primary Color (Header)</label><input type="color" class="form-control form-control-color" id="primary_color" name="primary_color" value="{{ settings.primary_color or '#1F2937' }}" title="Choose your primary color"></div>
                                     <div class="col"><label for="secondary_color" class="form-label">Secondary Color</label><input type="color" class="form-control form-control-color" id="secondary_color" name="secondary_color" value="{{ settings.secondary_color or '#E5E7EB' }}" title="Choose your secondary color"></div>
                                 </div>
+                                {% set settings_theme = team_theme(settings) %}
+                                <div id="teamColorPreview" class="rounded-3 px-3 py-2 mb-3 fw-bold small" style="background:var(--primary-color);color:var(--on-primary-color)">Header text and main buttons will look like this.</div>
+                                <div id="teamColorTextPreview" class="rounded-3 px-3 py-2 mb-3 fw-bold small bg-white" style="color:var(--primary-text-color);border:1px solid var(--primary-text-color)">Links and outlined buttons on white will look like this.</div>
+                                <div id="teamColorWarning" class="alert alert-warning small{{ '' if settings_theme.warnings else ' d-none' }}" role="status"><ul id="teamColorWarningList" class="mb-0 ps-3">{% for warning in settings_theme.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></div>
                                 <button type="submit" class="btn btn-primary w-100 mt-3">Save All Settings</button>
                             </form>
                         </div>
@@ -205,7 +209,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const battingOrderMode = document.getElementById('batting_order_mode');
     const fixedLineupSizeWrap = document.getElementById('fixedLineupSizeWrap');
 
-    if (primaryColorInput) primaryColorInput.addEventListener('input', function() { document.documentElement.style.setProperty('--primary-color', this.value); });
+    // Live preview: the color applies at once; the readable foreground and the
+    // warnings come from the server, which owns the contrast calculation.
+    let previewTimer = null;
+    function previewTeamTheme() {
+        clearTimeout(previewTimer);
+        previewTimer = setTimeout(async () => {
+            const params = new URLSearchParams({primary: primaryColorInput.value, secondary: secondaryColorInput ? secondaryColorInput.value : ''});
+            try {
+                const response = await fetch(`{{ url_for('admin.team_theme_preview') }}?${params}`);
+                if (!response.ok) return;
+                const theme = await response.json();
+                const root = document.documentElement;
+                root.style.setProperty('--on-primary-color', theme.on_primary);
+                root.style.setProperty('--primary-text-color', theme.primary_text);
+                root.classList.toggle('cb-on-primary-dark', theme.on_primary_is_dark);
+                root.classList.toggle('cb-primary-near-danger', theme.near_danger);
+                const navbar = document.querySelector('nav.navbar');
+                if (navbar) {
+                    navbar.classList.toggle('navbar-light', theme.on_primary_is_dark);
+                    navbar.classList.toggle('navbar-dark', !theme.on_primary_is_dark);
+                }
+                const warning = document.getElementById('teamColorWarning');
+                const list = document.getElementById('teamColorWarningList');
+                if (warning && list) {
+                    list.replaceChildren(...theme.warnings.map(text => Object.assign(document.createElement('li'), {textContent: text})));
+                    warning.classList.toggle('d-none', theme.warnings.length === 0);
+                }
+            } catch (_) {}
+        }, 120);
+    }
+    if (primaryColorInput) primaryColorInput.addEventListener('input', function() { document.documentElement.style.setProperty('--primary-color', this.value); previewTeamTheme(); });
     if (secondaryColorInput) secondaryColorInput.addEventListener('input', function() { document.documentElement.style.setProperty('--secondary-color', this.value); });
 
     function suggestedInnings(ageGroup) {

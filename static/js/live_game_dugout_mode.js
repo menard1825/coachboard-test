@@ -162,15 +162,15 @@
       #cbCoachBoardNavModal .cb-nav-safe{border:1px solid #b9dcc4;background:#f4fbf6;color:#22543d;border-radius:10px;padding:9px 10px;font-size:.75rem;line-height:1.4;margin-bottom:12px}
       #cbCoachBoardNavModal .cb-app-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
       #cbCoachBoardNavModal .cb-app-link{min-height:58px;border:1px solid #dfe4ea;border-radius:11px;background:#fff;color:#253047;text-decoration:none;display:flex;align-items:center;gap:9px;padding:10px 11px;font-size:.8rem;font-weight:780}
-      #cbCoachBoardNavModal .cb-app-link i{font-size:1.05rem;color:var(--primary-color,#102a66)}
-      #cbCoachBoardNavModal .cb-return-game{grid-column:1/-1;background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66);color:#fff}
-      #cbCoachBoardNavModal .cb-return-game i{color:#fff}
+      #cbCoachBoardNavModal .cb-app-link i{font-size:1.05rem;color:var(--cb-primary-text,#102a66)}
+      #cbCoachBoardNavModal .cb-return-game{grid-column:1/-1;background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66);color:var(--cb-on-primary,#fff)}
+      #cbCoachBoardNavModal .cb-return-game i{color:var(--cb-on-primary,#fff)}
 
       body.cb-dugout .coach-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;margin:0 0 12px!important}
       body.cb-dugout .coach-actions>.btn{min-height:68px!important;border-radius:12px!important;border-width:2px!important;padding:9px!important;align-items:center!important;text-align:center!important;justify-content:center!important;touch-action:manipulation}
       body.cb-dugout .coach-action-title{font-size:.96rem!important;font-weight:850!important}
       body.cb-dugout .coach-action-note{font-size:.67rem!important;margin-top:4px!important;opacity:.78!important}
-      body.cb-dugout #liveChangePitcherBtn{background:var(--primary-color,#102a66)!important;border-color:var(--primary-color,#102a66)!important;color:#fff!important}
+      body.cb-dugout #liveChangePitcherBtn{background:var(--primary-color,#102a66)!important;border-color:var(--primary-color,#102a66)!important;color:var(--cb-on-primary,#fff)!important}
       body.cb-dugout #liveEndInningBtn{background:#172033!important;border-color:#172033!important;color:#fff!important}
       body.cb-dugout #liveUndoBtn{background:#fff!important;border-color:#cfd5dd!important;color:#475467!important}
       body.cb-dugout .coach-card{border:1.5px solid #cfd5dd!important;border-radius:14px!important;box-shadow:0 2px 7px #10182814!important;background:#fff!important;padding:13px!important;margin-bottom:12px!important}
@@ -219,7 +219,7 @@
       body.cb-dugout #live-board-prep-v3 .bp-move{min-height:44px!important;background:#fff!important;border-color:#dfe4ea!important}
       body.cb-dugout #live-board-prep-v3 .bp-move strong{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important}
       body.cb-dugout #live-board-prep-v3 .bp-actions .btn{min-height:44px!important;font-size:.73rem!important;font-weight:850!important;touch-action:manipulation}
-      .cb-board-flash{animation:cbBoardFlash 1.5s ease-out 1}@keyframes cbBoardFlash{50%{box-shadow:0 0 0 8px #102a6624}}
+      .cb-board-flash{animation:cbBoardFlash 1.5s ease-out 1}@keyframes cbBoardFlash{50%{box-shadow:0 0 0 8px color-mix(in srgb,var(--cb-primary,#102a66) 14%,transparent)}}
 
       .cb-end-zone{margin-top:16px;padding-top:12px;border-top:1px solid #cfd5dd;text-align:right}
       .cb-end-zone small{display:block;color:#667085;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}

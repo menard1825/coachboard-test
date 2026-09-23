@@ -327,8 +327,8 @@
     style.textContent = `
       #roster .cb-roster-metrics-v2{align-items:stretch}
       #roster .cb-roster-metrics-v2>span{display:flex;align-items:baseline;gap:4px}
-      #roster .cb-roster-metrics-v2 .cb-roster-total{border-color:color-mix(in srgb,var(--cb-primary,#102a66) 28%,#dfe5ec);background:color-mix(in srgb,var(--cb-primary,#102a66) 5%,#fff)}
-      #roster .cb-roster-metrics-v2 .cb-roster-total strong{color:var(--cb-primary,#102a66)}
+      #roster .cb-roster-metrics-v2 .cb-roster-total{border-color:color-mix(in srgb,var(--cb-primary-text,#102a66) 28%,#dfe5ec);background:color-mix(in srgb,var(--cb-primary,#102a66) 5%,#fff)}
+      #roster .cb-roster-metrics-v2 .cb-roster-total strong{color:var(--cb-primary-text,#102a66)}
       #roster .cb-roster-metrics-v2 .cb-roster-profile-metric:not(.is-complete){border-color:#ecd7a7;background:#fff8e8;color:#795000}
       #roster .cb-roster-metrics-v2 .cb-roster-metric-copy{font-weight:650}
       @media(max-width:767.98px){

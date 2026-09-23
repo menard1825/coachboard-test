@@ -27,7 +27,7 @@
       #cbQuickDefense .cb-qd-bench-player{touch-action:manipulation;cursor:grab}
       #cbQuickDefense .cb-qd-spot:not(.pitcher):active,
       #cbQuickDefense .cb-qd-bench-player:active{cursor:grabbing}
-      #cbQuickDefense .cb-qd-spot.cb-drag-over .cb-qd-name{outline:4px solid rgba(16,42,102,.25);border-color:#102a66;background:#f4f7ff}
+      #cbQuickDefense .cb-qd-spot.cb-drag-over .cb-qd-name{outline:4px solid color-mix(in srgb,var(--cb-primary,#102a66) 25%,transparent);border-color:var(--cb-primary-text,#102a66);background:color-mix(in srgb,var(--cb-primary,#102a66) 5%,#fff)}
       #cbQuickDefense .cb-qd-bench-wrap.cb-drag-over{outline:4px solid rgba(22,107,56,.22);border-color:#5b9b70;background:#f0f8f2}
       #cbQuickDefense .cb-main-open .cb-qd-name,
       #cbQuickDefense .cb-authoritative-open .cb-qd-name{border:2px dashed #d49a22;background:#fff8e7;color:#8b5c00;font-weight:850}

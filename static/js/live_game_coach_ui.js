@@ -34,7 +34,7 @@
       .coach-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
       .coach-actions .btn{min-height:58px;border-radius:11px!important;padding:8px 10px;box-shadow:none!important;text-align:left;display:flex!important;flex-direction:column;justify-content:center;align-items:flex-start!important;line-height:1.1}
       .coach-actions .btn i{display:none!important}.coach-action-title{display:block;font-weight:780;font-size:.94rem}.coach-action-note{display:block;margin-top:4px;font-size:.67rem;font-weight:550;opacity:.68}
-      .coach-action-primary{background:var(--primary-color,#102a66)!important;border-color:var(--primary-color,#102a66)!important;color:#fff!important}.coach-action-end{background:#202733!important;border-color:#202733!important;color:#fff!important}.coach-action-undo{background:#fff!important;border:1px solid #d6dae1!important;color:#5f6b7a!important}
+      .coach-action-primary{background:var(--primary-color,#102a66)!important;border-color:var(--primary-color,#102a66)!important;color:var(--cb-on-primary,#fff)!important}.coach-action-end{background:#202733!important;border-color:#202733!important;color:#fff!important}.coach-action-undo{background:#fff!important;border:1px solid #d6dae1!important;color:#5f6b7a!important}
       #rotation-board.coach-live-board-hidden{display:none!important}
       @media(max-width:575.98px){.coach-game-header{display:block!important}.coach-game-header-actions{margin-top:10px}.coach-game-header-actions .btn{flex:1}.coach-game-meta .meta-location{flex-basis:100%}#live-game-overlay.coach-live-polished{padding:8px!important}.coach-card{border-radius:12px;padding:11px}}
     `;

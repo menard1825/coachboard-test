@@ -332,7 +332,7 @@
         body.cb-pitch-dugout-mobile .cb-pitch-quick-usage strong { color:#344054; font-size:.76rem; }
         body.cb-pitch-dugout-mobile .cb-pitcher-card[data-mobile-expanded="true"] .cb-pitch-quick-usage { display:none; }
 
-        body.cb-pitch-dugout-mobile .cb-pitcher-details-toggle { display:flex; width:100%; min-height:44px; margin:0; padding:9px 11px; border:0; border-top:1px solid #e8ecf0; border-radius:0; background:#fbfcfd; color:var(--primary-color,#344054); font-size:.73rem; font-weight:850; }
+        body.cb-pitch-dugout-mobile .cb-pitcher-details-toggle { display:flex; width:100%; min-height:44px; margin:0; padding:9px 11px; border:0; border-top:1px solid #e8ecf0; border-radius:0; background:#fbfcfd; color:var(--cb-primary-text,#344054); font-size:.73rem; font-weight:850; }
         body.cb-pitch-dugout-mobile .cb-pitcher-details-toggle i { color:inherit; }
         body.cb-pitch-dugout-mobile .cb-pitcher-card[data-mobile-expanded="true"] .cb-pitcher-details-toggle { background:#f6f8fa; }
 
@@ -346,7 +346,7 @@
         body.cb-pitch-dugout-mobile .cb-pitch-target-copy .fw-bold { font-size:.78rem; }
         body.cb-pitch-dugout-mobile .cb-pitch-target-copy .small { font-size:.67rem; }
 
-        body.cb-pitch-dugout-mobile .cb-pitcher-collapse-bottom { display:none; align-items:center; justify-content:center; gap:7px; width:100%; min-height:46px; padding:9px 12px; border:0; border-top:1px solid #e4e8ed; background:#f6f8fa; color:var(--primary-color,#344054); font-size:.76rem; font-weight:850; }
+        body.cb-pitch-dugout-mobile .cb-pitcher-collapse-bottom { display:none; align-items:center; justify-content:center; gap:7px; width:100%; min-height:46px; padding:9px 12px; border:0; border-top:1px solid #e4e8ed; background:#f6f8fa; color:var(--cb-primary-text,#344054); font-size:.76rem; font-weight:850; }
         body.cb-pitch-dugout-mobile .cb-pitcher-card[data-mobile-expanded="true"] .cb-pitcher-collapse-bottom { display:flex; }
 
         body.cb-pitch-dugout-mobile .cb-pitch-section-card > .card-header .small { font-size:.66rem; }

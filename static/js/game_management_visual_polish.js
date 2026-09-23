@@ -47,6 +47,7 @@
       body.coach-game-page main.container-fluid{background:#eef2f6}
       body.coach-game-page .game-workspace-v2{
         --gm-navy:var(--primary-color,#0b2a6b);
+        --gm-navy-text:var(--cb-primary-text,var(--gm-navy));
         --gm-gold:#d0a526;
         --gm-ink:#172033;
         --gm-muted:#667085;
@@ -65,25 +66,25 @@
       body.coach-game-page .game-workspace-v2 .card-header{background:#fbfcfd!important;border-bottom:1px solid #e7ebef}
       body.coach-game-page .game-workspace-v2 .btn{border-radius:9px;font-weight:700}
       body.coach-game-page .game-workspace-v2 .btn-primary{
-        background:var(--gm-navy)!important;border-color:var(--gm-navy)!important;color:#fff!important;
+        background:var(--gm-navy)!important;border-color:var(--gm-navy)!important;color:var(--cb-on-primary,#fff)!important;
       }
       body.coach-game-page .game-workspace-v2 .btn-primary:hover,
       body.coach-game-page .game-workspace-v2 .btn-primary:focus{filter:brightness(.91)}
       body.coach-game-page .game-workspace-v2 .btn-outline-primary{
-        color:var(--gm-navy)!important;border-color:rgba(17,52,112,.5)!important;background:#fff;
+        color:var(--gm-navy-text)!important;border-color:var(--cb-primary-outline,var(--gm-navy-text))!important;background:#fff;
       }
       body.coach-game-page .game-workspace-v2 .btn-outline-primary:hover,
       body.coach-game-page .game-workspace-v2 .btn-outline-primary:focus{
-        color:#fff!important;background:var(--gm-navy)!important;border-color:var(--gm-navy)!important;
+        color:var(--cb-on-primary,#fff)!important;background:var(--gm-navy)!important;border-color:var(--gm-navy)!important;
       }
       body.coach-game-page #pregame-checklist-container > .d-flex:first-child{padding:4px 2px 2px}
       body.coach-game-page #pregame-checklist-container > .row.g-3.mb-4 .card{
-        border-top:3px solid var(--gm-navy)!important;background:#fff;
+        border-top:3px solid var(--gm-navy-text)!important;background:#fff;
       }
       body.coach-game-page #pregame-checklist-container > .row.g-3.mb-4 .card-body{padding:15px}
       body.coach-game-page #startLiveGameBtnAction{
         background:var(--gm-navy)!important;border:1px solid var(--gm-navy)!important;
-        border-left:6px solid var(--gm-gold)!important;color:#fff!important;border-radius:13px!important;
+        border-left:6px solid var(--gm-gold)!important;color:var(--cb-on-primary,#fff)!important;border-radius:13px!important;
         box-shadow:0 5px 14px rgba(15,42,100,.18)!important;letter-spacing:.01em;
       }
       body.coach-game-page #startLiveGameBtnAction i{color:#f0c34b}
@@ -97,7 +98,7 @@
       body.coach-game-page #game-pitching-rules-v2 .gpr-badge.game{background:#fff5d9!important;color:#73520a!important}
       body.coach-game-page #game-pitching-rules-v2 .gpr-badge.team{background:#edf2f8!important;color:#344054!important}
       body.coach-game-page #game-pitching-rules-v2 .form-select:focus{
-        border-color:var(--gm-navy)!important;box-shadow:0 0 0 .2rem rgba(20,55,120,.12)!important;
+        border-color:var(--gm-navy-text)!important;box-shadow:0 0 0 .2rem rgba(20,55,120,.12)!important;
       }
       body.coach-game-page #rotation-card-container > .card > .card-header{padding:12px 14px;border-bottom:1px solid #e4e8ed}
       body.coach-game-page #rotation-card-container #liveGameModeToggle:checked{background-color:#b42318;border-color:#b42318}
@@ -191,7 +192,7 @@
           border-left:4px solid var(--gm-gold)!important;
           border-radius:9px!important;
           background:var(--gm-navy)!important;
-          color:#fff!important;
+          color:var(--cb-on-primary,#fff)!important;
           box-shadow:none!important;
           font-size:.72rem!important;
           font-weight:800!important;
@@ -297,7 +298,7 @@
           border-left:4px solid var(--gm-gold)!important;
           border-radius:9px!important;
           background:var(--gm-navy)!important;
-          color:#fff!important;
+          color:var(--cb-on-primary,#fff)!important;
           box-shadow:none!important;
           font-size:.72rem!important;
           font-weight:800!important;
