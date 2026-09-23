@@ -71,11 +71,25 @@
             <span class="badge text-bg-light border">{{ current_team.age_group }}{% if not rules.competition_unselected %} · {{ rules.rule_set_name }}{% endif %}</span>
         </div>
         <div class="card-body p-0">
+            {% if hidden_non_pitcher_count %}
+            <div class="cb-pitch-roster-note" id="pitchRosterNote">
+                <span><strong>{{ pitchers | length }} of {{ roster_count }} player{{ '' if roster_count == 1 else 's' }}</strong> · {{ hidden_non_pitcher_count }} marked Not a Pitcher</span>
+                {% if can_edit_roster %}<a href="{{ url_for('home') }}#roster">Edit roster</a>{% endif %}
+            </div>
+            {% endif %}
+            {% if ns.eligible and not ns.unavailable and not ns.review %}
+            {# Everyone is eligible: one line instead of three tiles, two of them zero. #}
+            <div class="cb-pitch-all-ready" id="pitchAllReady" role="status">
+                <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                <span>{% if ns.eligible == 1 %}1 pitcher eligible today{% else %}All {{ ns.eligible }} pitchers eligible today{% endif %}</span>
+            </div>
+            {% else %}
             <div class="cb-pitch-summary cb-pitch-counts" aria-label="Pitcher availability summary">
                 <div class="cb-pitch-summary-item"><span>Eligible Today</span><strong>{{ ns.eligible }}</strong></div>
                 <div class="cb-pitch-summary-item"><span>Unavailable</span><strong>{{ ns.unavailable }}</strong></div>
                 <div class="cb-pitch-summary-item"><span>Needs Review</span><strong>{{ ns.review }}</strong></div>
             </div>
+            {% endif %}
             <div class="cb-pitch-card-grid">
                 {% for player in pitchers | sort(attribute='name') %}
                     {% set s = pitch_count_summary.get(player.name) %}

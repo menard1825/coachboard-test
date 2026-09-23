@@ -1,6 +1,7 @@
 from flask import Blueprint, request, redirect, url_for, flash, session, render_template, jsonify
 from models import PitchingOuting, Team, Game, Player, PlayerPitchTarget
 from db import db
+from permissions import EDIT_ROSTER, has_permission
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from extensions import socketio
@@ -301,6 +302,10 @@ def pitching_page():
     designated_pitchers = {p.id: p for p in all_players if p.pitcher_role != 'Not a Pitcher'}
     players_with_outings = {o.player_id: o.player for o in all_outings if o.player is not None}
     pitchers = list({**designated_pitchers, **players_with_outings}.values())
+    # Everyone left out above is marked Not a Pitcher and has never recorded
+    # throwing. Say so on the page rather than letting the roster look short.
+    shown_ids = {player.id for player in pitchers}
+    hidden_non_pitcher_count = sum(1 for player in all_players if player.id not in shown_ids)
 
     return render_template(
         'pitching.html',
@@ -308,6 +313,9 @@ def pitching_page():
         pitch_count_summary=pitch_count_summary,
         current_team=team,
         pitchers=pitchers,
+        roster_count=len(all_players),
+        hidden_non_pitcher_count=hidden_non_pitcher_count,
+        can_edit_roster=has_permission(session.get('role'), EDIT_ROSTER),
         rules=rules,
         scheduled_games=scheduled_games,
         planned_targets=planned_targets,

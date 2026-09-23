@@ -160,6 +160,52 @@ body.cb-pitching main > .container-fluid {
   font-size: 1.05rem;
 }
 
+.cb-pitch-roster-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 10px 14px 0;
+  background: var(--pitch-soft);
+  color: var(--pitch-muted);
+  font-size: .72rem;
+}
+
+.cb-pitch-roster-note strong {
+  color: var(--pitch-ink);
+}
+
+.cb-pitch-roster-note a {
+  color: var(--primary-color, #344054);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+/* Shown only when every pitcher is eligible, in place of the three tiles. */
+.cb-pitch-all-ready {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 0;
+  background: var(--pitch-soft);
+  color: #176b38;
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+/* The roll-up below has no top margin in the compact layouts; give it room. */
+body.cb-pitch-dugout-mobile .cb-pitch-roster-note,
+body.cb-pitch-dugout-tablet .cb-pitch-roster-note {
+  padding: 8px 10px;
+}
+
+/* On phones and touch tablets the "Ready to pitch" roll-up already says this. */
+body.cb-pitch-dugout-mobile .cb-pitch-all-ready,
+body.cb-pitch-dugout-tablet .cb-pitch-all-ready {
+  display: none;
+}
+
 .cb-pitch-card-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
