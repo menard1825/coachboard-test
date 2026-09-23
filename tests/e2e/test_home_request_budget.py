@@ -6,13 +6,13 @@ duplicates; each slice lowers these ceilings in the same commit that earns
 the reduction.
 
 Ceilings are per endpoint, so a change that trades one request for a new one
-still fails. main.js now loads a legacy tab's datasets only when that tab is
-opened, so none of its thirteen start-up requests remain on Home: the
-endpoints below are home_dashboard.js's own plus the enhancer scripts'
-(roster_pitching_traits.js, season_management_v2.js, getting_started_home.js,
-client_timezone.js's heartbeat, and on phones mobile_game_day_fields.js).
-An endpoint that only a legacy tab needs -- /api/signs, say -- appearing here
-fails as "outside the baseline".
+still fails. main.js loads a legacy tab's datasets only when that tab is
+opened, and the enhancer scripts for hidden features (roster_pitching_traits,
+season_management_v2, mobile_game_day_fields) make their requests only when
+their pane is first shown. What remains is Home's own work: home_dashboard.js
+(9), getting_started_home.js (1) and client_timezone.js's heartbeat (1), the
+same on phones. An endpoint that only a hidden feature needs -- /api/signs,
+/api/rotations -- appearing here fails as "outside the baseline".
 """
 
 import os
@@ -36,27 +36,26 @@ TEST_PASSWORD = 'playwright-password'
 #: endpoint -> maximum requests per Home load. Measured on the lazy-loading
 #: change, three runs per viewport at 0 ms and 150 ms API latency, identical
 #: every time. History: 10eed5d measured 28 desktop / 30 phone; pageshow,
-#: rotations and lazy legacy tabs brought it to 13 / 14.
+#: rotations and lazy legacy tabs brought it to 13 / 14, and deferring the
+#: hidden features' enhancer requests to 11 / 11.
 DESKTOP_BASELINE = {
     '/api/session_data': 1,                   # home_dashboard.js
     '/api/roster': 1,                         # home_dashboard.js
-    '/api/rotations': 1,                      # season_management_v2.js
     '/api/games': 1,                          # home_dashboard.js
     '/api/practice_plans': 1,                 # home_dashboard.js
     '/api/overview_data': 1,                  # home_dashboard.js
-    '/api/roster-pitching-profiles': 1,
-    '/api/getting-started': 1,
-    '/api/pitching-preferences/settings': 1,
-    '/api/pitching-preferences/arm-care-summary': 1,
-    '/api/game-day/<id>/readiness': 1,
-    '/api/game-day/<id>/pitching-rules': 1,
-    '/api/coach-usage/heartbeat': 1,
+    '/api/pitching-preferences/settings': 1,  # home_dashboard.js
+    '/api/pitching-preferences/arm-care-summary': 1,  # home_dashboard.js
+    '/api/game-day/<id>/readiness': 1,        # home_dashboard.js
+    '/api/game-day/<id>/pitching-rules': 1,   # home_dashboard.js
+    '/api/getting-started': 1,                # getting_started_home.js
+    '/api/coach-usage/heartbeat': 1,          # client_timezone.js
 }
-#: Phones also load mobile_game_day_fields.js, which fetches /api/games once more.
-PHONE_BASELINE = dict(DESKTOP_BASELINE, **{'/api/games': 2})
+#: mobile_game_day_fields.js is loaded on phones but dormant on Home.
+PHONE_BASELINE = dict(DESKTOP_BASELINE)
 
 #: The measured totals the ceilings above add up from. Printed with the result.
-MEASURED_TOTAL = {'desktop': 13, 'phone': 14}
+MEASURED_TOTAL = {'desktop': 11, 'phone': 11}
 
 
 def _normalise(url):

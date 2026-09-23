@@ -5,8 +5,9 @@ Two Home modules refetched on every `pageshow`:
 * roster_pitching_traits.js -> /api/roster-pitching-profiles (every viewport)
 * mobile_game_day_fields.js -> /api/games (phones and tablets only)
 
-Both already fetch once in their own start-up code. `pageshow` also fires on
-every ordinary page load, so each normal Home visit fetched twice. The only
+Both fetch once when their feature is initialised -- which is now the first
+time its pane is shown, not Home's start-up. `pageshow` also fires on every
+ordinary page load, so each normal Home visit used to fetch twice. The only
 pageshow worth refreshing on is a bfcache restore (`event.persisted`), where
 the page comes back from memory with whatever data it had when the coach
 left.
@@ -138,11 +139,13 @@ def _describe(page, path):
 
 # --- roster_pitching_traits.js ---------------------------------------------
 
-def test_home_load_fetches_roster_profiles_once(make_page, coachboard_url):
+def test_roster_profiles_load_once_when_roster_is_first_shown(make_page, coachboard_url):
     page = make_page(DESKTOP)
     _open_home(page, coachboard_url)
+    assert _calls(page, PROFILES) == [], 'Home fetched profiles for a hidden Roster'
+    _open_roster(page)
     calls = _calls(page, PROFILES)
-    assert len(calls) == 1, f'{PROFILES} fetched {len(calls)} times on one Home load: {calls}'
+    assert len(calls) == 1, f'{PROFILES} fetched {len(calls)} times on the first Roster open: {calls}'
     assert calls[0]['by'] == TRAITS_JS
     assert page.cb_errors == []
 
@@ -150,6 +153,7 @@ def test_home_load_fetches_roster_profiles_once(make_page, coachboard_url):
 def test_normal_pageshow_does_not_refetch_roster_profiles(make_page, coachboard_url):
     page = make_page(DESKTOP)
     _open_home(page, coachboard_url)
+    _open_roster(page)
     before = len(_calls(page, PROFILES, TRAITS_JS))
     _dispatch_pageshow(page, persisted=False)
     after = len(_calls(page, PROFILES, TRAITS_JS))
@@ -172,12 +176,24 @@ def test_bfcache_restore_refreshes_roster_profiles(make_page, coachboard_url):
 
 # --- mobile_game_day_fields.js (phones and tablets only) -------------------
 
-def test_phone_home_load_fetches_mobile_games_once(make_page, coachboard_url):
+def _show_legacy_games(page):
+    """No supported path shows the legacy #games pane (navigation_v2.js sends
+    it to /game-day), so the module only initialises if something shows it."""
+    page.evaluate("""() => {
+      document.querySelectorAll('#mainTabContent > .tab-pane').forEach(p => p.classList.remove('active', 'show'));
+      document.getElementById('games').classList.add('active', 'show');
+    }""")
+    page.wait_for_timeout(1500)
+
+
+def test_phone_mobile_games_load_once_when_the_pane_is_shown(make_page, coachboard_url):
     page = make_page(PHONE)
     _open_home(page, coachboard_url)
+    assert _calls(page, GAMES, MOBILE_GAMES_JS) == [], 'the module fetched on Home'
+    _show_legacy_games(page)
     mine = _calls(page, GAMES, MOBILE_GAMES_JS)
     assert len(mine) == 1, (
-        f'{MOBILE_GAMES_JS} fetched {GAMES} {len(mine)} times on one Home load; '
+        f'{MOBILE_GAMES_JS} fetched {GAMES} {len(mine)} times on first showing; '
         f'all {GAMES} callers: {_describe(page, GAMES)}')
     # The other caller is legitimate and out of scope; it must be seen and
     # attributed separately, or this test would not be measuring the module.
@@ -199,6 +215,9 @@ def test_normal_pageshow_does_not_refetch_mobile_games(make_page, coachboard_url
 def test_bfcache_restore_refreshes_mobile_games(make_page, coachboard_url):
     page = make_page(PHONE)
     _open_home(page, coachboard_url)
+    _dispatch_pageshow(page, persisted=True)
+    assert _calls(page, GAMES, MOBILE_GAMES_JS) == [], 'a restore initialised the dormant module'
+    _show_legacy_games(page)
     before = len(_calls(page, GAMES, MOBILE_GAMES_JS))
     _dispatch_pageshow(page, persisted=True)
     after = len(_calls(page, GAMES, MOBILE_GAMES_JS))

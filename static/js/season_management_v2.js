@@ -15,6 +15,12 @@
   let rotationsCache = null;
   let rotationsRequest = null;
   let refreshRotationsOnNextPass = false;
+  // Rotation data is fetched only once the Rotations tab has been shown; the
+  // Practice and Development enhancements need none and run regardless.
+  // Before that the rotation work is dormant. After it: `rotationsRequest`
+  // while a fetch is out, `rotationsCache` once one succeeded; neither means
+  // the last fetch failed and the next pass tries again.
+  let rotationsInitialized = false;
   const separatedItems = new WeakSet();
   let separatedState = null;
 
@@ -86,7 +92,7 @@
   async function separateDefensePresets() {
     const tab = document.getElementById('rotations');
     const accordion = document.getElementById('rotationsAccordion');
-    if (!tab || !accordion) return;
+    if (!tab || !accordion || !rotationsInitialized) return;
 
     const forceRefresh = refreshRotationsOnNextPass;
     refreshRotationsOnNextPass = false;
@@ -282,15 +288,34 @@
     }, 100);
   }
 
+  // Initialising goes through the same debounced pass as every other
+  // trigger, so a first desktop showing -- which is also a shown.bs.tab asking
+  // for a refresh -- makes one request, not two.
+  function rotationsBecameActive() {
+    rotationsInitialized = true;
+    scheduleEnhance();
+  }
+
+  function watchRotationsPane() {
+    const pane = document.getElementById('rotations');
+    if (!pane) return;
+    // One showing per batch of class changes: adding "active show" at once can
+    // report two records that both start from an inactive pane.
+    new MutationObserver(records => {
+      if (pane.classList.contains('active') && !/\bactive\b/.test(records[0].oldValue || '')) rotationsBecameActive();
+    }).observe(pane, {attributes:true, attributeFilter:['class'], attributeOldValue:true});
+    if (pane.classList.contains('active')) rotationsBecameActive();
+  }
+
   function init() {
     installStyles();
     ensurePracticeModal();
     scheduleEnhance();
     const targets = [document.getElementById('practicePlanAccordion'), document.getElementById('rotationsAccordion'), document.getElementById('dev-player-list')].filter(Boolean);
     targets.forEach(target => new MutationObserver(scheduleEnhance).observe(target, {childList:true, subtree:true}));
+    watchRotationsPane();
     document.addEventListener('shown.bs.tab', event => {
       // Opening Rotations is the one refresh the accordion observer cannot see:
-      // rotation_save makes main.js refetch without re-rendering this list, so
       // a preset saved on another device only appears here when asked for.
       if (event.target?.getAttribute?.('href') === '#rotations') refreshRotationsOnNextPass = true;
       scheduleEnhance();

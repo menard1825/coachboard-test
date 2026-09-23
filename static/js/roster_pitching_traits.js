@@ -5,6 +5,12 @@
 
   let traitOptions = [];
   const profiles = new Map();
+  // Profiles load when Roster is first shown, not with Home. Until then the
+  // feature is dormant (`initialized` false) and nothing refreshes it. After
+  // that: `loading` while a request is out, `loaded` once profiles arrived;
+  // initialized but neither means the last load failed, and the next time
+  // Roster is shown tries again.
+  let initialized = false;
   let loaded = false;
   let loading = false;
   let activeTeamId = null;
@@ -121,6 +127,7 @@
   }
 
   function scheduleProfileRefresh(delay = 60) {
+    if (!initialized) return;
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(loadProfiles, delay);
   }
@@ -244,7 +251,31 @@
   function rosterTabWasShown(event) {
     const target = event?.target;
     const href = target?.getAttribute?.('href') || target?.dataset?.bsTarget || '';
+    // Showing an initialised Roster again refreshes it, as it always has.
+    // Bootstrap fires this before the pane observer below runs, so on the
+    // first showing the feature is not initialised yet and this does nothing:
+    // that showing's load is the observer's.
     if (href === '#roster') scheduleProfileRefresh(0);
+  }
+
+  function rosterBecameActive() {
+    if (!initialized) {
+      initialized = true;
+      loadProfiles();
+    } else if (!loaded && !loading) {
+      loadProfiles();
+    }
+  }
+
+  function watchRosterPane() {
+    const pane = document.getElementById('roster');
+    if (!pane) return;
+    // One showing per batch of class changes: adding "active show" at once can
+    // report two records that both start from an inactive pane.
+    new MutationObserver(records => {
+      if (pane.classList.contains('active') && !/\bactive\b/.test(records[0].oldValue || '')) rosterBecameActive();
+    }).observe(pane, {attributes:true, attributeFilter:['class'], attributeOldValue:true});
+    if (pane.classList.contains('active')) rosterBecameActive();
   }
 
   installStyles();
@@ -252,10 +283,10 @@
   const start = () => {
     observer.observe(document.body, {childList:true, subtree:true});
     connectProfileSocket();
-    loadProfiles();
+    watchRosterPane();
 
     document.addEventListener('shown.bs.tab', rosterTabWasShown);
-    // start() has already loaded; only a bfcache restore needs fresh data.
+    // Showing Roster loads; after that only a bfcache restore needs fresh data.
     window.addEventListener('pageshow', event => { if (event.persisted) scheduleProfileRefresh(0); });
     window.addEventListener('focus', () => scheduleProfileRefresh(80));
     document.addEventListener('visibilitychange', () => {

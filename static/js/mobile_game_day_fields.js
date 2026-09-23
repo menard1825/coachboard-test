@@ -6,6 +6,14 @@
   let gamesById = new Map();
   let scheduleObserver = null;
   let patchQueued = false;
+  // This enhances the legacy #games pane, which no supported path shows today:
+  // navigation_v2.js sends /#games to /game-day and rewrites #games links. So
+  // it stays dormant -- no request -- until the pane is actually shown, and
+  // only then loads games: `gamesLoading` while a request is out, `gamesLoaded`
+  // after one succeeded; a failed one is retried the next time it is shown.
+  let gamesInitialized = false;
+  let gamesLoading = false;
+  let gamesLoaded = false;
 
   const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -344,6 +352,7 @@
   }
 
   async function loadGames() {
+    gamesLoading = true;
     try {
       const response = await fetch(`/api/games?_=${Date.now()}`, {
         cache:'no-store',
@@ -352,9 +361,12 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const games = await response.json();
       gamesById = new Map((Array.isArray(games) ? games : []).map(game => [Number(game.id), game]));
+      gamesLoaded = true;
       queueSchedulePatch();
     } catch (error) {
       console.warn('Unable to refresh Game Day schedule:', error);
+    } finally {
+      gamesLoading = false;
     }
   }
 
@@ -366,22 +378,40 @@
     queueSchedulePatch();
   }
 
+  function gamesPaneBecameActive() {
+    if (gamesLoading || (gamesInitialized && gamesLoaded)) return;
+    gamesInitialized = true;
+    loadGames();
+  }
+
+  function watchGamesPane() {
+    const pane = document.getElementById('games');
+    if (!pane) return;
+    // One showing per batch of class changes: adding "active show" at once can
+    // report two records that both start from an inactive pane.
+    new MutationObserver(records => {
+      if (pane.classList.contains('active') && !/\bactive\b/.test(records[0].oldValue || '')) gamesPaneBecameActive();
+    }).observe(pane, {attributes:true, attributeFilter:['class'], attributeOldValue:true});
+    if (pane.classList.contains('active')) gamesPaneBecameActive();
+  }
+
   function start() {
     installStyles();
     enhanceAddGameForm();
     observeSchedule();
-    loadGames();
+    watchGamesPane();
 
     document.addEventListener('click', event => {
       const button = event.target.closest('.cb-mobile-delete-game');
       if (button) deletePastGame(button);
     });
 
-    // start() has already loaded; only a bfcache restore needs fresh data.
-    window.addEventListener('pageshow', event => { if (event.persisted) loadGames(); });
+    // Once initialised, only a bfcache restore needs fresh data.
+    window.addEventListener('pageshow', event => { if (event.persisted && gamesInitialized) loadGames(); });
     window.addEventListener('hashchange', () => {
       if (window.location.hash === '#games') {
         enhanceAddGameForm();
+        gamesInitialized = true;
         loadGames();
       }
     });
