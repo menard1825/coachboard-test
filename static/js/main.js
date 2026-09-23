@@ -877,6 +877,36 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = `<div class="row"><div class="col-md-6">${nextGameHtml}${pitchersOnRestHtml}</div><div class="col-md-6">${recentNotesHtml}</div></div>`;
     }
 
+    // dataset -> the tab pane that shows it. session_data and overview have no
+    // tab of their own here: Home is home_dashboard.js's, which handles its own
+    // failures, and session data only refines ordering and permissions.
+    const LOAD_ERROR_PANES = {
+        roster: 'roster', lineups: 'lineups', pitching_data: 'pitching',
+        scouting_list: 'scouting_list', rotations: 'rotations', games: 'games',
+        collaboration_notes: 'collaboration', practice_plans: 'practice_plan',
+        player_development: 'player_development', signs: 'signs', stats: 'stats',
+    };
+
+    function renderLoadErrors() {
+        const errors = AppState.load_errors || {};
+        Object.entries(LOAD_ERROR_PANES).forEach(([key, paneId]) => {
+            const pane = document.getElementById(paneId);
+            if (!pane) return;
+            const existing = pane.querySelector(`:scope > [data-cb-load-error="${key}"]`);
+            if (!errors[key]) {
+                existing?.remove();
+                return;
+            }
+            if (existing) return;
+            const notice = document.createElement('div');
+            notice.className = 'alert alert-warning small';
+            notice.setAttribute('role', 'status');
+            notice.dataset.cbLoadError = key;
+            notice.textContent = "This section couldn't load. Refresh the page to try again.";
+            pane.prepend(notice);
+        });
+    }
+
     function renderAll() {
         renderOverview();
         renderRoster();
@@ -957,6 +987,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- INITIALIZATION ---
+    // Each dataset loads -- and fails -- on its own. A failed request for one
+    // legacy tab used to reject the whole load, and init()'s catch then replaced
+    // #mainTabContent, taking the visible Home dashboard with it. A failed
+    // dataset now keeps its last good value (or an empty value of the shape its
+    // renderer expects) and is recorded in AppState.load_errors so its own tab
+    // can say so.
+    const EMPTY_DATA = {
+        session_data: {session: {}, player_order: []},
+        roster: [],
+        lineups: [],
+        pitching_data: {pitching: [], pitch_count_summary: {}},
+        scouting_list: {},
+        rotations: [],
+        games: [],
+        collaboration_notes: {team_notes: [], player_notes: []},
+        practice_plans: [],
+        player_development: {},
+        signs: [],
+        stats: {cumulative_pitching_data: {}, cumulative_position_data: {}, attendance_stats: {}},
+        overview: {},
+    };
+    const lastGoodData = {};
+
     async function fetchData() {
         const endpoints = {
             session_data: '/api/session_data',
@@ -981,8 +1034,19 @@ document.addEventListener('DOMContentLoaded', () => {
             })
         );
 
-        const results = await Promise.all(requests);
+        const settled = await Promise.allSettled(requests);
         const dataKeys = Object.keys(endpoints);
+        AppState.load_errors = {};
+        const results = settled.map((outcome, index) => {
+            const key = dataKeys[index];
+            if (outcome.status === 'fulfilled') {
+                lastGoodData[key] = outcome.value;
+                return outcome.value;
+            }
+            console.error(`Could not load ${key}:`, outcome.reason);
+            AppState.load_errors[key] = String(outcome.reason?.message || outcome.reason);
+            return lastGoodData[key] ?? EMPTY_DATA[key];
+        });
 
         const sessionData = results[dataKeys.indexOf('session_data')];
         const statsData = results[dataKeys.indexOf('stats')];
@@ -1012,13 +1076,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function init() {
-        const mainContent = document.getElementById('mainTabContent');
-        
         try {
             await fetchData();
         } catch (error) {
+            // fetchData() no longer rejects for a failed request, so this is an
+            // unexpected error. Never replace #mainTabContent: it holds Home.
             console.error("Init Error:", error);
-            if(mainContent) mainContent.innerHTML = `<div class="alert alert-danger">Could not load app data. Please refresh the page. Error: ${error.message}</div>`;
             return;
         }
         
@@ -1026,6 +1089,7 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
         setupEventListeners();
         renderAll();
+        renderLoadErrors();
         initializeSortables();
         handleTabLogic();
         
@@ -1182,6 +1246,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('data_updated received');
             await fetchData();
             renderAll();
+            renderLoadErrors();
         });
 
         // --- Other Data Sockets ---
