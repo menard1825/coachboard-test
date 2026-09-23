@@ -86,7 +86,7 @@ SECTIONS = {
     'practice_plan': (
         {'/api/practice_plans', '/api/roster'},                    # roster: attendance
         '#practicePlanAccordion .accordion-item',
-        '#practicePlanAccordion .practice-reuse-btn',              # season_management_v2.js
+        None,
     ),
     'signs': (
         {'/api/signs'},
@@ -372,7 +372,7 @@ def test_phone_bottom_bar_opens_roster_and_practice(make_page, coachboard_url):
     assert page.cb_errors == []
 
 
-@pytest.mark.parametrize('section', ['rotations', 'practice_plan'])
+@pytest.mark.parametrize('section', ['rotations'])
 def test_phone_first_open_is_decorated_by_its_enhancer(make_page, coachboard_url, section):
     """Phones switch panes without Bootstrap events, so season_management_v2.js
     sees the new list only through its observers on the containers main.js

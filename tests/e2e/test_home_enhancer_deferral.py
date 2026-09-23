@@ -359,17 +359,14 @@ def test_practice_and_development_do_not_fetch_rotations(make_page, coachboard_u
     page = make_page(viewport)
     _open_home(page, coachboard_url)
     _go(page, 'practice_plan')
-    expect(page.locator('#practicePlanAccordion .practice-reuse-btn').first).to_be_attached(timeout=15_000)
+    expect(page.locator('#practicePlanAccordion .cb-practice-plan-button').first).to_be_attached(timeout=15_000)
     _go(page, 'player_development')
     expect(page.locator('#dev-player-list .cb-dev-player').first).to_be_attached(timeout=15_000)
     page.wait_for_timeout(1500)
     assert _calls(page, ROTATIONS) == []
     assert _calls(page, by=SEASON_JS) == []
 
-    # Reusing a plan still works. (season_management_v2.js's own "Reuse Plan"
-    # button is added as before but throws on click on the parent commit too:
-    # it reuses the template's #reusePracticeModal, which lacks its field ids.
-    # That predates this change and is left alone.)
+    # Reusing a plan still works.
     _go(page, 'practice_plan')
     page.locator('.cb-practice-plan-button').first.click()
     page.get_by_role('button', name='Reuse on another date').first.click()
