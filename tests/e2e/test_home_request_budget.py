@@ -33,7 +33,9 @@ TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
 
 #: endpoint -> maximum requests per Home load. Measured on 10eed5d, five runs
-#: per viewport, identical each time except where a range is noted.
+#: per viewport, identical each time except where a range is noted. Lowered as
+#: later slices earn it: pageshow no longer refetches on a normal load, so
+#: roster-pitching-profiles 2 -> 1 and (phone) games 4 -> 3.
 DESKTOP_BASELINE = {
     '/api/session_data': 2,
     '/api/roster': 2,
@@ -48,7 +50,7 @@ DESKTOP_BASELINE = {
     '/api/signs': 1,
     '/api/stats': 1,
     '/api/overview_data': 2,
-    '/api/roster-pitching-profiles': 2,
+    '/api/roster-pitching-profiles': 1,
     '/api/getting-started': 1,
     '/api/pitching-preferences/settings': 1,
     '/api/pitching-preferences/arm-care-summary': 1,
@@ -56,11 +58,11 @@ DESKTOP_BASELINE = {
     '/api/game-day/<id>/pitching-rules': 1,
     '/api/coach-usage/heartbeat': 1,
 }
-#: Phones also load mobile_game_day_fields.js, which fetches /api/games twice more.
-PHONE_BASELINE = dict(DESKTOP_BASELINE, **{'/api/games': 4})
+#: Phones also load mobile_game_day_fields.js, which fetches /api/games once more.
+PHONE_BASELINE = dict(DESKTOP_BASELINE, **{'/api/games': 3})
 
 #: The measured totals the ceilings above add up from. Printed with the result.
-MEASURED_TOTAL = {'desktop': 28, 'phone': 30}
+MEASURED_TOTAL = {'desktop': 27, 'phone': 28}
 
 
 def _normalise(url):

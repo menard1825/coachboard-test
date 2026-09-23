@@ -377,7 +377,8 @@
       if (button) deletePastGame(button);
     });
 
-    window.addEventListener('pageshow', loadGames);
+    // start() has already loaded; only a bfcache restore needs fresh data.
+    window.addEventListener('pageshow', event => { if (event.persisted) loadGames(); });
     window.addEventListener('hashchange', () => {
       if (window.location.hash === '#games') {
         enhanceAddGameForm();

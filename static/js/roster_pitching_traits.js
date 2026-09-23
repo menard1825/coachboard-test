@@ -255,7 +255,8 @@
     loadProfiles();
 
     document.addEventListener('shown.bs.tab', rosterTabWasShown);
-    window.addEventListener('pageshow', () => scheduleProfileRefresh(0));
+    // start() has already loaded; only a bfcache restore needs fresh data.
+    window.addEventListener('pageshow', event => { if (event.persisted) scheduleProfileRefresh(0); });
     window.addEventListener('focus', () => scheduleProfileRefresh(80));
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') scheduleProfileRefresh(80);
