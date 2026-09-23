@@ -593,6 +593,13 @@ document.addEventListener('DOMContentLoaded', () => {
             ? `<div class="cb-practice-work"><i class="bi ${icon}"></i><div><strong>${label}</strong><p>${escapeHTML(value)}</p></div></div>`
             : '';
 
+        // This list is rebuilt whenever practice data changes -- including a
+        // setup task ticked inside the open plan, and any other coach's change.
+        // Keep the plan (and its Edit plan details section) the coach has open,
+        // open: collapsing it under them shrank the page and threw a phone's
+        // scroll position back to the top.
+        const openSections = new Set([...container.querySelectorAll('.collapse.show')].map(el => el.id).filter(Boolean));
+
         container.innerHTML = orderedPlans.map(plan => {
             const dateOnly = plan.date.split('T')[0];
             const isUpcoming = dateOnly >= today;
@@ -636,6 +643,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div></div>
             </div>`;
         }).join('');
+        openSections.forEach(id => {
+            const section = document.getElementById(id);
+            if (!section || !container.contains(section)) return;
+            section.classList.add('show');
+            container.querySelectorAll(`[data-bs-target="#${CSS.escape(id)}"]`).forEach(toggle => {
+                toggle.classList.remove('collapsed');
+                toggle.setAttribute('aria-expanded', 'true');
+            });
+        });
         attachTaskListeners();
         container.querySelectorAll('.reuse-practice-btn').forEach(button => {
             button.addEventListener('click', () => {
