@@ -21,6 +21,11 @@ B. the coach opens the Rotations tab on desktop (`shown.bs.tab`). That is the
 
 Requests are attributed to the script on the fetch's stack: main.js makes its
 own legitimate /api/rotations request, which this slice does not touch.
+
+main.js now renders the Rotations list only when the tab is first opened, so
+Home itself is left with season_management_v2.js's single start-up fetch, and
+the first open decorates the new list from that cached response. Tests that
+act on the decorated list open the tab first.
 """
 
 import os
@@ -121,6 +126,12 @@ def _open_home(page, base_url):
     page.goto(f'{base_url}/')
     page.wait_for_load_state('load')
     expect(page.locator('#overview-content-container .cb-home-dashboard')).to_have_count(1, timeout=30_000)
+    _settle(page)
+
+
+def _open_rotations(page):
+    page.evaluate("() => { location.hash = '#rotations'; }")
+    expect(page.locator('#rotations')).to_be_visible(timeout=15_000)
     _wait_until_rotations_decorated(page)
     _settle(page)
 
@@ -132,10 +143,22 @@ def _rotation_calls(page, by=None):
 
 def _assert_home_load_counts(page):
     everyone = sorted(_rotation_calls(page))
-    assert _rotation_calls(page, MAIN_JS) == [MAIN_JS], everyone
+    assert _rotation_calls(page, MAIN_JS) == [], everyone
     assert len(_rotation_calls(page, SEASON_JS)) == 1, (
         f'{SEASON_JS} fetched {ROTATIONS} {len(_rotation_calls(page, SEASON_JS))} '
         f'times on one Home load; all callers: {everyone}')
+    assert page.cb_errors == []
+
+    # Opening the tab: main.js fetches and renders the list once, and the
+    # season script decorates it from the response it already has. Desktop
+    # opens tabs through Bootstrap, whose shown.bs.tab is the season script's
+    # own refresh trigger (B above) -- one more request there, none on phones.
+    phone = page.viewport_size['width'] < 992
+    _open_rotations(page)
+    everyone = sorted(_rotation_calls(page))
+    assert _rotation_calls(page, MAIN_JS) == [MAIN_JS], everyone
+    assert len(_rotation_calls(page, SEASON_JS)) == (1 if phone else 2), everyone
+    _assert_rotations_ui_is_decorated(page)
     assert page.cb_errors == []
 
 
@@ -210,11 +233,12 @@ def test_home_load_count_does_not_grow_with_api_latency_phone(make_page, coachbo
 # --- mutations that are not rotation changes ------------------------------
 
 def test_main_js_rerender_without_rotation_changes_does_not_refetch(make_page, coachboard_url):
-    """A real data_updated for a game: main.js refetches and re-renders every
-    tab, including the accordion with the same rotations. The season script
-    must re-decorate from what it already has."""
+    """A real data_updated for a game while Rotations is showing: main.js
+    refetches and re-renders the accordion with the same rotations. The season
+    script must re-decorate from what it already has."""
     page = make_page(DESKTOP)
     _open_home(page, coachboard_url)
+    _open_rotations(page)
     before = len(_rotation_calls(page, SEASON_JS))
     main_before = len(_rotation_calls(page, MAIN_JS))
 
@@ -237,6 +261,7 @@ def test_unrelated_watched_containers_do_not_refetch(make_page, coachboard_url):
     enhancements; changing them must not fetch rotations."""
     page = make_page(DESKTOP)
     _open_home(page, coachboard_url)
+    _open_rotations(page)
     before = len(_rotation_calls(page, SEASON_JS))
     page.evaluate("""() => {
       for (const id of ['dev-player-list', 'practicePlanAccordion']) {
@@ -254,6 +279,7 @@ def test_new_template_from_another_device_refreshes_and_is_decorated(make_page, 
     """Trigger A: data_updated after a template is created elsewhere."""
     page = make_page(DESKTOP)
     _open_home(page, coachboard_url)
+    _open_rotations(page)
     before = len(_rotation_calls(page, SEASON_JS))
 
     title = f'Sunday Rotation {uuid.uuid4().hex[:6]}'
@@ -274,6 +300,7 @@ def test_new_preset_from_another_device_lands_in_the_preset_panel(make_page, coa
     """Trigger A for the preset branch: the new row must move out of the list."""
     page = make_page(DESKTOP)
     _open_home(page, coachboard_url)
+    _open_rotations(page)
     before = len(_rotation_calls(page, SEASON_JS))
 
     name = f'Tournament {uuid.uuid4().hex[:6]}'
@@ -310,7 +337,8 @@ def test_opening_rotations_on_desktop_after_idle_refreshes_once(make_page, coach
 
 def test_opening_rotations_on_phone_after_idle_shows_the_decorated_tab(make_page, coachboard_url):
     """Phones switch tabs without Bootstrap events: nothing to refetch, but the
-    tab must already be fully decorated from the Home load."""
+    list main.js renders on first open must be decorated from the Home load's
+    response."""
     page = make_page(PHONE)
     _open_home(page, coachboard_url)
     page.wait_for_timeout(3000)

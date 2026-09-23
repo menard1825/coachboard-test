@@ -180,8 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 AppState.active_player_dev_name = button.dataset.playerName;
                 const tabLink = document.querySelector('a[data-bs-toggle="tab"][href="#player_development"]');
                 if (tabLink) bootstrap.Tab.getOrCreateInstance(tabLink).show();
-                renderPlayerDevelopmentList();
-                renderPlayerDevelopmentDetails();
+                renderSection('player_development');
             });
         });
     }
@@ -359,11 +358,13 @@ document.addEventListener('DOMContentLoaded', () => {
         container.querySelector('.edit-roster-profile')?.addEventListener('click', () => {
             const tabLink = document.querySelector('a[data-bs-toggle="tab"][href="#roster"]');
             if (tabLink) bootstrap.Tab.getOrCreateInstance(tabLink).show();
-            const rosterCard = document.querySelector(`#collapse-roster-${player?.id}`);
-            if (rosterCard) {
-                bootstrap.Collapse.getOrCreateInstance(rosterCard, { toggle: false }).show();
-                rosterCard.closest('.player-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            ensureSectionLoaded('roster').then(() => {
+                const rosterCard = document.querySelector(`#collapse-roster-${player?.id}`);
+                if (rosterCard) {
+                    bootstrap.Collapse.getOrCreateInstance(rosterCard, { toggle: false }).show();
+                    rosterCard.closest('.player-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
         });
     }
 
@@ -800,7 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // than repairing it afterwards.
         if (container.querySelector('.cb-home-loading, .cb-home-dashboard')) return;
 
-        // Since the data is already fetched in init(), we can access it from AppState
+        // The overview section loads this data before it draws (see SECTIONS).
         const { next_game, pitchers_on_rest, recent_notes } = AppState.full_data.overview || {};
 
         if (!next_game && !pitchers_on_rest && !recent_notes) {
@@ -877,50 +878,63 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = `<div class="row"><div class="col-md-6">${nextGameHtml}${pitchersOnRestHtml}</div><div class="col-md-6">${recentNotesHtml}</div></div>`;
     }
 
-    // dataset -> the tab pane that shows it. session_data and overview have no
-    // tab of their own here: Home is home_dashboard.js's, which handles its own
-    // failures, and session data only refines ordering and permissions.
-    const LOAD_ERROR_PANES = {
-        roster: 'roster', lineups: 'lineups', pitching_data: 'pitching',
-        scouting_list: 'scouting_list', rotations: 'rotations', games: 'games',
-        collaboration_notes: 'collaboration', practice_plans: 'practice_plan',
-        player_development: 'player_development', signs: 'signs', stats: 'stats',
+    // --- SECTIONS ---
+    // Every workspace pane main.js draws is a section: the datasets it reads
+    // and the renderers that draw it. A section loads the first time its pane
+    // is shown, however it was shown, so Home -- which home_dashboard.js owns --
+    // costs main.js nothing, and a pane is never drawn from data it has not
+    // loaded. #games is kept for completeness; navigation_v2.js redirects it.
+    const SECTIONS = {
+        overview: { datasets: ['overview', 'roster', 'pitching_data'], render: [renderOverview] },
+        roster: { datasets: ['session_data', 'roster'], render: [renderRoster] },
+        player_development: { datasets: ['session_data', 'roster', 'player_development'], render: [renderPlayerDevelopmentList, renderPlayerDevelopmentDetails] },
+        lineups: { datasets: ['lineups', 'roster'], render: [renderLineups] },
+        rotations: { datasets: ['rotations'], render: [renderRotations] },
+        games: { datasets: ['games', 'lineups', 'rotations'], render: [renderGames] },
+        scouting_list: { datasets: ['scouting_list'], render: [renderScoutingList] },
+        collaboration: { datasets: ['session_data', 'roster', 'collaboration_notes'], render: [renderCollaborationNotes] },
+        practice_plan: { datasets: ['roster', 'practice_plans'], render: [renderPracticePlans] },
+        signs: { datasets: ['signs'], render: [renderSigns] },
+        stats: { datasets: ['roster', 'stats'], render: [renderStats] },
+        pitching: { datasets: ['session_data', 'roster', 'pitching_data'], render: [renderPitchingLog] },
     };
+    const renderedSections = new Set();
 
-    function renderLoadErrors() {
-        const errors = AppState.load_errors || {};
-        Object.entries(LOAD_ERROR_PANES).forEach(([key, paneId]) => {
-            const pane = document.getElementById(paneId);
-            if (!pane) return;
-            const existing = pane.querySelector(`:scope > [data-cb-load-error="${key}"]`);
-            if (!errors[key]) {
-                existing?.remove();
-                return;
-            }
-            if (existing) return;
-            const notice = document.createElement('div');
-            notice.className = 'alert alert-warning small';
-            notice.setAttribute('role', 'status');
-            notice.dataset.cbLoadError = key;
-            notice.textContent = "This section couldn't load. Refresh the page to try again.";
-            pane.prepend(notice);
-        });
+    function renderSection(name) {
+        if (!renderedSections.has(name)) return;
+        SECTIONS[name].render.forEach(render => render());
     }
 
-    function renderAll() {
-        renderOverview();
-        renderRoster();
-        renderPlayerDevelopmentList();
-        renderPlayerDevelopmentDetails();
-        renderLineups();
-        renderRotations();
-        renderPitchingLog();
-        renderSigns();
-        renderCollaborationNotes();
-        renderScoutingList();
-        renderGames();
-        renderPracticePlans();
-        renderStats();
+    // A failed dataset is reported in each drawn section that reads it. Home's
+    // failures are home_dashboard.js's to handle, and session data only
+    // refines ordering and permissions, so neither gets a notice.
+    function renderLoadErrors() {
+        const errors = AppState.load_errors;
+        Object.entries(SECTIONS).forEach(([name, section]) => {
+            const pane = document.getElementById(name);
+            if (!pane || name === 'overview') return;
+            section.datasets.forEach(key => {
+                if (key === 'session_data') return;
+                const existing = pane.querySelector(`:scope > [data-cb-load-error="${key}"]`);
+                if (!errors[key] || !renderedSections.has(name)) {
+                    existing?.remove();
+                    return;
+                }
+                if (existing) return;
+                const notice = document.createElement('div');
+                notice.className = 'alert alert-warning small';
+                notice.setAttribute('role', 'status');
+                notice.dataset.cbLoadError = key;
+                notice.textContent = "This section couldn't load. ";
+                const retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'btn btn-link btn-sm p-0 align-baseline';
+                retry.textContent = 'Try again';
+                retry.addEventListener('click', () => ensureSectionLoaded(name));
+                notice.append(retry);
+                pane.prepend(notice);
+            });
+        });
     }
 
     // --- EVENT HANDLERS & LISTENERS ---
@@ -986,13 +1000,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- INITIALIZATION ---
-    // Each dataset loads -- and fails -- on its own. A failed request for one
-    // legacy tab used to reject the whole load, and init()'s catch then replaced
-    // #mainTabContent, taking the visible Home dashboard with it. A failed
-    // dataset now keeps its last good value (or an empty value of the shape its
-    // renderer expects) and is recorded in AppState.load_errors so its own tab
-    // can say so.
+    // --- DATA ---
+    // Datasets load on demand and are tracked one by one, because sections
+    // share them (roster feeds eight). Each has an explicit state -- absent
+    // (never requested), 'loading', 'loaded' or 'failed' -- one request at a
+    // time, and a `stale` mark for a loaded copy the server has since changed.
+    // Until a dataset loads, AppState holds an empty value of the shape its
+    // renderers and socket handlers expect; that value is never "loaded".
+    // A failed request leaves whatever AppState already had and records the
+    // error, so the section that needed it can say so and try again.
+    const DATASET_URLS = {
+        session_data: '/api/session_data',
+        roster: '/api/roster',
+        lineups: '/api/lineups',
+        pitching_data: '/api/pitching_data',
+        scouting_list: '/api/scouting_list',
+        rotations: '/api/rotations',
+        games: '/api/games',
+        collaboration_notes: '/api/collaboration_notes',
+        practice_plans: '/api/practice_plans',
+        player_development: '/api/player_development',
+        signs: '/api/signs',
+        stats: '/api/stats',
+        overview: '/api/overview_data',
+    };
     const EMPTY_DATA = {
         session_data: {session: {}, player_order: []},
         roster: [],
@@ -1008,279 +1039,311 @@ document.addEventListener('DOMContentLoaded', () => {
         stats: {cumulative_pitching_data: {}, cumulative_position_data: {}, attendance_stats: {}},
         overview: {},
     };
-    const lastGoodData = {};
+    const datasets = {};
+    const sectionRequests = {};
 
-    async function fetchData() {
-        const endpoints = {
-            session_data: '/api/session_data',
-            roster: '/api/roster',
-            lineups: '/api/lineups',
-            pitching_data: '/api/pitching_data',
-            scouting_list: '/api/scouting_list',
-            rotations: '/api/rotations',
-            games: '/api/games',
-            collaboration_notes: '/api/collaboration_notes',
-            practice_plans: '/api/practice_plans',
-            player_development: '/api/player_development',
-            signs: '/api/signs',
-            stats: '/api/stats',
-            overview: '/api/overview_data'
-        };
-
-        const requests = Object.entries(endpoints).map(([key, url]) =>
-            fetch(url).then(res => {
-                if (!res.ok) throw new Error(`Failed to fetch ${key}`);
-                return res.json();
-            })
-        );
-
-        const settled = await Promise.allSettled(requests);
-        const dataKeys = Object.keys(endpoints);
-        AppState.load_errors = {};
-        const results = settled.map((outcome, index) => {
-            const key = dataKeys[index];
-            if (outcome.status === 'fulfilled') {
-                lastGoodData[key] = outcome.value;
-                return outcome.value;
-            }
-            console.error(`Could not load ${key}:`, outcome.reason);
-            AppState.load_errors[key] = String(outcome.reason?.message || outcome.reason);
-            return lastGoodData[key] ?? EMPTY_DATA[key];
-        });
-
-        const sessionData = results[dataKeys.indexOf('session_data')];
-        const statsData = results[dataKeys.indexOf('stats')];
-        const pitchingData = results[dataKeys.indexOf('pitching_data')];
-
-        Object.assign(AppState, {
-            session: sessionData.session,
-            player_order: sessionData.player_order,
-            pitch_count_summary: pitchingData.pitch_count_summary,
-            full_data: {
-                roster: results[dataKeys.indexOf('roster')],
-                lineups: results[dataKeys.indexOf('lineups')],
-                pitching: pitchingData.pitching,
-                scouting_list: results[dataKeys.indexOf('scouting_list')],
-                rotations: results[dataKeys.indexOf('rotations')],
-                games: results[dataKeys.indexOf('games')],
-                collaboration_notes: results[dataKeys.indexOf('collaboration_notes')],
-                practice_plans: results[dataKeys.indexOf('practice_plans')],
-                player_development: results[dataKeys.indexOf('player_development')],
-                signs: results[dataKeys.indexOf('signs')],
-                cumulative_pitching_data: statsData.cumulative_pitching_data,
-                cumulative_position_data: statsData.cumulative_position_data,
-                attendance_stats: statsData.attendance_stats,
-                overview: results[dataKeys.indexOf('overview')]
-            }
-        });
+    function applyDataset(key, value) {
+        if (key === 'session_data') {
+            AppState.session = value.session;
+            AppState.player_order = value.player_order;
+        } else if (key === 'pitching_data') {
+            AppState.full_data.pitching = value.pitching;
+            AppState.pitch_count_summary = value.pitch_count_summary;
+        } else if (key === 'stats') {
+            AppState.full_data.cumulative_pitching_data = value.cumulative_pitching_data;
+            AppState.full_data.cumulative_position_data = value.cumulative_position_data;
+            AppState.full_data.attendance_stats = value.attendance_stats;
+        } else {
+            AppState.full_data[key] = value;
+        }
     }
 
-    async function init() {
-        try {
-            await fetchData();
-        } catch (error) {
-            // fetchData() no longer rejects for a failed request, so this is an
-            // unexpected error. Never replace #mainTabContent: it holds Home.
-            console.error("Init Error:", error);
-            return;
-        }
-        
+    Object.entries(EMPTY_DATA).forEach(([key, value]) => applyDataset(key, JSON.parse(JSON.stringify(value))));
+    AppState.load_errors = {};
+
+    const datasetReady = key => datasets[key]?.state === 'loaded' && !datasets[key].stale;
+
+    function loadDataset(key) {
+        if (!datasets[key]) datasets[key] = { state: undefined, stale: false, version: 0, request: null };
+        const entry = datasets[key];
+        if (entry.request) return entry.request;
+        if (datasetReady(key)) return Promise.resolve();
+        entry.state = 'loading';
+        entry.request = (async () => {
+            for (;;) {
+                const version = entry.version;
+                let value;
+                try {
+                    const response = await fetch(DATASET_URLS[key]);
+                    if (!response.ok) throw new Error(`Failed to fetch ${key}`);
+                    value = await response.json();
+                } catch (error) {
+                    console.error(`Could not load ${key}:`, error);
+                    AppState.load_errors[key] = String(error?.message || error);
+                    entry.state = 'failed';
+                    return;
+                }
+                // The server changed this data while the request was out, so
+                // the response may predate the change: ask again.
+                if (entry.version !== version) continue;
+                applyDataset(key, value);
+                delete AppState.load_errors[key];
+                entry.state = 'loaded';
+                entry.stale = false;
+                return;
+            }
+        })().finally(() => { entry.request = null; });
+        return entry.request;
+    }
+
+    // The one way a section gets its data: load whatever it needs that is not
+    // loaded and fresh, then draw it. Concurrent calls share one request.
+    function ensureSectionLoaded(name) {
+        const section = SECTIONS[name];
+        if (!section || (name === 'overview' && !legacyOverviewNeeded())) return Promise.resolve();
+        if (sectionRequests[name]) return sectionRequests[name];
+        if (renderedSections.has(name) && section.datasets.every(datasetReady)) return Promise.resolve();
+        sectionRequests[name] = Promise.all(section.datasets.map(loadDataset))
+            .then(() => {
+                renderedSections.add(name);
+                renderSection(name);
+                renderLoadErrors();
+            })
+            .catch(error => console.error(`Could not render ${name}:`, error))
+            .finally(() => { delete sectionRequests[name]; });
+        return sectionRequests[name];
+    }
+
+    function activeSectionName() {
+        const id = document.querySelector('#mainTabContent > .tab-pane.active')?.id;
+        return id && SECTIONS[id] ? id : null;
+    }
+
+    // Load a section when its pane becomes active. Watching the panes, rather
+    // than each way of opening one, covers the desktop tabs and menus, the
+    // phone navigator (which toggles classes without Bootstrap events),
+    // popstate and a direct /#hash load alike.
+    function watchSectionPanes() {
+        const root = document.getElementById('mainTabContent');
+        if (!root) return;
+        const observer = new MutationObserver(records => records.forEach(({ target, oldValue }) => {
+            if (target.classList.contains('active') && !/\bactive\b/.test(oldValue || '')) {
+                ensureSectionLoaded(target.id);
+            }
+        }));
+        root.querySelectorAll(':scope > .tab-pane').forEach(pane =>
+            observer.observe(pane, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }));
+        const active = activeSectionName();
+        if (active) ensureSectionLoaded(active);
+    }
+
+    // The server changed these datasets. Nothing to do for one never loaded:
+    // its first load will be current. A loaded one is marked stale and
+    // refetched when its section is next shown -- now, if it is showing.
+    function invalidateDatasets(keys) {
+        keys.forEach(key => {
+            const entry = datasets[key];
+            if (!entry) return;
+            if (entry.state === 'loading') entry.version += 1;
+            else entry.stale = true;
+        });
+        const name = activeSectionName();
+        if (name) (sectionRequests[name] || Promise.resolve()).then(() => ensureSectionLoaded(name));
+    }
+
+    // A socket delta patches data main.js holds. Before a dataset has loaded
+    // there is nothing to patch, and a delta that lands mid-request may be
+    // older or newer than the response, so that request is repeated instead.
+    function acceptDelta(key) {
+        const entry = datasets[key];
+        if (entry?.state === 'loaded') return true;
+        if (entry?.state === 'loading') entry.version += 1;
+        return false;
+    }
+
+    // Home belongs to home_dashboard.js, which claims #overview-content-container
+    // as soon as it runs. main.js draws its legacy overview -- and loads data
+    // for it -- only if that script is missing, failed to load, or ran without
+    // claiming the container.
+    let homeDashboardFailed = false;
+
+    function legacyOverviewNeeded() {
+        const container = document.getElementById('overview-content-container');
+        if (!container || container.querySelector('.cb-home-loading, .cb-home-dashboard')) return false;
+        return homeDashboardFailed || !document.querySelector('script[data-cb-home-dashboard]');
+    }
+
+    function watchHomeDashboard() {
+        const settled = event => {
+            if (!event.target?.matches?.('script[data-cb-home-dashboard]')) return;
+            document.removeEventListener('load', settled, true);
+            document.removeEventListener('error', settled, true);
+            homeDashboardFailed = event.type === 'error'
+                || !document.querySelector('#overview-content-container :is(.cb-home-loading, .cb-home-dashboard)');
+            if (homeDashboardFailed && activeSectionName() === 'overview') ensureSectionLoaded('overview');
+        };
+        document.addEventListener('load', settled, true);
+        document.addEventListener('error', settled, true);
+    }
+
+    // --- INITIALIZATION ---
+    function init() {
         lineupEditorModal = new bootstrap.Modal(document.getElementById('lineupEditorModal'));
         confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
         setupEventListeners();
-        renderAll();
-        renderLoadErrors();
         initializeSortables();
         handleTabLogic();
-        
-        const socket = io();
+        watchHomeDashboard();
+        watchSectionPanes();
 
-        // --- Data Fetch Helpers for Sockets ---
-        const fetchPitchingData = async () => {
-            const data = await fetch('/api/pitching_data').then(res => res.json());
-            AppState.full_data.pitching = data.pitching;
-            AppState.pitch_count_summary = data.pitch_count_summary;
-        };
-        const fetchScoutingData = async () => {
-            AppState.full_data.scouting_list = await fetch('/api/scouting_list').then(res => res.json());
-        };
-        const fetchNotesData = async () => {
-            AppState.full_data.collaboration_notes = await fetch('/api/collaboration_notes').then(res => res.json());
-        };
-        const fetchPlansData = async () => {
-            AppState.full_data.practice_plans = await fetch('/api/practice_plans').then(res => res.json());
-        };
-        const fetchSignsData = async () => {
-            AppState.full_data.signs = await fetch('/api/signs').then(res => res.json());
-        };
-        const fetchStatsData = async () => {
-            const statsData = await fetch('/api/stats').then(res => res.json());
-            AppState.full_data.cumulative_pitching_data = statsData.cumulative_pitching_data;
-            AppState.full_data.cumulative_position_data = statsData.cumulative_position_data;
-            AppState.full_data.attendance_stats = statsData.attendance_stats;
-        };
+        const socket = io();
 
         // --- Roster Sockets ---
         socket.on('roster_add', (data) => {
             console.log('roster_add received', data);
+            if (!acceptDelta('roster')) return;
             AppState.full_data.roster.push(data.player);
             if (!AppState.player_order.includes(data.player.name)) {
                 AppState.player_order.push(data.player.name);
             }
-            renderRoster();
-            renderPlayerDevelopmentList();
+            renderSection('roster');
+            renderSection('player_development');
         });
         socket.on('roster_update', (data) => {
             console.log('roster_update received', data);
+            if (!acceptDelta('roster')) return;
             const index = AppState.full_data.roster.findIndex(p => p.id === data.player.id);
             if (index > -1) {
                 AppState.full_data.roster[index] = data.player;
-                renderRoster();
-                renderPlayerDevelopmentList();
+                renderSection('roster');
+                renderSection('player_development');
             }
         });
         socket.on('roster_delete', (data) => {
             console.log('roster_delete received', data);
+            if (!acceptDelta('roster')) return;
             const playerToDelete = AppState.full_data.roster.find(p => p.id === data.player_id);
             if(playerToDelete) {
                 AppState.player_order = AppState.player_order.filter(name => name !== playerToDelete.name);
             }
             AppState.full_data.roster = AppState.full_data.roster.filter(p => p.id !== data.player_id);
-            renderRoster();
-            renderPlayerDevelopmentList();
+            renderSection('roster');
+            renderSection('player_development');
         });
         socket.on('player_order_update', (data) => {
             console.log('player_order_update received', data);
+            if (!acceptDelta('session_data')) return;
             AppState.player_order = data.order;
-            renderRoster();
-            renderPlayerDevelopmentList();
+            renderSection('roster');
+            renderSection('player_development');
         });
 
         // --- Game, Lineup, Rotation Sockets ---
         socket.on('game_add', (data) => {
             console.log('game_add received', data);
+            if (!acceptDelta('games')) return;
             AppState.full_data.games.push(data.game);
-            renderGames();
+            renderSection('games');
         });
         socket.on('game_update', (data) => {
             console.log('game_update received', data);
+            if (!acceptDelta('games')) return;
             const index = AppState.full_data.games.findIndex(g => g.id === data.game.id);
             if (index > -1) AppState.full_data.games[index] = data.game;
-            renderGames();
+            renderSection('games');
         });
         socket.on('game_delete', (data) => {
             console.log('game_delete received', data);
+            if (!acceptDelta('games')) return;
             AppState.full_data.games = AppState.full_data.games.filter(g => g.id !== data.game_id);
-            renderGames();
+            renderSection('games');
         });
         socket.on('lineup_add', (data) => {
             console.log('lineup_add received', data);
+            if (!acceptDelta('lineups')) return;
             if (data.lineup.is_default) AppState.full_data.lineups.forEach(lineup => { lineup.is_default = false; });
             AppState.full_data.lineups.push(data.lineup);
-            renderLineups();
-            renderGames();
+            renderSection('lineups');
+            renderSection('games');
         });
         socket.on('lineup_update', (data) => {
             console.log('lineup_update received', data);
+            if (!acceptDelta('lineups')) return;
             if (data.lineup.is_default) AppState.full_data.lineups.forEach(lineup => { lineup.is_default = false; });
             const index = AppState.full_data.lineups.findIndex(l => l.id === data.lineup.id);
             if (index > -1) AppState.full_data.lineups[index] = data.lineup;
             else AppState.full_data.lineups.push(data.lineup);
-            renderLineups();
-            renderGames();
+            renderSection('lineups');
+            renderSection('games');
         });
         socket.on('lineup_delete', (data) => {
             console.log('lineup_delete received', data);
+            if (!acceptDelta('lineups')) return;
             AppState.full_data.lineups = AppState.full_data.lineups.filter(l => l.id !== data.lineup_id);
-            renderLineups();
-            renderGames();
+            renderSection('lineups');
+            renderSection('games');
         });
-        socket.on('rotation_save', async (data) => {
+        socket.on('rotation_save', (data) => {
             console.log('rotation_save received', data);
-            await fetchData();
-            renderGames();
+            invalidateDatasets(['rotations']);
         });
         socket.on('rotation_delete', (data) => {
             console.log('rotation_delete received', data);
+            if (!acceptDelta('rotations')) return;
             AppState.full_data.rotations = AppState.full_data.rotations.filter(r => r.id !== data.rotation_id);
-            renderRotations();
-            renderGames();
+            renderSection('rotations');
+            renderSection('games');
         });
 
         // --- Player Development Sockets ---
         socket.on('dev_focus_add', (data) => {
             console.log('dev_focus_add received', data);
+            if (!acceptDelta('player_development')) return;
             const { player_name, focus } = data;
             if (!AppState.full_data.player_development[player_name]) {
                 AppState.full_data.player_development[player_name] = [];
             }
             AppState.full_data.player_development[player_name].push(focus);
-            renderPlayerDevelopmentList();
-            if (AppState.active_player_dev_name === player_name) {
-                renderPlayerDevelopmentDetails();
-            }
+            renderSection('player_development');
         });
         socket.on('dev_focus_update', (data) => {
             console.log('dev_focus_update received', data);
+            if (!acceptDelta('player_development')) return;
             const { player_name, focus } = data;
             const playerDevList = AppState.full_data.player_development[player_name];
             if (playerDevList) {
                 const index = playerDevList.findIndex(f => f.id === focus.id);
                 if (index > -1) playerDevList[index] = focus;
-                renderPlayerDevelopmentList();
-                if (AppState.active_player_dev_name === player_name) renderPlayerDevelopmentDetails();
+                renderSection('player_development');
             }
         });
         socket.on('dev_focus_delete', (data) => {
             console.log('dev_focus_delete received', data);
+            if (!acceptDelta('player_development')) return;
             const { player_name, focus_id } = data;
             const playerDevList = AppState.full_data.player_development[player_name];
             if (playerDevList) {
                 AppState.full_data.player_development[player_name] = playerDevList.filter(f => f.id !== focus_id);
-                renderPlayerDevelopmentList();
-                if (AppState.active_player_dev_name === player_name) renderPlayerDevelopmentDetails();
+                renderSection('player_development');
             }
         });
 
-        socket.on('data_updated', async () => {
+        socket.on('data_updated', () => {
             console.log('data_updated received');
-            await fetchData();
-            renderAll();
-            renderLoadErrors();
+            invalidateDatasets(Object.keys(datasets));
         });
 
         // --- Other Data Sockets ---
-        socket.on('pitching_update', async () => {
-            console.log('pitching_update received');
-            await fetchPitchingData();
-            renderPitchingLog();
-            renderStats();
+        const invalidateOn = (event, key) => socket.on(event, () => {
+            console.log(`${event} received`);
+            invalidateDatasets([key]);
         });
-        socket.on('scouting_update', async () => {
-            console.log('scouting_update received');
-            await fetchScoutingData();
-            renderScoutingList();
-        });
-        socket.on('notes_update', async () => {
-            console.log('notes_update received');
-            await fetchNotesData();
-            renderCollaborationNotes();
-        });
-        socket.on('plans_update', async () => {
-            console.log('plans_update received');
-            await fetchPlansData();
-            renderPracticePlans();
-        });
-        socket.on('signs_update', async () => {
-            console.log('signs_update received');
-            await fetchSignsData();
-            renderSigns();
-        });
-        socket.on('stats_update', async () => {
-            console.log('stats_update received');
-            await fetchStatsData();
-            renderStats();
-        });
+        invalidateOn('pitching_update', 'pitching_data');
+        invalidateOn('scouting_update', 'scouting_list');
+        invalidateOn('notes_update', 'collaboration_notes');
+        invalidateOn('plans_update', 'practice_plans');
+        invalidateOn('signs_update', 'signs');
+        invalidateOn('stats_update', 'stats');
     }
 
     function initializeSortables() {

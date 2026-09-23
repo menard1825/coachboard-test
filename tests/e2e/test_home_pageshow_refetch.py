@@ -12,8 +12,9 @@ the page comes back from memory with whatever data it had when the coach
 left.
 
 Requests are attributed to the script that made them, from the fetch call's
-stack, because /api/games also has legitimate callers in main.js and
-home_dashboard.js. Counting the endpoint alone would test the wrong thing.
+stack, because /api/games also has a legitimate caller in home_dashboard.js
+(and main.js, once its Schedule data is needed). Counting the endpoint alone
+would test the wrong thing.
 
 The normal-pageshow and restore tests dispatch a synthetic PageTransitionEvent
 after the page has settled. That exercises exactly the handler under test with
@@ -101,7 +102,13 @@ def _open_home(page, base_url):
     page.goto(f'{base_url}/')
     page.wait_for_load_state('load')
     expect(page.locator('#overview-content-container .cb-home-dashboard')).to_have_count(1, timeout=15_000)
-    # Traits panels exist only after the profile fetch has resolved.
+    page.wait_for_timeout(1500)
+
+
+def _open_roster(page):
+    """main.js renders the Roster on first open; traits panels follow the
+    profile fetch."""
+    page.evaluate("() => { location.hash = '#roster'; }")
     page.wait_for_function(
         """() => {
           const cards = document.querySelectorAll('#roster-cards-container .save-player-btn').length;
@@ -153,6 +160,7 @@ def test_bfcache_restore_refreshes_roster_profiles(make_page, coachboard_url):
     """A restored page may hold stale traits from before the coach left."""
     page = make_page(DESKTOP)
     _open_home(page, coachboard_url)
+    _open_roster(page)
     before = len(_calls(page, PROFILES, TRAITS_JS))
     _dispatch_pageshow(page, persisted=True)
     after = len(_calls(page, PROFILES, TRAITS_JS))
@@ -171,10 +179,11 @@ def test_phone_home_load_fetches_mobile_games_once(make_page, coachboard_url):
     assert len(mine) == 1, (
         f'{MOBILE_GAMES_JS} fetched {GAMES} {len(mine)} times on one Home load; '
         f'all {GAMES} callers: {_describe(page, GAMES)}')
-    # The other callers are legitimate and out of scope; they must be seen and
+    # The other caller is legitimate and out of scope; it must be seen and
     # attributed separately, or this test would not be measuring the module.
+    # (main.js no longer fetches games on Home: its Schedule pane is unreachable.)
     others = {call['by'] for call in _calls(page, GAMES)} - {MOBILE_GAMES_JS}
-    assert {'main.js', 'home_dashboard.js'} <= others, _describe(page, GAMES)
+    assert 'home_dashboard.js' in others, _describe(page, GAMES)
     assert page.cb_errors == []
 
 

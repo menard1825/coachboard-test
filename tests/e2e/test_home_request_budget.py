@@ -1,16 +1,18 @@
-"""Home's API request budget -- recorded baseline, to be tightened later.
+"""Home's API request budget.
 
 Measured from one click on the team logo (from /pitching) to a settled Home.
-The numbers are today's behaviour, not the goal: the Home audit found 17 of 28
-desktop requests serve hidden tabs or are duplicates, and the planned end
-state is about 11. Each later slice should lower these ceilings in the same
-commit that earns the reduction.
+The Home audit found 17 of 28 desktop requests served hidden tabs or were
+duplicates; each slice lowers these ceilings in the same commit that earns
+the reduction.
 
 Ceilings are per endpoint, so a change that trades one request for a new one
-still fails. /api/rotations used to need a range (3 with instant APIs, 5 with
-150 ms latency) because season_management_v2.js refetched on its own writes;
-it now fetches once plus only on real rotation changes, so the count is 2 at
-any latency -- one from main.js, one from season_management_v2.js.
+still fails. main.js now loads a legacy tab's datasets only when that tab is
+opened, so none of its thirteen start-up requests remain on Home: the
+endpoints below are home_dashboard.js's own plus the enhancer scripts'
+(roster_pitching_traits.js, season_management_v2.js, getting_started_home.js,
+client_timezone.js's heartbeat, and on phones mobile_game_day_fields.js).
+An endpoint that only a legacy tab needs -- /api/signs, say -- appearing here
+fails as "outside the baseline".
 """
 
 import os
@@ -31,25 +33,17 @@ import cdn_assets  # noqa: E402
 TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
 
-#: endpoint -> maximum requests per Home load. Measured on 10eed5d, five runs
-#: per viewport, identical each time except where a range is noted. Lowered as
-#: later slices earn it: pageshow no longer refetches on a normal load, so
-#: roster-pitching-profiles 2 -> 1 and (phone) games 4 -> 3; season_management_v2
-#: no longer refetches on its own writes, so rotations 3-5 -> 2.
+#: endpoint -> maximum requests per Home load. Measured on the lazy-loading
+#: change, three runs per viewport at 0 ms and 150 ms API latency, identical
+#: every time. History: 10eed5d measured 28 desktop / 30 phone; pageshow,
+#: rotations and lazy legacy tabs brought it to 13 / 14.
 DESKTOP_BASELINE = {
-    '/api/session_data': 2,
-    '/api/roster': 2,
-    '/api/lineups': 1,
-    '/api/pitching_data': 1,
-    '/api/scouting_list': 1,
-    '/api/rotations': 2,                      # main.js 1 + season_management_v2 1
-    '/api/games': 2,
-    '/api/collaboration_notes': 1,
-    '/api/practice_plans': 2,
-    '/api/player_development': 1,
-    '/api/signs': 1,
-    '/api/stats': 1,
-    '/api/overview_data': 2,
+    '/api/session_data': 1,                   # home_dashboard.js
+    '/api/roster': 1,                         # home_dashboard.js
+    '/api/rotations': 1,                      # season_management_v2.js
+    '/api/games': 1,                          # home_dashboard.js
+    '/api/practice_plans': 1,                 # home_dashboard.js
+    '/api/overview_data': 1,                  # home_dashboard.js
     '/api/roster-pitching-profiles': 1,
     '/api/getting-started': 1,
     '/api/pitching-preferences/settings': 1,
@@ -59,10 +53,10 @@ DESKTOP_BASELINE = {
     '/api/coach-usage/heartbeat': 1,
 }
 #: Phones also load mobile_game_day_fields.js, which fetches /api/games once more.
-PHONE_BASELINE = dict(DESKTOP_BASELINE, **{'/api/games': 3})
+PHONE_BASELINE = dict(DESKTOP_BASELINE, **{'/api/games': 2})
 
 #: The measured totals the ceilings above add up from. Printed with the result.
-MEASURED_TOTAL = {'desktop': 26, 'phone': 27}
+MEASURED_TOTAL = {'desktop': 13, 'phone': 14}
 
 
 def _normalise(url):

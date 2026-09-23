@@ -9,7 +9,9 @@ dashboard inside it, and init() returned before binding listeners, rendering
 or opening its socket.
 
 Now each dataset fails on its own: its tab gets a small notice, the other tabs
-render normally, and Home is untouched. /api/lineups is included because its
+render normally, and Home is untouched. (main.js now loads a tab's datasets
+when the tab is first opened, so these tests open a tab before asserting on
+it; a failed load is retried when its tab is opened again.) /api/lineups is included because its
 renderers call .filter/.find on the data directly, so it proves the fallback
 has the shape the renderer expects, not merely "something".
 
@@ -106,9 +108,13 @@ def _assert_home_intact(page):
 
 def _assert_unrelated_tabs_rendered(page):
     """Data from requests that succeeded still reaches its tabs."""
+    _open_tab(page, 'roster')
     expect(page.locator('#roster-cards-container .save-player-btn')).not_to_have_count(0, timeout=15_000)
+    _open_tab(page, 'rotations')
     expect(page.locator('#rotationsAccordion [data-rotation-id]')).not_to_have_count(0, timeout=15_000)
+    _open_tab(page, 'practice_plan')
     expect(page.locator('#practicePlanAccordion .accordion-item')).not_to_have_count(0, timeout=15_000)
+    _open_tab(page, 'overview')
 
 
 def _open_tab(page, pane_id):
@@ -207,7 +213,7 @@ def test_home_owned_failure_stays_with_home_dashboard(make_page, coachboard_url)
 # --- a later refresh after a failure --------------------------------------
 
 def _trigger_data_updated(page, base_url):
-    """A real server change: every open main.js refetches and re-renders."""
+    """A real server change: main.js refetches the datasets of the tab showing."""
     before = page.evaluate("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/signs')).length")
     response = page.request.post(f'{base_url}/add_game', form={
         'game_date': '2031-06-01', 'game_opponent': f'Refresh {uuid.uuid4().hex[:6]}',
@@ -223,14 +229,18 @@ def test_data_update_after_a_failure_does_not_throw(make_page, coachboard_url):
     page = make_page(DESKTOP, failing=['/api/signs'])
     _open_home(page, coachboard_url)
     _assert_home_intact(page)
+    _open_tab(page, 'signs')
+    expect(_notice(page, 'signs', 'signs')).to_be_visible()
 
     _trigger_data_updated(page, coachboard_url)   # signs still failing
-    _assert_home_intact(page)
-    _assert_unrelated_tabs_rendered(page)
     assert _notice(page, 'signs', 'signs').count() == 1
 
     _recover(page, '/api/signs')
     _trigger_data_updated(page, coachboard_url)   # signs back
-    _assert_home_intact(page)
     assert page.locator('[data-cb-load-error]').count() == 0
+    expect(page.locator('#signs-list-container strong')).not_to_have_count(0)
+
+    _open_tab(page, 'overview')
+    _assert_home_intact(page)
+    _assert_unrelated_tabs_rendered(page)
     assert page.cb_errors == []

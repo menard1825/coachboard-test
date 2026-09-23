@@ -176,13 +176,24 @@ def _assert_metric_labels(page, base_url):
 
 # --- the loop --------------------------------------------------------------
 
+def _back_to_home_after_roster(page):
+    """main.js renders the Roster on first open, so open it, then hide it."""
+    page.evaluate("() => { location.hash = '#roster'; }")
+    _wait_until_roster_is_enhanced(page)
+    page.evaluate("() => { location.hash = '#overview'; }")
+    expect(page.locator('#overview')).to_be_visible(timeout=15_000)
+    # Let the pane switch and the profile refresh that opening Roster starts
+    # finish, as _wait_until_roster_is_enhanced does for the first render.
+    page.wait_for_timeout(1500)
+
+
 def test_roster_enhancer_settles_while_home_is_open(make_page, coachboard_url):
     """Roster is hidden behind Home here; it must still stop working."""
     page = make_page(DESKTOP)
     _login(page, coachboard_url)
     page.goto(f'{coachboard_url}/')
     expect(page.locator('#overview-content-container .cb-home-dashboard')).to_have_count(1, timeout=15_000)
-    _wait_until_roster_is_enhanced(page)
+    _back_to_home_after_roster(page)
     _assert_settled(page, 'Home')
     assert page.cb_errors == []
 
@@ -200,7 +211,7 @@ def test_roster_enhancer_settles_on_phone(make_page, coachboard_url):
     page = make_page(PHONE)
     _login(page, coachboard_url)
     page.goto(f'{coachboard_url}/')
-    _wait_until_roster_is_enhanced(page)
+    _back_to_home_after_roster(page)
     _assert_settled(page, 'Home (phone)')
     assert page.cb_errors == []
 
