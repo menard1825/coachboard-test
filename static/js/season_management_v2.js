@@ -7,6 +7,17 @@
   let practiceBusy = false;
   let mutationTimer = null;
 
+  // /api/rotations is fetched when the rotations themselves may have changed,
+  // not on every mutation of a watched container. Those containers also change
+  // when main.js renders unrelated lists and when this script (or
+  // coachboard_ui.js) decorates the Rotations tab, and each of those used to
+  // cost another request -- 3 per Home load, 5 on a slow connection.
+  let rotationsCache = null;
+  let rotationsRequest = null;
+  let refreshRotationsOnNextPass = false;
+  const separatedItems = new WeakSet();
+  let separatedState = null;
+
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[ch]));
@@ -32,11 +43,44 @@
   async function loadRotations() {
     try {
       const response = await fetch('/api/rotations', {cache:'no-store'});
-      if (!response.ok) return [];
+      if (!response.ok) return null;
       return await response.json();
     } catch (_) {
-      return [];
+      return null;
     }
+  }
+
+  function requestRotations() {
+    rotationsRequest = rotationsRequest || loadRotations().finally(() => { rotationsRequest = null; });
+    return rotationsRequest;
+  }
+
+  // The rotations main.js rendered, in the terms that decide the separation:
+  // which rotations, under which titles (the preset prefix is in the title).
+  function renderedRotationsKey(accordion) {
+    return [...accordion.querySelectorAll('[data-rotation-id]')]
+      .map(item => `${item.dataset.rotationId}\u0001${item.querySelector('.accordion-button strong')?.textContent ?? ''}`)
+      .sort().join('\u0002');
+  }
+
+  function fetchedRotationsKey(rotations) {
+    return rotations.filter(item => !item.associated_game_id)
+      .map(item => `${item.id}\u0001${item.title ?? ''}`)
+      .sort().join('\u0002');
+  }
+
+  // The accordion as this script last left it. Decorations inside the rows
+  // (its own Edit buttons, coachboard_ui.js's Delete buttons) do not change
+  // it; main.js re-rendering the list does, because that creates new rows.
+  function accordionState(accordion) {
+    const items = [...accordion.querySelectorAll('[data-rotation-id]')];
+    return items.map(item => item.dataset.rotationId).join(',') + '|'
+      + (items.length ? '' : accordion.textContent.trim());
+  }
+
+  function accordionUnchanged(accordion) {
+    return accordionState(accordion) === separatedState
+      && [...accordion.querySelectorAll('[data-rotation-id]')].every(item => separatedItems.has(item));
   }
 
   async function separateDefensePresets() {
@@ -44,7 +88,16 @@
     const accordion = document.getElementById('rotationsAccordion');
     if (!tab || !accordion) return;
 
-    const rotations = await loadRotations();
+    const forceRefresh = refreshRotationsOnNextPass;
+    refreshRotationsOnNextPass = false;
+    if (!forceRefresh && rotationsCache && accordionUnchanged(accordion)) return;
+
+    let rotations = rotationsCache;
+    if (forceRefresh || !rotations || renderedRotationsKey(accordion) !== fetchedRotationsKey(rotations)) {
+      const fetched = await requestRotations();
+      if (fetched) rotationsCache = fetched;
+      rotations = fetched || [];
+    }
     const presets = rotations.filter(item => !item.associated_game_id && String(item.title || '').startsWith(PRESET_PREFIX));
     const normalIds = new Set(rotations.filter(item => !item.associated_game_id && !String(item.title || '').startsWith(PRESET_PREFIX)).map(item => String(item.id)));
 
@@ -94,6 +147,9 @@
         cardHeader.appendChild(toolbar);
       }
     }
+
+    accordion.querySelectorAll('[data-rotation-id]').forEach(item => separatedItems.add(item));
+    separatedState = accordionState(accordion);
   }
 
   function ensurePracticeModal() {
@@ -232,7 +288,13 @@
     scheduleEnhance();
     const targets = [document.getElementById('practicePlanAccordion'), document.getElementById('rotationsAccordion'), document.getElementById('dev-player-list')].filter(Boolean);
     targets.forEach(target => new MutationObserver(scheduleEnhance).observe(target, {childList:true, subtree:true}));
-    document.addEventListener('shown.bs.tab', scheduleEnhance);
+    document.addEventListener('shown.bs.tab', event => {
+      // Opening Rotations is the one refresh the accordion observer cannot see:
+      // rotation_save makes main.js refetch without re-rendering this list, so
+      // a preset saved on another device only appears here when asked for.
+      if (event.target?.getAttribute?.('href') === '#rotations') refreshRotationsOnNextPass = true;
+      scheduleEnhance();
+    });
   }
 
   document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init, {once:true}) : init();

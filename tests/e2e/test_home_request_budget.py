@@ -7,11 +7,10 @@ state is about 11. Each later slice should lower these ceilings in the same
 commit that earns the reduction.
 
 Ceilings are per endpoint, so a change that trades one request for a new one
-still fails. /api/rotations has a range rather than a single number: its extra
-fetches come from season_management_v2.js's debounced MutationObserver, and
-how many of them merge depends on how quickly the other API calls return
-(3 with instant local APIs, 5 with 150 ms latency). The ceiling is the top of
-that measured range so the test does not flake on a slow machine.
+still fails. /api/rotations used to need a range (3 with instant APIs, 5 with
+150 ms latency) because season_management_v2.js refetched on its own writes;
+it now fetches once plus only on real rotation changes, so the count is 2 at
+any latency -- one from main.js, one from season_management_v2.js.
 """
 
 import os
@@ -35,14 +34,15 @@ TEST_PASSWORD = 'playwright-password'
 #: endpoint -> maximum requests per Home load. Measured on 10eed5d, five runs
 #: per viewport, identical each time except where a range is noted. Lowered as
 #: later slices earn it: pageshow no longer refetches on a normal load, so
-#: roster-pitching-profiles 2 -> 1 and (phone) games 4 -> 3.
+#: roster-pitching-profiles 2 -> 1 and (phone) games 4 -> 3; season_management_v2
+#: no longer refetches on its own writes, so rotations 3-5 -> 2.
 DESKTOP_BASELINE = {
     '/api/session_data': 2,
     '/api/roster': 2,
     '/api/lineups': 1,
     '/api/pitching_data': 1,
     '/api/scouting_list': 1,
-    '/api/rotations': 5,                      # 3 measured; 5 under API latency
+    '/api/rotations': 2,                      # main.js 1 + season_management_v2 1
     '/api/games': 2,
     '/api/collaboration_notes': 1,
     '/api/practice_plans': 2,
@@ -62,7 +62,7 @@ DESKTOP_BASELINE = {
 PHONE_BASELINE = dict(DESKTOP_BASELINE, **{'/api/games': 3})
 
 #: The measured totals the ceilings above add up from. Printed with the result.
-MEASURED_TOTAL = {'desktop': 27, 'phone': 28}
+MEASURED_TOTAL = {'desktop': 26, 'phone': 27}
 
 
 def _normalise(url):
