@@ -242,6 +242,7 @@
   function fieldSpot(pos, left, top) {
     const name = draft?.[pos] || '';
     const isOpen = !name;
+    const number = isOpen ? '' : String(playerByName(name)?.number ?? '').trim();
 
     const selectedHere =
       (
@@ -272,9 +273,9 @@
             : `${playerLabel(name)} at ${pos}`
         )}"
       >
-        <span class="cb-qd-pos">${esc(pos)}</span>
+        <span class="cb-qd-pos">${esc(pos)}${number ? ` <span class="cb-qd-num">#${esc(number)}</span>` : ''}</span>
         <span class="cb-qd-name">
-          ${esc(isOpen ? 'OPEN' : playerLabel(name))}
+          ${esc(isOpen ? 'OPEN' : name)}
         </span>
       </button>`;
   }
@@ -728,6 +729,10 @@
           0 2px 5px rgba(16,24,40,.12)!important;
       }
 
+      #${CARD_ID} .cb-next-destination .cb-qd-num{
+        display:none;
+      }
+
       #${CARD_ID} .cb-next-destination .cb-qd-pos::after{
         content:" · TAP HERE";
         color:#fff;
@@ -875,11 +880,12 @@
 
         #${CARD_ID} .cb-qd-spot{
           width:clamp(54px,17vw,66px)!important;
+          min-height:30px!important;
         }
 
         #${CARD_ID} .cb-qd-name{
-          font-size:.56rem!important;
-          padding:3px 4px!important;
+          font-size:var(--cb-marker-name)!important;
+          padding:2px!important;
         }
 
         #${CARD_ID} .cb-next-bench-player{

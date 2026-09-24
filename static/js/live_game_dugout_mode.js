@@ -186,9 +186,15 @@
       .cb-qd-body{padding:10px 11px 12px}
       .cb-qd-field{position:relative;aspect-ratio:1.28/1;min-height:238px;overflow:hidden;border:1px solid #d8e2d8;border-radius:12px;background:repeating-linear-gradient(90deg,#3d8f55 0,#3d8f55 12.5%,#438f58 12.5%,#438f58 25%)}
       .cb-qd-field-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+      /* Field markers (On the Field and Next Inning share them). Position
+         and jersey ride on the grass line; the name box holds only the name
+         so it can be the largest, easiest text on the field. The sizes are
+         set once here per layout and used by every marker override. */
+      :root{--cb-marker-name:.67rem;--cb-marker-pos:.625rem}
       .cb-qd-spot{position:absolute;transform:translate(-50%,-50%);z-index:2;width:clamp(62px,20vw,112px);border:0;background:transparent;padding:0;text-align:center;touch-action:manipulation}
-      .cb-qd-pos{display:block;color:#fff;font-size:.49rem;font-weight:900;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45);margin-bottom:3px;letter-spacing:.04em}
-      .cb-qd-name{display:block;width:100%;background:rgba(255,255,255,.96);border:1px solid #dce1e5;border-radius:8px;padding:5px 5px;font-size:.67rem;line-height:1.08;font-weight:820;color:#172033;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;box-shadow:0 1px 2px rgba(16,24,40,.1)}
+      .cb-qd-pos{display:block;color:#fff;font-size:var(--cb-marker-pos);font-weight:900;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45);margin-bottom:2px;letter-spacing:.03em}
+      .cb-qd-num{margin-left:.3em;font-weight:800}
+      .cb-qd-name{display:block;width:100%;background:rgba(255,255,255,.96);border:1px solid #dce1e5;border-radius:8px;padding:4px 2px;font-size:var(--cb-marker-name);line-height:1.04;font-weight:820;color:#172033;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;box-shadow:0 1px 2px rgba(16,24,40,.1)}
       .cb-qd-spot:active .cb-qd-name,.cb-qd-bench-player:active{transform:scale(.98)}
       .cb-qd-spot.pitcher .cb-qd-name{border-color:#b7c8e8;background:#f5f8ff}
       .cb-qd-bench-wrap{margin-top:9px;border:1px solid #e2e6eb;border-radius:11px;background:#f8fafc;padding:9px}
@@ -232,7 +238,7 @@
         body.cb-dugout .coach-actions{grid-template-columns:repeat(4,minmax(0,1fr))!important}
         .cb-qd-field{min-height:330px}
         .cb-qd-spot{width:clamp(78px,11vw,122px)}
-        .cb-qd-name{font-size:.75rem}
+        :root{--cb-marker-name:.75rem;--cb-marker-pos:.66rem}
       }
       @media(max-width:575.98px){
         #cbDugoutHeader{margin:0 -10px 10px;padding:8px 9px}
@@ -258,8 +264,9 @@
         .cb-dh-title{display:none}
         body.cb-dugout .coach-actions>.btn{min-height:70px!important}
         .cb-qd-field{min-height:232px}
-        .cb-qd-spot{width:66px}
-        .cb-qd-name{font-size:.59rem;padding:4px}
+        .cb-qd-spot{width:66px;min-height:30px}
+        :root{--cb-marker-name:.625rem;--cb-marker-pos:.6rem}
+        .cb-qd-name{padding:2px}
         .cb-qd-bench-player{font-size:.69rem;padding:7px 8px}
         .cb-end-zone{text-align:center}.cb-end-zone #liveEndGameBtn{width:100%!important}
         #cbCoachBoardNavModal .cb-app-grid{grid-template-columns:1fr 1fr}
@@ -272,7 +279,7 @@
         .cb-dh-name{font-size:.64rem}
         .cb-dh-btn{font-size:.58rem!important;padding:4px 5px!important}
         .cb-qd-spot{width:61px}
-        .cb-qd-name{font-size:.55rem}
+        :root{--cb-marker-name:.6rem;--cb-marker-pos:.5625rem}
       }
     `;
     document.head.appendChild(style);
@@ -540,18 +547,16 @@
     const pitcher = pos === 'P';
     const open = name === 'Open';
     const number = numberMap().get(name);
-    const label = number
-      ? `#${number} ${name}`
-      : open && !pitcher
-        ? 'Open · tap to fill'
-        : name;
+    const label = open && !pitcher ? 'Open · tap to fill' : name;
+    const fullLabel = open ? `${pos} open` : `${number ? `#${number} ` : ''}${name} at ${pos}`;
 
     return `<button type="button"
                     class="cb-qd-spot ${pitcher ? 'pitcher' : ''} ${open ? 'cb-authoritative-open' : ''}"
                     style="left:${left}%;top:${top}%"
                     data-cb-move-player="${esc(name)}"
-                    data-cb-position="${esc(pos)}">
-              <span class="cb-qd-pos">${esc(pos)}</span>
+                    data-cb-position="${esc(pos)}"
+                    aria-label="${esc(fullLabel)}">
+              <span class="cb-qd-pos">${esc(pos)}${number && !open ? ` <span class="cb-qd-num">#${esc(number)}</span>` : ''}</span>
               <span class="cb-qd-name">${esc(label)}</span>
             </button>`;
   }

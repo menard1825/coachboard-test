@@ -75,9 +75,13 @@
     return draft;
   }
 
-  function rosterLabel(name, roster = draft?.roster || []) {
+  function rosterNumber(name, roster = draft?.roster || []) {
     const player = roster.find(item => item.name === name);
-    const number = String(player?.number ?? '').trim();
+    return String(player?.number ?? '').trim();
+  }
+
+  function rosterLabel(name, roster = draft?.roster || []) {
+    const number = rosterNumber(name, roster);
     return number ? `#${number} ${name}` : name;
   }
 
@@ -114,9 +118,15 @@
         // A real draft render always takes over from it.
         button.classList.remove('cb-authoritative-open');
         button.classList.toggle('cb-main-open', !name);
+        // Name in the box; position and jersey on the grass line above it.
         const label = button.querySelector('.cb-qd-name');
-        const desiredLabel = name ? rosterLabel(name) : 'Open — choose player';
+        const desiredLabel = name || 'Open — choose player';
         if (label && label.textContent !== desiredLabel) label.textContent = desiredLabel;
+        const posLine = button.querySelector('.cb-qd-pos');
+        const number = name ? rosterNumber(name) : '';
+        const desiredPos = `${esc(pos)}${number ? ` <span class="cb-qd-num">#${esc(number)}</span>` : ''}`;
+        if (posLine && posLine.innerHTML !== desiredPos) posLine.innerHTML = desiredPos;
+        button.setAttribute('aria-label', name ? `${rosterLabel(name)} at ${pos}` : `${pos} open`);
       });
 
       const benchPlayers = draft.roster.filter(player => !assigned.has(player.name));
@@ -411,7 +421,7 @@
           kind: node.classList.contains('cb-qd-bench-player') ? 'chip' : 'marker',
           key: name,
           name,
-          label: node.querySelector('.cb-qd-name, span')?.textContent?.trim() || name,
+          label: (node.querySelector('.cb-qd-name') || node.querySelector('span'))?.textContent?.trim() || name,
         };
       },
 
