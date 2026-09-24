@@ -136,7 +136,7 @@
     {% endfor %}
   </div>
   {% else %}
-    <div class="gd-empty"><strong>No games are scheduled.</strong><div class="mt-1">{% if is_game_changer %}No GameChanger setup is available until a game is scheduled.{% else %}No games scheduled.{% endif %}</div>{% if not is_game_changer %}<a class="btn btn-outline-primary mt-3" href="#">Add Game</a>{% endif %}</div>
+    <div class="gd-empty"><strong>No games are scheduled.</strong><div class="mt-1">{% if is_game_changer %}No GameChanger setup is available until a game is scheduled.{% else %}No games scheduled.{% endif %}</div></div>
   {% endif %}
 
   {% if followup_cards and not is_game_changer %}

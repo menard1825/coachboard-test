@@ -263,11 +263,6 @@ def _team_colored_controls(page, base_url, viewport):
     if viewport is PHONE:
         yield 'active phone nav', page.locator('#cb-global-mobile-nav .nav-link.active').first, ('color', 'border-top-color')
 
-    page.goto(f'{base_url}/game-day')
-    add = page.locator('.btn-outline-primary.gd-add-game').first
-    expect(add).to_be_visible(timeout=15_000)
-    yield 'Add Game', add, ('color', 'border-top-color')
-
     _open_game(page, base_url)
     # Set Who's Out and Edit Lineup are hidden while the game is in pregame
     # planning; check the team-colored outline buttons the page is showing.

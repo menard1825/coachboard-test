@@ -680,38 +680,16 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
 
 /* Coach Notes workspace. The legacy markup is intentionally preserved for
    data/permission compatibility, while this adapter makes it read like the
-   newer CoachBoard workspaces on desktop and mobile. */
+   newer CoachBoard workspaces on desktop and mobile. The page title is the
+   standard tab intro coachboard_ui.js adds to every Home tab. */
 #collaboration {
   max-width: 1180px;
   margin: 0 auto;
   padding-bottom: 84px;
 }
 
-#collaboration::before {
-  content: 'Coach Notes';
-  display: block;
-  margin: 2px 0 2px;
-  color: var(--cb-ink);
-  font-size: 1.55rem;
-  font-weight: 850;
-  letter-spacing: -.02em;
-  line-height: 1.1;
-}
-
 #collaboration > .row {
   row-gap: 14px;
-}
-
-#collaboration > .row::before {
-  content: 'Shared team context and player-specific notes for the coaching staff.';
-  flex: 0 0 100%;
-  width: 100%;
-  max-width: 100%;
-  margin: 0 0 4px;
-  padding: 0 12px;
-  color: var(--cb-muted);
-  font-size: .78rem;
-  line-height: 1.4;
 }
 
 #collaboration > .row > [class*='col-'] {

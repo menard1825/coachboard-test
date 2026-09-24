@@ -36,8 +36,8 @@ def test_coach_notes_workspace_is_mobile_readable(page: Page, coachboard_url: st
     workspace = page.locator('#collaboration')
     expect(workspace).to_be_visible()
 
-    pseudo_title = workspace.evaluate("el => getComputedStyle(el, '::before').content")
-    assert 'Coach Notes' in pseudo_title
+    # The standard CoachBoard tab intro titles the page (once).
+    expect(workspace.locator(':scope > .cb-tab-intro h1')).to_have_text('Coach Notes')
 
     panels = workspace.locator(':scope > .row > .col-md-6 > .card')
     expect(panels).to_have_count(2)

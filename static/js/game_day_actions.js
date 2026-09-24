@@ -227,28 +227,18 @@
     let title = titles.find(item => item.textContent.trim().toLowerCase() === 'coming up');
     let list = title?.nextElementSibling?.classList.contains('gd-upcoming') ? title.nextElementSibling : null;
 
+    // Add Game lives in the page header (addHeroButton) only; neither the
+    // Schedule heading nor the no-games message repeats it.
     if (title) {
       title.textContent = 'Schedule';
       const head = document.createElement('div');
       head.className = 'gd-schedule-head';
       title.parentNode.insertBefore(head, title);
       head.appendChild(title);
-      const add = document.createElement('button');
-      add.type = 'button';
-      add.className = 'btn btn-sm btn-outline-primary gd-add-game';
-      add.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add Game';
-      add.addEventListener('click', openAddGame);
-      head.appendChild(add);
     } else {
       const head = document.createElement('div');
       head.className = 'gd-schedule-head';
       head.innerHTML = '<div class="gd-section-title">Schedule</div>';
-      const add = document.createElement('button');
-      add.type = 'button';
-      add.className = 'btn btn-sm btn-outline-primary gd-add-game';
-      add.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add Game';
-      add.addEventListener('click', openAddGame);
-      head.appendChild(add);
       shell.appendChild(head);
 
       list = document.createElement('div');
@@ -268,23 +258,6 @@
       .find(item => item.textContent.trim().toLowerCase() === 'past games');
     const list = title?.nextElementSibling?.classList.contains('gd-upcoming') ? title.nextElementSibling : null;
     list?.querySelectorAll('.gd-up-row').forEach(addScheduleRowMenu);
-  }
-
-  function fixEmptyState() {
-    const empty = document.querySelector('.gd-empty');
-    if (!empty) return;
-    const link = empty.querySelector('a.btn');
-    if (!link) return;
-    link.href = '#';
-    link.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add Game';
-    link.classList.remove('btn-outline-primary');
-    link.classList.add('btn-primary');
-    link.addEventListener('click', event => {
-      event.preventDefault();
-      openAddGame();
-    });
-    const detail = empty.querySelector('div.mt-1');
-    if (detail) detail.textContent = 'No games scheduled.';
   }
 
   async function deleteGame(button) {
@@ -327,7 +300,6 @@
     document.querySelectorAll('.gd-game[data-game-id]').forEach(addCardMenu);
     scheduleSection();
     pastGameSection();
-    fixEmptyState();
 
     document.addEventListener('click', event => {
       const button = event.target.closest('.gd-delete-game');
