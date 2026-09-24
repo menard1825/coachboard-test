@@ -65,9 +65,9 @@
         display:none!important;
       }
 
-      /* One copy action, after the field it copies. */
+      /* One copy action, just above the field it copies. */
       #rotation-card-container .gm-coach-apply-actions{
-        margin:10px 0 4px;
+        margin:0 0 10px;
       }
 
       #rotation-card-container .gm-coach-apply-actions > .btn{
@@ -2399,16 +2399,28 @@
           openPickInningsModal
         );
     }
-    // After the field: directly below the defense editor when it is shown.
-    const anchor =
+    // Directly above the defense editor, where a phone still sees it with
+    // the field. It stays outside the editor, which re-renders its own
+    // markup, so an open menu is not torn down by an edit.
+    const panel =
       document.getElementById(
         PANEL_ID
-      ) || pickerRow;
-    if (
-      anchor.nextElementSibling !==
+      );
+    if (panel) {
+      if (
+        panel.previousElementSibling !==
+        controls
+      ) {
+        panel.insertAdjacentElement(
+          'beforebegin',
+          controls
+        );
+      }
+    } else if (
+      pickerRow.nextElementSibling !==
       controls
     ) {
-      anchor.insertAdjacentElement(
+      pickerRow.insertAdjacentElement(
         'afterend',
         controls
       );
@@ -2642,11 +2654,23 @@
         'gm-ipad-sticky-inning-picker'
       );
 
+      // Copy this defense… sits between the picker and the panel.
+      const copyControls =
+        picker.nextElementSibling
+          ?.classList.contains('gm-coach-apply-actions')
+          ? picker.nextElementSibling
+          : null;
+
       if (
         picker.parentElement !== board ||
-        picker.nextElementSibling !== panel
+        (copyControls || picker).nextElementSibling !== panel
       ) {
-        panel.insertAdjacentElement(
+        (
+          panel.previousElementSibling
+            ?.classList.contains('gm-coach-apply-actions')
+            ? panel.previousElementSibling
+            : panel
+        ).insertAdjacentElement(
           'beforebegin',
           picker
         );

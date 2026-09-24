@@ -98,13 +98,38 @@ def _clean_draft_alignment(candidate, game, team):
     return cleaned, None
 
 
-def _seed_next_alignment(current_alignment, planned_alignment, team):
+def _field_changed_this_inning(events, current_inning, current_alignment, team):
+    """Whether the coach changed the live field during the current inning.
+
+    The inning starts with the field End Inning put out (or, before the
+    first change of a game, the field that change replaced). Reverted events
+    do not count, and a change undone by hand leaves the field as it began.
+    """
+    allowed = _allowed_positions(team)
+
+    def filled(alignment):
+        return {pos: (alignment or {}).get(pos) for pos in allowed if (alignment or {}).get(pos)}
+
+    inning_events = [
+        event for event in events
+        if not event.reverted and str(event.inning) == str(current_inning)
+    ]
+    if not inning_events:
+        return False
+    first = inning_events[0]
+    start = first.after_alignment if first.event_type == 'End Inning' else first.before_alignment
+    return filled(start) != filled(current_alignment)
+
+
+def _seed_next_alignment(current_alignment, planned_alignment, team, field_changed=False):
     """Build the automatic NEXT board for the upcoming inning."""
     allowed = _allowed_positions(team)
     current = current_alignment or {}
     planned = planned_alignment or {}
 
-    has_plan = any(planned.get(pos) for pos in allowed)
+    # A live change this inning (a new pitcher, a swap) is a decision made
+    # in the game; the pregame plan for the next inning must not undo it.
+    has_plan = not field_changed and any(planned.get(pos) for pos in allowed)
 
     if has_plan:
         seeded = {
@@ -151,11 +176,17 @@ def _clear_prep(game_id, team_id):
 
 
 def _next_inning_context(game, team):
-    rotation, actual_rotation, _ = _actual_rotation(game, team.id)
+    rotation, actual_rotation, events = _actual_rotation(game, team.id)
     current_inning = str(game.live_current_inning or '1')
     next_inning = _next_inning_key(current_inning)
     current_alignment = deepcopy(
         actual_rotation.get(current_inning, {}) or {}
+    )
+    field_changed = _field_changed_this_inning(
+        events,
+        current_inning,
+        current_alignment,
+        team,
     )
     planned_alignment = deepcopy(
         (rotation.innings or {}).get(next_inning, {})
@@ -170,11 +201,35 @@ def _next_inning_context(game, team):
         db.session.commit()
         prep = None
 
+    # An automatic NEXT is a default, not a coach decision. Keep it in step
+    # with the live field so a mid-inning change (a new pitcher, a swap)
+    # carries into the next inning instead of the field as it was when NEXT
+    # was first seeded. Same defense is the coach choosing "carry the field
+    # forward", so it follows the field too, without the plan. Any other NEXT
+    # a coach set during the game (NEXT is only writable while live) is
+    # never touched.
+    if prep and (prep.updated_by == 'Auto' or prep.source == 'current'):
+        if prep.updated_by == 'Auto':
+            seeded, source = _seed_next_alignment(
+                current_alignment,
+                planned_alignment,
+                team,
+                field_changed,
+            )
+        else:
+            seeded, source = _seed_next_alignment(current_alignment, {}, team)
+        if prep.alignment != seeded or prep.source != source:
+            prep.alignment = seeded
+            prep.source = source
+            prep.updated_at = datetime.utcnow()
+            db.session.commit()
+
     if not prep and next_inning:
         seeded, source = _seed_next_alignment(
             current_alignment,
             planned_alignment,
             team,
+            field_changed,
         )
 
         prep = GameNextInningPrep(

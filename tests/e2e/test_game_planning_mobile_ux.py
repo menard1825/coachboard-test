@@ -606,8 +606,8 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
         expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
 
-        # Copying the inning is one action after the field, with three
-        # choices, instead of three buttons above it.
+        # Copying the inning is one action just above the editor, with
+        # three choices, instead of three buttons.
         copy_defense = page.locator('#gmCopyDefenseBtn')
         apply_all = page.locator('#gmApplyDefenseAllBtn')
         apply_remaining = page.locator('#gmApplyDefenseRemainingBtn')

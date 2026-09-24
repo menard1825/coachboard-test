@@ -3,8 +3,8 @@
 * Game Plan  -- the full multi-inning defensive plan for a game.
 * Saved Defense -- a reusable defense for one inning.
 
-Copying the inning shown is one action placed after the field, "Copy this
-defense...", offered only once the inning has a defense. A Saved Defense is
+Copying the inning shown is one action placed directly above the defense
+editor, "Copy this defense...", offered only once the inning has a defense. A Saved Defense is
 chosen and then used for "This inning" or the "Whole game". Plan Options holds
 only inning structure and Game Plan actions.
 """
@@ -126,7 +126,7 @@ def _copy(page, choice):
 # --- Copy this defense ------------------------------------------------------------------
 
 @DEVICES
-def test_copy_is_offered_only_after_the_field_for_an_inning_with_a_defense(make_page, coachboard_url, game, device):
+def test_copy_is_offered_just_above_the_field_for_an_inning_with_a_defense(make_page, coachboard_url, game, device):
     page = make_page(device)
     _open_game(page, coachboard_url, game)
 
@@ -136,8 +136,13 @@ def test_copy_is_offered_only_after_the_field_for_an_inning_with_a_defense(make_
 
     expect(page.locator(COPY)).to_be_visible()
     expect(page.locator(COPY)).to_have_text(re.compile(r'Copy this defense…'))
+    # Directly above the defense editor -- not lost below the field on a phone.
+    assert page.locator(COPY).evaluate(
+        f"b => b.closest('.gm-coach-apply-actions').nextElementSibling === document.querySelector('{PANEL}')")
+    copy, panel = page.locator(COPY).bounding_box(), page.locator(PANEL).bounding_box()
     field = page.locator(f'{PANEL} .pde-field').bounding_box()
-    assert page.locator(COPY).bounding_box()['y'] > field['y'] + field['height'], 'Copy sits after the field'
+    assert copy['y'] + copy['height'] <= panel['y'] <= copy['y'] + copy['height'] + 16, (copy, panel)
+    assert copy['y'] + copy['height'] <= field['y'], 'Copy sits above the field'
 
     _choose_inning(page, 2)                                   # empty inning
     expect(page.locator(COPY)).to_be_hidden()
