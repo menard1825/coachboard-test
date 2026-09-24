@@ -1436,29 +1436,42 @@
 
     if (!endInning) return;
 
-    const title =
+    // This is the only code that writes End Inning's label. The attribute
+    // tells the other live-screen scripts, which place and style the
+    // button, to leave its text alone -- they used to reset it to
+    // "End Inning" on their own refreshes, so the label flashed.
+    endInning.dataset.cbLabelOwner = 'next-inning';
+
+    let title =
       endInning.querySelector(
         '.coach-action-title'
       );
 
-    const note =
+    let note =
       endInning.querySelector(
         '.coach-action-note'
       );
+
+    if (!title || !note) {
+      endInning.innerHTML =
+        '<span class="coach-action-title"></span>' +
+        '<span class="coach-action-note"></span>';
+      title = endInning.querySelector('.coach-action-title');
+      note = endInning.querySelector('.coach-action-note');
+    }
 
     const buttonTitle = currentLabel
       ? `End ${currentLabel} → Start ${inningLabel}`
       : `Start ${inningLabel}`;
 
-    if (title) {
+    const noteText = `${inningLabel} inning defense`;
+
+    if (title.textContent !== buttonTitle) {
       title.textContent = buttonTitle;
-    } else {
-      endInning.textContent = buttonTitle;
     }
 
-    if (note) {
-      note.textContent =
-        `${inningLabel} inning defense`;
+    if (note.textContent !== noteText) {
+      note.textContent = noteText;
     }
 
     endInning.setAttribute(

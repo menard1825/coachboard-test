@@ -441,7 +441,7 @@
     if (title && !card.querySelector('.cb-board-help')) {
       title.insertAdjacentHTML('afterend', '<div class="cb-board-help mb-2">Review next-inning changes.</div>');
     }
-    const actionNote = document.querySelector('#liveEndInningBtn .coach-action-note');
+    const actionNote = document.querySelector('#liveEndInningBtn:not([data-cb-label-owner]) .coach-action-note');
     if (actionNote && actionNote.textContent !== 'Show next board') actionNote.textContent = 'Show next board';
   }
 

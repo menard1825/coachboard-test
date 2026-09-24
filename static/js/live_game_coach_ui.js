@@ -98,6 +98,9 @@
   function setActionContent(button, title, note, className) {
     if (!button) return;
     button.className = `btn w-100 ${className}`;
+    // A button whose label another script owns (End Inning, owned by the
+    // Next Inning board) keeps that label; only its styling is set here.
+    if (button.dataset.cbLabelOwner) return;
     button.innerHTML = `<span class="coach-action-title">${esc(title)}</span><span class="coach-action-note">${esc(note)}</span>`;
   }
 

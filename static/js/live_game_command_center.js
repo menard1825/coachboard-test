@@ -144,7 +144,10 @@
     if (slot) {
       slot.classList.add('cb-command-actions');
       actionMarkup(pitcher, 'Change Pitcher', 'Make a mound change');
-      actionMarkup(endInning, 'End Inning', 'Keep or change defense');
+      // The Next Inning board owns End Inning's label once it has set it.
+      if (!endInning?.dataset.cbLabelOwner) {
+        actionMarkup(endInning, 'End Inning', 'Keep or change defense');
+      }
       [pitcher, endInning].filter(Boolean).forEach(button => {
         if (button.parentElement !== slot) slot.appendChild(button);
       });
