@@ -1,0 +1,15 @@
+{#
+  Home-screen install metadata, included in the <head> of base.html and
+  auth_base.html so a coach can install CoachBoard from the login page or a
+  signed-in page. Android reads the manifest; iOS reads the apple-* tags and
+  apple-touch-icon. There is deliberately no service worker: nothing is
+  cached for offline use.
+#}
+<link rel="manifest" href="{{ url_for('serve_manifest') }}">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+<meta name="application-name" content="CoachBoard">
+<meta name="apple-mobile-web-app-title" content="CoachBoard">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#172033">
