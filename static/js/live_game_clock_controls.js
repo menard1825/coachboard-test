@@ -31,7 +31,7 @@
       body.cb-clock-paused #cbDugoutHeader{border-bottom-color:#f5b942!important}
       body.cb-clock-paused #cbDugoutHeader .cb-dh-dot{background:#f5b942!important}
       body.cb-clock-paused #cbDugoutHeader .cb-dh-time{color:#ffd166!important}
-      @media(max-width:575.98px){#cbDugoutHeader [data-cb-clock]{font-size:.68rem!important;padding:.35rem .5rem!important}}
+      @media(max-width:575.98px){#cbDugoutHeader [data-cb-clock]{font-size:var(--cb-text-xs)!important;padding:.35rem .5rem!important}}
     `;
     document.head.appendChild(style);
   }

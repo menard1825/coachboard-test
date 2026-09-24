@@ -120,10 +120,10 @@
 
       #cbDugoutHeader{position:sticky;top:0;z-index:1040;margin:0 -10px 12px;padding:9px 12px;background:#101828;color:#fff;border-bottom:3px solid var(--primary-color,#102a66);box-shadow:0 4px 14px rgba(16,24,40,.2)}
       .cb-dh-main{display:grid;grid-template-columns:auto auto minmax(0,1fr) minmax(0,auto) auto auto auto;align-items:center;gap:10px}
-      .cb-dh-live{display:flex;gap:6px;align-items:center;font-size:.66rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+      .cb-dh-live{display:flex;gap:6px;align-items:center;font-size:var(--cb-text-2xs);font-weight:900;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
       .cb-dh-dot{width:8px;height:8px;border-radius:50%;background:#2dd36f}
       .cb-dh-inning{min-width:58px;text-align:center;border-inline:1px solid #ffffff2e;padding:0 10px}
-      .cb-dh-inning small,.cb-dh-clock small,.cb-dh-pitcher small{display:block;color:#cbd5e1;font-size:.55rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;line-height:1.1}
+      .cb-dh-inning small,.cb-dh-clock small,.cb-dh-pitcher small{display:block;color:#cbd5e1;font-size:var(--cb-text-2xs);font-weight:800;text-transform:uppercase;letter-spacing:.08em;line-height:1.1}
       .cb-dh-inning strong{display:block;font-size:1.35rem;line-height:1.05;margin-top:2px}
       .cb-dh-time{font-size:1.08rem;font-weight:850;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:2px}
       .cb-dh-time.warn{color:#ffd166}.cb-dh-time.danger{color:#ff8a80}
@@ -145,7 +145,7 @@
          first places it. Hide it there so it never flashes as a third action
          tile in the frame before this header claims it. */
       body.cb-dugout #coach-action-slot #liveUndoBtn{display:none!important}
-      .cb-dh-title{margin-top:6px;color:#cbd5e1;font-size:.67rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .cb-dh-title{margin-top:6px;color:#cbd5e1;font-size:var(--cb-text-xs);font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       body.cb-clock-paused #cbDugoutHeader{border-bottom-color:#f5b942!important}
       body.cb-clock-paused #cbDugoutHeader .cb-dh-time{color:#ffd166!important}
       /* The dot carries connection health, so a paused clock only tints it
@@ -177,10 +177,10 @@
 
       .cb-quick-defense{padding:0!important;overflow:hidden}
       .cb-qd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:12px 13px 10px;border-bottom:1px solid #e8ebef;background:#fff}
-      .cb-qd-kicker{font-size:.64rem;text-transform:uppercase;letter-spacing:.09em;font-weight:900;color:#667085}
+      .cb-qd-kicker{font-size:var(--cb-text-2xs);text-transform:uppercase;letter-spacing:.09em;font-weight:900;color:#667085}
       .cb-qd-title{font-size:1rem;font-weight:850;color:#172033;margin-top:1px}
       .cb-qd-help{font-size:.7rem;color:#667085;margin-top:2px;line-height:1.3}
-      .cb-save-state{flex:0 0 auto;min-height:30px;border-radius:999px;padding:6px 9px;font-size:.65rem;font-weight:850;display:inline-flex;align-items:center;gap:5px;border:1px solid #b8ddc4;background:#edf8f1;color:#176b38}
+      .cb-save-state{flex:0 0 auto;min-height:30px;border-radius:999px;padding:6px 9px;font-size:var(--cb-text-2xs);font-weight:850;display:inline-flex;align-items:center;gap:5px;border:1px solid #b8ddc4;background:#edf8f1;color:#176b38}
       .cb-save-state.saving{border-color:#c7d7ef;background:#f3f7fd;color:#315d98}
       .cb-save-state.error{border-color:#edb8b2;background:#fff2f0;color:#b42318;cursor:pointer}
       .cb-qd-body{padding:10px 11px 12px}
@@ -194,7 +194,7 @@
       .cb-qd-bench-wrap{margin-top:9px;border:1px solid #e2e6eb;border-radius:11px;background:#f8fafc;padding:9px}
       .cb-qd-bench-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:7px}
       .cb-qd-bench-head strong{font-size:.74rem;color:#253047}
-      .cb-qd-bench-head span{font-size:.61rem;color:#7b8492;text-align:right}
+      .cb-qd-bench-head span{font-size:var(--cb-text-xs);color:var(--cb-muted);text-align:right}
       .cb-qd-bench{display:flex;flex-wrap:wrap;gap:6px}
       .cb-qd-bench-player{border:1px solid #cfd5dd;background:#fff;color:#253047;border-radius:10px;padding:7px 9px;text-align:left;font-size:.72rem;font-weight:760;line-height:1.08;touch-action:manipulation}
       .cb-qd-bench-player .cb-bench-note{display:block;margin-top:3px;color:#667085;font-size:.58rem;font-weight:650}
@@ -241,7 +241,7 @@
            the pitcher name. Put connection health on a slim status row, then
            give the game state and controls six explicit tracks below it. */
         .cb-dh-main{grid-template-columns:auto minmax(56px,.8fr) minmax(64px,1fr) auto auto auto;grid-template-areas:"live live live live live live" "inning clock pitcher undo clockbtn menu";gap:3px 4px}
-        .cb-dh-live{grid-area:live;display:flex;font-size:.5rem;letter-spacing:.04em;gap:3px}
+        .cb-dh-live{grid-area:live;display:flex;font-size:var(--cb-text-2xs);letter-spacing:.04em;gap:3px}
         .cb-dh-dot{width:7px;height:7px}
         .cb-dh-inning{grid-area:inning;min-width:43px;padding:0 5px;border-left:0}
         .cb-dh-clock{grid-area:clock;min-width:0}
@@ -251,8 +251,8 @@
         .cb-dh-main>[data-cb-menu]{grid-area:menu}
         .cb-dh-inning strong{font-size:1.12rem}
         .cb-dh-time{font-size:.84rem}
-        .cb-dh-name{font-size:.68rem;max-width:none}
-        .cb-dh-btn{font-size:.65rem!important;padding:5px 6px!important}
+        .cb-dh-name{font-size:var(--cb-text-xs);max-width:none}
+        .cb-dh-btn{font-size:var(--cb-text-xs)!important;padding:5px 6px!important}
         body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{width:40px!important;padding:0!important;gap:0!important}
         body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo .cb-dh-undo-text{display:none!important}
         .cb-dh-title{display:none}

@@ -337,7 +337,7 @@
         #roster .cb-roster-metrics-v2 .cb-roster-total{grid-column:1/-1;min-height:46px;font-size:.82rem}
         #roster .cb-roster-metrics-v2 .cb-roster-submetric{min-height:54px;flex-direction:column;justify-content:center;align-items:center;gap:2px;padding:8px}
         #roster .cb-roster-metrics-v2 .cb-roster-submetric strong{font-size:1rem;line-height:1}
-        #roster .cb-roster-metrics-v2 .cb-roster-submetric .cb-roster-metric-copy{font-size:.66rem;line-height:1.2;color:inherit}
+        #roster .cb-roster-metrics-v2 .cb-roster-submetric .cb-roster-metric-copy{font-size:var(--cb-text-xs);line-height:1.2;color:inherit}
       }
     `;
     document.head.appendChild(style);

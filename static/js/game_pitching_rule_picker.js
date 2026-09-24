@@ -72,15 +72,15 @@
       #game-pitching-rules-v2 .gpr-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 11px}
       #game-pitching-rules-v2 .gpr-summary-copy{display:grid;gap:4px;min-width:0}
       #game-pitching-rules-v2 .gpr-line{display:flex;align-items:center;gap:7px;min-width:0;flex-wrap:wrap}
-      #game-pitching-rules-v2 .gpr-label{font-size:.62rem;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#667085;min-width:82px}
+      #game-pitching-rules-v2 .gpr-label{font-size:var(--cb-text-2xs);font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#667085;min-width:82px}
       #game-pitching-rules-v2 .gpr-rule{font-size:.79rem;font-weight:850;color:#1d2939}
       #game-pitching-rules-v2 .gpr-arm{font-size:.73rem;font-weight:750;color:#344054}
-      #game-pitching-rules-v2 .gpr-edit{min-height:34px;border-radius:8px;font-size:.7rem;font-weight:800;white-space:nowrap}
+      #game-pitching-rules-v2 .gpr-edit{min-height:34px;border-radius:8px;font-size:var(--cb-text-xs);font-weight:800;white-space:nowrap}
       #game-pitching-rules-v2 .gpr-editor{padding:11px;border-top:1px solid #e7ebef;background:#fbfcfd}
       #game-pitching-rules-v2 .gpr-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:9px}
       #game-pitching-rules-v2 .gpr-title{font-size:.78rem;font-weight:850;color:#1d2939}
       #game-pitching-rules-v2 .gpr-help{font-size:.67rem;color:#667085;margin-top:2px;max-width:650px}
-      #game-pitching-rules-v2 .gpr-badge{font-size:.61rem;font-weight:850;border-radius:999px;padding:5px 8px;white-space:nowrap}
+      #game-pitching-rules-v2 .gpr-badge{font-size:var(--cb-text-2xs);font-weight:850;border-radius:999px;padding:5px 8px;white-space:nowrap}
       #game-pitching-rules-v2 .gpr-badge.team{background:#eef2f6;color:#475467}
       #game-pitching-rules-v2 .gpr-badge.game,#game-pitching-rules-v2 .gpr-badge.unselected{background:#fff4dd;color:#8b5c00}
       #game-pitching-rules-v2 .form-select{min-height:44px;border-radius:9px;font-weight:750;color:#1d2939}
@@ -92,27 +92,27 @@
       #game-pitching-rules-v2 .gpr-arm-note,#game-pitching-rules-v2 .gpr-arm-player{font-size:.68rem;color:#475467;line-height:1.4}
       #pitcher-availability-card .gpa-source{display:none!important}
       #pitcher-availability-card .gpa-shell{padding:10px;background:#f8f9fb}
-      #pitcher-availability-card .gpa-summary{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:9px;font-size:.67rem;color:#667085}
+      #pitcher-availability-card .gpa-summary{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:9px;font-size:var(--cb-text-xs);color:#667085}
       #pitcher-availability-card .gpa-summary strong{font-size:.74rem;color:#344054}
       #pitcher-availability-card .gpa-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
       #pitcher-availability-card .gpa-card{border:1px solid #dfe4ea;border-radius:12px;background:#fff;overflow:hidden;min-width:0}
       #pitcher-availability-card .gpa-card.attention{border-color:#ead7b5}
       #pitcher-availability-card .gpa-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;padding:10px 11px 7px}
       #pitcher-availability-card .gpa-name{font-weight:850;color:#172033;font-size:.86rem}
-      #pitcher-availability-card .gpa-status{font-size:.57rem;font-weight:850;border-radius:999px;padding:4px 7px;white-space:nowrap;background:#e9f7ee;color:#176b38}
+      #pitcher-availability-card .gpa-status{font-size:var(--cb-text-2xs);font-weight:850;border-radius:999px;padding:4px 7px;white-space:nowrap;background:#e9f7ee;color:#176b38}
       #pitcher-availability-card .gpa-card.attention .gpa-status{background:#fff3d8;color:#8a5800}
       #pitcher-availability-card .gpa-decision{margin:0 10px 8px;padding:8px 9px;border-radius:9px;background:#f7f9fb;border:1px solid #e5e8ed}
       #pitcher-availability-card .gpa-card.attention .gpa-decision{background:#fffaf1;border-color:#ecd9b4}
-      #pitcher-availability-card .gpa-label{display:block;font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;font-weight:850;color:#667085}
+      #pitcher-availability-card .gpa-label{display:block;font-size:var(--cb-text-2xs);text-transform:uppercase;letter-spacing:.06em;font-weight:850;color:#667085}
       #pitcher-availability-card .gpa-decision strong{display:block;font-size:.75rem;color:#1d2939;margin-top:2px}
       #pitcher-availability-card .gpa-metrics{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #edf0f3}
-      #pitcher-availability-card .gpa-metric{padding:8px 10px;font-size:.68rem;min-width:0}
+      #pitcher-availability-card .gpa-metric{padding:8px 10px;font-size:var(--cb-text-xs);min-width:0}
       #pitcher-availability-card .gpa-metric+.gpa-metric{border-left:1px solid #edf0f3}
       #pitcher-availability-card .gpa-metric .pitch-limit-progress{max-width:100%}
       #pitcher-availability-card .gpa-arm{padding:8px 10px;border-top:1px solid #edf0f3;background:#fcfcfd}
-      #pitcher-availability-card .gpa-arm strong{display:block;font-size:.68rem;color:#344054;margin-top:1px}
+      #pitcher-availability-card .gpa-arm strong{display:block;font-size:var(--cb-text-xs);color:#344054;margin-top:1px}
       #pitcher-availability-card .gpa-next{display:block;font-size:.61rem;color:#8a5a13;margin-top:2px}
-      #pitcher-availability-card .gpa-detail{display:block;font-size:.59rem;color:#7b8492;line-height:1.3;margin-top:3px}
+      #pitcher-availability-card .gpa-detail{display:block;font-size:.59rem;color:var(--cb-muted);line-height:1.3;margin-top:3px}
       @media(max-width:575.98px){
         #game-pitching-rules-v2 .gpr-summary{align-items:flex-start}
         #game-pitching-rules-v2 .gpr-label{min-width:72px}

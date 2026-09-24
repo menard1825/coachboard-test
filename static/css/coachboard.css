@@ -22,6 +22,12 @@
   --cb-border-strong: #cfd7e2;
   --cb-ink: #172033;
   --cb-muted: #667085;
+  /* Readability floor for small text. Secondary text a coach reads at the
+     field (helper copy, meta, timestamps, short actions) is never below
+     --cb-text-xs; only short uppercase kickers/labels and status pills use
+     the one-step-smaller --cb-text-2xs. */
+  --cb-text-xs: .75rem;
+  --cb-text-2xs: .6875rem;
   --cb-muted-2: #8a94a3;
   --cb-success: #16794a;
   --cb-success-bg: #eef9f2;
@@ -64,7 +70,7 @@ body.cb-ui .cb-page-head {
 
 body.cb-ui .cb-kicker {
   color: var(--cb-muted);
-  font-size: .68rem;
+  font-size: var(--cb-text-2xs);
   font-weight: 850;
   letter-spacing: .11em;
   text-transform: uppercase;

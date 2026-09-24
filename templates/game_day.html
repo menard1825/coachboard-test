@@ -7,7 +7,7 @@
 <style>
   .gd-shell{max-width:1180px;margin:0 auto;padding-bottom:82px}
   .gd-hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;margin:4px 0 18px}
-  .gd-kicker{font-size:.68rem;letter-spacing:.11em;text-transform:uppercase;font-weight:850;color:#667085}
+  .gd-kicker{font-size:var(--cb-text-2xs);letter-spacing:.11em;text-transform:uppercase;font-weight:850;color:#667085}
   .gd-hero h1{font-size:1.7rem;font-weight:850;margin:2px 0 2px;color:#172033}
   .gd-hero p{margin:0;color:#667085;font-size:.86rem}
   .gd-date{font-size:.82rem;font-weight:750;color:#344054;background:#f4f6f8;border:1px solid #e4e7ec;border-radius:10px;padding:8px 11px;white-space:nowrap}
@@ -18,23 +18,23 @@
   .gd-top{display:flex;justify-content:space-between;gap:14px;padding:15px 16px 12px;border-bottom:1px solid #eef1f4}
   .gd-opponent{font-size:1.22rem;font-weight:850;color:#172033;line-height:1.15}
   .gd-meta{font-size:.76rem;color:#667085;margin-top:5px;display:flex;gap:11px;flex-wrap:wrap}
-  .gd-status{align-self:flex-start;border-radius:999px;padding:5px 9px;font-size:.62rem;font-weight:900;letter-spacing:.06em;white-space:nowrap}
+  .gd-status{align-self:flex-start;border-radius:999px;padding:5px 9px;font-size:var(--cb-text-2xs);font-weight:900;letter-spacing:.06em;white-space:nowrap}
   .gd-status.success{background:#e9f7ee;color:#176b38}.gd-status.warning{background:#fff4dd;color:#8b5c00}.gd-status.danger{background:#feecec;color:#a32929}.gd-status.secondary{background:#eef1f5;color:#475467}
   .gd-body{padding:13px 16px 15px}
   .gd-readiness{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
   .gd-ready-item{border:1px solid #e4e7ec;border-radius:10px;padding:9px 10px;min-width:0;background:#fafbfc}
   .gd-ready-item.good{background:#f1f9f4;border-color:#cce8d5}.gd-ready-item.need{background:#fff8eb;border-color:#f1d7a5}.gd-ready-item.optional{background:#f8f9fb;border-color:#e4e7ec}
-  .gd-ready-label{font-size:.57rem;text-transform:uppercase;letter-spacing:.07em;font-weight:850;color:#667085}
+  .gd-ready-label{font-size:var(--cb-text-2xs);text-transform:uppercase;letter-spacing:.07em;font-weight:850;color:#667085}
   .gd-ready-value{font-size:.8rem;font-weight:800;color:#1d2939;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .gd-alerts{margin-top:10px;border-radius:10px;background:#fff8eb;border:1px solid #f1d7a5;padding:9px 10px}
-  .gd-alerts strong{font-size:.72rem;color:#7a4d00}.gd-alerts div{font-size:.68rem;color:#7b6241;margin-top:3px}
+  .gd-alerts strong{font-size:.72rem;color:#7a4d00}.gd-alerts div{font-size:var(--cb-text-xs);color:#7b6241;margin-top:3px}
   .gd-actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
   .gd-actions .btn{min-height:44px;border-radius:10px;font-weight:780;padding-left:16px;padding-right:16px}
   .gd-primary{background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66);color:var(--cb-on-primary,#fff)}
   .gd-primary:hover{color:#fff;filter:brightness(.95)}
   .gd-upcoming{margin-top:22px;border:1px solid #e4e7ec;border-radius:14px;background:#fff;overflow:hidden}
   .gd-up-row{display:grid;grid-template-columns:125px minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 13px;border-top:1px solid #eef1f4}.gd-up-row:first-child{border-top:0}
-  .gd-up-date{font-size:.7rem;color:#667085;font-weight:750}.gd-up-name{font-size:.78rem;font-weight:750;color:#1d2939}.gd-up-loc{font-size:.65rem;color:#8a94a3;margin-top:2px}
+  .gd-up-date{font-size:.7rem;color:#667085;font-weight:750}.gd-up-name{font-size:.78rem;font-weight:750;color:#1d2939}.gd-up-loc{font-size:.65rem;color:var(--cb-muted);margin-top:2px}
   .gd-up-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
   .gd-history-more{border-top:1px solid #eef1f4}.gd-history-more summary{cursor:pointer;list-style:none;padding:12px 13px;font-size:.72rem;font-weight:800;color:#475467;background:#fafbfc}.gd-history-more summary::-webkit-details-marker{display:none}.gd-history-more summary::before{content:'+';display:inline-block;width:18px;font-weight:900}.gd-history-more[open] summary::before{content:'−'}
   .gd-empty{border:1px dashed #ccd3db;border-radius:15px;padding:28px;text-align:center;background:#fafbfc;color:#667085}

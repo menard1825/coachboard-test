@@ -33,9 +33,9 @@
     style.id = 'cb-test2-contract-styles';
     style.textContent = `
       #${MODE_ID}{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:9px 10px;border:1px solid #dfe4ea;border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.04)}
-      #${MODE_ID} .cb-t2-mode-copy{min-width:0}.cb-t2-mode-kicker{font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;font-weight:900;color:#667085}.cb-t2-mode-help{font-size:.67rem;color:#667085;line-height:1.3;margin-top:2px}
+      #${MODE_ID} .cb-t2-mode-copy{min-width:0}.cb-t2-mode-kicker{font-size:var(--cb-text-2xs);text-transform:uppercase;letter-spacing:.08em;font-weight:900;color:#667085}.cb-t2-mode-help{font-size:var(--cb-text-xs);color:#667085;line-height:1.3;margin-top:2px}
       #${MODE_ID} .cb-t2-mode-buttons{display:flex;gap:5px;flex:0 0 auto;padding:3px;border:1px solid #d9dee5;border-radius:10px;background:#f4f6f8}
-      #${MODE_ID} .cb-t2-mode-buttons .btn{border:0!important;border-radius:7px!important;min-height:36px;padding:6px 10px;font-size:.69rem;font-weight:850;box-shadow:none!important}
+      #${MODE_ID} .cb-t2-mode-buttons .btn{border:0!important;border-radius:7px!important;min-height:36px;padding:6px 10px;font-size:var(--cb-text-xs);font-weight:850;box-shadow:none!important}
       #${MODE_ID} .cb-t2-mode-buttons .active{background:#172033!important;color:#fff!important}
       #cb-quick-start-launch,#cb-quick-start-modal{display:none!important}
       body.cb-test2-first-pitch #lineup-card-container,
@@ -85,7 +85,7 @@
           flex:0 0 auto;
           min-height:30px;
           padding:4px 8px;
-          font-size:.61rem;
+          font-size:var(--cb-text-xs);
         }
         #${HUDDLE_ID} .modal-dialog{
           margin:.35rem;

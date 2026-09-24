@@ -30,7 +30,7 @@
       .cb-game-clock-actions{display:flex;gap:7px;flex-wrap:wrap}
       .cb-game-clock-note{font-size:.68rem;color:#667085;margin-top:8px}
       .cb-pregame-clock{border:1px solid #dfe4ea;border-radius:12px;background:#fff;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-      .cb-pregame-clock strong{font-size:.8rem}.cb-pregame-clock span{font-size:.7rem;color:#667085}
+      .cb-pregame-clock strong{font-size:.8rem}.cb-pregame-clock span{font-size:var(--cb-text-xs);color:#667085}
       .cb-clock-preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px}
       .cb-clock-preset-grid .btn{min-height:42px}
       .cb-clock-end-choice{border:1px solid #e1e6ec;border-radius:12px;padding:12px;margin-bottom:10px;text-align:left;width:100%;background:#fff}

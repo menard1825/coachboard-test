@@ -41,7 +41,7 @@
       }
       #rotation-card-container .gm-coach-help{
         color:#667085;
-        font-size:.71rem;
+        font-size:var(--cb-text-xs);
         margin:5px 2px 9px;
       }
       #rotation-card-container .gm-coach-actions{align-items:center}
@@ -80,7 +80,7 @@
       #rotation-card-container .gm-coach-apply-actions .btn{
         min-height:38px;
         border-radius:9px;
-        font-size:.7rem;
+        font-size:var(--cb-text-xs);
         font-weight:800;
         white-space:normal;
       }
@@ -222,7 +222,7 @@
       #${PANEL_ID} #pde-save{display:none!important}
       #${PANEL_ID} #pde-apply{white-space:normal}
       #${PANEL_ID} #pde-primary-fill{white-space:nowrap}
-      #${PANEL_ID} .pde-status{font-size:.7rem!important}
+      #${PANEL_ID} .pde-status{font-size:var(--cb-text-xs)!important}
       #${PANEL_ID} .pde-field-caption strong{font-size:.72rem!important}
       #rotation-card-container .gm-secondary-report .accordion-collapse,
       #rotation-card-container .gm-secondary-report .collapse{scroll-margin-top:90px}
@@ -244,7 +244,7 @@
           border-radius:8px;
           background:#fff;
           color:#475467;
-          font-size:.59rem;
+          font-size:var(--cb-text-xs);
           font-weight:850;
         }
       }

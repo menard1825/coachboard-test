@@ -185,9 +185,9 @@
     style.textContent = `
       #${PANEL_ID}{border:1px solid #dfe4ea;border-radius:16px;background:#fff;box-shadow:0 1px 4px rgba(16,24,40,.06);overflow:hidden;margin-bottom:18px}
       #${PANEL_ID} .pde-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 16px 11px;border-bottom:1px solid #edf0f3;background:#fff}
-      #${PANEL_ID} .pde-kicker{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}
+      #${PANEL_ID} .pde-kicker{font-size:var(--cb-text-2xs);text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#667085}
       #${PANEL_ID} .pde-title{font-size:1.05rem;font-weight:850;color:#172033;margin-top:2px}
-      #${PANEL_ID} .pde-help{font-size:.73rem;color:#7b8492;margin-top:2px;max-width:620px}
+      #${PANEL_ID} .pde-help{font-size:.73rem;color:var(--cb-muted);margin-top:2px;max-width:620px}
       #${PANEL_ID} .pde-inning{background:#172033;color:#fff;border-radius:10px;min-width:68px;text-align:center;padding:7px 9px;flex:0 0 auto}
       #${PANEL_ID} .pde-inning small{display:block;font-size:.53rem;letter-spacing:.08em;opacity:.75;font-weight:750}
       #${PANEL_ID} .pde-inning strong{display:block;font-size:1.4rem;line-height:1.05}
@@ -203,7 +203,7 @@
       #${PANEL_ID} .pde-field-card{border:1px solid #d6e2d4;border-radius:14px;overflow:hidden;background:#fff}
       #${PANEL_ID} .pde-field-caption{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #e4e9e4;background:#fff}
       #${PANEL_ID} .pde-field-caption strong{font-size:.72rem;color:#344054}
-      #${PANEL_ID} .pde-field-caption span{font-size:.62rem;color:#98a2b3}
+      #${PANEL_ID} .pde-field-caption span{font-size:var(--cb-text-xs);color:var(--cb-muted)}
       #${PANEL_ID} .pde-field{position:relative;height:clamp(330px,52vw,500px);overflow:hidden;background:repeating-linear-gradient(90deg,#3c8a50 0,#3c8a50 12.5%,#438f56 12.5%,#438f56 25%)}
       #${PANEL_ID} .pde-field-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
       #${PANEL_ID} .pde-spot{position:absolute;transform:translate(-50%,-50%);width:clamp(72px,13vw,118px);min-height:45px;border:1px solid rgba(220,225,229,.98);border-radius:9px;background:rgba(255,255,255,.96);box-shadow:0 2px 5px rgba(16,24,40,.12);padding:5px 6px;text-align:center;z-index:2;cursor:pointer;color:#172033}
@@ -213,9 +213,9 @@
       #${PANEL_ID} .pde-name{display:block;font-size:.68rem;line-height:1.08;font-weight:800;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
       #${PANEL_ID} .pde-spot.open .pde-name{color:#a63d3d}
       #${PANEL_ID} .pde-bench{padding:9px 10px 10px;background:#fff;border-top:1px solid #e4e9e4}
-      #${PANEL_ID} .pde-label{font-size:.61rem;text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin-bottom:6px}
+      #${PANEL_ID} .pde-label{font-size:var(--cb-text-2xs);text-transform:uppercase;letter-spacing:.08em;font-weight:850;color:#667085;margin-bottom:6px}
       #${PANEL_ID} .pde-chips{display:flex;gap:5px;flex-wrap:wrap}
-      #${PANEL_ID} .pde-chips span{font-size:.65rem;border:1px solid #dde2e7;background:#f8f9fb;border-radius:999px;padding:4px 7px;color:#475467;font-weight:650}
+      #${PANEL_ID} .pde-chips span{font-size:var(--cb-text-xs);border:1px solid #dde2e7;background:#f8f9fb;border-radius:999px;padding:4px 7px;color:#475467;font-weight:650}
       #${PANEL_ID} .pde-playing-time{margin-top:12px;border:1px solid #dfe4ea;border-radius:12px;background:#fff;overflow:hidden}
       #${PANEL_ID} .pde-playing-time-head{padding:9px 10px;background:#f8fafc;border-bottom:1px solid #e7ebef}
       #${PANEL_ID} .pde-playing-time-head strong{display:block;font-size:.76rem;color:#172033;font-weight:900}
@@ -233,8 +233,8 @@
       #${PANEL_ID} .pde-status-icon{font-size:1.05rem;line-height:1;flex:0 0 auto}
       #${PANEL_ID} .pde-status-copy{min-width:0;flex:1}
       #${PANEL_ID} .pde-status-copy strong{display:block;font-size:.76rem;font-weight:900;color:inherit}
-      #${PANEL_ID} .pde-status-copy span{display:block;font-size:.68rem;font-weight:700;color:inherit;margin-top:1px;line-height:1.25}
-      #${PANEL_ID} .pde-status-badge{flex:0 0 auto;background:#694200;color:#fff;border-radius:999px;padding:4px 8px;font-size:.56rem;font-weight:900;letter-spacing:.05em}
+      #${PANEL_ID} .pde-status-copy span{display:block;font-size:var(--cb-text-xs);font-weight:700;color:inherit;margin-top:1px;line-height:1.25}
+      #${PANEL_ID} .pde-status-badge{flex:0 0 auto;background:#694200;color:#fff;border-radius:999px;padding:4px 8px;font-size:var(--cb-text-2xs);font-weight:900;letter-spacing:.05em}
       #${PANEL_ID} .pde-status.complete .pde-status-badge{background:#176b38}
       #pde-player-modal .modal-content,#pde-preset-modal .modal-content{border:0;border-radius:16px;overflow:hidden}
       #pde-player-modal .pde-choice{padding:14px;min-height:56px}

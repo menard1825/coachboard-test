@@ -551,7 +551,7 @@
 
       #${PLAN_CARD_ID} .cb-plan-pos{
         display:block;
-        color:#7b8492;
+        color:var(--cb-muted);
         font-size:.55rem;
         font-weight:900;
         letter-spacing:.06em;
@@ -599,7 +599,7 @@
       #${CARD_ID} .cb-next-sub{
         margin-top:2px;
         color:#667085;
-        font-size:.67rem;
+        font-size:var(--cb-text-xs);
       }
 
       #${CARD_ID} .cb-next-save{
@@ -613,7 +613,7 @@
         border-radius:999px;
         background:#edf8f1;
         color:#176b38;
-        font-size:.62rem;
+        font-size:var(--cb-text-2xs);
         font-weight:850;
       }
 
@@ -755,8 +755,8 @@
       }
 
       #${CARD_ID} .cb-next-bench-head span{
-        color:#7b8492;
-        font-size:.59rem;
+        color:var(--cb-muted);
+        font-size:var(--cb-text-xs);
       }
 
       #${CARD_ID} .cb-next-bench-chips{
@@ -813,7 +813,7 @@
       #${CARD_ID} .cb-next-tools .btn{
         min-height:38px;
         border-radius:9px;
-        font-size:.68rem;
+        font-size:var(--cb-text-xs);
         font-weight:820;
       }
 
@@ -1120,7 +1120,7 @@
         }
 
         html body.cb-dugout #cbQuickDefense .cb-qd-help{
-          font-size:.66rem!important;
+          font-size:var(--cb-text-xs)!important;
         }
       }
     `;

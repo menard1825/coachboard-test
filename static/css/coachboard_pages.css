@@ -402,7 +402,7 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
 .cb-dev-mobile-picker .form-label {
   margin-bottom: 5px;
   color: var(--cb-muted);
-  font-size: .68rem;
+  font-size: var(--cb-text-2xs);
   font-weight: 800;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -416,7 +416,7 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
 
 .cb-dev-count {
   color: var(--cb-muted);
-  font-size: .68rem;
+  font-size: var(--cb-text-xs);
   text-align: right;
 }
 
@@ -535,7 +535,7 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
 .cb-practice-title small {
   overflow: hidden;
   color: var(--cb-muted);
-  font-size: .69rem;
+  font-size: var(--cb-text-xs);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -557,7 +557,7 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
   border: 1px solid var(--cb-border);
   border-radius: 999px;
   color: var(--cb-muted);
-  font-size: .65rem;
+  font-size: var(--cb-text-xs);
   white-space: nowrap;
 }
 
@@ -860,8 +860,8 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
 
 #team-notes-container .card-body > small,
 #player-notes-container .card-body > small {
-  color: #7d8796 !important;
-  font-size: .64rem;
+  color: var(--cb-muted) !important;
+  font-size: var(--cb-text-xs);
   line-height: 1.35;
 }
 
@@ -882,7 +882,7 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
   border-radius: 8px;
   background: #fff;
   color: #596579 !important;
-  font-size: .66rem;
+  font-size: var(--cb-text-xs);
   font-weight: 750;
   text-decoration: none;
 }
@@ -974,6 +974,6 @@ body.cb-ui:has(#pregame-defense-editor-v3) main::before {
   #player-notes-container .btn-link {
     min-height: 40px;
     padding: 7px 10px !important;
-    font-size: .7rem;
+    font-size: var(--cb-text-xs);
   }
 }

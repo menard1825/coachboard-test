@@ -32,7 +32,7 @@
         #games .cb-game-datetime-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;width:100%}
         #games .cb-game-native-field{min-width:0}
         #games .cb-game-native-field>label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;color:#475467;font-size:.72rem;font-weight:800;letter-spacing:.01em}
-        #games .cb-game-native-field>label small{color:#98a2b3;font-size:.62rem;font-weight:700}
+        #games .cb-game-native-field>label small{color:var(--cb-muted);font-size:.62rem;font-weight:700}
         #games .cb-game-native-input{position:relative;min-width:0}
         #games .cb-game-native-input .form-control{width:100%;min-width:0;min-height:50px;font-size:16px;padding:.7rem .75rem;background:#fff}
         #games .cb-game-native-empty{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#667085;font-size:.82rem;font-weight:650;line-height:1;pointer-events:none;background:#fff;padding-right:4px}

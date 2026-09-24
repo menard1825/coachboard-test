@@ -27,7 +27,7 @@
       .coach-live-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:10px}
       .coach-live-kicker{font-size:.68rem;color:#667085;text-transform:uppercase;letter-spacing:.11em;font-weight:800}
       .coach-live-context{margin-top:2px;color:#344054;font-size:.9rem;font-weight:650}
-      .coach-live-subcontext{color:#8a94a3;font-size:.76rem;margin-top:1px}
+      .coach-live-subcontext{color:var(--cb-muted);font-size:.76rem;margin-top:1px}
       .coach-inning-pill{background:#172033;color:#fff;border-radius:10px;min-width:74px;padding:8px 10px;text-align:center;box-shadow:0 1px 2px rgba(16,24,40,.12)}
       .coach-inning-pill small{display:block;font-size:.58rem;opacity:.7;font-weight:750;letter-spacing:.1em}.coach-inning-pill strong{display:block;font-size:1.45rem;line-height:1.05;margin-top:2px}
       .coach-card{background:#fff;border:1px solid #e4e7ec;border-radius:13px;box-shadow:0 1px 3px rgba(16,24,40,.06);padding:12px;margin-bottom:10px}

@@ -31,7 +31,7 @@
       #${PANEL_ID} .cb-starting-defense-label{
         display:block;
         color:#667085;
-        font-size:.62rem;
+        font-size:var(--cb-text-2xs);
         line-height:1.1;
         font-weight:850;
         text-transform:uppercase;
@@ -46,7 +46,7 @@
         border-radius:9px;
         background:#f7f9fd;
         color:#526176;
-        font-size:.66rem;
+        font-size:var(--cb-text-xs);
         line-height:1.3;
       }
       #${PANEL_ID} .cb-starting-defense-help strong{color:#294a84}

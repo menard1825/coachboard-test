@@ -127,7 +127,7 @@
       }
       .gm-optional-badge{
         display:inline-flex;align-items:center;margin-left:7px;padding:3px 7px;border-radius:999px;
-        background:#f2f4f7;color:#667085;font-size:.56rem;font-weight:850;letter-spacing:.04em;text-transform:uppercase;
+        background:#f2f4f7;color:#667085;font-size:var(--cb-text-2xs);font-weight:850;letter-spacing:.04em;text-transform:uppercase;
         vertical-align:middle;
       }
       .gm-pitcher-list-toggle{
@@ -136,7 +136,7 @@
       }
       .gm-pitch-card-more{
         display:none;width:100%;border:0;border-top:1px solid #edf0f3;background:#fff;color:#526078;
-        min-height:34px;font-size:.65rem;font-weight:800;
+        min-height:34px;font-size:var(--cb-text-xs);font-weight:800;
       }
 
       @media (min-width:1200px){
@@ -273,9 +273,9 @@
         body.coach-game-page #game-pitching-rules-v2 .gpr-summary{padding:8px 9px!important}
         body.coach-game-page #game-pitching-rules-v2 .gpr-summary-copy{gap:2px!important}
         body.coach-game-page #game-pitching-rules-v2 .gpr-line{gap:5px!important}
-        body.coach-game-page #game-pitching-rules-v2 .gpr-label{min-width:66px!important;font-size:.55rem!important}
+        body.coach-game-page #game-pitching-rules-v2 .gpr-label{min-width:66px!important;font-size:var(--cb-text-2xs)!important}
         body.coach-game-page #game-pitching-rules-v2 .gpr-rule,
-        body.coach-game-page #game-pitching-rules-v2 .gpr-arm{font-size:.7rem!important}
+        body.coach-game-page #game-pitching-rules-v2 .gpr-arm{font-size:var(--cb-text-xs)!important}
 
         body.coach-game-page #gm-game-header-actions{
           display:grid!important;
@@ -327,7 +327,7 @@
         }
         body.coach-game-page #gameBattingOrderCard .card-header .small{
           margin-top:1px!important;
-          font-size:.59rem!important;
+          font-size:var(--cb-text-xs)!important;
           line-height:1.2!important;
         }
         body.coach-game-page #gameBattingOrderCard .gm-lineup-actions{
@@ -339,7 +339,7 @@
         body.coach-game-page #gameBattingOrderCard .gm-lineup-actions .btn{
           min-height:32px!important;
           padding:4px 7px!important;
-          font-size:.61rem!important;
+          font-size:var(--cb-text-xs)!important;
         }
         body.coach-game-page #gameBattingOrderCard:not(.gm-lineup-open) > .card-body{
           display:none!important;
@@ -358,7 +358,7 @@
           display:grid!important;grid-template-columns:1fr!important;gap:5px!important;padding:7px!important;margin-bottom:5px!important;
         }
         body.coach-game-page #rotation-card-container .gm-coach-inning-label{
-          width:auto!important;margin:0!important;font-size:.62rem!important;line-height:1!important;
+          width:auto!important;margin:0!important;font-size:var(--cb-text-xs)!important;line-height:1!important;
         }
         body.coach-game-page #rotation-card-container #inning-btn-group{
           display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;width:100%;
@@ -368,7 +368,7 @@
           border-radius:8px!important;font-size:.82rem!important;line-height:1!important;
         }
         body.coach-game-page #rotation-card-container .gm-coach-help{
-          margin:3px 1px 7px!important;font-size:.64rem!important;line-height:1.3!important;
+          margin:3px 1px 7px!important;font-size:var(--cb-text-xs)!important;line-height:1.3!important;
         }
         body.coach-game-page #rotation-card-container .gm-coach-actions{
           display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,.8fr)!important;gap:6px!important;width:100%;
@@ -383,7 +383,7 @@
         body.coach-game-page #pregame-defense-editor-v3 .pde-head{padding:9px 10px 7px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-kicker{display:none!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-title{font-size:.96rem!important;line-height:1.1!important}
-        body.coach-game-page #pregame-defense-editor-v3 .pde-help{font-size:.64rem!important;line-height:1.25!important;margin-top:3px!important}
+        body.coach-game-page #pregame-defense-editor-v3 .pde-help{font-size:var(--cb-text-xs)!important;line-height:1.25!important;margin-top:3px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-body{padding:8px 9px 9px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-tools{
           display:grid!important;grid-template-columns:minmax(0,1fr) minmax(132px,auto)!important;gap:6px!important;padding:7px!important;margin-bottom:7px!important;align-items:end!important;
@@ -394,7 +394,7 @@
         body.coach-game-page #pregame-defense-editor-v3 .pde-tools .btn{min-height:38px!important;font-size:.68rem!important}
         body.coach-game-page #pregame-defense-editor-v3 #pde-apply{width:auto!important;padding-left:7px!important;padding-right:7px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-field-caption{padding:6px 8px!important}
-        body.coach-game-page #pregame-defense-editor-v3 .pde-field-caption strong{font-size:.67rem!important}
+        body.coach-game-page #pregame-defense-editor-v3 .pde-field-caption strong{font-size:var(--cb-text-xs)!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-field-caption span{display:none!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-field{
           height:clamp(238px,64vw,265px)!important;min-height:0!important;
@@ -405,35 +405,35 @@
         body.coach-game-page #pregame-defense-editor-v3 .pde-pos{font-size:.42rem!important;margin-bottom:1px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-name{font-size:.52rem!important;line-height:1.05!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-bench{padding:6px 8px 7px!important}
-        body.coach-game-page #pregame-defense-editor-v3 .pde-label{font-size:.55rem!important;margin-bottom:4px!important}
+        body.coach-game-page #pregame-defense-editor-v3 .pde-label{font-size:var(--cb-text-2xs)!important;margin-bottom:4px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-chips{gap:4px!important}
-        body.coach-game-page #pregame-defense-editor-v3 .pde-chips span{font-size:.57rem!important;padding:3px 5px!important}
+        body.coach-game-page #pregame-defense-editor-v3 .pde-chips span{font-size:var(--cb-text-xs)!important;padding:3px 5px!important}
         body.coach-game-page #pregame-defense-editor-v3 .pde-status{margin-top:7px!important;padding:7px 8px!important;gap:7px!important}
-        body.coach-game-page #pregame-defense-editor-v3 .pde-status-copy strong{font-size:.68rem!important}
-        body.coach-game-page #pregame-defense-editor-v3 .pde-status-copy span{font-size:.6rem!important}
+        body.coach-game-page #pregame-defense-editor-v3 .pde-status-copy strong{font-size:var(--cb-text-xs)!important}
+        body.coach-game-page #pregame-defense-editor-v3 .pde-status-copy span{font-size:var(--cb-text-xs)!important}
 
         body.coach-game-page #pitcher-availability-card{scroll-margin-top:10px}
         body.coach-game-page #pitcher-availability-card > .card-header{padding:9px 10px!important}
         body.coach-game-page #pitcher-availability-card > .card-header strong{font-size:.92rem!important}
-        body.coach-game-page #pitcher-availability-card .cb-pitch-rule-note{font-size:.62rem!important;line-height:1.25!important}
+        body.coach-game-page #pitcher-availability-card .cb-pitch-rule-note{font-size:var(--cb-text-xs)!important;line-height:1.25!important}
         body.coach-game-page #pitcher-availability-card .gpa-shell{padding:7px!important}
-        body.coach-game-page #pitcher-availability-card .gpa-summary{margin-bottom:6px!important;font-size:.62rem!important;gap:5px!important}
-        body.coach-game-page #pitcher-availability-card .gpa-summary strong{font-size:.68rem!important}
+        body.coach-game-page #pitcher-availability-card .gpa-summary{margin-bottom:6px!important;font-size:var(--cb-text-xs)!important;gap:5px!important}
+        body.coach-game-page #pitcher-availability-card .gpa-summary strong{font-size:var(--cb-text-xs)!important}
         body.coach-game-page #pitcher-availability-card .gpa-grid{gap:6px!important}
         body.coach-game-page #pitcher-availability-card .gpa-card{border-radius:10px!important}
         body.coach-game-page #pitcher-availability-card .gpa-top{padding:8px 9px 5px!important}
         body.coach-game-page #pitcher-availability-card .gpa-name{font-size:.82rem!important}
-        body.coach-game-page #pitcher-availability-card .gpa-status{font-size:.52rem!important;padding:3px 6px!important}
+        body.coach-game-page #pitcher-availability-card .gpa-status{font-size:var(--cb-text-2xs)!important;padding:3px 6px!important}
         body.coach-game-page #pitcher-availability-card .gpa-decision{margin:0 8px 6px!important;padding:6px 7px!important}
-        body.coach-game-page #pitcher-availability-card .gpa-decision strong{font-size:.69rem!important}
-        body.coach-game-page #pitcher-availability-card .gpa-label{font-size:.5rem!important}
+        body.coach-game-page #pitcher-availability-card .gpa-decision strong{font-size:var(--cb-text-xs)!important}
+        body.coach-game-page #pitcher-availability-card .gpa-label{font-size:var(--cb-text-2xs)!important}
         body.coach-game-page #pitcher-availability-card .gpa-arm{padding:6px 8px!important}
-        body.coach-game-page #pitcher-availability-card .gpa-arm strong{font-size:.64rem!important}
+        body.coach-game-page #pitcher-availability-card .gpa-arm strong{font-size:var(--cb-text-xs)!important}
         body.coach-game-page #pitcher-availability-card .gpa-card:not(.gm-details-open) .gpa-metrics{display:none!important}
         body.coach-game-page #pitcher-availability-card .gpa-metrics{grid-template-columns:1fr 1fr!important}
         body.coach-game-page #pitcher-availability-card .gpa-metric{padding:6px 8px!important;font-size:.62rem!important}
         body.coach-game-page #pitcher-availability-card .gm-pitch-card-more{display:block}
-        body.coach-game-page #pitcher-availability-card .btn-outline-secondary{min-height:34px;font-size:.66rem;padding:5px 9px}
+        body.coach-game-page #pitcher-availability-card .btn-outline-secondary{min-height:34px;font-size:var(--cb-text-xs);padding:5px 9px}
 
         body.coach-game-page .cb-pitch-plan-card .card-header{padding:9px 10px!important}
         body.coach-game-page .cb-pitch-plan-card .card-header h5{font-size:1rem!important}

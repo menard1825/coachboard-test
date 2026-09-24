@@ -46,7 +46,7 @@
       .gd-rule-explain{margin-top:7px;padding:8px 9px;border:1px solid #e4e7ec;border-radius:9px;background:#f8fafc}
       .gd-rule-explain strong{display:block;font-size:.7rem;color:#344054}
       .gd-rule-explain span{display:block;font-size:.64rem;color:#667085;margin-top:2px}
-      .gd-rule-explain .gd-rule-ref{color:#8a94a3}
+      .gd-rule-explain .gd-rule-ref{color:var(--cb-muted)}
     `;
     document.head.appendChild(style);
   }

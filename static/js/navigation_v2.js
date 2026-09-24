@@ -128,7 +128,7 @@
       #more .cb-mobile-more-link:last-child{border-bottom:0}
       #more .cb-mobile-more-icon{width:36px;height:36px;border-radius:9px;background:#f1f4f8;color:var(--cb-primary-text,#102a66);display:flex;align-items:center;justify-content:center;font-size:1rem}
       #more .cb-mobile-more-copy strong{display:block;font-size:.79rem;font-weight:800;color:#1d2939}
-      #more .cb-mobile-more-copy small{display:block;font-size:.65rem;color:#7b8492;margin-top:1px;line-height:1.2}
+      #more .cb-mobile-more-copy small{display:block;font-size:.65rem;color:var(--cb-muted);margin-top:1px;line-height:1.2}
       #more .cb-mobile-more-arrow{color:#98a2b3;font-size:.8rem;text-align:right}
       #userOffcanvas .cb-account-context{padding:3px 16px 10px;color:#667085;font-size:.72rem;border-bottom:1px solid #eef1f4;margin-bottom:4px}
       #userOffcanvas .list-group-item{min-height:44px;display:flex;align-items:center}
