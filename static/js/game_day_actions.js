@@ -100,7 +100,7 @@
                   <input class="form-control" id="gd-add-date" type="date" name="game_date" required>
                 </div>
                 <div class="col-5">
-                  <label class="form-label" for="gd-add-time">Time</label>
+                  <label class="form-label" for="gd-add-time">Time <span class="fw-normal text-muted">(optional)</span></label>
                   <input class="form-control" id="gd-add-time" type="time" name="game_start_time">
                 </div>
                 <div class="col-12">
