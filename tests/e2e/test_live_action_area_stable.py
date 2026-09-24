@@ -36,14 +36,19 @@ RECORD = r"""() => {
     'live header': '#cbDugoutHeader',
     'Next Inning heading': '#live-board-prep-v3 .cb-next-head',
   };
-  // The clock ticks every second by design; everything else must hold still.
+  // Only what is on screen counts: a hidden tab's card may be built in the
+  // background. The clock ticks every second by design; everything else
+  // must hold still.
   const read = sel => [...document.querySelectorAll(sel)]
+    .filter(el => el.getClientRects().length)
     .map(el => (el.innerText || '').replace(/\d+:\d\d/g, '0:00').replace(/\s+/g, ' ').trim()).join(' | ');
   const seen = window.__cbAreaText = {};
   const sample = () => {
     for (const [area, sel] of Object.entries(areas)) {
       const text = read(sel);
       const list = seen[area] || (seen[area] = []);
+      // An area first appearing is not a flash; going blank after showing is.
+      if (!list.length && !text) continue;
       if (list[list.length - 1] !== text) list.push(text);
     }
   };

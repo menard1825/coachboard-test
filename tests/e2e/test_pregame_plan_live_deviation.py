@@ -1,11 +1,17 @@
-"""Pregame Plan says when the live game has departed from the plan.
+"""Pregame Plan notes where the game has gone its own way from the plan.
 
 "Changed from Inning 1: ..." (amber) is a change inside the original plan.
-"Live game differs from plan: ..." (red) compares the plan for an inning with
-the defense the game is really using: the field now for the inning being
-played, and for the next inning whatever End Inning would put out -- the
-carried-forward field or the coach's own Next Inning edit. The plan itself
-stays read-only.
+A quiet team-colored note compares the plan for an inning with the defense
+the game is really using, in plain baseball terms:
+
+* "In-game adjustments" -- the inning being played, against the field now;
+* "Heading into the 2nd" -- the next inning, against what End Inning would
+  put out (the carried-forward field or the coach's own Next Inning edit);
+* "How the 1st finished" -- an inning already played.
+
+The note states what is ("Pat pitching instead of Ames"), never a story of
+how it happened ("came in", "moved", "switched"): it compares alignments and
+does not know the order moves were made in. The plan itself stays read-only.
 """
 
 import os
@@ -108,6 +114,28 @@ def _open_plan(page, base_url, inning):
     return page.locator(CARD)
 
 
+NARRATIVE = ('came in', 'moved', 'switched', 'swapped')
+
+
+def _note(card):
+    """The note's heading and lines, checked for plain, factual wording."""
+    note = card.locator('.cb-plan-live')
+    expect(note).to_be_visible(timeout=10_000)
+    heading = note.locator('strong').inner_text().strip()
+    lines = [line.strip() for line in note.locator('li').all_inner_texts()]
+    for line in lines:
+        assert not any(verb in line for verb in NARRATIVE), line
+    return heading, lines
+
+
+def _advance(page, base_url):
+    prep = page.cb_api.request.get(f'{base_url}/api/live-game/{page.cb_game}/next-inning-prep').json()
+    response = page.cb_api.request.post(f'{base_url}/api/live-game/{page.cb_game}/advance-inning', data={
+        'alignment': prep['confirmed']['alignment'], 'next_prep_id': prep['confirmed']['id'],
+        'base_sequence': _sequence(_state(page, base_url))})
+    assert response.ok, response.text()[:300]
+
+
 def _differs(card):
     marked = card.locator('[data-plan-position][data-plan-live-differs="true"]').evaluate_all(
         'els => els.map(el => el.dataset.planPosition)')
@@ -120,14 +148,20 @@ def test_mid_inning_pitcher_change_shows_on_the_inning_being_played(live, coachb
     _change_pitcher(page, coachboard_url, RELIEVER)
     card = _open_plan(page, coachboard_url, 1)
 
-    banner = card.locator('.cb-plan-live')
-    expect(banner).to_contain_text('Live game differs from plan: P', timeout=10_000)
-    expect(banner).to_contain_text(RELIEVER)
+    expect(card.locator('.cb-plan-live li')).to_have_count(1, timeout=10_000)
+    assert _note(card) == ('In-game adjustments', [f'{RELIEVER} pitching instead of {INNING_1["P"]}'])
     assert _differs(card) == ['P']
     assert RELIEVER in card.locator('[data-plan-position="P"]').get_attribute('aria-label')
     # The plan itself still shows what was planned.
     expect(card.locator('[data-plan-position="P"] .cb-qd-name')).to_have_text(INNING_1['P'])
     expect(card.locator('[data-plan-inning="1"]')).to_have_attribute('data-plan-live-differs', 'true')
+    # A quiet team-colored note: the same color as the position outline, and
+    # nothing red about it.
+    note_rule = card.locator('.cb-plan-live').evaluate('el => getComputedStyle(el).borderLeftColor')
+    outline = card.locator('[data-plan-position="P"] .cb-qd-name').evaluate('el => getComputedStyle(el).outlineColor')
+    assert note_rule == outline, (note_rule, outline)
+    r, g, b = (int(v) for v in note_rule[note_rule.index('(') + 1:note_rule.index(')')].split(',')[:3])
+    assert not (r > g + 60 and r > b + 60), note_rule
     # A live deviation looks different from a change inside the plan.
     _show = lambda n: card.locator(f'[data-plan-inning="{n}"]').click()
     look = 'el => { const s = getComputedStyle(el.querySelector(".cb-qd-name")); return [s.outlineStyle, s.outlineColor, s.boxShadow]; }'
@@ -144,7 +178,12 @@ def test_several_live_changes_are_all_listed(live, coachboard_url, device):
     _change_pitcher(page, coachboard_url, RELIEVER)
     _swap(page, coachboard_url, 'LF', 'RF')
     card = _open_plan(page, coachboard_url, 1)
-    expect(card.locator('.cb-plan-live')).to_contain_text('Live game differs from plan: P, LF, RF', timeout=10_000)
+    expect(card.locator('.cb-plan-live li')).to_have_count(3, timeout=10_000)
+    assert _note(card) == ('In-game adjustments', [
+        f'{RELIEVER} pitching instead of {INNING_1["P"]}',
+        f'{INNING_1["RF"]} in LF instead of {INNING_1["LF"]}',
+        f'{INNING_1["LF"]} in RF instead of {INNING_1["RF"]}',
+    ])
     assert _differs(card) == ['P', 'LF', 'RF']
     assert page.cb_errors == []
 
@@ -173,9 +212,13 @@ def test_next_inning_compares_what_end_inning_would_put_out(live, coachboard_url
     carried = prep['confirmed']['alignment']
     assert carried['P'] == RELIEVER
     expected = [pos for pos in ORDER if (INNING_2.get(pos) or '') != (carried.get(pos) or '')]
-    banner = card.locator('.cb-plan-live')
-    expect(banner).to_contain_text(f'Live game differs from plan: {", ".join(expected)}', timeout=10_000)
-    expect(banner).to_contain_text('End Inning would put out')
+    assert expected == ['P', '1B']
+    expect(card.locator('.cb-plan-live li')).to_have_count(2, timeout=10_000)
+    # Both players are already in those spots now, so they "stay".
+    assert _note(card) == ('Heading into the 2nd', [
+        f'{RELIEVER} stays on the mound (plan: {INNING_2["P"]})',
+        f'{carried["1B"]} stays at 1B (plan: {INNING_2["1B"]})',
+    ])
     assert _differs(card) == expected
     assert page.cb_errors == []
 
@@ -188,11 +231,32 @@ def test_a_manual_next_inning_edit_is_compared_with_the_plan(live, coachboard_ur
                                         data={'mode': 'custom', 'alignment': edited})
     assert response.ok, response.text()[:200]
     card = _open_plan(page, coachboard_url, 2)
-    expect(card.locator('.cb-plan-live')).to_contain_text('Live game differs from plan: LF, RF', timeout=10_000)
+    expect(card.locator('.cb-plan-live li')).to_have_count(2, timeout=10_000)
+    # Neither player is in that spot now, so no "stays".
+    assert _note(card) == ('Heading into the 2nd', [
+        f'{INNING_2["RF"]} in LF (plan: {INNING_2["LF"]})',
+        f'{INNING_2["LF"]} in RF (plan: {INNING_2["RF"]})',
+    ])
     assert _differs(card) == ['LF', 'RF']
     # Inning 1 is still being played exactly as planned.
     card.locator('[data-plan-inning="1"]').click()
     expect(card.locator('.cb-plan-live')).to_have_count(0)
+    assert page.cb_errors == []
+
+
+@DEVICES
+def test_a_finished_inning_shows_how_it_finished(live, coachboard_url, device):
+    page = live(device)
+    _change_pitcher(page, coachboard_url, RELIEVER)
+    _advance(page, coachboard_url)                     # the relief pitcher carries into the 2nd
+    card = _open_plan(page, coachboard_url, 1)
+    expect(card.locator('.cb-plan-live li')).to_have_count(1, timeout=10_000)
+    assert _note(card) == ('How the 1st finished', [f'{RELIEVER} pitching instead of {INNING_1["P"]}'])
+
+    card.locator('[data-plan-inning="2"]').click()     # now being played
+    heading, lines = _note(card)
+    assert heading == 'In-game adjustments'
+    assert f'{RELIEVER} pitching instead of {INNING_2["P"]}' in lines
     assert page.cb_errors == []
 
 

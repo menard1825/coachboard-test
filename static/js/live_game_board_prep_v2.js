@@ -610,51 +610,61 @@
         vertical-align:1px;
       }
 
-      /* The live game has departed from the plan here: red dashed outline
-         and a red diamond -- deliberately unlike the amber ring and dot
-         used for changes between planned innings. */
+      /* Where the game has gone its own way from the plan: a quiet
+         team-colored dashed outline, and a small dot on the inning button.
+         Amber stays reserved for changes inside the original plan. */
       #${PLAN_CARD_ID} .cb-plan-spot[data-plan-live-differs="true"] .cb-qd-name{
-        outline:2.5px dashed #c0362c;
+        outline:2px dashed var(--cb-primary-text, #1f3f6e);
         outline-offset:2px;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-spot[data-plan-live-differs="true"] .cb-qd-pos::before{
-        content:'\\25C6';
-        margin-right:3px;
-        color:#ffb4ab;
-        font-size:.8em;
       }
 
       #${PLAN_CARD_ID} .cb-plan-live{
         margin:0 0 9px;
-        padding:7px 10px;
-        border:1px solid #f1b8b1;
-        border-left:4px solid #c0362c;
-        border-radius:8px;
-        background:#fff4f2;
-        color:#8f1f14;
+        padding:6px 10px 7px;
+        border-left:3px solid var(--cb-primary-text, #1f3f6e);
+        background:#f5f7fa;
+        color:#172033;
         font-size:var(--cb-text-xs, 12px);
-        font-weight:850;
       }
 
-      #${PLAN_CARD_ID} .cb-plan-live small{
+      #${PLAN_CARD_ID} .cb-plan-live strong{
         display:block;
-        margin-top:2px;
-        color:#7a2a20;
+        margin-bottom:2px;
+        color:var(--cb-primary-text, #1f3f6e);
         font-size:var(--cb-text-xs, 12px);
-        font-weight:700;
+        font-weight:900;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-live ul{
+        margin:0;
+        padding:0;
+        list-style:none;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-live li{
+        font-weight:750;
+        line-height:1.35;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-live li + li{
+        margin-top:3px;
       }
 
       #${PLAN_CARD_ID} .cb-plan-inning-btn[data-plan-live-differs="true"]::after{
         content:'';
         position:absolute;
-        top:4px;
-        right:4px;
-        width:8px;
-        height:8px;
-        transform:rotate(45deg);
-        background:#c0362c;
+        top:5px;
+        right:5px;
+        width:7px;
+        height:7px;
+        border-radius:50%;
+        background:var(--cb-primary-text, #1f3f6e);
         box-shadow:0 0 0 1.5px #fff;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn[aria-pressed="true"][data-plan-live-differs="true"]::after{
+        background:#fff;
+        box-shadow:0 0 0 1.5px var(--cb-primary-text, #1f3f6e);
       }
 
       #${PLAN_CARD_ID} .cb-plan-bench{
@@ -1660,7 +1670,7 @@
         aria-label="${esc(
           `${pos}: ${name ? playerLabel(name) : 'open'}`
           + `${changed ? ', changed from the inning before' : ''}`
-          + `${live ? `, live game has ${live.name ? playerLabel(live.name) : 'nobody'} here` : ''}`
+          + `${live ? `, in the game: ${live.name ? playerLabel(live.name) : 'open'}` : ''}`
         )}"
       >
         <span class="cb-qd-pos">${esc(pos)}${number ? ` <span class="cb-qd-num">#${esc(number)}</span>` : ''}</span>
@@ -1701,7 +1711,45 @@
 
     return order
       .filter(pos => (entry.alignment[pos] || '') !== (live[pos] || ''))
-      .map(pos => ({pos, name: live[pos] || ''}));
+      .map(pos => ({pos, name: live[pos] || '', planned: entry.alignment[pos] || ''}));
+  }
+
+  /*
+   * One line per position, in plain baseball terms. These compare the plan
+   * with the defense on the field (or the one End Inning would put out) --
+   * they do not know the order moves were made in, so they state what is,
+   * not a story of how it happened ("came in", "moved", "switched").
+   */
+  function deviationLine(item, kind) {
+    const spot = item.pos === 'P'
+      ? 'on the mound'
+      : ['LF', 'CF', 'RF', 'LCF', 'RCF'].includes(item.pos)
+        ? `in ${item.pos}`
+        : `at ${item.pos}`;
+    const planned = item.planned || 'open';
+
+    if (!item.name) {
+      return `${item.pos} open (plan: ${planned})`;
+    }
+
+    if (kind === 'next') {
+      const stays = (latest?.current_alignment || {})[item.pos] === item.name;
+      return `${item.name} ${stays ? 'stays ' : ''}${spot} (plan: ${planned})`;
+    }
+
+    if (!item.planned) {
+      return `${item.name} ${spot} (plan: open)`;
+    }
+
+    return item.pos === 'P'
+      ? `${item.name} pitching instead of ${item.planned}`
+      : `${item.name} ${spot} instead of ${item.planned}`;
+  }
+
+  function deviationHeading(key) {
+    if (key === String(latest?.current_inning || '')) return 'In-game adjustments';
+    if (key === String(latest?.next_inning || '')) return `Heading into the ${inningOrdinal(key)}`;
+    return `How the ${inningOrdinal(key)} finished`;
   }
 
   function planInningLabel(key) {
@@ -1826,12 +1874,12 @@
           }</div>
           ${
             deviations.length
-              ? `<div class="cb-plan-live" role="status">
-                  Live game differs from plan: ${esc(deviations.map(item => item.pos).join(', '))}
-                  <small>${esc(
-                    `${entry.key === String(latest?.next_inning || '') ? 'End Inning would put out' : 'Live'}: `
-                    + deviations.map(item => `${item.pos} ${item.name ? playerLabel(item.name) : 'open'}`).join(' · ')
-                  )}</small>
+              ? `<div class="cb-plan-live">
+                  <strong>${esc(deviationHeading(entry.key))}</strong>
+                  <ul>${deviations.map(item => `<li>${esc(deviationLine(
+                    item,
+                    entry.key === String(latest?.next_inning || '') ? 'next' : 'now'
+                  ))}</li>`).join('')}</ul>
                 </div>`
               : ''
           }
