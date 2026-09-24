@@ -14,6 +14,9 @@
   let latest = null;
   let draft = {};
   let activeView = 'now';
+  // Pregame Plan: the inning being looked at, and the live inning it was
+  // chosen during (a new live inning opens the plan on its next inning).
+  let planChoice = {inning: '', during: ''};
   let selected = null;
   let selectedPosition = '';
   let busy = false;
@@ -280,9 +283,10 @@
       </button>`;
   }
 
-  function fieldMarkup() {
+  // The diamond, baselines and outfield arc shared by Next Inning and
+  // Pregame Plan; each draws its own markers on top.
+  function fieldArt() {
     return `
-      <div class="cb-qd-field cb-next-field">
         <svg
           class="cb-qd-field-art"
           viewBox="0 0 100 88"
@@ -312,7 +316,13 @@
           />
           <circle cx="50" cy="61" r="4.8" fill="#cfa56c"/>
           <circle cx="50" cy="81" r="6.2" fill="#cfa56c"/>
-        </svg>
+        </svg>`;
+  }
+
+  function fieldMarkup() {
+    return `
+      <div class="cb-qd-field cb-next-field">
+        ${fieldArt()}
 
         ${spots().map(
           ([pos, left, top]) => fieldSpot(pos, left, top)
@@ -495,77 +505,165 @@
         text-align:center;
       }
 
-      #${PLAN_CARD_ID} .cb-plan-inning{
+      #${PLAN_CARD_ID} .cb-plan-innings{
+        display:flex;
+        gap:6px;
+        overflow-x:auto;
+        padding:1px 1px 3px;
         margin-bottom:9px;
-        padding:9px 10px 10px;
+        scrollbar-width:thin;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn{
+        position:relative;
+        flex:0 0 auto;
+        min-width:48px;
+        min-height:44px;
+        padding:4px 10px;
+        border:1.5px solid #cfd6df;
+        border-radius:10px;
+        background:#fff;
+        color:#172033;
+        font-size:1rem;
+        font-weight:900;
+        line-height:1.05;
+        transition:none;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn[aria-pressed="true"]{
+        border-color:#172033;
+        background:#172033;
+        color:#fff;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn small{
+        display:block;
+        font-size:var(--cb-text-2xs, 11px);
+        font-weight:850;
+        letter-spacing:.03em;
+        text-transform:uppercase;
+        color:#315d98;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn[aria-pressed="true"] small{
+        color:#c9d7ef;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-title{
+        color:#172033;
+        font-size:.95rem;
+        font-weight:900;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-title span{
+        margin-left:6px;
+        padding:2px 8px;
+        border-radius:999px;
+        background:#e8eef8;
+        color:#1f3f6e;
+        font-size:var(--cb-text-2xs, 11px);
+        font-weight:900;
+        letter-spacing:.05em;
+        text-transform:uppercase;
+        vertical-align:2px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-changes{
+        margin:3px 0 8px;
+        color:#475467;
+        font-size:var(--cb-text-xs, 12px);
+        font-weight:750;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-changes.has-changes{
+        color:#7a4b00;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-field{
+        width:min(100%,640px);
+        min-height:0;
+        margin-inline:auto;
+        aspect-ratio:1.28/1;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot{
+        cursor:default;
+        width:clamp(58px,17%,112px);
+        min-height:40px;
+      }
+
+      /* A position that changed from the inning before: amber ring and dot. */
+      #${PLAN_CARD_ID} .cb-plan-spot[data-plan-changed="true"] .cb-qd-name{
+        border-color:#d18a00!important;
+        box-shadow:0 0 0 2.5px #f5b83d, 0 2px 6px rgba(16,24,40,.22)!important;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot[data-plan-changed="true"] .cb-qd-pos::after{
+        content:'';
+        display:inline-block;
+        width:7px;
+        height:7px;
+        margin-left:4px;
+        border-radius:50%;
+        background:#f5b83d;
+        box-shadow:0 0 0 1.5px #fff;
+        vertical-align:1px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-bench{
+        margin-top:9px;
+        padding:8px 10px;
         border:1px solid #e3e7ec;
         border-radius:10px;
         background:#fafbfc;
       }
 
-      #${PLAN_CARD_ID} .cb-plan-inning:last-child{
-        margin-bottom:0;
+      #${PLAN_CARD_ID} .cb-plan-bench strong{
+        display:block;
+        margin-bottom:5px;
+        color:#344054;
+        font-size:var(--cb-text-xs, 12px);
+        font-weight:900;
       }
 
-      #${PLAN_CARD_ID} .cb-plan-inning.current{
-        border:2px solid #315d98;
-        background:#f3f7fd;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-inning-head{
+      #${PLAN_CARD_ID} .cb-plan-bench-chips{
         display:flex;
-        align-items:baseline;
-        gap:8px;
-        margin-bottom:7px;
+        flex-wrap:wrap;
+        gap:5px;
       }
 
-      #${PLAN_CARD_ID} .cb-plan-inning-no{
-        color:#172033;
-        font-size:.86rem;
-        font-weight:900;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-now{
-        padding:2px 7px;
-        border-radius:999px;
-        background:#172033;
-        color:#fff;
-        font-size:.56rem;
-        font-weight:900;
-        letter-spacing:.07em;
-        text-transform:uppercase;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-grid{
-        display:grid;
-        grid-template-columns:repeat(auto-fill,minmax(94px,1fr));
-        gap:6px;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-slot{
-        padding:5px 7px;
+      #${PLAN_CARD_ID} .cb-plan-bench-chips span{
+        padding:4px 8px;
         border:1px solid #dce1e5;
-        border-radius:8px;
+        border-radius:999px;
         background:#fff;
-        min-width:0;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-pos{
-        display:block;
-        color:var(--cb-muted);
-        font-size:.55rem;
-        font-weight:900;
-        letter-spacing:.06em;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-name{
-        display:block;
-        margin-top:1px;
         color:#172033;
-        font-size:.68rem;
+        font-size:var(--cb-text-xs, 12px);
         font-weight:800;
-        line-height:1.12;
-        overflow-wrap:anywhere;
+      }
+
+      @media(max-width:575.98px){
+        #${PLAN_CARD_ID} .cb-plan-field{
+          width:100%;
+        }
+
+        /* Wider than the live board's markers, and never narrower than the
+           longest word in the name: the plan is not sharing the screen with
+           End Inning, so names wrap between words, not inside them. */
+        #${PLAN_CARD_ID} .cb-plan-spot{
+          width:min-content!important;
+          min-width:clamp(60px,21vw,84px);
+          min-height:30px!important;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-spot .cb-qd-name{
+          overflow-wrap:normal;
+          word-break:normal;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-spot .cb-qd-name{
+          font-size:var(--cb-marker-name)!important;
+        }
       }
 
       #${CARD_ID}{
@@ -1225,8 +1323,14 @@
               : 'now';
 
           // Only toggles visibility. Pregame Plan is reference data that is
-          // already in `latest`, so opening it must never fetch or save.
+          // already in `latest`, so opening it must never fetch or save --
+          // but it is drawn now rather than on the next background refresh.
           applyView();
+
+          if (activeView === 'plan' && latest) {
+            ensureSurface();
+            renderPlanCard();
+          }
         }
       );
     }
@@ -1473,15 +1577,43 @@
       .sort((a, b) => a.sort - b.sort);
   }
 
+  function planSpot(pos, left, top, name, changed) {
+    const number = name
+      ? String(playerByName(name)?.number ?? '').trim()
+      : '';
+
+    return `
+      <div
+        class="cb-qd-spot cb-plan-spot ${pos === 'P' ? 'pitcher' : ''}"
+        style="left:${left}%;top:${top}%"
+        data-plan-position="${esc(pos)}"
+        data-plan-changed="${changed ? 'true' : 'false'}"
+        role="img"
+        aria-label="${esc(
+          `${pos}: ${name ? playerLabel(name) : 'open'}${changed ? ', changed from the inning before' : ''}`
+        )}"
+      >
+        <span class="cb-qd-pos">${esc(pos)}${number ? ` <span class="cb-qd-num">#${esc(number)}</span>` : ''}</span>
+        <span class="cb-qd-name">${esc(name || 'OPEN')}</span>
+      </div>`;
+  }
+
+  function planInningLabel(key) {
+    return String(key).includes('.')
+      ? `Change during Inning ${Math.floor(Number.parseFloat(key))}`
+      : `Inning ${key}`;
+  }
+
   function renderPlanCard() {
     const card = $(PLAN_CARD_ID);
 
     if (!card) return;
 
     const innings = planInnings();
+    let html;
 
     if (!innings.length) {
-      card.innerHTML = `
+      html = `
         <div class="cb-plan-head">
           <div>
             <div class="cb-plan-kicker">PREGAME PLAN</div>
@@ -1494,54 +1626,127 @@
             No pregame defensive plan was saved for this game.
           </div>
         </div>`;
+    } else {
+      const currentInning = String(latest?.current_inning || '');
+      const nextInning = String(latest?.next_inning || '');
+      const keys = innings.map(entry => entry.key);
 
-      return;
+      // Open on the next inning -- usually what a coach wants mid-game --
+      // and keep the coach's choice until the live inning moves on.
+      if (
+        planChoice.during !== currentInning ||
+        !keys.includes(planChoice.inning)
+      ) {
+        planChoice = {
+          inning:
+            [nextInning, currentInning].find(key => keys.includes(key)) ||
+            keys[0],
+          during: currentInning,
+        };
+      }
+
+      const index = keys.indexOf(planChoice.inning);
+      const entry = innings[index];
+      const previous = index > 0 ? innings[index - 1] : null;
+      const order = positions(latest?.outfielder_count);
+      const changed = previous
+        ? order.filter(pos =>
+            (entry.alignment[pos] || '') !== (previous.alignment[pos] || '')
+          )
+        : [];
+
+      const assigned = new Set(
+        order.map(pos => entry.alignment[pos]).filter(Boolean)
+      );
+      const bench = (latest?.roster || [])
+        .filter(player => !assigned.has(player.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      const tag = entry.key === currentInning
+        ? 'On now'
+        : entry.key === nextInning
+          ? 'Next inning'
+          : '';
+
+      const buttons = innings.map(item => `
+        <button
+          type="button"
+          class="cb-plan-inning-btn"
+          data-plan-inning="${esc(item.key)}"
+          aria-pressed="${item.key === entry.key ? 'true' : 'false'}"
+          aria-label="${esc(planInningLabel(item.key))}${item.key === currentInning ? ' (on now)' : ''}"
+        >${esc(item.key.includes('.') ? `${Math.floor(Number.parseFloat(item.key))}+` : item.key)}${
+          item.key === currentInning ? '<small>Now</small>' : ''
+        }</button>`).join('');
+
+      const field = `
+        <div class="cb-qd-field cb-plan-field">
+          ${fieldArt()}
+          ${spots().map(([pos, left, top]) =>
+            planSpot(pos, left, top, entry.alignment[pos] || '', changed.includes(pos))
+          ).join('')}
+        </div>`;
+
+      html = `
+        <div class="cb-plan-head">
+          <div>
+            <div class="cb-plan-kicker">
+              PREGAME PLAN · ${esc(String(innings.length))} ${
+                innings.length === 1 ? 'INNING' : 'INNINGS'
+              }
+            </div>
+            <div class="cb-plan-title">Pregame Defense</div>
+            <div class="cb-plan-sub">
+              What you set before first pitch. Nothing here changes the live game.
+            </div>
+          </div>
+          <div class="cb-plan-readonly">Reference only</div>
+        </div>
+        <div class="cb-plan-body">
+          <div class="cb-plan-innings" aria-label="Planned innings">${buttons}</div>
+          <div class="cb-plan-inning-title">
+            ${esc(planInningLabel(entry.key))}${tag ? `<span>${esc(tag)}</span>` : ''}
+          </div>
+          <div class="cb-plan-changes${changed.length ? ' has-changes' : ''}">${
+            previous
+              ? changed.length
+                ? `Changed from ${esc(planInningLabel(previous.key))}: ${esc(changed.join(', '))}`
+                : `Same as ${esc(planInningLabel(previous.key))}`
+              : 'First inning of the plan'
+          }</div>
+          ${field}
+          <div class="cb-plan-bench">
+            <strong>Bench · ${bench.length}</strong>
+            <div class="cb-plan-bench-chips">${
+              bench.length
+                ? bench.map(player => `<span>${esc(playerLabel(player.name))}</span>`).join('')
+                : '<span>Nobody</span>'
+            }</div>
+          </div>
+        </div>`;
     }
 
-    const currentInning = String(latest?.current_inning || '');
-    const order = positions(latest?.outfielder_count);
+    // The board refreshes every few seconds; only touch the DOM when the
+    // plan view would actually look different.
+    if (card._cbPlanMarkup !== html) {
+      card.innerHTML = html;
+      card._cbPlanMarkup = html;
+    }
 
-    const blocks = innings.map(entry => {
-      const isCurrent = entry.key === currentInning;
+    if (!card.dataset.cbPlanBound) {
+      card.dataset.cbPlanBound = '1';
+      card.addEventListener('click', event => {
+        const button = event.target.closest('[data-plan-inning]');
 
-      const slots = order.map(pos => {
-        const name = entry.alignment[pos] || '';
+        if (!button) return;
 
-        return `
-          <div class="cb-plan-slot">
-            <span class="cb-plan-pos">${esc(pos)}</span>
-            <span class="cb-plan-name">${
-              esc(name ? playerLabel(name) : '—')
-            }</span>
-          </div>`;
-      }).join('');
-
-      return `
-        <section class="cb-plan-inning${isCurrent ? ' current' : ''}">
-          <div class="cb-plan-inning-head">
-            <span class="cb-plan-inning-no">Inning ${esc(entry.key)}</span>
-            ${isCurrent ? '<span class="cb-plan-now">On now</span>' : ''}
-          </div>
-          <div class="cb-plan-grid">${slots}</div>
-        </section>`;
-    }).join('');
-
-    card.innerHTML = `
-      <div class="cb-plan-head">
-        <div>
-          <div class="cb-plan-kicker">
-            PREGAME PLAN · ${esc(String(innings.length))} ${
-              innings.length === 1 ? 'INNING' : 'INNINGS'
-            }
-          </div>
-          <div class="cb-plan-title">Pregame Defense</div>
-          <div class="cb-plan-sub">
-            What you set before first pitch. Nothing here changes the live game.
-          </div>
-        </div>
-        <div class="cb-plan-readonly">Reference only</div>
-      </div>
-      <div class="cb-plan-body">${blocks}</div>`;
+        planChoice = {
+          inning: button.dataset.planInning,
+          during: String(latest?.current_inning || ''),
+        };
+        renderPlanCard();
+      });
+    }
   }
 
   function renderCard() {

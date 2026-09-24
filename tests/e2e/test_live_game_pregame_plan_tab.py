@@ -187,20 +187,25 @@ def test_pregame_plan_tab_renders_every_planned_inning(page: Page, coachboard_ur
         expect(plan).to_contain_text('Pregame Defense')
         expect(plan).to_contain_text('Reference only')
 
-        innings = plan.locator('.cb-plan-inning')
+        # One planned inning at a time, each a tap away.
+        innings = plan.locator('[data-plan-inning]')
         expect(innings).to_have_count(3)
-        expect(innings.nth(0)).to_contain_text('Inning 1')
-        expect(innings.nth(1)).to_contain_text('Inning 2')
-        expect(innings.nth(2)).to_contain_text('Inning 3')
+        assert innings.evaluate_all('els => els.map(el => el.dataset.planInning)') == ['1', '2', '3']
 
-        # The plan as written, not the live alignment: inning 2 planned
-        # Second Sam on the mound and Pitcher Pat at second.
-        expect(innings.nth(1)).to_contain_text('Second Sam')
-        expect(innings.nth(1)).to_contain_text('Pitcher Pat')
+        # It opens on the next inning. The plan as written, not the live
+        # alignment: inning 2 planned Second Sam on the mound and Pitcher Pat
+        # at second.
+        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('Inning 2')
+        expect(plan.locator('[data-plan-position="P"] .cb-qd-name')).to_have_text('Second Sam')
+        expect(plan.locator('[data-plan-position="2B"] .cb-qd-name')).to_have_text('Pitcher Pat')
 
         # The inning actually being played is called out.
-        expect(innings.nth(0)).to_contain_text('On now')
-        expect(innings.nth(1)).not_to_contain_text('On now')
+        expect(innings.nth(0)).to_contain_text('Now')
+        expect(innings.nth(1)).not_to_contain_text('Now')
+        innings.nth(0).click()
+        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('On now')
+        innings.nth(2).click()
+        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('Inning 3')
     finally:
         cleanup_game(page, coachboard_url, game_id)
 
@@ -217,8 +222,11 @@ def test_pregame_plan_tab_offers_no_way_to_edit(page: Page, coachboard_url: str)
         plan = page.locator(PLAN_CARD)
         expect(plan).to_be_visible(timeout=10_000)
 
+        # The only buttons choose which planned inning to look at.
+        buttons = plan.locator('button')
+        assert buttons.count() == plan.locator('button[data-plan-inning]').count() > 0
+
         for selector in (
-            'button',
             'input',
             'select',
             'textarea',

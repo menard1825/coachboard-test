@@ -85,8 +85,11 @@ def _alignment():
     return {pos: name for pos, (name, _) in LINEUP.items()}
 
 
-def create_named_live_game(page, base_url):
-    """Add the named players, start a live game with them; return (game_id, player_ids)."""
+def create_named_live_game(page, base_url, innings=None):
+    """Add the named players, start a live game with them; return (game_id, player_ids).
+
+    ``innings`` is the pregame plan; by default Innings 1 and 2 both use LINEUP.
+    """
     for name, number in LINEUP.values():
         response = page.request.post(f'{base_url}/add_player', form={
             'name': name, 'number': number, 'position1': '', 'position2': '', 'position3': '',
@@ -105,7 +108,8 @@ def create_named_live_game(page, base_url):
     game_id = int(re.search(r'/game/(\d+)', response.headers['location']).group(1))
     for path, payload in (
         ('/add_lineup', {'title': 'Marker Lineup', 'lineup_player_ids': player_ids, 'associated_game_id': game_id}),
-        ('/save_rotation', {'title': 'Marker Rotation', 'innings': {'1': _alignment(), '2': _alignment()},
+        ('/save_rotation', {'title': 'Marker Rotation',
+                            'innings': innings or {'1': _alignment(), '2': _alignment()},
                             'associated_game_id': game_id}),
         (f'/api/live-game/{game_id}/start', {}),
     ):
