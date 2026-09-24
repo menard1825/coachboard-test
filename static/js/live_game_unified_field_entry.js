@@ -448,13 +448,7 @@
     const card = document.getElementById('cbQuickDefense');
     if (!card) return;
     if (draft) renderDraft();
-
-    const helpText = 'Drag or tap players right on the field and bench. Pitcher changes stay in Change Pitcher.';
-    const tipText = 'Tap a player for a quick move, or drag directly between the field and bench. CoachBoard saves a complete defense automatically.';
-    const help = card.querySelector('.cb-qd-help');
-    if (help && help.textContent !== helpText) help.textContent = helpText;
-    const tip = card.querySelector('.cb-qd-tip');
-    if (tip && tip.textContent !== tipText) tip.textContent = tipText;
+    // Quick Field's help and tip text belong to live_game_dugout_mode.js.
   }
 
   function queueEnhance() {

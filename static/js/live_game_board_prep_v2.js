@@ -610,6 +610,53 @@
         vertical-align:1px;
       }
 
+      /* The live game has departed from the plan here: red dashed outline
+         and a red diamond -- deliberately unlike the amber ring and dot
+         used for changes between planned innings. */
+      #${PLAN_CARD_ID} .cb-plan-spot[data-plan-live-differs="true"] .cb-qd-name{
+        outline:2.5px dashed #c0362c;
+        outline-offset:2px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot[data-plan-live-differs="true"] .cb-qd-pos::before{
+        content:'\\25C6';
+        margin-right:3px;
+        color:#ffb4ab;
+        font-size:.8em;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-live{
+        margin:0 0 9px;
+        padding:7px 10px;
+        border:1px solid #f1b8b1;
+        border-left:4px solid #c0362c;
+        border-radius:8px;
+        background:#fff4f2;
+        color:#8f1f14;
+        font-size:var(--cb-text-xs, 12px);
+        font-weight:850;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-live small{
+        display:block;
+        margin-top:2px;
+        color:#7a2a20;
+        font-size:var(--cb-text-xs, 12px);
+        font-weight:700;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn[data-plan-live-differs="true"]::after{
+        content:'';
+        position:absolute;
+        top:4px;
+        right:4px;
+        width:8px;
+        height:8px;
+        transform:rotate(45deg);
+        background:#c0362c;
+        box-shadow:0 0 0 1.5px #fff;
+      }
+
       #${PLAN_CARD_ID} .cb-plan-bench{
         margin-top:9px;
         padding:8px 10px;
@@ -1423,10 +1470,12 @@
         '[data-now-next="next"]'
       );
 
-    if (nextTab) {
-      nextTab.textContent = inningLabel
-        ? `${inningLabel} Inning`
-        : 'Next Inning';
+    const tabText = inningLabel
+      ? `${inningLabel} Inning`
+      : 'Next Inning';
+
+    if (nextTab && nextTab.textContent !== tabText) {
+      nextTab.textContent = tabText;
     }
 
     if (!inningLabel) return;
@@ -1440,7 +1489,9 @@
     // tells the other live-screen scripts, which place and style the
     // button, to leave its text alone -- they used to reset it to
     // "End Inning" on their own refreshes, so the label flashed.
-    endInning.dataset.cbLabelOwner = 'next-inning';
+    if (endInning.dataset.cbLabelOwner !== 'next-inning') {
+      endInning.dataset.cbLabelOwner = 'next-inning';
+    }
 
     let title =
       endInning.querySelector(
@@ -1474,12 +1525,13 @@
       note.textContent = noteText;
     }
 
-    endInning.setAttribute(
-      'aria-label',
-      currentLabel
-        ? `End ${currentLabel} inning and start ${inningLabel}`
-        : `Start ${inningLabel} inning`
-    );
+    const ariaLabel = currentLabel
+      ? `End ${currentLabel} inning and start ${inningLabel}`
+      : `Start ${inningLabel} inning`;
+
+    if (endInning.getAttribute('aria-label') !== ariaLabel) {
+      endInning.setAttribute('aria-label', ariaLabel);
+    }
   }
 
   function syncLiveActions() {
@@ -1496,7 +1548,9 @@
 
     if (endInning) {
       endInning.removeAttribute('hidden');
-      endInning.classList.remove('d-none');
+      if (endInning.classList.contains('d-none')) {
+        endInning.classList.remove('d-none');
+      }
     }
 
     // On the Field owns two live actions. NEXT and Pregame Plan hide
@@ -1590,7 +1644,7 @@
       .sort((a, b) => a.sort - b.sort);
   }
 
-  function planSpot(pos, left, top, name, changed) {
+  function planSpot(pos, left, top, name, changed, live) {
     const number = name
       ? String(playerByName(name)?.number ?? '').trim()
       : '';
@@ -1601,14 +1655,53 @@
         style="left:${left}%;top:${top}%"
         data-plan-position="${esc(pos)}"
         data-plan-changed="${changed ? 'true' : 'false'}"
+        data-plan-live-differs="${live ? 'true' : 'false'}"
         role="img"
         aria-label="${esc(
-          `${pos}: ${name ? playerLabel(name) : 'open'}${changed ? ', changed from the inning before' : ''}`
+          `${pos}: ${name ? playerLabel(name) : 'open'}`
+          + `${changed ? ', changed from the inning before' : ''}`
+          + `${live ? `, live game has ${live.name ? playerLabel(live.name) : 'nobody'} here` : ''}`
         )}"
       >
         <span class="cb-qd-pos">${esc(pos)}${number ? ` <span class="cb-qd-num">#${esc(number)}</span>` : ''}</span>
         <span class="cb-qd-name">${esc(name || 'OPEN')}</span>
       </div>`;
+  }
+
+  /*
+   * The defense the live game is actually using for a planned inning:
+   *   - the inning being played: the field right now;
+   *   - the next inning: what End Inning would put out (the carried-forward
+   *     field, the plan, or the coach's own Next Inning edit);
+   *   - an inning already played: the defense it ended with.
+   * Later innings and planned mid-inning changes have none yet.
+   */
+  function liveAlignmentFor(key) {
+    if (!latest || String(key).includes('.')) return null;
+
+    const current = String(latest.current_inning || '');
+
+    if (key === current) return latest.current_alignment || null;
+    if (key === String(latest.next_inning || '')) {
+      return latest.confirmed?.alignment || null;
+    }
+
+    const inning = Number.parseFloat(key);
+    const playing = Number.parseFloat(current);
+
+    return Number.isFinite(inning) && Number.isFinite(playing) && inning < playing
+      ? latest.actual_rotation?.[key] || null
+      : null;
+  }
+
+  function liveDeviations(entry, order) {
+    const live = liveAlignmentFor(entry.key);
+
+    if (!live) return [];
+
+    return order
+      .filter(pos => (entry.alignment[pos] || '') !== (live[pos] || ''))
+      .map(pos => ({pos, name: live[pos] || ''}));
   }
 
   function planInningLabel(key) {
@@ -1668,6 +1761,9 @@
           )
         : [];
 
+      const deviations = liveDeviations(entry, order);
+      const liveAt = pos => deviations.find(item => item.pos === pos) || null;
+
       const assigned = new Set(
         order.map(pos => entry.alignment[pos]).filter(Boolean)
       );
@@ -1686,6 +1782,7 @@
           type="button"
           class="cb-plan-inning-btn"
           data-plan-inning="${esc(item.key)}"
+          data-plan-live-differs="${liveDeviations(item, order).length ? 'true' : 'false'}"
           aria-pressed="${item.key === entry.key ? 'true' : 'false'}"
           aria-label="${esc(planInningLabel(item.key))}${item.key === currentInning ? ' (on now)' : ''}"
         >${esc(item.key.includes('.') ? `${Math.floor(Number.parseFloat(item.key))}+` : item.key)}${
@@ -1696,7 +1793,7 @@
         <div class="cb-qd-field cb-plan-field">
           ${fieldArt()}
           ${spots().map(([pos, left, top]) =>
-            planSpot(pos, left, top, entry.alignment[pos] || '', changed.includes(pos))
+            planSpot(pos, left, top, entry.alignment[pos] || '', changed.includes(pos), liveAt(pos))
           ).join('')}
         </div>`;
 
@@ -1727,6 +1824,17 @@
                 : `Same as ${esc(planInningLabel(previous.key))}`
               : 'First inning of the plan'
           }</div>
+          ${
+            deviations.length
+              ? `<div class="cb-plan-live" role="status">
+                  Live game differs from plan: ${esc(deviations.map(item => item.pos).join(', '))}
+                  <small>${esc(
+                    `${entry.key === String(latest?.next_inning || '') ? 'End Inning would put out' : 'Live'}: `
+                    + deviations.map(item => `${item.pos} ${item.name ? playerLabel(item.name) : 'open'}`).join(' · ')
+                  )}</small>
+                </div>`
+              : ''
+          }
           ${field}
           <div class="cb-plan-bench">
             <strong>Bench · ${bench.length}</strong>

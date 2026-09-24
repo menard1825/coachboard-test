@@ -183,14 +183,6 @@
     setMode(mode);
   }
 
-  function polishQuickField() {
-    const quick = $('cbQuickDefense');
-    if (!quick) return;
-    setText(quick.querySelector('.cb-qd-kicker'), 'Live Defense');
-    setText(quick.querySelector('.cb-qd-title'), 'Quick Field');
-    setText(quick.querySelector('.cb-qd-help'), 'Drag or tap players right on the field and bench. Pitcher changes stay in Change Pitcher.');
-  }
-
   function applyContract() {
     queued = false;
     installStyles();
@@ -202,9 +194,15 @@
     }
 
     if (isLive()) {
-      document.body.classList.remove('cb-test2-first-pitch', 'cb-test2-full-plan');
+      // Only touch the classes when one is there: classList.remove() rewrites
+      // the attribute even when nothing changes, which woke the other
+      // body-class observers and kept both scripts re-running every frame.
+      // Quick Field's words belong to live_game_dugout_mode.js.
+      const modeClasses = ['cb-test2-first-pitch', 'cb-test2-full-plan'];
+      if (modeClasses.some(name => document.body.classList.contains(name))) {
+        document.body.classList.remove(...modeClasses);
+      }
       $(MODE_ID)?.remove();
-      polishQuickField();
     } else {
       ensureModeBar();
       forceInningOne();
