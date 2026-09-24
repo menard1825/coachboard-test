@@ -753,16 +753,16 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         # Current/source inning is intentionally not offered.
         expect(
             picker.get_by_role(
-                'button',
-                name='2',
+                'checkbox',
+                name='Inning 2',
                 exact=True,
             )
         ).to_have_count(0)
 
         inning_3_choice = (
             picker.get_by_role(
-                'button',
-                name='3',
+                'checkbox',
+                name='Inning 3',
                 exact=True,
             )
         )
@@ -776,7 +776,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(
             inning_3_choice
         ).to_have_attribute(
-            'aria-pressed',
+            'aria-checked',
             'true',
         )
 

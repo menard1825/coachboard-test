@@ -123,6 +123,13 @@ def _copy(page, choice):
     page.get_by_role('button', name=choice, exact=True).click()
 
 
+def _replace(page):
+    """Inning 3 already has Defense B, so copying over it asks first."""
+    confirm = page.locator('#gmCoachConfirmModal')
+    expect(confirm).to_contain_text('Inning 3')
+    confirm.locator('[data-gm-confirm-action]').click()
+
+
 # --- Copy this defense ------------------------------------------------------------------
 
 @DEVICES
@@ -156,6 +163,7 @@ def test_copy_to_all_other_innings(make_page, coachboard_url, game, device):
     page = make_page(device)
     _open_game(page, coachboard_url, game)
     _copy(page, 'All other innings')
+    _replace(page)
     _saved(page)
     innings = _innings(page, coachboard_url, game)
     assert all(_filled(innings[str(i)]) == DEFENSE_A for i in range(1, 7)), innings
@@ -166,8 +174,9 @@ def test_copy_to_later_innings_leaves_earlier_innings(make_page, coachboard_url,
     page = make_page(device)
     _open_game(page, coachboard_url, game)
     _choose_inning(page, 3)
-    _copy(page, 'Later innings')
+    _copy(page, 'Later innings')                              # 4-6 are empty: no question
     _saved(page)
+    expect(page.locator('#gmCoachConfirmModal')).to_be_hidden()
     innings = _innings(page, coachboard_url, game)
     assert _filled(innings['1']) == DEFENSE_A and _filled(innings['2']) == {}
     assert all(_filled(innings[str(i)]) == DEFENSE_B for i in (3, 4, 5, 6)), innings
@@ -191,10 +200,11 @@ def test_copy_to_chosen_innings(make_page, coachboard_url, game, device):
 
 @DEVICES
 def test_copy_can_be_undone(make_page, coachboard_url, game, device):
-    """Copying overwrites at once and offers Undo, as before."""
+    """Copying offers Undo, as before -- after confirming the overwrite."""
     page = make_page(device)
     _open_game(page, coachboard_url, game)
     _copy(page, 'All other innings')
+    _replace(page)
     _saved(page)
     page.get_by_role('button', name='Undo').click()
     _saved(page)

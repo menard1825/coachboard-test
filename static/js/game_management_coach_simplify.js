@@ -111,10 +111,50 @@
       }
 
       #gmPickInningsModal .gm-pick-inning-choice{
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
         min-height:48px;
         border-radius:10px;
         font-size:1rem;
         font-weight:900;
+        border:1.5px solid;
+        transition:none;
+      }
+
+      /* Each chosen inning stays filled and ticked while others are chosen.
+         Hover, press and focus never tint a tile, so one just tapped off
+         looks like any other unchosen inning; focus only rings it. */
+      #gmPickInningsModal .gm-pick-inning-choice,
+      #gmPickInningsModal .gm-pick-inning-choice:hover,
+      #gmPickInningsModal .gm-pick-inning-choice:active,
+      #gmPickInningsModal .gm-pick-inning-choice:focus{
+        color:var(--cb-primary-text, #172033)!important;
+        background:#fff!important;
+        border-color:var(--cb-primary-outline, #172033)!important;
+      }
+
+      #gmPickInningsModal .gm-pick-inning-choice[aria-checked="true"],
+      #gmPickInningsModal .gm-pick-inning-choice[aria-checked="true"]:hover,
+      #gmPickInningsModal .gm-pick-inning-choice[aria-checked="true"]:active,
+      #gmPickInningsModal .gm-pick-inning-choice[aria-checked="true"]:focus{
+        color:var(--cb-on-primary, #fff)!important;
+        background:var(--cb-primary, #172033)!important;
+        border-color:var(--cb-primary, #172033)!important;
+      }
+
+      #gmPickInningsModal .gm-pick-inning-choice:focus-visible{
+        outline:3px solid color-mix(in srgb, var(--cb-primary, #172033) 35%, transparent);
+        outline-offset:2px;
+      }
+
+      #gmPickInningsModal .gm-pick-check{
+        display:none;
+      }
+
+      #gmPickInningsModal .gm-pick-inning-choice[aria-checked="true"] .gm-pick-check{
+        display:inline-block;
       }
 
       #gmPickInningsModal .gm-pick-note{
@@ -1170,19 +1210,14 @@
         if (choice) {
           const active =
             choice.getAttribute(
-              'aria-pressed'
+              'aria-checked'
             ) === 'true';
 
           choice.setAttribute(
-            'aria-pressed',
+            'aria-checked',
             active
               ? 'false'
               : 'true'
-          );
-
-          choice.classList.toggle(
-            'active',
-            !active
           );
 
           modal
@@ -1192,7 +1227,7 @@
             ?.toggleAttribute(
               'disabled',
               !modal.querySelector(
-                '[data-gm-pick-inning][aria-pressed="true"]'
+                '[data-gm-pick-inning][aria-checked="true"]'
               )
             );
 
@@ -1209,7 +1244,7 @@
         const selected =
           Array.from(
             modal.querySelectorAll(
-              '[data-gm-pick-inning][aria-pressed="true"]'
+              '[data-gm-pick-inning][aria-checked="true"]'
             )
           ).map(
             button =>
@@ -1242,9 +1277,33 @@
           return;
         }
 
-        copyDefenseToTargets(
-          context,
-          selected
+        // Copy once the sheet has closed: a confirmation, if one is
+        // needed, opens as its own sheet.
+        modal.addEventListener(
+          'hidden.bs.modal',
+          () => {
+            const fresh =
+              defenseApplyContext();
+
+            if (
+              !fresh ||
+              fresh.current !==
+                expectedSource
+            ) {
+              toast(
+                'The selected inning changed. Open Choose innings again.',
+                'warning'
+              );
+
+              return;
+            }
+
+            copyDefenseConfirmingReplace(
+              fresh,
+              selected
+            );
+          },
+          {once:true}
         );
 
         bootstrap.Modal
@@ -1299,7 +1358,7 @@
       modal.querySelector(
         '.gm-pick-source'
       ),
-      'Pick exactly where to use this defense.'
+      'Choose one or more innings.'
     );
 
     const grid =
@@ -1313,10 +1372,13 @@
           inning => `
             <button
               type="button"
-              class="btn btn-outline-primary gm-pick-inning-choice"
+              class="btn gm-pick-inning-choice"
+              role="checkbox"
+              aria-checked="false"
+              aria-label="Inning ${inning}"
               data-gm-pick-inning="${inning}"
-              aria-pressed="false"
             >
+              <svg class="gm-pick-check" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
               ${inning}
             </button>
           `
@@ -1949,6 +2011,111 @@
   }
 
 
+  /*
+   * The one way every Copy this defense… choice copies. Innings that are
+   * empty, or already hold this defense, are filled at once. If any
+   * requested inning has a different defense, one confirmation names them
+   * first: Cancel changes no inning, Replace copies to every requested
+   * inning. Undo is offered afterwards either way.
+   */
+  function copyDefenseConfirmingReplace(
+    context,
+    targets
+  ) {
+    const filled =
+      defense =>
+        Object.fromEntries(
+          Object.entries(
+            defense || {}
+          ).filter(
+            ([, name]) => name
+          )
+        );
+
+    const source =
+      filled(context.source);
+
+    const replacing =
+      targets
+        .map(String)
+        .filter(
+          inning => {
+            const existing =
+              filled(
+                context.rotation
+                  .innings[inning]
+              );
+
+            return (
+              Object.keys(existing).length &&
+              !sameDefense(
+                existing,
+                source
+              )
+            );
+          }
+        )
+        .sort(
+          (a, b) =>
+            Number.parseFloat(a) -
+            Number.parseFloat(b)
+        );
+
+    if (!replacing.length) {
+      copyDefenseToTargets(
+        context,
+        targets
+      );
+
+      return;
+    }
+
+    const label =
+      targetInningLabel(
+        replacing
+      );
+
+    const sourceInning =
+      context.current;
+
+    showCoachConfirm({
+      title:
+        `Replace the defense in ${label}?`,
+
+      message:
+        `${label} already ${replacing.length === 1 ? 'has' : 'have'} a defense. `
+        + `Copying Inning ${sourceInning} replaces it in every inning you chose.`,
+
+      confirmLabel:
+        'Replace',
+
+      onConfirm:
+        () => {
+          const fresh =
+            defenseApplyContext();
+
+          if (
+            !fresh ||
+            fresh.current !==
+              sourceInning
+          ) {
+            toast(
+              'The selected inning changed. Copy the defense again.',
+              'warning'
+            );
+
+            return;
+          }
+
+          copyDefenseToTargets(
+            fresh,
+            targets
+          );
+        },
+    });
+  }
+
+
   function applyCurrentDefense(
     scope
   ) {
@@ -1993,7 +2160,7 @@
       return;
     }
 
-    copyDefenseToTargets(
+    copyDefenseConfirmingReplace(
       context,
       targets
     );
