@@ -2666,11 +2666,25 @@
     );
   }
 
+  // The start-up request (140 ms) usually answers before the live shell
+  // exists, so hydrate() keeps the data but has nowhere to draw the card.
+  // Draw it the moment the tabs are built, from that same data -- otherwise
+  // Next Inning stayed blank until the first 3.5 s poll. No extra request.
+  function buildSurface() {
+    const switcher = ensureSwitcher();
+
+    if (switcher && latest && !$(CARD_ID)) {
+      renderCard();
+    }
+
+    return switcher;
+  }
+
   function bootSurfaceWhenReady() {
     if ($(SWITCH_ID)) return;
 
     if (liveSurfaceReady()) {
-      ensureSwitcher();
+      buildSurface();
       return;
     }
 
@@ -2687,7 +2701,7 @@
 
       // One shot: disconnect the moment the switcher is built, so this stops
       // running for the rest of the game.
-      if (ensureSwitcher()) observer.disconnect();
+      if (buildSurface()) observer.disconnect();
     });
 
     observer.observe(target, {childList: true, subtree: true});
