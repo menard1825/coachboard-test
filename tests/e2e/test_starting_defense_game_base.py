@@ -114,7 +114,7 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
         page.reload(wait_until='domcontentloaded')
 
         # 1024x768 is an iPad-landscape planning surface. Starting Defense
-        # tools are intentionally secondary there, so open Preset / Apply
+        # tools are intentionally secondary there, so open Use a saved defense
         # before interacting with the canonical preset controls.
         preset_toggle = page.locator('.gm-mobile-preset-toggle')
         expect(preset_toggle).to_be_visible(timeout=15_000)
@@ -126,9 +126,12 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
         expect(select).to_be_visible(timeout=15_000)
         select.select_option(label=template_title)
 
-        apply_to_game = page.get_by_role('button', name='Apply to Entire Game')
-        expect(apply_to_game).to_be_enabled()
-        expect(page.get_by_role('button', name='Apply to Inning 1')).to_be_visible()
+        use = page.locator('#pde-use')
+        expect(use).to_be_enabled()
+        use.click()
+        apply_to_game = page.locator('#pde-use-game')
+        expect(apply_to_game).to_have_text('Whole game')
+        expect(page.locator('#pde-use-inning')).to_have_text('This inning')
         expect(page.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as assigned')
 
         page.once('dialog', lambda dialog: dialog.accept())

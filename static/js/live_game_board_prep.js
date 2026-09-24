@@ -407,11 +407,11 @@
       <div class="pde-body">
         <div class="pde-tools">
           <select class="form-select" id="pde-preset">
-            <option value="">Starting Defense Template…</option>
+            <option value="">Choose a saved defense…</option>
             ${savedPresets.map((preset) => `<option value="${preset.id}">${esc(presetName(preset))}</option>`).join('')}
           </select>
-          <button class="btn btn-outline-primary" id="pde-apply" disabled>Apply to Inning ${esc(inning)}</button>
-          <button class="btn btn-outline-secondary" id="pde-save">Save as Starting Defense</button>
+          <button class="btn btn-outline-primary" id="pde-apply" disabled>This inning</button>
+          <button class="btn btn-outline-secondary" id="pde-save">Save this defense</button>
         </div>
         ${baseballField(source)}
         ${playingTimeSummary()}
@@ -604,7 +604,7 @@
     render();
     toast(
       unavailable.length
-        ? `Preset applied. Open spots remain because ${[...new Set(unavailable)].join(', ')} is unavailable.`
+        ? `Saved defense used. Open spots remain because ${[...new Set(unavailable)].join(', ')} is unavailable.`
         : next.P ? `${name} applied to Inning ${inning}.` : `${name} applied. Choose the pitcher for Inning ${inning}.`,
       unavailable.length ? 'warning' : 'success'
     );
@@ -622,14 +622,14 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <div><h5 class="modal-title mb-0">Save Starting Defense</h5><div class="small text-muted">Reuse this starting defense from any Game Day planning screen.</div></div>
+            <div><h5 class="modal-title mb-0">Save this defense</h5><div class="small text-muted">Save the field as a Saved Defense you can use in any game.</div></div>
             <button class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <label class="form-label fw-semibold">Template name</label>
+            <label class="form-label fw-semibold">Name</label>
             <input id="pde-name" class="form-control form-control-lg" maxlength="60" placeholder="e.g. #1 Defense">
             <div class="form-text">Pitcher may remain open so you can choose him for each game.</div>
-            <div class="d-grid mt-3"><button class="btn btn-primary btn-lg" id="pde-confirm">Save Starting Defense</button></div>
+            <div class="d-grid mt-3"><button class="btn btn-primary btn-lg" id="pde-confirm">Save defense</button></div>
           </div>
         </div>
       </div>`;
@@ -660,7 +660,7 @@
     }
     input.classList.remove('is-invalid');
     if (presets().some((preset) => presetName(preset).toLowerCase() === name.toLowerCase())) {
-      toast(`A Starting Defense named “${name}” already exists.`, 'warning');
+      toast(`A Saved Defense named “${name}” already exists.`, 'warning');
       return;
     }
 
@@ -680,13 +680,13 @@
       bootstrap.Modal.getOrCreateInstance($('pde-preset-modal')).hide();
       filterWholeGameTemplates();
       render();
-      toast(`${name} saved as a Starting Defense template.`);
+      toast(`${name} saved as a Saved Defense.`);
     } catch (error) {
       toast(error.message, 'danger');
     } finally {
       busy = false;
       button.disabled = false;
-      button.textContent = 'Save Starting Defense';
+      button.textContent = 'Save defense';
     }
   }
 

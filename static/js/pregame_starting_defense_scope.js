@@ -17,15 +17,33 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
+      /* One obvious action: pick a saved defense, then Use. The scope
+         (This inning / Whole game) is chosen from Use's menu; the buttons
+         that do the work stay in the page, hidden, so every existing path
+         (confirmations, quick start) runs unchanged. */
       #${PANEL_ID} .pde-tools.cb-starting-defense-tools{
-        grid-template-columns:minmax(190px,1fr) auto auto auto;
+        grid-template-columns:minmax(0,1fr) auto!important;
+        align-items:end!important;
       }
-      #${PANEL_ID} #pde-apply-game{
-        font-weight:800;
-        white-space:normal;
-        min-width:132px!important;
-        padding-left:10px!important;
-        padding-right:10px!important;
+      #${PANEL_ID} .pde-tools.cb-starting-defense-tools .gm-preset-wrap{grid-column:1!important;grid-row:1!important;min-width:0!important}
+      #${PANEL_ID} .pde-tools.cb-starting-defense-tools .cb-saved-defense-use{grid-column:2!important;grid-row:1!important}
+      #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply,
+      #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply-game{display:none!important}
+      #${PANEL_ID} .cb-saved-defense-use > .btn{min-height:38px;min-width:78px;font-weight:800}
+      #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-save{
+        grid-column:1/-1!important;
+        grid-row:2!important;
+        justify-self:start!important;
+        width:auto!important;
+        min-height:0!important;
+        padding:2px 0!important;
+        border:0!important;
+        background:none!important;
+        color:var(--cb-primary-text,#102a66)!important;
+        font-size:var(--cb-text-xs)!important;
+        font-weight:750!important;
+        text-decoration:underline;
+        text-underline-offset:2px;
       }
       #${PANEL_ID} .gm-preset-label{display:none!important}
       #${PANEL_ID} .cb-starting-defense-label{
@@ -50,47 +68,6 @@
         line-height:1.3;
       }
       #${PANEL_ID} .cb-starting-defense-help strong{color:#294a84}
-      @media(max-width:767.98px){
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools{
-          grid-template-columns:minmax(0,1fr) minmax(132px,auto)!important;
-          align-items:end!important;
-        }
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools .gm-preset-wrap{
-          grid-column:1!important;
-          grid-row:1!important;
-          min-width:0!important;
-        }
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply-game{
-          grid-column:2!important;
-          grid-row:1!important;
-          width:100%!important;
-          max-width:none!important;
-        }
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply{
-          grid-column:1/-1!important;
-          grid-row:2!important;
-          width:100%!important;
-          max-width:none!important;
-        }
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-save{
-          grid-column:1/-1!important;
-        }
-      }
-      @media(max-width:374.98px){
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools{
-          grid-template-columns:1fr!important;
-        }
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools .gm-preset-wrap,
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply-game,
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply,
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-save{
-          grid-column:1!important;
-          width:100%!important;
-        }
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools .gm-preset-wrap{grid-row:1!important}
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply-game{grid-row:2!important}
-        #${PANEL_ID} .pde-tools.cb-starting-defense-tools #pde-apply{grid-row:3!important}
-      }
     `;
     document.head.appendChild(style);
   }
@@ -141,9 +118,9 @@
 
   function syncInningButtonLabel(button, panel) {
     if (!button) return;
-    const label = `Apply to Inning ${currentInningLabel(panel)}`;
+    const label = 'This inning';
     if (button.textContent.trim() !== label) button.textContent = label;
-    button.title = 'Apply this saved Starting Defense only to the inning currently shown.';
+    button.title = `Use this saved defense for Inning ${currentInningLabel(panel)} only.`;
   }
 
   async function fetchGameData() {
@@ -166,9 +143,9 @@
     try {
       const data = await fetchGameData();
       const preset = selectedPreset(data, select.value);
-      if (!preset) throw new Error('That Starting Defense is no longer available.');
+      if (!preset) throw new Error('That saved defense is no longer available.');
 
-      const label = presetLabel(preset) || 'Starting Defense';
+      const label = presetLabel(preset) || 'Saved defense';
       const sourceInnings = parseInnings(preset.innings);
       const source = sourceInnings['1'] || Object.values(sourceInnings).find(value => value && typeof value === 'object') || {};
 
@@ -223,7 +200,7 @@
         ? `\n\n${[...unavailable].join(', ')} is unavailable, so those positions will remain open.`
         : '';
       const confirmed = window.confirm(
-        `Apply “${label}” to ${inningRange}?\n\n` +
+        `Use “${label}” for ${inningRange}?\n\n` +
         'Non-pitcher positions in those innings will be replaced. Existing pitcher assignments will stay unchanged.' +
         warning
       );
@@ -241,13 +218,15 @@
       rotation.innings = proposedInnings;
       window.CBPregameRotation.commitLocalChange(rotation.title, false);
     } catch (error) {
-      window.alert(error.message || 'Unable to apply the Starting Defense.');
+      window.alert(error.message || 'Unable to use the saved defense.');
     } finally {
       applying = false;
       if (button?.isConnected) {
         if (button.innerHTML !== original) button.innerHTML = original;
         button.disabled = !select?.value;
       }
+      const use = document.getElementById('pde-use');
+      if (use) use.disabled = !select?.value;
     }
   }
 
@@ -262,11 +241,11 @@
     if (kicker && kicker.textContent.trim() !== 'Defense Setup') kicker.textContent = 'Defense Setup';
 
     tools.classList.add('cb-starting-defense-tools');
-    if (select.getAttribute('aria-label') !== 'Choose Starting Defense') {
-      select.setAttribute('aria-label', 'Choose Starting Defense');
+    if (select.getAttribute('aria-label') !== 'Choose a saved defense') {
+      select.setAttribute('aria-label', 'Choose a saved defense');
     }
-    if (select.options.length && select.options[0].textContent !== 'Choose Starting Defense…') {
-      select.options[0].textContent = 'Choose Starting Defense…';
+    if (select.options.length && select.options[0].textContent !== 'Choose a saved defense…') {
+      select.options[0].textContent = 'Choose a saved defense…';
     }
 
     const presetWrap = select.closest('.gm-preset-wrap');
@@ -274,13 +253,13 @@
       const canonicalLabel = document.createElement('label');
       canonicalLabel.className = 'cb-starting-defense-label';
       canonicalLabel.htmlFor = 'pde-preset';
-      canonicalLabel.textContent = 'Starting Defense Preset (Optional)';
+      canonicalLabel.textContent = 'Use a saved defense';
       presetWrap.insertBefore(canonicalLabel, select);
     }
 
     syncInningButtonLabel(inningButton, panel);
-    if (saveButton.textContent !== 'Save Current') saveButton.textContent = 'Save Current';
-    saveButton.title = 'Save the current field as a reusable Starting Defense.';
+    if (saveButton.textContent !== 'Save this defense') saveButton.textContent = 'Save this defense';
+    saveButton.title = 'Save this field as a Saved Defense you can use in any game.';
 
     let gameButton = panel.querySelector('#pde-apply-game');
     if (!gameButton) {
@@ -291,8 +270,8 @@
       inningButton.insertAdjacentElement('beforebegin', gameButton);
       gameButton.addEventListener('click', applyStartingDefenseToGame);
     }
-    if (!applying && gameButton.textContent.trim() !== 'Apply to Entire Game') gameButton.textContent = 'Apply to Entire Game';
-    gameButton.title = 'Apply this Starting Defense to the non-pitcher positions in every planned inning.';
+    if (!applying && gameButton.textContent.trim() !== 'Whole game') gameButton.textContent = 'Whole game';
+    gameButton.title = 'Use this saved defense for the non-pitcher positions in every planned inning.';
 
     gameButton.disabled = !select.value || applying;
     if (select.dataset.cbStartingDefenseScope !== '1') {
@@ -300,17 +279,51 @@
       select.addEventListener('change', () => {
         const currentButton = panel.querySelector('#pde-apply-game');
         if (currentButton) currentButton.disabled = !select.value || applying;
+        const use = panel.querySelector('#pde-use');
+        if (use) use.disabled = !select.value || applying;
       });
     }
 
+    ensureUseMenu(panel, tools, select);
     let help = panel.querySelector('.cb-starting-defense-help');
     if (!help) {
       help = document.createElement('div');
       help.className = 'cb-starting-defense-help';
       tools.insertAdjacentElement('afterend', help);
     }
-    const helpMarkup = '<strong>Pitchers stay as assigned.</strong> Choose whether to apply the saved defense to this inning or the entire game.';
+    const helpMarkup = '<strong>Pitchers stay as assigned.</strong> Choose a saved defense, then Use it for this inning or the whole game.';
     if (help.innerHTML !== helpMarkup) help.innerHTML = helpMarkup;
+  }
+
+  function ensureUseMenu(panel, tools, select) {
+    let use = tools.querySelector('.cb-saved-defense-use');
+    if (!use) {
+      use = document.createElement('div');
+      use.className = 'dropdown cb-saved-defense-use';
+      use.innerHTML = `
+        <button type="button" class="btn btn-primary dropdown-toggle" id="pde-use"
+                data-bs-toggle="dropdown" aria-expanded="false">Use</button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="pde-use">
+          <li><button type="button" class="dropdown-item" id="pde-use-inning">This inning</button></li>
+          <li><button type="button" class="dropdown-item" id="pde-use-game">Whole game</button></li>
+        </ul>`;
+      // The hidden buttons are re-rendered with the panel, so look them up
+      // at click time.
+      use.querySelector('#pde-use-inning').addEventListener('click', () => {
+        panel.querySelector('#pde-apply')?.click();
+      });
+      use.querySelector('#pde-use-game').addEventListener('click', () => {
+        panel.querySelector('#pde-apply-game')?.click();
+      });
+    }
+    const anchor = select.closest('.gm-preset-wrap') || select;
+    if (anchor.nextElementSibling !== use) anchor.insertAdjacentElement('afterend', use);
+    const button = use.querySelector('#pde-use');
+    const disabled = !select.value || applying;
+    if (button.disabled !== disabled) button.disabled = disabled;
+    const inning = `Inning ${currentInningLabel(panel)}`;
+    const inningItem = use.querySelector('#pde-use-inning');
+    if (inningItem.title !== `Use it for ${inning} only.`) inningItem.title = `Use it for ${inning} only.`;
   }
 
   function attachPanelObserver(panel) {

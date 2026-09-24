@@ -387,7 +387,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         expect(
             canonical_label
         ).to_have_text(
-            'Starting Defense Preset (Optional)'
+            'Use a saved defense'
         )
 
         expect(
@@ -404,7 +404,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
 
         preset_toggle = defense.get_by_role(
             'button',
-            name='Preset / Apply',
+            name='Use a saved defense',
         )
 
         expect(
@@ -417,17 +417,14 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             preset_tools
         ).to_be_visible()
 
-        expect(
-            defense.locator('#pde-apply')
-        ).to_have_text(
-            'Apply to Inning 1'
-        )
-
-        expect(
-            defense.locator('#pde-apply-game')
-        ).to_have_text(
-            'Apply to Entire Game'
-        )
+        # One obvious action: choose a saved defense, then Use. The scope
+        # (This inning / Whole game) is picked from Use's menu, and Save
+        # this defense is a secondary action beneath the row.
+        use_button = defense.locator('#pde-use')
+        expect(use_button).to_have_text('Use')
+        expect(defense.locator('#pde-apply')).to_be_hidden()
+        expect(defense.locator('#pde-apply-game')).to_be_hidden()
+        expect(defense.locator('#pde-save')).to_have_text('Save this defense')
 
         expect(
             defense.locator(
@@ -439,28 +436,25 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
 
         preset_layout = preset_tools.evaluate(
             """tools => {
-                const wrap = tools.querySelector('.gm-preset-wrap').getBoundingClientRect();
-                const select = tools.querySelector('#pde-preset').getBoundingClientRect();
-                const game = tools.querySelector('#pde-apply-game').getBoundingClientRect();
-                const apply = tools.querySelector('#pde-apply').getBoundingClientRect();
+                const box = el => { const r = el.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}; };
                 return {
                     display:getComputedStyle(tools).display,
-                    wrap:{left:wrap.left,right:wrap.right,top:wrap.top,bottom:wrap.bottom},
-                    select:{left:select.left,right:select.right,top:select.top,bottom:select.bottom},
-                    game:{left:game.left,right:game.right,top:game.top,bottom:game.bottom},
-                    apply:{left:apply.left,right:apply.right,top:apply.top},
+                    select:box(tools.querySelector('#pde-preset')),
+                    use:box(tools.querySelector('#pde-use')),
+                    save:box(tools.querySelector('#pde-save')),
+                    tools:box(tools),
                 };
             }"""
         )
         assert preset_layout['display'] == 'grid'
-        assert abs(preset_layout['game']['top'] - preset_layout['select']['top']) <= 4
-        assert preset_layout['apply']['top'] >= max(preset_layout['wrap']['bottom'], preset_layout['game']['bottom']) - 1
-        assert abs(preset_layout['apply']['left'] - min(preset_layout['wrap']['left'], preset_layout['game']['left'])) <= 2
-        assert abs(preset_layout['apply']['right'] - max(preset_layout['wrap']['right'], preset_layout['game']['right'])) <= 2
+        assert abs(preset_layout['use']['top'] - preset_layout['select']['top']) <= 4, preset_layout
+        assert preset_layout['use']['left'] >= preset_layout['select']['right'] - 1, preset_layout
+        assert preset_layout['use']['right'] <= preset_layout['tools']['right'] + 1, preset_layout
+        assert preset_layout['save']['top'] >= preset_layout['select']['bottom'] - 1, preset_layout
 
         defense_options = page.get_by_role('button', name=re.compile('Plan Options'))
         defense_options.click()
-        expect(page.locator('#gmFullGamePlanHeader')).to_contain_text('Saved plans')
+        expect(page.locator('#gmFullGamePlanHeader')).to_contain_text('Game Plan')
 
         # The sticky inning picker must never paint over Plan Options.
         # This is especially important on phones where the picker uses
@@ -596,7 +590,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             assert layering['menuOwnsOverlap'], layering
         rotation_template = page.locator('#rotationTemplateSelect')
         expect(rotation_template).to_be_visible()
-        expect(rotation_template.locator('option').first).to_have_text('Load saved defense plan…')
+        expect(rotation_template.locator('option').first).to_have_text('Load saved game plan…')
         defense_options.click()
 
         preset = defense.locator('#pde-preset')
@@ -607,29 +601,35 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         assert preset_id
         preset.select_option(value=preset_id)
         page.once('dialog', lambda dialog: dialog.accept())
-        defense.locator('#pde-apply').click()
+        defense.locator('#pde-use').click()
+        defense.locator('#pde-use-inning').click()
         expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
         expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
 
-        # Common inning-copy actions are visible directly instead of being
-        # split between multiple copy/apply controls.
+        # Copying the inning is one action after the field, with three
+        # choices, instead of three buttons above it.
+        copy_defense = page.locator('#gmCopyDefenseBtn')
         apply_all = page.locator('#gmApplyDefenseAllBtn')
         apply_remaining = page.locator('#gmApplyDefenseRemainingBtn')
         choose_innings = page.locator('#gmChooseDefenseInningsBtn')
 
+        expect(copy_defense).to_be_visible()
+        expect(apply_all).to_be_hidden()
+        copy_defense.click()
+
         expect(apply_all).to_be_visible()
         expect(apply_all).to_have_text(
-            re.compile('Apply to All Innings')
+            re.compile('All other innings')
         )
 
         expect(apply_remaining).to_be_visible()
         expect(apply_remaining).to_have_text(
-            re.compile('Apply to Later Innings')
+            re.compile('Later innings')
         )
 
         expect(choose_innings).to_be_visible()
         expect(choose_innings).to_have_text(
-            re.compile('Pick Innings')
+            re.compile('Choose innings…')
         )
 
         expect(
@@ -717,8 +717,9 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             )
         )
 
-        # Pick Innings opens a CoachBoard sheet instead of exposing the
+        # Choose innings opens a CoachBoard sheet instead of exposing the
         # legacy inline copy controls.
+        copy_defense.click()
         choose_innings.click()
 
         picker = page.locator(
@@ -781,7 +782,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
 
         picker.get_by_role(
             'button',
-            name='Apply Defense',
+            name='Copy Defense',
         ).click()
 
         expect(

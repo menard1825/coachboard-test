@@ -573,13 +573,18 @@ def test_apply_all_preserves_planned_mid_inning_changes(
             base,
         )
 
+        # Copy this defense… holds All other innings.
         expect(
             page.locator(
-                '#gmApplyDefenseAllBtn'
+                '#gmCopyDefenseBtn'
             )
         ).to_be_visible(
             timeout=10_000,
         )
+
+        page.locator(
+            '#gmCopyDefenseBtn'
+        ).click()
 
         page.locator(
             '#gmApplyDefenseAllBtn'
@@ -1020,6 +1025,18 @@ def test_apply_all_undo_restores_targets_and_preserves_planned_change(
         )
 
         expect(
+            page.locator(
+                '#gmCopyDefenseBtn'
+            )
+        ).to_be_visible(
+            timeout=10_000
+        )
+
+        page.locator(
+            '#gmCopyDefenseBtn'
+        ).click()
+
+        expect(
             apply_all
         ).to_be_visible(
             timeout=10_000
@@ -1187,6 +1204,10 @@ def test_apply_all_undo_refuses_after_newer_target_edit_without_partial_restore(
             'Saved',
             timeout=10_000,
         )
+
+        page.locator(
+            '#gmCopyDefenseBtn'
+        ).click()
 
         page.locator(
             '#gmApplyDefenseAllBtn'
@@ -1512,7 +1533,7 @@ def test_plan_change_confirm_double_tap_creates_only_one_planned_change(
         plan_change = page.get_by_role(
             'button',
             name=re.compile(
-                'Plan a Change During This Inning'
+                'Plan mid-inning change'
             ),
         )
 

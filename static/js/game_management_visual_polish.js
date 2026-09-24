@@ -516,10 +516,10 @@
     setText(panel.querySelector('.pde-help'), 'Tap a position to assign or change a player. Saves automatically.');
 
     const label = panel.querySelector('.gm-preset-label');
-    setText(label, 'Starting Defense Preset (Optional)');
+    setText(label, 'Use a saved defense');
     const select = document.getElementById('pde-preset');
-    if (select?.options?.length) setText(select.options[0], 'Choose Starting Defense…');
-    setText(document.getElementById('pde-apply'), `Apply to Inning ${inning}`);
+    if (select?.options?.length) setText(select.options[0], 'Choose a saved defense…');
+    setText(document.getElementById('pde-apply'), 'This inning');
 
     setText(panel.querySelector('.pde-field-caption strong'), 'Current Defense');
     setText(panel.querySelector('.pde-field-caption span'), 'Tap a position to change it');

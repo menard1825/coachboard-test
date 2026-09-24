@@ -1039,13 +1039,13 @@ function applyOutOfPositionIndicators() {
                 }
 
                 saveTemplateModal.hide();
-                alert('Template saved successfully!');
+                alert('Game plan saved.');
 
             } catch (error) {
-                alert('Error saving template: ' + error.message);
+                alert('Error saving game plan: ' + error.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = 'Save Template';
+                btn.innerHTML = 'Save game plan';
             }
         });
 
@@ -1081,7 +1081,7 @@ function applyOutOfPositionIndicators() {
         });
 
         document.getElementById('deleteRotationBtn')?.addEventListener('click', () => {
-            if (state.rotation?.id && confirm(`Are you sure you want to delete this rotation?`)) {
+            if (state.rotation?.id && confirm(`Delete this game plan?`)) {
                 window.location.href = `/delete_rotation/${state.rotation.id}`;
             }
         });

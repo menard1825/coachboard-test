@@ -65,24 +65,20 @@
         display:none!important;
       }
 
+      /* One copy action, after the field it copies. */
       #rotation-card-container .gm-coach-apply-actions{
-        flex:1 0 100%;
-        width:100%;
-        display:grid;
-        grid-template-columns:
-          minmax(0,1.35fr)
-          minmax(0,1fr)
-          minmax(0,1fr);
-        gap:6px;
-        margin-top:2px;
+        margin:10px 0 4px;
       }
 
-      #rotation-card-container .gm-coach-apply-actions .btn{
-        min-height:38px;
+      #rotation-card-container .gm-coach-apply-actions > .btn{
+        min-height:40px;
         border-radius:9px;
         font-size:var(--cb-text-xs);
         font-weight:800;
-        white-space:normal;
+      }
+
+      #rotation-card-container .gm-coach-apply-actions .dropdown-item{
+        font-weight:700;
       }
 
 
@@ -165,15 +161,6 @@
         background:#f3f8fd;
       }
 
-      @media(max-width:575.98px){
-        #rotation-card-container .gm-coach-apply-actions{
-          grid-template-columns:1fr 1fr;
-        }
-
-        #rotation-card-container .gm-coach-apply-actions #gmApplyDefenseAllBtn{
-          grid-column:1 / -1;
-        }
-      }
 
       #rotation-card-container .gm-sub-inning-label{
         border-style:dashed!important;
@@ -219,7 +206,6 @@
         margin:0 0 5px 2px;
       }
       #${PANEL_ID} .gm-preset-help{display:none!important}
-      #${PANEL_ID} #pde-save{display:none!important}
       #${PANEL_ID} #pde-apply{white-space:normal}
       #${PANEL_ID} #pde-primary-fill{white-space:nowrap}
       #${PANEL_ID} .pde-status{font-size:var(--cb-text-xs)!important}
@@ -1122,7 +1108,7 @@
           <div class="modal-header">
             <div>
               <h5 class="modal-title mb-0">
-                Pick Innings
+                Choose innings
               </h5>
               <div class="small text-muted gm-pick-source"></div>
             </div>
@@ -1162,7 +1148,7 @@
               data-gm-pick-apply
               disabled
             >
-              Apply Defense
+              Copy Defense
             </button>
           </div>
         </div>
@@ -1249,7 +1235,7 @@
             .hide();
 
           toast(
-            'The selected inning changed. Open Pick Innings again.',
+            'The selected inning changed. Open Choose innings again.',
             'warning'
           );
 
@@ -1531,7 +1517,7 @@
       setText(
         rotationTemplateSelect
           .options[0],
-        'Load saved defense plan…'
+        'Load saved game plan…'
       );
     }
 
@@ -1556,7 +1542,7 @@
           'gmFullGamePlanHeader';
 
         header.innerHTML =
-          '<div class="dropdown-header">Saved plans</div>';
+          '<div class="dropdown-header">Game Plan</div>';
 
         menu.insertBefore(
           header,
@@ -1569,57 +1555,22 @@
       document.getElementById(
         'saveAsTemplateBtn'
       ),
-      '<i class="bi bi-journal-plus me-1"></i> Save Current Plan'
+      '<i class="bi bi-journal-plus me-1"></i> Save game plan'
     );
 
     setHtml(
       document.getElementById(
         'printCardBtn'
       ),
-      '<i class="bi bi-printer me-1"></i> Print Defense / Lineup'
+      '<i class="bi bi-printer me-1"></i> Print'
     );
 
     setHtml(
       document.getElementById(
         'deleteRotationBtn'
       ),
-      '<i class="bi bi-trash me-1"></i> Delete Plan'
+      '<i class="bi bi-trash me-1"></i> Delete game plan'
     );
-
-    if (
-      menu &&
-      !document.getElementById(
-        'gmSaveCurrentDefensePreset'
-      )
-    ) {
-      const item =
-        document.createElement('li');
-
-      item.innerHTML = `
-        <button
-          type="button"
-          class="dropdown-item"
-          id="gmSaveCurrentDefensePreset"
-        >
-          <i class="bi bi-bookmark-plus me-1"></i>
-          Save Inning as Defense Preset
-        </button>
-      `;
-
-      menu.appendChild(item);
-
-      item.querySelector(
-        'button'
-      )?.addEventListener(
-        'click',
-        () =>
-          document
-            .getElementById(
-              'pde-save'
-            )
-            ?.click()
-      );
-    }
 
     if (
       menu &&
@@ -1637,7 +1588,7 @@
           id="gmPlanMidInningChange"
         >
           <i class="bi bi-arrow-left-right me-1"></i>
-          Plan a Change During This Inning…
+          Plan mid-inning change…
         </button>
       `;
 
@@ -2099,7 +2050,7 @@
         'gmPlanInningToolsHeader';
 
       header.innerHTML =
-        '<div class="dropdown-header">Inning setup</div>';
+        '<div class="dropdown-header">Innings</div>';
 
       menu.appendChild(header);
 
@@ -2122,7 +2073,7 @@
           icon:
             'plus-circle',
           label:
-            'Add Another Inning',
+            'Add inning',
           target:
             'addInningBtn',
         },
@@ -2132,7 +2083,7 @@
           icon:
             'dash-circle',
           label:
-            'Remove Last Inning',
+            'Remove last inning',
           target:
             'removeInningBtn',
           danger:
@@ -2213,7 +2164,7 @@
           id="gmRemoveCurrentSubInning"
         >
           <i class="bi bi-trash me-2"></i>
-          Remove This Planned Change
+          Remove this planned change
         </button>
       `;
 
@@ -2318,11 +2269,6 @@
         ?.closest('li'),
       document
         .getElementById(
-          'gmSaveCurrentDefensePreset'
-        )
-        ?.closest('li'),
-      document
-        .getElementById(
           'printCardBtn'
         )
         ?.closest('li'),
@@ -2339,7 +2285,7 @@
     // Once all expected items exist, establish the coach-facing order
     // exactly once.
     if (
-      visibleOrder.length >= 11 &&
+      visibleOrder.length >= 10 &&
       menu.dataset.gmOrdered !== '1'
     ) {
       visibleOrder.forEach(
@@ -2354,63 +2300,74 @@
     }
   }
 
+  function currentInningHasDefense() {
+    const innings =
+      window.CBPregameRotation
+        ?.getRotation('Rotation')
+        ?.innings;
+    const defense =
+      innings?.[currentInning()];
+    return Boolean(
+      defense &&
+      Object.values(defense).some(Boolean)
+    );
+  }
+
+  /*
+   * One copy action, after the field it copies. It is offered only once
+   * the inning shown has a defense, and never while editing a planned
+   * change during an inning. The three choices keep the ids of the
+   * buttons they replace and run the same copy (with Undo) as before.
+   */
   function ensureApplyControls(
     pickerRow,
     legacyActions
   ) {
     if (!pickerRow) return;
-
     legacyActions
       ?.classList.add(
         'gm-legacy-inning-actions'
       );
-
     let controls =
       document.querySelector(
         '#rotation-card-container .gm-coach-apply-actions'
       );
-
     if (!controls) {
       controls =
         document.createElement(
           'div'
         );
-
       controls.className =
-        'gm-coach-apply-actions';
-
+        'gm-coach-apply-actions dropdown';
       controls.innerHTML = `
         <button
           type="button"
-          class="btn btn-primary btn-sm"
-          id="gmApplyDefenseAllBtn"
+          class="btn btn-outline-primary btn-sm dropdown-toggle"
+          id="gmCopyDefenseBtn"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
         >
-          <i class="bi bi-layers me-1"></i>
-          Apply to All Innings
+          <i class="bi bi-copy me-1"></i>
+          Copy this defense…
         </button>
-
-        <button
-          type="button"
-          class="btn btn-outline-primary btn-sm"
-          id="gmApplyDefenseRemainingBtn"
-        >
-          Apply to Later Innings
-        </button>
-
-        <button
-          type="button"
-          class="btn btn-outline-secondary btn-sm"
-          id="gmChooseDefenseInningsBtn"
-        >
-          Pick Innings
-        </button>
+        <ul class="dropdown-menu" aria-labelledby="gmCopyDefenseBtn">
+          <li>
+            <button type="button" class="dropdown-item" id="gmApplyDefenseAllBtn">
+              All other innings
+            </button>
+          </li>
+          <li>
+            <button type="button" class="dropdown-item" id="gmApplyDefenseRemainingBtn">
+              Later innings
+            </button>
+          </li>
+          <li>
+            <button type="button" class="dropdown-item" id="gmChooseDefenseInningsBtn">
+              Choose innings…
+            </button>
+          </li>
+        </ul>
       `;
-
-      pickerRow.insertAdjacentElement(
-        'afterend',
-        controls
-      );
-
       controls
         .querySelector(
           '#gmApplyDefenseAllBtn'
@@ -2422,7 +2379,6 @@
               'all'
             )
         );
-
       controls
         .querySelector(
           '#gmApplyDefenseRemainingBtn'
@@ -2434,7 +2390,6 @@
               'remaining'
             )
         );
-
       controls
         .querySelector(
           '#gmChooseDefenseInningsBtn'
@@ -2444,11 +2399,33 @@
           openPickInningsModal
         );
     }
-
-    controls.classList.toggle(
-      'd-none',
-      isSubInning()
-    );
+    // After the field: directly below the defense editor when it is shown.
+    const anchor =
+      document.getElementById(
+        PANEL_ID
+      ) || pickerRow;
+    if (
+      anchor.nextElementSibling !==
+      controls
+    ) {
+      anchor.insertAdjacentElement(
+        'afterend',
+        controls
+      );
+    }
+    const hidden =
+      isSubInning() ||
+      !currentInningHasDefense();
+    if (
+      controls.classList.contains(
+        'd-none'
+      ) !== hidden
+    ) {
+      controls.classList.toggle(
+        'd-none',
+        hidden
+      );
+    }
   }
 
   function simplifyInningControls() {
@@ -2755,8 +2732,8 @@
 
     toggle.innerHTML = (
       presetToolsOpen
-        ? '<i class="bi bi-chevron-up"></i> Hide Preset / Apply'
-        : '<i class="bi bi-bookmark"></i> Preset / Apply'
+        ? '<i class="bi bi-chevron-up"></i> Hide saved defense'
+        : '<i class="bi bi-bookmark"></i> Use a saved defense'
     );
 
     tools.style.setProperty(
@@ -2793,8 +2770,8 @@
     const tools = panel.querySelector('.pde-tools');
     const select = document.getElementById('pde-preset');
     const apply = document.getElementById('pde-apply');
-    if (select?.options?.length) setText(select.options[0], 'Choose Starting Defense…');
-    setText(apply, `Apply to Inning ${shortInningLabel(inning)}`);
+    if (select?.options?.length) setText(select.options[0], 'Choose a saved defense…');
+    setText(apply, 'This inning');
 
     let wrap = tools?.querySelector('.gm-preset-wrap');
     if (tools && select && !wrap) {
@@ -2817,7 +2794,7 @@
         label.htmlFor = 'pde-preset';
         wrap.insertBefore(label, select);
       }
-      setText(label, 'Starting Defense Preset (Optional)');
+      setText(label, 'Use a saved defense');
       wrap.querySelector('.gm-preset-help')?.remove();
     }
 

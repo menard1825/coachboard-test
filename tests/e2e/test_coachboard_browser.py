@@ -61,7 +61,8 @@ def test_starting_defense_applies_and_survives_reload(page: Page, coachboard_url
 
     preset_select.select_option(value=preset_id)
     page.once('dialog', lambda dialog: dialog.accept())
-    defense.locator('#pde-apply').click()
+    defense.locator('#pde-use').click()
+    defense.locator('#pde-use-inning').click()
 
     expected_positions = {
         'C': 'Catcher Cole',
