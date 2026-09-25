@@ -460,7 +460,20 @@
         </div>
       </div>`;
     document.body.appendChild(modal);
+    // Bootstrap ignores hide() while the modal is still animating open, so a
+    // quick pick (within ~0.4s) used to leave the picker stuck on screen.
+    modal.addEventListener('shown.bs.modal', () => { modal.dataset.pdeOpen = '1'; });
+    modal.addEventListener('hide.bs.modal', () => { delete modal.dataset.pdeOpen; });
     return modal;
+  }
+
+  function closePlayerModal(modal) {
+    const instance = bootstrap.Modal.getOrCreateInstance(modal);
+    if (modal.dataset.pdeOpen === '1') {
+      instance.hide();
+    } else {
+      modal.addEventListener('shown.bs.modal', () => instance.hide(), {once: true});
+    }
   }
 
   function choosePlayer(pos) {
@@ -539,7 +552,7 @@
       }
 
       state.rotation.innings[inning] = next;
-      bootstrap.Modal.getOrCreateInstance(modal).hide();
+      closePlayerModal(modal);
       render();
       // Optimistic: describe the local change now rather than waiting on the
       // network. Save outcome (including failure) is reported by the

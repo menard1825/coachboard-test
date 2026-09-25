@@ -71,8 +71,9 @@ def _vendor_cdns(page: Page):
 
 @pytest.fixture(autouse=True)
 def _dialogs(page: Page):
-    """"Remove This Planned Change" shows a confirm() before deleting.
-    Accept every dialog so the flow under test can proceed unattended."""
+    """Accept any browser dialog so the flow under test can proceed
+    unattended. ("Remove This Planned Change" itself now confirms in the
+    coach confirmation sheet, handled in the test.)"""
     seen = []
 
     def on_dialog(dialog):
@@ -218,8 +219,16 @@ def test_remove_planned_change_during_inflight_save_keeps_it_deleted(page: Page,
         page.wait_for_timeout(300)
 
         # Invoke the real user-facing "Remove This Planned Change" action
-        # while that save is still in flight.
+        # while that save is still in flight, and confirm it in the coach
+        # confirmation sheet that replaced window.confirm() (cad1b90).
         click_hidden(page, 'gmRemoveCurrentSubInning')
+        confirm_sheet = page.locator('#gmCoachConfirmModal')
+        expect(confirm_sheet).to_be_visible(timeout=10_000)
+        expect(confirm_sheet.locator('.modal-title')).to_have_text('Remove planned change 1A?')   # 1.1 is shown as 1A
+        confirm = confirm_sheet.locator('[data-gm-confirm-action]')
+        expect(confirm).to_be_enabled(timeout=10_000)
+        confirm.click()
+        expect(confirm_sheet).to_be_hidden(timeout=10_000)
         page.wait_for_timeout(700)
 
         batch = list(held_routes)

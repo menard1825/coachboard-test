@@ -38,6 +38,8 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Browser, Page, expect
 
+import cdn_assets
+
 
 TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
@@ -138,6 +140,38 @@ def test_pregame_editor_visible_legacy_diamond_hidden(page: Page, coachboard_url
         expect(panel(page)).to_be_visible(timeout=15_000)
         expect(page.locator('#pos-desktop-SS')).to_be_hidden()
         expect(page.locator('#pos-mobile-SS')).to_be_hidden()
+    finally:
+        cleanup(page, coachboard_url, game_id)
+
+
+QUICK_PICK = """async ([delayMs, name]) => {
+  document.querySelector('#pregame-defense-editor-v3 [data-pde-pos="SS"]').click();
+  await new Promise(resolve => setTimeout(resolve, delayMs));
+  document.querySelector(`#pde-player-modal .pde-choice[data-player="${name}"]`).click();
+}"""
+
+
+def test_a_quick_pick_while_the_picker_opens_still_closes_it_and_saves(page: Page, coachboard_url: str):
+    """Bootstrap ignores hide() while a modal is still animating open, so a
+    player picked within ~0.4s of opening the picker used to leave it stuck
+    on screen. The pick must close the picker, save, and survive a reload."""
+    login(page, coachboard_url)
+    game_id = create_planning_game(page, coachboard_url, 'Quick Pick Opponent')
+    try:
+        page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
+        expect(panel(page)).to_be_visible(timeout=15_000)
+        modal = page.locator('#pde-player-modal')
+
+        for delay_ms, name in ((0, 'Shortstop Shawn'), (150, 'Second Sam'), (300, 'Third Theo')):
+            page.evaluate(QUICK_PICK, [delay_ms, name])
+            expect(modal).to_be_hidden(timeout=5_000)
+            expect(panel(page).locator('[data-pde-pos="SS"] .pde-name')).to_have_text(name)
+            expect(save_status(page)).to_contain_text('Saved', timeout=10_000)
+            expect(page.locator('.modal-backdrop')).to_have_count(0)
+
+        assert get_game_data(page, coachboard_url, game_id)['rotation']['innings']['1']['SS'] == 'Third Theo'
+        page.reload(wait_until='domcontentloaded')
+        expect(panel(page).locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Third Theo', timeout=15_000)
     finally:
         cleanup(page, coachboard_url, game_id)
 
@@ -437,7 +471,11 @@ def test_desktop_and_touch_interaction_with_tap_editor(browser: Browser, coachbo
     independent browser context and game — no state carried over from one
     mode's run to the other's."""
     label = 'touch' if context_kwargs.get('has_touch') else 'desktop-mouse'
+    # A context of its own: serve the vendored CDN assets here too, or
+    # Bootstrap never loads and the player modal cannot open or close.
+    cdn_assets.require_vendored_assets()
     context = browser.new_context(**context_kwargs)
+    cdn_assets.install(context)
     page = context.new_page()
     _install_cdn_vendor_routes(page)
     try:
