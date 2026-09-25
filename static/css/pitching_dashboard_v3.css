@@ -648,11 +648,9 @@ body.cb-pitching #newPitchingOutingForm button[type="submit"] {
   }
 
   .cb-pitch-rule-item strong {
-    overflow: hidden;
     margin-top: 1px;
     font-size: .68rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.25;
   }
 
   .cb-pitch-rule-item small {
