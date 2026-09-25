@@ -153,7 +153,7 @@ def test_mid_inning_pitcher_change_shows_on_the_inning_being_played(live, coachb
     assert _differs(card) == ['P']
     assert RELIEVER in card.locator('[data-plan-position="P"]').get_attribute('aria-label')
     # The plan itself still shows what was planned.
-    expect(card.locator('[data-plan-position="P"] .cb-qd-name')).to_have_text(INNING_1['P'])
+    expect(card.locator('[data-plan-position="P"] .cb-plan-card-name')).to_have_text(f'Plan: {INNING_1["P"].split()[-1]}')
     expect(card.locator('[data-plan-inning="1"]')).to_have_attribute('data-plan-live-differs', 'true')
     # A quiet team-colored note: the same color as the position outline, and
     # nothing red about it.

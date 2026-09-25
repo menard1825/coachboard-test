@@ -179,13 +179,13 @@ def test_pregame_plan_tab_renders_every_planned_inning(page: Page, coachboard_ur
     try:
         open_live_game(page, coachboard_url, game_id)
 
-        expect(tab(page, 'plan')).to_have_text('Pregame Plan')
+        expect(tab(page, 'plan')).to_have_text('Pregame Card')
         tab(page, 'plan').click()
 
         plan = page.locator(PLAN_CARD)
         expect(plan).to_be_visible(timeout=10_000)
-        expect(plan).to_contain_text('Pregame Defense')
-        expect(plan).to_contain_text('Reference only')
+        expect(plan).to_contain_text('Pregame Card · 2nd')
+        expect(plan).to_contain_text('Reference · not what goes out')
 
         # One planned inning at a time, each a tap away.
         innings = plan.locator('[data-plan-inning]')
@@ -203,7 +203,7 @@ def test_pregame_plan_tab_renders_every_planned_inning(page: Page, coachboard_ur
         expect(innings.nth(0)).to_contain_text('Now')
         expect(innings.nth(1)).not_to_contain_text('Now')
         innings.nth(0).click()
-        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('On now')
+        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('Being played')
         innings.nth(2).click()
         expect(plan.locator('.cb-plan-inning-title')).to_contain_text('Inning 3')
     finally:
@@ -275,13 +275,13 @@ def test_visiting_pregame_plan_leaves_the_other_boards_untouched(page: Page, coa
         tab(page, 'now').click()
         expect(field_board).to_be_visible(timeout=10_000)
         assert field_board.inner_html() == field_before, (
-            'On the Field changed after a visit to Pregame Plan'
+            'On the Field changed after a visit to Pregame Card'
         )
 
         tab(page, 'next').click()
         expect(next_board).to_be_visible(timeout=10_000)
         assert next_board.inner_html() == next_before, (
-            'Next Inning changed after a visit to Pregame Plan'
+            'Next Inning changed after a visit to Pregame Card'
         )
 
         # Viewing a reference tab must not have written anything.
@@ -330,7 +330,7 @@ def test_pregame_plan_tab_shows_an_empty_state_without_a_saved_plan(page: Page, 
 
 def test_three_tab_switcher_fits_a_phone_without_clipping(page: Page, coachboard_url: str):
     """A third labelled tab makes the switcher much tighter than the two it
-    replaced, and "Pregame Plan" is the longest of the three. Measured in the
+    replaced, and "Pregame Card" is the longest of the three. Measured in the
     real browser rather than trusting the arithmetic."""
     page.set_viewport_size({'width': 390, 'height': 844})
     login(page, coachboard_url)
@@ -364,7 +364,7 @@ def test_three_tab_switcher_fits_a_phone_without_clipping(page: Page, coachboard
         )
 
         labels = [button['label'] for button in measurements['buttons']]
-        assert labels == ['On the Field', 'Next Inning', 'Pregame Plan'], labels
+        assert labels == ['On the Field', 'Next Inning', 'Pregame Card'], labels
 
         for button in measurements['buttons']:
             assert button['lineCount'] == 1, (
