@@ -116,11 +116,10 @@ def _changed(page):
 def test_plan_opens_on_the_next_inning_as_a_field(open_plan, device):
     page = open_plan(device)
     card = page.locator(CARD)
-    expect(card.locator('.cb-plan-title')).to_have_text('Pregame Card · 2nd')
-    expect(card.locator('.cb-plan-sub')).to_have_text('Reference · not what goes out')
+    expect(card.locator('.cb-plan-readonly')).to_have_text('Reference only')
     expect(card.locator('[data-plan-inning="2"]')).to_have_attribute('aria-pressed', 'true')
     expect(card.locator('.cb-plan-inning-title')).to_contain_text('Inning 2')
-    expect(card.locator('.cb-plan-inning-title')).to_contain_text('On deck')
+    expect(card.locator('.cb-plan-inning-title')).to_contain_text('Next inning')
     assert _names(page) == INNING_2
 
     data = card.locator('.cb-plan-field').evaluate(MEASURE)
@@ -144,7 +143,7 @@ def test_every_planned_inning_is_one_tap_away(open_plan, device):
     assert _names(page) == INNING_3
     _show(page, 1)
     assert _names(page) == INNING_1
-    expect(card.locator('.cb-plan-inning-title')).to_contain_text('Being played')
+    expect(card.locator('.cb-plan-inning-title')).to_contain_text('On now')
 
     # The inning chosen stays chosen through the background refreshes.
     _show(page, 3)
@@ -186,7 +185,7 @@ def test_bench_lists_who_sits_that_inning(open_plan, device):
     text = bench.inner_text()
     for name in INNING_2.values():
         assert name not in text, name
-    assert 'Card bench' in text
+    assert 'Bench' in text
     assert page.cb_errors == []
 
 

@@ -17,10 +17,7 @@
   // Pregame Plan: the inning being looked at, and the live inning it was
   // chosen during (a new live inning opens the plan on its next inning).
   let planChoice = {inning: '', during: ''};
-  // True from a live change until the next-inning data has been re-read:
-  // until then CoachBoard does not know what End Inning would send.
-  let liveCheckPending = false;
-  let liveCheckTimer = null;
+  let liveChangeTimer = null;
   let selected = null;
   let selectedPosition = '';
   let busy = false;
@@ -622,62 +619,6 @@
         outline-offset:2px;
       }
 
-      #${PLAN_CARD_ID} .cb-plan-field{
-        position:relative;
-      }
-
-      /* A quiet stamp: this field is the card, not the field. */
-      #${PLAN_CARD_ID} .cb-plan-stamp{
-        position:absolute;
-        top:6px;
-        left:8px;
-        z-index:1;
-        padding:1px 6px;
-        border:1px solid rgba(255,255,255,.55);
-        border-radius:4px;
-        color:rgba(255,255,255,.85);
-        font-size:var(--cb-text-2xs, 11px);
-        font-weight:900;
-        letter-spacing:.18em;
-        pointer-events:none;
-      }
-
-      /* Both realities on one marker: the card's player, then who is
-         really there (Now / Next / Finished). */
-      #${PLAN_CARD_ID} .cb-plan-spot .cb-plan-card-name,
-      #${PLAN_CARD_ID} .cb-plan-spot .cb-plan-effective{
-        display:block;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-spot .cb-plan-card-name{
-        color:#475467;
-        font-weight:800;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-spot .cb-plan-effective{
-        margin-top:1px;
-        padding-top:1px;
-        border-top:1px solid #dfe5ee;
-        color:var(--cb-primary-text, #1f3f6e);
-        font-weight:900;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-spot .cb-plan-k{
-        font-weight:900;
-        opacity:.8;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-checking,
-      #${PLAN_CARD_ID} .cb-plan-matches{
-        margin:0 0 9px;
-        padding:6px 10px;
-        border-left:3px solid #cfd6df;
-        background:#f5f7fa;
-        color:#475467;
-        font-size:var(--cb-text-xs, 12px);
-        font-weight:750;
-      }
-
       #${PLAN_CARD_ID} .cb-plan-live{
         margin:0 0 9px;
         padding:6px 10px 7px;
@@ -760,12 +701,8 @@
       }
 
       @media(max-width:575.98px){
-        /* Taller than the live board's field: two-line markers need the
-           vertical room, and the card is not sharing the screen with
-           End Inning. */
         #${PLAN_CARD_ID} .cb-plan-field{
           width:100%;
-          aspect-ratio:1/1;
         }
 
         /* Wider than the live board's markers, and never narrower than the
@@ -1402,7 +1339,7 @@
       );
       switcher.setAttribute(
         'aria-label',
-        'Defense on the field, next inning, and the pregame card'
+        'Defense on the field, next inning, and the pregame plan'
       );
 
       switcher.innerHTML = `
@@ -1420,7 +1357,7 @@
           type="button"
           class="btn"
           data-now-next="plan"
-        >Pregame Card</button>`;
+        >Pregame Plan</button>`;
 
       now.insertAdjacentElement(
         'beforebegin',
@@ -1448,7 +1385,7 @@
           // but it is drawn now rather than on the next background refresh.
           applyView();
 
-          if (activeView === 'plan') {
+          if (activeView === 'plan' && latest) {
             ensureSurface();
             renderPlanCard();
           }
@@ -1616,15 +1553,8 @@
 
     syncUpcomingInningLabels();
 
-    // The Pregame Card is reference only: no End Inning (it acts on the
-    // separate Next Inning state), so its dock is hidden entirely.
     if (actionSlot) {
       actionSlot.removeAttribute('hidden');
-      if (activeView === 'plan') {
-        actionSlot.style.setProperty('display', 'none', 'important');
-      } else if (actionSlot.style.display) {
-        actionSlot.style.removeProperty('display');
-      }
     }
 
     if (endInning) {
@@ -1725,32 +1655,10 @@
       .sort((a, b) => a.sort - b.sort);
   }
 
-  const EFFECTIVE_WORD = {now: 'Now', next: 'Next', done: 'Finished'};
-
-  // Surname for a two-line marker -- or the full name if another player
-  // here shares it. The note above and the screen-reader label keep the
-  // full names.
-  function shortName(name) {
-    if (!name) return 'open';
-    const surname = String(name).trim().split(/\s+/).pop();
-    const shared = (latest?.roster || []).filter(player =>
-      String(player.name).trim().split(/\s+/).pop() === surname
-    ).length > 1;
-    return shared ? name : surname;
-  }
-
-  function planSpot(pos, left, top, name, changed, live, kind) {
+  function planSpot(pos, left, top, name, changed, live) {
     const number = name
       ? String(playerByName(name)?.number ?? '').trim()
       : '';
-    const word = EFFECTIVE_WORD[kind] || 'Now';
-
-    // A spot where the game has gone its own way shows both on the marker:
-    // the card's player first, then who is really there.
-    const nameMarkup = live
-      ? `<span class="cb-plan-card-name"><span class="cb-plan-k">Plan:</span> ${esc(shortName(name))}</span>`
-        + `<span class="cb-plan-effective"><span class="cb-plan-k">${esc(word)}:</span> ${esc(shortName(live.name))}</span>`
-      : esc(name || 'OPEN');
 
     return `
       <div
@@ -1761,13 +1669,13 @@
         data-plan-live-differs="${live ? 'true' : 'false'}"
         role="img"
         aria-label="${esc(
-          `${pos}: card ${name ? playerLabel(name) : 'open'}`
+          `${pos}: ${name ? playerLabel(name) : 'open'}`
           + `${changed ? ', changed from the inning before' : ''}`
-          + `${live ? `, ${word.toLowerCase()} ${live.name ? playerLabel(live.name) : 'open'}` : ''}`
+          + `${live ? `, in the game: ${live.name ? playerLabel(live.name) : 'open'}` : ''}`
         )}"
       >
         <span class="cb-qd-pos">${esc(pos)}${number ? ` <span class="cb-qd-num">#${esc(number)}</span>` : ''}</span>
-        <span class="cb-qd-name">${nameMarkup}</span>
+        <span class="cb-qd-name">${esc(name || 'OPEN')}</span>
       </div>`;
   }
 
@@ -1779,43 +1687,22 @@
    *   - an inning already played: the defense it ended with.
    * Later innings and planned mid-inning changes have none yet.
    */
-  // 'now' (being played), 'next' (End Inning would send it), 'done'
-  // (already played) or '' (later, or a planned mid-inning change).
-  function planInningKind(key) {
-    if (!latest || String(key).includes('.')) return '';
+  function liveAlignmentFor(key) {
+    if (!latest || String(key).includes('.')) return null;
 
     const current = String(latest.current_inning || '');
 
-    if (key === current) return 'now';
-    if (key === String(latest.next_inning || '')) return 'next';
+    if (key === current) return latest.current_alignment || null;
+    if (key === String(latest.next_inning || '')) {
+      return latest.confirmed?.alignment || null;
+    }
 
     const inning = Number.parseFloat(key);
     const playing = Number.parseFloat(current);
 
     return Number.isFinite(inning) && Number.isFinite(playing) && inning < playing
-      ? 'done'
-      : '';
-  }
-
-  // The effective defense, or null when CoachBoard does not know it yet --
-  // never an assumption that it matches the card.
-  function liveAlignmentFor(key) {
-    const kind = planInningKind(key);
-
-    if (kind === 'now') {
-      return liveCheckPending ? null : latest.current_alignment || null;
-    }
-
-    if (kind === 'next') {
-      const confirmed = latest.confirmed;
-      return !liveCheckPending &&
-        confirmed?.alignment &&
-        String(confirmed.inning) === String(latest.next_inning || '')
-        ? confirmed.alignment
-        : null;
-    }
-
-    return kind === 'done' ? latest.actual_rotation?.[key] || null : null;
+      ? latest.actual_rotation?.[key] || null
+      : null;
   }
 
   function liveDeviations(entry, order) {
@@ -1840,24 +1727,20 @@
       : ['LF', 'CF', 'RF', 'LCF', 'RCF'].includes(item.pos)
         ? `in ${item.pos}`
         : `at ${item.pos}`;
-    const planned = item.planned || 'open';
 
     if (!item.name) {
-      return `${item.pos} open (plan: ${planned})`;
-    }
-
-    if (kind === 'next') {
-      const stays = (latest?.current_alignment || {})[item.pos] === item.name;
-      return `${item.name} ${stays ? 'stays ' : ''}${spot} (plan: ${planned})`;
+      return `${item.pos} open (plan: ${item.planned || 'open'})`;
     }
 
     if (!item.planned) {
       return `${item.name} ${spot} (plan: open)`;
     }
 
-    return item.pos === 'P'
-      ? `${item.name} pitching instead of ${item.planned}`
-      : `${item.name} ${spot} instead of ${item.planned}`;
+    if (item.pos === 'P') {
+      return `${item.name} ${kind === 'done' ? 'pitched' : 'pitching'} instead of ${item.planned}`;
+    }
+
+    return `${item.name} ${spot} instead of ${item.planned}`;
   }
 
   function deviationHeading(key) {
@@ -1872,35 +1755,6 @@
       : `Inning ${key}`;
   }
 
-  function planHead(title) {
-    return `
-      <div class="cb-plan-head">
-        <div>
-          <div class="cb-plan-title">${esc(title)}</div>
-          <div class="cb-plan-sub">Reference · not what goes out</div>
-        </div>
-      </div>`;
-  }
-
-  function benchMarkupFor(label, players) {
-    return `
-      <div class="cb-plan-bench" data-plan-bench="${esc(label)}">
-        <strong>${esc(label)} · ${players.length}</strong>
-        <div class="cb-plan-bench-chips">${
-          players.length
-            ? players.map(player => `<span>${esc(playerLabel(player.name))}</span>`).join('')
-            : '<span>Nobody</span>'
-        }</div>
-      </div>`;
-  }
-
-  function benchFor(alignment, order) {
-    const assigned = new Set(order.map(pos => alignment[pos]).filter(Boolean));
-    return (latest?.roster || [])
-      .filter(player => !assigned.has(player.name))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }
-
   function renderPlanCard() {
     const card = $(PLAN_CARD_ID);
 
@@ -1909,15 +1763,15 @@
     const innings = planInnings();
     let html;
 
-    if (!latest) {
-      // Nothing is known yet -- not even the card. Say so rather than
-      // leaving a blank tab.
-      html = `${planHead('Pregame Card')}
-        <div class="cb-plan-body">
-          <div class="cb-plan-checking" role="status">Loading the pregame card…</div>
-        </div>`;
-    } else if (!innings.length) {
-      html = `${planHead('Pregame Card')}
+    if (!innings.length) {
+      html = `
+        <div class="cb-plan-head">
+          <div>
+            <div class="cb-plan-kicker">PREGAME PLAN</div>
+            <div class="cb-plan-title">Pregame Defense</div>
+          </div>
+          <div class="cb-plan-readonly">Reference only</div>
+        </div>
         <div class="cb-plan-body">
           <div class="cb-plan-empty">
             No pregame defensive plan was saved for this game.
@@ -1952,23 +1806,21 @@
           )
         : [];
 
-      const kind = planInningKind(entry.key);
-      const effective = liveAlignmentFor(entry.key);
-      const checking = (kind === 'now' || kind === 'next') && !effective;
       const deviations = liveDeviations(entry, order);
       const liveAt = pos => deviations.find(item => item.pos === pos) || null;
 
-      const cardBench = benchFor(entry.alignment, order);
-      // The live or next bench, from the roster of players here today and
-      // the effective defense -- shown only when it is not the card's.
-      const effectiveBench =
-        (kind === 'now' || kind === 'next') && effective && deviations.length
-          ? benchFor(effective, order)
-          : null;
-      const benchDiffers = effectiveBench &&
-        effectiveBench.map(p => p.name).join('|') !== cardBench.map(p => p.name).join('|');
+      const assigned = new Set(
+        order.map(pos => entry.alignment[pos]).filter(Boolean)
+      );
+      const bench = (latest?.roster || [])
+        .filter(player => !assigned.has(player.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-      const tag = {now: 'Being played', next: 'On deck', done: 'Finished'}[kind] || '';
+      const tag = entry.key === currentInning
+        ? 'On now'
+        : entry.key === nextInning
+          ? 'Next inning'
+          : '';
 
       const buttons = innings.map(item => `
         <button
@@ -1985,43 +1837,28 @@
       const field = `
         <div class="cb-qd-field cb-plan-field">
           ${fieldArt()}
-          <span class="cb-plan-stamp" aria-hidden="true">CARD</span>
           ${spots().map(([pos, left, top]) =>
-            planSpot(pos, left, top, entry.alignment[pos] || '', changed.includes(pos), liveAt(pos), kind)
+            planSpot(pos, left, top, entry.alignment[pos] || '', changed.includes(pos), liveAt(pos))
           ).join('')}
         </div>`;
 
-      let status = '';
-
-      if (checking) {
-        status = `<div class="cb-plan-checking" role="status">${
-          kind === 'next'
-            ? 'Checking what End Inning would send…'
-            : 'Checking the field…'
-        }</div>`;
-      } else if (deviations.length) {
-        status = `<div class="cb-plan-live">
-            <strong>${esc(deviationHeading(entry.key))}</strong>
-            <ul>${deviations.map(item => `<li>${esc(deviationLine(
-              item,
-              kind === 'next' ? 'next' : 'now'
-            ))}</li>`).join('')}</ul>
-          </div>`;
-      } else if (kind === 'now' || kind === 'next') {
-        status = `<div class="cb-plan-matches">${
-          kind === 'next'
-            ? 'End Inning would send the card as written.'
-            : 'The field matches the card.'
-        }</div>`;
-      }
-
-      const title = entry.key.includes('.')
-        ? `Pregame Card · ${planInningLabel(entry.key)}`
-        : `Pregame Card · ${inningOrdinal(entry.key)}`;
-
-      html = `${planHead(title)}
+      html = `
+        <div class="cb-plan-head">
+          <div>
+            <div class="cb-plan-kicker">
+              PREGAME PLAN · ${esc(String(innings.length))} ${
+                innings.length === 1 ? 'INNING' : 'INNINGS'
+              }
+            </div>
+            <div class="cb-plan-title">Pregame Defense</div>
+            <div class="cb-plan-sub">
+              What you set before first pitch. Nothing here changes the live game.
+            </div>
+          </div>
+          <div class="cb-plan-readonly">Reference only</div>
+        </div>
         <div class="cb-plan-body">
-          <div class="cb-plan-innings" aria-label="Innings on the card">${buttons}</div>
+          <div class="cb-plan-innings" aria-label="Planned innings">${buttons}</div>
           <div class="cb-plan-inning-title">
             ${esc(planInningLabel(entry.key))}${tag ? `<span>${esc(tag)}</span>` : ''}
           </div>
@@ -2032,15 +1869,34 @@
                 : `Same as ${esc(planInningLabel(previous.key))}`
               : 'First inning of the plan'
           }</div>
-          ${status}
+          ${
+            deviations.length
+              ? `<div class="cb-plan-live">
+                  <strong>${esc(deviationHeading(entry.key))}</strong>
+                  <ul>${deviations.map(item => `<li>${esc(deviationLine(
+                    item,
+                    entry.key === String(latest?.current_inning || '') ||
+                      entry.key === String(latest?.next_inning || '')
+                      ? 'live'
+                      : 'done'
+                  ))}</li>`).join('')}</ul>
+                </div>`
+              : ''
+          }
           ${field}
-          ${benchMarkupFor('Card bench', cardBench)}
-          ${benchDiffers ? benchMarkupFor(kind === 'next' ? 'Next bench' : 'Live bench', effectiveBench) : ''}
+          <div class="cb-plan-bench">
+            <strong>Bench · ${bench.length}</strong>
+            <div class="cb-plan-bench-chips">${
+              bench.length
+                ? bench.map(player => `<span>${esc(playerLabel(player.name))}</span>`).join('')
+                : '<span>Nobody</span>'
+            }</div>
+          </div>
         </div>`;
     }
 
     // The board refreshes every few seconds; only touch the DOM when the
-    // card would actually look different.
+    // plan view would actually look different.
     if (card._cbPlanMarkup !== html) {
       card.innerHTML = html;
       card._cbPlanMarkup = html;
@@ -2060,19 +1916,6 @@
         renderPlanCard();
       });
     }
-  }
-
-  // A live change (from this device or another) makes the effective
-  // defenses unknown until the next-inning data is read again: End Inning's
-  // default follows the field. Re-read once, shortly after, however many
-  // scripts announce the same change.
-  function onLiveChange() {
-    liveCheckPending = true;
-
-    if (activeView === 'plan') renderPlanCard();
-
-    window.clearTimeout(liveCheckTimer);
-    liveCheckTimer = window.setTimeout(() => refresh({force: true}), 150);
   }
 
   function renderCard() {
@@ -2715,8 +2558,6 @@
     try {
       const data = await api('GET');
       const signature = JSON.stringify(data);
-      const wasChecking = liveCheckPending;
-      liveCheckPending = false;
 
       if (
         force ||
@@ -2731,7 +2572,6 @@
         hydrate(data);
       } else {
         ensureSurface();
-        if (wasChecking) renderPlanCard();
       }
 
       return data;
@@ -2740,8 +2580,16 @@
     }
   }
 
+  // A live change (from this device or another) moves what End Inning would
+  // send and what the Pregame Plan note compares against. Re-read the
+  // next-inning data once, shortly after, however many scripts announce the
+  // same change -- instead of waiting for the 3.5 s poll.
+  function onLiveChange() {
+    window.clearTimeout(liveChangeTimer);
+    liveChangeTimer = window.setTimeout(() => refresh({force: true}), 150);
+  }
+
   function afterAdvance() {
-    liveCheckPending = true;
     activeView = 'now';
     selected = null;
     selectedPosition = '';

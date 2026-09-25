@@ -9,12 +9,18 @@ the game is really using, in plain baseball terms:
   put out (the carried-forward field or the coach's own Next Inning edit);
 * "How the 1st finished" -- an inning already played.
 
-The note states what is ("Pat pitching instead of Ames"), never a story of
-how it happened ("came in", "moved", "switched"): it compares alignments and
-does not know the order moves were made in. The plan itself stays read-only.
+The note states what is ("Pat pitching instead of Ames"; "Pat pitched
+instead of Ames" once the inning is over), never a story of how it happened
+("came in", "moved", "switched"): it compares alignments and does not know
+the order moves were made in.
+
+The field itself always shows the original plan -- no "Plan / Now" text on
+the markers, one bench -- and the plan stays read-only. End Inning stays
+available on this tab like on the others.
 """
 
 import os
+import re
 
 import pytest
 
@@ -28,6 +34,7 @@ from playwright.sync_api import expect  # noqa: E402
 
 import cdn_assets  # noqa: E402
 from live_field_markers import LINEUP, create_named_live_game, login, remove_named_live_game  # noqa: E402
+from test_pregame_plan_field_view import MEASURE  # noqa: E402
 
 
 PHONE = ('phone', {'width': 390, 'height': 844}, {'is_mobile': True, 'has_touch': True})
@@ -151,9 +158,16 @@ def test_mid_inning_pitcher_change_shows_on_the_inning_being_played(live, coachb
     expect(card.locator('.cb-plan-live li')).to_have_count(1, timeout=10_000)
     assert _note(card) == ('In-game adjustments', [f'{RELIEVER} pitching instead of {INNING_1["P"]}'])
     assert _differs(card) == ['P']
+    # The field is still the original plan: planned names only, one bench.
+    for pos, name in INNING_1.items():
+        expect(card.locator(f'[data-plan-position="{pos}"] .cb-qd-name')).to_have_text(name)
+    assert 'Now:' not in card.locator('.cb-plan-field').inner_text()
+    assert 'Plan:' not in card.locator('.cb-plan-field').inner_text()
+    expect(card.locator('.cb-plan-bench')).to_have_count(1)
+    expect(card.locator('.cb-plan-bench strong')).to_have_text(re.compile(r'^Bench · \d+$'))
     assert RELIEVER in card.locator('[data-plan-position="P"]').get_attribute('aria-label')
     # The plan itself still shows what was planned.
-    expect(card.locator('[data-plan-position="P"] .cb-plan-card-name')).to_have_text(f'Plan: {INNING_1["P"].split()[-1]}')
+    expect(card.locator('[data-plan-position="P"] .cb-qd-name')).to_have_text(INNING_1['P'])
     expect(card.locator('[data-plan-inning="1"]')).to_have_attribute('data-plan-live-differs', 'true')
     # A quiet team-colored note: the same color as the position outline, and
     # nothing red about it.
@@ -214,10 +228,9 @@ def test_next_inning_compares_what_end_inning_would_put_out(live, coachboard_url
     expected = [pos for pos in ORDER if (INNING_2.get(pos) or '') != (carried.get(pos) or '')]
     assert expected == ['P', '1B']
     expect(card.locator('.cb-plan-live li')).to_have_count(2, timeout=10_000)
-    # Both players are already in those spots now, so they "stay".
     assert _note(card) == ('Heading into the 2nd', [
-        f'{RELIEVER} stays on the mound (plan: {INNING_2["P"]})',
-        f'{carried["1B"]} stays at 1B (plan: {INNING_2["1B"]})',
+        f'{RELIEVER} pitching instead of {INNING_2["P"]}',
+        f'{carried["1B"]} at 1B instead of {INNING_2["1B"]}',
     ])
     assert _differs(card) == expected
     assert page.cb_errors == []
@@ -232,10 +245,9 @@ def test_a_manual_next_inning_edit_is_compared_with_the_plan(live, coachboard_ur
     assert response.ok, response.text()[:200]
     card = _open_plan(page, coachboard_url, 2)
     expect(card.locator('.cb-plan-live li')).to_have_count(2, timeout=10_000)
-    # Neither player is in that spot now, so no "stays".
     assert _note(card) == ('Heading into the 2nd', [
-        f'{INNING_2["RF"]} in LF (plan: {INNING_2["LF"]})',
-        f'{INNING_2["LF"]} in RF (plan: {INNING_2["RF"]})',
+        f'{INNING_2["RF"]} in LF instead of {INNING_2["LF"]}',
+        f'{INNING_2["LF"]} in RF instead of {INNING_2["RF"]}',
     ])
     assert _differs(card) == ['LF', 'RF']
     # Inning 1 is still being played exactly as planned.
@@ -251,12 +263,49 @@ def test_a_finished_inning_shows_how_it_finished(live, coachboard_url, device):
     _advance(page, coachboard_url)                     # the relief pitcher carries into the 2nd
     card = _open_plan(page, coachboard_url, 1)
     expect(card.locator('.cb-plan-live li')).to_have_count(1, timeout=10_000)
-    assert _note(card) == ('How the 1st finished', [f'{RELIEVER} pitching instead of {INNING_1["P"]}'])
+    assert _note(card) == ('How the 1st finished', [f'{RELIEVER} pitched instead of {INNING_1["P"]}'])
 
     card.locator('[data-plan-inning="2"]').click()     # now being played
     heading, lines = _note(card)
     assert heading == 'In-game adjustments'
     assert f'{RELIEVER} pitching instead of {INNING_2["P"]}' in lines
+    assert page.cb_errors == []
+
+
+@DEVICES
+def test_end_inning_stays_available_on_the_pregame_plan(live, coachboard_url, device):
+    page = live(device)
+    _open_plan(page, coachboard_url, 2)
+    end_inning = page.locator('#liveEndInningBtn')
+    expect(end_inning).to_be_visible()
+    expect(end_inning).to_contain_text('End 1st → Start 2nd')
+    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+    expect(end_inning).to_be_visible()
+    assert page.cb_errors == []
+
+
+def test_long_names_fit_on_a_small_phone(live, coachboard_url):
+    page = live(('small-phone', {'width': 360, 'height': 740}, {'is_mobile': True, 'has_touch': True}))
+    state = _state(page, coachboard_url)
+    current = {pos: name for pos, name in state['current_alignment'].items() if name}
+    long_name = 'Benjamin Hollingsworth'
+    player_id = next(p['id'] for p in page.cb_api.request.get(f'{coachboard_url}/api/roster').json()
+                     if p['name'] == long_name)
+    response = page.cb_api.request.post(
+        f'{coachboard_url}/api/live-game/{page.cb_game}/complete-pitcher-change',
+        data={'base_sequence': _sequence(state), 'fast': True, 'new_pitcher_id': int(player_id),
+              'alignment': {**current, 'P': long_name, 'CF': current['P']}})
+    assert response.ok, response.text()[:200]
+    _swap(page, coachboard_url, 'SS', '2B')
+    for inning in (1, 2):
+        card = _open_plan(page, coachboard_url, inning)
+        expect(card.locator('.cb-plan-live li')).to_have_count(5 if inning == 2 else 4, timeout=10_000)
+        note = card.locator('.cb-plan-live')
+        assert note.evaluate('el => el.scrollWidth <= el.clientWidth + 1'), inning
+        assert note.bounding_box()['x'] + note.bounding_box()['width'] <= card.bounding_box()['x'] + card.bounding_box()['width'] + 1
+        data = card.locator('.cb-plan-field').evaluate(MEASURE)
+        assert data['outside'] == [] and data['overlaps'] == [], (inning, data)
+        assert all(m['fits'] for m in data['markers']), (inning, data['markers'])
     assert page.cb_errors == []
 
 
