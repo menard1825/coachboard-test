@@ -189,12 +189,14 @@
       /* Field markers (On the Field and Next Inning share them). Position
          and jersey ride on the grass line; the name box holds only the name
          so it can be the largest, easiest text on the field. The sizes are
-         set once here per layout and used by every marker override. */
+         set once here per layout and used by every marker override.
+         A marker is never narrower than the longest word in its name: names
+         wrap between words ("Benjamin / Hollingsworth"), not inside them. */
       :root{--cb-marker-name:.67rem;--cb-marker-pos:.625rem}
-      .cb-qd-spot{position:absolute;transform:translate(-50%,-50%);z-index:2;width:clamp(62px,20vw,112px);border:0;background:transparent;padding:0;text-align:center;touch-action:manipulation}
+      .cb-qd-spot{position:absolute;transform:translate(-50%,-50%);z-index:2;width:clamp(62px,20vw,112px);min-width:min-content;border:0;background:transparent;padding:0;text-align:center;touch-action:manipulation}
       .cb-qd-pos{display:block;color:#fff;font-size:var(--cb-marker-pos);font-weight:900;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.45);margin-bottom:2px;letter-spacing:.03em}
       .cb-qd-num{margin-left:.3em;font-weight:800}
-      .cb-qd-name{display:block;width:100%;background:rgba(255,255,255,.96);border:1px solid #dce1e5;border-radius:8px;padding:4px 2px;font-size:var(--cb-marker-name);line-height:1.04;font-weight:820;color:#172033;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;box-shadow:0 1px 2px rgba(16,24,40,.1)}
+      .cb-qd-name{display:block;width:100%;background:rgba(255,255,255,.96);border:1px solid #dce1e5;border-radius:8px;padding:4px 2px;font-size:var(--cb-marker-name);line-height:1.04;font-weight:820;color:#172033;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:break-word;box-shadow:0 1px 2px rgba(16,24,40,.1)}
       .cb-qd-spot:active .cb-qd-name,.cb-qd-bench-player:active{transform:scale(.98)}
       .cb-qd-spot.pitcher .cb-qd-name{border-color:#b7c8e8;background:#f5f8ff}
       .cb-qd-bench-wrap{margin-top:9px;border:1px solid #e2e6eb;border-radius:11px;background:#f8fafc;padding:9px}
@@ -267,6 +269,11 @@
         .cb-qd-spot{width:66px;min-height:30px}
         :root{--cb-marker-name:.625rem;--cb-marker-pos:.6rem}
         .cb-qd-name{padding:2px}
+        /* The phone field is short. Lift SS and 2B and drop 3B and 1B a
+           few pixels, so a two-line name at short or second never reaches
+           into the next marker's tap area. */
+        .cb-qd-spot:is([data-cb-position="SS"],[data-cb-position="2B"],[data-next-position="SS"],[data-next-position="2B"]){margin-top:-6px}
+        .cb-qd-spot:is([data-cb-position="3B"],[data-cb-position="1B"],[data-next-position="3B"],[data-next-position="1B"]){margin-top:6px}
         .cb-qd-bench-player{font-size:.69rem;padding:7px 8px}
         .cb-end-zone{text-align:center}.cb-end-zone #liveEndGameBtn{width:100%!important}
         #cbCoachBoardNavModal .cb-app-grid{grid-template-columns:1fr 1fr}

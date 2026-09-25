@@ -13,6 +13,11 @@ fewer lines. The full name always shows -- it wraps, it is never ellipsized
 Each check uses a realistic roster: a short (Luke), medium (Graham) and long
 (Alexander Montgomery at shortstop, next to the pitcher) name, and a long
 surname in centre field near the top of the field.
+
+A marker is never narrower than the longest word in its name, so names wrap
+between words ("Benjamin / Hollingsworth") instead of inside them; on the
+short phone field the short and second base markers sit a little higher and
+third and first a little lower, so no two markers' tap areas overlap.
 """
 
 import os
@@ -34,14 +39,21 @@ from live_field_markers import (  # noqa: E402
 
 
 PHONE = ('phone', {'width': 390, 'height': 844}, {'is_mobile': True, 'has_touch': True})
+SMALL_PHONE = ('small-phone', {'width': 360, 'height': 740}, {'is_mobile': True, 'has_touch': True})
 TABLET = ('tablet', {'width': 1024, 'height': 768}, {'has_touch': True})
+IPAD_PORTRAIT = ('ipad-portrait', {'width': 820, 'height': 1180}, {'has_touch': True})
+IPAD_LANDSCAPE = ('ipad-landscape', {'width': 1180, 'height': 820}, {'has_touch': True})
 DESKTOP = ('desktop', {'width': 1440, 'height': 900}, {})
 
 #: The smallest readable sizes each layout holds with the roster above, and
 #: the drag target each layout already had before this change.
 TARGETS = {
     'phone': {'name': 10, 'pos': 9.5, 'min_width': 61, 'min_height': 30},
+    # Below 375px the whole live header and field step down one size.
+    'small-phone': {'name': 9.5, 'pos': 9, 'min_width': 61, 'min_height': 30},
     'tablet': {'name': 12, 'pos': 10, 'min_width': 56, 'min_height': 44},
+    'ipad-portrait': {'name': 12, 'pos': 10, 'min_width': 56, 'min_height': 35},
+    'ipad-landscape': {'name': 12, 'pos': 10, 'min_width': 56, 'min_height': 44},
     'desktop': {'name': 12, 'pos': 10, 'min_width': 56, 'min_height': 44},
 }
 
@@ -89,15 +101,24 @@ def _measure(page, coachboard_url, game_id, view):
 
 # --- fit and readability -----------------------------------------------------------
 
+def _hit_area_overlaps(markers):
+    """Pairs of markers whose tap areas (the whole button) overlap."""
+    boxes = list(markers.items())
+    return [(a, b) for i, (a, ra) in enumerate(boxes) for b, rb in boxes[i + 1:]
+            if min(ra['box']['right'], rb['box']['right']) - max(ra['box']['left'], rb['box']['left']) > 0.5
+            and min(ra['box']['bottom'], rb['box']['bottom']) - max(ra['box']['top'], rb['box']['top']) > 0.5]
+
+
 @pytest.mark.parametrize('view', ['now', 'next'], ids=['on-the-field', 'next-inning'])
-@pytest.mark.parametrize('device', [PHONE, TABLET, DESKTOP], ids=lambda d: d[0])
+@pytest.mark.parametrize('device', [SMALL_PHONE, PHONE, TABLET, IPAD_PORTRAIT, IPAD_LANDSCAPE, DESKTOP],
+                         ids=lambda d: d[0])
 def test_markers_are_readable_and_fit_the_field(open_page, coachboard_url, game, device, view):
     page = open_page(device)
     target = TARGETS[device[0]]
     _, data, markers = _measure(page, coachboard_url, game, view)
     # The short phone On the Field leaves the pitcher's jersey to the live
     # header directly above the field.
-    pitcher_in_header = device is PHONE and view == 'now'
+    pitcher_in_header = device in (PHONE, SMALL_PHONE) and view == 'now'
     if pitcher_in_header:
         name, jersey = LINEUP['P']
         expect(page.locator('#cbDugoutHeader [data-cb-pitcher]')).to_have_text(f'#{jersey} {name}')
@@ -111,9 +132,11 @@ def test_markers_are_readable_and_fit_the_field(open_page, coachboard_url, game,
         assert m['namePx'] >= target['name'], (pos, m['namePx'])
         assert m['posPx'] >= target['pos'], (pos, m['posPx'])
         assert m['namePx'] >= m['posPx'], (pos, m['namePx'], m['posPx'])
-        # The whole name, wrapped rather than cut off.
+        # The whole name, wrapped rather than cut off -- and wrapped between
+        # words, never inside one ("Hollingsw-orth").
         assert m['label'] == name, (pos, m['label'])
         assert m['nameWraps'] and m['nameFits'], (pos, m)
+        assert m['nameLines'] <= len(name.split()), (pos, name, m['nameLines'])
         # Position and jersey stay visible, and the full label stays on the button.
         if pitcher_in_header and pos == 'P':
             assert m['posLabel'] == 'P', m['posLabel']
@@ -126,6 +149,8 @@ def test_markers_are_readable_and_fit_the_field(open_page, coachboard_url, game,
 
     # The long name at shortstop no longer builds a four-line tower.
     assert markers['SS']['nameLines'] <= 3, markers['SS']
+    # No two markers' tap areas overlap -- shortstop and the pitcher included.
+    assert _hit_area_overlaps(markers) == [], _hit_area_overlaps(markers)
     assert page.cb_errors == []
 
 
@@ -134,6 +159,9 @@ def test_desktop_markers_are_not_oversized(open_page, coachboard_url, game):
     _, _, markers = _measure(page, coachboard_url, game, 'now')
     assert max(m['namePx'] for m in markers.values()) <= 12.5
     assert max(m['box']['width'] for m in markers.values()) <= 112
+    # Only a marker whose longest word needs the room is wider than the rest.
+    base = min(m['box']['width'] for m in markers.values())
+    assert sorted(pos for pos, m in markers.items() if m['box']['width'] > base + 1) in ([], ['CF']), markers
 
 
 # --- drag -----------------------------------------------------------------------------
@@ -161,7 +189,7 @@ def _names(board, attr):
     return {pos: board.locator(f'[{attr}="{pos}"] .cb-qd-name').inner_text().strip() for pos in LINEUP}
 
 
-@pytest.mark.parametrize('device', [PHONE, TABLET], ids=lambda d: d[0])
+@pytest.mark.parametrize('device', [SMALL_PHONE, PHONE, TABLET], ids=lambda d: d[0])
 def test_on_the_field_drag_still_swaps_players(open_page, coachboard_url, game, device):
     page = open_page(device)
     field = open_view(page, coachboard_url, game, 'now')
@@ -192,7 +220,7 @@ def test_on_the_field_drag_still_swaps_players(open_page, coachboard_url, game, 
     assert page.cb_errors == []
 
 
-@pytest.mark.parametrize('device', [PHONE, TABLET], ids=lambda d: d[0])
+@pytest.mark.parametrize('device', [SMALL_PHONE, PHONE, TABLET], ids=lambda d: d[0])
 def test_next_inning_drag_still_swaps_players(open_page, coachboard_url, game, device):
     page = open_page(device)
     field = open_view(page, coachboard_url, game, 'next')
