@@ -471,3 +471,91 @@ def test_portrait_and_phone_are_untouched_by_landscape_sizing(page: Page, coachb
                 )
     finally:
         cleanup_game(page, coachboard_url, game_id)
+
+
+GUIDANCE = '#live-board-prep-v3 .cb-next-selection'
+CANCEL = '#live-board-prep-v3 [data-next-cancel]'
+
+GUIDANCE_READABLE = """(sel) => {
+  const box = document.querySelector(sel);
+  const parts = ['.cb-next-step', '.cb-next-selection-main', '.cb-next-selection-sub']
+    .map(s => box.querySelector(s));
+  const r = el => el.getBoundingClientRect();
+  const cancel = box.querySelector('[data-next-cancel]');
+  return {
+    fonts: parts.map(el => parseFloat(getComputedStyle(el).fontSize)),
+    clipped: parts.filter(el => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1).length,
+    insideBox: [...parts, cancel].every(el => r(el).bottom <= r(box).bottom + 1 && r(el).right <= r(box).right + 1),
+    cancelBesideText: r(cancel).top < r(parts[2]).bottom && r(cancel).left >= r(parts[1]).right,
+  };
+}"""
+
+
+def start_move(page: Page, position='SS'):
+    page.locator(f'{NEXT_FIELD} [data-next-position="{position}"]').click()
+    expect(page.locator(GUIDANCE)).to_contain_text('STEP 2')
+
+
+def test_next_inning_mid_move_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
+    """STEP 2 guidance used to push End Inning 16px below the fold here."""
+    page.set_viewport_size({'width': 1024, 'height': 768})
+    login(page, coachboard_url)
+    game_id = create_live_game(page, coachboard_url, 'Landscape Mid Move')
+
+    try:
+        open_live_game(page, coachboard_url, game_id)
+        show(page, 'next')
+        start_move(page)
+
+        data = measure(page, NEXT_FIELD, {
+            'guidance': GUIDANCE, 'cancel': CANCEL,
+            'bench': '#live-board-prep-v3 .cb-next-bench',
+        })
+        height = data['viewport']['height']
+        for name in ('guidance', 'cancel', 'field', 'bench', 'endInning'):
+            box = data['boxes'][name]
+            assert box and box['bottom'] <= height, f'mid-move at 1024x768: {name} {box} below {height}'
+        assert_no_horizontal_overflow(data, 'Next Inning mid-move at 1024x768')
+        assert_markers_are_tappable(data, 'Next Inning mid-move at 1024x768')
+        assert_field_inside_card(page, NEXT_FIELD, '#live-board-prep-v3', 'Next Inning mid-move at 1024x768')
+
+        guidance = page.evaluate(GUIDANCE_READABLE, GUIDANCE)
+        assert guidance['clipped'] == 0 and guidance['insideBox'], guidance
+        assert guidance['fonts'][1] >= 12 and guidance['fonts'][2] >= 10, guidance
+        assert guidance['cancelBesideText'], guidance
+
+        # Finishing the move still works: SS and 2B swap, and the guidance goes.
+        page.locator(f'{NEXT_FIELD} [data-next-position="2B"]').click()
+        expect(page.locator(GUIDANCE)).to_have_count(0, timeout=10_000)
+        expect(page.locator(f'{NEXT_FIELD} [data-next-position="2B"]')).to_contain_text('Shortstop Shawn', timeout=10_000)
+        expect(page.locator(f'{NEXT_FIELD} [data-next-position="SS"]')).to_contain_text('Second Sam')
+        assert measure(page, NEXT_FIELD)['boxes']['endInning']['bottom'] <= height
+
+        # Cancelling leaves the field as it was.
+        start_move(page, 'CF')
+        page.locator(CANCEL).click()
+        expect(page.locator(GUIDANCE)).to_have_count(0)
+        expect(page.locator(f'{NEXT_FIELD} [data-next-position="CF"]')).to_contain_text('Center Casey')
+    finally:
+        cleanup_game(page, coachboard_url, game_id)
+
+
+@pytest.mark.parametrize('size', [(1180, 820), (1440, 900), (768, 1024), (390, 844)],
+                         ids=lambda s: f'{s[0]}x{s[1]}')
+def test_mid_move_guidance_keeps_its_layout_elsewhere(page: Page, coachboard_url: str, size):
+    """Taller landscape screens, portrait and phones keep Cancel under the text."""
+    width, height = size
+    page.set_viewport_size({'width': width, 'height': height})
+    login(page, coachboard_url)
+    game_id = create_live_game(page, coachboard_url, f'Mid Move {width}x{height}')
+
+    try:
+        open_live_game(page, coachboard_url, game_id)
+        show(page, 'next')
+        start_move(page)
+        guidance = page.evaluate(GUIDANCE_READABLE, GUIDANCE)
+        assert guidance['clipped'] == 0 and guidance['insideBox'], guidance
+        assert not guidance['cancelBesideText'], guidance
+        assert_no_horizontal_overflow(measure(page, NEXT_FIELD), f'mid-move at {width}x{height}')
+    finally:
+        cleanup_game(page, coachboard_url, game_id)

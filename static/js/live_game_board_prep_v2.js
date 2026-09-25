@@ -1241,6 +1241,39 @@
       }
 
       /*
+       * Short landscape screens (a 1024x768 iPad): the STEP 2 guidance spans
+       * the full width above the field, and its Cancel button on a row of its
+       * own pushed End Inning below the fold mid-move. Put Cancel beside the
+       * text instead; the text itself keeps its size.
+       */
+      @media(
+        min-width:700px
+      ) and (
+        min-height:500px
+      ) and (
+        max-height:800px
+      ) and (
+        orientation:landscape
+      ){
+        #${CARD_ID} .cb-next-selection.active{
+          display:grid;
+          grid-template-columns:minmax(0,1fr) auto;
+          column-gap:12px;
+          align-items:center;
+        }
+
+        #${CARD_ID} .cb-next-selection.active > :not([data-next-cancel]){
+          grid-column:1;
+        }
+
+        #${CARD_ID} .cb-next-selection.active [data-next-cancel]{
+          grid-column:2;
+          grid-row:1 / span 3;
+          margin-top:0!important;
+        }
+      }
+
+      /*
        * LANDSCAPE OWNER -- ON THE FIELD (Quick Field).
        *
        * This is the same media range live_game_sync_status.js uses for its
