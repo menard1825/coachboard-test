@@ -1085,6 +1085,27 @@
         }
     );
 
+    /*
+     * Lifecycle fallback. When Socket.IO is unavailable, the slow /state
+     * check in live_game_postgame_cleanup.js is the only thing still watching
+     * this game. If it sees the game go live before this page has, it hands
+     * that state over so the pregame screen switches to live. Ignored once
+     * this page already knows the game is live, so a slower response cannot
+     * replace newer socket state.
+     */
+    document.addEventListener(
+        'coachboard:live-lifecycle-observed',
+        event => {
+            const detail = event.detail || {};
+
+            if (Number(detail.game_id) !== gameId) return;
+            if (!detail.state?.game?.is_live) return;
+            if (liveState?.game?.is_live) return;
+
+            applyState(detail.state, { source: 'live-v2-fallback' });
+        }
+    );
+
     document.addEventListener('click', handleCapturedEvent, true);
     document.addEventListener('change', event => {
         if (event.target?.id === 'liveGameModeToggle') handleCapturedEvent(event);

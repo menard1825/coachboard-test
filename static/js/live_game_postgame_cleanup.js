@@ -9,6 +9,8 @@
   let reloading = false;
   let checking = false;
   let latestState = null;
+  // Whether the page itself has published this game as live (socket or fetch).
+  let publishedLive = false;
 
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -292,7 +294,17 @@
 
       if (!response.ok) return;
 
-      handleObservedState(await response.json());
+      const state = await response.json();
+
+      // Without a socket this check is the only one that notices the game
+      // going live; let the Live Game controller switch the page over.
+      if (state?.game?.is_live && !publishedLive) {
+        document.dispatchEvent(new CustomEvent('coachboard:live-lifecycle-observed', {
+          detail: { game_id: gameId, state },
+        }));
+      }
+
+      handleObservedState(state);
     } catch (_) {
       // The main Live Game controller owns user-facing sync errors.
     } finally {
@@ -304,7 +316,8 @@
     installBenchStyles();
     checkState();
     // Slow HTTP polling is only the fallback when shared live updates are
-    // unavailable. Normal postgame transitions arrive through live-state.
+    // unavailable. Normal start and end transitions arrive through
+    // live-state; this same check covers both when they do not.
     setInterval(checkState, 5000);
   });
 
@@ -312,6 +325,8 @@
     const detail = event.detail || {};
 
     if (Number(detail.game_id) !== gameId) return;
+
+    publishedLive = Boolean(detail.state?.game?.is_live);
 
     // Unlike the other live-state subscribers, this one may navigate away
     // when a game ends. Do not filter on detail.source: socket, initial fetch,
