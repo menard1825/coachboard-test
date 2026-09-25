@@ -266,7 +266,10 @@ def _team_colored_controls(page, base_url, viewport):
     _open_game(page, base_url)
     # Set Who's Out and Edit Lineup are hidden while the game is in pregame
     # planning; check the team-colored outline buttons the page is showing.
-    outlines = page.locator('.game-workspace-v2 .btn-outline-primary:visible, #pde-apply:visible')
+    # The selected inning is a filled button, not an outline one; it has its
+    # own test below.
+    outlines = page.locator(
+        '.game-workspace-v2 .btn-outline-primary:not(.btn-check:checked + *):visible, #pde-apply:visible')
     expect(outlines.first).to_be_visible(timeout=15_000)
     page.wait_for_timeout(500)
     for index in range(min(outlines.count(), 4)):
@@ -355,4 +358,51 @@ def test_team_settings_previews_the_foreground_and_warns(make_page, coachboard_u
     expect(warning).to_be_hidden()
     assert _style(preview, 'color') == WHITE_FG
     assert _style(text_sample, 'color') == _rgb(SEEDED)
+    assert page.cb_errors == []
+
+
+# --- the selected inning in Set Defense ------------------------------------------
+
+SELECTED_INNING = '#inning-btn-group .btn-check:checked + label'
+UNSELECTED_INNING = '#inning-btn-group .btn-check:not(:checked) + label'
+
+#: What is painted at the element (its own background over everything behind
+#: it) and what is painted just behind it (its parent's stack).
+FILLS = """el => {
+  const ctx = Object.assign(document.createElement('canvas'), {width: 1, height: 1}).getContext('2d');
+  const paint = els => {
+    ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1, 1);
+    for (const n of els) { ctx.fillStyle = getComputedStyle(n).backgroundColor; ctx.fillRect(0, 0, 1, 1); }
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+  const stack = []; for (let n = el; n; n = n.parentElement) stack.unshift(n);
+  return {fill: paint(stack), behind: paint(stack.slice(0, -1)), text: getComputedStyle(el).color};
+}"""
+
+
+@pytest.mark.parametrize('name', ['white', 'gold', 'yellow', 'navy', 'red'])
+@pytest.mark.parametrize('viewport', [DESKTOP, PHONE], ids=['desktop', 'phone'])
+def test_selected_inning_stands_out_for_any_team_color(make_page, coachboard_url, name, viewport):
+    color, _ = TEAM_COLORS[name]
+    page = make_page(viewport, color)
+    _open_game(page, coachboard_url)
+    selected = page.locator(SELECTED_INNING).first
+    other = page.locator(UNSELECTED_INNING).first
+    expect(selected).to_be_visible(timeout=15_000)
+    page.wait_for_timeout(500)
+
+    chosen = selected.evaluate(FILLS)
+    plain = other.evaluate(FILLS)
+    # The number on the selected inning is readable on its fill ...
+    assert _contrast(page, chosen['text'], chosen['fill']) >= 4.5, (name, chosen)
+    # ... and the selected inning stands apart from the card and from the
+    # innings that are not selected, like any UI control at 3:1.
+    assert _contrast(page, chosen['fill'], chosen['behind']) >= 3, (name, chosen)
+    assert _contrast(page, chosen['fill'], plain['fill']) >= 3, (name, chosen, plain)
+
+    if name in ('navy', 'red'):
+        # Dark team colors are used as they are.
+        assert chosen['fill'] == _rgb(color), (name, chosen)
+        assert chosen['text'] == WHITE_FG, (name, chosen)
     assert page.cb_errors == []

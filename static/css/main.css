@@ -258,6 +258,19 @@ body {
     --bs-btn-active-color: var(--cb-on-primary, #fff);
 }
 
+/* A light team color (white, gold, yellow) as the fill would leave the
+   selected inning a pale button on a white card. Fill it with the team
+   color's readable shade instead -- the one already used for team-colored
+   text on white -- with white text on it. Dark team colors are unchanged. */
+html.cb-on-primary-dark #inning-btn-group .btn-check:checked + .btn-outline-primary,
+html.cb-on-primary-dark #rotation-card-container #inning-btn-group .btn-check:checked + label.btn {
+    background-color: var(--cb-primary-text) !important;
+    border-color: var(--cb-primary-text) !important;
+    color: var(--cb-surface) !important;
+    --bs-btn-color: var(--cb-surface);
+    --bs-btn-active-color: var(--cb-surface);
+}
+
 /* Make it clear that the preset is optional, not the defense itself. */
 #rotation-card-container .gm-preset-label {
     font-size: 0 !important;
