@@ -1,4 +1,17 @@
-"""Regression coverage for secondary-coach postgame navigation races."""
+"""Postgame navigation for every coach viewing a live game.
+
+When a live game ends, the coach who ended it goes to the Game Report, and
+every other coach/device on that same game follows automatically:
+live_game_postgame_cleanup.js redirects on the server's game_state_update
+broadcast (live_game_v2.js republishes it as coachboard:live-state), with a
+slow /state check as the fallback when the socket is unavailable. It only
+redirects once it has seen this game live and the durable End Game marker is
+present, so a stale pre-start is_live=false response cannot end the game.
+
+Every coach here gets its own browser context with the vendored CDN assets
+routed (see cdn_assets.py); without socket.io the other coach never hears the
+live broadcast at all.
+"""
 
 import json
 import os
@@ -16,6 +29,8 @@ if os.environ.get("COACHBOARD_E2E") != "1":
     )
 
 from playwright.sync_api import Browser, Page, expect
+
+import cdn_assets
 
 
 TEST_USERNAME = "playwright-coach"
@@ -89,6 +104,14 @@ def create_game(page: Page, coachboard_url: str, opponent: str):
     assert rotation.json().get("status") == "success"
 
     return game_id
+
+
+def coach_context(browser: Browser, **routing):
+    """A phone-sized browser context for one coach, with CDN assets served."""
+    cdn_assets.require_vendored_assets()
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    cdn_assets.install(context, **routing)
+    return context
 
 
 def cleanup_game(page: Page, coachboard_url: str, game_id: int):
@@ -216,12 +239,8 @@ def test_stale_prestart_false_state_does_not_redirect_after_live(
     browser: Browser,
     coachboard_url: str,
 ):
-    coach_a_context = browser.new_context(
-        viewport={"width": 390, "height": 844}
-    )
-    coach_b_context = browser.new_context(
-        viewport={"width": 390, "height": 844}
-    )
+    coach_a_context = coach_context(browser)
+    coach_b_context = coach_context(browser)
 
     coach_a = coach_a_context.new_page()
     coach_b = coach_b_context.new_page()
@@ -364,12 +383,8 @@ def test_real_end_game_marker_redirects_secondary_coach(
     browser: Browser,
     coachboard_url: str,
 ):
-    coach_a_context = browser.new_context(
-        viewport={"width": 390, "height": 844}
-    )
-    coach_b_context = browser.new_context(
-        viewport={"width": 390, "height": 844}
-    )
+    coach_a_context = coach_context(browser)
+    coach_b_context = coach_context(browser)
 
     coach_a = coach_a_context.new_page()
     coach_b = coach_b_context.new_page()
@@ -473,3 +488,175 @@ def test_real_end_game_marker_redirects_secondary_coach(
 
         coach_a_context.close()
         coach_b_context.close()
+
+
+# --- Every coach on the game follows the end of it ---------------------------
+
+END_GAME = {"defer_pitching": True, "end_reason": "manual", "current_inning_played": True}
+
+
+def report_url(coachboard_url, game_id):
+    return re.compile(rf"^{re.escape(coachboard_url)}/game-day/{game_id}/report$")
+
+
+def open_live(page: Page, coachboard_url: str, game_id: int):
+    page.goto(f"{coachboard_url}/game/{game_id}", wait_until="domcontentloaded")
+    expect(page.locator("#cbQuickDefense")).to_be_visible(timeout=15_000)
+    expect(page.locator("#live-sync-status-v2")).to_contain_text("SYNCED", timeout=10_000)
+
+
+def track_report_visits(page: Page, coachboard_url: str, game_id: int):
+    """Count main-frame navigations to this game's report."""
+    visits = []
+    pattern = report_url(coachboard_url, game_id)
+    page.on("framenavigated", lambda frame: visits.append(frame.url)
+            if frame == page.main_frame and pattern.match(frame.url) else None)
+    return visits
+
+
+def start_game(page: Page, coachboard_url: str, opponent: str):
+    game_id = create_game(page, coachboard_url, opponent)
+    started = page.request.post(f"{coachboard_url}/api/live-game/{game_id}/start", data={})
+    assert started.ok and started.json().get("status") == "success", started.text()
+    return game_id
+
+
+def test_end_game_takes_the_ending_coach_and_the_other_coach_to_the_report(
+    browser: Browser,
+    coachboard_url: str,
+):
+    coach_a_context = coach_context(browser)
+    coach_b_context = coach_context(browser)
+    coach_a, coach_b = coach_a_context.new_page(), coach_b_context.new_page()
+    game_id = None
+
+    try:
+        login(coach_a, coachboard_url)
+        login(coach_b, coachboard_url)
+        game_id = start_game(coach_a, coachboard_url, "Both Coaches Opponent")
+        open_live(coach_a, coachboard_url, game_id)
+        open_live(coach_b, coachboard_url, game_id)
+        b_visits = track_report_visits(coach_b, coachboard_url, game_id)
+
+        # Coach A ends the game the way a coach does: End Game, then confirm.
+        coach_a.once("dialog", lambda dialog: dialog.accept())
+        coach_a.locator("#liveEndGameBtn").click()
+
+        expect(coach_a).to_have_url(report_url(coachboard_url, game_id), timeout=10_000)
+        expect(coach_a.get_by_text("Game Report", exact=True)).to_be_visible()
+
+        expect(coach_b).to_have_url(report_url(coachboard_url, game_id), timeout=10_000)
+        expect(coach_b.get_by_text("Game Report", exact=True)).to_be_visible()
+
+        # One redirect, then it stays: wait past the 5s fallback check.
+        coach_b.wait_for_timeout(6_000)
+        assert report_url(coachboard_url, game_id).match(coach_b.url), coach_b.url
+        assert len(b_visits) == 1, b_visits
+    finally:
+        if game_id is not None:
+            cleanup_game(coach_a, coachboard_url, game_id)
+        coach_a_context.close()
+        coach_b_context.close()
+
+
+def test_backgrounded_coach_goes_to_the_report_on_returning(
+    browser: Browser,
+    coachboard_url: str,
+):
+    coach_a_context = coach_context(browser)
+    coach_b_context = coach_context(browser)
+    coach_a, coach_b = coach_a_context.new_page(), coach_b_context.new_page()
+    game_id = None
+
+    try:
+        login(coach_a, coachboard_url)
+        login(coach_b, coachboard_url)
+        game_id = start_game(coach_a, coachboard_url, "Backgrounded Coach Opponent")
+        open_live(coach_b, coachboard_url, game_id)
+        b_visits = track_report_visits(coach_b, coachboard_url, game_id)
+
+        # Suspend Coach B's page the way a phone suspends a backgrounded
+        # app: no script runs -- no timers, no socket handlers, no
+        # navigation -- while the game ends.
+        suspended = coach_b_context.new_cdp_session(coach_b)
+        suspended.send("Debugger.enable")
+        suspended.send("Debugger.pause")
+        ended = coach_a.request.post(
+            f"{coachboard_url}/api/live-game/{game_id}/end-with-pitching", data=END_GAME)
+        assert ended.ok and ended.json()["state"]["game"]["is_live"] is False
+        coach_a.wait_for_timeout(6_000)   # past a socket update and a fallback check
+        assert re.search(rf"/game/{game_id}/?$", coach_b.url), coach_b.url
+
+        suspended.send("Debugger.resume")
+        suspended.send("Debugger.disable")
+        expect(coach_b).to_have_url(report_url(coachboard_url, game_id), timeout=10_000)
+        coach_b.wait_for_timeout(6_000)
+        assert len(b_visits) == 1, b_visits
+    finally:
+        if game_id is not None:
+            cleanup_game(coach_a, coachboard_url, game_id)
+        coach_a_context.close()
+        coach_b_context.close()
+
+
+def test_other_coach_without_a_socket_still_reaches_the_report(
+    browser: Browser,
+    coachboard_url: str,
+):
+    """socket.io unavailable (blocked network, failed CDN): the slow /state
+    check is the only path left, and it must still finish the transition."""
+    coach_a_context = coach_context(browser)
+    coach_b_context = coach_context(browser, blocked=("socket.io.min.js",))
+    coach_a, coach_b = coach_a_context.new_page(), coach_b_context.new_page()
+    game_id = None
+
+    try:
+        login(coach_a, coachboard_url)
+        login(coach_b, coachboard_url)
+        game_id = start_game(coach_a, coachboard_url, "No Socket Opponent")
+        coach_b.goto(f"{coachboard_url}/game/{game_id}", wait_until="domcontentloaded")
+        assert coach_b.evaluate("typeof io") == "undefined"
+        # Let the fallback check see the game live before it ends.
+        coach_b.wait_for_timeout(6_000)
+
+        ended = coach_a.request.post(
+            f"{coachboard_url}/api/live-game/{game_id}/end-with-pitching", data=END_GAME)
+        assert ended.ok
+        expect(coach_b).to_have_url(report_url(coachboard_url, game_id), timeout=12_000)
+    finally:
+        if game_id is not None:
+            cleanup_game(coach_a, coachboard_url, game_id)
+        coach_a_context.close()
+        coach_b_context.close()
+
+
+def test_coach_on_another_game_is_not_redirected(
+    browser: Browser,
+    coachboard_url: str,
+):
+    coach_a_context = coach_context(browser)
+    coach_c_context = coach_context(browser)
+    coach_a, coach_c = coach_a_context.new_page(), coach_c_context.new_page()
+    ended_game = other_game = None
+
+    try:
+        login(coach_a, coachboard_url)
+        login(coach_c, coachboard_url)
+        ended_game = start_game(coach_a, coachboard_url, "Ended Game Opponent")
+        other_game = start_game(coach_a, coachboard_url, "Still Live Opponent")
+        open_live(coach_c, coachboard_url, other_game)
+
+        ended = coach_a.request.post(
+            f"{coachboard_url}/api/live-game/{ended_game}/end-with-pitching", data=END_GAME)
+        assert ended.ok and ended.json()["state"]["game"]["is_live"] is False
+
+        # Past the 5s fallback check: Coach C is still on the live game.
+        coach_c.wait_for_timeout(6_500)
+        assert re.search(rf"/game/{other_game}/?$", coach_c.url), coach_c.url
+        expect(coach_c.locator("#cbQuickDefense")).to_be_visible()
+    finally:
+        for game_id in (ended_game, other_game):
+            if game_id is not None:
+                cleanup_game(coach_a, coachboard_url, game_id)
+        coach_a_context.close()
+        coach_c_context.close()

@@ -15,6 +15,20 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Browser, Page, expect
 
+import cdn_assets
+
+
+def routed_context(browser: Browser, **kwargs):
+    """A new context with the vendored CDN assets (Bootstrap, Socket.IO) served.
+
+    Every device in these tests depends on live Socket.IO updates, and the
+    local CDN routing is otherwise only installed on the default page.
+    """
+    cdn_assets.require_vendored_assets()
+    context = browser.new_context(**kwargs)
+    cdn_assets.install(context)
+    return context
+
 
 TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
@@ -88,8 +102,8 @@ def cleanup_game(page: Page, coachboard_url: str, game_id: int):
 
 
 def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url: str):
-    phone_context = browser.new_context(viewport={'width': 390, 'height': 844})
-    ipad_context = browser.new_context(viewport={'width': 768, 'height': 1024})
+    phone_context = routed_context(browser, viewport={'width': 390, 'height': 844})
+    ipad_context = routed_context(browser, viewport={'width': 768, 'height': 1024})
     phone = phone_context.new_page()
     ipad = ipad_context.new_page()
     game_id = None
@@ -256,10 +270,12 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
     browser: Browser,
     coachboard_url: str,
 ):
-    coach_a_context = browser.new_context(
+    coach_a_context = routed_context(
+        browser,
         viewport={'width': 390, 'height': 844}
     )
-    coach_b_context = browser.new_context(
+    coach_b_context = routed_context(
+        browser,
         viewport={'width': 390, 'height': 844}
     )
 
@@ -555,10 +571,12 @@ def test_test2_drag_survives_remote_live_redraw(
     to the older alignment after it has already rendered the newer remote
     defense.
     """
-    phone_context = browser.new_context(
+    phone_context = routed_context(
+        browser,
         viewport={'width': 390, 'height': 844}
     )
-    ipad_context = browser.new_context(
+    ipad_context = routed_context(
+        browser,
         viewport={'width': 768, 'height': 1024}
     )
 
@@ -976,10 +994,12 @@ def test_test2_end_inning_uses_latest_remote_next_prep(
     authoritative GET and advance using the newest server prep, not the
     stale in-memory phone draft.
     """
-    phone_context = browser.new_context(
+    phone_context = routed_context(
+        browser,
         viewport={'width': 390, 'height': 844}
     )
-    ipad_context = browser.new_context(
+    ipad_context = routed_context(
+        browser,
         viewport={'width': 768, 'height': 1024}
     )
 
@@ -1202,10 +1222,12 @@ def test_test2_stale_recovery_authoritative_open_does_not_freeze_quick_field(
     This proves the open marker survives as a visual-only class and that a
     later real remote defensive change still repaints the phone normally.
     """
-    phone_context = browser.new_context(
+    phone_context = routed_context(
+        browser,
         viewport={'width': 390, 'height': 844}
     )
-    ipad_context = browser.new_context(
+    ipad_context = routed_context(
+        browser,
         viewport={'width': 768, 'height': 1024}
     )
 

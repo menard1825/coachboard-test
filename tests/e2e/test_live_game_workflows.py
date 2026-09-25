@@ -14,6 +14,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
+import cdn_assets
 from e2e_cleanup import release_game
 
 
@@ -382,8 +383,13 @@ def test_secondary_coach_uses_live_state_for_postgame_transition(
     browser,
     coachboard_url: str,
 ):
+    # The assistant's transition must come from socket.io, so both
+    # contexts need the vendored CDN assets.
+    cdn_assets.require_vendored_assets()
     primary_context = browser.new_context()
     assistant_context = browser.new_context()
+    cdn_assets.install(primary_context)
+    cdn_assets.install(assistant_context)
     primary = game_id = None
 
     try:
