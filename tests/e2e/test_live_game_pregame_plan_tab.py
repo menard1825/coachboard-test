@@ -364,7 +364,7 @@ def test_three_tab_switcher_fits_a_phone_without_clipping(page: Page, coachboard
         )
 
         labels = [button['label'] for button in measurements['buttons']]
-        assert labels == ['On the Field', 'Next Inning', 'Pregame Plan'], labels
+        assert labels == ['On the Field', '2nd Inning', 'Pregame Plan'], labels
 
         for button in measurements['buttons']:
             assert button['lineCount'] == 1, (
@@ -399,7 +399,7 @@ def test_on_the_field_and_next_inning_still_work_alongside_the_new_tab(page: Pag
         tab(page, 'next').click()
         next_board = page.locator(NEXT_CARD)
         expect(next_board).to_be_visible(timeout=10_000)
-        expect(next_board).to_contain_text('NEXT INNING · 2')
+        expect(next_board.locator('.cb-next-title')).to_have_text('2nd Inning Defense')
         expect(page.locator(PLAN_CARD)).to_be_hidden()
 
         tab(page, 'now').click()

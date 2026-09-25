@@ -46,6 +46,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import expect  # noqa: E402
 
 import cdn_assets  # noqa: E402
+from e2e_cleanup import delete_players_named  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -169,8 +170,9 @@ FETCH_RECORDER = r"""
 
 
 @pytest.fixture
-def make_page(browser):
+def make_page(browser, coachboard_url):
     contexts = []
+    pages = []
 
     def _make(viewport=DESKTOP, *, api_delay_ms=0, blocked=()):
         cdn_assets.require_vendored_assets()
@@ -187,9 +189,16 @@ def make_page(browser):
                 and 'Failed to load resource' not in message.text else None)
         page.cb_errors = errors
         page.cb_failing = set()
+        page.cb_players = []
+        pages.append(page)
         return page
 
     yield _make
+    # Remove the players these tests added so the shared roster is unchanged.
+    for page in pages:
+        if page.cb_players:
+            left = delete_players_named(page.request, coachboard_url, page.cb_players)
+            assert left == [], f'test players were not removed: {left}'
     for context in contexts:
         context.close()
 
@@ -263,6 +272,7 @@ def _add_player(page, base_url, name):
         'throws': 'Right', 'bats': 'Right', 'notes': '', 'pitcher_role': 'Not a Pitcher',
         'roster_status': 'regular'})
     assert response.status in (200, 302), response.status
+    page.cb_players.append(name)
 
 
 def _add_template(page, base_url, title):

@@ -9,8 +9,8 @@ live_game_board_prep_v2.js now owns landscape sizing for both fields and
 derives it from the viewport height.
 
 On the Field and Next Inning do not share a vertical budget -- Next Inning
-carries a heading, a save chip and a STEP instruction above its field -- so
-they are measured separately here rather than through one shared helper.
+carries a heading and a save chip above its field -- so they are measured
+separately here rather than through one shared helper.
 """
 
 import os
@@ -302,15 +302,17 @@ def test_next_inning_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
     try:
         open_live_game(page, coachboard_url, game_id)
         show(page, 'next')
+        # At rest there is no STEP instruction any more (96a13c5); it only
+        # appears once a move has started.
+        expect(page.locator('#live-board-prep-v3 .cb-next-selection')).to_have_count(0)
 
         data = measure(page, NEXT_FIELD, {
             'heading': '#live-board-prep-v3 .cb-next-title',
-            'instruction': '#live-board-prep-v3 .cb-next-selection',
             'bench': '#live-board-prep-v3 .cb-next-bench',
         })
         height = data['viewport']['height']
 
-        for name in ('header', 'switcher', 'heading', 'instruction',
+        for name in ('header', 'switcher', 'heading',
                      'field', 'bench', 'endInning'):
             box = data['boxes'][name]
             assert box, f'Next Inning at 1024x768: {name} is missing'

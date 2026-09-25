@@ -148,15 +148,16 @@ def test_bench_report_shows_actual_and_future_planned_sits(page: Page, coachboar
 
         next_board = page.locator('#live-board-prep-v3')
         expect(next_board).to_be_visible(timeout=10_000)
-        expect(next_board).to_contain_text('NEXT INNING · 2')
-        expect(next_board).to_contain_text('Loaded from your pregame plan')
+        expect(next_board.locator('.cb-next-title')).to_have_text('2nd Inning Defense')
+        expect(next_board.locator('.cb-next-sub')).to_have_text('Pregame plan for the 2nd')
         expect(
             next_board.locator('[data-next-position="C"]')
         ).to_contain_text(BENCH_NAME)
         expect(
             next_board.get_by_role(
                 'button',
-                name='Use current defense',
+                name='Use 1st Inning Defense',
+                exact=True,
             )
         ).to_be_visible()
         expect(

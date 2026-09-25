@@ -28,6 +28,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
+from e2e_cleanup import delete_players_named, release_game
 from cdp_touch import (
     DRAG_OVER_SELECTOR,
     GHOST_SELECTOR,
@@ -43,11 +44,9 @@ from cdp_touch import (
 
 TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
-# Each test gets its own bench player. add_player (roster.py:137-140)
-# answers a duplicate name with a flash + redirect -- HTTP 200 carrying
-# HTML -- and its AJAX success path (roster.py:171) returns no player id,
-# so a test that relies on deleting its player by id cannot clean up and
-# poisons the next one.
+# Each test gets its own uniquely named bench player (add_player answers a
+# duplicate name with a flash + redirect, not an error), and cleanup() removes
+# it again by name once the game is no longer live.
 def bench_name():
     return f'Contract Bench {uuid.uuid4().hex[:8]}'
 
@@ -183,20 +182,27 @@ def create_game(page: Page, url: str):
     return game_id
 
 
+def start_live_game(page: Page, url: str):
+    """Add a bench player, create a planned game and start it; return (game_id, player_name).
+
+    Anything created before a failure is released again."""
+    player_name = game_id = None
+    try:
+        player_name = add_bench_player(page, url)
+        game_id = create_game(page, url)
+        post_json(page, url, f'/api/live-game/{game_id}/start', {})
+        return game_id, player_name
+    except BaseException:
+        cleanup(page, url, game_id, player_name)
+        raise
+
+
 def cleanup(page: Page, url: str, game_id, player_name):
-    if game_id:
-        state = page.request.get(f'{url}/api/live-game/{game_id}/state')
-        if state.ok and state.json().get('game', {}).get('is_live'):
-            page.request.post(
-                f'{url}/api/live-game/{game_id}/end-with-pitching',
-                data={'defer_pitching': True, 'end_reason': 'manual', 'current_inning_played': True},
-            )
-        page.request.post(f'{url}/game-day/{game_id}/delete', headers={'Accept': 'application/json'})
-    # The bench player is deliberately left on the disposable roster.
-    # delete_player needs an id, and add_player's AJAX response does not
-    # return one (roster.py:171); the roster is also locked while a game
-    # is live. Unique names are what keep tests independent, so there is
-    # nothing here that has to succeed.
+    # End the game first: the roster stays locked while it is live.
+    release_game(page.request, url, game_id)
+    if player_name:
+        left = delete_players_named(page.request, url, [player_name])
+        assert left == [], f'bench player was not removed: {left}'
 
 
 def is_vacant(state, position):
@@ -285,10 +291,8 @@ def live_board(page: Page, coachboard_url: str, browser_name: str, request):
     board = request.param if hasattr(request, 'param') else ON_FIELD
     page.set_viewport_size(PHONE)
     login(page, coachboard_url)
-    player_name = add_bench_player(page, coachboard_url)
-    game_id = create_game(page, coachboard_url)
+    game_id, player_name = start_live_game(page, coachboard_url)
     try:
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
         dismiss_flashes(page)
@@ -537,10 +541,8 @@ def test_drag_controller_is_a_singleton_with_two_surfaces(
 
     page.set_viewport_size(PHONE)
     login(page, coachboard_url)
-    player_name = add_bench_player(page, coachboard_url)
-    game_id = create_game(page, coachboard_url)
+    game_id, player_name = start_live_game(page, coachboard_url)
     try:
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
         page.locator('[data-now-next="next"]').click()
@@ -574,10 +576,8 @@ def test_board_click_handlers_survive_the_migration(page: Page, coachboard_url, 
 
     page.set_viewport_size(PHONE)
     login(page, coachboard_url)
-    player_name = add_bench_player(page, coachboard_url)
-    game_id = create_game(page, coachboard_url)
+    game_id, player_name = start_live_game(page, coachboard_url)
     try:
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
 
@@ -921,12 +921,14 @@ def _open_live_page(page: Page, coachboard_url: str):
     """A started live game with both boards registered."""
     page.set_viewport_size(PHONE)
     login(page, coachboard_url)
-    player_name = add_bench_player(page, coachboard_url)
-    game_id = create_game(page, coachboard_url)
-    post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
-    page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
-    expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
-    dismiss_flashes(page)
+    game_id, player_name = start_live_game(page, coachboard_url)
+    try:
+        page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
+        expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
+        dismiss_flashes(page)
+    except BaseException:
+        cleanup(page, coachboard_url, game_id, player_name)
+        raise
     return game_id, player_name
 
 
