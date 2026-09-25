@@ -155,7 +155,7 @@
         <ul class="navbar-nav ms-auto flex-row">
             <li class="nav-item dropdown d-none d-lg-block">
                 <a class="nav-link dropdown-toggle" href="#" id="userMenuDesktop" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-person-circle me-1"></i> Welcome, {{ session.full_name or session.username }}!
+                    <i class="bi bi-person-circle me-1"></i> <span class="cb-account-greeting">Welcome, </span>{{ session.full_name or session.username }}<span class="cb-account-greeting">!</span>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDesktop">
                     {% if session.role in ['Head Coach', 'Super Admin'] %}

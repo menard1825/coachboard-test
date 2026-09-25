@@ -229,6 +229,61 @@ body.cb-ui .coach-primary-nav .dropdown-item:focus {
   }
 }
 
+/* Development and Practice join the header at 1200px, after the compact rules
+   above stop applying. Keep every item on one line, and until full desktop
+   widths tighten the spacing and drop the greeting words so the header fits
+   inside the viewport. */
+@media (min-width: 1200px) {
+  body.cb-ui .coach-primary-nav {
+    flex: 0 0 auto;
+  }
+}
+
+@media (min-width: 1200px) and (max-width: 1365.98px) {
+  body.cb-ui .navbar > .container-fluid {
+    flex-wrap: nowrap;
+  }
+
+  body.cb-ui .navbar-brand {
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  body.cb-ui .navbar-brand-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.cb-ui .coach-primary-nav {
+    gap: .35rem !important;
+    margin-left: .5rem !important;
+  }
+
+  body.cb-ui .coach-primary-nav .cb-nav-link,
+  body.cb-ui .coach-primary-nav .cb-nav-more {
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+
+  body.cb-ui .navbar-nav:has(#userMenuDesktop),
+  body.cb-ui .navbar-nav .nav-item:has(#userMenuDesktop) {
+    min-width: 0;
+  }
+
+  body.cb-ui #userMenuDesktop {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.cb-ui #userMenuDesktop .cb-account-greeting {
+    display: none;
+  }
+}
+
 /* Shared cards */
 body.cb-ui main .card,
 body.cb-ui main .accordion-item,
