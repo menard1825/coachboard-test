@@ -172,7 +172,17 @@ document.addEventListener('DOMContentLoaded', () => {
             profileStatusEl.classList.toggle('is-complete', incompleteCount === 0);
         }
 
+        // Keep the player the coach has open, open, and anything typed into it.
+        const openCards = new Set([...container.querySelectorAll('.collapse.show')].map(el => el.id).filter(Boolean));
+        const unsaved = captureUnsavedEdits(container, rosterCardScope);
         container.innerHTML = filteredRoster.length > 0 ? filteredRoster.map(playerTemplate).join('') : `<div class="p-4 text-center text-muted">No players match that search.</div>`;
+        openCards.forEach(id => {
+            const card = document.getElementById(id);
+            if (!card || !container.contains(card)) return;
+            card.classList.add('show');
+            container.querySelectorAll(`[href="#${CSS.escape(id)}"]`).forEach(toggle => toggle.setAttribute('aria-expanded', 'true'));
+        });
+        restoreUnsavedEdits(container, rosterCardScope, unsaved);
         attachRosterSaveListeners();
         container.querySelectorAll('.open-player-development').forEach(button => {
             button.addEventListener('click', event => {
@@ -318,6 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </article>`;
         }).join('') : `<div class="cb-empty-state"><i class="bi bi-bullseye"></i><h5>${statusFilter === 'completed' ? 'No completed priorities yet' : 'No active priorities yet'}</h5><p>${statusFilter === 'completed' ? 'Completed player work will collect here.' : 'Add one clear, coachable priority to start the next development cycle.'}</p></div>`;
         const lessonValue = player?.has_lessons || 'No';
+        const unsaved = captureUnsavedEdits(container, formScope);
 
         container.innerHTML = `
             <div class="cb-dev-detail-head">
@@ -354,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </form>
             </div></div>` : ''}
         `;
+        restoreUnsavedEdits(container, formScope, unsaved);
 
         container.querySelector('.edit-roster-profile')?.addEventListener('click', () => {
             const tabLink = document.querySelector('a[data-bs-toggle="tab"][href="#roster"]');
@@ -556,30 +568,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
     
-    // The plan list below is rebuilt on every practice refresh, including
+    // Home sections below (Practice plans, Roster cards, a player's lesson
+    // info) are rebuilt with innerHTML on every refresh, including
     // data_updated from any coach's change. Carry over what the coach has
-    // typed or ticked but not saved yet -- any field that no longer matches
-    // the value it was rendered with -- so a refresh cannot wipe it. Fields
-    // the coach has not touched still take the refreshed values.
-    function practiceFormFields(container) {
-        return [...container.querySelectorAll('form[action]')].flatMap(form =>
-            [...form.querySelectorAll('input[name], textarea[name]')].map(field => ({
-                field,
-                key: `${form.getAttribute('action')}|${field.name}|${field.type === 'checkbox' ? field.value : ''}`,
-            })));
+    // typed, ticked or picked but not saved yet -- any field that no longer
+    // matches the value it was rendered with -- so a refresh cannot wipe it.
+    // Fields the coach has not touched still take the refreshed values.
+    // scopeOf(field) names the record a field belongs to (a plan's form, a
+    // player's card), so a value can only return to that same record; a
+    // record that no longer exists gets nothing back.
+    function editableFields(container, scopeOf) {
+        return [...container.querySelectorAll('input[name], textarea[name], select[name]')].flatMap(field => {
+            const scope = scopeOf(field);
+            if (!scope) return [];
+            return [{field, key: `${scope}|${field.name}|${field.type === 'checkbox' ? field.value : ''}`}];
+        });
     }
 
-    function captureUnsavedPracticeEdits(container) {
+    function renderedValue(field) {
+        if (field.tagName === 'SELECT') {
+            const options = [...field.options];
+            return (options.find(option => option.defaultSelected) || options[0])?.value ?? '';
+        }
+        return field.defaultValue;
+    }
+
+    function captureUnsavedEdits(container, scopeOf) {
         const edits = new Map();
-        practiceFormFields(container).forEach(({field, key}) => {
+        const fields = editableFields(container, scopeOf);
+        fields.forEach(({field, key}) => {
             if (field.type === 'checkbox') {
                 if (field.checked !== field.defaultChecked) edits.set(key, {checked: field.checked});
-            } else if (field.value !== field.defaultValue) {
+            } else if (field.value !== renderedValue(field)) {
                 edits.set(key, {value: field.value});
             }
         });
         const active = document.activeElement;
-        const focused = practiceFormFields(container).find(({field}) => field === active);
+        const focused = fields.find(({field}) => field === active);
         const focus = focused && {
             key: focused.key,
             start: typeof active.selectionStart === 'number' ? active.selectionStart : null,
@@ -588,19 +613,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return {edits, focus};
     }
 
-    function restoreUnsavedPracticeEdits(container, saved) {
-        practiceFormFields(container).forEach(({field, key}) => {
+    function restoreUnsavedEdits(container, scopeOf, saved) {
+        editableFields(container, scopeOf).forEach(({field, key}) => {
             const edit = saved.edits.get(key);
             if (edit && 'checked' in edit) field.checked = edit.checked;
             else if (edit) field.value = edit.value;
             if (saved.focus?.key === key) {
                 field.focus({preventScroll: true});
                 if (saved.focus.start !== null) {
-                    try { field.setSelectionRange(saved.focus.start, saved.focus.end); } catch (_) { /* date inputs */ }
+                    try { field.setSelectionRange(saved.focus.start, saved.focus.end); } catch (_) { /* number/date inputs */ }
                 }
             }
         });
     }
+
+    const formScope = field => field.form?.getAttribute('action') || null;
+    const rosterCardScope = field => field.closest('[id^="collapse-roster-"]')?.id || null;
 
     function renderPracticePlans() {
         const container = document.getElementById('practicePlanAccordion');
@@ -645,7 +673,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // open: collapsing it under them shrank the page and threw a phone's
         // scroll position back to the top.
         const openSections = new Set([...container.querySelectorAll('.collapse.show')].map(el => el.id).filter(Boolean));
-        const unsaved = captureUnsavedPracticeEdits(container);
+        const unsaved = captureUnsavedEdits(container, formScope);
 
         container.innerHTML = orderedPlans.map(plan => {
             const dateOnly = plan.date.split('T')[0];
@@ -699,7 +727,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggle.setAttribute('aria-expanded', 'true');
             });
         });
-        restoreUnsavedPracticeEdits(container, unsaved);
+        restoreUnsavedEdits(container, formScope, unsaved);
         attachTaskListeners();
         container.querySelectorAll('.reuse-practice-btn').forEach(button => {
             button.addEventListener('click', () => {
