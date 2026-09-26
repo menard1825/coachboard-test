@@ -111,7 +111,7 @@
 
   function liveBanner(model) {
     const game = model.liveGame;
-    if (!game) return '';
+    if (!game || Number(game.id) === Number(model.nextGame?.id)) return '';
     return `<a class="cb-home-live" href="/game/${game.id}">
       <span class="cb-live-dot"></span>
       <span><strong>Game in progress</strong><small>vs ${esc(game.opponent)} · Resume live game</small></span>
@@ -148,7 +148,7 @@
         <i class="bi bi-diamond cb-home-card-icon"></i>
       </div>
 
-      <div class="cb-home-readiness">
+      <div class="cb-home-readiness" aria-label="Game prep checklist">
         ${statusItem(r.lineup_ready ? 'check-circle-fill' : 'exclamation-circle', 'Batting lineup', r.lineup_ready ? `${r.lineup_count || 0} hitters ready` : 'Needs attention before game day', r.lineup_ready, !r.lineup_ready)}
         ${statusItem(r.defense_ready ? 'check-circle-fill' : 'exclamation-circle', 'Defense', r.defense_ready ? `${r.defense_completed_innings || r.defense_innings || 0} innings planned` : 'Rotation is not complete', r.defense_ready, !r.defense_ready)}
         ${statusItem('people', 'Availability', r.present_count == null ? 'Open game to review availability' : `${present} available${absent ? ` · ${absent} out` : ''}`, true)}
@@ -159,7 +159,6 @@
 
       <div class="cb-home-card-actions">
         <a class="btn btn-primary" href="/game/${game.id}">${game.is_live ? 'Resume Live Game' : 'Manage Game'}</a>
-        <a class="btn btn-outline-secondary" href="/game-day">Schedule</a>
       </div>
     </section>`;
   }
@@ -167,12 +166,10 @@
   function attentionCard(model) {
     const rows = [];
     const r = model.readiness || {};
-    const rules = model.rules || {};
 
+    // Lineup, defense and competition rules are the Next Game card's prep
+    // checklist; this card holds only what that checklist does not.
     if (model.nextGame) {
-      if (!r.lineup_ready) rows.push(attentionRow('card-list', 'Batting lineup', 'Build or finish the lineup for the next game.', `/game/${model.nextGame.id}`));
-      if (!r.defense_ready) rows.push(attentionRow('diagram-3', 'Defensive plan', 'Complete the starting defense / rotation.', `/game/${model.nextGame.id}`));
-      if (!rules.effective || rules.source === 'unselected') rows.push(attentionRow('trophy', 'Competition rules', 'Choose the rules that apply to this event.', `/game/${model.nextGame.id}`));
       (r.pitching_alerts || []).slice(0, 2).forEach(item => {
         rows.push(attentionRow('exclamation-triangle', item.name, `${item.status}${item.detail ? ` · ${item.detail}` : ''}`, '/pitching'));
       });
@@ -188,10 +185,10 @@
 
     const body = rows.length
       ? rows.slice(0, 6).join('')
-      : `<div class="cb-home-all-clear"><i class="bi bi-check2-circle"></i><strong>No items need attention</strong></div>`;
+      : `<div class="cb-home-all-clear"><i class="bi bi-check2-circle"></i><strong>No pitching, arm-care or roster alerts</strong></div>`;
 
     return `<section class="cb-home-card cb-home-attention">
-      <div class="cb-home-card-head compact"><div><span class="cb-home-eyebrow">Coach checklist</span><h3>Needs Attention</h3></div><i class="bi bi-lightning-charge cb-home-card-icon"></i></div>
+      <div class="cb-home-card-head compact"><div><span class="cb-home-eyebrow">Team alerts</span><h3>Needs Attention</h3></div><i class="bi bi-lightning-charge cb-home-card-icon"></i></div>
       <div class="cb-home-attention-list">${body}</div>
     </section>`;
   }
@@ -259,7 +256,7 @@
     container.innerHTML = `<div class="cb-home-dashboard">
       <header class="cb-home-welcome">
         <div><span class="cb-home-eyebrow">CoachBoard Home</span><h1>${greeting()}${firstName ? `, ${esc(firstName)}` : ''}</h1><p>Next game, practice, pitching, and team status.</p></div>
-        <div class="cb-home-context"><span>${esc(role || 'Coach')}</span>${competitionDefault ? `<small>Default rules: ${esc(competitionDefault)}</small>` : '<small>Competition rules: choose by game/event</small>'}</div>
+        <div class="cb-home-context"><span>${esc(role || 'Coach')}</span>${model.nextGame ? '' : competitionDefault ? `<small>Default rules: ${esc(competitionDefault)}</small>` : '<small>Competition rules: choose by game/event</small>'}</div>
       </header>
 
       ${liveBanner(model)}
@@ -278,7 +275,7 @@
       <section class="cb-home-quick-section">
         <div class="cb-home-section-head"><div><span class="cb-home-eyebrow">Shortcuts</span><h3>Quick Actions</h3></div></div>
         <div class="cb-home-quick-grid">
-          ${quickLink('/game-day', 'diamond', 'Game Day', 'Plan or open the next game')}
+          ${quickLink('/game-day', 'diamond', 'Game Day', 'Schedule and every game')}
           ${quickLink('/#practice_plan', 'clipboard-check', 'Practice', 'Build the next practice plan')}
           ${quickLink('/pitching', 'bullseye', 'Pitching', 'Eligibility and arm care')}
           ${quickLink('/#roster', 'people', 'Roster', 'Player profiles and roles')}
