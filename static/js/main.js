@@ -556,6 +556,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
     
+    // The plan list below is rebuilt on every practice refresh, including
+    // data_updated from any coach's change. Carry over what the coach has
+    // typed or ticked but not saved yet -- any field that no longer matches
+    // the value it was rendered with -- so a refresh cannot wipe it. Fields
+    // the coach has not touched still take the refreshed values.
+    function practiceFormFields(container) {
+        return [...container.querySelectorAll('form[action]')].flatMap(form =>
+            [...form.querySelectorAll('input[name], textarea[name]')].map(field => ({
+                field,
+                key: `${form.getAttribute('action')}|${field.name}|${field.type === 'checkbox' ? field.value : ''}`,
+            })));
+    }
+
+    function captureUnsavedPracticeEdits(container) {
+        const edits = new Map();
+        practiceFormFields(container).forEach(({field, key}) => {
+            if (field.type === 'checkbox') {
+                if (field.checked !== field.defaultChecked) edits.set(key, {checked: field.checked});
+            } else if (field.value !== field.defaultValue) {
+                edits.set(key, {value: field.value});
+            }
+        });
+        const active = document.activeElement;
+        const focused = practiceFormFields(container).find(({field}) => field === active);
+        const focus = focused && {
+            key: focused.key,
+            start: typeof active.selectionStart === 'number' ? active.selectionStart : null,
+            end: typeof active.selectionEnd === 'number' ? active.selectionEnd : null,
+        };
+        return {edits, focus};
+    }
+
+    function restoreUnsavedPracticeEdits(container, saved) {
+        practiceFormFields(container).forEach(({field, key}) => {
+            const edit = saved.edits.get(key);
+            if (edit && 'checked' in edit) field.checked = edit.checked;
+            else if (edit) field.value = edit.value;
+            if (saved.focus?.key === key) {
+                field.focus({preventScroll: true});
+                if (saved.focus.start !== null) {
+                    try { field.setSelectionRange(saved.focus.start, saved.focus.end); } catch (_) { /* date inputs */ }
+                }
+            }
+        });
+    }
+
     function renderPracticePlans() {
         const container = document.getElementById('practicePlanAccordion');
         if (!container) return;
@@ -599,6 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // open: collapsing it under them shrank the page and threw a phone's
         // scroll position back to the top.
         const openSections = new Set([...container.querySelectorAll('.collapse.show')].map(el => el.id).filter(Boolean));
+        const unsaved = captureUnsavedPracticeEdits(container);
 
         container.innerHTML = orderedPlans.map(plan => {
             const dateOnly = plan.date.split('T')[0];
@@ -652,6 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggle.setAttribute('aria-expanded', 'true');
             });
         });
+        restoreUnsavedPracticeEdits(container, unsaved);
         attachTaskListeners();
         container.querySelectorAll('.reuse-practice-btn').forEach(button => {
             button.addEventListener('click', () => {
