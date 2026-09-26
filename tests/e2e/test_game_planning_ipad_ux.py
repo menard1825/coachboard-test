@@ -462,7 +462,9 @@ def test_ipad_game_planning_keeps_tablet_layout(
             )
 
             page.evaluate(
-                "y => window.scrollTo(0, y)",
+                # Instant: Bootstrap makes page scrolling smooth, and a
+                # mid-animation read is not where the picker settles.
+                "y => window.scrollTo({top: y, behavior: 'instant'})",
                 field_document_top + 120,
             )
 
@@ -476,7 +478,7 @@ def test_ipad_game_planning_keeps_tablet_layout(
             # inning row must still remain pinned instead of moving
             # away after one frame.
             page.evaluate(
-                "window.scrollBy(0, 220)"
+                "window.scrollBy({top: 220, behavior: 'instant'})"
             )
 
             page.wait_for_timeout(150)
