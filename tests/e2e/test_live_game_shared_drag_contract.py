@@ -696,29 +696,35 @@ def test_next_inning_pitcher_is_a_drag_source(page: Page, coachboard_url, live_b
 
 
 @_next_inning
-def test_next_inning_move_to_pitcher_benches_the_old_pitcher(
+def test_next_inning_move_to_pitcher_swaps_with_the_old_pitcher(
     page: Page, coachboard_url, live_board
 ):
-    """Moving onto P is asymmetric: the old pitcher is benched, not swapped.
+    """A field player dragged onto P swaps with the pitcher.
 
-    Every other field-to-field move swaps the two players. A move whose
-    target is P deliberately does not (live_game_board_prep_v2.js:1730-1740)
-    -- the outgoing pitcher goes to the bench and the source position is
-    left vacant. A refactor that unified the drop path would turn this
-    into a swap and silently put the old pitcher at shortstop.
+    Moving onto P used to bench the outgoing pitcher and leave the source
+    position open, so shortstop-to-pitcher silently emptied SS. It is now
+    the same two-player swap as every other field-to-field move (a bench
+    player dropped on P still sends the old pitcher to the bench).
     """
     board, game_id = live_board
 
     mouse_drag(page, page.locator(board.marker('SS')), page.locator(board.marker('P')))
     expect(page.locator(board.marker('P'))).to_contain_text('Shortstop Shawn', timeout=10_000)
+    expect(page.locator(board.marker('SS'))).to_contain_text('Pitcher Pat', timeout=10_000)
 
+    page.wait_for_function(
+        """async gameId => {
+            const r = await fetch(`/api/live-game/${gameId}/next-inning-prep`, {cache: 'no-store'});
+            const a = (await r.json()).confirmed.alignment;
+            return a.P === 'Shortstop Shawn' && a.SS === 'Pitcher Pat';
+        }""",
+        arg=game_id,
+        timeout=10_000,
+    )
     after = board_state(page, coachboard_url, game_id, board)
     assert after.get('P') == 'Shortstop Shawn', f'Next Inning: move onto P failed; {after}'
-    assert is_vacant(after, 'SS'), (
-        f'Next Inning: moving onto P swapped instead of benching; SS={after.get("SS")!r}'
-    )
-    assert 'Pitcher Pat' not in after.values(), (
-        f'Next Inning: the outgoing pitcher stayed on the field; {after}'
+    assert after.get('SS') == 'Pitcher Pat', (
+        f'Next Inning: moving onto P did not swap; SS={after.get("SS")!r}'
     )
 
 

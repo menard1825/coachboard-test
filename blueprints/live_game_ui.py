@@ -163,6 +163,29 @@ def _prep_dict(prep):
     }
 
 
+def _next_prep_conflict(data, next_inning, prep, team):
+    """Why a Next Inning save no longer applies, or None when it does."""
+    if 'inning' in data and str(data.get('inning') or '') != str(next_inning):
+        return 'The inning changed before this Next Inning change was saved.'
+
+    base = data.get('base_alignment')
+    if not isinstance(base, dict):
+        return None
+
+    allowed = _allowed_positions(team)
+
+    def filled(alignment):
+        return {
+            pos: (alignment or {}).get(pos)
+            for pos in allowed
+            if (alignment or {}).get(pos)
+        }
+
+    if filled(base) != filled(prep.alignment if prep else {}):
+        return 'The Next Inning defense changed on another device.'
+    return None
+
+
 def _prep_for_game(game_id, team_id):
     return db.session.query(GameNextInningPrep).filter_by(game_id=game_id, team_id=team_id).first()
 
@@ -326,6 +349,28 @@ def next_inning_prep(game_id):
     if request.method == 'POST':
         data = request.get_json(silent=True) or {}
         mode = (data.get('mode') or 'custom').lower()
+
+        # Next Inning saves in the background while the coach keeps moving
+        # players, so a save can land after the board changed elsewhere (a
+        # new inning, another coach's edit). Clients that send what they
+        # last saw get a conflict instead of silently overwriting it; older
+        # callers that send neither field keep the previous behavior.
+        #
+        # Technical debt: that unversioned path exists only for tabs opened
+        # before this deploy (the current board always sends both fields).
+        # Remove it once such tabs are no longer a compatibility concern.
+        #
+        # The compare and the write are atomic only because this POST holds
+        # the per-game lock in live_game_write_lock.py, which is valid for
+        # the single-process eventlet deployment. Moving to multiple workers
+        # or processes needs a database/Redis/distributed lock first.
+        conflict = _next_prep_conflict(data, next_inning, prep, team)
+        if conflict:
+            return jsonify({
+                'status': 'error',
+                'code': 'next_prep_conflict',
+                'message': conflict,
+            }), 409
 
         if mode == 'current':
             candidate = deepcopy(current_alignment)

@@ -601,8 +601,118 @@
       .show();
   }
 
+  function positionList(open) {
+    if (open.length === 1) return open[0];
+    if (open.length === 2) return `${open[0]} and ${open[1]}`;
+    return (
+      `${open.slice(0, -1).join(', ')}, ` +
+      `and ${open[open.length - 1]}`
+    );
+  }
+
+  // End Inning starts the next inning with the Next Inning defense. An open
+  // spot there is allowed (a short-handed team), but never by accident.
+  function ensureIncompleteNextModal() {
+    let modal = $('cbIncompleteNextModal');
+
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'cbIncompleteNextModal';
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.setAttribute('aria-labelledby', 'cbIncompleteNextTitle');
+
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cbIncompleteNextTitle">
+              Defense is incomplete
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div
+              class="fw-semibold"
+              data-cb-incomplete-next-message
+            ></div>
+            <div class="small text-muted mt-2">
+              Finish the Next Inning defense, or start the inning with
+              the open spot.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-cb-finish-defense
+            >
+              Finish defense
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              data-cb-start-inning-anyway
+            >
+              Start inning anyway
+            </button>
+          </div>
+        </div>
+      </div>`;
+
+    document.body.appendChild(modal);
+
+    return modal;
+  }
+
+  function warnIncompleteNextDefense(
+    open,
+    allowOpenCurrent
+  ) {
+    const modal = ensureIncompleteNextModal();
+    const instance =
+      bootstrap.Modal.getOrCreateInstance(modal);
+
+    modal.querySelector(
+      '[data-cb-incomplete-next-message]'
+    ).textContent =
+      `${positionList(open)} ` +
+      `${open.length === 1 ? 'is' : 'are'} still open.`;
+
+    modal.querySelector(
+      '[data-cb-finish-defense]'
+    ).onclick = () => {
+      instance.hide();
+      window.CBNextDefense?.showNext?.();
+    };
+
+    modal.querySelector(
+      '[data-cb-start-inning-anyway]'
+    ).onclick = () => {
+      modal.addEventListener(
+        'hidden.bs.modal',
+        () => {
+          endInningFromNext(allowOpenCurrent, true);
+        },
+        {once: true}
+      );
+
+      instance.hide();
+    };
+
+    instance.show();
+  }
+
   async function endInningFromNext(
-    allowOpenCurrent = false
+    allowOpenCurrent = false,
+    allowOpenNext = false
   ) {
     if (inningAdvanceBusy) return;
 
@@ -703,6 +813,36 @@
         }
 
         assigned.set(name, position);
+      }
+
+      const openNext = requiredDefensePositions(
+        prep
+      ).filter(
+        position => !String(
+          alignment[position] || ''
+        ).trim()
+      );
+
+      // "End Inning Anyway" on the field's open spots already covers the
+      // very same spots carried into the next inning. Any difference in the
+      // Next Inning gaps is a new question, so it is still asked.
+      const acceptedOpen =
+        allowOpenCurrent &&
+        openNext.length === openCurrent.length &&
+        openNext.every(
+          position => openCurrent.includes(position)
+        );
+
+      if (
+        openNext.length &&
+        !allowOpenNext &&
+        !acceptedOpen
+      ) {
+        warnIncompleteNextDefense(
+          openNext,
+          allowOpenCurrent
+        );
+        return;
       }
 
       const result = await postJson(

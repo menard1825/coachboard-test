@@ -20,11 +20,25 @@
   let liveChangeTimer = null;
   let selected = null;
   let selectedPosition = '';
-  let busy = false;
+  // Next Inning saves in the background, one request at a time, like the
+  // Pregame Plan. A move changes `draft` (the board) at once; the queue then
+  // sends the newest board. `serverBase` is the defense the server last
+  // confirmed -- each save sends it so a save cannot overwrite a defense that
+  // changed somewhere else in the meantime.
+  let serverBase = null;
+  let dirty = false;
+  let pendingMode = 'custom';
   let activeSavePromise = null;
+  let conflictCount = 0;
+  let rejectCount = 0;
+  // Bumped by every local move and every confirmed save, so a poll that was
+  // already on its way cannot put an older board back afterwards.
+  let localRevision = 0;
   let lastSignature = '';
   let saveMode = 'saved';
   let saveMessage = 'Saved ✓';
+  let successMessage = 'Saved ✓';
+  let noticeMessage = '';
   let errorMessage = '';
   let undoStack = [];
   let socketBound = false;
@@ -84,6 +98,12 @@
 
   function snapshot() {
     return normalize(draft);
+  }
+
+  function sameAlignment(a, b) {
+    return positions().every(
+      pos => (a?.[pos] || '') === (b?.[pos] || '')
+    );
   }
 
   function playerByName(name) {
@@ -786,6 +806,48 @@
         color:#a12d26;
       }
 
+      #${CARD_ID} .cb-next-save.waiting{
+        border-color:#e6ca82;
+        background:#fff8e6;
+        color:#775a10;
+      }
+
+      #${CARD_ID} .cb-next-notice{
+        border:1px solid #bdd0ea;
+        border-radius:8px;
+        background:#f2f6fc;
+        color:#315d98;
+        padding:7px 8px;
+        font-size:.68rem;
+        font-weight:780;
+      }
+
+      #${CARD_ID} .cb-next-notice[hidden]{
+        display:none;
+      }
+
+      #cbNextOpenWarning{
+        grid-column:1 / -1;
+        order:-1;
+        margin:0;
+        padding:4px 8px;
+        border:1px solid #e6ca82;
+        border-radius:8px;
+        background:#fff8e6;
+        color:#775a10;
+        font-size:.72rem;
+        font-weight:800;
+        line-height:1.25;
+        text-align:center;
+      }
+
+      @media(max-width:575.98px){
+        html body.cb-dugout.cb-next-open-warning .coach-live-shell{
+          padding-bottom:
+            calc(128px + env(safe-area-inset-bottom))!important;
+        }
+      }
+
       #${CARD_ID} .cb-next-body{
         padding:10px 11px 11px;
       }
@@ -1324,27 +1386,40 @@
   }
 
   async function api(method = 'GET', body = null) {
-    const response = await fetch(
-      `/api/live-game/${gameId}/next-inning-prep`,
-      {
-        method,
-        headers: body
-          ? {'Content-Type': 'application/json'}
-          : undefined,
-        body: body
-          ? JSON.stringify(body)
-          : undefined,
-        cache: 'no-store',
-      }
-    );
+    let response;
+
+    try {
+      response = await fetch(
+        `/api/live-game/${gameId}/next-inning-prep`,
+        {
+          method,
+          headers: body
+            ? {'Content-Type': 'application/json'}
+            : undefined,
+          body: body
+            ? JSON.stringify(body)
+            : undefined,
+          cache: 'no-store',
+        }
+      );
+    } catch (_) {
+      // The browser's own text ("Failed to fetch") means nothing to a
+      // coach. `retry` marks a failure worth trying again later.
+      const error = new Error('No connection.');
+      error.retry = true;
+      throw error;
+    }
 
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok || data.status === 'error') {
-      throw new Error(
+      const error = new Error(
         data.message ||
-        `Unable to save NEXT (${response.status}).`
+        `Unable to save the Next Inning defense (${response.status}).`
       );
+      error.code = data.code || '';
+      error.retry = response.status >= 500;
+      throw error;
     }
 
     return data;
@@ -1628,10 +1703,46 @@
       } else {
         undo.disabled =
           activeView === 'next'
-            ? busy || !undoStack.length
+            ? !undoStack.length
             : false;
       }
     }
+
+    syncOpenDefenseWarning(endInning);
+  }
+
+  // End Inning starts the next inning with the Next Inning defense, so an
+  // open spot there is worth seeing before tapping it -- including on a
+  // phone, where the card's own warning sits below the fixed action dock.
+  function syncOpenDefenseWarning(endInning) {
+    const open = latest ? openPositions() : [];
+    let warning = $('cbNextOpenWarning');
+
+    if (!endInning || !open.length) {
+      warning?.remove();
+      document.body.classList.remove('cb-next-open-warning');
+      return;
+    }
+
+    if (!warning) {
+      warning = document.createElement('div');
+      warning.id = 'cbNextOpenWarning';
+      warning.setAttribute('role', 'status');
+    }
+
+    if (warning.nextElementSibling !== endInning) {
+      endInning.parentNode.insertBefore(warning, endInning);
+    }
+
+    const text =
+      `⚠ Next inning: ${open.join(', ')} ` +
+      `${open.length === 1 ? 'is' : 'are'} open`;
+
+    if (warning.textContent !== text) {
+      warning.textContent = text;
+    }
+
+    document.body.classList.add('cb-next-open-warning');
   }
 
   function applyView() {
@@ -1978,9 +2089,11 @@
           </div>
         </div>
 
-        <div class="cb-next-save ${esc(saveMode)}">
-          ${esc(saveMessage)}
-        </div>
+        <div
+          class="cb-next-save ${esc(saveMode)}"
+          data-next-save-state
+          role="status"
+        >${esc(saveMessage)}</div>
       </div>
 
       <div class="cb-next-body">
@@ -1995,7 +2108,6 @@
             type="button"
             class="btn btn-outline-secondary"
             data-next-use-current
-            ${busy ? 'disabled' : ''}
           >
             ${
               currentLabel
@@ -2007,6 +2119,11 @@
         </div>
 
         <div class="cb-next-warnings">
+          <div
+            class="cb-next-notice"
+            data-next-notice
+            ${noticeMessage ? '' : 'hidden'}
+          >${esc(noticeMessage)}</div>
           ${nextWarningsMarkup()}
         </div>
 
@@ -2032,8 +2149,6 @@
 
             const name =
               button.dataset.nextPlayer || '';
-
-            if (busy) return;
 
             if (selected) {
               movePlayer(
@@ -2075,8 +2190,6 @@
         button.addEventListener(
           'click',
           () => {
-            if (busy) return;
-
             const name =
               button.dataset.nextBenchPlayer || '';
 
@@ -2136,108 +2249,251 @@
     applyView();
   }
 
-  async function saveAlignment(
+  // Update the save badge and notice in place. The queue finishes saves in
+  // the background while the coach keeps tapping, so it must not rebuild
+  // the board under a finger mid-tap just to change a status word.
+  function renderSyncState() {
+    const card = $(CARD_ID);
+    const badge = card?.querySelector('[data-next-save-state]');
+    const notice = card?.querySelector('[data-next-notice]');
+
+    if (badge) {
+      badge.className = `cb-next-save ${saveMode}`;
+      if (badge.textContent !== saveMessage) {
+        badge.textContent = saveMessage;
+      }
+    }
+
+    if (notice) {
+      notice.hidden = !noticeMessage;
+      if (notice.textContent !== noticeMessage) {
+        notice.textContent = noticeMessage;
+      }
+    }
+
+    syncLiveActions();
+  }
+
+  function setSyncState(state) {
+    if (state === 'saving') {
+      saveMode = 'saving';
+      saveMessage = 'Saving…';
+    } else if (state === 'waiting') {
+      saveMode = 'waiting';
+      saveMessage = 'Not synced — retrying';
+      noticeMessage =
+        'No connection right now. Your changes are kept on this screen ' +
+        'and will sync automatically when the connection is back.';
+    } else if (state === 'error') {
+      saveMode = 'error';
+      saveMessage = 'Not saved';
+    } else {
+      saveMode = 'saved';
+      saveMessage = successMessage;
+    }
+  }
+
+  // Apply a move to the board now and save it behind the coach's back.
+  function commitLocalChange(
     next,
     {
       mode = 'custom',
       pushUndo = true,
-      successMessage = 'Saved ✓',
+      message = 'Saved ✓',
     } = {}
   ) {
-    // NEXT currently blocks board interaction while a save is running, so
-    // there should only be one writer from this surface at a time. Keep the
-    // actual promise, though, so End Inning can wait for the exact write
-    // instead of merely waiting for live-game event state to look stable.
-    if (busy) return activeSavePromise;
-
     const before = snapshot();
+    const after = normalize(next);
 
-    busy = true;
-    saveMode = 'saving';
-    saveMessage = 'Saving…';
+    selected = null;
+    selectedPosition = '';
+
+    if (mode === 'custom' && sameAlignment(before, after)) {
+      renderCard();
+      return activeSavePromise || Promise.resolve();
+    }
+
+    if (pushUndo) {
+      undoStack.push(before);
+
+      if (undoStack.length > 12) {
+        undoStack.shift();
+      }
+    }
+
+    draft = after;
+    pendingMode = mode;
+    dirty = true;
+    localRevision += 1;
+    successMessage = message;
     errorMessage = '';
-    draft = normalize(next);
+    noticeMessage = '';
 
+    setSyncState('saving');
     renderCard();
 
-    const request = api(
-      'POST',
-      mode === 'current'
-        ? {mode: 'current'}
-        : {
-            mode: 'custom',
-            alignment: snapshot(),
-          }
-    );
+    return saveQueued();
+  }
 
+  // Send the newest board, one request at a time. Moves made while a save
+  // is in flight only mark the board dirty; the loop sends them together
+  // next, so an older board can never be saved after a newer one.
+  function saveQueued() {
+    if (activeSavePromise) return activeSavePromise;
+    if (!dirty) return Promise.resolve();
+
+    const request = runSaveQueue();
     activeSavePromise = request;
+    return request;
+  }
+
+  async function runSaveQueue() {
+    try {
+      while (dirty) {
+        dirty = false;
+
+        const mode = pendingMode;
+        const sent = snapshot();
+
+        setSyncState('saving');
+        renderSyncState();
+
+        let data;
+
+        try {
+          data = await api(
+            'POST',
+            {
+              mode,
+              ...(mode === 'current' ? {} : {alignment: sent}),
+              // Always versioned. The board is only drawn from a live read,
+              // which sets serverBase; if it is ever missing, `{}` fails
+              // closed as a conflict (reload) rather than overwriting.
+              base_alignment: serverBase || {},
+              inning: String(latest?.next_inning || ''),
+            }
+          );
+        } catch (error) {
+          if (error.code === 'next_prep_conflict') {
+            await resolveConflict();
+          } else if (error.retry) {
+            // Keep the coach's board. The poll (and the browser's online
+            // event) retries once the server answers again.
+            dirty = true;
+            setSyncState('waiting');
+            renderSyncState();
+          } else {
+            rejectLocalChange(error);
+          }
+          return;
+        }
+
+        latest = data;
+        lastSignature = JSON.stringify(data);
+        localRevision += 1;
+        serverBase = normalize(data?.confirmed?.alignment || sent);
+
+        // Newer moves are still on the board and go out next; only adopt the
+        // server's copy when nothing newer is waiting.
+        if (!dirty && !sameAlignment(serverBase, draft)) {
+          draft = normalize(serverBase);
+          renderCard();
+        }
+
+        document.dispatchEvent(
+          new CustomEvent(
+            'coachboard:next-defense-set',
+            {detail: {data}}
+          )
+        );
+      }
+
+      noticeMessage = '';
+      setSyncState('saved');
+      renderSyncState();
+    } finally {
+      activeSavePromise = null;
+    }
+  }
+
+  // The server's Next Inning defense moved on (another coach, a new inning)
+  // while this board had changes waiting. Never overwrite it: drop the
+  // waiting changes and show what the server has now.
+  async function resolveConflict() {
+    dirty = false;
+    undoStack = [];
+    conflictCount += 1;
+
+    let data = null;
 
     try {
-      const data = await request;
+      data = await api('GET');
+    } catch (_) {
+      data = null;
+    }
 
-      if (pushUndo) {
-        undoStack.push(before);
+    // A tap made while that read was out is part of the replay being
+    // stopped; the board below is the server's.
+    dirty = false;
+    dragSurface?.cancel();
 
-        if (undoStack.length > 12) {
-          undoStack.shift();
-        }
-      }
-
-      latest = data;
-      draft = normalize(
-        data?.confirmed?.alignment ||
-        draft
-      );
-
-      selected = null;
-      selectedPosition = '';
-
-      saveMode = 'saved';
-      saveMessage = successMessage;
-      errorMessage = '';
+    if (data) {
       lastSignature = JSON.stringify(data);
-
-      renderCard();
-
-      document.dispatchEvent(
-        new CustomEvent(
-          'coachboard:next-defense-set',
-          {detail: {data}}
-        )
-      );
-
-      return data;
-    } catch (error) {
-      draft = before;
-
-      selected = null;
-      selectedPosition = '';
-
-      saveMode = 'error';
-      saveMessage = 'Not saved';
-      errorMessage =
-        error.message ||
-        'Unable to save defense.';
-
-      renderCard();
-
-      return null;
-    } finally {
-      if (activeSavePromise === request) {
-        activeSavePromise = null;
-      }
-
-      busy = false;
+      hydrate(data, {remote: false});
+    } else {
+      // Show the last defense the server confirmed until the poll can
+      // read the new one.
+      lastSignature = '';
+      draft = normalize(serverBase || {});
       renderCard();
     }
+
+    noticeMessage =
+      'The Next Inning defense changed on another device before your ' +
+      'change could sync. Showing the latest defense — check it before ' +
+      'ending the inning.';
+    successMessage = 'Saved ✓';
+    setSyncState('saved');
+    renderSyncState();
+  }
+
+  // The server refused the change itself (for example, a player who is no
+  // longer available). Put the board back to what the server has.
+  function rejectLocalChange(error) {
+    dirty = false;
+    undoStack = [];
+    rejectCount += 1;
+    draft = normalize(serverBase || {});
+    noticeMessage = '';
+    errorMessage =
+      error?.message ||
+      'Unable to save the Next Inning defense.';
+    setSyncState('error');
+    renderCard();
   }
 
   async function flushPendingSave() {
     const deadline = Date.now() + 10000;
     const timeoutMessage =
-      'Defense is still saving. Check your connection, wait for Saved ✓, then try ending the inning again.';
+      'Next Inning defense is still saving. Check your connection, wait for Saved ✓, then try ending the inning again.';
+    const conflictsBefore = conflictCount;
+    const rejectsBefore = rejectCount;
+    let retried = false;
 
-    while (busy || activeSavePromise) {
+    while (activeSavePromise || dirty) {
+      if (!activeSavePromise) {
+        // Changes waiting on a failed save get one more try now; End
+        // Inning must not start the inning with an older defense.
+        if (retried) {
+          throw new Error(
+            'The Next Inning defense has not synced yet. Check your connection, then try ending the inning again.'
+          );
+        }
+
+        retried = true;
+        saveQueued();
+      }
+
       const pending = activeSavePromise;
       const remaining = deadline - Date.now();
 
@@ -2245,44 +2501,41 @@
         throw new Error(timeoutMessage);
       }
 
-      if (pending) {
-        let timer = null;
+      let timer = null;
 
-        try {
-          await Promise.race([
-            pending.then(
-              () => null,
-              () => null
-            ),
-            new Promise((_, reject) => {
-              timer = window.setTimeout(
-                () => reject(
-                  new Error(timeoutMessage)
-                ),
-                remaining
-              );
-            }),
-          ]);
-        } finally {
-          if (timer !== null) {
-            window.clearTimeout(timer);
-          }
+      try {
+        await Promise.race([
+          pending.then(
+            () => null,
+            () => null
+          ),
+          new Promise((_, reject) => {
+            timer = window.setTimeout(
+              () => reject(
+                new Error(timeoutMessage)
+              ),
+              remaining
+            );
+          }),
+        ]);
+      } finally {
+        if (timer !== null) {
+          window.clearTimeout(timer);
         }
-      } else {
-        await new Promise(resolve =>
-          window.setTimeout(
-            resolve,
-            Math.min(25, remaining)
-          )
-        );
       }
     }
 
-    if (saveMode === 'error') {
+    if (conflictCount !== conflictsBefore) {
+      throw new Error(
+        'The Next Inning defense changed on another device. Check it, then try ending the inning again.'
+      );
+    }
+
+    if (rejectCount !== rejectsBefore) {
       throw new Error(
         errorMessage
-          ? `${errorMessage} Save the defense again, then try ending the inning.`
-          : 'The defense was not saved. Save it again, then try ending the inning.'
+          ? `${errorMessage} Fix the defense, then try ending the inning again.`
+          : 'The defense was not saved. Fix it, then try ending the inning again.'
       );
     }
 
@@ -2290,7 +2543,7 @@
   }
 
   function isSaveInFlightOrQueued() {
-    return busy || Boolean(activeSavePromise);
+    return dirty || Boolean(activeSavePromise);
   }
 
   function movePlayerToBench(
@@ -2298,7 +2551,6 @@
     source
   ) {
     if (
-      busy ||
       !name ||
       !source ||
       source === 'BENCH'
@@ -2312,10 +2564,10 @@
     const next = snapshot();
     next[source] = '';
 
-    saveAlignment(
+    commitLocalChange(
       next,
       {
-        successMessage:
+        message:
           `${playerLabel(name)} → BENCH`,
       }
     );
@@ -2327,7 +2579,6 @@
     target
   ) {
     if (
-      busy ||
       !name ||
       !target ||
       source === target
@@ -2352,26 +2603,22 @@
 
     if (
       occupant &&
-      occupant !== name
+      occupant !== name &&
+      source &&
+      source !== 'BENCH'
     ) {
-      if (
-        target !== 'P' &&
-        source &&
-        source !== 'BENCH'
-      ) {
-        // Normal field-to-field move:
-        // true two-player swap.
-        next[source] = occupant;
-      }
-
-      // Bench -> field sends the old occupant to the bench.
-      // Moving someone to P also sends the old pitcher to the bench.
+      // Field-to-field, the pitcher's mound included: a true two-player
+      // swap, so moving the shortstop to P sends the pitcher to SS rather
+      // than leaving SS open.
+      next[source] = occupant;
     }
 
-    saveAlignment(
+    // Bench -> field (P included) sends the old occupant to the bench.
+
+    commitLocalChange(
       next,
       {
-        successMessage:
+        message:
           `${playerLabel(name)} → ${target} ✓`,
       }
     );
@@ -2382,10 +2629,9 @@
    *
    * Deliberately different from On the Field: the pitcher IS a valid
    * source here, because the next inning's defense is a plan and the
-   * coach edits the mound directly on the board. movePlayer() keeps its
-   * asymmetric handling of a move onto P (the outgoing pitcher is
-   * benched rather than swapped back), which is why the drop semantics
-   * stay in this file rather than in the shared manager.
+   * coach edits the mound directly on the board. Drops go through the
+   * same movePlayer()/movePlayerToBench() as taps, which is why the drop
+   * semantics stay in this file rather than in the shared manager.
    */
   function registerDragSurface() {
     if (dragSurface || !window.CoachBoardDrag) return;
@@ -2393,7 +2639,7 @@
     dragSurface = window.CoachBoardDrag.registerSurface({
       id: 'next',
       root: () => $(CARD_ID),
-      canStart: () => activeView === 'next' && !busy,
+      canStart: () => activeView === 'next',
       sourceSelector:
         `#${CARD_ID} [data-next-position], #${CARD_ID} [data-next-bench-player]`,
       targetSelector:
@@ -2448,82 +2694,28 @@
     });
   }
 
-  async function useCurrentDefense() {
-    if (busy || !latest) return;
+  function useCurrentDefense() {
+    if (!latest) return Promise.resolve();
 
-    const next = normalize(
-      latest.current_alignment || {}
-    );
-
-    await saveAlignment(
-      next,
+    return commitLocalChange(
+      latest.current_alignment || {},
       {
         mode: 'current',
-        successMessage:
-          'Saved ✓',
+        message: 'Saved ✓',
       }
     );
   }
 
-  async function undoNext() {
-    if (busy || !undoStack.length) return;
+  function undoNext() {
+    if (!undoStack.length) return Promise.resolve();
 
-    const previous = undoStack.pop();
-    const current = snapshot();
-
-    busy = true;
-    saveMode = 'saving';
-    saveMessage = 'Undoing…';
-    errorMessage = '';
-    draft = normalize(previous);
-
-    renderCard();
-
-    try {
-      const data = await api(
-        'POST',
-        {
-          mode: 'custom',
-          alignment: draft,
-        }
-      );
-
-      latest = data;
-      draft = normalize(
-        data?.confirmed?.alignment ||
-        draft
-      );
-
-      selected = null;
-      selectedPosition = '';
-
-      saveMode = 'saved';
-      saveMessage = 'Restored ✓';
-      lastSignature = JSON.stringify(data);
-
-      renderCard();
-
-      document.dispatchEvent(
-        new CustomEvent(
-          'coachboard:next-defense-set',
-          {detail: {data}}
-        )
-      );
-    } catch (error) {
-      undoStack.push(previous);
-      draft = current;
-
-      saveMode = 'error';
-      saveMessage = 'Undo failed';
-      errorMessage =
-        error.message ||
-        'Unable to undo change.';
-
-      renderCard();
-    } finally {
-      busy = false;
-      renderCard();
-    }
+    return commitLocalChange(
+      undoStack.pop(),
+      {
+        pushUndo: false,
+        message: 'Restored ✓',
+      }
+    );
   }
 
   function showError(message) {
@@ -2543,7 +2735,9 @@
     renderCard();
   }
 
-  function hydrate(data) {
+  function hydrate(data, {remote = true} = {}) {
+    const previousBase = serverBase;
+
     latest = data;
 
     if (
@@ -2551,9 +2745,13 @@
       data.status === 'inactive' ||
       data.is_live === false
     ) {
+      serverBase = null;
+      dirty = false;
+
       $(SWITCH_ID)?.remove();
       $(CARD_ID)?.remove();
       $(PLAN_CARD_ID)?.remove();
+      $('cbNextOpenWarning')?.remove();
 
       const now = $('cbQuickDefense');
 
@@ -2564,18 +2762,36 @@
       return false;
     }
 
-    draft = normalize(
+    const incoming = normalize(
       data?.confirmed?.alignment ||
       data?.current_alignment ||
       {}
     );
 
-    selected = null;
-    selectedPosition = '';
+    serverBase = normalize(
+      data?.confirmed?.alignment || {}
+    );
+
+    // Only a real change to the Next Inning defense clears a half-finished
+    // selection; a refresh that brings the same board keeps it.
+    if (!sameAlignment(incoming, draft)) {
+      if (
+        remote &&
+        previousBase &&
+        data?.confirmed?.source === 'custom'
+      ) {
+        noticeMessage = 'Defense updated by another coach.';
+      }
+
+      draft = incoming;
+      undoStack = [];
+      selected = null;
+      selectedPosition = '';
+    }
 
     if (saveMode !== 'error') {
-      saveMode = 'saved';
-      saveMessage = 'Saved ✓';
+      successMessage = 'Saved ✓';
+      setSyncState('saved');
     }
 
     renderCard();
@@ -2586,11 +2802,32 @@
   async function refresh({
     force = false,
   } = {}) {
-    if (busy) return null;
+    // The queue owns the board while a save is in the air; its answer is
+    // newer than anything this read could return.
+    if (activeSavePromise) return null;
+
+    const revision = localRevision;
 
     try {
       const data = await api('GET');
+
+      if (
+        activeSavePromise ||
+        revision !== localRevision
+      ) {
+        return null;
+      }
+
       const signature = JSON.stringify(data);
+
+      if (dirty) {
+        // Changes are waiting on a failed save and the server answers
+        // again: send them. The save carries the defense it was based on,
+        // so if the server's Next Inning defense moved on meanwhile it is
+        // refused (and shown) rather than overwritten.
+        saveQueued();
+        return data;
+      }
 
       if (
         force ||
@@ -2619,7 +2856,7 @@
   // same change -- instead of waiting for the 3.5 s poll.
   function onLiveChange() {
     window.clearTimeout(liveChangeTimer);
-    liveChangeTimer = window.setTimeout(() => refresh({force: true}), 150);
+    liveChangeTimer = window.setTimeout(() => refresh(), 150);
   }
 
   function afterAdvance() {
@@ -2628,6 +2865,9 @@
     selectedPosition = '';
     undoStack = [];
     errorMessage = '';
+    noticeMessage = '';
+    serverBase = null;
+    dirty = false;
     lastSignature = '';
     applyView();
 
@@ -2658,8 +2898,7 @@
         if (
           Number(payload?.game_id) === gameId
         ) {
-          lastSignature = '';
-          refresh({force: true});
+          refresh();
         }
       }
     );
@@ -2715,8 +2954,14 @@
   function buildSurface() {
     const switcher = ensureSwitcher();
 
-    if (switcher && latest && !$(CARD_ID)) {
-      renderCard();
+    if (switcher && !$(CARD_ID)) {
+      // A game started from this page last answered "not live"; that
+      // answer has no board (or saved defense) to draw, so read it now.
+      if (latest && latest.status !== 'inactive' && latest.is_live !== false) {
+        renderCard();
+      } else {
+        refresh();
+      }
     }
 
     return switcher;
@@ -2781,6 +3026,10 @@
       onLiveChange
     );
 
+    // Back online: read the server now instead of at the next poll, which
+    // also sends any Next Inning changes still waiting to sync.
+    window.addEventListener('online', () => refresh());
+
     registerDragSurface();
 
     window.addEventListener(
@@ -2801,7 +3050,7 @@
         event.stopPropagation();
         event.stopImmediatePropagation();
 
-        if (!busy && undoStack.length) {
+        if (undoStack.length) {
           undoNext();
         }
       },

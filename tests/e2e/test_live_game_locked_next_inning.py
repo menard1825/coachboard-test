@@ -1629,7 +1629,8 @@ def test_now_next_first_slice(
         assert 'RF' not in expected_now
         assert expected_now['P'] == 'Second Sam'
 
-        # One tap. No huddle. NEXT becomes NOW.
+        # No huddle. An open spot is confirmed once, by name, and then
+        # NEXT becomes NOW.
         page.locator(
             '#liveEndInningBtn'
         ).click()
@@ -1639,6 +1640,14 @@ def test_now_next_first_slice(
                 '#cb-test2-huddle-modal'
             )
         ).to_have_count(0)
+
+        incomplete = page.locator('#cbIncompleteNextModal')
+        expect(incomplete).to_be_visible(timeout=10_000)
+        expect(incomplete).to_contain_text('RF is still open.')
+        incomplete.get_by_role(
+            'button',
+            name='Start inning anyway',
+        ).click()
 
         expect(
             page.locator(
