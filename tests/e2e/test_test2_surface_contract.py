@@ -130,7 +130,7 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
             '[data-player-name="Shortstop Shawn"]'
         )
         expect(shawn_summary).to_contain_text(
-            '2 field · 0 bench'
+            '2 full · 0 bench'
         )
         expect(shawn_summary).to_contain_text('2B × 1')
         expect(shawn_summary).to_contain_text('SS × 1')

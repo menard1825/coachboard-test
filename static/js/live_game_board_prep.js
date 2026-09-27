@@ -103,51 +103,146 @@
     return Object.entries(source).find(([, playerName]) => playerName === name)?.[0] || null;
   }
 
-  function wholeInningKeys() {
+  // Each planned inning with its planned mid-inning changes ("Plan a
+  // change during Inning 2" saves as inning "2.1"): [{inning, segments}],
+  // segments in order. An inning with no one placed in any segment is an
+  // empty future slot, not a coaching plan, and is left out.
+  function plannedInnings() {
     ensureRotation();
-    return Object.keys(state.rotation.innings || {})
-      .filter((key) => /^\d+$/.test(String(key)))
-      .sort((a, b) => Number(a) - Number(b));
+    const innings = state.rotation.innings || {};
+    const groups = new Map();
+
+    Object.keys(innings)
+      .filter((key) => Number.isFinite(Number.parseFloat(key)))
+      .sort((a, b) => Number.parseFloat(a) - Number.parseFloat(b))
+      .forEach((key) => {
+        const base = String(Math.floor(Number.parseFloat(key)));
+        if (!groups.has(base)) groups.set(base, []);
+        groups.get(base).push(innings[key] || {});
+      });
+
+    return [...groups.entries()]
+      .map(([inningKey, segments]) => ({inning: inningKey, segments}))
+      .filter(({segments}) => segments.some((source) => (
+        Object.values(source).some((name) => String(name || '').trim())
+      )));
+  }
+
+  function inningOrdinal(value) {
+    const n = Number(value);
+    const tail = n % 100 >= 11 && n % 100 <= 13
+      ? 'th'
+      : ({1: 'st', 2: 'nd', 3: 'rd'}[n % 10] || 'th');
+    return `${n}${tail}`;
+  }
+
+  // A player marked absent for this game who is still placed in the plan is
+  // a planning problem for the coach to fix; nothing is moved for them.
+  function absentInPlanWarnings(planned) {
+    const absent = new Set((state?.absent_player_ids || []).map(Number));
+    const listed = (labels) => (
+      labels.length > 1
+        ? `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
+        : labels[0]
+    );
+
+    return (state?.roster || [])
+      .filter((player) => absent.has(Number(player.id)))
+      .map((player) => {
+        // Position -> the innings it is planned in, in plan order.
+        const where = new Map();
+
+        planned.forEach(({inning: key, segments}) => {
+          const first = playerPosition(player.name, segments[0]);
+          const places = [...new Set(
+            segments.map((source) => playerPosition(player.name, source)).filter(Boolean)
+          )];
+          places.forEach((pos) => {
+            const label = inningOrdinal(key) +
+              (pos === first ? '' : ' (mid-inning change)');
+            if (!where.has(pos)) where.set(pos, []);
+            where.get(pos).push(label);
+          });
+        });
+
+        const spots = [...where.entries()].map(([pos, labels]) => (
+          `${pos === 'P' ? 'pitching' : pos} in the ${listed(labels)}`
+        ));
+
+        return spots.length
+          ? `${player.name} is marked absent but is still in the plan: ${spots.join(', ')}.`
+          : '';
+      })
+      .filter(Boolean);
+  }
+
+  function positionChip(position, full, part) {
+    // Partial innings stay visibly partial: "SS × 1 + 1 part", never "SS × 2".
+    const text = full && part
+      ? `${position} × ${full} + ${part} part`
+      : part
+        ? `${position} × ${part} part`
+        : `${position} × ${full}`;
+    return `<span class="pde-time-chip${position === 'P' ? ' pitch' : ''}">${esc(text)}</span>`;
   }
 
   function playingTimeSummary() {
-    // Regulation inning slots are created ahead of time, but an entirely empty
-    // inning is not yet a coaching plan. Do not turn those empty future slots
-    // into artificial bench innings in the playing-time totals.
-    const inningKeys = wholeInningKeys().filter((key) => {
-      const source = state.rotation.innings[key];
-      return source &&
-        typeof source === 'object' &&
-        Object.values(source).some((name) => String(name || '').trim());
-    });
-    if (!inningKeys.length) return '';
+    const planned = plannedInnings();
+    if (!planned.length) return '';
 
     const positionOrder = positions();
+    const openSpots = (source) => positionOrder.filter((pos) => !String(source[pos] || '').trim());
+
+    // An inning with an open spot is not finished: a player not placed in
+    // it is unassigned ("–"), never counted as sitting on the bench.
+    const incomplete = planned
+      .map(({inning: key, segments}) => {
+        const open = [...new Set(segments.flatMap(openSpots))];
+        return open.length ? {inning: key, open} : null;
+      })
+      .filter(Boolean);
+    const incompleteInnings = new Set(incomplete.map(({inning: key}) => key));
 
     const rows = presentPlayers().map((player) => {
-      const counts = new Map();
-      let fieldInnings = 0;
+      const fullAt = new Map();
+      const partAt = new Map();
+      let fullInnings = 0;
+      let partialInnings = 0;
       let benchInnings = 0;
+      const timeline = [];
 
-      inningKeys.forEach((key) => {
-        const source = state.rotation.innings[key] || {};
-        const position = playerPosition(player.name, source);
+      planned.forEach(({inning: key, segments}) => {
+        const spots = segments.map((source) => playerPosition(player.name, source));
+        const unset = incompleteInnings.has(key);
+        const label = spots
+          .map((pos) => pos || (unset ? '–' : 'BN'))
+          .filter((pos, index, all) => index === 0 || pos !== all[index - 1])
+          .join('→');
 
-        if (position) {
-          fieldInnings += 1;
-          counts.set(
-            position,
-            (counts.get(position) || 0) + 1
-          );
-        } else {
+        timeline.push(`${key} ${label}`);
+
+        if (spots.every(Boolean)) {
+          // On the field for the whole inning, even if the position changes.
+          fullInnings += 1;
+        } else if (spots.some(Boolean)) {
+          // Enters or leaves during the inning.
+          partialInnings += 1;
+        } else if (!unset) {
           benchInnings += 1;
         }
+
+        [...new Set(spots.filter(Boolean))].forEach((pos) => {
+          const target = spots.every((spot) => spot === pos) ? fullAt : partAt;
+          target.set(pos, (target.get(pos) || 0) + 1);
+        });
       });
 
       const chips = positionOrder
-        .filter((position) => counts.get(position))
-        .map((position) => (
-          `<span class="pde-time-chip">${esc(position)} × ${counts.get(position)}</span>`
+        .filter((position) => fullAt.get(position) || partAt.get(position))
+        .map((position) => positionChip(
+          position,
+          fullAt.get(position) || 0,
+          partAt.get(position) || 0
         ));
 
       if (benchInnings) {
@@ -156,24 +251,67 @@
         );
       }
 
+      const playing = fullInnings + partialInnings;
+      const total = [
+        `${fullInnings} full`,
+        partialInnings ? `${partialInnings} partial` : '',
+        `${benchInnings} bench`,
+      ].filter(Boolean).join(' · ');
+
       return `
-        <div class="pde-time-row" data-player-name="${esc(player.name)}">
+        <div class="pde-time-row${playing ? '' : ' no-time'}"
+          data-player-name="${esc(player.name)}"
+          data-full="${fullInnings}"
+          data-partial="${partialInnings}"
+          data-bench="${benchInnings}"
+          data-innings="${esc(timeline.join(' · '))}">
           <div class="pde-time-main">
             <strong class="pde-time-name">${esc(player.name)}</strong>
-            <span class="pde-time-total">${fieldInnings} field · ${benchInnings} bench</span>
+            <span class="pde-time-total">${playing ? esc(total) : 'No field time planned'}</span>
           </div>
           <div class="pde-time-chips">${chips.join('')}</div>
+          <div class="pde-time-innings">${esc(timeline.join(' · '))}</div>
         </div>`;
     }).join('');
+
+    // Who is planned to pitch, and when. A change in the middle of an
+    // inning is shown as part of that inning, not as a whole one.
+    const pitching = new Map();
+    planned.forEach(({inning: key, segments}) => {
+      const names = segments.map((source) => String(source.P || '').trim());
+      [...new Set(names.filter(Boolean))].forEach((name) => {
+        const whole = names.every((entry) => entry === name);
+        if (!pitching.has(name)) pitching.set(name, []);
+        pitching.get(name).push(whole ? key : `${key} (part)`);
+      });
+    });
+    const pitchingLine = pitching.size
+      ? [...pitching.entries()]
+        .map(([name, innings]) => `${name}: ${innings.join(', ')}`)
+        .join(' · ')
+      : 'No pitcher planned yet';
+
+    const absentLines = absentInPlanWarnings(planned)
+      .map((line) => `<div class="pde-playing-time-absent" data-absent-warning>⚠ ${esc(line)}</div>`)
+      .join('');
+
+    const incompleteLine = incomplete.length
+      ? `<div class="pde-playing-time-open">Not finished: ${incomplete
+        .map(({inning: key, open}) => `Inning ${key} (${open.join(', ')} open)`)
+        .join(' · ')}. Players not placed there show – and don't count as bench.</div>`
+      : '';
 
     return `
       <section class="pde-playing-time" id="pde-playing-time-summary">
         <div class="pde-playing-time-head">
           <div>
             <strong>Playing Time Summary</strong>
-            <span>${inningKeys.length} planned inning${inningKeys.length === 1 ? '' : 's'} · updates as you move players</span>
+            <span>${planned.length} planned inning${planned.length === 1 ? '' : 's'} · updates as you move players</span>
           </div>
         </div>
+        ${absentLines}
+        <div class="pde-playing-time-pitching" data-pitching-plan>Pitching: ${esc(pitchingLine)}</div>
+        ${incompleteLine}
         <div class="pde-time-rows">${rows}</div>
       </section>`;
   }
@@ -228,6 +366,12 @@
       #${PANEL_ID} .pde-time-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
       #${PANEL_ID} .pde-time-chip{display:inline-flex;align-items:center;border:1px solid #4aae72;background:#f4fbf6;color:#176b38;border-radius:6px;padding:3px 6px;font-size:.59rem;font-weight:800;line-height:1}
       #${PANEL_ID} .pde-time-chip.bench{border-color:#d6dbe1;background:#f4f5f7;color:#667085}
+      #${PANEL_ID} .pde-time-chip.pitch{border-color:#6f8fc7;background:#f2f6fc;color:#264f8f}
+      #${PANEL_ID} .pde-time-innings{margin-top:4px;font-size:.6rem;color:#667085;font-weight:650;line-height:1.35}
+      #${PANEL_ID} .pde-time-row.no-time .pde-time-total{color:#a12d26}
+      #${PANEL_ID} .pde-playing-time-pitching{padding:6px 10px;border-bottom:1px solid #e7ebef;color:#264f8f;font-size:.64rem;font-weight:750}
+      #${PANEL_ID} .pde-playing-time-absent{padding:7px 10px;border-bottom:1px solid #efb5ae;background:#fff1ef;color:#912d28;font-size:.66rem;font-weight:800}
+      #${PANEL_ID} .pde-playing-time-open{padding:6px 10px;border-bottom:1px solid #e7ebef;background:#fff8e6;color:#775a10;font-size:.62rem;font-weight:750}
       #${PANEL_ID} .pde-status{display:flex;align-items:center;gap:10px;text-align:left;font-size:.72rem;margin-top:10px;border:2px solid #a66500;border-radius:11px;background:#fff4d8;color:#3f2b00;padding:9px 10px;box-shadow:0 2px 5px rgba(75,48,0,.08)}
       #${PANEL_ID} .pde-status.complete{border-color:#176b38;background:#edf8f1;color:#123d23}
       #${PANEL_ID} .pde-status-icon{font-size:1.05rem;line-height:1;flex:0 0 auto}

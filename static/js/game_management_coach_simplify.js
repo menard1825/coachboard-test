@@ -366,6 +366,50 @@
         background:#f4f5f7;
         color:#667085;
       }
+      #gm-playing-time-report .pde-time-chip.pitch{
+        border-color:#6f8fc7;
+        background:#f2f6fc;
+        color:#264f8f;
+      }
+      #gm-playing-time-report .pde-time-innings{
+        margin-top:4px;
+        font-size:.6rem;
+        color:#667085;
+        font-weight:650;
+        line-height:1.35;
+      }
+      #gm-playing-time-report .pde-time-row.no-time .pde-time-total{
+        color:#a12d26;
+      }
+      #gm-playing-time-report .pde-playing-time-pitching{
+        padding:6px 10px;
+        border-bottom:1px solid #e7ebef;
+        color:#264f8f;
+        font-size:.64rem;
+        font-weight:750;
+      }
+      #gm-playing-time-report .pde-playing-time-absent{
+        padding:7px 10px;
+        border-bottom:1px solid #efb5ae;
+        background:#fff1ef;
+        color:#912d28;
+        font-size:.66rem;
+        font-weight:800;
+      }
+      .gm-playing-time-alert{
+        margin-top:2px;
+        color:#a12d26;
+        font-size:.7rem;
+        font-weight:800;
+      }
+      #gm-playing-time-report .pde-playing-time-open{
+        padding:6px 10px;
+        border-bottom:1px solid #e7ebef;
+        background:#fff8e6;
+        color:#775a10;
+        font-size:.62rem;
+        font-weight:750;
+      }
 
       /*
        * Phones in either orientation, plus tablet landscape:
@@ -3031,6 +3075,17 @@
     }
   }
 
+  // An absent player still in the plan must be seen even while the
+  // summary is collapsed, so its toggle carries the warning too.
+  function absentInPlanAlert(summary) {
+    const count = summary?.querySelectorAll('[data-absent-warning]').length || 0;
+    return count
+      ? `<span class="gm-playing-time-alert d-block">⚠ ${count === 1
+        ? 'An absent player is still in the plan'
+        : `${count} absent players are still in the plan`}</span>`
+      : '';
+  }
+
   function syncPhonePlayingTimeDisclosure(
     panel,
     summary
@@ -3104,6 +3159,7 @@
       <span>
         <i class="bi bi-person-check me-2"></i>
         <strong>Player Time / Position Summary</strong>
+        ${absentInPlanAlert(summary)}
       </span>
       <span class="small text-muted">
         ${phonePlayingTimeOpen ? 'Hide' : 'View'}
@@ -3219,6 +3275,7 @@
                 <i class="bi bi-person-check me-2"></i>
                 Player Time / Position Summary
                 <small>Fair-play and position totals</small>
+                <span class="gm-playing-time-alert-slot"></span>
               </span>
               <i class="bi bi-chevron-down"></i>
             </button>
@@ -3241,6 +3298,11 @@
       // The base defense renderer owns the summary data. We only move
       // its freshly rendered DOM; no rotation state is duplicated.
       body.replaceChildren(summary);
+    }
+
+    const alertSlot = host.querySelector('.gm-playing-time-alert-slot');
+    if (alertSlot) {
+      alertSlot.innerHTML = absentInPlanAlert(summary);
     }
 
     markPlayingTimeHandled(panel);
