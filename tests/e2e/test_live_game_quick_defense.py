@@ -336,7 +336,7 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         if bench_player_id:
             page.request.get(f'{coachboard_url}/delete_player/{bench_player_id}')
 
-def test_pitcher_change_is_two_tap_and_leaves_defense_open(
+def test_pitcher_change_asks_where_the_pitcher_goes_and_can_leave_defense_open(
     page: Page,
     coachboard_url: str,
 ):
@@ -500,15 +500,24 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
             "window.__pitcherChangeStayedOnPage = 'yes'"
         )
 
-        # Tap 2: choose the new pitcher.
-        #
-        # This is the final pitching-change decision.
-        # There must be no destination questionnaire.
+        # Tap 2: choose the new pitcher. That only says who is going in to
+        # pitch, so CoachBoard asks where the outgoing pitcher goes.
         relief_choice.click()
 
         expect(
             picker
         ).not_to_be_visible(timeout=10_000)
+
+        question = page.locator('#live-pitcher-destination-v7')
+        expect(question).to_be_visible(timeout=10_000)
+        expect(question).to_contain_text(f'{relief_name} is going in to pitch')
+        expect(question).to_contain_text('Where should Pitcher Pat go?')
+
+        # Tap 3: the coach benches Pat, leaving 2B open on purpose.
+        question.get_by_role(
+            'button', name='Bench Pitcher Pat · 2B open', exact=True
+        ).click()
+        expect(question).not_to_be_visible(timeout=10_000)
 
         expect(
             page.locator('#live-pitcher-finish-v3')
@@ -563,7 +572,7 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
             timeout=10_000,
         )
 
-        # The outgoing pitcher is temporarily on the bench.
+        # The outgoing pitcher is on the bench, as the coach chose.
         expect(
             quick.locator('.cb-qd-bench')
         ).to_contain_text(
@@ -602,7 +611,7 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
         expect(
             toast
         ).to_contain_text(
-            '2B Open',
+            '2B is open',
         )
 
         state = get_json(
@@ -938,6 +947,12 @@ def test_pitcher_change_is_two_tap_and_leaves_defense_open(
         expect(
             picker
         ).not_to_be_visible(timeout=10_000)
+
+        question = page.locator('#live-pitcher-destination-v7')
+        expect(question).to_be_visible(timeout=10_000)
+        question.get_by_role(
+            'button', name=re.compile(r'^Bench Pitcher Pat')
+        ).click()
 
         expect(
             page.locator(
