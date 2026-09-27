@@ -10,6 +10,7 @@
   const PLAN_CARD_ID = 'live-board-pregame-plan';
   const SWITCH_ID = 'cb-now-next-switch';
   const STYLE_ID = 'live-next-defense-styles';
+  const PITCH_MODAL_ID = 'cbNextPitchingChange';
 
   let latest = null;
   let draft = {};
@@ -41,6 +42,8 @@
   let noticeMessage = '';
   let errorMessage = '';
   let undoStack = [];
+  // Pitching readiness from the shared live state (see pitchingReadiness).
+  let pitchSummary = null;
   let socketBound = false;
   let dragSurface = null;
 
@@ -824,6 +827,38 @@
 
       #${CARD_ID} .cb-next-notice[hidden]{
         display:none;
+      }
+
+      #${CARD_ID} .cb-next-pitcher-status{
+        margin-top:3px;
+        color:#176b38;
+        font-size:var(--cb-text-xs);
+        font-weight:750;
+        line-height:1.3;
+      }
+
+      #${CARD_ID} .cb-next-pitcher-status[hidden]{
+        display:none;
+      }
+
+      #${CARD_ID} .cb-next-pitcher-status.unknown,
+      #${CARD_ID} .cb-next-pitcher-status.ineligible{
+        margin-top:5px;
+        padding:4px 7px;
+        border-radius:7px;
+        font-weight:800;
+      }
+
+      #${CARD_ID} .cb-next-pitcher-status.unknown{
+        border:1px solid #e6ca82;
+        background:#fff8e6;
+        color:#775a10;
+      }
+
+      #${CARD_ID} .cb-next-pitcher-status.ineligible{
+        border:1px solid #efb5ae;
+        background:#fff1ef;
+        color:#a12d26;
       }
 
       #cbNextOpenWarning{
@@ -2087,6 +2122,7 @@
           <div class="cb-next-sub">
             ${esc(planStateText())}
           </div>
+          ${pitcherStatusMarkup()}
         </div>
 
         <div
@@ -2573,29 +2609,11 @@
     );
   }
 
-  function movePlayer(
-    name,
-    source,
-    target
-  ) {
-    if (
-      !name ||
-      !target ||
-      source === target
-    ) {
-      selected = null;
-      selectedPosition = '';
-      renderCard();
-      return;
-    }
-
-    const next = snapshot();
+  function plainMove(board, name, source, target) {
+    const next = {...board};
     const occupant = next[target] || '';
 
-    if (
-      source &&
-      source !== 'BENCH'
-    ) {
+    if (source && source !== 'BENCH') {
       next[source] = '';
     }
 
@@ -2607,21 +2625,389 @@
       source &&
       source !== 'BENCH'
     ) {
-      // Field-to-field, the pitcher's mound included: a true two-player
-      // swap, so moving the shortstop to P sends the pitcher to SS rather
-      // than leaving SS open.
+      // Field-to-field: a true two-player swap.
       next[source] = occupant;
     }
 
-    // Bench -> field (P included) sends the old occupant to the bench.
+    // Bench -> field sends the old occupant to the bench.
+    return next;
+  }
+
+  function movePlayer(
+    name,
+    source,
+    target
+  ) {
+    selected = null;
+    selectedPosition = '';
+
+    if (
+      !name ||
+      !target ||
+      source === target
+    ) {
+      renderCard();
+      return;
+    }
+
+    const board = snapshot();
+    const pitcher = board.P || '';
+
+    // Whether the new pitcher can pitch comes first: End Inning will not
+    // start the inning with a pitcher who is not Ready, so say so now.
+    if (
+      target === 'P' &&
+      isPitchingChange(name) &&
+      !pitchingReadiness(name).ready
+    ) {
+      renderCard();
+      explainNotReady(board, name);
+      return;
+    }
+
+    // Moving a player on or off P is a pitching change, not a position
+    // swap. The coach has only said who is moving; ask what happens to the
+    // other pitcher before anything changes.
+    if (target === 'P' && pitcher && pitcher !== name) {
+      renderCard();
+      askOutgoingPitcher(board, name, source, pitcher);
+      return;
+    }
+
+    if (source === 'P' && name === pitcher) {
+      renderCard();
+      askIncomingPitcher(board, name, target);
+      return;
+    }
+
+    const readyNote =
+      target === 'P' && isPitchingChange(name)
+        ? ` · ${pitchingReadiness(name).label}`
+        : '';
 
     commitLocalChange(
-      next,
+      plainMove(board, name, source, target),
       {
         message:
-          `${playerLabel(name)} → ${target} ✓`,
+          `${playerLabel(name)} → ${target} ✓${readyNote}`,
       }
     );
+  }
+
+  // Pitching readiness is the pitch_count_summary in the live state every
+  // live-game module shares (coachboard:live-state): the same data the
+  // Change Pitcher picker reads and End Inning checks on the server.
+  // Nothing is calculated here; the labels match Change Pitcher's.
+  function pitchingReadiness(name) {
+    const summary = pitchSummary?.[name];
+    const status = String(summary?.status || '').trim();
+    const lower = status.toLowerCase();
+    // The server's End Inning rule: Available is Ready; a missing summary
+    // or status cannot be verified; any other status is not eligible.
+    const kind =
+      status === 'Available'
+        ? 'ready'
+        : !summary || !status
+          ? 'unknown'
+          : 'ineligible';
+    const label =
+      kind === 'ready'
+        ? 'Ready'
+        : kind === 'unknown'
+          ? "Eligibility can't be confirmed"
+          : lower.includes('pitch') && lower.includes('limit')
+            ? 'At Pitch Limit'
+            : status;
+    const daily = summary?.daily;
+    const today =
+      daily === null || daily === undefined
+        ? ''
+        : `${daily} ${Number(daily) === 1 ? 'pitch' : 'pitches'} today`;
+    const detail = String(
+      summary?.status_detail || summary?.next_available || ''
+    ).trim();
+
+    return {
+      kind,
+      ready: kind === 'ready',
+      label,
+      text: [label, today, detail].filter(Boolean).join(' · '),
+    };
+  }
+
+  // As on the server, only a new pitcher is checked: the pitcher on the
+  // mound now carrying into the next inning is not a pitching change.
+  function isPitchingChange(name) {
+    return Boolean(name) && name !== (latest?.current_alignment?.P || '');
+  }
+
+  function notReadyTitle(name) {
+    return pitchingReadiness(name).kind === 'unknown'
+      ? `${name}'s pitching eligibility can't be confirmed`
+      : `${name} isn't eligible to pitch next inning`;
+  }
+
+  function readinessNote(name, {titled = true} = {}) {
+    const readiness = pitchingReadiness(name);
+
+    if (readiness.ready) {
+      return `${name}: ${readiness.text}`;
+    }
+
+    return readiness.kind === 'unknown'
+      ? `${titled ? `${notReadyTitle(name)}. ` : ''}` +
+        `CoachBoard needs a confirmed Ready status before ${name} ` +
+        'can be planned at P.'
+      : `${name}: ${readiness.text}. ` +
+        'End Inning only starts an inning with a pitcher who is Ready.';
+  }
+
+  function explainNotReady(board, name) {
+    askPitchingChange(
+      board,
+      notReadyTitle(name),
+      'Choose another pitcher, or use Change Pitcher during the game.',
+      [],
+      {note: readinessNote(name, {titled: false}), noteDanger: true}
+    );
+  }
+
+  // The planned next pitcher's readiness, shown on the board so a coach
+  // sees it before End Inning. Informational only: it never opens a
+  // question. Not shown until the live state has arrived.
+  function pitcherStatus() {
+    const name = draft?.P || '';
+
+    if (!name || !pitchSummary) {
+      return {tone: '', text: ''};
+    }
+
+    const readiness = pitchingReadiness(name);
+
+    if (!isPitchingChange(name)) {
+      return {
+        tone: readiness.ready ? 'ready' : 'unknown',
+        text: `Pitcher: ${name} · pitching now · ${readiness.text}`,
+      };
+    }
+
+    if (readiness.ready) {
+      return {tone: 'ready', text: `Pitcher: ${name} · ${readiness.text}`};
+    }
+
+    return readiness.kind === 'unknown'
+      ? {tone: 'unknown', text: `⚠ ${notReadyTitle(name)}`}
+      : {
+          tone: 'ineligible',
+          text: `⚠ ${notReadyTitle(name)} · ${readiness.text}`,
+        };
+  }
+
+  function pitcherStatusMarkup() {
+    const {tone, text} = pitcherStatus();
+    return `<div
+      class="cb-next-pitcher-status ${esc(tone)}"
+      data-next-pitcher-status
+      ${text ? '' : 'hidden'}
+    >${esc(text)}</div>`;
+  }
+
+  function renderPitcherStatus() {
+    const line = $(CARD_ID)?.querySelector('[data-next-pitcher-status]');
+    if (!line) return;
+
+    const {tone, text} = pitcherStatus();
+    line.className = `cb-next-pitcher-status ${tone}`;
+    line.hidden = !text;
+    if (line.textContent !== text) {
+      line.textContent = text;
+    }
+  }
+
+  // "Graham is going in to pitch. Where should Pat go?"
+  function askOutgoingPitcher(board, incoming, source, pitcher) {
+    const fromField = source && source !== 'BENCH';
+    const base = {...board, P: incoming};
+
+    if (fromField) {
+      base[source] = '';
+    }
+
+    const choices = [];
+
+    if (fromField) {
+      choices.push({
+        label: `Put ${pitcher} at ${source}`,
+        alignment: {...base, [source]: pitcher},
+        message: `${incoming} → P · ${pitcher} → ${source} ✓`,
+      });
+    }
+
+    positions()
+      .filter(pos => pos !== 'P' && !board[pos])
+      .forEach(pos => {
+        choices.push({
+          label: `Put ${pitcher} at ${pos}`,
+          alignment: {...base, [pos]: pitcher},
+          message: `${incoming} → P · ${pitcher} → ${pos} ✓`,
+        });
+      });
+
+    choices.push({
+      label: fromField
+        ? `Bench ${pitcher} · ${source} open`
+        : `Bench ${pitcher}`,
+      alignment: base,
+      message: `${incoming} → P · ${pitcher} → BENCH`,
+    });
+
+    askPitchingChange(
+      board,
+      `${incoming} is going in to pitch`,
+      `Where should ${pitcher} go?`,
+      choices,
+      {note: isPitchingChange(incoming) ? readinessNote(incoming) : ''}
+    );
+  }
+
+  // "Pat is moving to SS. Who's pitching?"
+  function askIncomingPitcher(board, pitcher, target) {
+    const occupant = board[target] || '';
+    const base = {...board, P: '', [target]: pitcher};
+    const choices = [];
+
+    const checked = occupant && isPitchingChange(occupant);
+    const occupantReady = !checked || pitchingReadiness(occupant).ready;
+
+    if (occupant) {
+      choices.push({
+        label: `${occupant} pitches`,
+        alignment: {...base, P: occupant},
+        message: `${pitcher} → ${target} · ${occupant} → P ✓`,
+        disabled: !occupantReady,
+      });
+      choices.push({
+        label: `Bench ${occupant} · P open`,
+        alignment: base,
+        message: `${pitcher} → ${target} · ${occupant} → BENCH`,
+      });
+    } else {
+      choices.push({
+        label: 'Leave P open — pick the pitcher next',
+        alignment: base,
+        message: `${pitcher} → ${target}`,
+      });
+    }
+
+    askPitchingChange(
+      board,
+      `${pitcher} is moving to ${target}`,
+      "Who's pitching next inning?",
+      choices,
+      {
+        note: checked ? readinessNote(occupant) : '',
+        noteDanger: !occupantReady,
+      }
+    );
+  }
+
+  function pitchingChangeModal() {
+    let modal = $(PITCH_MODAL_ID);
+
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = PITCH_MODAL_ID;
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.setAttribute('aria-labelledby', `${PITCH_MODAL_ID}-title`);
+
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5
+              class="modal-title"
+              id="${PITCH_MODAL_ID}-title"
+              data-pitch-title
+            ></h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="fw-semibold mb-2" data-pitch-question></div>
+            <div class="small mb-2" data-pitch-readiness hidden></div>
+            <div class="d-grid gap-2" data-pitch-choices></div>
+          </div>
+        </div>
+      </div>`;
+
+    document.body.appendChild(modal);
+
+    return modal;
+  }
+
+  // Nothing is saved while the coach decides. Only the answer becomes the
+  // board, as one change through the save queue (and one Undo).
+  function askPitchingChange(
+    board,
+    title,
+    question,
+    choices,
+    {note = '', noteDanger = false} = {}
+  ) {
+    const modal = pitchingChangeModal();
+    const instance = bootstrap.Modal.getOrCreateInstance(modal);
+    const list = modal.querySelector('[data-pitch-choices]');
+    const readiness = modal.querySelector('[data-pitch-readiness]');
+
+    modal.querySelector('[data-pitch-title]').textContent = title;
+    modal.querySelector('[data-pitch-question]').textContent = question;
+    readiness.textContent = note;
+    readiness.hidden = !note;
+    readiness.className =
+      `small mb-2 fw-semibold ${noteDanger ? 'text-danger' : 'text-success'}`;
+    list.replaceChildren();
+
+    const addButton = (label, className, onChoose, disabled = false) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `btn ${className}`;
+      button.textContent = label;
+      button.disabled = disabled;
+      button.addEventListener('click', () => {
+        instance.hide();
+        onChoose();
+      });
+      list.appendChild(button);
+    };
+
+    choices.forEach(choice => {
+      addButton(choice.label, 'btn-outline-primary', () => {
+        // The board moved on while the question was open (another
+        // coach, a new inning): the answer no longer applies.
+        if (!sameAlignment(snapshot(), board)) {
+          noticeMessage =
+            'The defense changed while you were choosing. Nothing was moved.';
+          renderSyncState();
+          return;
+        }
+
+        commitLocalChange(
+          choice.alignment,
+          {message: choice.message}
+        );
+      }, choice.disabled === true);
+    });
+
+    addButton('Cancel', 'btn-outline-secondary', () => {});
+
+    instance.show();
   }
 
   /**
@@ -2630,7 +3016,8 @@
    * Deliberately different from On the Field: the pitcher IS a valid
    * source here, because the next inning's defense is a plan and the
    * coach edits the mound directly on the board. Drops go through the
-   * same movePlayer()/movePlayerToBench() as taps, which is why the drop
+   * same movePlayer()/movePlayerToBench() as taps -- so a drop on or off
+   * P asks the same pitching-change question -- which is why the drop
    * semantics stay in this file rather than in the shared manager.
    */
   function registerDragSurface() {
@@ -3025,6 +3412,17 @@
       'coachboard:live-delta',
       onLiveChange
     );
+
+    document.addEventListener('coachboard:live-state', event => {
+      const detail = event.detail || {};
+      if (
+        Number(detail.game_id) === gameId &&
+        detail.state?.pitch_count_summary
+      ) {
+        pitchSummary = detail.state.pitch_count_summary;
+        renderPitcherStatus();
+      }
+    });
 
     // Back online: read the server now instead of at the next poll, which
     // also sends any Next Inning changes still waiting to sync.

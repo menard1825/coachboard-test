@@ -678,53 +678,60 @@ def test_on_the_field_open_spot_is_not_a_drag_source(page: Page, coachboard_url,
 def test_next_inning_pitcher_is_a_drag_source(page: Page, coachboard_url, live_board):
     """Next Inning deliberately lets the pitcher be moved.
 
-    Field-to-field with a non-P target is a true two-player swap
-    (live_game_board_prep_v2.js:1726-1733).
+    Dropping P on a fielder is a pitching change, so it asks who pitches
+    instead of silently putting that fielder on the mound; the coach's
+    answer is what moves.
     """
     board, game_id = live_board
+    before = board_state(page, coachboard_url, game_id, board)
     watch_ghosts(page)
 
     mouse_drag(page, page.locator(board.marker('P')), page.locator(board.marker('SS')))
-    expect(page.locator(board.marker('SS'))).to_contain_text('Pitcher Pat', timeout=10_000)
-
-    after = board_state(page, coachboard_url, game_id, board)
+    sheet = page.locator('#cbNextPitchingChange')
+    expect(sheet).to_be_visible(timeout=10_000)
     assert ghost_creations(page) == 1, 'Next Inning: P did not arm a drag'
-    assert after.get('SS') == 'Pitcher Pat', f'Next Inning: P did not move to SS; {after}'
-    assert after.get('P') == 'Shortstop Shawn', (
-        f'Next Inning: field-to-field move off P was not a swap; {after}'
+    expect(sheet).to_contain_text('Pitcher Pat is moving to SS')
+    assert board_state(page, coachboard_url, game_id, board) == before, (
+        'Next Inning: the drop changed the defense before the coach answered'
     )
+
+    sheet.get_by_role('button', name='Shortstop Shawn pitches', exact=True).click()
+    expect(page.locator(board.marker('SS'))).to_contain_text('Pitcher Pat', timeout=10_000)
+    wait_for_next(page, game_id, P='Shortstop Shawn', SS='Pitcher Pat')
 
 
 @_next_inning
-def test_next_inning_move_to_pitcher_swaps_with_the_old_pitcher(
+def test_next_inning_drop_on_pitcher_asks_where_the_pitcher_goes(
     page: Page, coachboard_url, live_board
 ):
-    """A field player dragged onto P swaps with the pitcher.
+    """A field player dropped on P asks what happens to the pitcher.
 
-    Moving onto P used to bench the outgoing pitcher and leave the source
-    position open, so shortstop-to-pitcher silently emptied SS. It is now
-    the same two-player swap as every other field-to-field move (a bench
-    player dropped on P still sends the old pitcher to the bench).
+    The drop only says who is going in to pitch. Pat is neither swapped to
+    SS nor benched until the coach chooses.
     """
     board, game_id = live_board
+    before = board_state(page, coachboard_url, game_id, board)
 
     mouse_drag(page, page.locator(board.marker('SS')), page.locator(board.marker('P')))
-    expect(page.locator(board.marker('P'))).to_contain_text('Shortstop Shawn', timeout=10_000)
-    expect(page.locator(board.marker('SS'))).to_contain_text('Pitcher Pat', timeout=10_000)
+    sheet = page.locator('#cbNextPitchingChange')
+    expect(sheet).to_be_visible(timeout=10_000)
+    expect(sheet).to_contain_text('Shortstop Shawn is going in to pitch')
+    assert board_state(page, coachboard_url, game_id, board) == before
 
+    sheet.get_by_role('button', name='Put Pitcher Pat at SS', exact=True).click()
+    expect(page.locator(board.marker('P'))).to_contain_text('Shortstop Shawn', timeout=10_000)
+    wait_for_next(page, game_id, P='Shortstop Shawn', SS='Pitcher Pat')
+
+
+def wait_for_next(page: Page, game_id, **expected):
     page.wait_for_function(
-        """async gameId => {
+        """async ([gameId, expected]) => {
             const r = await fetch(`/api/live-game/${gameId}/next-inning-prep`, {cache: 'no-store'});
             const a = (await r.json()).confirmed.alignment;
-            return a.P === 'Shortstop Shawn' && a.SS === 'Pitcher Pat';
+            return Object.entries(expected).every(([pos, name]) => a[pos] === name);
         }""",
-        arg=game_id,
+        arg=[game_id, expected],
         timeout=10_000,
-    )
-    after = board_state(page, coachboard_url, game_id, board)
-    assert after.get('P') == 'Shortstop Shawn', f'Next Inning: move onto P failed; {after}'
-    assert after.get('SS') == 'Pitcher Pat', (
-        f'Next Inning: moving onto P did not swap; SS={after.get("SS")!r}'
     )
 
 

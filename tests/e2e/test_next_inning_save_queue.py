@@ -201,7 +201,7 @@ def test_rapid_swaps_on_a_slow_connection_are_all_kept(
     posts = record_prep_posts(page)
     slow_network(page)
 
-    moves = [('SS', 'P'), ('LF', 'CF'), ('1B', '2B')]
+    moves = [('SS', '2B'), ('LF', 'CF'), ('1B', '3B')]
     done = []
     for source, target in moves:
         swap(board, source, target)
@@ -253,7 +253,7 @@ def test_end_inning_waits_for_the_queue_and_starts_with_the_final_defense(
     board, game_id = next_board
     slow_network(page)
 
-    moves = [('SS', 'P'), ('LF', 'RF')]
+    moves = [('SS', '2B'), ('LF', 'RF')]
     for source, target in moves:
         swap(board, source, target)
     final = expected_after(*moves)
@@ -284,9 +284,9 @@ def test_failed_save_keeps_the_board_and_syncs_on_reconnect(
     original = filled(starting_alignment())
 
     page.context.set_offline(True)
-    swap(board, 'SS', 'P')
+    swap(board, 'SS', '2B')
     swap(board, 'LF', 'CF')
-    final = expected_after(('SS', 'P'), ('LF', 'CF'))
+    final = expected_after(('SS', '2B'), ('LF', 'CF'))
 
     badge = board.locator('.cb-next-save')
     expect(badge).to_have_text('Not synced — retrying', timeout=5_000)
@@ -322,7 +322,7 @@ def test_failed_saves_do_not_hammer_the_server(
     posts = record_prep_posts(page)
 
     page.context.set_offline(True)
-    swap(board, 'SS', 'P')
+    swap(board, 'SS', '2B')
     expect(board.locator('.cb-next-save')).to_have_text(
         'Not synced — retrying', timeout=5_000
     )
@@ -330,7 +330,7 @@ def test_failed_saves_do_not_hammer_the_server(
     assert len(posts) == 1, f'{len(posts)} save attempts while offline'
     page.context.set_offline(False)
     wait_for_server(
-        page, coachboard_url, game_id, expected_after(('SS', 'P'))
+        page, coachboard_url, game_id, expected_after(('SS', '2B'))
     )
 
     page.route(
@@ -364,7 +364,7 @@ def test_end_inning_while_unsynced_explains_and_does_not_advance(
             else route.continue_()
         ),
     )
-    swap(board, 'SS', 'P')
+    swap(board, 'SS', '2B')
     expect(board.locator('.cb-next-save')).to_have_text(
         'Not synced — retrying', timeout=5_000
     )
@@ -376,7 +376,7 @@ def test_end_inning_while_unsynced_explains_and_does_not_advance(
     )
     expect(board).not_to_contain_text('Failed to fetch')
     assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
-    assert board_alignment(page) == expected_after(('SS', 'P'))
+    assert board_alignment(page) == expected_after(('SS', '2B'))
 
 
 # ------------------------------------------------------ stale conflicts
@@ -402,7 +402,7 @@ def test_server_rejects_a_save_based_on_an_older_defense(
         f'{coachboard_url}/api/live-game/{game_id}/next-inning-prep',
         data={
             'mode': 'custom',
-            'alignment': expected_after(('SS', 'P')),
+            'alignment': expected_after(('SS', '2B')),
             'base_alignment': starting_alignment(),
             'inning': '2',
         },
@@ -414,7 +414,7 @@ def test_server_rejects_a_save_based_on_an_older_defense(
         f'{coachboard_url}/api/live-game/{game_id}/next-inning-prep',
         data={
             'mode': 'custom',
-            'alignment': expected_after(('SS', 'P')),
+            'alignment': expected_after(('SS', '2B')),
             'base_alignment': other,
             'inning': '3',
         },
@@ -432,7 +432,7 @@ def test_offline_change_does_not_overwrite_a_newer_defense(
     other = expected_after(('LF', 'RF'))
 
     page.context.set_offline(True)
-    swap(board, 'SS', 'P')
+    swap(board, 'SS', '2B')
     expect(board.locator('.cb-next-save')).to_have_text(
         'Not synced — retrying', timeout=5_000
     )
@@ -469,8 +469,8 @@ def test_slow_save_does_not_overwrite_a_newer_defense(
 
     page.route(PREP_URL, other_coach_first)
 
-    swap(board, 'SS', 'P')
-    expect(spot(board, 'P')).to_contain_text(
+    swap(board, 'SS', '2B')
+    expect(spot(board, '2B')).to_contain_text(
         'Shortstop Shawn', timeout=IMMEDIATE_MS
     )
 
@@ -501,61 +501,171 @@ def test_another_coachs_change_clears_a_selection_with_a_notice(
     assert board_alignment(page) == other
 
 
-# -------------------------------------------------------- pitcher swaps
+# ------------------------------------------------------ pitching changes
 
 
-def test_field_player_to_pitcher_swaps_and_bench_to_pitcher_benches(
+def pitching_question(page: Page):
+    sheet = page.locator('#cbNextPitchingChange')
+    expect(sheet).to_be_visible(timeout=5_000)
+    return sheet
+
+
+def choose(page: Page, label):
+    sheet = pitching_question(page)
+    sheet.get_by_role('button', name=label, exact=True).click()
+    expect(sheet).to_be_hidden()
+
+
+def test_fielder_to_pitcher_asks_where_the_pitcher_goes(
     page: Page, coachboard_url, next_board
 ):
     board, game_id = next_board
+    posts = record_prep_posts(page)
+    original = filled(starting_alignment())
 
-    # SS -> P: the pitcher takes shortstop; nothing is left open.
+    # SS -> P: nothing moves until the coach says where Pat goes.
     swap(board, 'SS', 'P')
+    sheet = pitching_question(page)
+    expect(sheet).to_contain_text('Shortstop Shawn is going in to pitch')
+    expect(sheet).to_contain_text('Where should Pitcher Pat go?')
+    assert board_alignment(page) == original
+    page.wait_for_timeout(500)
+    assert posts == [], 'nothing may be saved while the coach decides'
+
+    # Cancel changes nothing.
+    choose(page, 'Cancel')
+    assert board_alignment(page) == original
+
+    # The coach chooses the swap.
+    swap(board, 'SS', 'P')
+    choose(page, 'Put Pitcher Pat at SS')
+    swapped = expected_after(('SS', 'P'))
     expect(spot(board, 'P')).to_contain_text('Shortstop Shawn')
     expect(spot(board, 'SS')).to_contain_text('Pitcher Pat')
-
-    # P -> field: the same swap in the other direction.
-    swap(board, 'P', '3B')
-    expect(spot(board, 'P')).to_contain_text('Third Theo')
-    expect(spot(board, '3B')).to_contain_text('Shortstop Shawn')
-
-    swapped = expected_after(('SS', 'P'), ('P', '3B'))
-    assert board_alignment(page) == swapped
     wait_for_server(page, coachboard_url, game_id, swapped)
-
-    # Bench -> P keeps its own rule: the old pitcher goes to the bench.
-    spot(board, 'CF').click()
-    board.locator('[data-next-bench-selected]').click()
-    expect(spot(board, 'CF')).not_to_contain_text('Center Casey')
-    board.locator('[data-next-bench-player="Center Casey"]').click()
-    spot(board, 'P').click()
-    expect(spot(board, 'P')).to_contain_text('Center Casey')
-
-    after = board_alignment(page)
-    assert 'Third Theo' not in after.values()
-    assert sorted(set(starting_alignment()) - set(after)) == ['CF'], (
-        'only the spot the coach emptied may be open', after
-    )
-    wait_for_server(page, coachboard_url, game_id, after)
+    assert len(posts) == 1, 'the resolved defense is one save'
 
 
-def test_shortstop_to_pitcher_swap_is_the_next_innings_pitching_change(
+def test_fielder_to_pitcher_bench_choice_leaves_the_spot_open(
     page: Page, coachboard_url, next_board
 ):
     board, game_id = next_board
 
     swap(board, 'SS', 'P')
-    final = expected_after(('SS', 'P'))
-    wait_for_server(page, coachboard_url, game_id, final)
+    choose(page, 'Bench Pitcher Pat · SS open')
 
+    expect(spot(board, 'P')).to_contain_text('Shortstop Shawn')
+    expect(spot(board, 'SS')).to_have_attribute('data-next-player', '')
+    expect(
+        board.locator('[data-next-bench-player="Pitcher Pat"]')
+    ).to_be_visible()
+    expected = {
+        pos: name for pos, name in expected_after(('SS', 'P')).items()
+        if pos != 'SS'
+    }
+    wait_for_server(page, coachboard_url, game_id, expected)
+
+    # The deliberately open SS is still caught before the inning starts.
+    expect(page.locator('#cbNextOpenWarning')).to_have_text(
+        '⚠ Next inning: SS is open'
+    )
+    page.locator('#liveEndInningBtn').click()
+    modal = page.locator('#cbIncompleteNextModal')
+    expect(modal).to_be_visible(timeout=10_000)
+    expect(modal).to_contain_text('SS is still open.')
+    modal.get_by_role('button', name='Finish defense').click()
+    assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
+
+
+def test_pitcher_to_field_asks_who_pitches(
+    page: Page, coachboard_url, next_board
+):
+    board, game_id = next_board
+    original = filled(starting_alignment())
+
+    # P -> SS: Shawn is not silently put on the mound.
+    swap(board, 'P', 'SS')
+    sheet = pitching_question(page)
+    expect(sheet).to_contain_text('Pitcher Pat is moving to SS')
+    expect(sheet).to_contain_text("Who's pitching next inning?")
+    assert board_alignment(page) == original
+    choose(page, 'Cancel')
+    assert board_alignment(page) == original
+
+    # Benching the displaced shortstop leaves P visibly open.
+    swap(board, 'P', 'SS')
+    choose(page, 'Bench Shortstop Shawn · P open')
+    expect(spot(board, 'SS')).to_contain_text('Pitcher Pat')
+    expect(spot(board, 'P')).to_have_attribute('data-next-player', '')
+    expect(board.locator('.cb-next-warnings')).to_contain_text(
+        'Set a pitcher for the next inning'
+    )
+    expected = {
+        pos: name for pos, name in original.items() if pos != 'P'
+    }
+    expected['SS'] = 'Pitcher Pat'
+    wait_for_server(page, coachboard_url, game_id, expected)
+
+    # Undo takes the whole answer back in one step.
+    page.locator('#liveUndoBtn').click()
+    wait_for_server(page, coachboard_url, game_id, original)
+
+    # Choosing the shortstop to pitch is the swap, because the coach said so.
+    swap(board, 'P', 'SS')
+    choose(page, 'Shortstop Shawn pitches')
+    wait_for_server(
+        page, coachboard_url, game_id, expected_after(('SS', 'P'))
+    )
+
+
+def test_bench_to_pitcher_asks_where_the_pitcher_goes(
+    page: Page, coachboard_url, next_board
+):
+    board, game_id = next_board
+
+    bench(board, 'CF')
+    swap_from_bench = board.locator(
+        '[data-next-bench-player="Center Casey"]'
+    )
+    swap_from_bench.click()
+    spot(board, 'P').click()
+
+    sheet = pitching_question(page)
+    expect(sheet).to_contain_text('Center Casey is going in to pitch')
+    expect(sheet).to_contain_text('Where should Pitcher Pat go?')
+    before = board_alignment(page)
+    assert before['P'] == 'Pitcher Pat'
+
+    # The open CF is offered by name; nothing is decided for the coach.
+    choose(page, 'Put Pitcher Pat at CF')
+    expected = dict(before, P='Center Casey', CF='Pitcher Pat')
+    expect(spot(board, 'P')).to_contain_text('Center Casey')
+    expect(spot(board, 'CF')).to_contain_text('Pitcher Pat')
+    wait_for_server(page, coachboard_url, game_id, expected)
+
+
+def test_pitching_change_through_a_slow_save_starts_the_next_inning(
+    page: Page, coachboard_url, next_board
+):
+    board, game_id = next_board
+    slow_network(page)
+
+    swap(board, 'SS', 'P')
+    choose(page, 'Put Pitcher Pat at SS')
+    swap(board, 'LF', 'RF')
+    final = expected_after(('SS', 'P'), ('LF', 'RF'))
+    expect(spot(board, 'RF')).to_contain_text(
+        final['RF'], timeout=IMMEDIATE_MS
+    )
+
+    # End Inning waits for the queued saves, then records the change.
     page.locator('#liveEndInningBtn').click()
     expect(page.locator('#live-inning-display')).to_have_text(
-        '2', timeout=20_000
+        '2', timeout=25_000
     )
 
     state = live_state(page, coachboard_url, game_id)
     assert filled(state['current_alignment']) == final
-    assert state['current_alignment']['SS'] == 'Pitcher Pat'
     end_inning = [
         event for event in state.get('rotation_events', [])
         if event.get('event_type') == 'End Inning' and not event.get('reverted')
@@ -563,6 +673,189 @@ def test_shortstop_to_pitcher_swap_is_the_next_innings_pitching_change(
     assert end_inning, state.get('rotation_events')
     assert end_inning[-1]['before_alignment']['P'] == 'Pitcher Pat'
     assert end_inning[-1]['after_alignment']['P'] == 'Shortstop Shawn'
+    assert end_inning[-1]['after_alignment']['SS'] == 'Pitcher Pat'
+
+
+# ------------------------------------------------- pitching readiness
+
+
+def force_pitching_status(page: Page, game_id: int, name, status, daily, detail):
+    """Show `name` with a pitching status, the way the live state reports it.
+
+    Rewrites only what this browser reads (as the On the Field Change
+    Pitcher test does); the server's own End Inning check is unaffected and
+    covered by tests/test_live_game_feedback_pass.py.
+    """
+    def rewrite(route):
+        response = route.fetch()
+        payload = response.json()
+        summary = payload.setdefault('pitch_count_summary', {}).setdefault(name, {})
+        summary.update(status=status, daily=daily, status_detail=detail)
+        route.fulfill(status=response.status, headers=response.headers, json=payload)
+
+    page.route(f'**/api/live-game/{game_id}/state', rewrite)
+    page.reload(wait_until='domcontentloaded')
+    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    board = page.locator(CARD)
+    expect(spot(board, 'P')).not_to_have_attribute(
+        'data-next-player', '', timeout=10_000
+    )
+    return board
+
+
+def test_ready_pitcher_shows_readiness_and_continues(
+    page: Page, coachboard_url, next_board
+):
+    board, game_id = next_board
+
+    swap(board, 'SS', 'P')
+    sheet = pitching_question(page)
+    expect(sheet.locator('[data-pitch-readiness]')).to_contain_text(
+        'Shortstop Shawn: Ready'
+    )
+    choose(page, 'Put Pitcher Pat at SS')
+    wait_for_server(
+        page, coachboard_url, game_id, expected_after(('SS', 'P'))
+    )
+
+
+def test_warned_pitcher_cannot_become_the_planned_pitcher(
+    page: Page, coachboard_url, next_board
+):
+    """A status Change Pitcher would only warn about (Pitch Anyway).
+
+    End Inning has no Pitch Anyway: it refuses any new pitcher who is not
+    Ready. So the plan is stopped here, with the reason, not at End Inning.
+    """
+    _, game_id = next_board
+    board = force_pitching_status(
+        page, game_id, 'Shortstop Shawn', 'Needs Rest', 42, 'Pitched yesterday'
+    )
+    posts = record_prep_posts(page)
+    original = filled(starting_alignment())
+
+    swap(board, 'SS', 'P')
+    sheet = pitching_question(page)
+    expect(sheet).to_contain_text("Shortstop Shawn isn't eligible to pitch next inning")
+    expect(sheet.locator('[data-pitch-readiness]')).to_contain_text(
+        'Shortstop Shawn: Needs Rest · 42 pitches today · Pitched yesterday'
+    )
+    buttons = sheet.locator('[data-pitch-choices] button')
+    expect(buttons).to_have_count(1)
+    expect(buttons).to_have_text('Cancel')
+
+    choose(page, 'Cancel')
+    page.wait_for_timeout(500)
+    assert board_alignment(page) == original
+    assert posts == []
+
+    # The same player cannot be chosen to pitch from the other direction.
+    swap(board, 'P', 'SS')
+    sheet = pitching_question(page)
+    expect(sheet.locator('[data-pitch-readiness]')).to_contain_text('Needs Rest')
+    expect(
+        sheet.get_by_role('button', name='Shortstop Shawn pitches', exact=True)
+    ).to_be_disabled()
+    choose(page, 'Cancel')
+    assert board_alignment(page) == original
+
+
+def test_unverified_pitcher_from_the_bench_is_stopped(
+    page: Page, coachboard_url, next_board
+):
+    """No status at all is not Ready either (End Inning refuses it too)."""
+    _, game_id = next_board
+    board = force_pitching_status(
+        page, game_id, 'Center Casey', '', None, ''
+    )
+
+    bench(board, 'CF')
+    before = board_alignment(page)
+    board.locator('[data-next-bench-player="Center Casey"]').click()
+    spot(board, 'P').click()
+
+    sheet = pitching_question(page)
+    expect(sheet).to_contain_text(
+        "Center Casey's pitching eligibility can't be confirmed"
+    )
+    expect(sheet).not_to_contain_text("isn't eligible")
+    expect(sheet.locator('[data-pitch-readiness]')).to_contain_text(
+        'CoachBoard needs a confirmed Ready status before Center Casey '
+        'can be planned at P.'
+    )
+    choose(page, 'Cancel')
+    assert board_alignment(page) == before
+
+    # Undo still takes back only the coach's own last change (the CF bench).
+    page.locator('#liveUndoBtn').click()
+    wait_for_server(page, coachboard_url, game_id, filled(starting_alignment()))
+
+
+def planned_pitching_change():
+    """Shawn planned to pitch next inning, Pat to short (a pitching change)."""
+    return expected_after(('SS', 'P'))
+
+
+def no_question_open(page: Page):
+    page.wait_for_timeout(800)
+    expect(page.locator('#cbNextPitchingChange')).not_to_be_visible()
+    expect(page.locator('#cbIncompleteNextModal')).not_to_be_visible()
+
+
+def test_board_shows_a_ready_planned_pitcher_quietly(
+    page: Page, coachboard_url, next_board
+):
+    board, game_id = next_board
+    status = board.locator('[data-next-pitcher-status]')
+
+    # The pitcher on the mound carrying into the next inning.
+    expect(status).to_contain_text('Pitcher: Pitcher Pat · pitching now · Ready')
+    expect(status).to_have_class(re.compile(r'\bready\b'))
+
+    other_coach_sets(page, coachboard_url, game_id, planned_pitching_change())
+    expect(status).to_contain_text(
+        'Pitcher: Shortstop Shawn · Ready', timeout=10_000
+    )
+    expect(status).to_have_class(re.compile(r'\bready\b'))
+    expect(status).not_to_contain_text('⚠')
+    no_question_open(page)
+
+
+def test_board_flags_an_ineligible_planned_pitcher_without_a_modal(
+    page: Page, coachboard_url, next_board
+):
+    _, game_id = next_board
+    other_coach_sets(page, coachboard_url, game_id, planned_pitching_change())
+    board = force_pitching_status(
+        page, game_id, 'Shortstop Shawn', 'Needs Rest', 42, 'Pitched yesterday'
+    )
+    status = board.locator('[data-next-pitcher-status]')
+
+    expect(status).to_have_text(
+        "⚠ Shortstop Shawn isn't eligible to pitch next inning · "
+        'Needs Rest · 42 pitches today · Pitched yesterday',
+        timeout=10_000,
+    )
+    expect(status).to_have_class(re.compile(r'\bineligible\b'))
+    expect(status).to_be_in_viewport()
+    no_question_open(page)
+
+
+def test_board_says_unknown_eligibility_cannot_be_confirmed(
+    page: Page, coachboard_url, next_board
+):
+    _, game_id = next_board
+    other_coach_sets(page, coachboard_url, game_id, planned_pitching_change())
+    board = force_pitching_status(page, game_id, 'Shortstop Shawn', '', None, '')
+    status = board.locator('[data-next-pitcher-status]')
+
+    expect(status).to_have_text(
+        "⚠ Shortstop Shawn's pitching eligibility can't be confirmed",
+        timeout=10_000,
+    )
+    expect(status).to_have_class(re.compile(r'\bunknown\b'))
+    expect(status).not_to_contain_text("isn't eligible")
+    no_question_open(page)
 
 
 # -------------------------------------------------- incomplete defense
