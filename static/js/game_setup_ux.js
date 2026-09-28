@@ -395,10 +395,10 @@
       'live-pitcher-picker-v2'
     );
 
-    // The v6 live picker owns Ready/warning presentation and
-    // intentionally keeps warned pitchers tappable so the coach
-    // can choose "Pitch Anyway". Preserve this legacy decorator
-    // for older picker surfaces only.
+    // The v6 live picker owns its Ready / not eligible / can't confirm
+    // presentation and keeps every row tappable so it can explain the
+    // status. Preserve this legacy decorator for older picker surfaces
+    // only.
     if (
       picker?.dataset.cbPitcherPickerOwner === 'live-v6'
     ) {

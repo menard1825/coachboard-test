@@ -26,6 +26,8 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
+import pitching_eligibility
+
 from test_next_inning_save_race import (
     cleanup_game,
     login,
@@ -689,8 +691,12 @@ def force_pitching_status(page: Page, game_id: int, name, status, daily, detail)
     def rewrite(route):
         response = route.fetch()
         payload = response.json()
-        summary = payload.setdefault('pitch_count_summary', {}).setdefault(name, {})
-        summary.update(status=status, daily=daily, status_detail=detail)
+        item = {'status': status, 'daily': daily, 'status_detail': detail}
+        # What the server's shared policy says (and shows) about that status.
+        item.update(pitching_eligibility.describe(
+            name, item, {'rule_set_name': 'MLB Pitch Smart'}
+        ))
+        payload.setdefault('pitch_count_summary', {})[name] = item
         route.fulfill(status=response.status, headers=response.headers, json=payload)
 
     page.route(f'**/api/live-game/{game_id}/state', rewrite)
@@ -719,54 +725,69 @@ def test_ready_pitcher_shows_readiness_and_continues(
     )
 
 
-def test_warned_pitcher_cannot_become_the_planned_pitcher(
+RESTING_REASON = (
+    'Rule conflict · 0 pitches today · MLB Pitch Smart: Resting. '
+    '66 game pitches on Sun, Sep 27 require 3 day(s) rest.'
+)
+
+
+def test_rule_conflict_pitcher_can_be_planned_with_the_reason(
     page: Page, coachboard_url, next_board
 ):
-    """A status Change Pitcher would only warn about (Pitch Anyway).
+    """A plan is not the official field: a flagged pitcher can be planned.
 
-    End Inning has no Pitch Anyway: it refuses any new pitcher who is not
-    Ready. So the plan is stopped here, with the reason, not at End Inning.
+    The sheet asks only the usual destination question and shows the rule
+    conflict; End Inning asks for the coach's decision later. Cancel
+    changes nothing.
     """
     _, game_id = next_board
     board = force_pitching_status(
-        page, game_id, 'Shortstop Shawn', 'Needs Rest', 42, 'Pitched yesterday'
+        page, game_id, 'Shortstop Shawn', 'Resting', 0, '66 game pitches on Sun, Sep 27 require 3 day(s) rest.'
     )
     posts = record_prep_posts(page)
     original = filled(starting_alignment())
 
     swap(board, 'SS', 'P')
     sheet = pitching_question(page)
-    expect(sheet).to_contain_text("Shortstop Shawn isn't eligible to pitch next inning")
-    expect(sheet.locator('[data-pitch-readiness]')).to_contain_text(
-        'Shortstop Shawn: Needs Rest · 42 pitches today · Pitched yesterday'
+    expect(sheet).to_contain_text('Shortstop Shawn is going in to pitch')
+    expect(sheet.locator('[data-pitch-readiness]')).to_have_text(
+        f'Shortstop Shawn: {RESTING_REASON} '
+        'End Inning will ask whether to use Shortstop Shawn anyway.'
     )
-    buttons = sheet.locator('[data-pitch-choices] button')
-    expect(buttons).to_have_count(1)
-    expect(buttons).to_have_text('Cancel')
 
     choose(page, 'Cancel')
     page.wait_for_timeout(500)
     assert board_alignment(page) == original
     assert posts == []
 
-    # The same player cannot be chosen to pitch from the other direction.
+    # From the other direction too, the flagged player is a choice.
     swap(board, 'P', 'SS')
     sheet = pitching_question(page)
-    expect(sheet.locator('[data-pitch-readiness]')).to_contain_text('Needs Rest')
+    expect(sheet.locator('[data-pitch-readiness]')).to_contain_text('Rule conflict')
     expect(
         sheet.get_by_role('button', name='Shortstop Shawn pitches', exact=True)
-    ).to_be_disabled()
+    ).to_be_enabled()
     choose(page, 'Cancel')
     assert board_alignment(page) == original
 
+    swap(board, 'SS', 'P')
+    choose(page, 'Put Pitcher Pat at SS')
+    wait_for_server(page, coachboard_url, game_id, expected_after(('SS', 'P')))
+    expect(board.locator('[data-next-pitcher-status]')).to_contain_text('Rule conflict')
 
-def test_unverified_pitcher_from_the_bench_is_stopped(
+
+def test_unconfirmed_pitcher_can_be_planned_with_a_clear_note(
     page: Page, coachboard_url, next_board
 ):
-    """No status at all is not Ready either (End Inning refuses it too)."""
+    """Eligibility CoachBoard can't confirm is not "ineligible".
+
+    The coach may plan the pitcher; the note says End Inning will ask them
+    to confirm they verified it. Nothing is decided for them meanwhile.
+    """
     _, game_id = next_board
     board = force_pitching_status(
-        page, game_id, 'Center Casey', '', None, ''
+        page, game_id, 'Center Casey', 'Unavailable — Pitch Count Incomplete', None,
+        'Verify missing game pitch counts before using this pitcher.',
     )
 
     bench(board, 'CF')
@@ -775,20 +796,30 @@ def test_unverified_pitcher_from_the_bench_is_stopped(
     spot(board, 'P').click()
 
     sheet = pitching_question(page)
-    expect(sheet).to_contain_text(
-        "Center Casey's pitching eligibility can't be confirmed"
+    expect(sheet).to_contain_text('Center Casey is going in to pitch')
+    expect(sheet).not_to_contain_text('ineligible')
+    expect(sheet.locator('[data-pitch-readiness]')).to_have_text(
+        "Center Casey: Can't confirm · CoachBoard can't confirm Center "
+        "Casey's pitching eligibility (Pitch Count Incomplete). Verify "
+        'missing game pitch counts before using this pitcher. End Inning '
+        'will ask you to confirm you verified Center Casey is eligible.'
     )
-    expect(sheet).not_to_contain_text("isn't eligible")
-    expect(sheet.locator('[data-pitch-readiness]')).to_contain_text(
-        'CoachBoard needs a confirmed Ready status before Center Casey '
-        'can be planned at P.'
-    )
+
+    # Cancel changes nothing.
     choose(page, 'Cancel')
     assert board_alignment(page) == before
 
-    # Undo still takes back only the coach's own last change (the CF bench).
-    page.locator('#liveUndoBtn').click()
-    wait_for_server(page, coachboard_url, game_id, filled(starting_alignment()))
+    board.locator('[data-next-bench-player="Center Casey"]').click()
+    spot(board, 'P').click()
+    choose(page, 'Bench Pitcher Pat')
+    expected = dict(before, P='Center Casey')
+    wait_for_server(page, coachboard_url, game_id, expected)
+    expect(board.locator('[data-next-pitcher-status]')).to_have_text(
+        "⚠ Pitcher: Center Casey · Can't confirm · CoachBoard can't confirm "
+        "Center Casey's pitching eligibility (Pitch Count Incomplete). "
+        'Verify missing game pitch counts before using this pitcher. · '
+        'End Inning will ask you to decide'
+    )
 
 
 def planned_pitching_change():
@@ -808,8 +839,11 @@ def test_board_shows_a_ready_planned_pitcher_quietly(
     board, game_id = next_board
     status = board.locator('[data-next-pitcher-status]')
 
-    # The pitcher on the mound carrying into the next inning.
-    expect(status).to_contain_text('Pitcher: Pitcher Pat · pitching now · Ready')
+    # The pitcher on the mound carrying into the next inning. CoachBoard
+    # can't count this game's pitches until it ends, and says so.
+    expect(status).to_have_text(
+        "Pitcher: Pitcher Pat · pitching now · this game's pitches aren't counted until it ends"
+    )
     expect(status).to_have_class(re.compile(r'\bready\b'))
 
     other_coach_sets(page, coachboard_url, game_id, planned_pitching_change())
@@ -821,22 +855,22 @@ def test_board_shows_a_ready_planned_pitcher_quietly(
     no_question_open(page)
 
 
-def test_board_flags_an_ineligible_planned_pitcher_without_a_modal(
+def test_board_flags_a_rule_conflict_planned_pitcher_without_a_modal(
     page: Page, coachboard_url, next_board
 ):
     _, game_id = next_board
     other_coach_sets(page, coachboard_url, game_id, planned_pitching_change())
     board = force_pitching_status(
-        page, game_id, 'Shortstop Shawn', 'Needs Rest', 42, 'Pitched yesterday'
+        page, game_id, 'Shortstop Shawn', 'Resting', 0, '66 game pitches on Sun, Sep 27 require 3 day(s) rest.'
     )
     status = board.locator('[data-next-pitcher-status]')
 
     expect(status).to_have_text(
-        "⚠ Shortstop Shawn isn't eligible to pitch next inning · "
-        'Needs Rest · 42 pitches today · Pitched yesterday',
+        f'⚠ Pitcher: Shortstop Shawn · {RESTING_REASON} · '
+        'End Inning will ask you to decide',
         timeout=10_000,
     )
-    expect(status).to_have_class(re.compile(r'\bineligible\b'))
+    expect(status).to_have_class(re.compile(r'\brule_conflict\b'))
     expect(status).to_be_in_viewport()
     no_question_open(page)
 
@@ -850,11 +884,13 @@ def test_board_says_unknown_eligibility_cannot_be_confirmed(
     status = board.locator('[data-next-pitcher-status]')
 
     expect(status).to_have_text(
-        "⚠ Shortstop Shawn's pitching eligibility can't be confirmed",
+        "⚠ Pitcher: Shortstop Shawn · Can't confirm · CoachBoard can't "
+        "confirm Shortstop Shawn's pitching eligibility. · "
+        'End Inning will ask you to decide',
         timeout=10_000,
     )
     expect(status).to_have_class(re.compile(r'\bunknown\b'))
-    expect(status).not_to_contain_text("isn't eligible")
+    expect(status).not_to_contain_text('ineligible')
     no_question_open(page)
 
 

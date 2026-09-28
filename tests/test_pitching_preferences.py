@@ -212,7 +212,7 @@ def test_assistant_coach_cannot_change_pitching_preferences(monkeypatch):
     assert response.status_code == 403
 
 
-def test_live_pitcher_change_blocks_officially_ineligible_pitcher(monkeypatch):
+def test_legacy_pitcher_change_returns_the_rule_warning(monkeypatch):
     app = _build_app(monkeypatch)
     _add_heavy_previous_day_outing(app)
     _set_complete_live_defense(app)
@@ -225,17 +225,22 @@ def test_live_pitcher_change_blocks_officially_ineligible_pitcher(monkeypatch):
     })
     assert settings.status_code == 200
 
+    # The deprecated route takes no pitching decision, and the old generic
+    # pitch_anyway flag is not one: the warning comes back instead.
     response = client.post('/api/live-game/1/change-pitcher', json={
         'new_pitcher_id': 1,
         'outgoing_destination': 'BENCH',
+        'pitch_anyway': True,
     })
     assert response.status_code == 409
     payload = response.get_json()
     assert payload['status'] == 'error'
+    # The legacy route answers with the shared eligibility policy.
     assert payload['pitching_status'] != 'Available'
     assert payload['next_available']
-    assert 'cannot be selected to pitch' in payload['message']
-    assert 'Can pitch again' in payload['message']
+    assert payload['code'] == 'pitcher_rule_conflict'
+    assert payload['eligibility_message'].startswith('MLB Pitch Smart: ')
+    assert payload['message'].endswith('Refresh CoachBoard to decide on this warning.')
 
 
 def test_arm_care_rest_does_not_become_competition_block_without_rules(monkeypatch):
@@ -274,4 +279,5 @@ def test_live_game_requires_competition_rules_before_pitcher_change(monkeypatch)
     assert payload['status'] == 'error'
     assert payload['pitching_status'] == 'Unavailable — Select Game Rules'
     assert payload['next_available'] == 'Verify event rules'
-    assert 'cannot be selected to pitch' in payload['message']
+    assert payload['code'] == 'pitcher_eligibility_unconfirmed'
+    assert "can't confirm" in payload['message']

@@ -5,6 +5,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from blueprints.fair_play import pitching_preferences_for_team, pitching_rules_for_name
 from db import db
+from pitching_eligibility import annotate as annotate_eligibility
 from pitching_rule_presets import install_additional_pitching_rules
 from utils import PITCHING_RULES, calculate_pitch_count_summary as _base_calculate_pitch_summary
 
@@ -217,7 +218,7 @@ def _fail_closed_unknown_statuses(summary):
     for item in summary.values():
         status = str(item.get('status') or '').strip()
         lowered = status.lower()
-        if status == 'Available':
+        if status == 'Available' or item.get('advisory'):
             continue
         if lowered.startswith(('unavailable', 'resting', 'ineligible')):
             continue
@@ -256,7 +257,7 @@ def gameplay_pitch_summary(
             current_game_id=current_game_id,
         )
         summary = _ensure_gameplay_summary_rows(roster, summary, rules)
-        return _fail_closed_unknown_statuses(summary)
+        return annotate_eligibility(_fail_closed_unknown_statuses(summary))
 
     if rules.get('rule_type') == 'pitch_count' and rules.get('max_daily'):
         proxy_rules = dict(rules)
@@ -300,7 +301,7 @@ def gameplay_pitch_summary(
         item['next_available'] = 'Verify event rules'
         # Keep the arm-care daily max and remaining pitch context available to
         # the Game Planning UI. Those values remain guidance only.
-    return summary
+    return annotate_eligibility(summary)
 
 
 def install_request_rule_adapters():

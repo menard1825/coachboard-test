@@ -427,9 +427,8 @@
             });
         }
 
-        // Selecting a Ready pitcher is the final action.
-        // A warned pitcher reaches here only after the coach
-        // explicitly chose "Pitch Anyway".
+        // A Ready pitcher goes straight on; a flagged one reaches here only
+        // with the coach's explicit decision (options.pitchingDecision).
         await controller.open(
             playerId,
             options,
@@ -444,8 +443,8 @@
             'Change Pitcher',
         );
 
-        // This picker owns its own Ready / warning presentation
-        // and the coach-facing "Pitch Anyway" confirmation.
+        // This picker owns its own Ready / advisory / rule conflict / can't
+        // confirm presentation and the coach's decision.
         // Legacy availability decorators must not disable its rows.
         modal.dataset.cbPitcherPickerOwner = 'live-v6';
 
@@ -503,7 +502,7 @@
         const statusLabel = summary => {
             const status = String(
                 summary?.status || ''
-            ).trim();
+            ).trim().replace(/^Unavailable — /, '');
 
             if (status === 'Available') {
                 return 'Ready';
@@ -527,9 +526,25 @@
         };
 
         const isReady = summary =>
-            String(
-                summary?.status || ''
-            ).trim() === 'Available';
+            eligibilityOf(summary) === 'ready';
+
+        // The server classifies eligibility (pitching_eligibility.py) and
+        // sends it with the live state, with the rule set and reason:
+        // ready, advisory (Continue), rule_conflict (the coach may override
+        // it explicitly) or unknown (the coach confirms they verified it).
+        const eligibilityOf = summary => {
+            if (summary?.eligibility) return summary.eligibility;
+            if (summary?.advisory) return 'advisory';
+            const status = String(summary?.status || '').trim();
+            if (status === 'Available') return 'ready';
+            return status ? 'rule_conflict' : 'unknown';
+        };
+
+        const rowNote = kind => ({
+            unknown: ["Can't confirm", 'text-primary'],
+            advisory: ['Advisory', 'text-warning-emphasis'],
+            rule_conflict: ['Rule conflict', 'text-danger'],
+        }[kind] || ['Rule conflict', 'text-danger']);
 
         const pitchesToday = summary => {
             const value =
@@ -647,7 +662,9 @@
                                                 ${
                                                     ready
                                                         ? 'text-success'
-                                                        : 'text-danger'
+                                                        : eligibilityOf(summary) === 'rule_conflict'
+                                                            ? 'text-danger'
+                                                            : 'text-warning-emphasis'
                                                 }
                                             "
                                         >
@@ -662,11 +679,12 @@
                                                         class="
                                                             small
                                                             fw-semibold
-                                                            text-primary
                                                             mt-1
+                                                            ${rowNote(eligibilityOf(summary))[1]}
                                                         "
+                                                        data-pitcher-eligibility="${eligibilityOf(summary)}"
                                                     >
-                                                        Pitch Anyway
+                                                        ${rowNote(eligibilityOf(summary))[0]}
                                                     </div>
                                                 `
                                         }
@@ -689,8 +707,43 @@
                     .split(/\s+/)[0] ||
                 player.name;
 
-            const detail =
-                warningDetail(summary);
+            const kind = eligibilityOf(summary);
+            const advisory = kind === 'advisory';
+            const unknown = kind === 'unknown';
+
+            // What CoachBoard believes (rule set and reason, worded by the
+            // server), then the coach decides. Advisory: Continue. Can't
+            // confirm: I verified. Rule conflict: Use Anyway, then a
+            // deliberate override confirmation.
+            const heading =
+                summary?.eligibility_heading ||
+                (advisory
+                    ? `${player.name} is eligible — please read this first`
+                    : unknown
+                        ? `CoachBoard can't confirm ${player.name}'s eligibility`
+                        : `${player.name} appears ineligible to pitch`);
+
+            const message =
+                summary?.eligibility_message ||
+                warningDetail(summary) ||
+                statusLabel(summary);
+
+            const action = advisory
+                ? `<button type="button" class="btn btn-primary btn-lg"
+                        data-pitching-decision="advisory_acknowledged"
+                        data-player-id="${player.id}">
+                        Continue with ${esc(firstName)}
+                    </button>`
+                : unknown
+                    ? `<button type="button" class="btn btn-primary btn-lg"
+                            data-pitching-decision="eligibility_verified"
+                            data-player-id="${player.id}">
+                            I verified ${esc(firstName)} is eligible
+                        </button>`
+                    : `<button type="button" class="btn btn-outline-danger btn-lg"
+                            data-override-step="${player.id}">
+                            Use ${esc(firstName)} Anyway
+                        </button>`;
 
             body.innerHTML = `
                 <div class="small text-muted mb-2">
@@ -700,65 +753,28 @@
                     </strong>
                 </div>
 
-                <h5 class="mb-3">
-                    Pitch ${esc(player.name)}?
+                <h5 class="mb-3" data-eligibility-heading>
+                    ${esc(heading)}
                 </h5>
 
-                <div
-                    class="
-                        border
-                        rounded
-                        p-3
-                        mb-4
-                    "
-                >
-                    <div
-                        class="
-                            fw-bold
-                            text-danger
-                        "
-                    >
-                        ${esc(
-                            statusLabel(summary)
-                        )}
+                <div class="border rounded p-3 mb-3"
+                     data-eligibility-kind="${esc(kind)}">
+                    <div class="fw-bold ${kind === 'rule_conflict' ? 'text-danger' : 'text-warning-emphasis'}">
+                        ${esc(statusLabel(summary))}
                     </div>
-
-                    <div
-                        class="
-                            text-muted
-                            mt-1
-                        "
-                    >
-                        ${esc(
-                            pitchesToday(summary)
-                        )}
-                        ${
-                            detail
-                                ? ` · ${esc(detail)}`
-                                : ''
-                        }
+                    <div class="mt-1" data-eligibility-reason>
+                        ${esc(message)}
+                    </div>
+                    <div class="small text-muted mt-1">
+                        ${esc(pitchesToday(summary))}
                     </div>
                 </div>
 
                 <div class="d-grid gap-2">
+                    ${action}
                     <button
                         type="button"
-                        class="
-                            btn
-                            btn-primary
-                            btn-lg
-                        "
-                        data-pitch-anyway-confirm="${player.id}"
-                    >
-                        Yes, Pitch ${esc(firstName)}
-                    </button>
-
-                    <button
-                        type="button"
-                        class="
-                            btn
-                            btn-outline-secondary
-                        "
+                        class="btn btn-outline-secondary"
                         data-pitch-anyway-back
                     >
                         Go Back
@@ -767,9 +783,69 @@
             `;
         };
 
+        // A rule override is deliberate: say again which rule set and why.
+        const renderOverrideConfirm = player => {
+            const summary =
+                summaryFor(player);
+
+            const firstName =
+                String(player.name)
+                    .trim()
+                    .split(/\s+/)[0] ||
+                player.name;
+
+            const confirmText =
+                summary?.override_confirm ||
+                'CoachBoard believes this may violate the selected rules. ' +
+                "Continue only if you have verified the tournament's rules " +
+                'or are intentionally overriding this warning.';
+
+            body.innerHTML = `
+                <h5 class="mb-3" data-eligibility-heading>
+                    Override pitching rule?
+                </h5>
+
+                <div class="border border-danger rounded p-3 mb-3">
+                    <div class="fw-bold text-danger" data-eligibility-reason>
+                        ${esc(
+                            summary?.eligibility_message ||
+                            [statusLabel(summary), warningDetail(summary)]
+                                .filter(Boolean)
+                                .join(' · ')
+                        )}
+                    </div>
+                    <div class="mt-2" data-override-confirm-text>
+                        ${esc(confirmText)}
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-danger btn-lg"
+                        data-pitching-decision="rule_override"
+                        data-player-id="${player.id}">
+                        Use ${esc(firstName)} Anyway
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        data-pitch-anyway-back
+                    >
+                        Cancel
+                    </button>
+                </div>
+            `;
+        };
+
+        const playerById = playerId =>
+            players.find(
+                item =>
+                    Number(item.id) ===
+                    Number(playerId)
+            );
+
         const makeChange = async (
             playerId,
-            pitchAnyway,
+            pitchingDecision,
             trigger,
         ) => {
             if (actionBusy) return;
@@ -790,10 +866,7 @@
                 await openCompletePitcherChange(
                     modal,
                     playerId,
-                    {
-                        pitchAnyway:
-                            pitchAnyway === true,
-                    },
+                    {pitchingDecision},
                 );
             } catch (err) {
                 toast(
@@ -825,25 +898,39 @@
                 return;
             }
 
-            const confirm =
+            const overrideStep =
                 event.target.closest(
-                    '[data-pitch-anyway-confirm]'
+                    '[data-override-step]'
                 );
 
-            if (confirm) {
-                const playerId =
-                    Number(
-                        confirm.dataset
-                            .pitchAnywayConfirm
-                    );
+            if (overrideStep) {
+                const player = playerById(
+                    overrideStep.dataset.overrideStep
+                );
+                if (player) renderOverrideConfirm(player);
+                return;
+            }
 
-                if (
-                    Number.isFinite(playerId)
-                ) {
+            const decided =
+                event.target.closest(
+                    '[data-pitching-decision]'
+                );
+
+            if (decided) {
+                const player = playerById(
+                    decided.dataset.playerId
+                );
+
+                if (player) {
+                    // The decision covers the status the coach was shown;
+                    // the server asks again if it has changed since.
                     await makeChange(
-                        playerId,
-                        true,
-                        confirm,
+                        player.id,
+                        {
+                            type: decided.dataset.pitchingDecision,
+                            status: summaryFor(player)?.status || '',
+                        },
+                        decided,
                     );
                 }
 
@@ -893,7 +980,7 @@
 
             await makeChange(
                 playerId,
-                false,
+                null,
                 choice,
             );
         };
@@ -994,6 +1081,11 @@
                 await api('/start', { method: 'POST', body: '{}' });
                 toast('✓ Live Game started • Saved & Synced');
             } else if (id === 'liveChangePitcherBtn') {
+                // Read eligibility fresh: live deltas carry the field, not
+                // who already pitched this game.
+                try {
+                    await fetchState();
+                } catch (_) {}
                 showPitcherPicker();
             } else if (id === 'liveUndoBtn') {
                 actionBusy = true;

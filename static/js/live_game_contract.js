@@ -230,7 +230,13 @@
       body:JSON.stringify(body || {}),
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.status === 'error') throw new Error(data.message || `Request failed (${response.status}).`);
+    if (!response.ok || data.status === 'error') {
+      const error = new Error(data.message || `Request failed (${response.status}).`);
+      error.code = data.code || '';
+      error.pitcher = data.pitcher || '';
+      error.payload = data;
+      throw error;
+    }
     return data;
   }
 
@@ -710,9 +716,103 @@
     instance.show();
   }
 
+  const PITCHING_DECISION_CODES = new Set([
+    'pitcher_advisory',
+    'pitcher_rule_conflict',
+    'pitcher_eligibility_unconfirmed',
+  ]);
+
+  // End Inning putting a flagged pitcher on the mound: the server has just
+  // re-evaluated eligibility and says what it believes (rule set, reason).
+  // The coach decides -- Continue (advisory), I verified (can't confirm),
+  // or Use Anyway plus a deliberate override confirmation (rule conflict).
+  // Cancel changes nothing.
+  function askPitchingDecision(info, retry) {
+    let modal = $('cbPitchingDecisionModal');
+
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'cbPitchingDecisionModal';
+      modal.className = 'modal fade';
+      modal.tabIndex = -1;
+      modal.setAttribute('aria-hidden', 'true');
+      modal.setAttribute('aria-labelledby', 'cbPitchingDecisionTitle');
+      modal.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="cbPitchingDecisionTitle"></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="fw-semibold" data-cb-decision-message></div>
+              <div class="small text-muted mt-2" data-cb-decision-confirm-text></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-cb-decision-cancel></button>
+              <button type="button" class="btn" data-cb-decision-go></button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+
+    const instance = bootstrap.Modal.getOrCreateInstance(modal);
+    const pitcher = info.pitcher || '';
+    const firstName = String(pitcher).trim().split(/\s+/)[0] || pitcher;
+    const kind = info.eligibility;
+    const decision = info.required_decision;
+    const title = modal.querySelector('.modal-title');
+    const message = modal.querySelector('[data-cb-decision-message]');
+    const confirmText = modal.querySelector('[data-cb-decision-confirm-text]');
+    const cancel = modal.querySelector('[data-cb-decision-cancel]');
+    const go = modal.querySelector('[data-cb-decision-go]');
+
+    modal.dataset.eligibilityKind = kind || '';
+
+    const decide = () => {
+      modal.addEventListener(
+        'hidden.bs.modal',
+        () => retry({type: decision, status: info.pitching_status || ''}),
+        {once: true}
+      );
+      instance.hide();
+    };
+
+    const showOverrideConfirm = () => {
+      title.textContent = 'Override pitching rule?';
+      confirmText.textContent = info.override_confirm || '';
+      cancel.textContent = 'Cancel';
+      go.className = 'btn btn-danger';
+      go.textContent = `Use ${firstName} Anyway`;
+      go.onclick = decide;
+    };
+
+    title.textContent = info.eligibility_heading || pitcher;
+    message.textContent = info.eligibility_message || info.message || '';
+    confirmText.textContent = '';
+    cancel.textContent = kind === 'unknown' ? 'Cancel' : 'Go Back';
+    cancel.onclick = () => instance.hide();
+
+    if (kind === 'rule_conflict') {
+      go.className = 'btn btn-outline-danger';
+      go.textContent = `Use ${firstName} Anyway`;
+      go.onclick = showOverrideConfirm;
+    } else {
+      go.className = 'btn btn-primary';
+      go.textContent = kind === 'advisory'
+        ? `Continue with ${firstName}`
+        : `I verified ${firstName} is eligible`;
+      go.onclick = decide;
+    }
+
+    instance.show();
+  }
+
   async function endInningFromNext(
     allowOpenCurrent = false,
-    allowOpenNext = false
+    allowOpenNext = false,
+    pitchingDecision = null
   ) {
     if (inningAdvanceBusy) return;
 
@@ -856,6 +956,14 @@
             sequenceFromState(
               liveState
             ),
+          // The coach's decision from this End Inning, for the status
+          // shown; honored here instead of asking again.
+          ...(pitchingDecision?.type
+            ? {
+                pitching_decision: pitchingDecision.type,
+                pitching_decision_status: pitchingDecision.status || '',
+              }
+            : {}),
         }
       );
 
@@ -885,6 +993,23 @@
         ?.afterAdvance?.();
 
     } catch (error) {
+      // Asked again only when the status changed since the coach decided
+      // (the server says the decision is outdated).
+      if (
+        PITCHING_DECISION_CODES.has(error?.code) &&
+        (!pitchingDecision || error.payload?.decision_outdated)
+      ) {
+        askPitchingDecision(
+          error.payload || {pitcher: error.pitcher, message: error.message},
+          decision => endInningFromNext(
+            allowOpenCurrent,
+            allowOpenNext,
+            decision
+          )
+        );
+        return;
+      }
+
       try {
         const fresh = await getJson(
           `/api/live-game/${gameId}/state`

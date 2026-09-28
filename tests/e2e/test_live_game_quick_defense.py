@@ -783,35 +783,18 @@ def test_pitcher_change_asks_where_the_pitcher_goes_and_can_leave_defense_open(
             == relief_name
         )
 
-        # Force only the browser's displayed live summary into a
-        # warning state. The backend contract is independently
-        # covered by the server regression test above.
-        warning_url = (
-            f'**/api/live-game/{game_id}/state'
-        )
+        # Force only the browser's displayed live summary into each
+        # eligibility state. The server's own policy is covered by
+        # tests/test_live_game_feedback_pass.py and
+        # tests/test_pitching_eligibility_policy.py.
+        forced = {}
 
-        def force_pitcher_warning(route):
+        def force_pitcher_status(route):
             response = route.fetch()
             payload = response.json()
-
-            summary = (
-                payload
-                .setdefault(
-                    'pitch_count_summary',
-                    {},
-                )
-                .setdefault(
-                    relief_name,
-                    {},
-                )
-            )
-
-            summary['status'] = 'Needs Rest'
-            summary['daily'] = 42
-            summary['status_detail'] = (
-                'Pitched yesterday'
-            )
-
+            payload.setdefault('pitch_count_summary', {}).setdefault(
+                relief_name, {}
+            ).update(forced)
             route.fulfill(
                 status=response.status,
                 headers=response.headers,
@@ -819,134 +802,76 @@ def test_pitcher_change_asks_where_the_pitcher_goes_and_can_leave_defense_open(
             )
 
         page.route(
-            warning_url,
-            force_pitcher_warning,
+            f'**/api/live-game/{game_id}/state',
+            force_pitcher_status,
         )
 
         pitch_change_posts = []
 
         def capture_pitch_change(route):
-            pitch_change_posts.append(
-                route.request.post_data or ''
-            )
+            pitch_change_posts.append(route.request.post_data or '')
             route.continue_()
 
         page.route(
-            f'**/api/live-game/{game_id}'
-            '/complete-pitcher-change',
+            f'**/api/live-game/{game_id}/complete-pitcher-change',
             capture_pitch_change,
         )
 
-        page.reload(
-            wait_until='domcontentloaded'
+        def open_picker_for(status):
+            forced.clear()
+            forced.update(status)
+            page.reload(wait_until='domcontentloaded')
+            expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
+            page.locator('#liveChangePitcherBtn').click()
+            picker = page.locator('#live-pitcher-picker-v2')
+            expect(picker).to_be_visible(timeout=10_000)
+            return picker, picker.locator('.pitcher-choice-v2', has_text=relief_name)
+
+        # Required rest: a rule conflict, shown with its reason. The coach
+        # may override it only deliberately; Cancel changes nothing.
+        picker, choice = open_picker_for({
+            'status': 'Resting',
+            'eligibility': 'rule_conflict',
+            'daily': 0,
+            'status_detail': '66 game pitches on Sun, Sep 27 require 3 day(s) rest.',
+        })
+        expect(choice).to_contain_text('Resting')
+        expect(choice).to_contain_text('Rule conflict')
+        expect(choice).not_to_contain_text('Pitch Anyway')
+        choice.click()
+        expect(picker.locator('[data-eligibility-heading]')).to_have_text(
+            f'{relief_name} appears ineligible to pitch'
         )
+        expect(picker).to_contain_text('require 3 day(s) rest')
+        expect(picker.locator('[data-pitching-decision="eligibility_verified"]')).to_have_count(0)
+        expect(picker.get_by_role('button', name=re.compile('Pitch Anyway|Yes, Pitch'))).to_have_count(0)
+        picker.get_by_role('button', name='Use Relief Anyway').click()
+        expect(picker.locator('[data-eligibility-heading]')).to_have_text('Override pitching rule?')
+        expect(picker).to_contain_text('require 3 day(s) rest')
+        picker.get_by_role('button', name='Cancel').click()
+        expect(choice).to_be_visible()
+        page.wait_for_timeout(300)
+        assert pitch_change_posts == []
 
-        expect(
-            page.locator('#cbQuickDefense')
-        ).to_be_visible(timeout=15_000)
-
-        page.locator(
-            '#liveChangePitcherBtn'
-        ).click()
-
-        picker = page.locator(
-            '#live-pitcher-picker-v2'
+        # Eligibility CoachBoard can't confirm: the coach may go ahead only
+        # by saying they verified it.
+        picker, choice = open_picker_for({
+            'status': 'Unavailable — Pitch Count Incomplete',
+            'eligibility': 'unknown',
+            'daily': None,
+            'status_detail': 'Verify missing game pitch counts before using this pitcher.',
+        })
+        expect(choice).to_contain_text('Pitch Count Incomplete')
+        expect(choice).to_contain_text("Can't confirm")
+        choice.click()
+        expect(picker.locator('[data-eligibility-heading]')).to_have_text(
+            f"CoachBoard can't confirm {relief_name}'s eligibility"
         )
-
-        expect(
-            picker
-        ).to_be_visible(timeout=10_000)
-
-        warned_choice = picker.locator(
-            '.pitcher-choice-v2',
-            has_text=relief_name,
-        )
-
-        expect(
-            warned_choice
-        ).to_contain_text(
-            'Needs Rest'
-        )
-
-        expect(
-            warned_choice
-        ).to_contain_text(
-            '42 pitches today'
-        )
-
-        expect(
-            warned_choice
-        ).to_contain_text(
-            'Pitch Anyway'
-        )
-
-        warned_choice.click()
-
-        expect(
-            picker
-        ).to_contain_text(
-            f'Pitch {relief_name}?'
-        )
-
-        expect(
-            picker
-        ).to_contain_text(
-            'Needs Rest'
-        )
-
-        expect(
-            picker
-        ).to_contain_text(
-            '42 pitches today'
-        )
-
-        expect(
-            picker
-        ).to_contain_text(
-            'Pitched yesterday'
-        )
-
-        expect(
-            picker
-        ).not_to_contain_text(
-            'CoachBoard says'
-        )
-
-        expect(
-            picker.get_by_role(
-                'button',
-                name='Go Back',
-            )
-        ).to_be_visible()
-
-        expect(
-            picker.get_by_role(
-                'button',
-                name='Yes, Pitch Relief',
-            )
-        ).to_be_visible()
-
-        # Go Back returns to the compact pitcher list without
-        # changing the game.
+        expect(picker.locator('[data-override-step]')).to_have_count(0)
         picker.get_by_role(
-            'button',
-            name='Go Back',
+            'button', name='I verified Relief is eligible'
         ).click()
-
-        expect(
-            warned_choice
-        ).to_be_visible()
-
-        warned_choice.click()
-
-        picker.get_by_role(
-            'button',
-            name='Yes, Pitch Relief',
-        ).click()
-
-        expect(
-            picker
-        ).not_to_be_visible(timeout=10_000)
+        expect(picker).not_to_be_visible(timeout=10_000)
 
         question = page.locator('#live-pitcher-destination-v7')
         expect(question).to_be_visible(timeout=10_000)
@@ -955,27 +880,13 @@ def test_pitcher_change_asks_where_the_pitcher_goes_and_can_leave_defense_open(
         ).click()
 
         expect(
-            page.locator(
-                '#cbQuickDefense '
-                '[data-cb-position="P"]'
-            )
-        ).to_contain_text(
-            relief_name,
-            timeout=10_000,
-        )
+            page.locator('#cbQuickDefense [data-cb-position="P"]')
+        ).to_contain_text(relief_name, timeout=10_000)
 
         assert pitch_change_posts
-
-        normalized_post = (
-            pitch_change_posts[-1]
-            .replace(' ', '')
-            .lower()
-        )
-
-        assert (
-            '"pitch_anyway":true'
-            in normalized_post
-        )
+        normalized_post = pitch_change_posts[-1].replace(' ', '').lower()
+        assert '"pitching_decision":"eligibility_verified"' in normalized_post
+        assert 'pitch_anyway' not in normalized_post
 
     finally:
         if game_id is not None:

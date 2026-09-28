@@ -6,6 +6,7 @@ from flask import Blueprint, g, jsonify, request
 from asset_versioning import asset_url
 from db import db
 from extensions import socketio
+import pitching_eligibility
 from models import Player, PlayerGameAbsence
 from blueprints.live_game_api import (
     _actual_rotation,
@@ -38,37 +39,95 @@ def _present_players(game, team_id):
     return [player for player in players if player.id not in absent_ids]
 
 
-def _pitcher_eligibility_block(game, team, pitcher_name):
-    """Authoritative eligibility check shared by every action that puts a
-    pitcher on the mound as live state (Change Pitcher, End Inning).
+PITCHING_DECISION_CODES = {
+    pitching_eligibility.ADVISORY: 'pitcher_advisory',
+    pitching_eligibility.RULE_CONFLICT: 'pitcher_rule_conflict',
+    pitching_eligibility.UNKNOWN: 'pitcher_eligibility_unconfirmed',
+}
 
-    Fail-closed by allowlist, not blocklist: only an explicit 'Available'
-    status permits assigning a new pitcher. A known-blocking status, an
-    unrecognized/future status, an empty status, or a missing summary
-    entirely all block. A caller that already knows the pitcher is simply
-    continuing from NOW into NEXT should not call this at all.
 
-    Returns (blocked, message). message is only meaningful when blocked.
+def _pitcher_eligibility_check(game, team, pitcher_name, data=None):
+    """The one server check for a new pitcher (Change Pitcher, End Inning).
+
+    Returns (response, decision). response is None when the pitcher may go
+    in, otherwise the 409 asking the coach to decide. decision is what the
+    caller records once the change is saved: the coach's explicit
+    `pitching_decision` for the status in `pitching_decision_status`, or
+    None for a Ready pitcher.
+
+    Pitching rules inform; the coach decides (pitching_eligibility). A
+    decision made for a different status -- the plan is older than the
+    latest pitching history -- is asked again. The old generic
+    `pitch_anyway` flag is not a decision: it cannot say which warning the
+    coach saw, so it never lets a flagged pitcher in. A pitcher simply
+    continuing from NOW into NEXT is not a new pitcher and is not checked.
     """
-    state = get_authoritative_live_state(game.id, team.id) or {}
+    # Evaluate under this game's own rules, whatever request-hook order a
+    # caller (including the deprecated /change-pitcher guard) runs in.
+    from game_pitching_rules import game_rule_context
+    from blueprints import live_game_api
+
+    data = data or {}
+    with game_rule_context(team, game):
+        state = get_authoritative_live_state(game.id, team.id) or {}
+        # The same (game-aware) rules the live state was evaluated under.
+        rules = live_game_api.get_pitching_rules_for_team(team)
     summary = (state.get('pitch_count_summary') or {}).get(pitcher_name)
-    status = str((summary or {}).get('status') or '').strip()
+    kind = pitching_eligibility.classify(summary)
+    status = (summary or {}).get('status') or 'Eligibility Unknown'
+    described = pitching_eligibility.describe(pitcher_name, summary, rules)
 
-    if status == 'Available':
-        return False, None
+    if kind == pitching_eligibility.READY:
+        return None, None
 
-    if not summary or not status:
-        return True, (
-            f"CoachBoard could not verify {pitcher_name}'s pitching "
-            "eligibility. Verify pitching history before using this "
-            "player to pitch."
-        )
+    decision = data.get('pitching_decision')
+    if pitching_eligibility.decision_accepted(
+        summary, decision, data.get('pitching_decision_status')
+    ):
+        return None, {
+            'decision': decision,
+            'status': pitching_eligibility.base_status(status),
+            'reason': described['eligibility_message'],
+            'rule_set': described['rule_set'],
+        }
 
-    detail = summary.get('status_detail') or summary.get('next_available')
-    message = f'{pitcher_name} cannot pitch right now: {status}.'
-    if detail:
-        message += f' {detail}'
-    return True, message
+    message = described['eligibility_message']
+    if not decision and data.get('pitch_anyway') is True:
+        message += ' Refresh CoachBoard to decide on this warning.'
+    return (jsonify({
+        'status': 'error',
+        'code': PITCHING_DECISION_CODES[kind],
+        'pitcher': pitcher_name,
+        'pitching_status': status,
+        'next_available': (summary or {}).get('next_available'),
+        **described,
+        'message': message,
+        'decision_outdated': bool(decision),
+    }), 409), None
+
+
+def _pitcher_eligibility_error(game, team, pitcher_name, data=None):
+    """_pitcher_eligibility_check without the decision detail."""
+    return _pitcher_eligibility_check(game, team, pitcher_name, data)[0]
+
+
+def _record_pitching_decision(user, team, game, event, pitcher_name, decision):
+    """Keep why CoachBoard let a flagged pitcher in: the decision type, the
+    rule set and the status and reason the coach was shown, for which game,
+    event and pitcher. The activity log adds who and when."""
+    from blueprints.security_guard import record_activity
+
+    record_activity(
+        'pitching_decision',
+        user=user,
+        team_id=team.id,
+        detail=(
+            f"{decision['decision']}: game {game.id}, {event.event_type} "
+            f'(event {event.id}, inning {event.inning}), pitcher '
+            f"{pitcher_name}; rules {decision['rule_set']}; status "
+            f"{decision['status']}; shown: {decision['reason']}"
+        ),
+    )
 
 
 def _missing_positions(alignment, allowed):
@@ -263,22 +322,14 @@ def complete_pitcher_change(game_id):
     if old_pitcher_name == new_pitcher.name:
         return jsonify({'status': 'error', 'message': 'That player is already pitching.'}), 409
 
-    blocked, message = _pitcher_eligibility_block(
-        game,
-        team,
-        new_pitcher.name,
+    # A flagged pitcher goes in only with the coach's explicit decision for
+    # the warning shown (checked after the version check above: a decision
+    # never saves over a field that has changed).
+    blocked, pitching_decision = _pitcher_eligibility_check(
+        game, team, new_pitcher.name, data
     )
-
-    # A warned pitcher remains blocked unless the coach explicitly
-    # confirmed "Pitch Anyway" for this specific mound change.
-    # This does not change the calculated eligibility status.
-    pitch_anyway = data.get('pitch_anyway') is True
-
-    if blocked and not pitch_anyway:
-        return jsonify({
-            'status': 'error',
-            'message': message,
-        }), 409
+    if blocked:
+        return blocked
 
     after = {}
     for pos in allowed:
@@ -311,6 +362,11 @@ def complete_pitcher_change(game_id):
         new_pitcher_id=new_pitcher.id,
     )
     db.session.commit()
+
+    if pitching_decision:
+        _record_pitching_decision(
+            user, team, game, event, new_pitcher.name, pitching_decision
+        )
 
     if data.get('fast'):
         return _fast_success(game, team, event, after)
@@ -585,14 +641,15 @@ def advance_inning(game_id):
     # common case and must not gate on eligibility. Only a genuine pitching
     # change at the End Inning commit boundary goes through the same
     # authoritative check Change Pitcher already enforces.
+    # Eligibility is re-evaluated here, from the latest pitching history, not
+    # taken from when NEXT was planned.
+    pitching_decision = None
     if new_pitcher != old_pitcher:
-        blocked, message = _pitcher_eligibility_block(game, team, new_pitcher)
+        blocked, pitching_decision = _pitcher_eligibility_check(
+            game, team, new_pitcher, data
+        )
         if blocked:
-            return jsonify({
-                'status': 'error',
-                'code': 'pitcher_not_eligible',
-                'message': message,
-            }), 409
+            return blocked
 
     old_pitcher_id = _player_id_by_name(old_pitcher, team.id)
     new_pitcher_id = _player_id_by_name(new_pitcher, team.id)
@@ -615,6 +672,12 @@ def advance_inning(game_id):
         db.session.delete(prep)
 
     db.session.commit()
+
+    if pitching_decision:
+        _record_pitching_decision(
+            user, team, game, event, new_pitcher, pitching_decision
+        )
+
     return _fast_success(game, team, event, after, prep_changed=True)
 
 

@@ -417,20 +417,35 @@ def test_advance_inning_continuing_pitcher_bypasses_eligibility_gate(monkeypatch
     assert payload['delta']['current_alignment']['P'] == 'Aiden'
 
 
-@pytest.mark.parametrize('pitch_count_summary, expected_message_fragment', [
-    ({'Jack': {'status': 'Resting', 'status_detail': '40 game pitches on Mon, Aug 24 require 2 day(s) rest.'}}, 'Resting'),
-    ({'Jack': {'status': 'Pitch Count Incomplete'}}, 'Pitch Count Incomplete'),
-    ({'Jack': {'status': 'Innings Incomplete'}}, 'Innings Incomplete'),
-    ({'Jack': {'status': 'Verify Rules'}}, 'Verify Rules'),
-    ({'Jack': {'status': 'Eligibility Error', 'status_detail': "CoachBoard could not calculate pitching eligibility."}}, 'Eligibility Error'),
-    ({}, "could not verify Jack's pitching eligibility"),
-    ({'Jack': {'status': ''}}, "could not verify Jack's pitching eligibility"),
-    ({'Jack': {'status': 'Something Nobody Has Invented Yet'}}, 'Something Nobody Has Invented Yet'),
+RULE_CONFLICT = 'pitcher_rule_conflict'
+UNCONFIRMED = 'pitcher_eligibility_unconfirmed'
+
+
+@pytest.mark.parametrize('pitch_count_summary, expected_code, expected_message_fragment', [
+    ({'Jack': {'status': 'Resting', 'status_detail': '40 game pitches on Mon, Aug 24 require 2 day(s) rest.'}},
+     RULE_CONFLICT, ': Resting. 40 game pitches on Mon, Aug 24 require 2 day(s) rest.'),
+    ({'Jack': {'status': 'Unavailable — Same-Day Game Restriction'}},
+     RULE_CONFLICT, ': Same-Day Game Restriction.'),
+    ({'Jack': {'status': 'Ineligible', 'status_detail': 'One-day or rolling three-day innings limit reached.'}},
+     RULE_CONFLICT, 'innings limit reached'),
+    ({'Jack': {'status': 'Pitch Count Incomplete'}}, UNCONFIRMED, 'Pitch Count Incomplete'),
+    ({'Jack': {'status': 'Unavailable — Innings Incomplete'}}, UNCONFIRMED, 'Innings Incomplete'),
+    ({'Jack': {'status': 'Verify Rules'}}, UNCONFIRMED, 'Verify Rules'),
+    ({'Jack': {'status': 'Unavailable — Select Game Rules'}}, UNCONFIRMED, 'Select Game Rules'),
+    ({'Jack': {'status': 'Eligibility Error', 'status_detail': "CoachBoard could not calculate pitching eligibility."}},
+     UNCONFIRMED, 'Eligibility Error'),
+    ({}, UNCONFIRMED, "CoachBoard can't confirm Jack's pitching eligibility."),
+    ({'Jack': {'status': ''}}, UNCONFIRMED, "CoachBoard can't confirm Jack's pitching eligibility."),
+    ({'Jack': {'status': 'Something Nobody Has Invented Yet'}},
+     RULE_CONFLICT, 'Something Nobody Has Invented Yet'),
 ], ids=[
-    'resting', 'pitch_count_incomplete', 'innings_incomplete', 'verify_rules',
-    'eligibility_error', 'missing_summary', 'empty_status', 'unknown_future_status',
+    'resting', 'same_day_game', 'innings_limit', 'pitch_count_incomplete',
+    'innings_incomplete', 'verify_rules', 'rules_not_selected', 'eligibility_error',
+    'missing_summary', 'empty_status', 'unknown_future_status',
 ])
-def test_advance_inning_ineligible_new_pitcher_is_rejected(monkeypatch, pitch_count_summary, expected_message_fragment):
+def test_advance_inning_flagged_new_pitcher_needs_a_decision(
+    monkeypatch, pitch_count_summary, expected_code, expected_message_fragment
+):
     app = _build_app(monkeypatch)
     client = app.test_client()
     _login(client)
@@ -455,8 +470,18 @@ def test_advance_inning_ineligible_new_pitcher_is_rejected(monkeypatch, pitch_co
     assert response.status_code == 409
     payload = response.get_json()
     assert payload['status'] == 'error'
-    assert payload['code'] == 'pitcher_not_eligible'
+    assert payload['code'] == expected_code
     assert expected_message_fragment in payload['message']
+    if expected_code == UNCONFIRMED:
+        assert "can't confirm" in payload['message']
+        assert payload['required_decision'] == 'eligibility_verified'
+    else:
+        assert "can't confirm" not in payload['message']
+        assert payload['required_decision'] == 'rule_override'
+        assert payload['eligibility_heading'] == 'Jack appears ineligible to pitch'
+        assert payload['override_confirm'].startswith(
+            'CoachBoard believes this may violate the selected'
+        )
 
     from blueprints.live_game_ui import GameNextInningPrep
     from db import db
@@ -471,7 +496,7 @@ def test_advance_inning_ineligible_new_pitcher_is_rejected(monkeypatch, pitch_co
 
 @pytest.mark.parametrize('pitch_count_summary, expected_message_fragment', [
     ({'Carter': {'status': 'Eligibility Error'}}, 'Eligibility Error'),
-    ({}, "could not verify Carter's pitching eligibility"),
+    ({}, "CoachBoard can't confirm Carter's pitching eligibility."),
     ({'Carter': {'status': 'Something Nobody Has Invented Yet'}}, 'Something Nobody Has Invented Yet'),
 ], ids=['eligibility_error', 'missing_summary', 'unknown_future_status'])
 def test_complete_pitcher_change_blocks_via_shared_helper(monkeypatch, pitch_count_summary, expected_message_fragment):
@@ -519,90 +544,254 @@ def test_complete_pitcher_change_blocks_via_shared_helper(monkeypatch, pitch_cou
 
 
 
-def test_complete_pitcher_change_pitch_anyway_allows_warned_pitcher(
-    monkeypatch,
-):
-    app = _build_app(monkeypatch)
-    client = app.test_client()
-    _login(client)
-
+def _patch_summary(monkeypatch, summary):
     from blueprints import live_game_bulk_api as bulk_module
 
     monkeypatch.setattr(
         bulk_module,
         'get_authoritative_live_state',
-        lambda game_id, team_id: {
-            'pitch_count_summary': {
-                'Carter': {
-                    'status': 'Needs Rest',
-                    'daily': 42,
-                    'status_detail': 'Pitched yesterday',
-                },
-            },
-        },
+        lambda game_id, team_id: {'pitch_count_summary': summary},
     )
 
-    # Carter moves from 1B to P. The outgoing pitcher sits and
-    # 1B intentionally remains open for On the Field.
-    proposed = {
-        'P': 'Carter',
-        'C': 'Bennett',
-        '2B': 'Drew',
-        '3B': 'Eli',
-        'SS': 'Finn',
-        'LF': 'Gavin',
-        'CF': 'Hudson',
-        'RF': 'Isaac',
-    }
 
-    response = client.post(
-        '/api/live-game/70/complete-pitcher-change',
-        json={
-            'base_sequence': 0,
-            'fast': True,
-            'new_pitcher_id': 3,
-            'alignment': proposed,
-            'pitch_anyway': True,
-        },
-    )
+CARTER_TO_P = {
+    # Carter moves from 1B to P; the outgoing pitcher sits and 1B stays open.
+    'P': 'Carter', 'C': 'Bennett', '2B': 'Drew', '3B': 'Eli',
+    'SS': 'Finn', 'LF': 'Gavin', 'CF': 'Hudson', 'RF': 'Isaac',
+}
 
-    assert response.status_code == 200
 
-    payload = response.get_json()
+def _change_to_carter(client, **flags):
+    return client.post('/api/live-game/70/complete-pitcher-change', json={
+        'base_sequence': 0,
+        'fast': True,
+        'new_pitcher_id': 3,
+        'alignment': CARTER_TO_P,
+        **flags,
+    })
 
-    assert (
-        payload['delta']['current_alignment']['P']
-        == 'Carter'
-    )
 
-    assert (
-        '1B'
-        not in payload['delta']['current_alignment']
-    )
-
-    assert 'Aiden' in {
-        player['name']
-        for player in payload['delta']['bench']
-    }
-
-    assert (
-        payload['delta']['event']['event_type']
-        == 'Pitcher Change'
-    )
-
+def _event_count(app):
     from db import db
     from models import GameRotationEvent
 
     with app.app_context():
-        assert (
-            db.session.query(GameRotationEvent)
-            .filter_by(
-                game_id=70,
-                team_id=1,
-            )
-            .count()
-            == 1
-        )
+        return db.session.query(GameRotationEvent).filter_by(game_id=70, team_id=1).count()
+
+
+CARTER_RESTING = {
+    'Carter': {
+        'status': 'Resting',
+        'daily': 0,
+        'status_detail': '66 game pitches on Sun, Sep 27 require 3 day(s) rest.',
+    },
+}
+
+
+@pytest.mark.parametrize('flags', [
+    {},
+    # The old generic flag says nothing about which warning was seen.
+    {'pitch_anyway': True},
+    # A lighter decision than the rule needs.
+    {'pitching_decision': 'eligibility_verified', 'pitching_decision_status': 'Resting'},
+    {'pitching_decision': 'advisory_acknowledged', 'pitching_decision_status': 'Resting'},
+], ids=['no_decision', 'legacy_pitch_anyway', 'verification', 'advisory_ack'])
+def test_required_rest_is_a_rule_conflict_needing_an_override(monkeypatch, flags):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, CARTER_RESTING)
+
+    response = _change_to_carter(client, **flags)
+
+    assert response.status_code == 409
+    payload = response.get_json()
+    assert payload['code'] == 'pitcher_rule_conflict'
+    assert payload['eligibility'] == 'rule_conflict'
+    assert payload['required_decision'] == 'rule_override'
+    assert payload['pitching_status'] == 'Resting'
+    assert payload['eligibility_heading'] == 'Carter appears ineligible to pitch'
+    assert payload['eligibility_message'].endswith(
+        ': Resting. 66 game pitches on Sun, Sep 27 require 3 day(s) rest.'
+    )
+    if flags.get('pitch_anyway'):
+        assert payload['message'].endswith('Refresh CoachBoard to decide on this warning.')
+    assert _event_count(app) == 0
+    assert _decision_log(app) == []
+
+
+def test_coach_can_explicitly_override_required_rest(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, CARTER_RESTING)
+
+    response = _change_to_carter(
+        client, pitching_decision='rule_override', pitching_decision_status='Resting'
+    )
+
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()['delta']['current_alignment']['P'] == 'Carter'
+    assert _event_count(app) == 1
+    (detail,) = _decision_log(app)
+    assert detail.startswith('rule_override: game 70, Pitcher Change')
+    assert 'pitcher Carter;' in detail
+    assert 'status Resting;' in detail
+    assert '66 game pitches on Sun, Sep 27 require 3 day(s) rest.' in detail
+
+
+def test_override_for_a_status_that_changed_is_asked_again(monkeypatch):
+    """A decision covers the warning the coach saw, not whatever is true now."""
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {
+        'Carter': {'status': 'Already Pitched This Game', 'status_detail': 'Carter already pitched.'},
+    })
+
+    response = _change_to_carter(
+        client, pitching_decision='rule_override', pitching_decision_status='Resting'
+    )
+
+    assert response.status_code == 409
+    payload = response.get_json()
+    assert payload['decision_outdated'] is True
+    assert payload['pitching_status'] == 'Already Pitched This Game'
+    assert _event_count(app) == 0
+
+
+@pytest.mark.parametrize('route', ['complete-pitcher-change', 'advance-inning'])
+def test_override_never_bypasses_the_stale_field_check(monkeypatch, route):
+    """A rule override is a coach decision; a changed field is a software
+    stop. The version check still refuses the write."""
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {**CARTER_RESTING, 'Jack': {'status': 'Resting'}})
+
+    decision = {'pitching_decision': 'rule_override', 'pitching_decision_status': 'Resting'}
+    if route == 'complete-pitcher-change':
+        response = _change_to_carter(client, **{**decision, 'base_sequence': 7})
+    else:
+        next_alignment = _next_alignment_with_new_pitcher('Jack')
+        with app.app_context():
+            _seed_next_inning_prep(next_alignment)
+        response = client.post('/api/live-game/70/advance-inning', json={
+            'base_sequence': 7, 'alignment': next_alignment, **decision,
+        })
+
+    assert response.status_code == 409
+    assert response.get_json()['code'] == 'stale_live_state'
+    assert _event_count(app) == 0
+    assert _decision_log(app) == []
+
+
+def test_complete_pitcher_change_unknown_needs_explicit_verification(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {
+        'Carter': {
+            'status': 'Unavailable — Pitch Count Incomplete',
+            'status_detail': 'Verify missing game pitch counts before using this pitcher.',
+        },
+    })
+
+    refused = _change_to_carter(client)
+    assert refused.status_code == 409
+    assert refused.get_json()['code'] == 'pitcher_eligibility_unconfirmed'
+    assert refused.get_json()['message'].startswith(
+        "CoachBoard can't confirm Carter's pitching eligibility (Pitch Count Incomplete)."
+    )
+    assert refused.get_json()['required_decision'] == 'eligibility_verified'
+    assert _event_count(app) == 0
+
+    # Verification is its own decision; a rule override does not stand in.
+    wrong = _change_to_carter(
+        client,
+        pitching_decision='rule_override',
+        pitching_decision_status='Unavailable — Pitch Count Incomplete',
+    )
+    assert wrong.status_code == 409
+    assert _event_count(app) == 0
+
+    confirmed = _change_to_carter(
+        client,
+        pitching_decision='eligibility_verified',
+        pitching_decision_status='Unavailable — Pitch Count Incomplete',
+    )
+    assert confirmed.status_code == 200
+    payload = confirmed.get_json()
+    assert payload['delta']['current_alignment']['P'] == 'Carter'
+    assert payload['delta']['event']['event_type'] == 'Pitcher Change'
+    assert _event_count(app) == 1
+
+
+def test_advance_inning_unknown_needs_explicit_verification(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {'Jack': {'status': 'Unavailable — Innings Incomplete'}})
+
+    next_alignment = _next_alignment_with_new_pitcher('Jack')
+    with app.app_context():
+        _seed_next_inning_prep(next_alignment)
+
+    body = {'base_sequence': 0, 'alignment': next_alignment}
+    refused = client.post('/api/live-game/70/advance-inning', json=body)
+    assert refused.status_code == 409
+    assert refused.get_json()['code'] == 'pitcher_eligibility_unconfirmed'
+
+    confirmed = client.post(
+        '/api/live-game/70/advance-inning',
+        json={
+            **body,
+            'pitching_decision': 'eligibility_verified',
+            'pitching_decision_status': 'Unavailable — Innings Incomplete',
+        },
+    )
+    assert confirmed.status_code == 200
+    assert confirmed.get_json()['delta']['current_alignment']['P'] == 'Jack'
+    (detail,) = _decision_log(app)
+    assert detail.startswith('eligibility_verified: game 70, End Inning')
+
+
+@pytest.mark.parametrize('status, detail', [
+    ('Resting', '66 game pitches on Sun, Sep 27 require 3 day(s) rest.'),
+    ('Ineligible', 'One-day or rolling three-day innings limit reached.'),
+    ('Already Pitched This Game', 'Jack already pitched and was removed from the mound.'),
+], ids=['required_rest', 'innings_limit', 'reentry'])
+def test_end_inning_rule_conflict_needs_an_explicit_override(monkeypatch, status, detail):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {'Jack': {'status': status, 'status_detail': detail}})
+
+    next_alignment = _next_alignment_with_new_pitcher('Jack')
+    with app.app_context():
+        _seed_next_inning_prep(next_alignment)
+    body = {'base_sequence': 0, 'alignment': next_alignment}
+
+    for not_enough in (
+        {},
+        {'pitch_anyway': True},
+        {'pitching_decision': 'eligibility_verified', 'pitching_decision_status': status},
+    ):
+        refused = client.post('/api/live-game/70/advance-inning', json={**body, **not_enough})
+        assert refused.status_code == 409
+        assert refused.get_json()['code'] == 'pitcher_rule_conflict'
+        assert refused.get_json()['required_decision'] == 'rule_override'
+        assert detail in refused.get_json()['eligibility_message']
+    assert _event_count(app) == 0
+
+    overridden = client.post('/api/live-game/70/advance-inning', json={
+        **body, 'pitching_decision': 'rule_override', 'pitching_decision_status': status,
+    })
+    assert overridden.status_code == 200, overridden.get_json()
+    assert overridden.get_json()['delta']['current_alignment']['P'] == 'Jack'
+    (logged,) = _decision_log(app)
+    assert logged.startswith('rule_override: game 70, End Inning')
+    assert f'status {status};' in logged
 
 
 def test_field_player_can_take_mound_without_benching_outgoing_pitcher(monkeypatch):
@@ -916,3 +1105,133 @@ def test_reverted_event_does_not_count_as_active_version(monkeypatch):
     payload = response.get_json()
 
     assert payload['delta']['sequence'] == 2
+
+
+def test_verified_unknown_eligibility_is_recorded(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {'Carter': {'status': 'Unavailable — Pitch Count Incomplete'}})
+
+    assert _decision_log(app) == []
+    response = _change_to_carter(
+        client,
+        pitching_decision='eligibility_verified',
+        pitching_decision_status='Unavailable — Pitch Count Incomplete',
+    )
+    assert response.status_code == 200
+
+    event_id = response.get_json()['delta']['event']['id']
+    (row,) = _decision_rows(app)
+    assert row['detail'].startswith(
+        f'eligibility_verified: game 70, Pitcher Change (event {event_id}, '
+        'inning 2), pitcher Carter; rules '
+    )
+    assert row['detail'].endswith(
+        "status Pitch Count Incomplete; shown: CoachBoard can't confirm "
+        "Carter's pitching eligibility (Pitch Count Incomplete)."
+    )
+    # Who and when come from the activity log itself.
+    assert row['user_id'] is not None
+    assert row['created_at'] is not None
+
+
+def test_ready_pitcher_records_no_decision(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {'Carter': {'status': 'Available'}})
+
+    assert _change_to_carter(
+        client, pitching_decision='rule_override', pitching_decision_status='Available'
+    ).status_code == 200
+    assert _decision_log(app) == []
+
+
+def test_advisory_needs_only_an_acknowledgement(monkeypatch):
+    """Pitch Smart's same-day recommendation: shown, then Continue."""
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {
+        'Carter': {'status': 'Same-Day Game Advisory', 'advisory': True},
+        'Jack': {'status': 'Same-Day Game Advisory', 'advisory': True},
+    })
+
+    shown = _change_to_carter(client)
+    assert shown.status_code == 409
+    assert shown.get_json()['code'] == 'pitcher_advisory'
+    assert shown.get_json()['required_decision'] == 'advisory_acknowledged'
+    assert 'override_confirm' not in shown.get_json()
+
+    ack = {
+        'pitching_decision': 'advisory_acknowledged',
+        'pitching_decision_status': 'Same-Day Game Advisory',
+    }
+    assert _change_to_carter(client, **ack).status_code == 200
+
+    next_alignment = _next_alignment_with_new_pitcher('Jack')
+    with app.app_context():
+        _seed_next_inning_prep(next_alignment)
+    response = client.post('/api/live-game/70/advance-inning', json={
+        'base_sequence': 1,
+        'alignment': next_alignment,
+        **ack,
+    })
+    assert response.status_code == 200, response.get_json()
+    assert [d.split(':')[0] for d in _decision_log(app)] == [
+        'advisory_acknowledged', 'advisory_acknowledged',
+    ]
+
+
+@pytest.mark.parametrize('flags, allowed', [
+    ({'pitch_anyway': True}, False),
+    ({'pitching_decision': 'eligibility_verified',
+      'pitching_decision_status': 'Already Pitched This Game'}, False),
+    ({'pitching_decision': 'rule_override',
+      'pitching_decision_status': 'Already Pitched This Game'}, True),
+], ids=['legacy_pitch_anyway', 'verification', 'rule_override'])
+def test_reentry_is_overridable_only_explicitly(monkeypatch, flags, allowed):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    reason = (
+        'Carter already pitched and was removed from the mound. USSSA rules '
+        'indicate Carter cannot return to pitch in this game.'
+    )
+    _patch_summary(monkeypatch, {
+        'Carter': {'status': 'Already Pitched This Game', 'status_detail': reason},
+    })
+
+    response = _change_to_carter(client, **flags)
+    if not allowed:
+        assert response.status_code == 409
+        payload = response.get_json()
+        assert payload['code'] == 'pitcher_rule_conflict'
+        assert payload['eligibility_message'] == reason
+        assert _event_count(app) == 0
+        return
+
+    assert response.status_code == 200
+    assert _event_count(app) == 1
+    (detail,) = _decision_log(app)
+    assert detail.startswith('rule_override:')
+    assert reason in detail
+
+
+def _decision_rows(app):
+    from blueprints.security_guard import ActivityLog
+    from db import db
+
+    with app.app_context():
+        return [
+            {'detail': row.detail, 'user_id': row.user_id, 'created_at': row.created_at}
+            for row in db.session.query(ActivityLog)
+            .filter_by(action='pitching_decision')
+            .order_by(ActivityLog.id)
+            .all()
+        ]
+
+
+def _decision_log(app):
+    return [row['detail'] for row in _decision_rows(app)]

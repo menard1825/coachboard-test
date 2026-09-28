@@ -283,7 +283,9 @@ def test_missing_usssa_innings_is_visibly_unavailable_in_gameplay():
     assert item['next_available'] == 'Verify game innings'
 
 
-def test_same_day_game_restriction_is_visibly_unavailable_in_gameplay():
+def test_same_day_second_game_is_a_pitch_smart_advisory_in_gameplay():
+    """Pitch Smart recommends against a second game the same day; it is not
+    an eligibility rule unless the selected rules make it one."""
     target_date = date(2026, 8, 26)
     roster = [_player()]
     outings = [_outing(1, target_date, 15, game_id=100)]
@@ -298,6 +300,30 @@ def test_same_day_game_restriction_is_visibly_unavailable_in_gameplay():
     )
 
     item = summary['Test Pitcher']
+    assert item['status'] == 'Same-Day Game Advisory'
+    assert item['advisory'] is True
+    assert item['eligibility'] == 'advisory'
+    assert item['status_detail'] == (
+        'Pitch Smart recommends that players not pitch in multiple games on the same day.'
+    )
+    assert item['next_available'] == 'Today'
+
+
+def test_same_day_second_game_is_unavailable_when_the_rules_prohibit_it():
+    target_date = date(2026, 8, 26)
+    roster = [_player()]
+    outings = [_outing(1, target_date, 15, game_id=100)]
+
+    summary = gameplay_pitch_summary(
+        roster,
+        outings,
+        dict(PITCH_SMART_12U, same_day_games_prohibited=True),
+        target_date=target_date,
+        team_timezone='America/Indiana/Indianapolis',
+        current_game_id=200,
+    )
+
+    item = summary['Test Pitcher']
     assert item['status'] == 'Unavailable — Same-Day Game Restriction'
-    assert 'multiple games on the same day' in item['status_detail']
+    assert item['eligibility'] == 'rule_conflict'
     assert item['next_available'] != 'Today'

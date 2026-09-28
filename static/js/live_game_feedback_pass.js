@@ -187,6 +187,14 @@
     stateLoadedAt = Date.now();
     queuePatch();
     document.dispatchEvent(new CustomEvent('coachboard:live-delta', {detail:delta}));
+
+    // A delta carries the field, not pitching eligibility. After a pitcher
+    // leaves the mound (a pitching change, or a new pitcher at End Inning)
+    // read the full state once so every screen knows who may not return.
+    const type = delta.event?.event_type;
+    if (type === 'Pitcher Change' || type === 'End Inning') {
+      loadState(true, 'pitching-change').catch(() => {});
+    }
   }
 
   function wireSocket(socket) {

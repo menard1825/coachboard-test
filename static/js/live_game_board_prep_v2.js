@@ -842,20 +842,22 @@
       }
 
       #${CARD_ID} .cb-next-pitcher-status.unknown,
-      #${CARD_ID} .cb-next-pitcher-status.ineligible{
+      #${CARD_ID} .cb-next-pitcher-status.advisory,
+      #${CARD_ID} .cb-next-pitcher-status.rule_conflict{
         margin-top:5px;
         padding:4px 7px;
         border-radius:7px;
         font-weight:800;
       }
 
-      #${CARD_ID} .cb-next-pitcher-status.unknown{
+      #${CARD_ID} .cb-next-pitcher-status.unknown,
+      #${CARD_ID} .cb-next-pitcher-status.advisory{
         border:1px solid #e6ca82;
         background:#fff8e6;
         color:#775a10;
       }
 
-      #${CARD_ID} .cb-next-pitcher-status.ineligible{
+      #${CARD_ID} .cb-next-pitcher-status.rule_conflict{
         border:1px solid #efb5ae;
         background:#fff1ef;
         color:#a12d26;
@@ -2653,17 +2655,9 @@
     const board = snapshot();
     const pitcher = board.P || '';
 
-    // Whether the new pitcher can pitch comes first: End Inning will not
-    // start the inning with a pitcher who is not Ready, so say so now.
-    if (
-      target === 'P' &&
-      isPitchingChange(name) &&
-      !pitchingReadiness(name).ready
-    ) {
-      renderCard();
-      explainNotReady(board, name);
-      return;
-    }
+    // A flagged pitcher can still be planned at P: this is a plan, not the
+    // official field. The board shows the status; End Inning re-evaluates
+    // it and asks for the coach's decision when the pitcher goes in.
 
     // Moving a player on or off P is a pitching change, not a position
     // swap. The coach has only said who is moving; ask what happens to the
@@ -2700,38 +2694,54 @@
   // Nothing is calculated here; the labels match Change Pitcher's.
   function pitchingReadiness(name) {
     const summary = pitchSummary?.[name];
-    const status = String(summary?.status || '').trim();
-    const lower = status.toLowerCase();
-    // The server's End Inning rule: Available is Ready; a missing summary
-    // or status cannot be verified; any other status is not eligible.
+    const status = String(summary?.status || '')
+      .trim()
+      .replace(/^Unavailable — /, '');
+    // The server classifies it (pitching_eligibility.py) and sends the
+    // answer with the live state, so this screen, Change Pitcher and End
+    // Inning agree. The fallback only covers a state without it.
     const kind =
-      status === 'Available'
+      summary?.eligibility ||
+      (summary?.status === 'Available'
         ? 'ready'
-        : !summary || !status
-          ? 'unknown'
-          : 'ineligible';
+        : summary?.advisory
+          ? 'advisory'
+          : !summary || !status
+            ? 'unknown'
+            : 'rule_conflict');
+    // One of four words, shown prominently, then the status.
+    const word = {
+      ready: 'Ready',
+      advisory: 'Advisory',
+      rule_conflict: 'Rule conflict',
+      unknown: "Can't confirm",
+    }[kind] || 'Rule conflict';
     const label =
       kind === 'ready'
-        ? 'Ready'
-        : kind === 'unknown'
-          ? "Eligibility can't be confirmed"
-          : lower.includes('pitch') && lower.includes('limit')
-            ? 'At Pitch Limit'
-            : status;
+        ? word
+        : [word, status].filter(Boolean).join(' · ');
     const daily = summary?.daily;
     const today =
       daily === null || daily === undefined
         ? ''
         : `${daily} ${Number(daily) === 1 ? 'pitch' : 'pitches'} today`;
+    // The server's wording names the rule set and the reason.
     const detail = String(
-      summary?.status_detail || summary?.next_available || ''
+      summary?.eligibility_message ||
+      summary?.status_detail ||
+      summary?.next_available ||
+      ''
     ).trim();
 
     return {
       kind,
       ready: kind === 'ready',
       label,
-      text: [label, today, detail].filter(Boolean).join(' · '),
+      text: [
+        summary?.eligibility_message ? word : label,
+        today,
+        detail,
+      ].filter(Boolean).join(' · '),
     };
   }
 
@@ -2741,35 +2751,37 @@
     return Boolean(name) && name !== (latest?.current_alignment?.P || '');
   }
 
-  function notReadyTitle(name) {
-    return pitchingReadiness(name).kind === 'unknown'
-      ? `${name}'s pitching eligibility can't be confirmed`
-      : `${name} isn't eligible to pitch next inning`;
+  function toneFor(name) {
+    const kind = pitchingReadiness(name).kind;
+    return kind === 'ready'
+      ? 'ok'
+      : kind === 'rule_conflict'
+        ? 'danger'
+        : 'warn';
   }
 
-  function readinessNote(name, {titled = true} = {}) {
+  // Planning a flagged pitcher asks nothing extra; the note says what End
+  // Inning will ask when the pitcher actually goes in.
+  function readinessNote(name) {
     const readiness = pitchingReadiness(name);
 
     if (readiness.ready) {
       return `${name}: ${readiness.text}`;
     }
 
-    return readiness.kind === 'unknown'
-      ? `${titled ? `${notReadyTitle(name)}. ` : ''}` +
-        `CoachBoard needs a confirmed Ready status before ${name} ` +
-        'can be planned at P.'
-      : `${name}: ${readiness.text}. ` +
-        'End Inning only starts an inning with a pitcher who is Ready.';
-  }
+    const ask = {
+      advisory: 'End Inning will show this before the inning starts.',
+      unknown:
+        `End Inning will ask you to confirm you verified ${name} is ` +
+        'eligible.',
+      rule_conflict:
+        `End Inning will ask whether to use ${name} anyway.`,
+    }[readiness.kind] || '';
 
-  function explainNotReady(board, name) {
-    askPitchingChange(
-      board,
-      notReadyTitle(name),
-      'Choose another pitcher, or use Change Pitcher during the game.',
-      [],
-      {note: readinessNote(name, {titled: false}), noteDanger: true}
-    );
+    const sentence = /[.!?]$/.test(readiness.text)
+      ? readiness.text
+      : `${readiness.text}.`;
+    return `${name}: ${sentence} ${ask}`.trim();
   }
 
   // The planned next pitcher's readiness, shown on the board so a coach
@@ -2785,9 +2797,13 @@
     const readiness = pitchingReadiness(name);
 
     if (!isPitchingChange(name)) {
+      // CoachBoard records this game's pitches when the game ends, so it
+      // cannot say how many the pitcher on the mound has thrown today.
       return {
-        tone: readiness.ready ? 'ready' : 'unknown',
-        text: `Pitcher: ${name} · pitching now · ${readiness.text}`,
+        tone: 'ready',
+        text:
+          `Pitcher: ${name} · pitching now · ` +
+          "this game's pitches aren't counted until it ends",
       };
     }
 
@@ -2795,12 +2811,14 @@
       return {tone: 'ready', text: `Pitcher: ${name} · ${readiness.text}`};
     }
 
-    return readiness.kind === 'unknown'
-      ? {tone: 'unknown', text: `⚠ ${notReadyTitle(name)}`}
-      : {
-          tone: 'ineligible',
-          text: `⚠ ${notReadyTitle(name)} · ${readiness.text}`,
-        };
+    // Advisory, Rule conflict or Can't confirm leads the line; End Inning
+    // asks for the decision.
+    return {
+      tone: readiness.kind,
+      text:
+        `⚠ Pitcher: ${name} · ${readiness.text} · ` +
+        'End Inning will ask you to decide',
+    };
   }
 
   function pitcherStatusMarkup() {
@@ -2866,7 +2884,10 @@
       `${incoming} is going in to pitch`,
       `Where should ${pitcher} go?`,
       choices,
-      {note: isPitchingChange(incoming) ? readinessNote(incoming) : ''}
+      {
+        note: isPitchingChange(incoming) ? readinessNote(incoming) : '',
+        noteTone: toneFor(incoming),
+      }
     );
   }
 
@@ -2877,14 +2898,12 @@
     const choices = [];
 
     const checked = occupant && isPitchingChange(occupant);
-    const occupantReady = !checked || pitchingReadiness(occupant).ready;
 
     if (occupant) {
       choices.push({
         label: `${occupant} pitches`,
         alignment: {...base, P: occupant},
         message: `${pitcher} → ${target} · ${occupant} → P ✓`,
-        disabled: !occupantReady,
       });
       choices.push({
         label: `Bench ${occupant} · P open`,
@@ -2906,7 +2925,7 @@
       choices,
       {
         note: checked ? readinessNote(occupant) : '',
-        noteDanger: !occupantReady,
+        noteTone: checked ? toneFor(occupant) : 'ok',
       }
     );
   }
@@ -2959,7 +2978,7 @@
     title,
     question,
     choices,
-    {note = '', noteDanger = false} = {}
+    {note = '', noteTone = 'ok'} = {}
   ) {
     const modal = pitchingChangeModal();
     const instance = bootstrap.Modal.getOrCreateInstance(modal);
@@ -2971,7 +2990,9 @@
     readiness.textContent = note;
     readiness.hidden = !note;
     readiness.className =
-      `small mb-2 fw-semibold ${noteDanger ? 'text-danger' : 'text-success'}`;
+      `small mb-2 fw-semibold ${
+        {danger: 'text-danger', warn: 'text-warning-emphasis'}[noteTone] || 'text-success'
+      }`;
     list.replaceChildren();
 
     const addButton = (label, className, onChoose, disabled = false) => {

@@ -23,6 +23,7 @@ from models import (
     TeamMembership,
     User,
 )
+import pitching_eligibility
 from utils import calculate_pitch_count_summary, get_pitching_rules_for_team, model_to_dict
 
 live_game_api_bp = Blueprint('live_game_api', __name__, url_prefix='/api/live-game')
@@ -337,6 +338,17 @@ def get_authoritative_live_state(game_id, team_id, game=None):
         team_timezone=team.timezone,
         current_game_id=game.id,
     )
+    # Re-entry depends on this game's pitching history, which the
+    # pitch-count calculator does not see.
+    pitching_eligibility.apply_reentry_rule(
+        pitch_summary,
+        rules,
+        events,
+        current_alignment.get('P'),
+        current_alignment,
+    )
+    # Every screen shows the same classification, rule set and reason.
+    pitching_eligibility.annotate(pitch_summary, rules)
 
     profiles = db.session.query(PlayerPitchingProfile).filter_by(team_id=team_id).all()
     plans = db.session.query(GamePitchingPlan).filter_by(game_id=game.id, team_id=team_id).all()

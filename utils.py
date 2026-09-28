@@ -7,6 +7,8 @@ import zoneinfo
 from PIL import Image
 from werkzeug.utils import secure_filename
 
+from pitching_eligibility import same_day_rule
+
 
 logger = logging.getLogger(__name__)
 
@@ -475,11 +477,28 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                                 status_detail = f'Daily game-pitch maximum reached ({max_daily}).'
                                 next_available = after_today_date.strftime('%a, %b %d')
                             elif other_game_today:
-                                status = 'Same-Day Game Restriction'
-                                status_detail = 'Pitch Smart guidance: do not pitch in multiple games on the same day.'
-                                next_available = after_today_date.strftime('%a, %b %d')
+                                # What the selected preset says about a second
+                                # game today (pitching_eligibility.same_day_rule).
+                                same_day = same_day_rule(rules)
+                                if same_day == 'prohibited':
+                                    status = 'Same-Day Game Restriction'
+                                    status_detail = 'These pitching rules do not allow pitching in more than one game on the same day.'
+                                    next_available = after_today_date.strftime('%a, %b %d')
+                                elif same_day == 'advisory':
+                                    # Pitch Smart recommends against it; it is
+                                    # not an eligibility rule.
+                                    status = 'Same-Day Game Advisory'
+                                    status_detail = 'Pitch Smart recommends that players not pitch in multiple games on the same day.'
+                                elif same_day == 'unknown':
+                                    status = 'Same-Day Rule Unknown'
+                                    status_detail = (
+                                        f"Pitched in another game today. CoachBoard's "
+                                        f"{rules.get('rule_set_name') or 'selected'} preset doesn't "
+                                        'say whether a second game the same day is allowed.'
+                                    )
+                                    next_available = 'Verify the event rules'
 
-                if official_daily_pitches is not None and status == 'Available':
+                if official_daily_pitches is not None and status in ('Available', 'Same-Day Game Advisory'):
                     pitches_remaining_today = max(0, max_daily - official_daily_pitches)
 
             elif rule_type == 'innings':
@@ -576,6 +595,7 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                 'status': status,
                 'status_detail': status_detail,
                 'next_available': next_available,
+                'advisory': status == 'Same-Day Game Advisory',
                 'max_daily': max_daily,
                 'pitches_remaining_today': pitches_remaining_today,
                 'last_outing_display': last_game_outing,

@@ -7,6 +7,8 @@
                 <span class="pitch-status-available"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Available</span>
             {% elif summary.status in ['Pitch Count Incomplete', 'Innings Incomplete'] %}
                 <span class="badge text-bg-warning">Verify Data</span>
+            {% elif summary.advisory %}
+                <span class="badge text-bg-warning">Pitch Smart Advisory</span>
             {% elif summary.status == 'Same-Day Game Restriction' %}
                 <span class="badge text-bg-warning">No 2nd Game</span>
             {% else %}

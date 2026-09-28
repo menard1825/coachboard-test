@@ -127,6 +127,18 @@ def _guard_legacy_pitcher_change(game, team, data):
     if not new_pitcher:
         return None
 
+    # The deprecated route is evaluated by the same eligibility policy as
+    # every live pitching change, checked first. It takes no pitching
+    # decision: a flagged pitcher gets the warning back (the coach decides in
+    # the current Change Pitcher), and the old pitch_anyway flag is not one.
+    from blueprints.live_game_bulk_api import _pitcher_eligibility_error
+
+    blocked = _pitcher_eligibility_error(
+        game, team, new_pitcher.name, {'pitch_anyway': data.get('pitch_anyway')}
+    )
+    if blocked:
+        return blocked
+
     after = deepcopy(before)
     old_pitcher = before.get('P')
     incoming_source = next((pos for pos, name in before.items() if name == new_pitcher.name), None)

@@ -110,7 +110,7 @@
     incoming,
     alignment,
     successMessage,
-    pitchAnyway = false,
+    pitchingDecision = null,
   ) {
     const response = await fetch(
       `/api/live-game/${gameId}/complete-pitcher-change`,
@@ -124,7 +124,14 @@
           alignment,
           base_sequence: sequenceFromState(),
           fast: true,
-          pitch_anyway: Boolean(pitchAnyway),
+          // The coach's explicit decision on a flagged pitcher, for the
+          // status they were shown (see pitching_eligibility.py).
+          ...(pitchingDecision?.type
+            ? {
+                pitching_decision: pitchingDecision.type,
+                pitching_decision_status: pitchingDecision.status || '',
+              }
+            : {}),
         }),
       },
     );
@@ -340,8 +347,8 @@
 
     busy = true;
 
-    const pitchAnyway =
-      options?.pitchAnyway === true;
+    const pitchingDecision =
+      options?.pitchingDecision || null;
 
     try {
       state = await loadState();
@@ -413,7 +420,7 @@
         incoming,
         decision.alignment,
         decision.message,
-        pitchAnyway,
+        pitchingDecision,
       );
     } catch (err) {
       toast(

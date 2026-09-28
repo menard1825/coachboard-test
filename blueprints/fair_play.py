@@ -194,11 +194,17 @@ def redirect_rules_page_when_no_default():
 
 @fair_play_bp.before_app_request
 def guard_live_pitcher_change():
-    """Do not let a live pitcher change bypass official competition eligibility.
+    """Do not let the legacy live pitcher change bypass eligibility.
 
-    Arm-care guidance remains advisory. During an active game, missing competition
-    rules or unknown/incomplete eligibility fail closed until the coach selects or
-    verifies the event rules and pitching history.
+    DEPRECATED: /api/live-game/<id>/change-pitcher is no longer called by the
+    app (Change Pitcher uses /complete-pitcher-change). It stays only for tabs
+    and callers from before that change; remove it once they are gone.
+
+    It gets the same evaluation as every live pitching change: the shared
+    server policy (pitching_eligibility via live_game_bulk_api). It takes no
+    pitching decision, so any flagged pitcher (advisory, rule conflict,
+    can't confirm) gets the warning back and the coach decides in the
+    current Change Pitcher; the old `pitch_anyway` flag lets nobody in.
     """
     if request.endpoint != 'live_game_api.change_pitcher' or request.method != 'POST':
         return None
@@ -229,43 +235,13 @@ def guard_live_pitcher_change():
     if not player:
         return None
 
-    # Import locally to avoid the intentional game_pitching_rules <-> fair_play
-    # module dependency during app startup.
-    from game_pitching_rules import gameplay_pitch_summary, pitching_rules_for_game
+    # Imported here: live_game_bulk_api imports modules that import this one.
+    from blueprints.live_game_bulk_api import _pitcher_eligibility_error
 
-    roster = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
-    outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team.id).all()
-    targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team.id).all()
-    rules = pitching_rules_for_game(team, game)
-    summary = gameplay_pitch_summary(
-        roster,
-        outings,
-        rules,
-        target_date=game.date,
-        all_targets=targets,
-        team_timezone=team.timezone,
-        current_game_id=game.id,
+    # No decision path here (see above); pitch_anyway only adds "refresh".
+    return _pitcher_eligibility_error(
+        game, team, player.name, {'pitch_anyway': payload.get('pitch_anyway')}
     )
-    item = summary.get(player.name) or {}
-    status = str(item.get('status') or 'Eligibility unknown')
-    if status == 'Available':
-        return None
-
-    message = f'{player.full_name} cannot be selected to pitch: {status}.'
-    next_available = item.get('next_available')
-    if next_available and next_available != 'Today':
-        if str(next_available).lower().startswith('verify'):
-            message += f' {next_available}.'
-        else:
-            message += f' Can pitch again {next_available}.'
-    elif item.get('status_detail'):
-        message += f" {item['status_detail']}"
-    return jsonify({
-        'status': 'error',
-        'message': message,
-        'pitching_status': status,
-        'next_available': next_available,
-    }), 409
 
 
 @fair_play_bp.route('/api/fair-play/settings', methods=['GET'])
