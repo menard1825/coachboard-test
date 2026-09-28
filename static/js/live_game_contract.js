@@ -444,169 +444,6 @@
         ];
   }
 
-  function openCurrentDefensePositions(
-    liveState
-  ) {
-    const alignment =
-      liveState?.current_alignment || {};
-
-    return requiredDefensePositions(
-      liveState
-    ).filter(
-      position =>
-        !String(
-          alignment[position] || ''
-        ).trim()
-    );
-  }
-
-  function openDefenseMessage(open) {
-    if (open.length === 1) {
-      return `${open[0]} is still Open.`;
-    }
-
-    if (open.length === 2) {
-      return (
-        `${open[0]} and ${open[1]} ` +
-        'are still Open.'
-      );
-    }
-
-    return (
-      `${open.slice(0, -1).join(', ')}, ` +
-      `and ${open[open.length - 1]} ` +
-      'are still Open.'
-    );
-  }
-
-  function ensureOpenDefenseEndModal() {
-    let modal =
-      $('cbOpenDefenseEndModal');
-
-    if (modal) return modal;
-
-    modal = document.createElement('div');
-    modal.id = 'cbOpenDefenseEndModal';
-    modal.className = 'modal fade';
-    modal.tabIndex = -1;
-    modal.setAttribute(
-      'aria-hidden',
-      'true'
-    );
-
-    modal.innerHTML = `
-      <div
-        class="
-          modal-dialog
-          modal-dialog-centered
-        "
-      >
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              Defense still open
-            </h5>
-
-            <button
-              type="button"
-              class="btn-close"
-              data-bs-dismiss="modal"
-              aria-label="Close"
-            ></button>
-          </div>
-
-          <div class="modal-body">
-            <div
-              class="fw-semibold"
-              data-cb-open-defense-message
-            ></div>
-
-            <div
-              class="
-                small
-                text-muted
-                mt-2
-              "
-            >
-              Fix the position on On the Field,
-              or end the inning anyway. You can
-              also correct this inning from the
-              Game Report after the game.
-            </div>
-          </div>
-
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="
-                btn
-                btn-outline-secondary
-              "
-              data-bs-dismiss="modal"
-            >
-              Go Back
-            </button>
-
-            <button
-              type="button"
-              class="btn btn-primary"
-              data-cb-end-inning-anyway
-            >
-              End Inning Anyway
-            </button>
-          </div>
-        </div>
-      </div>`;
-
-    document.body.appendChild(modal);
-
-    return modal;
-  }
-
-  function warnOpenCurrentDefense(
-    open
-  ) {
-    const modal =
-      ensureOpenDefenseEndModal();
-
-    const message =
-      modal.querySelector(
-        '[data-cb-open-defense-message]'
-      );
-
-    if (message) {
-      message.textContent =
-        openDefenseMessage(open);
-    }
-
-    const confirm =
-      modal.querySelector(
-        '[data-cb-end-inning-anyway]'
-      );
-
-    confirm.onclick = () => {
-      const instance =
-        bootstrap.Modal
-          .getOrCreateInstance(modal);
-
-      modal.addEventListener(
-        'hidden.bs.modal',
-        () => {
-          endInningFromNext(true);
-        },
-        {
-          once: true,
-        }
-      );
-
-      instance.hide();
-    };
-
-    bootstrap.Modal
-      .getOrCreateInstance(modal)
-      .show();
-  }
-
   function positionList(open) {
     if (open.length === 1) return open[0];
     if (open.length === 2) return `${open[0]} and ${open[1]}`;
@@ -618,102 +455,129 @@
 
   // End Inning starts the next inning with the Next Inning defense. An open
   // spot there is allowed (a short-handed team), but never by accident.
-  function ensureIncompleteNextModal() {
-    let modal = $('cbIncompleteNextModal');
-
-    if (modal) return modal;
-
-    modal = document.createElement('div');
-    modal.id = 'cbIncompleteNextModal';
-    modal.className = 'modal fade';
-    modal.tabIndex = -1;
-    modal.setAttribute('aria-hidden', 'true');
-    modal.setAttribute('aria-labelledby', 'cbIncompleteNextTitle');
-
-    modal.innerHTML = `
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="cbIncompleteNextTitle">
-              Defense is incomplete
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              data-bs-dismiss="modal"
-              aria-label="Close"
-            ></button>
-          </div>
-          <div class="modal-body">
-            <div
-              class="fw-semibold"
-              data-cb-incomplete-next-message
-            ></div>
-            <div class="small text-muted mt-2">
-              Finish the Next Inning defense, or start the inning with
-              the open spot.
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-primary"
-              data-cb-finish-defense
-            >
-              Finish defense
-            </button>
-            <button
-              type="button"
-              class="btn btn-outline-secondary"
-              data-cb-start-inning-anyway
-            >
-              Start inning anyway
-            </button>
-          </div>
-        </div>
-      </div>`;
-
-    document.body.appendChild(modal);
-
-    return modal;
+  function ordinal(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return String(value || '');
+    const teen = n % 100 >= 11 && n % 100 <= 13;
+    const suffix = teen ? 'th' : ({1: 'st', 2: 'nd', 3: 'rd'}[n % 10] || 'th');
+    return `${n}${suffix}`;
   }
 
-  function warnIncompleteNextDefense(
-    open,
-    allowOpenCurrent
-  ) {
-    const modal = ensureIncompleteNextModal();
-    const instance =
-      bootstrap.Modal.getOrCreateInstance(modal);
+  function openPositionsIn(alignment, source) {
+    return requiredDefensePositions(source).filter(
+      position => !String((alignment || {})[position] || '').trim()
+    );
+  }
 
-    modal.querySelector(
-      '[data-cb-incomplete-next-message]'
-    ).textContent =
-      `${positionList(open)} ` +
-      `${open.length === 1 ? 'is' : 'are'} still open.`;
+  // A modal with a title, a message, a note and two actions.
+  function endInningQuestion(id, {title, message, note, primary, secondary}) {
+    let modal = $(id);
 
-    modal.querySelector(
-      '[data-cb-finish-defense]'
-    ).onclick = () => {
-      instance.hide();
-      window.CBNextDefense?.showNext?.();
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = id;
+      modal.className = 'modal fade';
+      modal.tabIndex = -1;
+      modal.setAttribute('aria-hidden', 'true');
+      modal.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" data-cb-question-title></h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="fw-semibold" data-cb-question-message></div>
+              <div class="small text-muted mt-2" data-cb-question-note></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-primary" data-cb-question-primary></button>
+              <button type="button" class="btn btn-outline-secondary" data-cb-question-secondary></button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+
+    const instance = bootstrap.Modal.getOrCreateInstance(modal);
+    modal.querySelector('[data-cb-question-title]').textContent = title;
+    modal.querySelector('[data-cb-question-message]').textContent = message;
+    modal.querySelector('[data-cb-question-note]').textContent = note;
+
+    const wire = (selector, [label, onChoose]) => {
+      const button = modal.querySelector(selector);
+      button.textContent = label;
+      button.onclick = () => {
+        modal.addEventListener('hidden.bs.modal', onChoose, {once: true});
+        instance.hide();
+      };
     };
-
-    modal.querySelector(
-      '[data-cb-start-inning-anyway]'
-    ).onclick = () => {
-      modal.addEventListener(
-        'hidden.bs.modal',
-        () => {
-          endInningFromNext(allowOpenCurrent, true);
-        },
-        {once: true}
-      );
-
-      instance.hide();
-    };
+    wire('[data-cb-question-primary]', primary);
+    wire('[data-cb-question-secondary]', secondary);
 
     instance.show();
+  }
+
+  /*
+   * The inning being completed. An open position in its recorded defense
+   * may be a recording mistake that would make the Game Report and
+   * playing time wrong, so it is worth one clear question -- about THAT
+   * inning, never worded as if the next inning's plan were open.
+   * "Keep as Recorded" is remembered for this exact recorded defense.
+   */
+  const acknowledgedRecords = new Set();
+
+  function recordKey(liveState) {
+    const alignment = Object.entries(liveState?.current_alignment || {})
+      .filter(([, name]) => String(name || '').trim())
+      .sort(([a], [b]) => (a < b ? -1 : 1));
+    return JSON.stringify([
+      gameId,
+      String(liveState?.current_inning || ''),
+      alignment,
+    ]);
+  }
+
+  function warnRecordedInningGap(open, liveState, retry) {
+    const inning = ordinal(liveState?.current_inning);
+    const next = ordinal(Number(liveState?.current_inning) + 1);
+    const key = recordKey(liveState);
+
+    endInningQuestion('cbRecordedInningGapModal', {
+      title: `${inning} inning record has an open position`,
+      message:
+        `${positionList(open)} ${open.length === 1 ? 'was' : 'were'} ` +
+        `left open on the recorded defense for the ${inning} inning.`,
+      note:
+        'If that is correct, you can continue. Otherwise, go back and fix ' +
+        `the ${inning} inning defense before starting the ${next}.`,
+      primary: [`Fix ${inning} Inning`, () => {
+        document.querySelector('#cb-now-next-switch [data-now-next="now"]')?.click();
+      }],
+      secondary: ['Keep as Recorded', () => {
+        acknowledgedRecords.add(key);
+        retry();
+      }],
+    });
+  }
+
+  // The next inning's plan: exactly the alignment advance-inning receives.
+  function warnIncompleteNextDefense(open, nextInning, retry) {
+    const inning = ordinal(nextInning);
+
+    endInningQuestion('cbIncompleteNextModal', {
+      title: `${inning} inning defense still open`,
+      message:
+        `${positionList(open)} ${open.length === 1 ? 'is' : 'are'} ` +
+        `still open for the ${inning} inning.`,
+      note:
+        `Finish the ${inning} inning defense, or start the inning with ` +
+        `the open ${open.length === 1 ? 'spot' : 'spots'}.`,
+      primary: [`Finish ${inning} Inning Defense`, () => {
+        window.CBNextDefense?.showNext?.();
+      }],
+      secondary: ['Start Inning Anyway', retry],
+    });
   }
 
   const PITCHING_DECISION_CODES = new Set([
@@ -810,7 +674,6 @@
   }
 
   async function endInningFromNext(
-    allowOpenCurrent = false,
     allowOpenNext = false,
     pitchingDecision = null
   ) {
@@ -854,27 +717,31 @@
         ''
       );
 
-      const openCurrent =
-        openCurrentDefensePositions(
-          liveState
-        );
-
-      if (
-        openCurrent.length &&
-        !allowOpenCurrent
-      ) {
-        warnOpenCurrentDefense(
-          openCurrent
-        );
-        return;
-      }
-
       if (
         currentInning !==
         String(prep?.current_inning || '')
       ) {
         recoverAdvancedInning(
           liveState
+        );
+        return;
+      }
+
+      // The inning being completed: an unacknowledged open position in
+      // its recorded defense gets one clear question about that inning.
+      const openRecorded = openPositionsIn(
+        liveState?.current_alignment,
+        liveState
+      );
+
+      if (
+        openRecorded.length &&
+        !acknowledgedRecords.has(recordKey(liveState))
+      ) {
+        warnRecordedInningGap(
+          openRecorded,
+          liveState,
+          () => endInningFromNext(allowOpenNext, pitchingDecision)
         );
         return;
       }
@@ -915,32 +782,22 @@
         assigned.set(name, position);
       }
 
-      const openNext = requiredDefensePositions(
+      // The next inning's plan -- the alignment sent below.
+      const openNext = openPositionsIn(
+        alignment,
         prep
-      ).filter(
-        position => !String(
-          alignment[position] || ''
-        ).trim()
       );
 
-      // "End Inning Anyway" on the field's open spots already covers the
-      // very same spots carried into the next inning. Any difference in the
-      // Next Inning gaps is a new question, so it is still asked.
-      const acceptedOpen =
-        allowOpenCurrent &&
-        openNext.length === openCurrent.length &&
-        openNext.every(
-          position => openCurrent.includes(position)
-        );
-
+      // Validated and sent are the same alignment: the warning names the
+      // spots open in the plan, and "Start inning anyway" sends that plan.
       if (
         openNext.length &&
-        !allowOpenNext &&
-        !acceptedOpen
+        !allowOpenNext
       ) {
         warnIncompleteNextDefense(
           openNext,
-          allowOpenCurrent
+          Number(currentInning) + 1,
+          () => endInningFromNext(true, pitchingDecision)
         );
         return;
       }
@@ -1002,7 +859,6 @@
         askPitchingDecision(
           error.payload || {pitcher: error.pitcher, message: error.message},
           decision => endInningFromNext(
-            allowOpenCurrent,
             allowOpenNext,
             decision
           )

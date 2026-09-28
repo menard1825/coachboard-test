@@ -1656,10 +1656,10 @@ def test_now_next_first_slice(
 
         incomplete = page.locator('#cbIncompleteNextModal')
         expect(incomplete).to_be_visible(timeout=10_000)
-        expect(incomplete).to_contain_text('RF is still open.')
+        expect(incomplete).to_contain_text('RF is still open for the')
         incomplete.get_by_role(
             'button',
-            name='Start inning anyway',
+            name='Start Inning Anyway',
         ).click()
 
         expect(

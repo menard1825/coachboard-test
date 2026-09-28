@@ -489,61 +489,42 @@ def test_end_inning_warns_but_can_continue_with_open_position(
             '#liveEndInningBtn'
         ).click()
 
-        warning = page.locator(
-            '#cbOpenDefenseEndModal'
+        # First, the inning being recorded: 2B was open On the Field.
+        recorded = page.locator('#cbRecordedInningGapModal')
+        expect(recorded).to_be_visible(timeout=10_000)
+        expect(recorded.locator('.modal-title')).to_have_text(
+            '1st inning record has an open position'
         )
-
-        expect(
-            warning
-        ).to_be_visible(timeout=10_000)
-
-        expect(
-            warning
-        ).to_contain_text(
-            '2B is still Open.'
+        expect(recorded).to_contain_text(
+            '2B was left open on the recorded defense for the 1st inning.'
         )
-
+        expect(recorded).to_contain_text(
+            'fix the 1st inning defense before starting the 2nd'
+        )
         expect(
-            warning.get_by_role(
-                'button',
-                name='Go Back',
-            )
+            recorded.get_by_role('button', name='Fix 1st Inning')
         ).to_be_visible()
 
-        expect(
-            warning.get_by_role(
-                'button',
-                name='End Inning Anyway',
-            )
-        ).to_be_visible()
-
-        warning.get_by_role(
-            'button',
-            name='Go Back',
-        ).click()
-
-        expect(
-            warning
-        ).not_to_be_visible(timeout=10_000)
-
+        # Closing the question changes nothing.
+        recorded.locator('.btn-close').click()
+        expect(recorded).not_to_be_visible(timeout=10_000)
         state = page.request.get(
             f'{coachboard_url}/api/live-game/{game_id}/state'
         ).json()
-
         assert state['current_inning'] == '1'
 
-        page.locator(
-            '#liveEndInningBtn'
-        ).click()
+        page.locator('#liveEndInningBtn').click()
+        expect(recorded).to_be_visible(timeout=10_000)
+        recorded.get_by_role('button', name='Keep as Recorded').click()
 
+        # Then the next inning's plan, which here follows the field.
+        warning = page.locator('#cbIncompleteNextModal')
+        expect(warning).to_be_visible(timeout=10_000)
+        expect(warning).to_contain_text('2B is still open for the 2nd inning.')
         expect(
-            warning
-        ).to_be_visible(timeout=10_000)
-
-        warning.get_by_role(
-            'button',
-            name='End Inning Anyway',
-        ).click()
+            warning.get_by_role('button', name='Finish 2nd Inning Defense')
+        ).to_be_visible()
+        warning.get_by_role('button', name='Start Inning Anyway').click()
 
         expect(
             page.locator('#live-inning-display')
@@ -551,6 +532,12 @@ def test_end_inning_warns_but_can_continue_with_open_position(
             '2',
             timeout=10_000,
         )
+
+        # The plan the warning described is what took the field.
+        started = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/state'
+        ).json()
+        assert not started['current_alignment'].get('2B')
 
     finally:
         state_response = page.request.get(
