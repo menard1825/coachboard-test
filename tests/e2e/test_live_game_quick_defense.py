@@ -174,10 +174,12 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
 
         modal.locator('[data-cb-bench-current]').click()
 
-        expect(modal).to_contain_text('Who takes C?')
+        expect(modal.locator('[data-cb-chain-question]')).to_have_text(
+            'What should happen at C?'
+        )
 
         catcher_replacement = modal.locator(
-            '[data-cb-chain-player-id]',
+            '[data-cb-chain-choices] button',
             has_text='Center Casey',
         )
 
@@ -187,6 +189,7 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         )
 
         catcher_replacement.click()
+        modal.get_by_role('button', name='Make this change', exact=True).click()
 
         expect(modal).not_to_be_visible(timeout=10_000)
 

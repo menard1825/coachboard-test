@@ -825,8 +825,8 @@
     const sourceText = source === 'BENCH' ? `${name} is currently on the bench.` : `${name} is currently playing ${source}.`;
     const benchDestination = source === 'BENCH'
       ? ''
-      : `<button type="button" class="btn btn-outline-secondary cb-destination" data-cb-bench-current><span>Bench</span><small>Choose who takes ${esc(source)}</small></button>`;
-    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. If someone is there, you choose where they go.' : 'Choose another position, or tap Bench and pick the replacement.'}</div><div class="cb-destination-grid">${benchDestination}${destinations.map(pos => {
+      : `<button type="button" class="btn btn-outline-secondary cb-destination" data-cb-bench-current><span>Bench</span><small>Leave ${esc(source)} open or choose who plays it</small></button>`;
+    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. If someone is there, you choose where they go.' : 'Choose another position, or Bench.'}</div><div class="cb-destination-grid">${benchDestination}${destinations.map(pos => {
       const occupant = alignment[pos] || '';
       return `<button type="button" class="btn btn-outline-primary cb-destination" data-cb-destination="${esc(pos)}"><span>${esc(pos)}</span><small>${occupant ? `Currently ${esc(occupant)}` : 'Open position'}</small></button>`;
     }).join('')}</div>`;
@@ -835,111 +835,10 @@
       button.addEventListener('click', () => moveOrAsk(player.name, button.dataset.cbDestination));
     });
 
+    // Bench: the coach says what happens at the vacated spot (leave it
+    // open, or who plays it) -- the same decision as dragging to Bench.
     body.querySelector('[data-cb-bench-current]')?.addEventListener('click', () => {
-      const availableBench = benchPlayers();
-
-      if (!availableBench.length) {
-        body.innerHTML = `<div class="cb-move-current"><strong>No bench player is available.</strong><br>${esc(name)} cannot come out without leaving a position open.</div>`;
-        return;
-      }
-
-      const draft = {...alignment};
-      delete draft[source];
-
-      // The original player is definitely coming out. Players selected from
-      // other field positions become fixed in their new spots as we follow
-      // the vacancy around the field.
-      const lockedNames = new Set([name]);
-
-      const playerPositionInDraft = playerName =>
-        Object.entries(draft).find(([, assigned]) => assigned === playerName)?.[0] || 'BENCH';
-
-      const renderVacancy = vacancy => {
-        const choices = (state?.roster || [])
-          .filter(candidate => !lockedNames.has(candidate.name))
-          .map(candidate => ({
-            ...candidate,
-            currentPosition: playerPositionInDraft(candidate.name),
-          }))
-          .filter(candidate => candidate.currentPosition !== 'P');
-
-        const fieldChoices = choices
-          .filter(candidate => candidate.currentPosition !== 'BENCH')
-          .sort((a, b) => a.currentPosition.localeCompare(b.currentPosition));
-
-        const benchChoices = choices
-          .filter(candidate => candidate.currentPosition === 'BENCH')
-          .sort((a, b) => a.name.localeCompare(b.name));
-
-        const choiceButton = candidate => {
-          const number = String(candidate.number ?? '').trim();
-          const label = number ? `#${number} ${candidate.name}` : candidate.name;
-          const detail = candidate.currentPosition === 'BENCH'
-            ? `Bench → ${vacancy}`
-            : `${candidate.currentPosition} → ${vacancy}`;
-
-          return `<button type="button"
-                         class="btn btn-outline-primary cb-destination"
-                         data-cb-chain-player-id="${candidate.id}"
-                         data-cb-chain-from="${esc(candidate.currentPosition)}">
-                    <span>${esc(label)}</span>
-                    <small>${esc(detail)}</small>
-                  </button>`;
-        };
-
-        body.innerHTML = `
-          <div class="cb-move-current">
-            <strong>Who takes ${esc(vacancy)}?</strong><br>
-            ${esc(name)} is going to the bench. Pick anyone except the pitcher.
-          </div>
-
-          ${fieldChoices.length ? `
-            <div class="small fw-bold text-uppercase text-muted mb-2">On the field</div>
-            <div class="cb-destination-grid mb-3">
-              ${fieldChoices.map(choiceButton).join('')}
-            </div>
-          ` : ''}
-
-          <div class="small fw-bold text-uppercase text-muted mb-2">On the bench</div>
-          <div class="cb-destination-grid">
-            ${benchChoices.map(choiceButton).join('')}
-          </div>`;
-
-        body.querySelectorAll('[data-cb-chain-player-id]').forEach(button => {
-          const playerId = Number(button.dataset.cbChainPlayerId);
-          const fromPosition = button.dataset.cbChainFrom;
-          const replacement = choices.find(
-            candidate => Number(candidate.id) === playerId
-          );
-
-          if (!replacement) return;
-
-          button.addEventListener('click', () => {
-            if (fromPosition !== 'BENCH') {
-              delete draft[fromPosition];
-            }
-
-            draft[vacancy] = replacement.name;
-
-            // Choosing somebody from the bench fills the final vacancy,
-            // so the complete defense can be saved in one transaction.
-            if (fromPosition === 'BENCH') {
-              saveDefenseDraft(
-                draft,
-                `${name} to bench · ${replacement.name} to ${vacancy}`
-              );
-              return;
-            }
-
-            // A player came from another field position. Keep them in their
-            // new spot and follow their old position as the new vacancy.
-            lockedNames.add(replacement.name);
-            renderVacancy(fromPosition);
-          });
-        });
-      };
-
-      renderVacancy(source);
+      askOccupiedMove(player, source, 'BENCH');
     });
     bootstrap.Modal.getOrCreateInstance(modal).show();
   }
@@ -988,6 +887,12 @@
    * No loops: players already placed by this chain are never offered
    * again, and P is never an ordinary destination.
    */
+  //
+  // Also: "Graham is going to the bench. What should happen at 2B?"
+  // (target 'BENCH'): leave 2B open -- one tap, saved at once, exactly
+  // what dragging Graham to the bench does -- or choose who plays 2B: a
+  // bench player, or a field player whose own spot is then left open.
+  // Nothing is filled automatically.
   function askOccupiedMove(player, source, target) {
     const before = {...currentAlignment()};
     const baseSequence = sequenceFromState();
@@ -996,12 +901,13 @@
     const title = modal.querySelector('.modal-title');
     const body = modal.querySelector('.modal-body');
     const spots = positions().filter(pos => pos !== 'P');
+    const toBench = target === 'BENCH';
 
     const draft = {...before};
     if (source !== 'BENCH') delete draft[source];
-    const firstDisplaced = draft[target];
-    draft[target] = player.name;
-    const moves = [{name: player.name, from: source, to: target}];
+    const firstDisplaced = toBench ? null : draft[target];
+    if (!toBench) draft[target] = player.name;
+    const moves = [{name: player.name, from: source, to: toBench ? 'Bench' : target}];
     const placed = new Set([player.name]);
     let active = true;
 
@@ -1132,7 +1038,44 @@
       ]);
     };
 
-    ask(firstDisplaced, target, player.name);
+    const numbered = name => {
+      const number = String(playerForName(name)?.number ?? '').trim();
+      return number ? `#${number} ${name}` : name;
+    };
+
+    // "What should happen at <pos>?" after <player> goes to the bench.
+    const fill = pos => {
+      const bench = benchPlayers().filter(candidate => !placed.has(candidate.name));
+      const fielders = spots.filter(spot => draft[spot] && !placed.has(draft[spot]));
+      render(`${player.name} is going to the bench`, `What should happen at ${pos}?`, [
+        [`Leave ${pos} open`, 'btn-primary', () => {
+          stop();
+          saveDefenseDraft({...draft}, `${player.name} to Bench · ${pos} open`, baseSequence);
+        }],
+        ...bench.map(candidate => [
+          `${numbered(candidate.name)} — Bench → ${pos}`,
+          'btn-outline-primary',
+          () => {
+            place(candidate.name, 'BENCH', pos);
+            review();
+          },
+        ]),
+        ...fielders.map(spot => [
+          `${numbered(draft[spot])} — ${spot} → ${pos} · ${spot} left open`,
+          'btn-outline-secondary',
+          () => {
+            const name = draft[spot];
+            delete draft[spot];
+            place(name, spot, pos);
+            review();
+          },
+        ]),
+        cancel,
+      ]);
+    };
+
+    if (toBench) fill(source);
+    else ask(firstDisplaced, target, player.name);
     instance.show();
   }
 
