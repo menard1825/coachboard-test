@@ -132,13 +132,15 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
         apply_to_game = page.locator('#pde-use-game')
         expect(apply_to_game).to_have_text('Whole game')
         expect(page.locator('#pde-use-inning')).to_have_text('This inning')
-        expect(page.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as assigned')
+        expect(page.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as planned')
 
-        page.once('dialog', lambda dialog: dialog.accept())
         # Applying to the entire game mutates the canonical CBPregameRotation
         # rotation and saves through the shared queue (no page reload): wait
         # for the persistent save-status indicator instead of a navigation.
         apply_to_game.click()
+        sheet = page.locator('#pde-use-confirm')
+        expect(sheet).to_be_visible(timeout=10_000)
+        sheet.get_by_role('button', name='Use Saved Defense', exact=True).click()
         expect(page.locator('#pregame-defense-editor-v3 #pde-save-status')).to_contain_text('Saved', timeout=10_000)
 
         updated_response = page.request.get(f'{coachboard_url}/api/game_data/{game_id}')

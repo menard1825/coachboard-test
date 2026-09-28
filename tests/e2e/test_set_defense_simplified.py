@@ -226,13 +226,18 @@ def saved_defense(make_page, coachboard_url):
     yield name, defense
 
 
-def _use(page, scope):
-    """Use -> This inning / Whole game."""
+def _use(page, scope, answer='Use Saved Defense'):
+    """Use -> This inning / Whole game, then answer the confirmation sheet."""
     page.locator('#pde-use').click()
     item = page.locator('#pde-use-inning' if scope == 'This inning' else '#pde-use-game')
     expect(item).to_be_visible()
     expect(item).to_have_text(scope)
     item.click()
+    sheet = page.locator('#pde-use-confirm')
+    expect(sheet).to_be_visible(timeout=10_000)
+    sheet.get_by_role('button', name=answer, exact=True).click()
+    expect(sheet).to_be_hidden(timeout=10_000)
+    return sheet
 
 
 def _saved_defense_tools(page):
@@ -260,7 +265,6 @@ def test_saved_defense_for_this_inning(make_page, coachboard_url, game, saved_de
     expect(tools.get_by_role('button', name='Save this defense', exact=True)).to_be_visible()
     tools.locator('#pde-preset').select_option(label=name)
     expect(page.locator('#pde-use')).to_be_enabled()
-    page.once('dialog', lambda dialog: dialog.accept())
     _use(page, 'This inning')
     _saved(page)
     innings = _innings(page, coachboard_url, game)
@@ -277,12 +281,10 @@ def test_saved_defense_for_the_whole_game_asks_first(make_page, coachboard_url, 
     tools.locator('#pde-preset').select_option(label=name)
 
     # Declining the overwrite leaves the plan exactly as it was.
-    page.once('dialog', lambda dialog: dialog.dismiss())
-    _use(page, 'Whole game')
+    _use(page, 'Whole game', 'Cancel')
     page.wait_for_timeout(600)
     assert _filled(_innings(page, coachboard_url, game)['3']) == DEFENSE_B
 
-    page.once('dialog', lambda dialog: dialog.accept())
     _use(page, 'Whole game')
     _saved(page)
     innings = _innings(page, coachboard_url, game)

@@ -431,7 +431,7 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
                 '.cb-starting-defense-help'
             )
         ).to_contain_text(
-            'Pitchers stay as assigned'
+            'Pitchers stay as planned'
         )
 
         preset_layout = preset_tools.evaluate(
@@ -600,9 +600,9 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         preset_id = everyday.get_attribute('value')
         assert preset_id
         preset.select_option(value=preset_id)
-        page.once('dialog', lambda dialog: dialog.accept())
         defense.locator('#pde-use').click()
         defense.locator('#pde-use-inning').click()
+        page.locator('#pde-use-confirm').get_by_role('button', name='Use Saved Defense', exact=True).click()
         expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
         expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')
 

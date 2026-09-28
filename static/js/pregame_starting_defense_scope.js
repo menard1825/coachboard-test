@@ -4,8 +4,6 @@
   const match = window.location.pathname.match(/^\/game\/(\d+)\/?$/);
   if (!match) return;
 
-  const gameId = Number(match[1]);
-  const PREFIX = 'DEFENSE PRESET — ';
   const PANEL_ID = 'pregame-defense-editor-v3';
   const STYLE_ID = 'cb-starting-defense-scope-styles';
   let findingObserver = null;
@@ -72,42 +70,6 @@
     document.head.appendChild(style);
   }
 
-  function presetLabel(template) {
-    const title = String(template?.title || '').trim();
-    return title.startsWith(PREFIX) ? title.slice(PREFIX.length).trim() : null;
-  }
-
-  function parseInnings(value) {
-    if (value && typeof value === 'object') return {...value};
-    if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value);
-        return parsed && typeof parsed === 'object' ? parsed : {};
-      } catch (_) {
-        return {};
-      }
-    }
-    return {};
-  }
-
-  function wholeInningKeys(innings) {
-    return Object.keys(innings || {})
-      .filter(key => /^\d+$/.test(String(key)))
-      .sort((a, b) => Number(a) - Number(b));
-  }
-
-  function positionsFor(data) {
-    return Number(data?.outfielder_count) === 4
-      ? ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'RCF', 'RF']
-      : ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
-  }
-
-  function selectedPreset(data, selectedId) {
-    return (data?.rotation_templates || []).find(template =>
-      String(template.id) === String(selectedId) && presetLabel(template)
-    );
-  }
-
   function currentInningLabel(panel) {
     const checked = document.querySelector('#inning-btn-group input[name="inning-radio"]:checked');
     if (checked?.value) return String(checked.value);
@@ -123,12 +85,6 @@
     button.title = `Use this saved defense for Inning ${currentInningLabel(panel)} only.`;
   }
 
-  async function fetchGameData() {
-    const response = await fetch(`/api/game_data/${gameId}`, {cache: 'no-store'});
-    if (!response.ok) throw new Error(`Unable to load game defense (${response.status}).`);
-    return response.json();
-  }
-
   async function applyStartingDefenseToGame() {
     if (applying) return;
     const select = document.getElementById('pde-preset');
@@ -141,82 +97,12 @@
     button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Applying…';
 
     try {
-      const data = await fetchGameData();
-      const preset = selectedPreset(data, select.value);
-      if (!preset) throw new Error('That saved defense is no longer available.');
-
-      const label = presetLabel(preset) || 'Saved defense';
-      const sourceInnings = parseInnings(preset.innings);
-      const source = sourceInnings['1'] || Object.values(sourceInnings).find(value => value && typeof value === 'object') || {};
-
-      // Read the ONE canonical CBPregameRotation rotation object, not a
-      // freshly re-fetched /api/game_data snapshot: that snapshot can
-      // already be stale relative to an edit the shared queue is still
-      // saving (or already saved), and building this game-wide payload
-      // from it — rather than from the current shared state — could
-      // silently overwrite that edit once this save lands.
-      //
-      // The proposed change is built on a DETACHED deep copy
-      // (proposedInnings), never on the canonical rotation.innings object
-      // itself, until the coach actually confirms it below. Mutating the
-      // canonical object before this confirm() would leave a canceled
-      // Starting Defense sitting in shared state, ready to be persisted
-      // by the next unrelated save.
-      const rotation = window.CBPregameRotation.getRotation(
-        `Rotation for vs ${data.game?.opponent || 'Opponent'}`
-      );
-      const proposedInnings = JSON.parse(JSON.stringify(rotation.innings));
-      const targetKeys = wholeInningKeys(proposedInnings);
-      if (!targetKeys.length) targetKeys.push('1');
-
-      const absent = new Set((data.absent_player_ids || []).map(Number));
-      const presentPlayers = (data.roster || []).filter(player => !absent.has(Number(player.id)));
-      const available = new Set(presentPlayers.map(player => String(player.name || '').trim()).filter(Boolean));
-      const positions = positionsFor(data);
-      const unavailable = new Set();
-
-      targetKeys.forEach(key => {
-        const existing = proposedInnings[key] && typeof proposedInnings[key] === 'object' ? proposedInnings[key] : {};
-        const next = {};
-
-        // Starting Defense is a field-position base, not a pitching plan.
-        // Preserve an already assigned pitcher when that player is present.
-        if (existing.P && available.has(existing.P)) next.P = existing.P;
-
-        positions.forEach(position => {
-          if (position === 'P') return;
-          const playerName = String(source[position] || '').trim();
-          if (!playerName) return;
-          if (available.has(playerName)) next[position] = playerName;
-          else unavailable.add(playerName);
-        });
-        proposedInnings[key] = next;
-      });
-
-      const inningRange = targetKeys.length === 1
-        ? `Inning ${targetKeys[0]}`
-        : `Innings ${targetKeys[0]}–${targetKeys[targetKeys.length - 1]}`;
-      const warning = unavailable.size
-        ? `\n\n${[...unavailable].join(', ')} is unavailable, so those positions will remain open.`
-        : '';
-      const confirmed = window.confirm(
-        `Use “${label}” for ${inningRange}?\n\n` +
-        'Non-pitcher positions in those innings will be replaced. Existing pitcher assignments will stay unchanged.' +
-        warning
-      );
-      // Cancel leaves the canonical rotation completely untouched — only
-      // the detached proposedInnings copy was ever built above.
-      if (!confirmed) return;
-
-      // Apply the confirmed proposal to the canonical rotation object now
-      // (the object reference itself stays the same; only its innings are
-      // replaced) and save through the shared queue. Persistence,
-      // retry-on-failure, and the persistent Saving/Saved/Failed indicator
-      // are all handled from here — no reload needed: live_game_board_prep.js's
-      // own onChange listener already re-renders the visible field for
-      // every inning this touched.
-      rotation.innings = proposedInnings;
-      window.CBPregameRotation.commitLocalChange(rotation.title, false);
+      // "This inning" and "Whole game" share one rule, owned by
+      // live_game_board_prep.js: fielders only, each inning's pitcher kept,
+      // conflicts left Open and explained, confirmed before anything
+      // changes. Cancel leaves the canonical rotation untouched.
+      if (!window.CBSavedDefense) throw new Error('The defense editor is not ready yet. Try again.');
+      await window.CBSavedDefense.use('game', select.value);
     } catch (error) {
       window.alert(error.message || 'Unable to use the saved defense.');
     } finally {
@@ -271,7 +157,7 @@
       gameButton.addEventListener('click', applyStartingDefenseToGame);
     }
     if (!applying && gameButton.textContent.trim() !== 'Whole game') gameButton.textContent = 'Whole game';
-    gameButton.title = 'Use this saved defense for the non-pitcher positions in every planned inning.';
+    gameButton.title = 'Use this saved defense for the fielders in every planned inning. Pitchers stay as planned.';
 
     gameButton.disabled = !select.value || applying;
     if (select.dataset.cbStartingDefenseScope !== '1') {
@@ -291,7 +177,7 @@
       help.className = 'cb-starting-defense-help';
       tools.insertAdjacentElement('afterend', help);
     }
-    const helpMarkup = '<strong>Pitchers stay as assigned.</strong> Choose a saved defense, then Use it for this inning or the whole game.';
+    const helpMarkup = '<strong>Saved defenses set fielders only.</strong> Pitchers stay as planned. Choose a saved defense, then Use it for this inning or the whole game.';
     if (help.innerHTML !== helpMarkup) help.innerHTML = helpMarkup;
   }
 

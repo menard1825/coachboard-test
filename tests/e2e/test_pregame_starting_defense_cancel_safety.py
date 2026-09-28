@@ -21,7 +21,9 @@ The fix builds the proposal on a detached deep copy of the canonical
 innings and only assigns it back to the canonical rotation object (then
 saves through the shared queue) after the coach confirms. This test
 proves cancellation now leaves the canonical rotation, the visible
-defense, and the DB completely untouched.
+defense, and the DB completely untouched. (The confirmation is now a
+coach-facing sheet rather than confirm(); its Cancel is what this test
+presses.)
 """
 
 import json
@@ -172,9 +174,12 @@ def test_canceling_apply_to_game_leaves_canonical_rotation_and_db_untouched(page
             apply_to_game = page.locator('#pde-use-game')
             expect(apply_to_game).to_be_visible(timeout=10_000)
 
-            # Dismiss (Cancel) the confirmation dialog this action shows.
-            page.once('dialog', lambda dialog: dialog.dismiss())
+            # Cancel the confirmation sheet this action shows.
             apply_to_game.click()
+            sheet = page.locator('#pde-use-confirm')
+            expect(sheet).to_be_visible(timeout=10_000)
+            sheet.get_by_role('button', name='Cancel', exact=True).click()
+            expect(sheet).to_be_hidden(timeout=10_000)
             page.wait_for_timeout(500)
 
             # Nothing should have started saving: the canceled action must

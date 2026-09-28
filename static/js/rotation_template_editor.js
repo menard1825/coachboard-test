@@ -28,6 +28,13 @@
     saving: false,
   };
   state.isStartingDefense = state.templateKind === 'starting_defense';
+  // A saved defense is fielders only; the pitcher is chosen for each game.
+  // An older starting defense saved with a P shows who that was, and the
+  // P is not kept when it is saved again.
+  state.legacyPitcher = state.isStartingDefense
+    ? String(state.rotation?.innings?.['1']?.P || '').trim()
+    : '';
+  if (state.legacyPitcher) delete state.rotation.innings['1'].P;
 
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
@@ -113,7 +120,9 @@
     const bench = state.roster.filter((player) => !assigned.has(player.name));
     const opens = requiredOpenPositions(source);
     const pitcherStatus = state.isStartingDefense
-      ? source.P ? `Pitcher saved: ${esc(source.P)}` : 'Pitcher will be chosen on Game Day'
+      ? state.legacyPitcher
+        ? `Pitcher isn't saved: ${esc(state.legacyPitcher)} will be chosen for each game`
+        : 'Pitcher is chosen for each game'
       : '';
 
     return `
@@ -213,6 +222,12 @@
     const title = $('rtePlayerTitle');
     const choices = $('rtePlayerChoices');
     if (!choices) return;
+    if (state.isStartingDefense && position === 'P') {
+      if (title) title.textContent = 'P — Chosen for each game';
+      choices.innerHTML = '<div class="list-group-item">Saved defenses set fielders only. Choose the pitcher for each game in Prepare Game.</div>';
+      bootstrap.Modal.getOrCreateInstance($('rtePlayerModal')).show();
+      return;
+    }
     if (title) title.textContent = `${position} — Choose Player`;
 
     const rows = [];
@@ -298,7 +313,7 @@
 
     const missingRequired = requiredOpenPositions(alignment('1'));
     if (state.isStartingDefense && missingRequired.length) {
-      window.alert(`Fill ${missingRequired.join(', ')} before saving. Pitcher may remain open.`);
+      window.alert(`Fill ${missingRequired.join(', ')} before saving. The pitcher isn't saved.`);
       return;
     }
 

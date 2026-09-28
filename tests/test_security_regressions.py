@@ -557,7 +557,7 @@ def test_starting_defense_template_allows_open_pitcher_and_reaches_game_day(monk
     editor = client.get(f'/starting-defense-template/{template_id}')
     assert editor.status_code == 200
     editor_html = editor.get_data(as_text=True)
-    assert 'Pitcher is optional' in editor_html
+    assert 'Fielders only' in editor_html
     assert 'Standard Starters' in editor_html
 
     game_data = client.get('/api/game_data/14')

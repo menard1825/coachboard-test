@@ -399,11 +399,14 @@ def save_starting_defense_template():
         return jsonify({'status': 'error', 'message': error}), 400
 
     alignment = _first_alignment(innings)
+    # A saved defense is fielders only. The pitcher is a decision for each
+    # game, so a P sent by an older client is not stored.
+    alignment.pop('P', None)
     missing = [position for position in _positions(team) if position != 'P' and not alignment.get(position)]
     if missing:
         return jsonify({
             'status': 'error',
-            'message': f"Fill {', '.join(missing)} before saving. Pitcher may remain open.",
+            'message': f"Fill {', '.join(missing)} before saving. The pitcher isn't saved.",
         }), 400
 
     stored_title = PRESET_PREFIX + display_title

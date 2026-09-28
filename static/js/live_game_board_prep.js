@@ -740,33 +740,275 @@
 
   function applyPreset() {
     const select = $('pde-preset');
-    if (!select?.value) return;
-    const preset = presets().find((item) => String(item.id) === String(select.value));
-    const name = presetName(preset);
-    if (!preset || !confirm(`Apply “${name}” to Inning ${inning}? Only this inning will be replaced.`)) return;
-
-    const source = preset.innings?.['1'] || Object.values(preset.innings || {})[0] || {};
-    const available = new Set(presentPlayers().map((player) => player.name));
-    const next = {};
-    const unavailable = [];
-
-    positions().forEach((pos) => {
-      const playerName = source[pos];
-      if (!playerName) return;
-      if (available.has(playerName)) next[pos] = playerName;
-      else unavailable.push(playerName);
-    });
-
-    state.rotation.innings[inning] = next;
-    render();
-    toast(
-      unavailable.length
-        ? `Saved defense used. Open spots remain because ${[...new Set(unavailable)].join(', ')} is unavailable.`
-        : next.P ? `${name} applied to Inning ${inning}.` : `${name} applied. Choose the pitcher for Inning ${inning}.`,
-      unavailable.length ? 'warning' : 'success'
-    );
-    saveRotation();
+    if (select?.value) useSavedDefense('inning', select.value);
   }
+
+  // ---- Saved Defense: fielders only ------------------------------------
+  //
+  // One rule for "This inning" and "Whole game". A saved defense fills the
+  // fielding positions; it never sets, removes or moves the pitcher. Every
+  // target inning keeps exactly the P it already has -- a filled P, an open
+  // P, even a P marked Out (the absent-in-plan warning covers that) -- and a
+  // P stored in an older saved defense is ignored. A saved fielder who can't
+  // be placed (marked Out, pitching that inning, or already placed) leaves
+  // that position Open, and the confirmation says why, so the result can
+  // never hold one player twice.
+  let usingSavedDefense = false;
+
+  function fieldersOnly(source) {
+    const fielders = {...(source || {})};
+    delete fielders.P;
+    return fielders;
+  }
+
+  function savedDefenseSource(preset) {
+    let innings = preset?.innings;
+    if (typeof innings === 'string') {
+      try { innings = JSON.parse(innings); } catch (_) { innings = {}; }
+    }
+    if (!innings || typeof innings !== 'object') innings = {};
+    const source = innings['1'] || Object.values(innings).find((value) => value && typeof value === 'object') || {};
+    return source && typeof source === 'object' ? source : {};
+  }
+
+  function planSavedDefense(source, innings, targetKeys, available, rostered, fieldPositions) {
+    const proposed = {};
+    const openings = [];
+    targetKeys.forEach((key) => {
+      const existing = innings[key] && typeof innings[key] === 'object' ? innings[key] : {};
+      const next = {};
+      const placed = new Set();
+      if (existing.P) {
+        next.P = existing.P;
+        placed.add(existing.P);
+      }
+      fieldPositions.forEach((pos) => {
+        if (pos === 'P') return;
+        const player = String(source[pos] || '').trim();
+        if (!player) return;
+        let reason = '';
+        if (!rostered.has(player)) reason = 'roster';
+        else if (!available.has(player)) reason = 'out';
+        else if (player === next.P) reason = 'pitching';
+        else if (placed.has(player)) reason = 'placed';
+        if (reason) {
+          openings.push({key, pos, player, reason});
+          return;
+        }
+        next[pos] = player;
+        placed.add(player);
+      });
+      proposed[key] = next;
+    });
+    return {proposed, openings};
+  }
+
+  function inningLabel(key) {
+    return /^\d+$/.test(String(key)) ? inningOrdinal(key) : `Inning ${key}`;
+  }
+
+  // "the 2nd", "the 1st–3rd", "the 1st, 3rd and 5th"
+  function inningsPhrase(keys) {
+    const whole = keys.every((key) => /^\d+$/.test(String(key)));
+    if (!whole) return keys.map(inningLabel).join(', ');
+    const numbers = [...new Set(keys.map(Number))].sort((a, b) => a - b);
+    const runs = [];
+    numbers.forEach((n) => {
+      const run = runs[runs.length - 1];
+      if (run && n === run[1] + 1) run[1] = n;
+      else runs.push([n, n]);
+    });
+    const parts = runs.map(([a, b]) => (a === b ? inningOrdinal(a) : `${inningOrdinal(a)}–${inningOrdinal(b)}`));
+    const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
+    return `the ${list}`;
+  }
+
+  function scopePhrase(scope, keys) {
+    if (scope === 'game') {
+      return keys.length === 1 ? `${inningsPhrase(keys)} inning` : `innings ${keys[0]}–${keys[keys.length - 1]}`;
+    }
+    return /^\d+$/.test(String(keys[0])) ? `${inningsPhrase(keys)} inning` : inningLabel(keys[0]);
+  }
+
+  function groupByInnings(items, keyOf) {
+    const groups = new Map();
+    items.forEach((item) => {
+      const id = keyOf(item);
+      if (!groups.has(id)) groups.set(id, {item, keys: []});
+      groups.get(id).keys.push(item.key);
+    });
+    return [...groups.values()];
+  }
+
+  function savedDefenseSummary(scope, label, source, innings, targetKeys, openings) {
+    const lines = [];
+    const pitchers = groupByInnings(
+      targetKeys.map((key) => ({key, name: String(innings[key]?.P || '')})),
+      (item) => item.name
+    );
+    if (pitchers.length === 1 && !pitchers[0].item.name) {
+      lines.push('No pitcher is planned yet. Saved defenses never set the pitcher.');
+    } else if (scope !== 'game') {
+      lines.push(`${pitchers[0].item.name} stays at P.`);
+    } else {
+      lines.push(`Pitchers stay as planned: ${pitchers.map(({item, keys}) => (
+        `${item.name || 'no pitcher yet'} (${inningsPhrase(keys).replace(/^the /, '')})`
+      )).join(' · ')}.`);
+    }
+
+    const savedPitcher = String(source.P || '').trim();
+    if (savedPitcher && targetKeys.some((key) => innings[key]?.P !== savedPitcher)) {
+      lines.push(`“${label}” was saved with ${savedPitcher} at P. Saved defenses set fielders only, so ${savedPitcher} isn't placed by it.`);
+    }
+
+    const why = {
+      roster: (player) => `${player} isn't on the roster`,
+      out: (player) => `${player} is marked Out for this game`,
+      pitching: (player) => `${player} is pitching`,
+      placed: (player) => `${player} is already placed`,
+    };
+    groupByInnings(openings, (item) => `${item.pos}|${item.player}|${item.reason}`)
+      .forEach(({item, keys}) => {
+        const where = scope === 'game' ? ` in ${inningsPhrase(keys)}` : '';
+        lines.push(`${item.pos} is left Open${where}: ${why[item.reason](item.player)}.`);
+      });
+    return lines;
+  }
+
+  async function confirmSavedDefense(title, intro, lines) {
+    let modal = $('pde-use-confirm');
+    // Still closing from a previous answer: let it finish before reopening.
+    if (modal && modal.style.display === 'block' && !modal.classList.contains('show')) {
+      await new Promise((resolve) => modal.addEventListener('hidden.bs.modal', resolve, {once: true}));
+    }
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'pde-use-confirm';
+      modal.className = 'modal fade';
+      modal.tabIndex = -1;
+      modal.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title mb-0"></h5>
+              <button type="button" class="btn-close" data-use-cancel aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p class="mb-2 fw-semibold" data-use-intro></p>
+              <ul class="mb-0 ps-3 small" data-use-lines></ul>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-use-cancel>Cancel</button>
+              <button type="button" class="btn btn-primary" data-use-confirm>Use Saved Defense</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+    modal.querySelector('.modal-title').textContent = title;
+    modal.querySelector('[data-use-intro]').textContent = intro;
+    modal.querySelector('[data-use-lines]').innerHTML = lines.map((line) => `<li>${esc(line)}</li>`).join('');
+
+    // The coach's answer counts the moment it is tapped. Bootstrap ignores
+    // hide() while the sheet is still opening, so a quick tap also closes
+    // the sheet once it has finished opening.
+    return new Promise((resolve) => {
+      let answer = null;
+      const instance = bootstrap.Modal.getOrCreateInstance(modal);
+      const decide = (value) => {
+        if (answer === null) {
+          answer = value;
+          resolve(value);
+        }
+        instance.hide();
+      };
+      const closeIfDecided = () => {
+        if (answer !== null) instance.hide();
+      };
+      modal.querySelector('[data-use-confirm]').onclick = () => decide(true);
+      modal.querySelectorAll('[data-use-cancel]').forEach((button) => {
+        button.onclick = () => decide(false);
+      });
+      modal.addEventListener('shown.bs.modal', closeIfDecided);
+      modal.addEventListener('hidden.bs.modal', () => {
+        modal.removeEventListener('shown.bs.modal', closeIfDecided);
+        if (answer === null) {
+          answer = false;
+          resolve(false);
+        }
+      }, {once: true});
+      instance.show();
+    });
+  }
+
+  async function useSavedDefense(scope, presetId) {
+    if (usingSavedDefense || !presetId) return;
+    usingSavedDefense = true;
+    try {
+      const response = await fetch(`/api/game_data/${gameId}`, {cache: 'no-store'});
+      if (!response.ok) throw new Error(`Unable to load game defense (${response.status}).`);
+      const data = await response.json();
+      const preset = (data.rotation_templates || []).find((item) => (
+        String(item.id) === String(presetId) && presetName(item)
+      ));
+      if (!preset) throw new Error('That saved defense is no longer available.');
+      const label = presetName(preset);
+
+      // Built on a DETACHED copy of the one canonical rotation, so Cancel
+      // leaves shared state (and the next unrelated save) untouched.
+      const rotation = window.CBPregameRotation.getRotation(defaultRotationTitle());
+      const innings = JSON.parse(JSON.stringify(rotation.innings || {}));
+      let targetKeys = [inning];
+      if (scope === 'game') {
+        targetKeys = Object.keys(innings).filter((key) => /^\d+$/.test(key)).sort((a, b) => Number(a) - Number(b));
+        if (!targetKeys.length) targetKeys = ['1'];
+      }
+
+      const absent = new Set((data.absent_player_ids || []).map(Number));
+      const names = (players) => new Set(
+        players.map((player) => String(player.name || '').trim()).filter(Boolean)
+      );
+      const rostered = names(data.roster || []);
+      const available = names((data.roster || []).filter((player) => !absent.has(Number(player.id))));
+      const fieldPositions = Number(data.outfielder_count) === 4
+        ? ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'RCF', 'RF']
+        : ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
+      const source = savedDefenseSource(preset);
+      const plan = (from) => planSavedDefense(source, from, targetKeys, available, rostered, fieldPositions);
+      const {proposed, openings} = plan(innings);
+
+      const where = scopePhrase(scope, targetKeys);
+      const confirmed = await confirmSavedDefense(
+        `Use “${label}” for ${where}?`,
+        `Fielders in ${where} will be replaced.`,
+        savedDefenseSummary(scope, label, source, innings, targetKeys, openings)
+      );
+      if (!confirmed) return;
+
+      // Apply only what the coach was shown: if the plan changed while the
+      // sheet was open (another coach, a refresh), ask again instead.
+      const current = window.CBPregameRotation.getRotation(defaultRotationTitle());
+      if (JSON.stringify(plan(current.innings || {}).proposed) !== JSON.stringify(proposed)) {
+        toast('The plan changed while you were deciding. Review it and use the saved defense again.', 'warning');
+        return;
+      }
+      targetKeys.forEach((key) => { current.innings[key] = proposed[key]; });
+      window.CBPregameRotation.commitLocalChange(current.title, false);
+      const openCount = new Set(openings.map((item) => `${item.key}|${item.pos}`)).size;
+      toast(
+        openCount
+          ? `${label} used for ${where}. ${openCount} position${openCount === 1 ? '' : 's'} left Open.`
+          : `${label} used for ${where}.`,
+        openCount ? 'warning' : 'success'
+      );
+    } catch (error) {
+      toast(error.message || 'Unable to use the saved defense.', 'danger');
+    } finally {
+      usingSavedDefense = false;
+    }
+  }
+
+  window.CBSavedDefense = {use: useSavedDefense};
 
   function presetModal() {
     let modal = $('pde-preset-modal');
@@ -785,7 +1027,7 @@
           <div class="modal-body">
             <label class="form-label fw-semibold">Name</label>
             <input id="pde-name" class="form-control form-control-lg" maxlength="60" placeholder="e.g. #1 Defense">
-            <div class="form-text">Pitcher may remain open so you can choose him for each game.</div>
+            <div class="form-text">Saved defenses set fielders only. The pitcher isn't saved; choose the pitcher for each game.</div>
             <div class="d-grid mt-3"><button class="btn btn-primary btn-lg" id="pde-confirm">Save defense</button></div>
           </div>
         </div>
@@ -797,7 +1039,7 @@
   function openPresetModal() {
     const open = positions().filter((pos) => pos !== 'P' && !alignment()[pos]);
     if (open.length) {
-      toast(`Fill ${open.join(', ')} before saving. Pitcher may remain open.`, 'warning');
+      toast(`Fill ${open.join(', ')} before saving. The pitcher isn't saved.`, 'warning');
       return;
     }
     const modal = presetModal();
@@ -829,7 +1071,8 @@
       const response = await fetch('/api/starting-defense-template/save', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({title: name, innings: {'1': {...alignment()}}}),
+        // Fielders only: the pitcher is a per-game decision.
+        body: JSON.stringify({title: name, innings: {'1': fieldersOnly(alignment())}}),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.status === 'error') throw new Error(result.message || 'Unable to save preset.');

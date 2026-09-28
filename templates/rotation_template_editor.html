@@ -35,7 +35,7 @@
     <div>
       <div class="rte-kicker">{% if starting_defense %}Game Day Planning Template{% else %}Full-Game Rotation Template{% endif %}</div>
       <h1 id="rtePageTitle">{% if starting_defense %}{% if editor_data.rotation.id %}Edit Starting Defense{% else %}New Starting Defense{% endif %}{% else %}{% if editor_data.rotation.id %}Edit Rotation Template{% else %}New Rotation Template{% endif %}{% endif %}</h1>
-      <p>{% if starting_defense %}Reusable starting defense for Game Day. Pitcher can remain open.{% else %}Build the reusable {{ editor_data.regulation_innings }}-inning regulation defense here, inning by inning. Extra innings are handled during the live game if needed.{% endif %}</p>
+      <p>{% if starting_defense %}Reusable starting defense for Game Day. Fielders only; the pitcher is chosen for each game.{% else %}Build the reusable {{ editor_data.regulation_innings }}-inning regulation defense here, inning by inning. Extra innings are handled during the live game if needed.{% endif %}</p>
     </div>
     <div class="rte-head-actions">
       <a class="btn btn-outline-secondary" href="{{ url_for('home') }}#rotations">Back to Templates</a>
@@ -57,7 +57,7 @@
 
   <section class="rte-card">
     {% if starting_defense %}
-    <div class="rte-start-note"><strong>Pitcher is optional</strong><span>Leave P open to choose the game’s pitcher during Game Day planning.</span></div>
+    <div class="rte-start-note"><strong>Fielders only</strong><span>A saved defense doesn’t include the pitcher. Choose the pitcher for each game in Prepare Game.</span></div>
     {% else %}
     <div class="rte-innings-bar">
       <div class="rte-tabs" id="rteInningTabs"></div>

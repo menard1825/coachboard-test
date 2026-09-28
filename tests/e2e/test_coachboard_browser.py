@@ -60,9 +60,9 @@ def test_starting_defense_applies_and_survives_reload(page: Page, coachboard_url
     assert preset_id
 
     preset_select.select_option(value=preset_id)
-    page.once('dialog', lambda dialog: dialog.accept())
     defense.locator('#pde-use').click()
     defense.locator('#pde-use-inning').click()
+    page.locator('#pde-use-confirm').get_by_role('button', name='Use Saved Defense', exact=True).click()
 
     expected_positions = {
         'C': 'Catcher Cole',
