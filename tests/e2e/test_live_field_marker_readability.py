@@ -203,6 +203,7 @@ def test_on_the_field_drag_still_swaps_players(open_page, coachboard_url, game, 
             ghost = _drag(page, spot(a), spot(b), measure_ghost=True)
             # The ghost carries the player, readable while it follows the pointer.
             assert ghost and ghost['px'] >= 11 and ghost['inside'] and ghost['text'] == name_a, ghost
+            _choose_swap(page, name_b, a)
             expect(spot(b).locator('.cb-qd-name')).to_have_text(name_a, timeout=10_000)
             expect(spot(a).locator('.cb-qd-name')).to_have_text(name_b, timeout=10_000)
             expect(quick.locator('.cb-save-state')).to_contain_text('Saved', timeout=10_000)
@@ -214,10 +215,20 @@ def test_on_the_field_drag_still_swaps_players(open_page, coachboard_url, game, 
             page.wait_for_timeout(750)
             if spot(a).locator('.cb-qd-name').inner_text().strip() != name_a:
                 _drag(page, spot(a), spot(b))
+                _choose_swap(page, name_a, a)
                 expect(spot(a).locator('.cb-qd-name')).to_have_text(name_a, timeout=10_000)
                 expect(quick.locator('.cb-save-state')).to_contain_text('Saved', timeout=10_000)
                 page.wait_for_timeout(750)
     assert page.cb_errors == []
+
+
+def _choose_swap(page, displaced, vacated):
+    """On the Field never swaps by itself: the coach sends the displaced
+    player to the vacated position, then confirms the change."""
+    sheet = page.locator('#cbQuickMoveModal')
+    sheet.get_by_role('button', name=f'Put {displaced} at {vacated}', exact=True).click()
+    sheet.get_by_role('button', name='Make this change', exact=True).click()
+    expect(sheet).to_be_hidden(timeout=10_000)
 
 
 @pytest.mark.parametrize('device', [SMALL_PHONE, PHONE, TABLET], ids=lambda d: d[0])

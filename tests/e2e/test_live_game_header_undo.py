@@ -300,6 +300,8 @@ def test_header_undo_still_undoes_and_still_disables(page: Page, coachboard_url:
         modal = page.locator('#cbQuickMoveModal')
         expect(modal).to_be_visible(timeout=10_000)
         modal.locator('[data-cb-destination="RF"]').click()
+        modal.get_by_role('button', name='Put Right Riley at LF', exact=True).click()
+        modal.get_by_role('button', name='Make this change', exact=True).click()
         expect(modal).to_be_hidden(timeout=15_000)
 
         expect(

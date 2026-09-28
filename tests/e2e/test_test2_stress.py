@@ -200,6 +200,11 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         move = phone.locator('#cbQuickMoveModal')
         expect(move).to_be_visible(timeout=10_000)
         move.locator('[data-cb-destination="2B"]').click()
+        # 2B is occupied: the coach explicitly sends its player to the
+        # vacated SS (inning 2's names come from the prepared defense).
+        at_second = next_alignment['2B']
+        move.get_by_role('button', name=f'Put {at_second} at SS', exact=True).click()
+        move.get_by_role('button', name='Make this change', exact=True).click()
         expect(move).not_to_be_visible(timeout=10_000)
         expect(quick.locator('.cb-save-state')).to_contain_text('Saved', timeout=10_000)
         phone.locator('#liveUndoBtn').click()
@@ -350,6 +355,18 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
             )
         ).to_be_visible(timeout=10_000)
 
+        # 2B is occupied, so the coach first says where Sam goes. This
+        # decision is local (no request); only "Make this change" writes.
+        move_b.locator('[data-cb-destination="2B"]').click()
+        move_b.get_by_role(
+            'button', name='Put Second Sam at SS', exact=True
+        ).click()
+        expect(
+            move_b.get_by_role(
+                'button', name='Make this change', exact=True
+            )
+        ).to_be_visible(timeout=10_000)
+
         # Coach B now loses all network.
         #
         # Chromium's offline transition is asynchronous enough that a
@@ -395,9 +412,9 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
         # locator after Chromium networking has been disabled.
         coach_b.evaluate(
             """() => {
-                const button = document.querySelector(
-                    '#cbQuickMoveModal [data-cb-destination="2B"]'
-                );
+                const button = [...document.querySelectorAll(
+                    '#cbQuickMoveModal button'
+                )].find(node => node.textContent.trim() === 'Make this change');
 
                 if (!button) {
                     throw new Error(
@@ -441,6 +458,12 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
 
         move_a.locator(
             '[data-cb-destination="3B"]'
+        ).click()
+        move_a.get_by_role(
+            'button', name='Put Third Theo at 1B', exact=True
+        ).click()
+        move_a.get_by_role(
+            'button', name='Make this change', exact=True
         ).click()
 
         expect(move_a).not_to_be_visible(timeout=10_000)
@@ -775,8 +798,11 @@ def test_test2_drag_survives_remote_live_redraw(
             is None
         )
 
+        # SS to the bench: a one-step drag that saves through the drag
+        # draft (an occupied drop now asks the coach first, see
+        # test_live_defense_coach_chain.py).
         destination = phone_quick.locator(
-            '[data-cb-position="2B"]'
+            '.cb-qd-bench-wrap'
         )
 
         expect(destination).to_be_visible(
@@ -899,7 +925,7 @@ def test_test2_drag_survives_remote_live_redraw(
         if save_response.status == 200:
             assert save_payload.get('status') == 'success'
 
-            # Remote 1B/3B edit and local SS/2B drag both survived.
+            # Remote 1B/3B edit and local SS-to-bench drag both survived.
             assert (
                 final_state['current_alignment']['1B']
                 == remote_alignment['1B']
@@ -910,12 +936,9 @@ def test_test2_drag_survives_remote_live_redraw(
             )
             assert (
                 final_state['current_alignment']['2B']
-                == 'Shortstop Shawn'
-            )
-            assert (
-                final_state['current_alignment']['SS']
                 == 'Second Sam'
             )
+            assert not final_state['current_alignment'].get('SS')
 
             expect(
                 phone_quick.locator('.cb-save-state')
@@ -1324,8 +1347,10 @@ def test_test2_stale_recovery_authoritative_open_does_not_freeze_quick_field(
 
         phone.route(stale_route, stale_drag_response)
 
+        # SS to the bench saves through the drag draft (an occupied drop
+        # now asks the coach first instead of saving).
         source = phone_quick.locator('[data-cb-position="SS"]')
-        destination = phone_quick.locator('[data-cb-position="2B"]')
+        destination = phone_quick.locator('.cb-qd-bench-wrap')
 
         expect(source).to_be_visible(timeout=10_000)
         expect(destination).to_be_visible(timeout=10_000)

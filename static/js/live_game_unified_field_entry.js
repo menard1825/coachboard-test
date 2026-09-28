@@ -207,10 +207,12 @@
       return {pitcher: false, changed: true};
     }
 
+    // An occupied destination is never resolved here (no automatic swap or
+    // bench): handleDrop hands it to the coach's question first.
     const occupant = alignment[destination] || null;
+    if (occupant && occupant !== name) return {pitcher: false, changed: false, occupied: true};
     if (source !== 'BENCH') delete alignment[source];
     alignment[destination] = name;
-    if (occupant && occupant !== name && source !== 'BENCH') alignment[source] = occupant;
     return {pitcher: false, changed: true};
   }
 
@@ -374,6 +376,16 @@
         setSaveBadge('', 'Saved ✓');
         clearDraft({restore: true});
         document.getElementById('liveChangePitcherBtn')?.click();
+        return;
+      }
+
+      // Dropping on an occupied position asks where its player goes -- the
+      // same question, chain and single save as tapping (Quick Field).
+      const occupant = working.alignment[destination];
+      if (destination !== 'BENCH' && occupant && occupant !== name) {
+        setSaveBadge('', 'Saved ✓');
+        clearDraft({restore: true});
+        window.CBQuickFieldMoves?.moveOrAsk(name, destination);
         return;
       }
 

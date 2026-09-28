@@ -144,6 +144,10 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         expect(modal).to_be_visible()
         expect(modal).to_contain_text(f'{BENCH_NAME} is currently on the bench')
         modal.locator('[data-cb-destination="CF"]').click()
+        # CF is occupied: the coach says where Casey goes (nothing automatic).
+        expect(modal.locator('[data-cb-chain-question]')).to_have_text('Where should Center Casey go?')
+        modal.get_by_role('button', name='Bench Center Casey', exact=True).click()
+        modal.get_by_role('button', name='Make this change', exact=True).click()
         expect(modal).not_to_be_visible(timeout=10_000)
         expect(quick.locator('[data-cb-position="CF"]')).to_contain_text(BENCH_NAME, timeout=10_000)
         expect(quick.locator('[data-cb-move-player="Center Casey"]')).to_be_visible(timeout=10_000)

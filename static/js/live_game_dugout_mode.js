@@ -819,20 +819,20 @@
     if (title) {
       title.textContent = 'Move Player';
     }
-    setMoveModalHint('Tap the new position. Occupied positions swap automatically.');
+    setMoveModalHint("Tap the new position. If someone is there, you choose where they go.");
 
     const destinations = positions().filter(pos => pos !== 'P' && pos !== source);
     const sourceText = source === 'BENCH' ? `${name} is currently on the bench.` : `${name} is currently playing ${source}.`;
     const benchDestination = source === 'BENCH'
       ? ''
       : `<button type="button" class="btn btn-outline-secondary cb-destination" data-cb-bench-current><span>Bench</span><small>Choose who takes ${esc(source)}</small></button>`;
-    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. The player currently there will move to the bench.' : 'Choose another position, or tap Bench and pick the replacement.'}</div><div class="cb-destination-grid">${benchDestination}${destinations.map(pos => {
+    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. If someone is there, you choose where they go.' : 'Choose another position, or tap Bench and pick the replacement.'}</div><div class="cb-destination-grid">${benchDestination}${destinations.map(pos => {
       const occupant = alignment[pos] || '';
       return `<button type="button" class="btn btn-outline-primary cb-destination" data-cb-destination="${esc(pos)}"><span>${esc(pos)}</span><small>${occupant ? `Currently ${esc(occupant)}` : 'Open position'}</small></button>`;
     }).join('')}</div>`;
 
     body.querySelectorAll('[data-cb-destination]').forEach(button => {
-      button.addEventListener('click', () => saveMove(player.id, button.dataset.cbDestination, player.name));
+      button.addEventListener('click', () => moveOrAsk(player.name, button.dataset.cbDestination));
     });
 
     body.querySelector('[data-cb-bench-current]')?.addEventListener('click', () => {
@@ -944,6 +944,202 @@
     bootstrap.Modal.getOrCreateInstance(modal).show();
   }
 
+  const STALE_MOVE_MESSAGE =
+    'Defense changed on another device. Check the field and try the move again.';
+
+  // Tap and drag both land here with "<name> is moving to <destination>".
+  // An open destination is the approved one-step move (saveMove). An
+  // occupied one is a coach decision about its player (askOccupiedMove).
+  // Anything touching P belongs to Change Pitcher.
+  function moveOrAsk(name, destination) {
+    const player = playerForName(name);
+    const target = String(destination || '').toUpperCase();
+    if (!player || !target) return;
+    const alignment = currentAlignment();
+    const source = Object.entries(alignment)
+      .find(([, assigned]) => assigned === name)?.[0] || 'BENCH';
+    if (source === 'P' || target === 'P') {
+      bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
+      $('liveChangePitcherBtn')?.click();
+      return;
+    }
+    const occupant = alignment[target];
+    if (occupant && occupant !== name) {
+      askOccupiedMove(player, source, target);
+      return;
+    }
+    saveMove(player.id, target, name);
+  }
+
+  /*
+   * "Graham is moving to SS. Where should Rylan go?"
+   *
+   * The coach said where one player goes -- not what happens to the
+   * player already there. CoachBoard offers the mover's vacated position,
+   * any open position, "another position…" and the bench, and never
+   * picks for the coach: no automatic swap, bench or move. Choosing
+   * another occupied position asks about that player next.
+   *
+   * The whole chain is built locally and shown as a review; "Make this
+   * change" saves it as one defensive change (one Undo). Cancel, or the
+   * sheet closing, changes nothing. If the official field changes while
+   * the chain is open, it is discarded -- never applied to newer state.
+   *
+   * No loops: players already placed by this chain are never offered
+   * again, and P is never an ordinary destination.
+   */
+  function askOccupiedMove(player, source, target) {
+    const before = {...currentAlignment()};
+    const baseSequence = sequenceFromState();
+    const modal = ensureMoveModal();
+    const instance = bootstrap.Modal.getOrCreateInstance(modal);
+    const title = modal.querySelector('.modal-title');
+    const body = modal.querySelector('.modal-body');
+    const spots = positions().filter(pos => pos !== 'P');
+
+    const draft = {...before};
+    if (source !== 'BENCH') delete draft[source];
+    const firstDisplaced = draft[target];
+    draft[target] = player.name;
+    const moves = [{name: player.name, from: source, to: target}];
+    const placed = new Set([player.name]);
+    let active = true;
+
+    // Spots this chain emptied first (e.g. the mover's old position).
+    const openSpots = () => [
+      ...spots.filter(pos => !draft[pos] && before[pos]),
+      ...spots.filter(pos => !draft[pos] && !before[pos]),
+    ];
+    const takenSpots = () => spots.filter(pos => draft[pos] && !placed.has(draft[pos]));
+    const fromLabel = pos => (pos === 'BENCH' ? 'Bench' : pos);
+
+    const stop = () => {
+      active = false;
+      document.removeEventListener('coachboard:live-delta', onLiveChange);
+      document.removeEventListener('coachboard:live-state', onLiveChange);
+    };
+
+    // Another coach (or an Undo) changed the official field: this chain
+    // was decided against a field that no longer exists.
+    function onLiveChange(event) {
+      const detail = event.detail || {};
+      if (!active || Number(detail.game_id) !== gameId) return;
+      const next = detail.state || detail;
+      const nextSequence = detail.state
+        ? sequenceFromState(detail.state)
+        : Number(detail.sequence);
+      const sameField = JSON.stringify(Object.entries(next.current_alignment || {})
+        .filter(([, n]) => n).sort()) === JSON.stringify(Object.entries(before)
+        .filter(([, n]) => n).sort());
+      if (sameField && (!Number.isFinite(nextSequence) || nextSequence === baseSequence)) return;
+      stop();
+      title.textContent = 'Move not made';
+      body.innerHTML = `<div class="alert alert-warning mb-3" data-cb-chain-stale>${esc(STALE_MOVE_MESSAGE)}</div>
+        <div class="d-grid"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button></div>`;
+      getState().catch(() => {});
+    }
+
+    document.addEventListener('coachboard:live-delta', onLiveChange);
+    document.addEventListener('coachboard:live-state', onLiveChange);
+    modal.addEventListener('hidden.bs.modal', stop, {once: true});
+
+    const render = (heading, question, buttons, lines = []) => {
+      title.textContent = heading;
+      setMoveModalHint('Nothing changes until you finish.');
+      body.innerHTML = `<div class="cb-move-current"><strong data-cb-chain-question>${esc(question)}</strong></div>
+        ${lines.length ? `<ul class="list-unstyled mb-3" data-cb-chain-summary>${lines.map(line => `<li>${esc(line)}</li>`).join('')}</ul>` : ''}
+        <div class="d-grid gap-2" data-cb-chain-choices></div>`;
+      const list = body.querySelector('[data-cb-chain-choices]');
+      buttons.forEach(([label, className, onChoose]) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `btn ${className}`;
+        button.textContent = label;
+        button.addEventListener('click', () => {
+          if (active) onChoose();
+        });
+        list.appendChild(button);
+      });
+    };
+
+    const cancel = ['Cancel', 'btn-outline-secondary', () => {
+      stop();
+      instance.hide();
+    }];
+
+    const place = (name, from, to) => {
+      if (to !== 'Bench') draft[to] = name;
+      placed.add(name);
+      moves.push({name, from, to});
+    };
+
+    const review = () => {
+      const lines = [
+        ...moves.map(move => `${move.name}: ${fromLabel(move.from)} → ${move.to}`),
+        ...openSpots().map(pos => `${pos}: open`),
+      ];
+      render('Check the defensive change', 'This is the field after the change:', [
+        ['Make this change', 'btn-primary', () => {
+          stop();
+          saveDefenseDraft(
+            {...draft},
+            moves.map(move => `${move.name} to ${move.to}`).join(' · '),
+            baseSequence,
+          );
+        }],
+        cancel,
+      ], lines);
+    };
+
+    // "Where should <name> go?" -- name was at `from` until just now.
+    const ask = (name, from, mover) => {
+      const buttons = openSpots().map(pos => [
+        `Put ${name} at ${pos}`,
+        'btn-outline-primary',
+        () => {
+          place(name, from, pos);
+          review();
+        },
+      ]);
+      if (takenSpots().length) {
+        buttons.push([
+          `Move ${name} to another position…`,
+          'btn-outline-primary',
+          () => choosePosition(name, from, mover),
+        ]);
+      }
+      buttons.push([`Bench ${name}`, 'btn-outline-primary', () => {
+        place(name, from, 'Bench');
+        review();
+      }]);
+      buttons.push(cancel);
+      render(`${mover} is moving to ${from}`, `Where should ${name} go?`, buttons);
+    };
+
+    const choosePosition = (name, from, mover) => {
+      render(`${mover} is moving to ${from}`, `Where should ${name} go?`, [
+        ...takenSpots().map(pos => [
+          `${pos} · ${draft[pos]}`,
+          'btn-outline-primary',
+          () => {
+            const next = draft[pos];
+            place(name, from, pos);
+            ask(next, pos, name);
+          },
+        ]),
+        ['Back', 'btn-outline-secondary', () => ask(name, from, mover)],
+        cancel,
+      ]);
+    };
+
+    ask(firstDisplaced, target, player.name);
+    instance.show();
+  }
+
+  // Drag-and-drop's occupied drops come here, so tap and drag ask the same
+  // question and save through the same writer.
+  window.CBQuickFieldMoves = Object.freeze({moveOrAsk});
+
   async function applyQuickDefenseSaveResponse(data) {
     if (data?.delta) {
       // Use the exact same local contract as drag-and-drop and pitcher
@@ -969,7 +1165,7 @@
     await getState();
   }
 
-  async function saveDefenseDraft(alignment, successMessage) {
+  async function saveDefenseDraft(alignment, successMessage, baseSequence = null) {
     if (moveBusy) return;
     moveBusy = true;
     saveMode = 'saving';
@@ -986,7 +1182,8 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           alignment,
-          base_sequence: sequenceFromState(),
+          // A chain is saved against the field it was decided on.
+          base_sequence: baseSequence ?? sequenceFromState(),
         }),
       });
 
@@ -1001,8 +1198,10 @@
         }
 
         throw new Error(
-          data.message ||
-          `Unable to save defense (${response.status}).`
+          data.code === 'stale_live_state'
+            ? STALE_MOVE_MESSAGE
+            : data.message ||
+              `Unable to save defense (${response.status}).`
         );
       }
 
@@ -1038,8 +1237,15 @@
     }
   }
 
+  // One-step moves only: an open destination (the old spot is left open).
+  // An occupied destination is the coach's decision -- askOccupiedMove.
   async function saveMove(playerId, destination, name) {
     if (moveBusy) return;
+    const occupying = currentAlignment()[String(destination || '').toUpperCase()];
+    if (occupying && occupying !== name) {
+      moveOrAsk(name, destination);
+      return;
+    }
     moveBusy = true;
     saveMode = 'saving';
     saveMessage = 'Saving…';
@@ -1081,23 +1287,15 @@
         );
       }
 
-      const occupant = alignment[target] || null;
+      if (alignment[target] && alignment[target] !== player.name) {
+        throw new Error(STALE_MOVE_MESSAGE);
+      }
 
       if (source !== 'BENCH') {
         delete alignment[source];
       }
 
       alignment[target] = player.name;
-
-      // Field -> field is a true swap.
-      // Bench -> occupied field sends the old occupant to the bench.
-      if (
-        occupant &&
-        occupant !== player.name &&
-        source !== 'BENCH'
-      ) {
-        alignment[source] = occupant;
-      }
 
       const response = await fetch(`/api/live-game/${gameId}/defense-edit`, {
         method: 'POST',
