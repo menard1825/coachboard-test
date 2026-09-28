@@ -14,6 +14,8 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
+from e2e_cleanup import delete_players_named
+
 
 TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
@@ -197,6 +199,9 @@ def test_phone_quick_field_bench_drop_saves_open_spot_immediately(
             game_id,
             player_id,
         )
+        # /add_player answers without the new player's id, so player_id is
+        # None here: remove this test's own player by its unique name.
+        assert delete_players_named(page.request, coachboard_url, [BENCH_NAME]) == []
 
 
 

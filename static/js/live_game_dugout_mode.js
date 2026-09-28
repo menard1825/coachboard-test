@@ -670,9 +670,15 @@
     modal.id = 'cbQuickMoveModal';
     modal.className = 'modal fade';
     modal.tabIndex = -1;
-    modal.innerHTML = '<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Move Player</h5><div class="small text-muted">Tap the new position. Occupied positions swap automatically.</div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"></div></div></div>';
+    modal.innerHTML = '<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">Move Player</h5><div class="small text-muted" data-cb-move-hint>Tap the new position. Occupied positions swap automatically.</div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"></div></div></div>';
     document.body.appendChild(modal);
     return modal;
+  }
+
+  // The Move Player and Fill sheets share one modal; each states its own rule.
+  function setMoveModalHint(text) {
+    const hint = ensureMoveModal().querySelector('[data-cb-move-hint]');
+    if (hint) hint.textContent = text;
   }
 
   function openOpenPositionModal(position) {
@@ -691,14 +697,35 @@
     if (title) {
       title.textContent = `Fill ${pos}`;
     }
+    setMoveModalHint('Only the player you choose moves.');
 
-    const availableBench = benchPlayers();
+    /*
+     * Anyone can fill an open position: a bench player, or a player at
+     * another position -- the same move drag-and-drop makes (saveMove,
+     * like applyMove in live_game_unified_field_entry.js): the player
+     * moves here and their old position is left open. Nothing else moves;
+     * the coach fills that spot next if they want to. The pitcher is
+     * special: choosing them goes to Change Pitcher, which settles who
+     * pitches (with its eligibility checks) before anyone leaves P.
+     */
+    const alignment = currentAlignment();
+    const labelFor = player => {
+      const number = String(player?.number ?? '').trim();
+      return number ? `#${number} ${player.name}` : player.name;
+    };
+    const candidates = [
+      ...benchPlayers().map(player => ({player, from: 'Bench'})),
+      ...positions()
+        .filter(spot => spot !== pos && alignment[spot])
+        .map(spot => ({player: playerForName(alignment[spot]), from: spot}))
+        .filter(item => item.player),
+    ];
 
-    if (!availableBench.length) {
+    if (!candidates.length) {
       body.innerHTML = `
         <div class="cb-move-current">
           <strong>${esc(pos)} is Open.</strong><br>
-          No bench player is available to fill it.
+          No player is available to fill it.
         </div>
       `;
 
@@ -709,33 +736,30 @@
       return;
     }
 
+    const detail = from => {
+      if (from === 'P') return `P → ${pos} · choose a new pitcher first`;
+      if (from === 'Bench') return `Bench → ${pos}`;
+      return `${from} → ${pos} · ${from} left open`;
+    };
+
     body.innerHTML = `
       <div class="cb-move-current">
         <strong>${esc(pos)} is Open.</strong><br>
-        Choose a bench player to put at ${esc(pos)}.
+        Choose a player to put at ${esc(pos)}.
       </div>
 
       <div class="cb-destination-grid">
-        ${availableBench.map(player => {
-          const number = String(
-            player.number ?? ''
-          ).trim();
-
-          const label = number
-            ? `#${number} ${player.name}`
-            : player.name;
-
-          return `
-            <button
-              type="button"
-              class="btn btn-outline-primary cb-destination"
-              data-cb-fill-open-player="${player.id}"
-            >
-              <span>${esc(label)}</span>
-              <small>Bench → ${esc(pos)}</small>
-            </button>
-          `;
-        }).join('')}
+        ${candidates.map(({player, from}) => `
+          <button
+            type="button"
+            class="btn ${from === 'Bench' ? 'btn-outline-primary' : 'btn-outline-secondary'} cb-destination"
+            data-cb-fill-open-player="${player.id}"
+            data-cb-fill-from="${esc(from)}"
+          >
+            <span>${esc(labelFor(player))}</span>
+            <small>${esc(detail(from))}</small>
+          </button>
+        `).join('')}
       </div>
     `;
 
@@ -749,17 +773,26 @@
             button.dataset.cbFillOpenPlayer
           );
 
-          const player = availableBench.find(
+          const choice = candidates.find(
             candidate =>
-              Number(candidate.id) === playerId
+              Number(candidate.player.id) === playerId
           );
 
-          if (!player) return;
+          if (!choice) return;
+
+          if (choice.from === 'P') {
+            // Never moves the pitcher off P here: Change Pitcher asks who
+            // pitches, then where the pitcher goes (this open spot is
+            // offered there as a one-tap choice).
+            bootstrap.Modal.getOrCreateInstance(modal).hide();
+            $('liveChangePitcherBtn')?.click();
+            return;
+          }
 
           saveMove(
-            player.id,
+            choice.player.id,
             pos,
-            player.name
+            choice.player.name
           );
         }
       );
@@ -786,6 +819,7 @@
     if (title) {
       title.textContent = 'Move Player';
     }
+    setMoveModalHint('Tap the new position. Occupied positions swap automatically.');
 
     const destinations = positions().filter(pos => pos !== 'P' && pos !== source);
     const sourceText = source === 'BENCH' ? `${name} is currently on the bench.` : `${name} is currently playing ${source}.`;

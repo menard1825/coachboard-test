@@ -138,7 +138,8 @@ def choose_new_pitcher(page: Page, name: str):
     page.locator('#liveChangePitcherBtn').click()
     picker = page.locator('#live-pitcher-picker-v2')
     expect(picker).to_be_visible(timeout=10_000)
-    picker.locator('.pitcher-choice-v2', has_text=name).click()
+    # Exact name: another suite's "Drag Bench Blake" contains "Bench Blake".
+    picker.locator('.pitcher-choice-v2', has=page.get_by_text(name, exact=True)).click()
     expect(picker).not_to_be_visible(timeout=10_000)
     question = page.locator(QUESTION)
     expect(question).to_be_visible(timeout=10_000)
