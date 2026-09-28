@@ -242,6 +242,7 @@ def test_next_inning_drag_still_swaps_players(open_page, coachboard_url, game, d
     name_a, name_b = before[a], before[b]
     try:
         _drag(page, spot(a), spot(b))
+        _choose_next_swap(page, name_b, a)
         expect(spot(b).locator('.cb-qd-name')).to_have_text(name_a, timeout=10_000)
         expect(spot(a).locator('.cb-qd-name')).to_have_text(name_b, timeout=10_000)
         data = page.evaluate(MEASURE, field)
@@ -250,5 +251,14 @@ def test_next_inning_drag_still_swaps_players(open_page, coachboard_url, game, d
         page.wait_for_timeout(750)
         if spot(a).locator('.cb-qd-name').inner_text().strip() != name_a:
             _drag(page, spot(a), spot(b))
+            _choose_next_swap(page, name_a, a)
             expect(spot(a).locator('.cb-qd-name')).to_have_text(name_a, timeout=10_000)
     assert page.cb_errors == []
+
+
+def _choose_next_swap(page, displaced, vacated):
+    """Next Inning asks where the displaced player goes; the coach sends
+    them to the vacated spot (an explicit swap)."""
+    sheet = page.locator('#cbNextPitchingChange')
+    sheet.get_by_role('button', name=f'Put {displaced} at {vacated}', exact=True).click()
+    expect(sheet).to_be_hidden(timeout=10_000)

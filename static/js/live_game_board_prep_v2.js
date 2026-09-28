@@ -2611,28 +2611,182 @@
     );
   }
 
+  // A move to an open position: the old spot (if any) is left open. An
+  // occupied target never reaches here -- askDisplaced asks the coach.
   function plainMove(board, name, source, target) {
     const next = {...board};
-    const occupant = next[target] || '';
 
     if (source && source !== 'BENCH') {
       next[source] = '';
     }
 
     next[target] = name;
-
-    if (
-      occupant &&
-      occupant !== name &&
-      source &&
-      source !== 'BENCH'
-    ) {
-      // Field-to-field: a true two-player swap.
-      next[source] = occupant;
-    }
-
-    // Bench -> field sends the old occupant to the bench.
     return next;
+  }
+
+  // The displacement question that is open, if any: another coach's
+  // change to the plan discards it (applyPrep).
+  let openChain = null;
+
+  function discardOpenChain() {
+    if (!openChain) return false;
+    const chain = openChain;
+    openChain = null;
+    chain.close();
+    return true;
+  }
+
+  /*
+   * "Graham is moving to SS next inning. Where should Rylan go?"
+   *
+   * The coach said where one player goes, not what happens to the player
+   * already there. Offer Graham's vacated spot, open spots, "another
+   * position…" and the bench; never choose. Choosing another occupied
+   * spot asks about that player next. Players already placed are never
+   * offered again (no loops), and P is never an ordinary spot.
+   *
+   * A plan stays fast: a one-question answer goes straight into the save
+   * queue; only a longer chain (3+ players) is shown for a quick check.
+   * Nothing enters the queue until the chain is resolved, and then as one
+   * alignment.
+   */
+  function askDisplaced(board, name, source, target) {
+    discardOpenChain();
+
+    const modal = pitchingChangeModal();
+    const instance = bootstrap.Modal.getOrCreateInstance(modal);
+    const titleEl = modal.querySelector('[data-pitch-title]');
+    const questionEl = modal.querySelector('[data-pitch-question]');
+    const noteEl = modal.querySelector('[data-pitch-readiness]');
+    const list = modal.querySelector('[data-pitch-choices]');
+    const spots = positions().filter(pos => pos !== 'P');
+    const fromLabel = pos => (!pos || pos === 'BENCH' ? 'Bench' : pos);
+
+    const draftBoard = {...board};
+    if (source && source !== 'BENCH') draftBoard[source] = '';
+    const firstDisplaced = draftBoard[target];
+    draftBoard[target] = name;
+    const moves = [{name, from: source, to: target}];
+    const placed = new Set([name]);
+
+    const chain = {
+      close: () => instance.hide(),
+    };
+    openChain = chain;
+    modal.addEventListener('hidden.bs.modal', () => {
+      if (openChain === chain) openChain = null;
+      noteEl.style.whiteSpace = '';
+    }, {once: true});
+
+    const openSpots = () => [
+      ...spots.filter(pos => !draftBoard[pos] && board[pos]),
+      ...spots.filter(pos => !draftBoard[pos] && !board[pos]),
+    ];
+    const takenSpots = () => spots.filter(
+      pos => draftBoard[pos] && !placed.has(draftBoard[pos])
+    );
+
+    const render = (title, question, buttons, lines = []) => {
+      titleEl.textContent = title;
+      questionEl.textContent = question;
+      noteEl.textContent = lines.join('\n');
+      noteEl.hidden = !lines.length;
+      noteEl.className = 'small mb-2 fw-semibold';
+      noteEl.style.whiteSpace = lines.length ? 'pre-line' : '';
+      list.replaceChildren(...buttons.map(([label, className, onChoose]) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `btn ${className}`;
+        button.textContent = label;
+        button.addEventListener('click', () => {
+          if (openChain === chain) onChoose();
+        });
+        return button;
+      }));
+    };
+
+    const cancel = ['Cancel', 'btn-outline-secondary', () => instance.hide()];
+
+    const commit = () => {
+      openChain = null;
+      instance.hide();
+      // The plan moved on underneath the question: never apply it there.
+      if (!sameAlignment(snapshot(), board)) {
+        noticeMessage = 'Defense updated by another coach.';
+        renderSyncState();
+        return;
+      }
+      commitLocalChange({...draftBoard}, {
+        message: moves
+          .map(move => `${playerLabel(move.name)} → ${move.to}`)
+          .join(' · ') + ' ✓',
+      });
+    };
+
+    const resolved = () => {
+      if (moves.length < 3) {
+        commit();
+        return;
+      }
+      render(
+        `${name} is moving to ${target} next inning`,
+        'Next inning after this change:',
+        [['Save plan', 'btn-primary', commit], cancel],
+        [
+          ...moves.map(move => `${move.name}: ${fromLabel(move.from)} → ${fromLabel(move.to)}`),
+          ...openSpots().map(pos => `${pos}: open`),
+        ],
+      );
+    };
+
+    const place = (player, from, to) => {
+      if (to !== 'BENCH') draftBoard[to] = player;
+      placed.add(player);
+      moves.push({name: player, from, to});
+    };
+
+    const ask = (player, from, mover) => {
+      const buttons = openSpots().map(pos => [
+        `Put ${player} at ${pos}`,
+        'btn-outline-primary',
+        () => {
+          place(player, from, pos);
+          resolved();
+        },
+      ]);
+      if (takenSpots().length) {
+        buttons.push([
+          `Move ${player} to another position…`,
+          'btn-outline-primary',
+          () => choosePosition(player, from, mover),
+        ]);
+      }
+      buttons.push([`Bench ${player}`, 'btn-outline-primary', () => {
+        place(player, from, 'BENCH');
+        resolved();
+      }]);
+      buttons.push(cancel);
+      render(`${mover} is moving to ${from} next inning`, `Where should ${player} go?`, buttons);
+    };
+
+    const choosePosition = (player, from, mover) => {
+      render(`${mover} is moving to ${from} next inning`, `Where should ${player} go?`, [
+        ...takenSpots().map(pos => [
+          `${pos} · ${draftBoard[pos]}`,
+          'btn-outline-primary',
+          () => {
+            const next = draftBoard[pos];
+            place(player, from, pos);
+            ask(next, pos, player);
+          },
+        ]),
+        ['Back', 'btn-outline-secondary', () => ask(player, from, mover)],
+        cancel,
+      ]);
+    };
+
+    ask(firstDisplaced, target, name);
+    instance.show();
   }
 
   function movePlayer(
@@ -2671,6 +2825,15 @@
     if (source === 'P' && name === pitcher) {
       renderCard();
       askIncomingPitcher(board, name, target);
+      return;
+    }
+
+    // Moving onto an occupied position: the coach decides where that
+    // player goes. Nothing is swapped or benched automatically.
+    const occupant = board[target] || '';
+    if (target !== 'P' && occupant && occupant !== name) {
+      renderCard();
+      askDisplaced(board, name, source, target);
       return;
     }
 
@@ -3188,6 +3351,11 @@
         previousBase &&
         data?.confirmed?.source === 'custom'
       ) {
+        noticeMessage = 'Defense updated by another coach.';
+      }
+
+      // An unfinished displacement question was about the old plan.
+      if (discardOpenChain()) {
         noticeMessage = 'Defense updated by another coach.';
       }
 

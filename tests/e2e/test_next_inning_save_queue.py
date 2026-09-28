@@ -101,8 +101,23 @@ def spot(board, position):
 
 
 def swap(board, source, target):
+    """Move source's player to target. For ordinary positions that is only
+    half a swap: CoachBoard asks where target's player goes, and the coach
+    explicitly sends them to the vacated spot. (Moves involving P ask the
+    pitching question instead; those tests answer it themselves.)"""
+    displaced = spot(board, target).get_attribute('data-next-player') or ''
     spot(board, source).click()
     spot(board, target).click()
+    if displaced and 'P' not in (source, target):
+        answer_displaced(board.page, displaced, source)
+
+
+def answer_displaced(page: Page, displaced, vacated):
+    sheet = page.locator('#cbNextPitchingChange')
+    expect(sheet).to_contain_text(f'Where should {displaced} go?', timeout=5_000)
+    # The answer applies at once; no wait for the sheet's fade, so callers
+    # can still check the board "immediately" after the move.
+    sheet.get_by_role('button', name=f'Put {displaced} at {vacated}', exact=True).click()
 
 
 def slow_network(page: Page, latency_ms=1000):
@@ -201,7 +216,9 @@ def test_rapid_swaps_on_a_slow_connection_are_all_kept(
 ):
     board, game_id = next_board
     posts = record_prep_posts(page)
-    slow_network(page)
+    # Each swap is now a move plus the coach's explicit answer, so give the
+    # first save long enough in flight for the next moves to coalesce.
+    slow_network(page, latency_ms=3000)
 
     moves = [('SS', '2B'), ('LF', 'CF'), ('1B', '3B')]
     done = []
