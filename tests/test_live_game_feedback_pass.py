@@ -1235,3 +1235,74 @@ def _decision_rows(app):
 
 def _decision_log(app):
     return [row['detail'] for row in _decision_rows(app)]
+
+
+# ------------------------------------------- a coach-resolved defensive chain
+
+INNING_TWO = {
+    'P': 'Aiden', 'C': 'Bennett', '1B': 'Carter', '2B': 'Drew', '3B': 'Eli',
+    'SS': 'Finn', 'LF': 'Gavin', 'CF': 'Hudson', 'RF': 'Isaac',
+}
+
+
+def test_a_resolved_defensive_chain_is_one_pitching_change_and_one_undo(monkeypatch):
+    """Jack (bench) pitches; the coach sends Aiden to 1B, Carter from 1B to
+    LF and Gavin from LF to the bench. The whole decision is one event."""
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {'Jack': {'status': 'Available'}})
+
+    after = dict(INNING_TWO, P='Jack', **{'1B': 'Aiden', 'LF': 'Carter'})
+    response = client.post('/api/live-game/70/complete-pitcher-change', json={
+        'base_sequence': 0, 'fast': True, 'new_pitcher_id': 10, 'alignment': after,
+    })
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()['delta']['current_alignment'] == after
+    assert _event_count(app) == 1
+
+    from db import db
+    from models import GameRotationEvent
+
+    with app.app_context():
+        (event,) = db.session.query(GameRotationEvent).filter_by(game_id=70).all()
+        assert event.event_type == 'Pitcher Change'
+        assert event.before_alignment == INNING_TWO
+        assert event.after_alignment == after
+
+    undone = client.post('/api/live-game/70/undo', json={'base_sequence': 1})
+    assert undone.status_code == 200
+
+    from blueprints.live_game_api import _actual_rotation
+    from models import Game
+
+    with app.app_context():
+        (event,) = db.session.query(GameRotationEvent).filter_by(game_id=70).all()
+        assert event.reverted is True
+        # The one Undo restores the whole field, pitcher included. (This
+        # fixture starts at inning 2 without End Inning events, so read
+        # inning 2's field directly.)
+        _, actual, _ = _actual_rotation(db.session.get(Game, 70), 1)
+        assert actual['2'] == INNING_TWO
+
+
+@pytest.mark.parametrize('alignment', [
+    # Aiden at 1B and LF.
+    dict(INNING_TWO, P='Jack', **{'1B': 'Aiden', 'LF': 'Aiden'}),
+    # The new pitcher also listed in the field.
+    dict(INNING_TWO, P='Jack', **{'1B': 'Aiden', 'LF': 'Jack'}),
+], ids=['player_twice', 'pitcher_also_in_field'])
+def test_a_chain_cannot_put_one_player_in_two_positions(monkeypatch, alignment):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+    _patch_summary(monkeypatch, {'Jack': {'status': 'Available'}})
+
+    response = client.post('/api/live-game/70/complete-pitcher-change', json={
+        'base_sequence': 0, 'fast': True, 'new_pitcher_id': 10, 'alignment': alignment,
+    })
+    assert response.status_code == 409
+    assert response.get_json()['message'] == (
+        'A player cannot occupy more than one defensive position.'
+    )
+    assert _event_count(app) == 0

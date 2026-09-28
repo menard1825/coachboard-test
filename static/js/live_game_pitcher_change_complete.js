@@ -214,6 +214,7 @@
           </div>
           <div class="modal-body">
             <div class="fw-semibold mb-2" data-pc-question></div>
+            <ul class="list-unstyled mb-3" data-pc-summary hidden></ul>
             <div class="d-grid gap-2" data-pc-choices></div>
           </div>
         </div>
@@ -225,53 +226,70 @@
   /*
    * "Graham is going in to pitch. Where should Pat go?"
    *
-   * Resolves with the chosen alignment and message, or null for Cancel
-   * or when the field changed underneath the question. Nothing is saved
-   * while it is open.
+   * Then, only if the coach sends Pat to an occupied position:
+   * "Pat is moving to 1B. Riggins is at 1B. Where should Riggins go?" --
+   * and so on until every displaced player has a place the coach chose.
+   *
+   * The pending change is built locally; nothing is saved while the
+   * question is open. CoachBoard offers open positions, "another
+   * position…" and the bench, but never decides for the coach: an
+   * occupied position is only taken when the coach picks it, and its
+   * player is always asked about next -- never benched or swapped
+   * automatically.
+   *
+   * No loops: a player the chain has already placed (the new pitcher, or
+   * anyone moved in this change) is never offered as a target again, so
+   * every step either ends the chain or brings in a player not yet moved.
+   * A chain of more than one move is shown as its resulting field before
+   * it is made.
+   *
+   * Resolves with the chosen alignment and message, or null for Cancel,
+   * or {stale: true} when the field changed underneath the question.
    */
   function askOutgoingDestination({incoming, oldPitcher, incomingPosition, before, sequence, positions}) {
     const modal = questionModal();
     const instance = bootstrap.Modal.getOrCreateInstance(modal);
     const list = modal.querySelector('[data-pc-choices]');
+    const titleEl = modal.querySelector('[data-pc-title]');
+    const questionEl = modal.querySelector('[data-pc-question]');
+    const summaryEl = modal.querySelector('[data-pc-summary]');
 
-    const base = {...before, P: incoming.name};
-    if (incomingPosition) delete base[incomingPosition];
+    const spots = positions.filter(pos => pos !== 'P');
+    const draft = {...before, P: incoming.name};
+    if (incomingPosition) delete draft[incomingPosition];
 
-    const choices = [];
+    // Moves the coach has decided, in order: {name, to} (to = a position
+    // or 'Bench'). Players placed by this change are never moved again.
+    const moves = [];
+    const placed = new Set([incoming.name]);
 
-    if (incomingPosition) {
-      choices.push({
-        label: `Put ${oldPitcher} at ${incomingPosition}`,
-        alignment: {...base, [incomingPosition]: oldPitcher},
-        message: `${incoming.name} is pitching · ${oldPitcher} to ${incomingPosition}`,
-      });
-    }
+    const openSpots = () => spots.filter(pos => !draft[pos]);
+    const openNote = () => {
+      const open = openSpots();
+      if (!open.length) return '';
+      return ` · ${open.join(', ')} ${open.length === 1 ? 'is' : 'are'} open`;
+    };
+    // Occupied positions whose player this change has not moved yet.
+    const takenSpots = () => spots.filter(
+      pos => draft[pos] && !placed.has(draft[pos])
+    );
 
-    positions
-      .filter(pos => pos !== 'P' && pos !== incomingPosition && !before[pos])
-      .forEach(pos => {
-        choices.push({
-          label: `Put ${oldPitcher} at ${pos}`,
-          alignment: {...base, [pos]: oldPitcher},
-          message: `${incoming.name} is pitching · ${oldPitcher} to ${pos}` +
-            (incomingPosition ? ` · ${incomingPosition} is open` : ''),
-        });
-      });
+    const message = () =>
+      `${incoming.name} is pitching · ` +
+      moves.map(move => `${move.name} to ${move.to}`).join(' · ') +
+      openNote();
 
-    choices.push({
-      label: incomingPosition
-        ? `Bench ${oldPitcher} · ${incomingPosition} open`
-        : `Bench ${oldPitcher}`,
-      alignment: base,
-      message: `${incoming.name} is pitching · ${oldPitcher} to Bench` +
-        (incomingPosition ? ` · ${incomingPosition} is open` : ''),
-    });
-
-    modal.querySelector('[data-pc-title]').textContent =
-      `${incoming.name} is going in to pitch`;
-    modal.querySelector('[data-pc-question]').textContent =
-      `Where should ${oldPitcher} go?`;
-    list.replaceChildren();
+    const lines = () => [
+      `${incoming.name} → P` +
+        (incomingPosition ? ` (from ${incomingPosition})` : ' (from Bench)'),
+      ...moves.map(move => {
+        const from = Object.entries(before).find(
+          ([pos, name]) => name === move.name
+        )?.[0] || 'Bench';
+        return `${move.name}: ${from} → ${move.to}`;
+      }),
+      ...openSpots().map(pos => `${pos}: open`),
+    ];
 
     return new Promise(resolve => {
       let answer = null;
@@ -310,27 +328,126 @@
         resolve(answer);
       }, {once: true});
 
-      const addButton = (label, className, onChoose) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `btn ${className}`;
-        button.textContent = label;
-        button.addEventListener('click', () => {
-          // An answer given after the field changed is not applied.
-          if (!stale) onChoose();
-          instance.hide();
-        });
-        list.appendChild(button);
+      const finish = value => {
+        answer = value;
+        instance.hide();
       };
 
-      choices.forEach(choice => {
-        addButton(choice.label, 'btn-outline-primary', () => {
-          answer = choice;
-        });
-      });
-      addButton('Cancel', 'btn-outline-secondary', () => {
-        answer = null;
-      });
+      // One step of the conversation: a title, a question, buttons.
+      const render = (title, question, buttons, summary = []) => {
+        titleEl.textContent = title;
+        questionEl.textContent = question;
+        summaryEl.replaceChildren(...summary.map(text => {
+          const item = document.createElement('li');
+          item.textContent = text;
+          return item;
+        }));
+        summaryEl.hidden = !summary.length;
+        list.replaceChildren(...buttons.map(([label, className, onChoose]) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `btn ${className}`;
+          button.textContent = label;
+          button.addEventListener('click', () => {
+            // An answer given after the field changed is not applied.
+            if (stale) {
+              instance.hide();
+              return;
+            }
+            onChoose();
+          });
+          return button;
+        }));
+      };
+
+      const cancel = ['Cancel', 'btn-outline-secondary', () => finish(null)];
+
+      const resolved = () => {
+        const result = {alignment: {...draft}, message: message()};
+        // One move is the tap the coach just made; a chain is shown as
+        // the field it produces before anything is changed.
+        if (moves.length === 1) {
+          finish(result);
+          return;
+        }
+        render(
+          'Check the pitching change',
+          'This is the field after the change:',
+          [
+            ['Make this change', 'btn-primary', () => finish(result)],
+            cancel,
+          ],
+          lines(),
+        );
+      };
+
+      const place = (name, to) => {
+        if (to !== 'Bench') draft[to] = name;
+        placed.add(name);
+        moves.push({name, to});
+      };
+
+      // "Where should <name> go?"
+      const ask = (name, title, question) => {
+        const buttons = openSpots().map(pos => [
+          `Put ${name} at ${pos}`,
+          'btn-outline-primary',
+          () => {
+            place(name, pos);
+            resolved();
+          },
+        ]);
+        if (takenSpots().length) {
+          buttons.push([
+            `Move ${name} to another position…`,
+            'btn-outline-primary',
+            () => choosePosition(name, title, question),
+          ]);
+        }
+        // Name only the spots this change opens (e.g. the new pitcher's).
+        const opened = openSpots().filter(pos => before[pos]);
+        buttons.push([
+          `Bench ${name}` + (opened.length ? ` · ${opened.join(', ')} open` : ''),
+          'btn-outline-primary',
+          () => {
+            place(name, 'Bench');
+            resolved();
+          },
+        ]);
+        buttons.push(cancel);
+        render(title, question, buttons);
+      };
+
+      // Every position with a player this change hasn't moved, by name.
+      const choosePosition = (name, title, question) => {
+        render(
+          title,
+          `Where should ${name} go?`,
+          [
+            ...takenSpots().map(pos => [
+              `${pos} · ${draft[pos]}`,
+              'btn-outline-primary',
+              () => {
+                const occupant = draft[pos];
+                place(name, pos);
+                ask(
+                  occupant,
+                  `${name} is moving to ${pos}`,
+                  `${occupant} is at ${pos}. Where should ${occupant} go?`,
+                );
+              },
+            ]),
+            ['Back', 'btn-outline-secondary', () => ask(name, title, question)],
+            cancel,
+          ],
+        );
+      };
+
+      ask(
+        oldPitcher,
+        `${incoming.name} is going in to pitch`,
+        `Where should ${oldPitcher} go?`,
+      );
 
       instance.show();
     });

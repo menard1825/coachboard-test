@@ -189,7 +189,8 @@ def test_shortstop_pitches_and_coach_sends_pitcher_to_short(
     expect(question).to_contain_text('Shortstop Shawn is going in to pitch')
     expect(question).to_contain_text('Where should Pitcher Pat go?')
     assert choices(question) == [
-        'Put Pitcher Pat at SS', 'Bench Pitcher Pat · SS open', 'Cancel',
+        'Put Pitcher Pat at SS', 'Move Pitcher Pat to another position…',
+        'Bench Pitcher Pat · SS open', 'Cancel',
     ]
 
     # Nothing official happens while the coach decides.
@@ -255,9 +256,11 @@ def test_bench_player_pitches_and_coach_places_the_pitcher(
 
     question = choose_new_pitcher(page, RELIEVER)
     expect(question).to_contain_text(f'{RELIEVER} is going in to pitch')
-    # The open spot is offered by name; nothing is decided for the coach.
+    # The open spot is offered by name and is still one tap; nothing is
+    # decided for the coach.
     assert choices(question) == [
-        'Put Pitcher Pat at LF', 'Bench Pitcher Pat', 'Cancel',
+        'Put Pitcher Pat at LF', 'Move Pitcher Pat to another position…',
+        'Bench Pitcher Pat', 'Cancel',
     ]
 
     answer(question, 'Put Pitcher Pat at LF')
@@ -329,6 +332,200 @@ def test_field_changed_by_another_coach_cancels_the_open_question(
     edit_field(page, coachboard_url, game_id, other)
 
     # The stale question closes by itself; nothing is applied.
+    expect(question).not_to_be_visible(timeout=10_000)
+    expect(page.locator('#pitcher-change-toast-v6 .toast-body')).to_contain_text(STALE)
+    page.wait_for_timeout(500)
+    assert posts == []
+    state = live_state(page, coachboard_url, game_id)
+    assert filled(state['current_alignment']) == other
+    assert pitcher_changes(state) == []
+
+
+# ------------------------------------------------ occupied destinations
+
+
+def step(question, label):
+    """A choice that continues the conversation (the question stays open)."""
+    question.get_by_role('button', name=label, exact=True).click()
+
+
+def expect_question(question, title, text):
+    expect(question.locator('[data-pc-title]')).to_have_text(title)
+    expect(question.locator('[data-pc-question]')).to_have_text(text)
+
+
+def test_bench_pitcher_in_old_pitcher_to_occupied_first_displaced_to_bench(
+    page: Page, coachboard_url, live_field
+):
+    """Blake from the bench pitches; the coach puts Pat at 1B, then decides
+    Frank (who was at 1B) sits. Every other position is occupied."""
+    game_id = live_field()
+    posts = record_pitching_changes(page)
+
+    question = choose_new_pitcher(page, RELIEVER)
+    expect_question(question, f'{RELIEVER} is going in to pitch', 'Where should Pitcher Pat go?')
+    # Nothing is open: the coach can move Pat or bench him.
+    assert choices(question) == [
+        'Move Pitcher Pat to another position…', 'Bench Pitcher Pat', 'Cancel',
+    ]
+
+    step(question, 'Move Pitcher Pat to another position…')
+    # Every position, with who is there now.
+    assert choices(question) == [
+        'C · Catcher Cole', '1B · First Frank', '2B · Second Sam', '3B · Third Theo',
+        'SS · Shortstop Shawn', 'LF · Left Lee', 'CF · Center Casey', 'RF · Right Riley',
+        'Back', 'Cancel',
+    ]
+    step(question, '1B · First Frank')
+
+    # Frank is not benched or moved for the coach: CoachBoard asks.
+    expect_question(
+        question, 'Pitcher Pat is moving to 1B',
+        'First Frank is at 1B. Where should First Frank go?',
+    )
+    assert choices(question) == [
+        'Move First Frank to another position…', 'Bench First Frank', 'Cancel',
+    ]
+    step(question, 'Bench First Frank')
+
+    # The resulting field, before anything changes.
+    expect(question.locator('[data-pc-title]')).to_have_text('Check the pitching change')
+    expect(question.locator('[data-pc-summary] li')).to_have_text([
+        f'{RELIEVER} → P (from Bench)',
+        'Pitcher Pat: P → 1B',
+        'First Frank: 1B → Bench',
+    ])
+    page.wait_for_timeout(500)
+    assert posts == []
+    assert filled(live_state(page, coachboard_url, game_id)['current_alignment']) == BASE
+
+    answer(question, 'Make this change')
+    expected = dict(BASE, P=RELIEVER, **{'1B': 'Pitcher Pat'})
+    wait_for_field(page, coachboard_url, game_id, expected)
+    assert len(posts) == 1
+    events = pitcher_changes(live_state(page, coachboard_url, game_id))
+    assert len(events) == 1
+    assert filled(events[0]['before_alignment']) == BASE
+    assert filled(events[0]['after_alignment']) == expected
+    expect(page.locator('#pitcher-change-toast-v6 .toast-body')).to_contain_text(
+        f'{RELIEVER} is pitching · Pitcher Pat to 1B · First Frank to Bench'
+    )
+
+    # One Undo restores the whole change.
+    page.locator('#liveUndoBtn').click()
+    wait_for_field(page, coachboard_url, game_id, BASE)
+    assert pitcher_changes(live_state(page, coachboard_url, game_id)) == []
+
+
+def test_fielder_pitches_and_displaced_player_takes_the_vacated_spot(
+    page: Page, coachboard_url, live_field
+):
+    """Shawn (SS) pitches; Pat to 1B; the coach sends Frank to short."""
+    game_id = live_field()
+    question = choose_new_pitcher(page, 'Shortstop Shawn')
+    step(question, 'Move Pitcher Pat to another position…')
+    step(question, '1B · First Frank')
+
+    expect_question(
+        question, 'Pitcher Pat is moving to 1B',
+        'First Frank is at 1B. Where should First Frank go?',
+    )
+    # The open short is offered, as is the bench -- neither is chosen.
+    assert choices(question) == [
+        'Put First Frank at SS', 'Move First Frank to another position…',
+        'Bench First Frank · SS open', 'Cancel',
+    ]
+    step(question, 'Put First Frank at SS')
+    expect(question.locator('[data-pc-summary] li')).to_have_text([
+        'Shortstop Shawn → P (from SS)',
+        'Pitcher Pat: P → 1B',
+        'First Frank: 1B → SS',
+    ])
+    answer(question, 'Make this change')
+    wait_for_field(
+        page, coachboard_url, game_id,
+        dict(BASE, P='Shortstop Shawn', **{'1B': 'Pitcher Pat', 'SS': 'First Frank'}),
+    )
+    assert len(pitcher_changes(live_state(page, coachboard_url, game_id))) == 1
+
+
+def test_three_player_rotation(page: Page, coachboard_url, live_field):
+    """Blake pitches; Pat → 1B; Frank → LF; Lee → bench."""
+    game_id = live_field()
+    posts = record_pitching_changes(page)
+    question = choose_new_pitcher(page, RELIEVER)
+    step(question, 'Move Pitcher Pat to another position…')
+    step(question, '1B · First Frank')
+    step(question, 'Move First Frank to another position…')
+    # Pat, already placed at 1B by this change, is never offered again.
+    offered = choices(question)
+    assert '1B · Pitcher Pat' not in offered
+    assert offered[:2] == ['C · Catcher Cole', '2B · Second Sam']
+    step(question, 'LF · Left Lee')
+
+    expect_question(
+        question, 'First Frank is moving to LF',
+        'Left Lee is at LF. Where should Left Lee go?',
+    )
+    step(question, 'Bench Left Lee')
+    expect(question.locator('[data-pc-summary] li')).to_have_text([
+        f'{RELIEVER} → P (from Bench)',
+        'Pitcher Pat: P → 1B',
+        'First Frank: 1B → LF',
+        'Left Lee: LF → Bench',
+    ])
+    assert posts == []
+    answer(question, 'Make this change')
+
+    expected = dict(BASE, P=RELIEVER, **{'1B': 'Pitcher Pat', 'LF': 'First Frank'})
+    wait_for_field(page, coachboard_url, game_id, expected)
+    after = filled(live_state(page, coachboard_url, game_id)['current_alignment'])
+    # No player twice, no position twice.
+    assert len(set(after.values())) == len(after)
+    assert len(posts) == 1
+    assert len(pitcher_changes(live_state(page, coachboard_url, game_id))) == 1
+
+
+def test_cancel_halfway_through_a_chain_changes_nothing(
+    page: Page, coachboard_url, live_field
+):
+    game_id = live_field()
+    posts = record_pitching_changes(page)
+    question = choose_new_pitcher(page, RELIEVER)
+    step(question, 'Move Pitcher Pat to another position…')
+    step(question, '1B · First Frank')
+    expect(question.locator('[data-pc-question]')).to_contain_text('Where should First Frank go?')
+    answer(question, 'Cancel')
+
+    page.wait_for_timeout(800)
+    assert posts == []
+    state = live_state(page, coachboard_url, game_id)
+    assert filled(state['current_alignment']) == BASE
+    assert pitcher_changes(state) == []
+
+    # Canceling at the final check changes nothing either.
+    question = choose_new_pitcher(page, RELIEVER)
+    step(question, 'Move Pitcher Pat to another position…')
+    step(question, '1B · First Frank')
+    step(question, 'Bench First Frank')
+    answer(question, 'Cancel')
+    page.wait_for_timeout(800)
+    assert posts == []
+    assert filled(live_state(page, coachboard_url, game_id)['current_alignment']) == BASE
+
+
+def test_another_coach_changing_the_field_mid_chain_discards_it(
+    page: Page, coachboard_url, live_field
+):
+    game_id = live_field()
+    posts = record_pitching_changes(page)
+    question = choose_new_pitcher(page, RELIEVER)
+    step(question, 'Move Pitcher Pat to another position…')
+    step(question, '1B · First Frank')
+
+    other = dict(BASE, LF='Right Riley', RF='Left Lee')
+    edit_field(page, coachboard_url, game_id, other)
+
     expect(question).not_to_be_visible(timeout=10_000)
     expect(page.locator('#pitcher-change-toast-v6 .toast-body')).to_contain_text(STALE)
     page.wait_for_timeout(500)
