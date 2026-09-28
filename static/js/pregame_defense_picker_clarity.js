@@ -63,6 +63,8 @@
     try {
       const clearChoice = choices.find(button => button.dataset.clear);
       const hasOccupant = Boolean(clearChoice);
+      // Moves involving P ask the coach; they are never presented as swaps.
+      const pitcherPicker = list.dataset.pdePosition === 'P';
       const playerChoices = choices.filter(button => button.dataset.player);
       const benchChoices = [];
       const fieldChoices = [];
@@ -75,7 +77,7 @@
         } else if (/^Currently at /i.test(detail)) {
           // The player already occupying the target spot does not need to appear
           // as a selectable choice: closing the modal simply keeps him there.
-          if (/will become open|swaps with/i.test(detail)) {
+          if (/will become open|swaps with|you'll choose/i.test(detail)) {
             button.classList.add('pde-field-choice');
             fieldChoices.push(button);
           }
@@ -101,9 +103,11 @@
       if (fieldChoices.length) {
         list.appendChild(
           sectionLabel(
-            hasOccupant
-              ? 'Already On Field — Tap to Swap'
-              : 'Already On Field — Move to This Spot'
+            pitcherPicker
+              ? 'Already On Field'
+              : hasOccupant
+                ? 'Already On Field — Tap to Swap'
+                : 'Already On Field — Move to This Spot'
           )
         );
 
@@ -114,9 +118,13 @@
 
       const help = document.getElementById('pde-help');
       if (help) {
-        help.textContent = hasOccupant
-          ? 'Choose a bench player to replace the current fielder, or tap an on-field player below to swap positions.'
-          : 'Choose a bench player, or move an on-field player into this open position.';
+        help.textContent = pitcherPicker
+          ? (hasOccupant
+              ? "Choose who pitches. You'll decide where the current pitcher goes."
+              : 'Choose who pitches.')
+          : hasOccupant
+            ? 'Choose a bench player to replace the current fielder, or tap an on-field player below to swap positions.'
+            : 'Choose a bench player, or move an on-field player into this open position.';
       }
     } finally {
       // Leave this marker in place until the base picker replaces innerHTML on

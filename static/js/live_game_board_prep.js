@@ -622,12 +622,15 @@
 
   function choosePlayer(pos) {
     const modal = playerModal();
-    const source = alignment();
+    const source = alignment() || {};
     const occupant = source[pos] || '';
+    const pitcher = source.P || '';
     modal.querySelector('.modal-title').textContent = `${pos} — Choose Player`;
-    $('pde-help').textContent = occupant
-      ? `Current: ${occupant}. Replacing him moves him to the bench.`
-      : 'Choose a player for this position.';
+    $('pde-help').textContent = pos === 'P'
+      ? (pitcher ? `Current pitcher: ${pitcher}.` : 'Choose the pitcher.')
+      : occupant
+        ? `Current: ${occupant}. Choosing a bench player moves ${occupant} to the bench.`
+        : 'Choose a player for this position.';
 
     const choices = presentPlayers()
       .map((player) => ({player, position: playerPosition(player.name, source)}))
@@ -639,24 +642,51 @@
         return a.player.name.localeCompare(b.player.name);
       });
 
+    const detail = (position) => {
+      if (position === pos) return `Currently at ${esc(pos)}`;
+      if (!position) return 'On bench this inning';
+      // Moves involving P ask the coach; they are never a one-tap swap.
+      if (pos === 'P' && pitcher) return `Currently at ${esc(position)} — you'll choose where ${esc(pitcher)} goes`;
+      if (position === 'P') return "Currently at P — you'll choose who pitches";
+      return occupant
+        ? `Currently at ${esc(position)} — swaps with ${esc(occupant)}`
+        : `Currently at ${esc(position)} — ${esc(position)} will become open`;
+    };
+
     const list = $('pde-list');
+    list.dataset.pdePosition = pos;
     list.innerHTML = `
-      ${occupant ? `<button class="list-group-item list-group-item-action pde-choice text-danger" data-clear="1"><strong>Move ${esc(occupant)} to Bench</strong><small>Leave ${esc(pos)} open.</small></button>` : ''}
+      ${occupant ? (pos === 'P'
+        ? `<button class="list-group-item list-group-item-action pde-choice text-danger" data-clear="1"><strong>Take ${esc(occupant)} off P</strong><small>Choose who pitches instead.</small></button>`
+        : `<button class="list-group-item list-group-item-action pde-choice text-danger" data-clear="1"><strong>Move ${esc(occupant)} to Bench</strong><small>Leave ${esc(pos)} open.</small></button>`) : ''}
       ${choices.map(({player, position}) => `
         <button class="list-group-item list-group-item-action pde-choice" data-player="${esc(player.name)}">
           <strong>${esc(player.name)}</strong>
-          <small>${position === pos
-            ? `Currently at ${esc(pos)}`
-            : position
-              ? (occupant && occupant !== player.name
-                  ? `Currently at ${esc(position)} — swaps with ${esc(occupant)}`
-                  : `Currently at ${esc(position)} — ${esc(position)} will become open`)
-              : 'On bench this inning'}</small>
+          <small>${detail(position)}</small>
         </button>`).join('')}`;
 
     list.onclick = (event) => {
       const choice = event.target.closest('.pde-choice');
       if (!choice) return;
+      const playerName = choice.dataset.player;
+      // A snapshot of the inning as the coach saw it when the move began.
+      const start = {...(alignment() || {})};
+
+      if (pos === 'P' && choice.dataset.clear) {
+        list.onclick = null;
+        void takeOffP(modal, start);
+        return;
+      }
+      if (pos === 'P' && pitcher && playerName && playerName !== pitcher) {
+        list.onclick = null;
+        void chooseNewPitcher(modal, start, playerName);
+        return;
+      }
+      if (pos !== 'P' && pitcher && playerName === pitcher) {
+        list.onclick = null;
+        void moveCurrentPitcher(modal, start, pos);
+        return;
+      }
 
       const next = {...alignment()};
       let message = '';
@@ -665,7 +695,6 @@
         delete next[pos];
         message = `${old} moved to the bench. ${pos} is open.`;
       } else {
-        const playerName = choice.dataset.player;
         const sourcePos = playerPosition(playerName, next);
         const displaced = next[pos];
 
@@ -706,6 +735,261 @@
     };
 
     bootstrap.Modal.getOrCreateInstance(modal).show();
+  }
+
+  // ---- Moves involving P are the coach's decision ------------------------
+  //
+  // Non-P planning swaps stay one tap (the picker says so). A move that
+  // changes who pitches, or where the pitcher goes, asks instead: CoachBoard
+  // never sends the old pitcher to a vacated spot or makes a fielder the
+  // pitcher on its own. Each answer only changes a local draft of this
+  // inning. Nothing is saved until the move is fully resolved, then the
+  // resolved inning is saved once; closing the sheet at any step (Cancel,
+  // the X, Escape) changes nothing.
+
+  const TBD = {tbd: true};
+
+  function pitcherRole() {
+    return String(inning) === '1' ? 'starting pitcher' : `pitcher for ${inningsPhrase([inning])}`;
+  }
+
+  function openFieldPositions(draft) {
+    return positions().filter((position) => position !== 'P' && !draft[position]);
+  }
+
+  function modalStillOpen(modal) {
+    return modal.classList.contains('show');
+  }
+
+  // One question in the open picker sheet. Resolves with the chosen value,
+  // or null when the coach cancels or closes the sheet.
+  function ask(modal, {title, help, options}) {
+    return new Promise((resolve) => {
+      if (!modalStillOpen(modal)) {
+        resolve(null);
+        return;
+      }
+      const list = $('pde-list');
+      modal.querySelector('.modal-title').textContent = title;
+      $('pde-help').textContent = help || '';
+      list.innerHTML = options.map((option, index) => `
+        <button type="button" class="list-group-item list-group-item-action pde-question-choice${option.danger ? ' text-danger' : ''}" data-answer="${index}">
+          <strong>${esc(option.label)}</strong>${option.detail ? `<small class="d-block">${esc(option.detail)}</small>` : ''}
+        </button>`).join('') + `
+        <button type="button" class="list-group-item list-group-item-action pde-question-choice" data-answer="cancel">
+          <strong>Cancel</strong><small class="d-block">Keep the plan as it was.</small>
+        </button>`;
+      const onHidden = () => resolve(null);
+      modal.addEventListener('hidden.bs.modal', onHidden, {once: true});
+      list.onclick = (event) => {
+        const button = event.target.closest('[data-answer]');
+        if (!button) return;
+        list.onclick = null;
+        modal.removeEventListener('hidden.bs.modal', onHidden);
+        if (button.dataset.answer === 'cancel') {
+          closePlayerModal(modal);
+          resolve(null);
+          return;
+        }
+        resolve(options[Number(button.dataset.answer)].value);
+      };
+    });
+  }
+
+  async function pitchingSummary(modal) {
+    $('pde-help').textContent = 'Checking pitchers…';
+    try {
+      const response = await fetch(`/api/live-game/${gameId}/state`, {cache: 'no-store'});
+      if (!response.ok) return {};
+      const data = await response.json();
+      return data?.pitch_count_summary || {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  // The server's own classification (pitching_eligibility.py), shown as the
+  // same four words the live game uses. Nothing is decided from it here.
+  const ELIGIBILITY_WORD = {
+    ready: 'Ready',
+    advisory: 'Advisory',
+    rule_conflict: 'Rule conflict',
+    unknown: "Can't confirm",
+  };
+
+  function eligibilityText(summary) {
+    const word = ELIGIBILITY_WORD[summary?.eligibility];
+    if (!word) return '';
+    if (summary.eligibility === 'ready') return word;
+    const reason = String(summary.eligibility_message || summary.status_detail || summary.status || '').trim();
+    return reason ? `${word} · ${reason}` : word;
+  }
+
+  // Who pitches instead of `leaving`? Resolves with a player name, TBD (later
+  // innings only), or null (cancelled).
+  async function askWhoPitches(modal, draft, leaving, title) {
+    const summary = await pitchingSummary(modal);
+    const rank = {ready: 0, advisory: 1, unknown: 2, rule_conflict: 3};
+    const candidates = presentPlayers()
+      .map((player) => player.name)
+      .filter((name) => name !== leaving)
+      .sort((a, b) => (
+        (rank[summary[a]?.eligibility] ?? 2) - (rank[summary[b]?.eligibility] ?? 2) || a.localeCompare(b)
+      ));
+    const options = candidates.map((name) => {
+      const at = playerPosition(name, draft);
+      const where = at ? `Currently at ${at} — ${at} will become open` : 'On bench';
+      return {
+        label: `${name} pitches`,
+        detail: [eligibilityText(summary[name]), where].filter(Boolean).join(' · '),
+        value: name,
+      };
+    });
+    if (String(inning) !== '1') {
+      options.push({label: 'Decide later — Pitcher TBD', detail: `No pitcher planned yet for ${inningsPhrase([inning])}.`, value: TBD});
+    }
+    return ask(modal, {title, help: 'Who pitches instead?', options});
+  }
+
+  // Where does `player` go now? Offered: the spot this move opened (first),
+  // any other open position, another position -- whose player is then asked
+  // about in turn -- or the bench. `locked` holds positions already decided
+  // in this move, so a chain can't loop. Resolves true, or null (cancelled).
+  async function placePlayer(modal, draft, player, {title, vacated, locked, moves}) {
+    const open = openFieldPositions(draft)
+      .sort((a, b) => (a === vacated ? -1 : b === vacated ? 1 : 0));
+    const taken = positions().filter((position) => (
+      position !== 'P' && draft[position] && !locked.has(position)
+    ));
+    const options = open.map((position) => ({
+      label: `Put ${player} at ${position}`,
+      detail: position === vacated ? 'The spot this move opened.' : 'Open position.',
+      value: {to: position},
+    }));
+    if (taken.length) {
+      options.push({label: `Move ${player} to another position…`, detail: "You'll decide where that player goes.", value: {another: true}});
+    }
+    const stillOpen = open.length ? ` · leave ${open.join(', ')} open` : '';
+    options.push({label: `Bench ${player}${stillOpen}`, value: {bench: true}, danger: true});
+
+    const answer = await ask(modal, {title, help: `Where should ${player} go?`, options});
+    if (!answer) return null;
+    if (answer.bench) {
+      moves.push(`${player} → Bench`);
+      return true;
+    }
+    if (answer.to) {
+      draft[answer.to] = player;
+      locked.add(answer.to);
+      moves.push(`${player} → ${answer.to}`);
+      return true;
+    }
+
+    const target = await ask(modal, {
+      title: `Move ${player} to…`,
+      help: 'That player will need a new spot.',
+      options: taken.map((position) => ({
+        label: `${position} — ${draft[position]}`,
+        detail: `${draft[position]} will need a new spot.`,
+        value: position,
+      })),
+    });
+    if (!target) return null;
+    const displaced = draft[target];
+    draft[target] = player;
+    locked.add(target);
+    moves.push(`${player} → ${target}`);
+    moves.chained = true;
+    return placePlayer(modal, draft, displaced, {title: `${player} plays ${target}`, vacated, locked, moves});
+  }
+
+  // Save the resolved inning once, unless the plan changed underneath the
+  // coach while they were answering.
+  async function finishPitchingMove(modal, start, draft, moves) {
+    // One light review when the coach moved players along a chain; a direct
+    // answer to one or two questions saves as answered.
+    if (moves.chained) {
+      const ok = await ask(modal, {
+        title: 'Review this change',
+        help: moves.join(' · '),
+        options: [{label: 'Save plan', value: true}],
+      });
+      if (!ok) return;
+    }
+    if (JSON.stringify(alignment() || {}) !== JSON.stringify(start)) {
+      closePlayerModal(modal);
+      toast('The plan changed while you were deciding. Nothing was changed; try again.', 'warning');
+      return;
+    }
+    const nowOpen = openFieldPositions(draft).filter((position) => start[position]);
+    state.rotation.innings[inning] = draft;
+    closePlayerModal(modal);
+    render();
+    toast(`${moves.join(' · ')}.${nowOpen.length ? ` ${nowOpen.join(', ')} ${nowOpen.length === 1 ? 'is' : 'are'} open.` : ''}`);
+    saveRotation();
+  }
+
+  // P: the coach chose `newPitcher` while `start.P` is pitching.
+  async function chooseNewPitcher(modal, start, newPitcher) {
+    const draft = {...start};
+    const oldPitcher = draft.P;
+    const vacated = playerPosition(newPitcher, draft);
+    if (vacated) delete draft[vacated];
+    draft.P = newPitcher;
+    const moves = [`${newPitcher} → P`];
+    const placed = await placePlayer(modal, draft, oldPitcher, {
+      title: `${newPitcher} is your ${pitcherRole()}`,
+      vacated,
+      locked: new Set(['P']),
+      moves,
+    });
+    if (placed) await finishPitchingMove(modal, start, draft, moves);
+  }
+
+  // A fielding position: the coach chose the current pitcher to play `pos`.
+  async function moveCurrentPitcher(modal, start, pos) {
+    const draft = {...start};
+    const oldPitcher = draft.P;
+    const displaced = draft[pos] || '';
+    delete draft.P;
+    draft[pos] = oldPitcher;
+    const moves = [`${oldPitcher} → ${pos}`];
+    const newPitcher = await askWhoPitches(modal, draft, oldPitcher, `${oldPitcher} moves to ${pos}`);
+    if (!newPitcher) return;
+    let vacated = '';
+    if (newPitcher !== TBD) {
+      vacated = playerPosition(newPitcher, draft) || '';
+      if (vacated) delete draft[vacated];
+      draft.P = newPitcher;
+      moves.push(`${newPitcher} → P`);
+    }
+    if (displaced && displaced !== newPitcher) {
+      const placed = await placePlayer(modal, draft, displaced, {
+        title: `${oldPitcher} plays ${pos}`,
+        vacated,
+        locked: new Set(['P', pos]),
+        moves,
+      });
+      if (!placed) return;
+    }
+    await finishPitchingMove(modal, start, draft, moves);
+  }
+
+  // P: "Take Tom off P" -- Tom goes to the bench and the coach picks who pitches.
+  async function takeOffP(modal, start) {
+    const draft = {...start};
+    const oldPitcher = draft.P;
+    delete draft.P;
+    const moves = [`${oldPitcher} → Bench`];
+    const newPitcher = await askWhoPitches(modal, draft, oldPitcher, `Take ${oldPitcher} off P`);
+    if (!newPitcher) return;
+    if (newPitcher !== TBD) {
+      const vacated = playerPosition(newPitcher, draft);
+      if (vacated) delete draft[vacated];
+      draft.P = newPitcher;
+      moves.push(`${newPitcher} → P`);
+    }
+    await finishPitchingMove(modal, start, draft, moves);
   }
 
   function applySaveStatusToDom() {

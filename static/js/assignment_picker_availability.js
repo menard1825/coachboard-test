@@ -72,7 +72,8 @@
     const list = document.getElementById('pde-list');
     if (!list) return;
 
-    // Pregame defense intentionally supports one-tap field-to-field swaps.
+    // Pregame defense intentionally supports one-tap field-to-field swaps
+    // between fielders; any move involving P asks the coach instead.
     // live_game_board_prep.js owns the swap behavior and
     // pregame_defense_picker_clarity.js owns this picker's presentation.
     // Do not remove players already on the field and do not overwrite the

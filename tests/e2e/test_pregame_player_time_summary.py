@@ -166,13 +166,16 @@ def select_inning(page: Page, inning: str):
     expect(page.locator('input[name="inning-radio"]:checked')).to_have_value(inning)
 
 
-def choose_for_spot(page: Page, position: str, button_name):
+def choose_for_spot(page: Page, position: str, button_name, then=None):
     page.locator(
         f'#pregame-defense-editor-v3 .pde-spot[data-pde-pos="{position}"]'
     ).click()
     modal = page.locator('#pde-player-modal')
     expect(modal).to_be_visible()
     modal.get_by_role('button', name=button_name).first.click()
+    if then:
+        # A move involving P asks the coach one more question.
+        modal.locator('.pde-question-choice').filter(has_text=then).first.click()
     expect(modal).to_be_hidden()
 
 
@@ -287,7 +290,7 @@ def test_summary_updates_as_the_plan_changes(
 
     # A new planned pitcher for inning 2.
     select_inning(page, '2')
-    choose_for_spot(page, 'P', re.compile('Right Riley'))
+    choose_for_spot(page, 'P', re.compile('Right Riley'), then='Bench Pitcher Pat')
     expect(page.locator(f'{SUMMARY} [data-pitching-plan]')).to_have_text(
         'Pitching: Pitcher Pat: 1 · Right Riley: 2'
     )
