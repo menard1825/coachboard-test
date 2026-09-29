@@ -1,8 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, session, jsonify
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from werkzeug.security import generate_password_hash
-from werkzeug.utils import secure_filename
 import uuid
 import os
 import random
@@ -16,7 +15,7 @@ from flask import g
 from types import SimpleNamespace
 from team_access import membership_for, team_members, error
 from extensions import socketio, disconnect_team_member
-from utils import PITCHING_RULES, allowed_file
+from utils import PITCHING_RULES
 
 # Define role constants
 SUPER_ADMIN = 'Super Admin'
@@ -237,6 +236,11 @@ def upload_logo():
         flash('Your team could not be found.', 'danger')
         return redirect(url_for('.admin_settings'))
     
+    max_bytes = 5 * 1024 * 1024
+    if request.content_length is not None and request.content_length > max_bytes + 64 * 1024:
+        flash('That logo is too large. The maximum size is 5 MB.', 'danger')
+        return redirect(url_for('.admin_settings'))
+
     if 'logo' not in request.files:
         flash('No file part in the request.', 'danger')
         return redirect(url_for('.admin_settings'))
@@ -246,29 +250,55 @@ def upload_logo():
         flash('No selected file.', 'danger')
         return redirect(url_for('.admin_settings'))
 
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        unique_id = uuid.uuid4().hex
-        file_ext = filename.rsplit('.', 1)[1].lower()
-        new_filename = f"{team.id}_{unique_id}.{file_ext}"
+    extension = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    signatures = {
+        'png': (b'\x89PNG\r\n\x1a\n',),
+        'jpg': (b'\xff\xd8\xff',), 'jpeg': (b'\xff\xd8\xff',),
+        'gif': (b'GIF87a', b'GIF89a')
+    }
+    if extension not in signatures:
+        flash('Invalid file type. Use a PNG, JPG, or GIF image.', 'danger')
+        return redirect(url_for('.admin_settings'))
+    image = file.stream.read(max_bytes + 1)
+    if len(image) > max_bytes:
+        flash('That logo is too large. The maximum size is 5 MB.', 'danger')
+        return redirect(url_for('.admin_settings'))
+    if not any(image.startswith(signature) for signature in signatures[extension]):
+        flash('That file does not match its image type.', 'danger')
+        return redirect(url_for('.admin_settings'))
 
-        upload_folder = os.path.join('static', 'uploads', 'logos')
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    new_filename = f"{team.id}_{uuid.uuid4().hex}.{extension}"
+    new_path = os.path.join(upload_folder, new_filename)
+    previous_logo = team.logo_path
+    try:
         os.makedirs(upload_folder, exist_ok=True)
-        
-        if team.logo_path:
-            old_logo_path = os.path.join(upload_folder, team.logo_path)
-            if os.path.exists(old_logo_path):
-                os.remove(old_logo_path)
-        
-        file_path = os.path.join(upload_folder, new_filename)
-        file.save(file_path)
+        with open(new_path, 'wb') as output:
+            output.write(image)
         team.logo_path = new_filename
         db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Could not save team logo')
+        try:
+            os.remove(new_path)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            current_app.logger.exception('Could not remove incomplete team logo')
+        flash('Could not save the new logo. The previous logo is unchanged.', 'danger')
+        return redirect(url_for('.admin_settings'))
 
-        flash('Team logo uploaded successfully!', 'success')
-        socketio.emit('data_updated', {'message': 'Team logo updated.'})
-    else:
-        flash('Invalid file type. Allowed types are: png, jpg, jpeg, gif, svg.', 'danger')
+    if previous_logo and previous_logo != new_filename and not db.session.query(Team).filter_by(logo_path=previous_logo).first():
+        try:
+            os.remove(os.path.join(upload_folder, previous_logo))
+        except FileNotFoundError:
+            pass
+        except OSError:
+            current_app.logger.exception('Could not remove unused previous team logo')
+
+    flash('Team logo uploaded successfully!', 'success')
+    socketio.emit('data_updated', {'message': 'Team logo updated.'})
 
     return redirect(url_for('.admin_settings'))
 

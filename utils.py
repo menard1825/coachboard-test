@@ -57,7 +57,7 @@ PITCHING_RULES = {
 
 def allowed_file(filename):
     """Checks if the filename has an allowed extension."""
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 

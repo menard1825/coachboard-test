@@ -1,13 +1,22 @@
 """Run with: python -m pytest tests/test_production_rollover_browser.py"""
 import threading
 import os
+from datetime import datetime
 from pathlib import Path
 import pytest
 from werkzeug.serving import make_server
 from playwright.sync_api import sync_playwright, expect
 from test_production_rollover import env
 from db import db
-from models import Player, Rotation
+from models import Player, PracticePlan, Rotation
+from extensions import socketio
+
+
+def chromium(playwright):
+    return playwright.chromium.launch(
+        args=['--no-sandbox'],
+        executable_path=os.environ.get('COACHBOARD_TEST_CHROMIUM') or None,
+    )
 
 
 @pytest.fixture
@@ -39,11 +48,53 @@ def local_cdn(context):
         context.route(prefix+'**', serve)
 
 
+def test_home_partial_failure_and_unsaved_forms_survive_live_refresh(live, env):
+    url, ids = live
+    with env[0].app_context():
+        plan = PracticePlan(team_id=ids['old'], date=datetime(2026, 10, 1), general_notes='Practice')
+        db.session.add(plan); db.session.commit()
+        plan_id = plan.id
+    with sync_playwright() as p:
+        browser = chromium(p)
+        context = browser.new_context(viewport={'width': 1440, 'height': 1000})
+        local_cdn(context)
+        page = context.new_page()
+        errors = []
+        page.on('pageerror', lambda e: errors.append(str(e)))
+        page.goto(url + '/login')
+        page.locator('[name=username]').fill('head')
+        page.locator('[name=password]').fill('password')
+        page.locator('button[type=submit]').click()
+        # An optional API error must leave the roster and practice forms usable.
+        page.route('**/api/scouting_list', lambda route: route.fulfill(status=503, body='Unavailable'))
+        page.goto(url + '/#roster')
+        expect(page.locator('#home-load-warning')).to_contain_text('scouting list')
+        card = page.locator(f'#collapse-roster-{ids["player"]}')
+        page.locator(f'[href="#collapse-roster-{ids["player"]}"]').click()
+        expect(card).to_have_class('collapse show')
+        card.locator('[name=notes]').fill('Unsaved roster note')
+        page.locator('a[data-bs-toggle="tab"][href="#practice_plan"]:visible').first.click()
+        plan = page.locator(f'#plan-{plan_id}')
+        page.locator(f'[data-bs-target="#plan-{plan_id}"]').click()
+        expect(plan).to_have_class('accordion-collapse collapse show')
+        plan.locator('[name=emphasis]').fill('Unsaved practice emphasis')
+        plan.locator(f'[name=absent_players][value="{ids["player"]}"]').check()
+        with page.expect_response('**/api/session_data'):
+            socketio.emit('data_updated', {'message': 'Another coach changed data'}, to=f'team:{ids["old"]}')
+        expect(card).to_have_class('collapse show')
+        expect(card.locator('[name=notes]')).to_have_value('Unsaved roster note')
+        expect(plan).to_have_class('accordion-collapse collapse show')
+        expect(plan.locator('[name=emphasis]')).to_have_value('Unsaved practice emphasis')
+        expect(plan.locator(f'[name=absent_players][value="{ids["player"]}"]')).to_be_checked()
+        assert not errors, errors
+        browser.close()
+
+
 @pytest.mark.parametrize('viewport',[{'width':1440,'height':1000},{'width':390,'height':844}])
 def test_rollover_in_browser(live,viewport,tmp_path):
     url,ids=live
     with sync_playwright() as p:
-        browser=p.chromium.launch(args=['--no-sandbox'])
+        browser=chromium(p)
         context=browser.new_context(viewport=viewport,ignore_https_errors=True)
         local_cdn(context)
         page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
@@ -74,7 +125,7 @@ def test_rollover_in_browser(live,viewport,tmp_path):
 def test_archive_and_stale_tab_in_browser(live):
     url,ids=live
     with sync_playwright() as p:
-        browser=p.chromium.launch(args=['--no-sandbox']);context=browser.new_context(ignore_https_errors=True)
+        browser=chromium(p);context=browser.new_context(ignore_https_errors=True)
         local_cdn(context)
         page=context.new_page();page.goto(url+'/login')
         page.locator('[name=username]').fill('head');page.locator('[name=password]').fill('password');page.locator('button[type=submit]').click()
@@ -103,7 +154,7 @@ def test_archive_and_stale_tab_in_browser(live):
 def test_create_defense_template_without_a_game(live,env,viewport):
     url,ids=live
     with sync_playwright() as p:
-        browser=p.chromium.launch(args=['--no-sandbox'])
+        browser=chromium(p)
         context=browser.new_context(viewport=viewport)
         local_cdn(context)
         page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
@@ -136,7 +187,7 @@ def test_dragging_over_occupied_position_keeps_player_until_drop(live,env):
         db.session.add(Player(team_id=ids['old'],name='Bench Player'))
         db.session.commit()
     with sync_playwright() as p:
-        browser=p.chromium.launch(args=['--no-sandbox'])
+        browser=chromium(p)
         context=browser.new_context(viewport={'width':1440,'height':1000})
         local_cdn(context)
         page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
@@ -185,7 +236,7 @@ def test_touch_drag_cannot_synthesize_a_remove_tap(live,env):
         db.session.add(Player(team_id=ids['old'],name='Bench Player'))
         db.session.commit()
     with sync_playwright() as p:
-        browser=p.chromium.launch(args=['--no-sandbox'])
+        browser=chromium(p)
         context=browser.new_context(viewport={'width':1376,'height':1032},has_touch=True)
         local_cdn(context)
         page=context.new_page();page.goto(url+'/login')
