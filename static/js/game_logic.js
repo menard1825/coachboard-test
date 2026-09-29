@@ -37,9 +37,9 @@ function initializeGameManagement(gameData) {
     let lineupEditorModal;
     let saveTemplateModal;
 
-    // iPads and other touch-first devices are more reliable with tap-to-assign
-    // than SortableJS drag/drop. This also prevents Safari's synthetic click
-    // after a touch drag from accidentally undoing the move.
+    // Touch-capable layouts support tap-to-assign as well as field dragging.
+    // The gesture guard below prevents a synthetic click after a drag from
+    // removing the player that was just placed.
     const useTapDefenseEditor =
         ((window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
          (navigator.maxTouchPoints || 0) > 0);
@@ -333,15 +333,16 @@ function initializeGameManagement(gameData) {
         });
         state.sortableInstances = {};
 
-        // Touch devices use the existing tap-to-assign workflow instead.
-        if (useTapDefenseEditor) {
+        // The narrow layout has its own tap-based board and bench display.
+        if (window.matchMedia('(max-width: 991.98px)').matches) {
             return;
         }
 
         const onEndHandler = (evt) => {
             const inningData = state.rotation.innings[state.currentInning] || {};
             const from = evt.from.dataset.position;
-            const pointer = evt.originalEvent;
+            const pointer = evt.originalEvent?.changedTouches?.[0] ||
+                            evt.originalEvent?.touches?.[0] || evt.originalEvent;
             const zones = [...document.querySelectorAll('#bench-list-desktop, #diamond-parent-desktop .position-dropzone')];
             const releasedOver = pointer && Number.isFinite(pointer.clientX) && Number.isFinite(pointer.clientY)
                 ? zones.find(zone => {
@@ -374,6 +375,10 @@ function initializeGameManagement(gameData) {
                 group: 'rotation',
                 draggable: '.player-tag',
                 animation: 150,
+                forceFallback: useTapDefenseEditor,
+                fallbackOnBody: true,
+                fallbackTolerance: 4,
+                touchStartThreshold: 4,
                 onEnd: onEndHandler
             });
         });

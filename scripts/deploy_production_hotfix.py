@@ -17,7 +17,7 @@ from deploy_rollover_production import (
     check_database, wait_for_app,
 )
 
-CURRENT = 'b928a0382501f89e318a8dbbec55006a4d0bd20b'
+CURRENT = '726ef5b4f31c989d64b89d9398019bb3b81c109a'
 REVISION = '20260929_team_rollover'
 
 

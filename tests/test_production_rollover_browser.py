@@ -197,11 +197,28 @@ def test_touch_drag_cannot_synthesize_a_remove_tap(live,env):
         expect(old).to_have_count(1)
         bench=page.locator('#bench-list-desktop .player-tag[data-player-name="Bench Player"]')
         start=bench.bounding_box();occupied=page.locator('#pos-desktop-P').bounding_box()
-        page.mouse.move(start['x']+start['width']/2,start['y']+start['height']/2)
-        page.mouse.down()
-        page.mouse.move(occupied['x']+occupied['width']/2,occupied['y']+occupied['height']/2,steps=12)
-        page.mouse.up()
+        empty=page.locator('#pos-desktop-CF').bounding_box()
+        # Use real touch input; mouse events in a touch-enabled context do not
+        # exercise Sortable's touch fallback or iPad's pointer/click sequence.
+        cdp=context.new_cdp_session(page)
+        def touch(kind,x,y):
+            cdp.send('Input.dispatchTouchEvent',{
+                'type':kind,
+                'touchPoints':[] if kind=='touchEnd' else [{'x':x,'y':y,'id':1}],
+            })
+        def move_touch(a,b):
+            for step in range(1,13):
+                touch('touchMove',round(a[0]+(b[0]-a[0])*step/12),round(a[1]+(b[1]-a[1])*step/12))
+        start_center=(start['x']+start['width']/2,start['y']+start['height']/2)
+        p_center=(occupied['x']+occupied['width']/2,occupied['y']+occupied['height']/2)
+        cf_center=(empty['x']+empty['width']/2,empty['y']+empty['height']/2)
+        touch('touchStart',*start_center)
+        move_touch(start_center,p_center)
         expect(old).to_have_count(1)
+        move_touch(p_center,cf_center)
+        touch('touchEnd',*cf_center)
+        expect(old).to_have_count(1)
+        expect(page.locator('#pos-desktop-CF .player-tag[data-player-name="Bench Player"]')).to_have_count(1)
         # A touch browser may deliver its synthetic click after pointerup.
         page.locator('#pos-desktop-P').dispatch_event('click')
         expect(old).to_have_count(1)
