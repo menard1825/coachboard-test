@@ -1,7 +1,7 @@
 from copy import deepcopy
 from datetime import datetime
 
-from flask import Blueprint, g, jsonify, request, session
+from flask import Blueprint, current_app, g, jsonify, request, session
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload
 
@@ -483,10 +483,37 @@ def start(game_id):
                 **start_readiness,
             }), 409
 
-    game.is_live = True
-    if not game.live_current_inning:
-        game.live_current_inning = '1'
-    db.session.commit()
+    # Last, the starting pitcher: the same eligibility classification and
+    # decisions as every live pitching change, evaluated fresh here. A
+    # decision never gets past any check above.
+    from blueprints.live_game_bulk_api import (
+        start_pitching_decision_row,
+        starting_pitcher_check,
+    )
+    starter = start_readiness['inning_one']['P']
+    pitching_question, pitching_decision = starting_pitcher_check(game, team, starter, data)
+    if pitching_question is not None:
+        response, status_code = pitching_question
+        body = response.get_json()
+        return jsonify({**start_readiness, **body}), status_code
+
+    # The game going live and the record of an accepted pitching decision
+    # commit together: if the record can't be written, the game doesn't start.
+    try:
+        game.is_live = True
+        if not game.live_current_inning:
+            game.live_current_inning = '1'
+        if pitching_decision:
+            db.session.add(start_pitching_decision_row(user, team, game, starter, pitching_decision))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Start Game for game %s could not be saved', game_id)
+        return jsonify({
+            'status': 'error',
+            'code': 'start_not_saved',
+            'message': "The game didn't start because CoachBoard couldn't save it. Try again.",
+        }), 500
     state = _broadcast_state(game.id, team.id)
     return jsonify({
         'status': 'success',

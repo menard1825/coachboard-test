@@ -1034,7 +1034,7 @@
     listed.hidden = !list.length;
     const footer = modal.querySelector('[data-cb-start-actions]');
     footer.innerHTML = actions.map((action, index) => `
-      <button type="button" class="btn ${action.primary ? 'btn-primary' : 'btn-outline-secondary'}" data-cb-start-action="${index}">${esc(action.label)}</button>`).join('');
+      <button type="button" class="btn ${action.danger ? 'btn-danger' : action.primary ? 'btn-primary' : 'btn-outline-secondary'}" data-cb-start-action="${index}">${esc(action.label)}</button>`).join('');
 
     return new Promise(resolve => {
       let answered = false;
@@ -1065,6 +1065,84 @@
     });
   }
 
+  // Back to the 1st inning's P to choose another starter.
+  function chooseAnotherPitcher() {
+    showFirstInningDefense();
+    window.setTimeout(() => {
+      document.querySelector('#pregame-defense-editor-v3 [data-pde-pos="P"]')?.click();
+    }, 450);
+  }
+
+  function chooseRules() {
+    const quickStart = $('cb-quick-start-modal');
+    if (quickStart) window.bootstrap?.Modal?.getInstance(quickStart)?.hide();
+    window.setTimeout(() => {
+      const card = $('game-pitching-rules-v2');
+      card?.scrollIntoView({behavior: 'smooth', block: 'start'});
+      const edit = $('game-pitch-rule-edit-v2');
+      if (edit && edit.getAttribute('aria-expanded') !== 'true') edit.click();
+    }, 250);
+  }
+
+  // The starting pitcher's question, from the server's own classification
+  // and wording (pitching_eligibility.py) -- the same four kinds and the
+  // same decisions as a live pitching change. Resolves 'decide', 'another',
+  // 'rules' or null.
+  async function askStartingPitcher(info) {
+    const pitcher = info.pitcher || '';
+    const first = String(pitcher).trim().split(/\s+/)[0] || pitcher;
+    const changed = info.decision_outdated ? `${pitcher}'s pitching status changed. ` : '';
+    const message = `${changed}${info.eligibility_message || info.message || ''}`;
+    const another = {label: 'Choose Another Pitcher', value: 'another'};
+
+    if (info.code === 'start_no_pitching_rules') {
+      return startQuestion({
+        title: info.eligibility_heading,
+        message,
+        actions: [
+          {label: 'Choose Rules', value: 'rules', primary: true},
+          {label: 'Start Without Rules', value: 'decide'},
+        ],
+      });
+    }
+    if (info.eligibility === 'advisory') {
+      return startQuestion({
+        title: info.eligibility_heading,
+        message,
+        actions: [{label: `Continue with ${first}`, value: 'decide', primary: true}, another],
+      });
+    }
+    if (info.eligibility === 'rule_conflict') {
+      const choice = await startQuestion({
+        title: info.eligibility_heading,
+        message,
+        actions: [another, {label: `Use ${first} Anyway`, value: 'override', danger: true}],
+      });
+      if (choice !== 'override') return choice;
+      // A deliberate second step, as in a live pitching change.
+      return startQuestion({
+        title: 'Override pitching rule?',
+        message: info.override_confirm || '',
+        actions: [
+          {label: `Use ${first} Anyway`, value: 'decide', danger: true},
+          {label: 'Cancel', value: null},
+        ],
+      });
+    }
+    return startQuestion({
+      title: info.eligibility_heading,
+      message,
+      actions: [{label: `I verified ${first} is eligible`, value: 'decide', primary: true}, another],
+    });
+  }
+
+  const STARTER_QUESTIONS = new Set([
+    'pitcher_advisory',
+    'pitcher_rule_conflict',
+    'pitcher_eligibility_unconfirmed',
+    'start_no_pitching_rules',
+  ]);
+
   async function postStart(body) {
     const response = await fetch(`/api/live-game/${gameId}/start`, {
       method: 'POST',
@@ -1092,10 +1170,12 @@
     // then asks for a refresh instead of starting.
     const inningOne = reviewedInningOne();
     let openAcknowledged = null;
+    let pitchingDecision = null;
     for (;;) {
       const body = {};
       if (inningOne) body.inning_one = inningOne;
       if (openAcknowledged) body.open_positions = openAcknowledged;
+      if (pitchingDecision) Object.assign(body, pitchingDecision);
       const {ok, data} = await postStart(body);
 
       if (ok) {
@@ -1147,6 +1227,25 @@
           continue;
         }
         if (choice === 'fix') showFirstInningDefense();
+        return null;
+      }
+
+      // The starter comes last, after the defense checks. A decision counts
+      // only for what the coach was shown; if that changed, the server asks
+      // again (decision_outdated).
+      if (STARTER_QUESTIONS.has(data.code)) {
+        const choice = await askStartingPitcher(data);
+        if (choice === 'decide') {
+          pitchingDecision = {
+            pitching_decision: data.required_decision,
+            pitching_decision_status: data.pitching_status || '',
+            pitching_decision_rule_set: data.decision_rule_set || '',
+            pitching_decision_reason: data.decision_reason || '',
+          };
+          continue;
+        }
+        if (choice === 'another') chooseAnotherPitcher();
+        if (choice === 'rules') chooseRules();
         return null;
       }
 

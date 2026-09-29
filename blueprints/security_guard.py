@@ -112,7 +112,7 @@ def normalize_utc_offset_minutes(value):
     return offset if -840 <= offset <= 840 else None
 
 
-def record_activity(
+def activity_log_row(
     action,
     *,
     user=None,
@@ -124,11 +124,11 @@ def record_activity(
     client_timezone=None,
     client_utc_offset_minutes=None,
 ):
-    """Record account activity without allowing an audit failure to break login.
+    """An ActivityLog row for this request, not yet added or committed.
 
-    Callers should commit their business change first. This helper uses a small
-    independent commit so a logging problem never rolls back a successful login,
-    password change, or team switch.
+    For the few callers whose business change and audit entry must commit
+    together (Start Game's pitching decision); record_activity() is the
+    usual, independently committed path.
     """
     if user is not None:
         username = user.username
@@ -153,26 +153,39 @@ def record_activity(
         ip_address = forwarded or request.remote_addr
         user_agent = str(request.headers.get('User-Agent') or '')[:300] or None
 
+    return ActivityLog(
+        user_id=getattr(user, 'id', None),
+        team_id=team_id,
+        username_snapshot=username[:120],
+        full_name_snapshot=(str(full_name)[:160] if full_name else None),
+        role_snapshot=(str(role)[:64] if role else None),
+        action=str(action or 'activity')[:64],
+        detail=(str(detail)[:500] if detail else None),
+        ip_address=(str(ip_address)[:64] if ip_address else None),
+        user_agent=user_agent,
+        client_timezone=client_timezone,
+        client_utc_offset_minutes=client_utc_offset_minutes,
+    )
+
+
+def record_activity(action, **fields):
+    """Record account activity without allowing an audit failure to break login.
+
+    Callers should commit their business change first. This helper uses a small
+    independent commit so a logging problem never rolls back a successful login,
+    password change, or team switch.
+    """
     try:
-        row = ActivityLog(
-            user_id=getattr(user, 'id', None),
-            team_id=team_id,
-            username_snapshot=username[:120],
-            full_name_snapshot=(str(full_name)[:160] if full_name else None),
-            role_snapshot=(str(role)[:64] if role else None),
-            action=str(action or 'activity')[:64],
-            detail=(str(detail)[:500] if detail else None),
-            ip_address=(str(ip_address)[:64] if ip_address else None),
-            user_agent=user_agent,
-            client_timezone=client_timezone,
-            client_utc_offset_minutes=client_utc_offset_minutes,
-        )
+        row = activity_log_row(action, **fields)
         db.session.add(row)
         db.session.commit()
         return row
     except Exception:
         db.session.rollback()
-        current_app.logger.exception('Unable to write CoachBoard activity log entry for %s', username)
+        current_app.logger.exception(
+            'Unable to write CoachBoard activity log entry for %s',
+            getattr(fields.get('user'), 'username', None) or fields.get('username') or session.get('username'),
+        )
         return None
 
 

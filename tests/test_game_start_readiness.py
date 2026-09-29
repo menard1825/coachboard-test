@@ -165,18 +165,20 @@ def test_an_open_inning_one_position_is_asked_about_not_blocked(monkeypatch):
         assert db.session.get(Game, 91).is_live is True
 
 
-def test_missing_pitching_rules_blocks_first_pitch(monkeypatch):
+def test_missing_pitching_rules_ask_about_the_starter_instead_of_blocking(monkeypatch):
+    """No rules is not a data problem: Start stays usable and asks, because
+    CoachBoard can't confirm the starter's eligibility."""
     app = _build_app(monkeypatch, with_rules=False)
     client = app.test_client()
     _login(client)
 
     readiness = client.get('/api/game-day/91/readiness').get_json()
-    assert readiness['ready'] is False
-    assert 'Select the game pitching rules / tracking method.' in readiness['missing']
+    assert readiness['ready'] is True
+    assert readiness['missing'] == []
+    assert readiness['pitching_rules_selected'] is False
 
-    rejected = client.post('/api/live-game/91/start', json={'inning_one': _stored_inning_one(client, 91)})
-    assert rejected.status_code == 409
-    payload = rejected.get_json()
-    assert 'ready' in payload, payload
-    assert 'missing' in payload, payload
-    assert payload['missing'] == readiness['missing']
+    asked = client.post('/api/live-game/91/start', json={'inning_one': _stored_inning_one(client, 91)})
+    assert asked.status_code == 409
+    payload = asked.get_json()
+    assert payload['code'] == 'start_no_pitching_rules'
+    assert payload['required_decision'] == 'no_rules_acknowledged'

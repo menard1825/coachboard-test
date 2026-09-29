@@ -252,7 +252,7 @@ def test_shared_rule_payload_matches_the_unshared_path(
     assert shipped.status_code == reference.status_code == 200
     got, want = shipped.get_json(), reference.get_json()
 
-    assert sorted(got) == ['hard_stops', 'inning_one', 'missing', 'open_positions', 'open_question', 'readiness', 'ready', 'status']
+    assert sorted(got) == ['hard_stops', 'inning_one', 'missing', 'open_positions', 'open_question', 'pitching_rules_selected', 'readiness', 'ready', 'status']
     assert got['status'] == want['status'] == 'success'
     assert got['ready'] == want['ready']
     assert got['missing'] == want['missing']
@@ -447,7 +447,7 @@ def test_rule_name_context_never_writes_the_team_row(monkeypatch):
 
 START_CASES = [
     ('successful team-default start', None, 'USSSA', 200),
-    ('missing rule -> 409', None, None, 409),
+    ('missing rule -> asks about the starter (409)', None, None, 409),
     ('valid game override', 'MLB Pitch Smart', 'USSSA', 200),
     ('invalid override fallback', 'Not A Real Rule', 'USSSA', 200),
     ('valid override + no team default', 'MLB Pitch Smart', None, 200),
@@ -488,8 +488,10 @@ def test_start_passes_no_preloads_to_can_start_game(
 
     payload = response.get_json()
     if expected_status == 409:
-        assert payload['ready'] is False
-        assert 'Select the game pitching rules / tracking method.' in payload['missing']
+        # No rules is not a hard stop: Start asks about the starter instead.
+        assert payload['ready'] is True
+        assert payload['pitching_rules_selected'] is False
+        assert payload['code'] == 'start_no_pitching_rules'
     else:
         assert payload['ready'] is True
         assert payload['state']['game']['is_live'] is True
@@ -701,10 +703,9 @@ def test_a_payload_from_another_game_produces_the_wrong_answer(monkeypatch):
         stale = can_start_game(game_b, team, rule_payload=payload_a)
         queried = can_start_game(game_b, team)
 
-    blocker = 'Select the game pitching rules / tracking method.'
-    assert blocker in correct['missing']
+    assert correct['pitching_rules_selected'] is False
     assert correct == queried
-    assert blocker not in stale['missing'], (
+    assert stale['pitching_rules_selected'] is True, (
         'a stale payload must visibly change the answer, otherwise this test '
         'proves nothing about the boundary'
     )

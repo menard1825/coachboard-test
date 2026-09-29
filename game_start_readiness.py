@@ -71,10 +71,11 @@ def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSE
         elif name not in present_names:
             hard_stops.append(f'{name} is marked Out but is at {position} in the 1st inning.')
 
+    # No pitching rules is not a data problem: CoachBoard just can't confirm
+    # the starter's eligibility, and Start asks about it with the pitcher.
     if rule_payload is _UNSET:
         rule_payload = rule_settings_payload(team, game)
-    if not rule_payload.get('effective'):
-        hard_stops.append('Select the game pitching rules / tracking method.')
+    pitching_rules_selected = bool(rule_payload.get('effective'))
 
     # An open fielding position is a baseball choice, not an error: Start asks.
     open_positions = [position for position in required if position != 'P' and position not in inning_one]
@@ -91,6 +92,7 @@ def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSE
         'inning_one': inning_one,
         'open_positions': open_positions,
         'open_question': open_position_question(open_positions, len(present), len(required), bench),
+        'pitching_rules_selected': pitching_rules_selected,
     }
 
 

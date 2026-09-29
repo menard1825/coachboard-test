@@ -62,20 +62,10 @@ def _pitcher_eligibility_check(game, team, pitcher_name, data=None):
     coach saw, so it never lets a flagged pitcher in. A pitcher simply
     continuing from NOW into NEXT is not a new pitcher and is not checked.
     """
-    # Evaluate under this game's own rules, whatever request-hook order a
+    # Evaluated under this game's own rules, whatever request-hook order a
     # caller (including the deprecated /change-pitcher guard) runs in.
-    from game_pitching_rules import game_rule_context
-    from blueprints import live_game_api
-
     data = data or {}
-    with game_rule_context(team, game):
-        state = get_authoritative_live_state(game.id, team.id) or {}
-        # The same (game-aware) rules the live state was evaluated under.
-        rules = live_game_api.get_pitching_rules_for_team(team)
-    summary = (state.get('pitch_count_summary') or {}).get(pitcher_name)
-    kind = pitching_eligibility.classify(summary)
-    status = (summary or {}).get('status') or 'Eligibility Unknown'
-    described = pitching_eligibility.describe(pitcher_name, summary, rules)
+    summary, kind, status, described = _pitcher_eligibility(game, team, pitcher_name)
 
     if kind == pitching_eligibility.READY:
         return None, None
@@ -106,6 +96,24 @@ def _pitcher_eligibility_check(game, team, pitcher_name, data=None):
     }), 409), None
 
 
+def _pitcher_eligibility(game, team, pitcher_name):
+    """The pitcher's summary entry, classification, raw status and the
+    wording the coach is shown -- evaluated under this game's own rules."""
+    # Imported here: live_game_api imports modules that import this one.
+    from game_pitching_rules import game_rule_context
+    from blueprints import live_game_api
+
+    with game_rule_context(team, game):
+        state = get_authoritative_live_state(game.id, team.id) or {}
+        # The same (game-aware) rules the live state was evaluated under.
+        rules = live_game_api.get_pitching_rules_for_team(team)
+    summary = (state.get('pitch_count_summary') or {}).get(pitcher_name)
+    kind = pitching_eligibility.classify(summary)
+    status = (summary or {}).get('status') or 'Eligibility Unknown'
+    described = pitching_eligibility.describe(pitcher_name, summary, rules)
+    return summary, kind, status, described
+
+
 def _pitcher_eligibility_error(game, team, pitcher_name, data=None):
     """_pitcher_eligibility_check without the decision detail."""
     return _pitcher_eligibility_check(game, team, pitcher_name, data)[0]
@@ -124,6 +132,96 @@ def _record_pitching_decision(user, team, game, event, pitcher_name, decision):
         detail=(
             f"{decision['decision']}: game {game.id}, {event.event_type} "
             f'(event {event.id}, inning {event.inning}), pitcher '
+            f"{pitcher_name}; rules {decision['rule_set']}; status "
+            f"{decision['status']}; shown: {decision['reason']}"
+        ),
+    )
+
+
+NO_RULES_ACKNOWLEDGED = 'no_rules_acknowledged'
+NO_RULES_STATUS = 'Select Game Rules'
+
+
+def starting_pitcher_check(game, team, pitcher_name, data=None):
+    """Start Game's question about the 1st-inning pitcher.
+
+    The same classification as every live pitching change
+    (_pitcher_eligibility / pitching_eligibility): Ready starts; Advisory,
+    Rule conflict and Can't confirm need the coach's decision. With no game
+    pitching rules selected the starter is Can't confirm, asked as "Pitching
+    rules aren't selected"; the coach may deliberately start without them
+    (no_rules_acknowledged), which never claims the pitcher is eligible.
+
+    A decision counts only for exactly what the coach was shown -- the
+    status, the rule set and the reason. If any of them changed before
+    Start, the coach is asked again.
+
+    Returns (response, decision) like _pitcher_eligibility_check.
+    """
+    data = data or {}
+    summary, kind, status, described = _pitcher_eligibility(game, team, pitcher_name)
+    if kind == pitching_eligibility.READY:
+        return None, None
+
+    base = pitching_eligibility.base_status(status) or 'Eligibility Unknown'
+    no_rules = base == NO_RULES_STATUS
+    required = NO_RULES_ACKNOWLEDGED if no_rules else pitching_eligibility.REQUIRED_DECISION[kind]
+    decision = data.get('pitching_decision')
+    shown = (
+        pitching_eligibility.base_status(data.get('pitching_decision_status')) or 'Eligibility Unknown',
+        str(data.get('pitching_decision_rule_set') or ''),
+        str(data.get('pitching_decision_reason') or ''),
+    )
+    current = (base, described['rule_set'], described['eligibility_message'])
+    if decision == required and shown == current:
+        return None, {
+            'decision': decision,
+            'status': base,
+            'reason': described['eligibility_message'],
+            'rule_set': described['rule_set'],
+        }
+
+    body = {
+        'status': 'error',
+        'code': 'start_no_pitching_rules' if no_rules else PITCHING_DECISION_CODES[kind],
+        'pitcher': pitcher_name,
+        'pitching_status': status,
+        'next_available': (summary or {}).get('next_available'),
+        **described,
+        'required_decision': required,
+        # Echoed back with the decision, so it counts only for this wording.
+        'decision_rule_set': current[1],
+        'decision_reason': current[2],
+        'message': described['eligibility_message'],
+        'decision_outdated': bool(decision),
+    }
+    if no_rules:
+        body['eligibility_heading'] = "Pitching rules aren't selected"
+        body['eligibility_message'] = (
+            f"CoachBoard can't confirm {pitcher_name}'s pitching eligibility "
+            'without the game rules.'
+        )
+        body['message'] = body['eligibility_message']
+    return (jsonify(body), 409), None
+
+
+def start_pitching_decision_row(user, team, game, pitcher_name, decision):
+    """The activity-log entry for why the 1st-inning pitcher started despite
+    a flag: the decision, the game and inning 1, the pitcher, the rule set,
+    and the status and reason the coach was shown (who and when come with
+    the row). Start is not a rotation event, so it names Start Game instead.
+
+    Returned unsaved: Start adds it to the same transaction that makes the
+    game live, so the game never goes live without it.
+    """
+    from blueprints.security_guard import activity_log_row
+
+    return activity_log_row(
+        'pitching_decision',
+        user=user,
+        team_id=team.id,
+        detail=(
+            f"{decision['decision']}: game {game.id}, Start Game (inning 1), pitcher "
             f"{pitcher_name}; rules {decision['rule_set']}; status "
             f"{decision['status']}; shown: {decision['reason']}"
         ),

@@ -97,11 +97,19 @@
     btn.disabled = !payload.ready;
     btn.classList.toggle('disabled', !payload.ready);
 
+    // An open fielding position or missing pitching rules is the coach's
+    // call: Start stays usable and asks about it.
+    const asks = [];
     if (payload.ready && payload.open_question) {
-      // An open fielding position is the coach's call: Start stays usable
-      // and asks about it.
+      asks.push([payload.open_question.title, payload.open_question.message]);
+    }
+    if (payload.ready && payload.pitching_rules_selected === false) {
+      asks.push(["Pitching rules aren't selected", "CoachBoard can't confirm the starting pitcher's eligibility without the game rules."]);
+    }
+    if (asks.length) {
       box.className = 'alert alert-warning border-0 shadow-sm mb-3';
-      box.innerHTML = `<strong>${esc(payload.open_question.title)}</strong><div class="small mt-1">${esc(payload.open_question.message)} Start Game will ask before first pitch.</div>`;
+      box.innerHTML = asks.map(([title, text]) => `<strong>${esc(title)}</strong><div class="small mt-1 mb-1">${esc(text)}</div>`).join('')
+        + '<div class="small">Start Game will ask before first pitch.</div>';
       return;
     }
 

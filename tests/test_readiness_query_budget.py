@@ -355,7 +355,7 @@ def test_readiness_response_is_unchanged_by_the_optimisation(monkeypatch, game_i
                         _reference_rule_settings_payload)
     reference = client.get(path).get_json()
 
-    assert sorted(shipped) == ['hard_stops', 'inning_one', 'missing', 'open_positions', 'open_question', 'readiness', 'ready', 'status']
+    assert sorted(shipped) == ['hard_stops', 'inning_one', 'missing', 'open_positions', 'open_question', 'pitching_rules_selected', 'readiness', 'ready', 'status']
     assert shipped['status'] == reference['status'] == 'success'
     assert shipped['ready'] == reference['ready']
     assert shipped['missing'] == reference['missing']
@@ -412,7 +412,7 @@ def test_readiness_response_is_unchanged_by_sharing_the_inputs(monkeypatch, game
                         _ignoring_preloads(game_day.build_game_readiness))
     reference = client.get(path).get_json()
 
-    assert sorted(shipped) == ['hard_stops', 'inning_one', 'missing', 'open_positions', 'open_question', 'readiness', 'ready', 'status']
+    assert sorted(shipped) == ['hard_stops', 'inning_one', 'missing', 'open_positions', 'open_question', 'pitching_rules_selected', 'readiness', 'ready', 'status']
     assert shipped['status'] == reference['status'] == 'success'
     assert shipped['ready'] == reference['ready']
     assert shipped['missing'] == reference['missing']

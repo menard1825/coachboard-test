@@ -40,6 +40,7 @@ def _app(monkeypatch, tmp_path):
     monkeypatch.setenv('DATABASE_URL', f'sqlite:///{tmp_path / "rotation.db"}')
 
     from app import create_app
+    from blueprints.fair_play import TeamPitchingSettings
     from db import db
     from models import Game, Player, Team, TeamMembership, User
 
@@ -68,6 +69,11 @@ def _app(monkeypatch, tmp_path):
         db.session.flush()
         db.session.add(TeamMembership(
             user_id=1, team_id=TEAM_ID, role='Head Coach', player_order=[],
+        ))
+        # Game rules are selected, so Start's starter check is Ready here;
+        # these tests are about the write lock, not pitching.
+        db.session.add(TeamPitchingSettings(
+            team_id=TEAM_ID, competition_default_rule='USSSA', arm_care_rule_set='MLB Pitch Smart',
         ))
         db.session.add(Game(
             id=GAME_ID,
