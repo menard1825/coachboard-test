@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4"><div class="alert alert-warning">{{ message }}</div>
+<a class="btn btn-primary" href="{{ url_for('home') }}">Reload current team</a>
+<a class="btn btn-outline-secondary" href="{{ url_for('seasons.index') }}">Teams & Seasons</a></div>
+{% endblock %}

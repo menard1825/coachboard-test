@@ -81,7 +81,7 @@
     <div class="card">
         <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Current Users</h5>
+                <h5 class="mb-0">Coaches on the current team</h5>
                 <div class="d-flex align-items-center">
                     <input type="text" id="user-search" class="form-control form-control-sm me-2" placeholder="Search users...">
                     <select id="role-filter" class="form-select form-select-sm me-2">
@@ -176,7 +176,7 @@
                           <i class="bi bi-key-fill"></i> Reset Password
                       </button>
                       <button type="button" class="btn btn-sm btn-outline-danger" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#deleteUserModal-{{ user.username }}">
-                          <i class="bi bi-trash"></i> Delete User
+                          <i class="bi bi-trash"></i> Remove from Team
                       </button>
                   </div>
                 </div>
@@ -194,18 +194,18 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">Delete User {{ user.username }}</h5>
+                        <h5 class="modal-title">Remove from Team {{ user.username }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="text-danger"><strong>Warning:</strong> This action cannot be undone.</p>
+                        <p class="text-danger"><strong>Warning:</strong> Access to other teams is preserved. If this is their only team, their account will be removed.</p>
                         <p>To confirm, please type the username "<strong>{{ user.username }}</strong>" in the box below.</p>
                         <input type="text" class="form-control" id="delete-user-confirmation-{{ user.username }}" data-username="{{ user.username }}">
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <form action="{{ url_for('admin.delete_user', username=user.username) }}" method="POST" style="display: inline;">
-                            <button type="submit" class="btn btn-danger delete-user-button" disabled>Delete User</button>
+                            <button type="submit" class="btn btn-danger delete-user-button" disabled>Remove from Team</button>
                         </form>
                     </div>
                 </div>

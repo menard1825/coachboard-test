@@ -19,6 +19,9 @@ class Team(db.Model):
     age_group = Column(String, default='12U', nullable=False)
     pitching_rule_set = Column(String, default='MLB Pitch Smart', nullable=False)
     outfielder_count = Column(Integer, default=3, nullable=False)
+    season_label = Column(String(80), nullable=True)
+    is_archived = Column(Boolean, default=False, server_default='0', nullable=False)
+    rollover_key = Column(String(64), unique=True, index=True, nullable=True)
 
     users = relationship("User", back_populates="team")
     players = relationship("Player", back_populates="team")
@@ -62,6 +65,9 @@ class Player(db.Model):
     pitcher_role = Column(String)
     has_lessons = Column(String)
     lesson_focus = Column(Text)
+    is_active = Column(Boolean, default=True, server_default='1', nullable=False)
+    # Copied season profiles share a stable pitching identity; historical rows stay put.
+    pitching_identity = Column(String(36), nullable=True, index=True)
     notes_author = Column(String)
     notes_timestamp = Column(DateTime) # Changed to DateTime
 
@@ -80,6 +86,16 @@ class Player(db.Model):
     def to_dict(self):
         """Return a dictionary representation of the Player object."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+class TeamMembership(db.Model):
+    __tablename__ = 'team_memberships'
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    team_id = Column(Integer, ForeignKey('teams.id'), primary_key=True)
+    role = Column(String, nullable=False, default='Assistant Coach')
+    player_order = Column(JSON, nullable=True)
+    user = relationship('User')
+    team = relationship('Team')
 
 
 class Lineup(db.Model):

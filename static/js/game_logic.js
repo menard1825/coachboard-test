@@ -788,7 +788,7 @@ function applyOutOfPositionIndicators() {
 
     // --- Event Listeners ---
     function setupEventListeners() {
-        const socket = io();
+        const socket = io({auth: {team_id: window.coachboardTeam?.id}});
         socket.on('data_updated', fetchLatestGameData);
         socket.on('lineup_add', fetchLatestGameData);
         socket.on('lineup_update', fetchLatestGameData);

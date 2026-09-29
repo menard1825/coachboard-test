@@ -18,6 +18,18 @@ def pitching_outing_to_dict(outing):
     d['player_name'] = outing.player.name if outing.player else "Unknown"
     return d
 
+
+def validate_associated_game(value):
+    if value in (None, ''):
+        return None
+    try:
+        game_id = int(value)
+    except (ValueError, TypeError):
+        return jsonify(status='error', message='Invalid game.'), 400
+    if not Game.query.filter_by(id=game_id, team_id=session['team_id']).first():
+        return jsonify(status='error', message='Game not found for the active team.'), 404
+    return None
+
 # --- Game Management ---
 @gameday_bp.route('/game/<int:game_id>')
 def game_management(game_id):
@@ -33,6 +45,8 @@ def game_management(game_id):
     
     roster_objects = db.session.query(Player).filter_by(team_id=team.id).order_by(Player.name).all()
     
+    if game.date.date() >= datetime.now().date() and not team.is_archived:
+        roster_objects = [p for p in roster_objects if p.is_active]
     lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team.id).first()
     rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team.id).first()
     
@@ -116,7 +130,7 @@ def edit_game(game_id):
     socketio.emit('data_updated', {'message': 'Game details updated.'})
     return redirect(url_for('.game_management', game_id=game_id))
 
-@gameday_bp.route('/delete_game/<int:game_id>')
+@gameday_bp.route('/delete_game/<int:game_id>', methods=['POST'])
 def delete_game(game_id):
     team_id = session['team_id']
     game_to_delete = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
@@ -164,6 +178,10 @@ def add_lineup():
     if not payload or 'title' not in payload or 'lineup_data' not in payload:
         return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
     
+    invalid = validate_associated_game(payload.get('associated_game_id'))
+    if invalid:
+        return invalid
+
     new_lineup = Lineup(
         title=payload['title'], 
         lineup_positions=payload['lineup_data'],
@@ -188,6 +206,9 @@ def edit_lineup(lineup_id):
     if not payload or 'title' not in payload or 'lineup_data' not in payload:
         return jsonify({'status': 'error', 'message': 'Invalid lineup data.'}), 400
         
+    invalid = validate_associated_game(payload.get('associated_game_id'))
+    if invalid:
+        return invalid
     lineup_to_edit.title = payload['title']
     lineup_to_edit.lineup_positions = payload['lineup_data']
     lineup_to_edit.associated_game_id = int(payload.get('associated_game_id')) if payload.get('associated_game_id') else None
@@ -198,7 +219,7 @@ def edit_lineup(lineup_id):
 
     return jsonify({'status': 'success', 'message': f'Lineup "{lineup_to_edit.title}" updated successfully!', 'lineup': lineup_dict})
 
-@gameday_bp.route('/delete_lineup/<int:lineup_id>')
+@gameday_bp.route('/delete_lineup/<int:lineup_id>', methods=['POST'])
 def delete_lineup(lineup_id):
     lineup_to_delete = db.session.query(Lineup).filter_by(id=lineup_id, team_id=session['team_id']).first()
     if lineup_to_delete:
@@ -213,7 +234,7 @@ def delete_lineup(lineup_id):
 
 @gameday_bp.route('/save_rotation', methods=['POST'])
 def save_rotation():
-    rotation_data = request.get_json()
+    rotation_data = request.get_json() or {}
     rotation_id = rotation_data.get('id')
     title = rotation_data.get('title')
     innings_data = rotation_data.get('innings')
@@ -221,6 +242,10 @@ def save_rotation():
 
     if not title or not isinstance(innings_data, dict):
         return jsonify({'status': 'error', 'message': 'Invalid data provided.'}), 400
+
+    invalid = validate_associated_game(associated_game_id)
+    if invalid:
+        return invalid
 
     if rotation_id:
         rotation_to_update = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
@@ -230,8 +255,8 @@ def save_rotation():
             rotation_to_update.associated_game_id = associated_game_id
             message = 'Rotation updated successfully!'
             new_rotation_id = rotation_id
-        else: 
-            rotation_id = None
+        else:
+            return jsonify(status='error', message='Rotation not found for the active team.'), 404
     
     if not rotation_id:
         new_rotation = Rotation(
@@ -255,7 +280,7 @@ def save_rotation():
 
     return jsonify({'status': 'success', 'message': message, 'new_id': new_rotation_id})
 
-@gameday_bp.route('/delete_rotation/<int:rotation_id>')
+@gameday_bp.route('/delete_rotation/<int:rotation_id>', methods=['POST'])
 def delete_rotation(rotation_id):
     rotation_to_delete = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
     if rotation_to_delete:

@@ -1,3 +1,5 @@
+from team_access import team_members
+from flask import g
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
 from models import ScoutedPlayer, Player, User
 from db import db
@@ -48,7 +50,7 @@ def add_scouted_player():
         print(f"Error adding scouted player: {e}")
         return jsonify({'status': 'error', 'message': 'An internal server error occurred.'}), 500
 
-@scouting_bp.route('/delete_scouted_player/<list_type>/<int:player_id>')
+@scouting_bp.route('/delete_scouted_player/<list_type>/<int:player_id>', methods=['POST'])
 def delete_scouted_player(list_type, player_id):
     player_to_delete = db.session.query(ScoutedPlayer).filter_by(id=player_id, list_type=list_type, team_id=session['team_id']).first()
     if player_to_delete:
@@ -92,7 +94,7 @@ def move_scouted_player_to_roster(player_id):
     db.session.flush() # to get the new player's ID
     db.session.delete(scouted_player)
     
-    for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
+    for user_obj in team_members(session['team_id']):
         current_order = get_player_order_as_list(user_obj.player_order)
         if new_roster_player.id not in current_order:
             current_order.append(new_roster_player.id)

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Teams & Seasons · CoachBoard{% endblock %}
+{% macro guards() %}<input type="hidden" name="_team_id" value="{{ team_context_id }}"><input type="hidden" name="_csrf_token" value="{{ team_csrf_token }}">{% endmacro %}
+{% block content %}
+<div class="container py-4" style="max-width:1000px">
+  <h1 class="h3">Teams & Seasons</h1>
+  <p class="text-muted">Keep each season’s roster, games, and history together.</p>
+  <div class="card mb-4"><div class="card-body">
+    <h2 class="h5">Your teams</h2>
+    {% for membership in memberships %}
+    <div class="d-flex gap-3 justify-content-between align-items-center border-bottom py-3">
+      <div><strong>{{ membership.team.team_name }}</strong><br>
+      <small>{{ membership.team.season_label or 'Existing team' }} · {{ membership.team.age_group }}{% if membership.team.is_archived %} · Archived (read-only){% endif %}</small></div>
+      {% if membership.team_id == team_context_id %}<span class="badge bg-primary">Current</span>{% else %}
+      <form method="post" action="{{ url_for('seasons.switch_team') }}">{{ guards() }}<input type="hidden" name="team_id" value="{{ membership.team_id }}"><button class="btn btn-outline-primary btn-sm">Open team</button></form>
+      {% endif %}
+    </div>{% endfor %}
+  </div></div>
+  {% if session.role in ['Head Coach', 'Super Admin'] %}
+  <div class="card mb-4"><div class="card-body">
+    <h2 class="h5">Start a new team or season</h2>
+    <p>Carry over the players and coaches you choose from <strong>{{ current_team.team_name }}</strong>. The new team starts with an empty schedule, pitching log, and lineup/defense templates. Old records stay with the previous team.</p>
+    <form method="post" action="{{ url_for('seasons.rollover') }}" id="rollover-form">
+      {{ guards() }}<input type="hidden" name="rollover_nonce" value="{{ rollover_nonce }}">
+      <div class="mb-3"><label class="form-label" for="new-team-name">New team name (include the season)</label><input class="form-control" id="new-team-name" name="team_name" maxlength="120" placeholder="Marucci Prospects 12U — Spring 2027" required></div>
+      <div class="row"><div class="col-sm-8 mb-3"><label class="form-label" for="season-label">Season</label><input class="form-control" id="season-label" name="season_label" maxlength="80" placeholder="Spring / Summer 2027" required></div>
+      <div class="col-sm-4 mb-3"><label class="form-label" for="age-group">Age group</label><select class="form-select" id="age-group" name="age_group">{% for age in age_groups %}<option {% if age == current_team.age_group %}selected{% endif %}>{{ age }}</option>{% endfor %}</select></div></div>
+      <fieldset class="mb-3"><legend class="h6">Returning players</legend>
+      <p class="small text-muted">Profiles, positions, and notes carry over. Recent pitching workload remains linked for rest calculations; previous season totals stay separate.</p>
+      <div class="row">{% for player in players %}<div class="col-sm-6"><label class="form-check py-1"><input class="form-check-input" type="checkbox" name="players" value="{{ player.id }}" checked><span class="form-check-label">{{ player.name }}{% if player.number %} #{{ player.number }}{% endif %}</span></label></div>{% else %}<p>No active players. You can add players after creating the new team.</p>{% endfor %}</div></fieldset>
+      <fieldset class="mb-3"><legend class="h6">Coaches with access to the new team</legend>
+      <p class="small text-muted">You will have access automatically. Selected coaches keep access to the old team and use their existing login.</p>
+      {% for member in coaches %}{% if member.user_id != active_membership.user_id %}<label class="form-check py-1"><input class="form-check-input" type="checkbox" name="coaches" value="{{ member.user_id }}" checked><span class="form-check-label">{{ member.user.full_name or member.user.username }} · {{ member.role }}</span></label>{% endif %}{% endfor %}</fieldset>
+      <p class="small">Team colors and coaching settings carry over. Upload the new team’s logo separately in Team Settings.</p>
+      <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="copy_signs" value="yes"><span class="form-check-label">Copy team signs</span></label>
+      <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="archive_source" value="yes"><span class="form-check-label">Archive the previous team as read-only (you can restore it later)</span></label>
+      <button class="btn btn-primary" type="submit">Create new team & switch</button>
+    </form>
+  </div></div>
+  <div class="card mb-4"><div class="card-body"><h2 class="h5">Archived players · {{ current_team.team_name }}</h2>
+  <p class="small text-muted">Their pitching, attendance, and development records are preserved.</p>
+  {% for player in archived_players %}<div class="d-flex justify-content-between align-items-center py-2"><span>{{ player.name }}</span>{% if not current_team.is_archived %}<form method="post" action="{{ url_for('seasons.restore_player', player_id=player.id) }}">{{ guards() }}<button class="btn btn-sm btn-outline-primary">Restore player</button></form>{% endif %}</div>{% else %}<p class="text-muted mb-0">No archived players.</p>{% endfor %}</div></div>
+  <details class="card"><summary class="card-header">{{ 'Restore' if current_team.is_archived else 'Archive' }} current team</summary><div class="card-body"><p>Archiving keeps all records available and prevents editing. It does not remove coach access.</p>
+  <form method="post" action="{{ url_for('seasons.archive_team') }}">{{ guards() }}<label class="form-label" for="archive-confirmation">Type {{ current_team.team_name }} to confirm</label><input class="form-control mb-3" id="archive-confirmation" name="confirmation" required><button class="btn btn-outline-secondary">{{ 'Restore team' if current_team.is_archived else 'Archive team' }}</button></form></div></details>
+  {% endif %}
+</div>
+{% endblock %}

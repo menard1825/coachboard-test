@@ -1,3 +1,5 @@
+from team_access import team_members
+from flask import g
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
 from models import Player, User
 from db import db
@@ -50,10 +52,10 @@ def add_player():
     db.session.add(new_player)
     db.session.flush() # Flush to get the new player's ID
 
-    for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
+    for user_obj in team_members(session['team_id']):
         current_order = get_player_order_as_list(user_obj.player_order)
-        if new_player.id not in current_order:
-            current_order.append(new_player.id)
+        if new_player.name not in current_order:
+            current_order.append(new_player.name)
             user_obj.player_order = current_order
 
     db.session.commit()
@@ -92,40 +94,29 @@ def update_player_inline(player_id):
     socketio.emit('data_updated', {'message': f'Player {new_name} updated.'})
     return jsonify({'status': 'success', 'message': f'Player "{new_name}" updated successfully!'})
 
-@roster_bp.route('/delete_player/<int:player_id>')
+@roster_bp.route('/delete_player/<int:player_id>', methods=['POST'])
 def delete_player(player_id):
-    player_to_delete = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first()
-    if player_to_delete:
-        player_name = player_to_delete.name
-        player_id_to_delete = player_to_delete.id
-        db.session.delete(player_to_delete)
+    if session.get('role') not in ('Head Coach', 'Super Admin'):
+        return jsonify(status='error', message='Only the head coach can archive players.'), 403
+    player = db.session.query(Player).filter_by(id=player_id, team_id=session['team_id']).first_or_404()
+    player.is_active = False
+    db.session.commit()
+    flash(f'{player.name} archived. All history is preserved; restore them in Teams & Seasons.', 'success')
+    socketio.emit('data_updated', {'message': 'Player archived.'})
+    return redirect(url_for('home', _anchor='roster'))
 
-        for user_obj in db.session.query(User).filter_by(team_id=session['team_id']).all():
-            current_order = get_player_order_as_list(user_obj.player_order)
-            updated_order = [pid for pid in current_order if pid != player_id_to_delete]
-            user_obj.player_order = updated_order
-        
-        if 'player_order' in session:
-            session_order = get_player_order_as_list(session['player_order'])
-            session['player_order'] = [pid for pid in session_order if pid != player_id_to_delete]
-            session.modified = True
-
-        db.session.commit()
-        flash(f'Player "{player_name}" removed successfully!', 'success')
-        socketio.emit('data_updated', {'message': f'Player {player_name} deleted.'})
-    else:
-        flash('Player not found.', 'danger')
-    return redirect(url_for('home', _anchor=request.args.get('active_tab', 'roster').lstrip('#')))
-        
 @roster_bp.route('/save_player_order', methods=['POST'])
 def save_player_order():
-    user = db.session.query(User).filter_by(username=session['username']).first()
+    user = g.membership
     if not user: return jsonify({'status': 'error', 'message': 'User not found'}), 404
     
     new_order = request.json.get('player_order')
     if not isinstance(new_order, list): 
         return jsonify({'status': 'error', 'message': 'Invalid order format'}), 400
     
+    active_names = {p.name for p in Player.query.filter_by(team_id=session['team_id'], is_active=True)}
+    if any(not isinstance(name, str) or name not in active_names for name in new_order) or len(set(new_order)) != len(new_order):
+        return jsonify(status='error', message='Roster order must contain current player names.'), 400
     user.player_order = new_order
     session['player_order'] = new_order
     session.modified = True

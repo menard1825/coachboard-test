@@ -80,7 +80,7 @@
                     <label for="player_id_select" class="form-label">Pitcher</label>
                     <select name="player_id" id="player_id_select" class="form-select" required>
                         <option value="">Select Pitcher...</option>
-                        {% for p in pitchers %}
+                        {% for p in pitchers if p.is_active %}
                         <option value="{{ p.id }}">{{ p.full_name }}</option>
                         {% endfor %}
                     </select>

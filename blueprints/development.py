@@ -56,7 +56,7 @@ def update_focus(focus_id):
     socketio.emit('data_updated', {'message': 'Focus item updated.'})
     return redirect(url_for('home', _anchor='player_development'))
 
-@development_bp.route('/complete_focus/<int:focus_id>')
+@development_bp.route('/complete_focus/<int:focus_id>', methods=['POST'])
 def complete_focus(focus_id):
     focus_item = find_focus_by_id(focus_id)
     if not focus_item or focus_item.team_id != session['team_id']:
@@ -70,7 +70,7 @@ def complete_focus(focus_id):
     socketio.emit('data_updated', {'message': 'Focus marked complete.'})
     return redirect(url_for('home', _anchor='player_development'))
 
-@development_bp.route('/delete_focus/<int:focus_id>')
+@development_bp.route('/delete_focus/<int:focus_id>', methods=['POST'])
 def delete_focus(focus_id):
     focus_item = find_focus_by_id(focus_id)
     if focus_item and focus_item.team_id == session['team_id']:
@@ -97,7 +97,7 @@ def update_lesson_info(player_id):
     socketio.emit('data_updated', {'message': f'Lesson info for {player.name} updated.'})
     return redirect(url_for('home', _anchor='player_development'))
 
-@development_bp.route('/delete_lesson_info/<int:player_id>')
+@development_bp.route('/delete_lesson_info/<int:player_id>', methods=['POST'])
 def delete_lesson_info(player_id):
     player = db.session.get(Player, player_id)
     if not player or player.team_id != session['team_id']:

@@ -26,7 +26,9 @@ def add_pitching():
     game_id = request.form.get('game_id')
     game = None
     if game_id:
-        game = db.session.get(Game, game_id)
+        game = Game.query.filter_by(id=game_id, team_id=session['team_id']).first()
+        if not game:
+            return 'Game not found for the active team.', 404
 
     # Validate form fields one by one to provide specific error messages
     try:
@@ -45,7 +47,10 @@ def add_pitching():
     if not player_id:
         flash('A valid pitcher must be selected.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
-    player_id = int(player_id)
+    try:
+        player_id = int(player_id)
+    except (TypeError, ValueError):
+        return 'Invalid pitcher.', 400
 
 
     if not player_id:
@@ -69,7 +74,7 @@ def add_pitching():
         flash('Opponent is required.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
 
-    player = db.session.get(Player, player_id)
+    player = Player.query.filter_by(id=player_id, team_id=session['team_id'], is_active=True).first()
     if not player:
         flash('Selected pitcher not found.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
@@ -112,7 +117,11 @@ def edit_pitching(outing_id):
 
         player_id = request.form.get('player_id')
         if player_id:
-            outing_to_edit.player_id = int(player_id)
+            player = Player.query.filter_by(id=int(player_id), team_id=session['team_id']).first()
+            if not player:
+                db.session.rollback()
+                return 'Pitcher not found for the active team.', 404
+            outing_to_edit.player_id = player.id
         else:
             pitcher_name = request.form.get('pitcher')
             if pitcher_name:
@@ -138,7 +147,7 @@ def edit_pitching(outing_id):
     return redirect(url_for('pitching.pitching_page'))
 
 
-@pitching_bp.route('/delete_pitching/<int:outing_id>')
+@pitching_bp.route('/delete_pitching/<int:outing_id>', methods=['POST'])
 def delete_pitching(outing_id):
     outing_to_delete = db.session.query(PitchingOuting).filter_by(id=outing_id, team_id=session['team_id']).first()
     if outing_to_delete:
@@ -177,7 +186,7 @@ def pitching_page():
     recent_outings = sorted(all_outings, key=lambda o: o.date, reverse=True)[:10]
 
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(all_players, all_outings, rules)
+    pitch_count_summary = calculate_pitch_count_summary([p for p in all_players if p.is_active], all_outings, rules)
 
     # Get players designated as pitchers by their role
     designated_pitchers = {p.id: p for p in all_players if p.pitcher_role != 'Not a Pitcher'}

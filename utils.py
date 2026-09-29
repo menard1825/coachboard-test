@@ -1,6 +1,8 @@
 import json
 from datetime import date, timedelta, datetime
 from sqlalchemy import func
+from db import db
+from sqlalchemy.orm import joinedload
 from models import Player, PitchingOuting
 
 def model_to_dict(obj):
@@ -138,12 +140,25 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None):
     else:
         today = target_date
 
+    # Only explicit rollover links connect profiles; matching names never does.
+    identities = {p.pitching_identity for p in roster if p.pitching_identity}
+    identity_ids = {}
+    if identities:
+        profiles = Player.query.filter(Player.pitching_identity.in_(identities)).all()
+        by_identity = {}
+        for profile in profiles:
+            by_identity.setdefault(profile.pitching_identity, set()).add(profile.id)
+        identity_ids = {p.id: by_identity.get(p.pitching_identity, {p.id}) for p in roster}
+        linked_ids = {pid for ids in by_identity.values() for pid in ids}
+        linked_outings = PitchingOuting.query.filter(PitchingOuting.player_id.in_(linked_ids)).all()
+        all_outings = list({o.id: o for o in list(all_outings) + linked_outings}.values())
+
     for player in roster:
         try:
-            player_outings = sorted([o for o in all_outings if o.player_id == player.id and isinstance(o.date, (datetime, date))], key=lambda x: x.date, reverse=True)
+            player_outings = sorted([o for o in all_outings if o.player_id in identity_ids.get(player.id, {player.id}) and isinstance(o.date, datetime) and o.date.date() <= today], key=lambda x: x.date, reverse=True)
             
             daily_pitches = sum(o.pitches or 0 for o in player_outings if o.date.date() == today)
-            weekly_pitches = sum(o.pitches or 0 for o in player_outings if (today - o.date.date()).days < 7)
+            weekly_pitches = sum(o.pitches or 0 for o in player_outings if 0 <= (today - o.date.date()).days < 7)
 
             status = 'Available'
             next_available_str = 'Today'

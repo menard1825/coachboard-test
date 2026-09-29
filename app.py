@@ -30,25 +30,31 @@ from blueprints.pitching import pitching_bp
 from blueprints.scouting import scouting_bp
 from blueprints.team_management import team_management_bp
 from blueprints.api import api_bp
+from blueprints.seasons import seasons_bp
+from team_access import install_team_access
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
 HEAD_COACH = 'Head Coach'
 
 
-def create_app():
+def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__)
     app.secret_key = os.environ.get('SECRET_KEY', 'a-fallback-secret-key-for-development')
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = False
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
     app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'app.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+    if test_config:
+        app.config.update(test_config)
+
     # Initialize extensions with the app
     db.init_app(app)
-    socketio.init_app(app)
+    socketio.init_app(app, async_mode=app.config.get('SOCKETIO_ASYNC_MODE'))
     migrate.init_app(app, db, render_as_batch=True)
 
     # Register Blueprints
@@ -61,6 +67,8 @@ def create_app():
     app.register_blueprint(scouting_bp)
     app.register_blueprint(team_management_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(seasons_bp)
+    install_team_access(app)
 
     # --- Custom Jinja Filter for Date/Time Formatting ---
     @app.template_filter('format_datetime')

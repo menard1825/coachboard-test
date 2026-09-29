@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pNotesSafe = escapeHTML(p.notes || '');
         const pNotesAuthorSafe = escapeHTML(p.notes_author || '');
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
-        const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}" data-delete-name="${pNameSafe}">Delete</button>`;
+        const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}" data-delete-name="${pNameSafe}">Archive</button>`;
 
         const positions = [p.position1, p.position2, p.position3].filter(Boolean).map(pos => `<span class="badge bg-secondary me-1">${pos}</span>`).join('') || '<span class="text-muted small">N/A</span>';
         const batsThrows = `B/T: ${p.bats?.[0] || 'N'}/${p.throws?.[0] || 'N'}`;
@@ -816,7 +816,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeSortables();
         handleTabLogic();
         
-        const socket = io();
+        const socket = io({auth: {team_id: window.coachboardTeam?.id}});
 
         // --- Data Fetch Helpers for Sockets ---
         const fetchPitchingData = async () => {
@@ -1121,7 +1121,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (url) {
                 deleteButton.href = url;
-                modalBody.innerHTML = `Are you sure you want to delete <strong>${name || 'this item'}</strong>? This action cannot be undone.`;
+                const archive = url.startsWith('/delete_player/');
+                deleteButton.textContent = archive ? 'Archive player' : 'Delete';
+                document.getElementById('confirmDeleteModalLabel').textContent = archive ? 'Archive player' : 'Confirm deletion';
+                modalBody.textContent = archive ? `Archive ${name || 'this player'}? Their history will be preserved. Restore them in Teams & Seasons.` : `Are you sure you want to delete ${name || 'this item'}? This action cannot be undone.`;
             } else {
                 console.error("Delete modal opened without a data-delete-url attribute on the trigger.");
                 e.preventDefault();

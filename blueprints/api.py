@@ -1,3 +1,5 @@
+from flask import g
+from team_access import player_order_for
 from flask import Blueprint, jsonify, session
 from db import db
 from models import User, Team, Player, Lineup, PitchingOuting, ScoutedPlayer, Rotation, Game, CollaborationNote, PracticePlan, PlayerDevelopmentFocus, Sign, PlayerGameAbsence, PlayerPracticeAbsence
@@ -29,9 +31,9 @@ def get_session_data():
         'session': {
             'username': session.get('username'),
             'role': session.get('role'),
-            'outfielder_count': user.team.outfielder_count if user.team else 3
+            'outfielder_count': g.current_team.outfielder_count
         },
-        'player_order': get_player_order_as_list(user.player_order),
+        'player_order': player_order_for(g.membership),
     })
 
 @api_bp.route('/roster')
@@ -42,7 +44,7 @@ def get_roster():
         return jsonify({"error": "Team not found"}), 404
 
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
-    return jsonify([model_to_dict(p) for p in roster_db])
+    return jsonify([model_to_dict(p) for p in roster_db if p.is_active or g.current_team.is_archived])
 
 @api_bp.route('/lineups')
 @login_required
@@ -66,7 +68,7 @@ def get_pitching_data():
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
 
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules)
+    pitch_count_summary = calculate_pitch_count_summary([p for p in roster_db if p.is_active], pitching_outings_db, rules)
 
     return jsonify({
         'pitching': [pitching_outing_to_dict(po) for po in pitching_outings_db],
@@ -196,7 +198,7 @@ def get_overview_data():
     roster_db = db.session.query(Player).filter_by(team_id=team_id).all()
     pitching_outings_db = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules)
+    pitch_count_summary = calculate_pitch_count_summary([p for p in roster_db if p.is_active], pitching_outings_db, rules)
     pitchers_on_rest = {name: data for name, data in pitch_count_summary.items() if data['status'] == 'Resting'}
 
     # 3. 3-5 most recent collaboration notes
@@ -225,6 +227,8 @@ def get_game_data(game_id):
         return jsonify({"error": "Game not found"}), 404
 
     roster_objects = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
+    if game.date.date() >= datetime.now().date() and not team.is_archived:
+        roster_objects = [p for p in roster_objects if p.is_active]
     lineup_obj = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team_id).first()
     rotation_obj = db.session.query(Rotation).filter_by(associated_game_id=game.id, team_id=team_id).first()
 

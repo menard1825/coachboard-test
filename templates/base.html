@@ -28,6 +28,10 @@
       }
     </style>
     
+    {% if session.get('logged_in') %}
+    <script>window.coachboardTeam = {{ {'id': team_context_id, 'csrf': team_csrf_token}|tojson }};</script>
+    <script src="{{ url_for('static', filename='js/team_context.js', v='20260929') }}"></script>
+    {% endif %}
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -74,6 +78,12 @@
       </div>
     </nav>
     
+    {% if session.get('logged_in') %}
+    <div class="container-fluid py-2 border-bottom d-flex flex-wrap gap-2 align-items-center justify-content-between">
+      <span>{{ current_team.team_name }}{% if current_team.season_label %} · {{ current_team.season_label }}{% endif %}{% if current_team.is_archived %} <strong>Archived · Read-only</strong>{% endif %}</span>
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('seasons.index') }}">Teams & Seasons</a>
+    </div>
+    {% endif %}
     <main class="container-fluid mt-3">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}

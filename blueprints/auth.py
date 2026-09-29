@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import User, Team
+from models import User, Team, TeamMembership
+from team_access import activate_team
 from db import db
 from sqlalchemy import func
 from datetime import datetime
@@ -37,12 +38,21 @@ def login():
             user.last_login = datetime.now()
             db.session.commit()
 
+            session.clear()
             session['logged_in'] = True
             session['username'] = user.username
             session['full_name'] = user.full_name or ''
             session['role'] = user.role
             session['team_id'] = user.team_id
             session['player_order'] = get_player_order_as_list(user.player_order)
+            member = TeamMembership.query.filter_by(user_id=user.id, team_id=user.team_id).first()
+            if member is None:
+                member = TeamMembership.query.filter_by(user_id=user.id).first()
+            if member is None:
+                session.clear()
+                flash('Your account has no team access. Contact your head coach.', 'danger')
+                return redirect(url_for('auth.login'))
+            activate_team(user, member)
             session.permanent = True
             flash('You were successfully logged in.', 'success')
             return redirect(url_for('home'))
@@ -75,11 +85,11 @@ def register():
             return redirect(url_for('auth.register'))
 
         team = db.session.query(Team).filter_by(registration_code=reg_code).first()
-        if not team:
+        if not team or team.is_archived:
             flash('Invalid Registration Code.', 'danger')
             return redirect(url_for('auth.register'))
 
-        is_first_user = db.session.query(User).filter_by(team_id=team.id).count() == 0
+        is_first_user = TeamMembership.query.filter_by(team_id=team.id).count() == 0
         user_role = HEAD_COACH if is_first_user else ASSISTANT_COACH
 
         hashed_password = generate_password_hash(password)
@@ -95,6 +105,8 @@ def register():
             player_order=[]
         )
         db.session.add(new_user)
+        db.session.flush()
+        db.session.add(TeamMembership(user_id=new_user.id, team_id=team.id, role=user_role, player_order=[]))
         db.session.commit()
 
         session['logged_in'] = True
