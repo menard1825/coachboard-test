@@ -41,6 +41,10 @@ The source DB is opened in SQLite read-only mode and copied with the backup API,
 
 Review the returning-player list; create a sample new season; switch to the old team; confirm its games and pitching history; check game saves and archive/restore a sample player. Stop the preview with Ctrl+C.
 
+## Guarded production update
+
+After confirming the preview's old team still has its historical games/pitching and the new team has the expected returning roster with an empty schedule, run `scripts/deploy_rollover_production.py` **from the preview checkout** using the production virtualenv's Python. Pass the exact reviewed Git commit to `--apply`. Do not run the preview preparation script again. The helper refuses unexpected production code, tracked changes, database revision, preview commit, or service WorkingDirectory. It fetches and verifies the exact commit before stopping `coachboard.service`, backs up SQLite and logos to a timestamped private directory in the coach's home, checks that all original table values survived the migration, and starts and checks the login page. If any step after shutdown fails, it attempts to restore the original commit and database before restarting. Keep the printed backup path for manual recovery if needed.
+
 ## Production deployment gate
 
 Before changing the live app, verify the real database preview passed, review the UI, identify the exact systemd unit, and verify the app's configured session secret. Then:
