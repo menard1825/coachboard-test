@@ -54,8 +54,9 @@ def rollover():
     age = request.form.get('age_group', '')
     if not name or len(name) > 120 or not season or len(season) > 80 or age not in PITCHING_RULES['MLB Pitch Smart'] or age == 'default':
         return error('Enter a team name, season, and valid age group.', 400)
-    if Team.query.filter(func.lower(Team.team_name) == name.lower()).first():
-        return error('That team name already exists. Include the season in the name.', 400)
+    if Team.query.filter(func.lower(Team.team_name) == name.lower(),
+                         func.lower(Team.season_label) == season.lower()).first():
+        return error('A team with that name and season already exists. Choose a different season or team name.', 400)
     try:
         player_ids = {int(v) for v in request.form.getlist('players')}
         coach_ids = {int(v) for v in request.form.getlist('coaches')}

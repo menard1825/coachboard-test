@@ -98,6 +98,17 @@ def test_rollover_preserves_history_and_links_pitching(env):
     assert a.get('/api/roster').get_json()[0]['name']=='Graham'
 
 
+def test_rollover_allows_same_team_name_for_new_season(env):
+    app,ids=env;c=login(app)
+    assert rollover(c,ids,team_name='Prospects Fall 2026',season_label='Spring 2027').status_code==302
+    with app.app_context():
+        assert Team.query.filter_by(team_name='Prospects Fall 2026').count()==2
+    assert c.get('/teams/').status_code==200
+    assert rollover(c,ids,team_name='Prospects Fall 2026',season_label='Spring 2027').status_code==400
+    with app.app_context():
+        assert Team.query.filter_by(team_name='Prospects Fall 2026').count()==2
+
+
 def test_switch_rejects_foreign_team_and_stale_tab_writes(env):
     app,ids=env;c=login(app); old_headers=headers(c)
     assert c.post('/teams/switch',data={'team_id':ids['other']},headers=old_headers).status_code==403

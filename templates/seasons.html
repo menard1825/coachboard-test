@@ -22,7 +22,7 @@
     <p>Carry over the players and coaches you choose from <strong>{{ current_team.team_name }}</strong>. The new team starts with an empty schedule, pitching log, and lineup/defense templates. Old records stay with the previous team.</p>
     <form method="post" action="{{ url_for('seasons.rollover') }}" id="rollover-form">
       {{ guards() }}<input type="hidden" name="rollover_nonce" value="{{ rollover_nonce }}">
-      <div class="mb-3"><label class="form-label" for="new-team-name">New team name (include the season)</label><input class="form-control" id="new-team-name" name="team_name" maxlength="120" placeholder="Marucci Prospects 12U — Spring 2027" required></div>
+      <div class="mb-3"><label class="form-label" for="new-team-name">Team name</label><input class="form-control" id="new-team-name" name="team_name" maxlength="120" placeholder="Marucci Prospects Midwest 12U" required><div class="form-text">You can keep the same name for a different season.</div></div>
       <div class="row"><div class="col-sm-8 mb-3"><label class="form-label" for="season-label">Season</label><input class="form-control" id="season-label" name="season_label" maxlength="80" placeholder="Spring / Summer 2027" required></div>
       <div class="col-sm-4 mb-3"><label class="form-label" for="age-group">Age group</label><select class="form-select" id="age-group" name="age_group">{% for age in age_groups %}<option {% if age == current_team.age_group %}selected{% endif %}>{{ age }}</option>{% endfor %}</select></div></div>
       <fieldset class="mb-3"><legend class="h6">Returning players</legend>

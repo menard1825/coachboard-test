@@ -7,6 +7,7 @@ This branch is for the existing Flask production app, independently of Test App 
 
 - **Teams & Seasons** appears below the team header on desktop and mobile.
 - A head coach selects returning players and existing coaches, names the new team and season, and chooses its age group. Their own access is included automatically.
+- The team may keep its name across seasons; the same name and season pair is rejected to avoid an accidental duplicate.
 - Player profiles/notes, colors, coaching settings, and optionally signs carry over. Upload a logo separately: the existing uploader deletes its previous file, so sharing the old logo path would endanger the old team.
 - Schedules, game lineups, defense plans, attendance, pitching logs, and development records stay with the original team. New season totals begin empty.
 - Explicitly linked player profiles share pitching workload for availability calculations, including subsequent changes and a second rollover. Matching names never link unrelated players. The app continues using its existing pitching rule calculation; this change does not implement new USSSA rules.
