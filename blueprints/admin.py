@@ -213,10 +213,17 @@ def update_admin_settings():
         return redirect(url_for('.admin_settings'))
 
     team_settings.team_name = request.form.get('team_name', team_settings.team_name)
-    team_settings.display_coach_names = 'display_coach_names' in request.form
+    if 'general_settings' in request.form:
+        team_settings.display_coach_names = 'display_coach_names' in request.form
     team_settings.age_group = request.form.get('age_group', team_settings.age_group)
     team_settings.pitching_rule_set = request.form.get('pitching_rule_set', team_settings.pitching_rule_set)
-    team_settings.outfielder_count = int(request.form.get('outfielder_count', 3))
+    try:
+        outfielder_count = int(request.form.get('outfielder_count', team_settings.outfielder_count))
+    except (TypeError, ValueError):
+        return error('Choose three or four outfielders.', 400)
+    if outfielder_count not in (3, 4):
+        return error('Choose three or four outfielders.', 400)
+    team_settings.outfielder_count = outfielder_count
     
     # ADDED: Handle the new color inputs
     team_settings.primary_color = request.form.get('primary_color', team_settings.primary_color)

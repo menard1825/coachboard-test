@@ -14,7 +14,8 @@ def get_player_order_as_list(player_order_data):
     if not player_order_data:
         return []
     if isinstance(player_order_data, list):
-        return player_order_data
+        # Assign a fresh list so SQLAlchemy persists the new roster order.
+        return list(player_order_data)
     if isinstance(player_order_data, str):
         try:
             return json.loads(player_order_data)
@@ -25,7 +26,9 @@ def get_player_order_as_list(player_order_data):
 @scouting_bp.route('/add_scouted_player', methods=['POST'])
 def add_scouted_player():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'status': 'error', 'message': 'Invalid scouting data.'}), 400
         player_name = data.get('scouted_player_name')
         scouted_player_type = data.get('scouted_player_type')
         if not player_name:
@@ -65,6 +68,9 @@ def delete_scouted_player(list_type, player_id):
 
 @scouting_bp.route('/move_scouted_player/<from_type>/<to_type>/<int:player_id>', methods=['POST'])
 def move_scouted_player(from_type, to_type, player_id):
+    valid_types = {'targets', 'committed', 'not_interested'}
+    if from_type not in valid_types or to_type not in valid_types or from_type == to_type:
+        return jsonify({'status': 'error', 'message': 'Invalid scouting list.'}), 400
     player_to_move = db.session.query(ScoutedPlayer).filter_by(id=player_id, list_type=from_type, team_id=session['team_id']).first()
     if player_to_move:
         player_to_move.list_type = to_type

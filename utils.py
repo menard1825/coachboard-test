@@ -88,14 +88,14 @@ def calculate_cumulative_position_stats(roster_players, rotations):
     """Calculates the number of games a player appeared at each position in a rotation."""
     stats = {player.name: {} for player in roster_players}
 
-    # Create a set to track which players have already been counted for a specific game
-    # to prevent counting them multiple times for the same game rotation.
+    # A template is a draft, not a played game. Prefer the newest rotation if
+    # multiple saved rotations are linked to the same game.
     game_rotations_counted = set()
 
-    for rotation in rotations:
-        # A rotation is tied to a single game, so we use its ID to track.
-        # If no associated game, we can use the rotation's own ID as a unique identifier.
-        rotation_key = rotation.associated_game_id or rotation.id
+    for rotation in sorted(rotations, key=lambda r: r.id, reverse=True):
+        rotation_key = rotation.associated_game_id
+        if rotation_key is None:
+            continue
 
         # Skip if we've already processed this game/rotation
         if rotation_key in game_rotations_counted:

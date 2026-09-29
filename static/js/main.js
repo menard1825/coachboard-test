@@ -114,8 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const formattedTimestamp = p.notes_timestamp ? formatDateTime(p.notes_timestamp) : '';
         const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_player/${p.id}" data-delete-name="${pNameSafe}">Archive</button>`;
 
-        const positions = [p.position1, p.position2, p.position3].filter(Boolean).map(pos => `<span class="badge bg-secondary me-1">${pos}</span>`).join('') || '<span class="text-muted small">N/A</span>';
-        const batsThrows = `B/T: ${p.bats?.[0] || 'N'}/${p.throws?.[0] || 'N'}`;
+        const positions = [p.position1, p.position2, p.position3].filter(Boolean).map(pos => `<span class="badge bg-secondary me-1">${escapeHTML(pos)}</span>`).join('') || '<span class="text-muted small">N/A</span>';
+        const batsThrows = `B/T: ${escapeHTML(p.bats?.[0] || 'N')}/${escapeHTML(p.throws?.[0] || 'N')}`;
 
         return `
         <div class="col-12" data-player-name="${pNameSafe}">
@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </h6>
                     <div class="d-flex align-items-center">
                         <div class="me-3 d-none d-sm-block">${positions}</div>
-                        <span class="badge bg-primary rounded-pill">#${p.number || 'N/A'}</span>
+                        <span class="badge bg-primary rounded-pill">#${escapeHTML(p.number || 'N/A')}</span>
                     </div>
                 </div>
                 <div id="collapse-roster-${p.id}" class="collapse">
@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${(p.notes_author && p.notes_author !== 'N/A') ? `<div class="col-12 text-end"><small class="text-muted fst-italic">Last saved: ${pNotesAuthorSafe} on ${formattedTimestamp}</small></div>` : ''}
                             <hr class="my-3">
                             <div class="col-12 col-md-4"><label class="form-label">Name</label><input type="text" class="form-control" name="name" value="${pNameSafe}"></div>
-                            <div class="col-6 col-md-2"><label class="form-label">J#</label><input type="number" class="form-control" name="number" value="${p.number || ''}"></div>
+                            <div class="col-6 col-md-2"><label class="form-label">J#</label><input type="number" class="form-control" name="number" value="${escapeHTML(p.number || '')}"></div>
                             <div class="col-6 col-md-3"><label class="form-label">Pos 1</label>${renderPositionSelect('position1', `position1_${p.id}`, p.position1, '', 'form-select')}</div>
                             <div class="col-6 col-md-3"><label class="form-label">Pos 2</label>${renderPositionSelect('position2', `position2_${p.id}`, p.position2, '', 'form-select')}</div>
                             <div class="col-6 col-md-3"><label class="form-label">Pos 3</label>${renderPositionSelect('position3', `position3_${p.id}`, p.position3, '', 'form-select')}</div>
@@ -468,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_pitching/${o.id}" data-delete-name="this pitching outing for ${escapeHTML(o.player_name)}"><i class="bi bi-trash"></i></button>`;
                 return `
                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.player_name)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${o.outing_type}</span></span>
+                    <span>${formatDateTime(o.date)}: <strong>${escapeHTML(o.player_name)}</strong> vs ${escapeHTML(o.opponent)} - ${o.pitches} pitches <span class="badge bg-info">${escapeHTML(o.outing_type)}</span></span>
                     <div class="btn-group btn-group-sm">
                         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editPitchingOutingModal"
                             data-outing-id="${o.id}"
@@ -477,8 +477,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             data-opponent="${escapeHTML(o.opponent)}"
                             data-pitches="${o.pitches}"
                             data-innings="${o.innings}"
-                            data-outing-type="${o.outing_type}"
-                            data-pitcher-type="${o.pitcher_type}">
+                            data-outing-type="${escapeHTML(o.outing_type)}"
+                            data-pitcher-type="${escapeHTML(o.pitcher_type)}">
                             <i class="bi bi-pencil"></i>
                         </button>
                         ${deleteButtonHtml}
@@ -517,9 +517,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (key === 'committed') {
                     moveOptions = `<li><form action="/move_scouted_player_to_roster/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item fw-bold">To Roster</button></form></li><li><hr class="dropdown-divider"></li><li><form action="/move_scouted_player/committed/not_interested/${p.id}" method="POST" class="d-inline"><button type="submit" class="dropdown-item">To Not Interested</button></form></li>`;
                 }
-                const positions = [p.position1, p.position2].filter(Boolean).join(' / ') || 'N/A';
+                const positions = escapeHTML([p.position1, p.position2].filter(Boolean).join(' / ') || 'N/A');
                 const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_scouted_player/${key}/${p.id}" data-delete-name="${escapeHTML(p.name)}"><i class="bi bi-trash"></i></button>`;
-                return `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${positions} | T/B: ${p.throws || 'N'}/${p.bats || 'N'}</small></div><div class="btn-group">${deleteButtonHtml}${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
+                return `<li class="list-group-item d-flex justify-content-between align-items-center"><div><div class="fw-bold">${escapeHTML(p.name)}</div><small class="text-muted">Pos: ${positions} | T/B: ${escapeHTML(p.throws || 'N')}/${escapeHTML(p.bats || 'N')}</small></div><div class="btn-group">${deleteButtonHtml}${moveOptions ? `<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button><ul class="dropdown-menu dropdown-menu-end">${moveOptions}</ul>` : ''}</div></li>`;
             }).join('') : `<li class="list-group-item text-center text-muted">No players in this list.</li>`;
             container.innerHTML = playerHtml;
         };
@@ -970,7 +970,12 @@ document.addEventListener('DOMContentLoaded', () => {
             await fetchData();
         } catch (error) {
             console.error("Init Error:", error);
-            if(mainContent) mainContent.innerHTML = `<div class="alert alert-danger">Could not load app data. Please refresh the page. Error: ${error.message}</div>`;
+            if (mainContent) {
+                const message = document.createElement('div');
+                message.className = 'alert alert-danger';
+                message.textContent = `Could not load app data. Please refresh the page. Error: ${error.message}`;
+                mainContent.replaceChildren(message);
+            }
             return;
         }
         

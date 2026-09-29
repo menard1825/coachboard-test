@@ -119,7 +119,9 @@
                                 data-pitcher-type="{{ o.pitcher_type }}">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <a href="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" class="btn btn-outline-danger" onclick="return confirm('Are you sure?')"><i class="bi bi-trash"></i></a>
+                            <form action="{{ url_for('pitching.delete_pitching', outing_id=o.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure?')">
+                                <button type="submit" class="btn btn-outline-danger" aria-label="Delete pitching outing"><i class="bi bi-trash"></i></button>
+                            </form>
                         </div>
                     </li>
                 {% else %}

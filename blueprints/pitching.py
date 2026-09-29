@@ -7,6 +7,7 @@ from extensions import socketio
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary
 from datetime import datetime, date, timedelta
 from functools import wraps
+from math import isfinite
 
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 
@@ -41,6 +42,9 @@ def add_pitching():
         innings_pitched = float(request.form['innings'])
     except (ValueError, KeyError):
         flash('Innings pitched must be a valid number.', 'danger')
+        return redirect(request.referrer or url_for('pitching.pitching_page'))
+    if pitch_count < 0 or not isfinite(innings_pitched) or innings_pitched < 0:
+        flash('Pitches and innings must be nonnegative numbers.', 'danger')
         return redirect(request.referrer or url_for('pitching.pitching_page'))
 
     player_id = request.form.get('player_id')
@@ -130,8 +134,14 @@ def edit_pitching(outing_id):
                     outing_to_edit.player_id = player.id
 
         outing_to_edit.opponent = request.form.get('opponent', outing_to_edit.opponent)
-        outing_to_edit.pitches = int(request.form.get('pitches', outing_to_edit.pitches))
-        outing_to_edit.innings = float(request.form.get('innings', outing_to_edit.innings))
+        pitches = int(request.form.get('pitches', outing_to_edit.pitches))
+        innings = float(request.form.get('innings', outing_to_edit.innings))
+        if pitches < 0 or not isfinite(innings) or innings < 0:
+            db.session.rollback()
+            flash('Pitches and innings must be nonnegative numbers.', 'danger')
+            return redirect(url_for('pitching.pitching_page'))
+        outing_to_edit.pitches = pitches
+        outing_to_edit.innings = innings
         outing_to_edit.pitcher_type = request.form.get('pitcher_type', outing_to_edit.pitcher_type)
         outing_to_edit.outing_type = request.form.get('outing_type', outing_to_edit.outing_type)
         

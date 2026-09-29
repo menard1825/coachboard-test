@@ -157,7 +157,10 @@ def update_absences(game_id):
         flash('Game not found.', 'danger')
         return redirect(url_for('home', _anchor='games'))
 
-    absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
+    try:
+        absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
+    except ValueError:
+        return jsonify({'status': 'error', 'message': 'Invalid player selection.'}), 400
     db.session.query(PlayerGameAbsence).filter_by(game_id=game_id, team_id=team_id).delete()
 
     for player_id in absent_player_ids:
@@ -234,7 +237,9 @@ def delete_lineup(lineup_id):
 
 @gameday_bp.route('/save_rotation', methods=['POST'])
 def save_rotation():
-    rotation_data = request.get_json() or {}
+    rotation_data = request.get_json(silent=True)
+    if not isinstance(rotation_data, dict):
+        return jsonify({'status': 'error', 'message': 'Invalid rotation data.'}), 400
     rotation_id = rotation_data.get('id')
     title = rotation_data.get('title')
     innings_data = rotation_data.get('innings')
@@ -295,7 +300,9 @@ def delete_rotation(rotation_id):
 
 @gameday_bp.route('/save_rotation_as_template', methods=['POST'])
 def save_rotation_as_template():
-    payload = request.get_json()
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({'status': 'error', 'message': 'Invalid template data.'}), 400
     title = payload.get('title')
     innings_data = payload.get('innings')
 

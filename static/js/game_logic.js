@@ -80,8 +80,8 @@ function initializeGameManagement(gameData) {
             innings.push('1');
         }
         container.innerHTML = innings.map(inn => `
-            <input type="radio" class="btn-check" name="inning-radio" id="inning-${inn}" value="${inn}" ${state.currentInning == inn ? 'checked' : ''}>
-            <label class="btn btn-outline-primary" for="inning-${inn}">${inn}</label>
+            <input type="radio" class="btn-check" name="inning-radio" id="inning-${escapeHTML(inn)}" value="${escapeHTML(inn)}" ${state.currentInning == inn ? 'checked' : ''}>
+            <label class="btn btn-outline-primary" for="inning-${escapeHTML(inn)}">${escapeHTML(inn)}</label>
         `).join('');
         container.querySelectorAll('input[name="inning-radio"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
@@ -165,7 +165,7 @@ function initializeGameManagement(gameData) {
         html += '<thead class="table-light"><tr><th style="width: 150px; text-align: left;">Player</th>';
         innings.forEach(inn => {
             const isCurrent = inn === state.currentInning;
-            html += `<th class="${isCurrent ? 'table-primary border-primary' : ''}">Inning ${inn}</th>`;
+            html += `<th class="${isCurrent ? 'table-primary border-primary' : ''}">Inning ${escapeHTML(inn)}</th>`;
         });
         html += '</tr></thead><tbody>';
 
@@ -189,7 +189,7 @@ function initializeGameManagement(gameData) {
                 }
 
                 if (position) {
-                    html += `<td><span class="badge bg-success bg-opacity-10 text-success border border-success w-100">${position}</span></td>`;
+                    html += `<td><span class="badge bg-success bg-opacity-10 text-success border border-success w-100">${escapeHTML(position)}</span></td>`;
                 } else {
                     html += `<td class="bg-light"><span class="text-muted small">BENCH</span></td>`;
                 }
@@ -232,7 +232,7 @@ function initializeGameManagement(gameData) {
 
             html += `<div class="list-group-item">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-bold">Inning ${inn}</span>
+                    <span class="fw-bold">Inning ${escapeHTML(inn)}</span>
                     <span class="badge bg-secondary rounded-pill">${benchPlayers.length} Sitting</span>
                 </div>
                 <div class="d-flex flex-wrap gap-1">`;
@@ -283,9 +283,9 @@ function initializeGameManagement(gameData) {
                 }
 
                 if (position) {
-                    html += `<span class="badge bg-success bg-opacity-10 text-success border border-success" title="Inning ${inn}: ${position}">${inn}: ${position}</span>`;
+                    html += `<span class="badge bg-success bg-opacity-10 text-success border border-success" title="Inning ${escapeHTML(inn)}: ${escapeHTML(position)}">${escapeHTML(inn)}: ${escapeHTML(position)}</span>`;
                 } else {
-                     html += `<span class="badge bg-light text-muted border" title="Inning ${inn}: Bench">${inn}: BN</span>`;
+                     html += `<span class="badge bg-light text-muted border" title="Inning ${escapeHTML(inn)}: Bench">${escapeHTML(inn)}: BN</span>`;
                 }
             });
 
@@ -318,7 +318,7 @@ function initializeGameManagement(gameData) {
         for (const playerName of sortedPlayerNames) {
             const data = summary[playerName];
             if (!data) continue;
-            tableHtml += `<tr><td><strong>${playerName}</strong></td><td>${data.inningsOnField}</td><td>${data.inningsOnBench}</td><td>${Array.from(data.positions).join(', ') || 'N/A'}</td></tr>`;
+            tableHtml += `<tr><td><strong>${escapeHTML(playerName)}</strong></td><td>${data.inningsOnField}</td><td>${data.inningsOnBench}</td><td>${escapeHTML(Array.from(data.positions).join(', ') || 'N/A')}</td></tr>`;
         }
         tableHtml += `</tbody></table></div>`;
         const summaryDesktop = document.getElementById('summary-desktop');
@@ -423,7 +423,7 @@ function applyOutOfPositionIndicators() {
 
         // Rotation Grid
         const innings = Object.keys(state.rotation.innings || {}).sort((a,b) => parseInt(a)-parseInt(b));
-        const header = innings.map(inn => `<th>${inn}</th>`).join('');
+        const header = innings.map(inn => `<th>${escapeHTML(inn)}</th>`).join('');
 
         const sortedRoster = [...state.roster].sort((a,b) => a.name.localeCompare(b.name));
         const rotationRows = sortedRoster.map(p => {
@@ -433,7 +433,7 @@ function applyOutOfPositionIndicators() {
                 for(const [pos, name] of Object.entries(innData)) {
                     if(name === p.name) { position = pos; break; }
                 }
-                return position ? `<td><strong>${position}</strong></td>` : `<td style="color: #ccc;">-</td>`;
+                return position ? `<td><strong>${escapeHTML(position)}</strong></td>` : `<td style="color: #ccc;">-</td>`;
             }).join('');
             return `<tr><td style="text-align: left; padding-left: 10px;">${escapeHTML(p.name)}</td>${cells}</tr>`;
         }).join('');
@@ -1054,7 +1054,7 @@ function applyOutOfPositionIndicators() {
             const pasteCheckboxes = document.getElementById('inning-paste-checkboxes');
             pasteCheckboxes.innerHTML = Object.keys(state.rotation.innings)
                 .filter(inn => inn != state.currentInning)
-                .map(inn => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" value="${inn}" id="paste-check-${inn}"><label class="form-check-label" for="paste-check-${inn}">${inn}</label></div>`).join('');
+                .map(inn => `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" value="${escapeHTML(inn)}" id="paste-check-${escapeHTML(inn)}"><label class="form-check-label" for="paste-check-${escapeHTML(inn)}">${escapeHTML(inn)}</label></div>`).join('');
         });
         document.getElementById('pasteToSelectedBtn')?.addEventListener('click', () => {
             if (!state.copiedInningData) return;

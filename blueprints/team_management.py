@@ -43,7 +43,9 @@ def add_note(note_type):
 
 @team_management_bp.route('/edit_note', methods=['POST'])
 def edit_note():
-    note_id = int(request.form.get('note_id'))
+    note_id = request.form.get('note_id', type=int)
+    if note_id is None or not request.form.get('note_text', '').strip():
+        return jsonify({'status': 'error', 'message': 'A valid note and text are required.'}), 400
     note_type = request.form.get('note_type')
     new_text = request.form.get('note_text')
     
@@ -152,7 +154,10 @@ def update_practice_attendance(plan_id):
     if not plan:
         return jsonify({'status': 'error', 'message': 'Practice plan not found'}), 404
 
-    absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
+    try:
+        absent_player_ids = [int(pid) for pid in request.form.getlist('absent_players')]
+    except ValueError:
+        return jsonify({'status': 'error', 'message': 'Invalid player selection.'}), 400
     
     db.session.query(PlayerPracticeAbsence).filter_by(practice_plan_id=plan_id, team_id=team_id).delete()
 
@@ -221,7 +226,9 @@ def update_task_status(plan_id, task_id):
     if not task:
         return jsonify({'status': 'error', 'message': 'Task not found'}), 404
     
-    request_data = request.get_json()
+    request_data = request.get_json(silent=True)
+    if not isinstance(request_data, dict):
+        return jsonify({'status': 'error', 'message': 'Invalid task status.'}), 400
     new_status = request_data.get('status')
     if new_status not in ['pending', 'complete']:
         return jsonify({'status': 'error', 'message': 'Invalid status'}), 400

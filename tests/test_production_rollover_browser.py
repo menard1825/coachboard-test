@@ -8,7 +8,7 @@ from werkzeug.serving import make_server
 from playwright.sync_api import sync_playwright, expect
 from test_production_rollover import env
 from db import db
-from models import Game, Player, PracticePlan, Rotation
+from models import Game, Player, PracticePlan, Rotation, PitchingOuting, ScoutedPlayer
 from extensions import socketio
 
 
@@ -124,6 +124,69 @@ def test_game_rotation_delete_posts_and_preserves_game(live, env):
             assert db.session.get(Rotation, rotation_id) is None
             assert db.session.get(Game, ids['game']) is not None
             assert db.session.get(Player, ids['player']) is not None
+        browser.close()
+
+
+@pytest.mark.parametrize('path', ['/pitching', 'game'])
+def test_pitching_delete_cancel_preserves_outing(live, env, path):
+    url, ids = live
+    with env[0].app_context():
+        outing = PitchingOuting.query.filter_by(team_id=ids['old']).one()
+        outing_id = outing.id
+    with sync_playwright() as p:
+        browser = chromium(p)
+        context = browser.new_context(viewport={'width': 1366, 'height': 900})
+        local_cdn(context)
+        page = context.new_page()
+        page.goto(url + '/login')
+        page.locator('[name=username]').fill('head')
+        page.locator('[name=password]').fill('password')
+        page.locator('button[type=submit]').click()
+        page.goto(url + (f'/game/{ids["game"]}' if path == 'game' else path))
+        dismiss = lambda dialog: dialog.dismiss()
+        page.on('dialog', dismiss)
+        button = page.locator(f'form[action="/delete_pitching/{outing_id}"] button')
+        expect(button).to_have_count(1, timeout=3000)
+        button.click()
+        with env[0].app_context():
+            assert db.session.get(PitchingOuting, outing_id) is not None
+        page.remove_listener('dialog', dismiss)
+        page.on('dialog', lambda dialog: dialog.accept())
+        with page.expect_response(lambda response: response.url.endswith(f'/delete_pitching/{outing_id}') and response.request.method == 'POST') as response:
+            button.click()
+        assert response.value.status == 302
+        with env[0].app_context():
+            assert db.session.get(PitchingOuting, outing_id) is None
+        browser.close()
+
+
+def test_user_entered_fields_render_as_text_in_dashboard_and_game(live, env):
+    url, ids = live
+    payload = '<img src=x onerror="window.__auditXss=1">'
+    with env[0].app_context():
+        db.session.add(Player(team_id=ids['old'], name=payload, position1=payload))
+        db.session.add(ScoutedPlayer(team_id=ids['old'], name='Scout',
+                                     position1=payload, list_type='targets'))
+        outing = PitchingOuting.query.filter_by(team_id=ids['old']).one()
+        outing.outing_type = payload
+        rotation = Rotation.query.filter_by(team_id=ids['old'], associated_game_id=ids['game']).one()
+        rotation.innings = {'1': {'P': 'Graham', payload: 'Departing'}}
+        db.session.commit()
+    with sync_playwright() as p:
+        browser = chromium(p)
+        context = browser.new_context(viewport={'width': 1440, 'height': 1000})
+        local_cdn(context)
+        page = context.new_page()
+        page.goto(url + '/login')
+        page.locator('[name=username]').fill('head')
+        page.locator('[name=password]').fill('password')
+        page.locator('button[type=submit]').click()
+        expect(page.locator('#roster-cards-container')).to_contain_text(payload)
+        expect(page.locator('#scouting-list-targets')).to_contain_text(payload)
+        assert page.evaluate('window.__auditXss || 0') == 0
+        page.goto(url + f'/game/{ids["game"]}')
+        expect(page.locator('#rotation-matrix-container')).to_contain_text(payload)
+        assert page.evaluate('window.__auditXss || 0') == 0
         browser.close()
 
 

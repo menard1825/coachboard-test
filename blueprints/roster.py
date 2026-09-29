@@ -1,7 +1,7 @@
 from team_access import team_members
 from flask import g
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
-from models import Player, User
+from models import Player, User, Lineup, Rotation, CollaborationNote
 from db import db
 from extensions import socketio
 import json
@@ -14,7 +14,8 @@ def get_player_order_as_list(player_order_data):
     if not player_order_data:
         return []
     if isinstance(player_order_data, list):
-        return player_order_data
+        # JSON columns detect replacement, but may miss an in-place append.
+        return list(player_order_data)
     if isinstance(player_order_data, str):
         try:
             return json.loads(player_order_data)
@@ -74,9 +75,47 @@ def update_player_inline(player_id):
         return jsonify({'status': 'error', 'message': 'Player not found.'}), 404
     
     original_name = player_to_edit.name
-    new_name = request.form.get('name', original_name)
+    new_name = request.form.get('name', original_name).strip()
+    if not new_name:
+        return jsonify({'status': 'error', 'message': 'Player name is required.'}), 400
     if new_name != original_name and db.session.query(Player).filter_by(name=new_name, team_id=session['team_id']).first():
         return jsonify({'status': 'error', 'message': f'Player name "{new_name}" already exists.'}), 400
+
+    if new_name != original_name:
+        # Saved lineups, defense and ordering use player names rather than IDs.
+        # Move these references in the same transaction as the roster rename.
+        for member in team_members(session['team_id']):
+            order = get_player_order_as_list(member.player_order)
+            if original_name in order:
+                member.player_order = [new_name if item == original_name else item for item in order]
+        for lineup in Lineup.query.filter_by(team_id=session['team_id']):
+            positions = lineup.lineup_positions
+            if isinstance(positions, str):
+                try:
+                    positions = json.loads(positions)
+                except (ValueError, TypeError):
+                    continue
+            if isinstance(positions, list) and original_name in positions:
+                lineup.lineup_positions = [new_name if item == original_name else item for item in positions]
+        for rotation in Rotation.query.filter_by(team_id=session['team_id']):
+            innings = rotation.innings
+            if isinstance(innings, str):
+                try:
+                    innings = json.loads(innings)
+                except (ValueError, TypeError):
+                    continue
+            if isinstance(innings, dict):
+                updated = {inning: {position: new_name if name == original_name else name
+                                    for position, name in assignments.items()}
+                           if isinstance(assignments, dict) else assignments
+                           for inning, assignments in innings.items()}
+                if updated != innings:
+                    rotation.innings = updated
+        CollaborationNote.query.filter_by(team_id=session['team_id'], note_type='player_notes',
+                                          player_name=original_name).update({'player_name': new_name})
+        if 'player_order' in session:
+            session['player_order'] = [new_name if item == original_name else item
+                                       for item in get_player_order_as_list(session['player_order'])]
 
     player_to_edit.name = new_name
     player_to_edit.number = request.form.get('number', player_to_edit.number)
@@ -110,7 +149,10 @@ def save_player_order():
     user = g.membership
     if not user: return jsonify({'status': 'error', 'message': 'User not found'}), 404
     
-    new_order = request.json.get('player_order')
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({'status': 'error', 'message': 'Invalid order format'}), 400
+    new_order = payload.get('player_order')
     if not isinstance(new_order, list): 
         return jsonify({'status': 'error', 'message': 'Invalid order format'}), 400
     

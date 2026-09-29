@@ -191,7 +191,8 @@ def get_overview_data():
     # 1. Next upcoming game
     next_game = db.session.query(Game).filter(
         Game.team_id == team_id,
-        Game.date >= datetime.utcnow()
+        # Games are saved at midnight, so a game later today is still upcoming.
+        Game.date >= datetime.combine(datetime.now().date(), datetime.min.time())
     ).order_by(Game.date.asc()).first()
 
     # 2. Pitchers on mandatory rest

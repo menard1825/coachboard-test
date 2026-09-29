@@ -36,6 +36,7 @@
                     <div class="tab-content">
                         <div class="tab-pane fade show active" id="general-settings">
                             <form action="{{ url_for('admin.update_admin_settings') }}" method="POST">
+                                <input type="hidden" name="general_settings" value="1">
                                 <h6 class="text-muted">General</h6>
                                 <div class="form-floating mb-3">
                                     <input type="text" class="form-control" id="team_name" name="team_name" value="{{ settings.team_name }}" required>

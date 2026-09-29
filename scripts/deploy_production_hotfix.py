@@ -17,7 +17,10 @@ from deploy_rollover_production import (
     check_database, wait_for_app,
 )
 
-CURRENT = 'b69679ea471fde57fdff29be0c04d45895c67da9'
+REVIEWED_CURRENT_COMMITS = {
+    'b69679ea471fde57fdff29be0c04d45895c67da9',
+    '1f118ce4469b4ca8210fae2ee56e52096fc2036d',
+}
 REVISION = '20260929_team_rollover'
 
 
@@ -36,7 +39,8 @@ def main():
         parser.error('The separate preview checkout is not at the reviewed commit.')
     if git(PREVIEW, 'status', '--porcelain', '--untracked-files=no'):
         parser.error('Preview has tracked changes; stop and review them first.')
-    if git(PROD, 'rev-parse', 'HEAD') != CURRENT:
+    current = git(PROD, 'rev-parse', 'HEAD')
+    if current not in REVIEWED_CURRENT_COMMITS:
         parser.error('Production code changed. Stop and review before updating.')
     if git(PROD, 'status', '--porcelain', '--untracked-files=no'):
         parser.error('Production has tracked changes. Stop and review before updating.')
@@ -65,7 +69,7 @@ def main():
                 source.backup(destination)
         check_database(backup, REVISION)
         (backup_dir / 'deployment.json').write_text(json.dumps({
-            'original_commit': CURRENT, 'target_commit': target,
+            'original_commit': current, 'target_commit': target,
             'service': SERVICE, 'production': str(PROD)}, indent=2) + '\n')
 
         git(PROD, 'checkout', '--detach', target)
@@ -79,7 +83,7 @@ def main():
             print('Hotfix failed; restoring the previous code and database.', file=sys.stderr)
             try:
                 run('sudo', 'systemctl', 'stop', SERVICE)
-                git(PROD, 'checkout', '--detach', CURRENT)
+                git(PROD, 'checkout', '--detach', current)
                 if backup.is_file():
                     for suffix in ('-wal', '-shm'):
                         (PROD / ('app.db' + suffix)).unlink(missing_ok=True)
