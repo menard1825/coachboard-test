@@ -4,7 +4,10 @@ from models import (
 )
 from db import db
 from extensions import socketio
+import json
 from datetime import datetime
+
+from blueprints.live_game_write_lock import game_write_lock
 from models import GameRotationEvent, PlayerPitchTarget
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
 from lineup_service import (
@@ -310,49 +313,133 @@ def delete_lineup(lineup_id):
     redirect_url = request.referrer or url_for('home', _anchor='lineups')
     return redirect(redirect_url)
 
+def _inning_label(key):
+    try:
+        number = float(key)
+    except (TypeError, ValueError):
+        return f'inning {key}'
+    if not number.is_integer():
+        return f'Inning {key}'
+    n = int(number)
+    suffix = 'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+    return f'{n}{suffix} inning'
+
+
+_FIELD_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'CF', 'RCF', 'RF']
+
+
+def _field_order(position):
+    return (_FIELD_ORDER.index(position) if position in _FIELD_ORDER else len(_FIELD_ORDER), position)
+
+
+def _duplicate_assignment(innings, stored_innings):
+    """The first player placed at two positions in one inning, as a message.
+
+    Only innings that differ from what is stored are checked. The browser
+    always sends the whole rotation, so checking every inning would let one
+    duplicate saved before this rule (for example from the old Whole-game
+    Saved Defense) block every later edit to the game -- including edits to
+    other innings. An inning the coach changes, including the edit that
+    fixes an old duplicate, is always checked. Open positions,
+    including a P not yet chosen for a later inning, are fine. Nothing is
+    moved to resolve a duplicate: the whole save is refused.
+    """
+    for key, alignment in innings.items():
+        if not isinstance(alignment, dict) or alignment == stored_innings.get(key):
+            continue
+        spots = {}
+        for position, name in alignment.items():
+            name = name.strip() if isinstance(name, str) else name
+            if not name:
+                continue
+            spots.setdefault(name, []).append(str(position))
+        for name, positions in spots.items():
+            if len(positions) > 1:
+                positions = sorted(positions, key=_field_order)
+                listed = ', '.join(positions[:-1]) + f' and {positions[-1]}'
+                where = 'both ' if len(positions) == 2 else ''
+                return f'{name} is assigned to {where}{listed} in the {_inning_label(key)}.'
+    return None
+
+
+def _as_game_id(value):
+    try:
+        return int(value) if value not in (None, '') else None
+    except (TypeError, ValueError):
+        return None
+
+
 @gameday_bp.route('/save_rotation', methods=['POST'])
 def save_rotation():
-    rotation_data = request.get_json()
+    rotation_data = request.get_json(silent=True) or {}
     rotation_id = rotation_data.get('id')
     title = rotation_data.get('title')
     innings_data = rotation_data.get('innings')
     associated_game_id = rotation_data.get('associated_game_id')
+    team_id = session['team_id']
 
     if not title or not isinstance(innings_data, dict):
         return jsonify({'status': 'error', 'message': 'Invalid data provided.'}), 400
 
+    rotation_to_update = None
     if rotation_id:
-        rotation_to_update = db.session.query(Rotation).filter_by(id=rotation_id, team_id=session['team_id']).first()
-        if rotation_to_update:
-            rotation_to_update.title = title
-            rotation_to_update.innings = innings_data
-            rotation_to_update.associated_game_id = associated_game_id
-            message = 'Rotation updated successfully!'
-            new_rotation_id = rotation_id
-        else: 
-            rotation_id = None
-    
-    if not rotation_id:
-        new_rotation = Rotation(
-            title=title, 
-            innings=innings_data,
-            associated_game_id=associated_game_id, 
-            team_id=session['team_id']
-        )
-        db.session.add(new_rotation)
-        db.session.commit()
-        new_rotation_id = new_rotation.id
-        message = 'Rotation saved successfully!'
+        rotation_to_update = db.session.query(Rotation).filter_by(id=rotation_id, team_id=team_id).first()
+
+    game_id = _as_game_id(associated_game_id)
+    if game_id is None and rotation_to_update is not None:
+        game_id = _as_game_id(rotation_to_update.associated_game_id)
+
+    if game_id is None:
+        # A reusable template, not a game's plan: no game lock or game rules.
+        return _write_rotation(rotation_to_update, title, innings_data, associated_game_id, team_id)
+
+    # The read/check/write below runs under the game's write lock, so no live
+    # write for this game -- Start Game included -- can run in the middle of
+    # it, and it cannot land in the middle of one.
+    with game_write_lock(game_id):
+        db.session.expire_all()
+        game = db.session.query(Game).filter_by(id=game_id, team_id=team_id).first()
+        if game is not None and game.is_live:
+            return jsonify({
+                'status': 'error',
+                'message': 'Pregame defense is locked while the game is live. Use Live Game controls.',
+            }), 409
+
+        if rotation_id:
+            rotation_to_update = db.session.query(Rotation).filter_by(id=rotation_id, team_id=team_id).first()
+        stored = (rotation_to_update.innings if rotation_to_update else None) or {}
+        if isinstance(stored, str):
+            try:
+                stored = json.loads(stored)
+            except ValueError:
+                stored = {}
+        duplicate = _duplicate_assignment(innings_data, stored if isinstance(stored, dict) else {})
+        if duplicate:
+            return jsonify({'status': 'error', 'code': 'duplicate_player', 'message': duplicate}), 400
+
+        return _write_rotation(rotation_to_update, title, innings_data, associated_game_id, team_id)
+
+
+def _write_rotation(rotation_to_update, title, innings_data, associated_game_id, team_id):
+    if rotation_to_update is not None:
+        rotation_to_update.title = title
+        rotation_to_update.innings = innings_data
+        rotation_to_update.associated_game_id = associated_game_id
+        message = 'Rotation updated successfully!'
+        saved_rotation = rotation_to_update
     else:
-         db.session.commit()
+        saved_rotation = Rotation(
+            title=title,
+            innings=innings_data,
+            associated_game_id=associated_game_id,
+            team_id=team_id
+        )
+        db.session.add(saved_rotation)
+        message = 'Rotation saved successfully!'
+    db.session.commit()
 
-    # Re-fetch the rotation to send back a complete object
-    saved_rotation = db.session.query(Rotation).get(new_rotation_id)
-    if saved_rotation:
-        socketio.emit('rotation_save', {'rotation': model_to_dict(saved_rotation)})
-
-
-    return jsonify({'status': 'success', 'message': message, 'new_id': new_rotation_id})
+    socketio.emit('rotation_save', {'rotation': model_to_dict(saved_rotation)})
+    return jsonify({'status': 'success', 'message': message, 'new_id': saved_rotation.id})
 
 @gameday_bp.route('/delete_rotation/<int:rotation_id>')
 def delete_rotation(rotation_id):

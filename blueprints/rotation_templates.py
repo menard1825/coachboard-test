@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 
+from blueprints.live_game_write_lock import game_write_lock
 from db import db
 from extensions import socketio
 from models import Game, GameRotationEvent, Player, Rotation, Team
@@ -61,13 +62,27 @@ def prepare_regulation_innings_for_game_management():
     if not game or game.is_live or game.date.date() < _team_today(team):
         return None
 
+    # Same per-game lock as /save_rotation and the live writes, so this
+    # top-up can't interleave with a plan save or Start Game. Everything is
+    # checked again under the lock.
+    with game_write_lock(game_id):
+        db.session.expire_all()
+        _top_up_regulation_innings(team, game_id)
+    return None
+
+
+def _top_up_regulation_innings(team, game_id):
+    game = db.session.query(Game).filter_by(id=game_id, team_id=team.id).first()
+    if not game or game.is_live or game.date.date() < _team_today(team):
+        return
+
     has_live_history = db.session.query(GameRotationEvent.id).filter_by(
         game_id=game.id,
         team_id=team.id,
         reverted=False,
     ).first()
     if has_live_history:
-        return None
+        return
 
     count = regulation_innings_for_team(team)
     rotation = db.session.query(Rotation).filter_by(
@@ -83,7 +98,7 @@ def prepare_regulation_innings_for_game_management():
             team_id=team.id,
         ))
         db.session.commit()
-        return None
+        return
 
     innings = deepcopy(rotation.innings or {})
     changed = False
@@ -95,7 +110,6 @@ def prepare_regulation_innings_for_game_management():
     if changed:
         rotation.innings = dict(sorted(innings.items(), key=lambda item: float(item[0])))
         db.session.commit()
-    return None
 
 
 def _clean_innings(raw_innings, team, roster_names):

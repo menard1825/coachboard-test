@@ -1,7 +1,8 @@
 from collections import defaultdict
+from contextlib import contextmanager
 
 from eventlet.semaphore import Semaphore
-from flask import Blueprint, g, request
+from flask import Blueprint, g, has_app_context, request
 
 
 live_game_write_lock_bp = Blueprint('live_game_write_lock', __name__)
@@ -46,6 +47,28 @@ def serialize_live_game_write():
     lock.acquire()
     g.coachboard_live_game_lock = lock
     return None
+
+
+@contextmanager
+def game_write_lock(game_id):
+    """Hold the same per-game lock for a write outside the live-game routes.
+
+    The pregame plan (/save_rotation) and the regulation-innings top-up read,
+    check and write the game's rotation; holding this lock across all three
+    means no live write for the game -- Start Game included -- can run in the
+    middle, and vice versa. The semaphore is not reentrant, so a request that
+    already holds it through serialize_live_game_write() is not blocked.
+    """
+    lock = _game_locks[int(game_id)]
+    held = getattr(g, 'coachboard_live_game_lock', None) if has_app_context() else None
+    if held is lock:
+        yield
+        return
+    lock.acquire()
+    try:
+        yield
+    finally:
+        lock.release()
 
 
 @live_game_write_lock_bp.teardown_app_request
