@@ -23,7 +23,11 @@
                     </li>
                     <li><a class="dropdown-item" href="#" id="saveAsTemplateBtn"><i class="bi bi-journal-plus me-1"></i> Save as New Template</a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item text-danger" href="#" id="deleteRotationBtn" {% if not rotation or not rotation.id %}disabled{% endif %}><i class="bi bi-trash me-1"></i> Delete Rotation</a></li>
+                    <li>
+                        <form id="deleteRotationForm" method="POST">
+                            <button type="button" class="dropdown-item text-danger" id="deleteRotationBtn" {% if not rotation or not rotation.id %}disabled{% endif %}><i class="bi bi-trash me-1"></i> Delete Rotation</button>
+                        </form>
+                    </li>
                 </ul>
             </div>
         </div>

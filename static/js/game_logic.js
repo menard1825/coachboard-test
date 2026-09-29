@@ -685,6 +685,7 @@ function applyOutOfPositionIndicators() {
 
             if (result.new_id) {
                 state.rotation.id = result.new_id;
+                document.getElementById('deleteRotationBtn')?.removeAttribute('disabled');
 
                 // If another edit occurred while the first-ever rotation
                 // save was running, make sure the queued request updates
@@ -957,7 +958,9 @@ function applyOutOfPositionIndicators() {
 
         document.getElementById('deleteRotationBtn')?.addEventListener('click', () => {
             if (state.rotation?.id && confirm(`Are you sure you want to delete this rotation?`)) {
-                window.location.href = `/delete_rotation/${state.rotation.id}`;
+                const form = document.getElementById('deleteRotationForm');
+                form.action = `/delete_rotation/${state.rotation.id}`;
+                form.requestSubmit();
             }
         });
         document.body.addEventListener('click', function(event){

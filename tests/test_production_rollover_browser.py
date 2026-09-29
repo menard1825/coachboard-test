@@ -8,7 +8,7 @@ from werkzeug.serving import make_server
 from playwright.sync_api import sync_playwright, expect
 from test_production_rollover import env
 from db import db
-from models import Player, PracticePlan, Rotation
+from models import Game, Player, PracticePlan, Rotation
 from extensions import socketio
 
 
@@ -87,6 +87,43 @@ def test_home_partial_failure_and_unsaved_forms_survive_live_refresh(live, env):
         expect(plan.locator('[name=emphasis]')).to_have_value('Unsaved practice emphasis')
         expect(plan.locator(f'[name=absent_players][value="{ids["player"]}"]')).to_be_checked()
         assert not errors, errors
+        browser.close()
+
+
+def test_game_rotation_delete_posts_and_preserves_game(live, env):
+    url, ids = live
+    with env[0].app_context():
+        rotation_id = Rotation.query.filter_by(team_id=ids['old'], associated_game_id=ids['game']).one().id
+    with sync_playwright() as p:
+        browser = chromium(p)
+        context = browser.new_context(viewport={'width': 1376, 'height': 1032}, has_touch=True)
+        local_cdn(context)
+        page = context.new_page()
+        page.goto(url + '/login')
+        page.locator('[name=username]').fill('head')
+        page.locator('[name=password]').fill('password')
+        page.locator('button[type=submit]').click()
+        page.goto(url + f'/game/{ids["game"]}')
+        assert context.request.get(url + f'/delete_rotation/{rotation_id}').status == 405
+        dismiss = lambda dialog: dialog.dismiss()
+        page.on('dialog', dismiss)
+        page.get_by_role('button', name='Menu').click()
+        page.get_by_role('button', name='Delete Rotation').click()
+        with env[0].app_context():
+            assert db.session.get(Rotation, rotation_id) is not None
+
+        page.remove_listener('dialog', dismiss)
+        page.on('dialog', lambda dialog: dialog.accept())
+        page.get_by_role('button', name='Menu').click()
+        with page.expect_response(lambda response: response.url.endswith(f'/delete_rotation/{rotation_id}') and response.request.method == 'POST') as response:
+            page.get_by_role('button', name='Delete Rotation').click()
+        assert response.value.status == 302
+        expect(page).to_have_url(url + f'/game/{ids["game"]}')
+        expect(page.get_by_text('Rotation deleted successfully!')).to_be_visible()
+        with env[0].app_context():
+            assert db.session.get(Rotation, rotation_id) is None
+            assert db.session.get(Game, ids['game']) is not None
+            assert db.session.get(Player, ids['player']) is not None
         browser.close()
 
 
