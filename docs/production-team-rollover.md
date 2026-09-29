@@ -37,7 +37,7 @@ python scripts/prepare_rollover_preview.py /home/mike1825/team-coach-app-dev3
 python scripts/run_rollover_preview.py
 ```
 
-The source DB is opened in SQLite read-only mode and copied with the backup API, including committed WAL data. The script refuses to overwrite a preview database. Uploaded logos are copied, never moved. Preview uses port 5006, a separate cookie, and a random secret; it uses the existing coach accounts from the copy. Changes in the preview are disposable and **must not** be copied back over production.
+The source DB is opened in SQLite read-only mode and copied with the backup API, including committed WAL data. The script refuses to overwrite a preview database. Uploaded logos are copied, never moved. Preview prefers port 5006, chooses an available port if needed, and prints its URL. It uses a separate cookie and a random secret with the existing coach accounts from the copy. Changes in the preview are disposable and **must not** be copied back over production.
 
 Review the returning-player list; create a sample new season; switch to the old team; confirm its games and pitching history; check game saves and archive/restore a sample player. Stop the preview with Ctrl+C.
 
