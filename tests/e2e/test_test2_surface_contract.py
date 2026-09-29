@@ -13,6 +13,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -218,7 +219,7 @@ def test_test2_pregame_modes_quick_field_and_pause_resume(page: Page, coachboard
         readiness = page.request.get(f'{coachboard_url}/api/game-day/{game_id}/readiness').json()
         assert readiness['readiness']['lineup_ready'] is False
         assert readiness['ready'] is True, readiness
-        started = post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+        started = post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
         assert started['state']['game']['is_live'] is True
 
         page.reload(wait_until='domcontentloaded')

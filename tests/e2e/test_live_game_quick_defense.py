@@ -13,6 +13,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -113,7 +114,7 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
     bench_player_id = None
 
     try:
-        started = post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+        started = post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
         bench_player = next(player for player in started['state']['roster'] if player['name'] == BENCH_NAME)
         bench_player_id = bench_player['id']
 
@@ -414,12 +415,7 @@ def test_pitcher_change_asks_where_the_pitcher_goes_and_can_leave_defense_open(
             },
         )
 
-        started = post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        started = post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         assert (
             started['state']['current_alignment']['2B']

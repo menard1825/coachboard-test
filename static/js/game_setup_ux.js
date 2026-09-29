@@ -97,6 +97,14 @@
     btn.disabled = !payload.ready;
     btn.classList.toggle('disabled', !payload.ready);
 
+    if (payload.ready && payload.open_question) {
+      // An open fielding position is the coach's call: Start stays usable
+      // and asks about it.
+      box.className = 'alert alert-warning border-0 shadow-sm mb-3';
+      box.innerHTML = `<strong>${esc(payload.open_question.title)}</strong><div class="small mt-1">${esc(payload.open_question.message)} Start Game will ask before first pitch.</div>`;
+      return;
+    }
+
     if (payload.ready) {
       box.className = 'alert alert-success border-0 shadow-sm mb-3';
       box.innerHTML = '<strong>Ready for first pitch.</strong><div class="small mt-1">Batting order and later innings can be added later.</div>';

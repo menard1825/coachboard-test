@@ -13,6 +13,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -86,7 +87,7 @@ def test_phone_current_fielder_uses_quick_field_move_sheet(page: Page, coachboar
     game_id = create_game(page, coachboard_url)
 
     try:
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
         quick = page.locator('#cbQuickDefense')

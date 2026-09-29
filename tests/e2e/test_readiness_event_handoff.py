@@ -32,6 +32,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -452,7 +453,7 @@ def test_readiness_request_rate_characterization(page: Page, coachboard_url: str
     game_id, _ = create_ready_pregame_game(page, coachboard_url, f'Handoff {label}')
     try:
         if go_live:
-            post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+            post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
             state = page.request.get(
                 f'{coachboard_url}/api/live-game/{game_id}/state'
             ).json()

@@ -13,6 +13,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 import cdn_assets
 from e2e_cleanup import release_game
@@ -493,9 +494,7 @@ def test_live_game_validation_legacy_client_and_cross_site_safety(page: Page, co
         response = page.request.post(f'{coachboard_url}{path}', data={'game_id': game_id})
         assert response.status == 410, f'{path} should require a refreshed client'
 
-    cross_site = page.request.post(
-        f'{coachboard_url}/api/live-game/{game_id}/start',
-        data={},
+    cross_site = page.request.post(f'{coachboard_url}/api/live-game/{game_id}/start', data=start_body(page.request, coachboard_url, game_id),
         headers={'Origin': 'https://evil.example', 'Sec-Fetch-Site': 'cross-site'},
     )
     assert cross_site.status == 403

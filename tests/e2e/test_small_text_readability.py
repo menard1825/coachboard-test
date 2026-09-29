@@ -25,6 +25,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import expect  # noqa: E402
+from start_helpers import start_body  # noqa: E402
 
 import cdn_assets  # noqa: E402
 
@@ -169,7 +170,7 @@ def live_game(make_page, coachboard_url):
     page.request.post(f'{coachboard_url}/save_rotation', data={
         'title': 'Readability Rotation', 'innings': {'1': _alignment(), '2': _alignment()},
         'associated_game_id': game_id})
-    assert page.request.post(f'{coachboard_url}/api/live-game/{game_id}/start', data={}).ok
+    assert page.request.post(f'{coachboard_url}/api/live-game/{game_id}/start', data=start_body(page.request, coachboard_url, game_id)).ok
     page.goto(f'{coachboard_url}/game/{game_id}')
     expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=20_000)
     page.wait_for_timeout(800)

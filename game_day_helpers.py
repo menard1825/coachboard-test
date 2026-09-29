@@ -27,6 +27,45 @@ def team_now(team):
         return datetime.now()
 
 
+FIELD_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'CF', 'RCF', 'RF']
+
+
+def field_order(position):
+    return (FIELD_ORDER.index(position) if position in FIELD_ORDER else len(FIELD_ORDER), position)
+
+
+def inning_label(key):
+    """'1st inning', '2nd inning' -- or 'Inning 2.1' for a planned change."""
+    try:
+        number = float(key)
+    except (TypeError, ValueError):
+        return f'inning {key}'
+    if not number.is_integer():
+        return f'Inning {key}'
+    n = int(number)
+    suffix = 'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+    return f'{n}{suffix} inning'
+
+
+def duplicate_assignment_message(alignment, inning_key):
+    """'Jake is assigned to both P and SS in the 1st inning.' for the first
+    player placed at more than one position, or None. Open positions are
+    fine; nothing is moved."""
+    spots = {}
+    for position, name in (alignment or {}).items():
+        name = name.strip() if isinstance(name, str) else name
+        if not name:
+            continue
+        spots.setdefault(name, []).append(str(position))
+    for name, positions in spots.items():
+        if len(positions) > 1:
+            positions = sorted(positions, key=field_order)
+            listed = ', '.join(positions[:-1]) + f' and {positions[-1]}'
+            where = 'both ' if len(positions) == 2 else ''
+            return f'{name} is assigned to {where}{listed} in the {inning_label(inning_key)}.'
+    return None
+
+
 def required_positions(team):
     base = ['P', 'C', '1B', '2B', '3B', 'SS']
     outfield = ['LF', 'LCF', 'RCF', 'RF'] if int(team.outfielder_count or 3) == 4 else ['LF', 'CF', 'RF']

@@ -88,6 +88,9 @@ def setup(make_page, coachboard_url):
         yield page, plan_game, saved_defense, legacy_defense
     finally:
         for game_id in games:
+            # A test may have started the game; a live game can't be deleted.
+            page.request.post(f'{coachboard_url}/api/live-game/{game_id}/end-with-pitching',
+                              data={'defer_pitching': True})
             page.request.post(f'{coachboard_url}/game-day/{game_id}/delete', headers={'Accept': 'application/json'})
         for defense_id in defenses:
             page.request.get(f'{coachboard_url}/delete_rotation/{defense_id}', max_redirects=0)

@@ -35,6 +35,16 @@ NO_ROTATION = 202
 EMPTY_ROTATION = 203
 
 
+
+def _stored_inning_one(client, game_id):
+    """What the Start button sends: the stored 1st inning the coach reviewed."""
+    rotation = client.get(f'/api/game_data/{game_id}').get_json().get('rotation') or {}
+    innings = rotation.get('innings') or {}
+    if isinstance(innings, str):
+        import json
+        innings = json.loads(innings)
+    return dict(innings.get('1') or {})
+
 def _build_app(monkeypatch):
     monkeypatch.setenv('SECRET_KEY', 'readiness-shared-inputs-test')
     monkeypatch.setenv('COACHBOARD_ENV', 'test')
@@ -204,7 +214,7 @@ def test_a_preloaded_rotation_of_none_still_prevents_the_query(monkeypatch):
 
     assert counts['rotations'] == 0, statements
     assert result['ready'] is False
-    assert 'Finish the Inning 1 defense.' in result['missing']
+    assert 'Choose the starting pitcher for the 1st inning.' in result['missing']
 
 
 def test_a_preloaded_rotation_with_empty_innings_is_handled(monkeypatch):
@@ -219,7 +229,7 @@ def test_a_preloaded_rotation_with_empty_innings_is_handled(monkeypatch):
 
     assert counts['rotations'] == 0, statements
     assert result['ready'] is False
-    assert 'Finish the Inning 1 defense.' in result['missing']
+    assert 'Choose the starting pitcher for the 1st inning.' in result['missing']
 
 
 @pytest.mark.parametrize('omitted', ['roster', 'absences', 'rotation'])
@@ -389,7 +399,7 @@ def test_start_calls_can_start_game_with_no_preloads(monkeypatch):
 
     client = app.test_client()
     _login(client)
-    response = client.post(f'/api/live-game/{WITH_ROTATION}/start', json={})
+    response = client.post(f'/api/live-game/{WITH_ROTATION}/start', json={'inning_one': _stored_inning_one(client, WITH_ROTATION)})
 
     assert response.status_code == 200, response.get_data(as_text=True)
     payload = response.get_json()
@@ -416,12 +426,13 @@ def test_start_still_queries_its_own_readiness_inputs(monkeypatch):
             return
         statements.append(statement)
 
+    reviewed = _stored_inning_one(client, WITH_ROTATION)
     from db import db
     with app.app_context():
         engine = db.session.get_bind()
     event.listen(engine, 'before_cursor_execute', capture)
     try:
-        response = client.post(f'/api/live-game/{WITH_ROTATION}/start', json={})
+        response = client.post(f'/api/live-game/{WITH_ROTATION}/start', json={'inning_one': reviewed})
     finally:
         event.remove(engine, 'before_cursor_execute', capture)
 

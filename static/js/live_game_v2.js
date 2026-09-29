@@ -1078,8 +1078,14 @@
         try {
             if (id === 'startLiveGameBtnAction') {
                 actionBusy = true;
-                await api('/start', { method: 'POST', body: '{}' });
-                toast('✓ Live Game started • Saved & Synced');
+                // live_game_contract.js owns the Start Game contract: it
+                // settles pregame saves, sends the reviewed 1st-inning
+                // defense and asks the coach about open positions.
+                const started = await window.CBStartGame.start();
+                if (started?.state) {
+                    applyState(started.state, { source: 'api' });
+                    toast('✓ Live Game started • Saved & Synced');
+                }
             } else if (id === 'liveChangePitcherBtn') {
                 // Read eligibility fresh: live deltas carry the field, not
                 // who already pitched this game.

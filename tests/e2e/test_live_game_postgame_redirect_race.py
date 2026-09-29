@@ -29,6 +29,7 @@ if os.environ.get("COACHBOARD_E2E") != "1":
     )
 
 from playwright.sync_api import Browser, Page, expect
+from start_helpers import start_body  # noqa: E402
 
 import cdn_assets
 
@@ -516,7 +517,7 @@ def track_report_visits(page: Page, coachboard_url: str, game_id: int):
 
 def start_game(page: Page, coachboard_url: str, opponent: str):
     game_id = create_game(page, coachboard_url, opponent)
-    started = page.request.post(f"{coachboard_url}/api/live-game/{game_id}/start", data={})
+    started = page.request.post(f"{coachboard_url}/api/live-game/{game_id}/start", data=start_body(page.request, coachboard_url, game_id))
     assert started.ok and started.json().get("status") == "success", started.text()
     return game_id
 

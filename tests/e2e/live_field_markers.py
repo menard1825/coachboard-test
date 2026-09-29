@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import re
 
 from e2e_cleanup import delete_players_named, release_game
+from start_helpers import start_body
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -121,10 +122,12 @@ def create_named_live_game(page, base_url, innings=None):
             ('/save_rotation', {'title': 'Marker Rotation',
                                 'innings': innings or {'1': _alignment(), '2': _alignment()},
                                 'associated_game_id': game_id}),
-            (f'/api/live-game/{game_id}/start', {}),
         ):
             response = page.request.post(f'{base_url}{path}', data=payload)
             assert response.ok and response.json().get('status') == 'success', (path, response.text()[:200])
+        path = f'/api/live-game/{game_id}/start'
+        response = page.request.post(f'{base_url}{path}', data=start_body(page.request, base_url, game_id))
+        assert response.ok and response.json().get('status') == 'success', (path, response.text()[:200])
         return game_id, player_ids
     except BaseException:
         release_game(page.request, base_url, game_id)

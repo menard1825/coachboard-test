@@ -3,6 +3,16 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash
 
 
+
+def _stored_inning_one(client, game_id):
+    """What the Start button sends: the stored 1st inning the coach reviewed."""
+    rotation = client.get(f'/api/game_data/{game_id}').get_json().get('rotation') or {}
+    innings = rotation.get('innings') or {}
+    if isinstance(innings, str):
+        import json
+        innings = json.loads(innings)
+    return dict(innings.get('1') or {})
+
 def _build_app(monkeypatch, *, complete_defense=True, with_rules=True):
     monkeypatch.setenv('SECRET_KEY', 'test-secret-key')
     monkeypatch.setenv('COACHBOARD_ENV', 'test')
@@ -112,7 +122,7 @@ def test_empty_batting_order_does_not_block_first_pitch(monkeypatch):
     assert readiness['ready'] is True
     assert readiness['missing'] == []
 
-    start_response = client.post('/api/live-game/91/start', json={})
+    start_response = client.post('/api/live-game/91/start', json={'inning_one': _stored_inning_one(client, 91)})
     assert start_response.status_code == 200
     payload = start_response.get_json()
     assert payload['ready'] is True
@@ -120,7 +130,9 @@ def test_empty_batting_order_does_not_block_first_pitch(monkeypatch):
     assert payload['state']['game']['is_live'] is True
 
 
-def test_missing_inning_one_defense_is_rejected_with_same_contract(monkeypatch):
+def test_an_open_inning_one_position_is_asked_about_not_blocked(monkeypatch):
+    """RF open in the 1st inning is the coach's call: Start stays usable,
+    asks about exactly RF, and starts once RF Open is acknowledged."""
     app = _build_app(monkeypatch, complete_defense=False)
     client = app.test_client()
     _login(client)
@@ -128,23 +140,29 @@ def test_missing_inning_one_defense_is_rejected_with_same_contract(monkeypatch):
     readiness_response = client.get('/api/game-day/91/readiness')
     assert readiness_response.status_code == 200
     readiness = readiness_response.get_json()
-    assert readiness['ready'] is False
-    assert 'Finish the Inning 1 defense.' in readiness['missing']
+    assert readiness['ready'] is True
+    assert readiness['missing'] == []
+    assert readiness['open_positions'] == ['RF']
+    assert readiness['open_question']['title'] == '1st inning: RF is open'
 
-    start_response = client.post('/api/live-game/91/start', json={})
+    start_response = client.post('/api/live-game/91/start', json={'inning_one': _stored_inning_one(client, 91)})
     assert start_response.status_code == 409
-    rejected = start_response.get_json()
-
-    assert 'ready' in rejected, rejected
-    assert 'missing' in rejected, rejected
-    assert rejected['ready'] == readiness['ready']
-    assert rejected['missing'] == readiness['missing']
+    asked = start_response.get_json()
+    assert asked['code'] == 'start_open_positions'
+    assert asked['open_positions'] == readiness['open_positions']
+    assert asked['open_question'] == readiness['open_question']
 
     from db import db
     from models import Game
 
     with app.app_context():
         assert db.session.get(Game, 91).is_live is False
+
+    started = client.post('/api/live-game/91/start', json={'inning_one': _stored_inning_one(client, 91), 'open_positions': ['RF']})
+    assert started.status_code == 200, started.get_json()
+    with app.app_context():
+        db.session.expire_all()
+        assert db.session.get(Game, 91).is_live is True
 
 
 def test_missing_pitching_rules_blocks_first_pitch(monkeypatch):
@@ -156,7 +174,7 @@ def test_missing_pitching_rules_blocks_first_pitch(monkeypatch):
     assert readiness['ready'] is False
     assert 'Select the game pitching rules / tracking method.' in readiness['missing']
 
-    rejected = client.post('/api/live-game/91/start', json={})
+    rejected = client.post('/api/live-game/91/start', json={'inning_one': _stored_inning_one(client, 91)})
     assert rejected.status_code == 409
     payload = rejected.get_json()
     assert 'ready' in payload, payload

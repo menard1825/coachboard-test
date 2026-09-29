@@ -14,6 +14,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Browser, Page, expect
+from start_helpers import start_body  # noqa: E402
 
 import cdn_assets
 
@@ -254,11 +255,11 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         assert phone_state['current_alignment'] == ipad_state['current_alignment']
 
         incomplete_id = create_game(phone, coachboard_url, 'Test 2 Incomplete Opponent', complete=False)
-        rejected = phone.request.post(f'{coachboard_url}/api/live-game/{incomplete_id}/start', data={})
+        rejected = phone.request.post(f'{coachboard_url}/api/live-game/{incomplete_id}/start', data=start_body(phone.request, coachboard_url, incomplete_id))
         assert rejected.status == 409, rejected.text()
         payload = rejected.json()
         assert payload['ready'] is False
-        assert 'Finish the Inning 1 defense.' in payload['missing']
+        assert 'Choose the starting pitcher for the 1st inning.' in payload['missing']
         incomplete_state = phone.request.get(f'{coachboard_url}/api/live-game/{incomplete_id}/state').json()
         assert incomplete_state['game']['is_live'] is False
     finally:
@@ -628,9 +629,7 @@ def test_test2_drag_survives_remote_live_redraw(
             'Test 2 Drag Redraw Race Opponent',
         )
 
-        started = phone.request.post(
-            f'{coachboard_url}/api/live-game/{game_id}/start',
-            data={},
+        started = phone.request.post(f'{coachboard_url}/api/live-game/{game_id}/start', data=start_body(phone.request, coachboard_url, game_id),
         )
 
         assert started.status == 200, started.text()
@@ -1042,9 +1041,7 @@ def test_test2_end_inning_uses_latest_remote_next_prep(
             'Test 2 Latest NEXT Opponent',
         )
 
-        started = phone.request.post(
-            f'{coachboard_url}/api/live-game/{game_id}/start',
-            data={},
+        started = phone.request.post(f'{coachboard_url}/api/live-game/{game_id}/start', data=start_body(phone.request, coachboard_url, game_id),
         )
 
         assert started.status == 200, started.text()
@@ -1280,9 +1277,7 @@ def test_test2_stale_recovery_authoritative_open_does_not_freeze_quick_field(
             'Test 2 Authoritative Open Opponent',
         )
 
-        started = phone.request.post(
-            f'{coachboard_url}/api/live-game/{game_id}/start',
-            data={},
+        started = phone.request.post(f'{coachboard_url}/api/live-game/{game_id}/start', data=start_body(phone.request, coachboard_url, game_id),
         )
 
         assert started.status == 200, started.text()

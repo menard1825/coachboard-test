@@ -18,6 +18,7 @@ if os.environ.get("COACHBOARD_E2E") != "1":
     pytest.skip("Set COACHBOARD_E2E=1 to run Playwright tests.", allow_module_level=True)
 
 from playwright.sync_api import Browser, Page, expect
+from start_helpers import start_body  # noqa: E402
 
 from test_live_game_postgame_redirect_race import cleanup_game, coach_context, create_game, login
 
@@ -50,7 +51,7 @@ def track_navigations(page: Page):
 
 
 def start(page: Page, coachboard_url: str, game_id: int):
-    response = page.request.post(f"{coachboard_url}/api/live-game/{game_id}/start", data={})
+    response = page.request.post(f"{coachboard_url}/api/live-game/{game_id}/start", data=start_body(page.request, coachboard_url, game_id))
     assert response.ok and response.json().get("status") == "success", response.text()
     return time.monotonic()
 

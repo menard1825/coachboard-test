@@ -16,6 +16,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     )
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -189,12 +190,7 @@ def test_next_inning_supports_drag_and_drop(
     game_id = create_game(page, coachboard_url)
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',
@@ -339,12 +335,7 @@ def test_next_touch_swipe_does_not_drag_player(
     game_id = create_game(page, coachboard_url)
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',
@@ -504,12 +495,7 @@ def test_next_refresh_cancels_active_mouse_drag(
     game_id = create_game(page, coachboard_url)
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',
@@ -698,12 +684,7 @@ def test_next_socket_update_cancels_active_mouse_drag(
     second = None
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',
@@ -911,12 +892,7 @@ def test_next_pointercancel_clears_mouse_drag_without_save(
     game_id = create_game(page, coachboard_url)
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',
@@ -1107,12 +1083,7 @@ def test_next_touch_swipe_leaves_tap_flow_clean(
     game_id = create_game(page, coachboard_url)
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',
@@ -1298,12 +1269,7 @@ def test_now_next_first_slice(
     game_id = create_game(page, coachboard_url)
 
     try:
-        started = post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        started = post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         assert (
             started['state']['current_alignment']['P']

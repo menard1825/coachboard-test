@@ -29,6 +29,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     )
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -176,7 +177,7 @@ def test_switcher_appears_without_waiting_for_the_refresh_interval(page: Page, c
         route.continue_()
 
     try:
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.route('**/live_game_dugout_mode.js*', delay_dugout_module)
 
@@ -222,7 +223,7 @@ def test_boot_leaves_on_the_field_active(page: Page, coachboard_url: str):
     game_id = create_game(page, coachboard_url)
 
     try:
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
         switcher = page.locator(SWITCHER)

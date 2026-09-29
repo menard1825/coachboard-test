@@ -25,6 +25,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     )
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 import pitching_eligibility
 
@@ -65,7 +66,7 @@ def create_live_game(page: Page, url: str):
         'innings': {'1': starting_alignment(), '2': starting_alignment()},
         'associated_game_id': game_id,
     })
-    post_json(page, url, f'/api/live-game/{game_id}/start', {})
+    post_json(page, url, f'/api/live-game/{game_id}/start', start_body(page.request, url, game_id))
     return game_id
 
 

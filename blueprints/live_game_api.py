@@ -7,7 +7,8 @@ from sqlalchemy.orm import joinedload
 
 from db import db
 from extensions import socketio
-from game_start_readiness import can_start_game
+from game_day_helpers import required_positions
+from game_start_readiness import can_start_game, normalized_inning_one
 from models import (
     Game,
     GamePitchingPlan,
@@ -429,13 +430,58 @@ def start(game_id):
     if not game:
         return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
 
+    # This request holds the game's write lock from before this view until
+    # teardown (live_game_write_lock.py), and /save_rotation takes the same
+    # lock, so the plan read here is the plan the game starts with.
+    data = request.get_json(silent=True) or {}
+
+    # Start turns the plan into the official game, so it must say which 1st
+    # inning the coach reviewed. A request without one (a tab from before
+    # this contract, a script) never starts: it is asked to refresh, not
+    # allowed to skip the check.
+    reviewed = data.get('inning_one')
+    if not isinstance(reviewed, dict):
+        return jsonify({
+            'status': 'error',
+            'code': 'start_refresh_required',
+            'title': 'Refresh Prepare Game before starting.',
+            'message': "CoachBoard needs to verify the 1st inning defense you're starting with.",
+        }), 409
+
     start_readiness = can_start_game(game, team)
+
+    # The 1st-inning defense the coach reviewed must be the stored one.
+    if normalized_inning_one(reviewed, required_positions(team)) != start_readiness['inning_one']:
+        return jsonify({
+            'status': 'error',
+            'code': 'start_defense_changed',
+            'message': 'The 1st inning defense changed. Review it before starting.',
+            **start_readiness,
+        }), 409
+
     if not start_readiness['ready']:
         return jsonify({
             'status': 'error',
+            'code': 'start_hard_stops',
             'message': 'Game is not ready to start.',
             **start_readiness,
         }), 409
+
+    # Open fielding positions are the coach's call, acknowledged for exactly
+    # the positions open now: an acknowledgement of CF no longer counts once
+    # CF is filled or LF opens.
+    open_positions = start_readiness['open_positions']
+    if open_positions:
+        acknowledged = data.get('open_positions')
+        if not isinstance(acknowledged, list) or sorted({str(item) for item in acknowledged}) != sorted(open_positions):
+            question = start_readiness['open_question']
+            return jsonify({
+                'status': 'error',
+                'code': 'start_open_positions',
+                'message': question['message'],
+                'acknowledgement_outdated': acknowledged is not None,
+                **start_readiness,
+            }), 409
 
     game.is_live = True
     if not game.live_current_inning:

@@ -13,6 +13,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -99,7 +100,7 @@ def test_ended_game_can_resume_same_inning_clock_and_history_then_end_again(page
     game_id = create_game(page, coachboard_url)
 
     try:
-        started = post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+        started = post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
         assert started['state']['game']['is_live'] is True
 
         # Use the same stale-write protected advance endpoint as the current

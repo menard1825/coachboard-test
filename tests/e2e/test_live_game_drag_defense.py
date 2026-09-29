@@ -13,6 +13,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 from e2e_cleanup import delete_players_named
 
@@ -119,12 +120,7 @@ def test_phone_quick_field_bench_drop_saves_open_spot_immediately(
     game_id = create_game(page, coachboard_url)
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',
@@ -221,12 +217,7 @@ def test_phone_quick_field_open_spot_syncs_to_second_client_without_poll(
     second = None
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',
@@ -371,7 +362,7 @@ def test_phone_quick_field_swaps_two_fielders_without_second_editor(page: Page, 
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
     try:
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 
         quick = page.locator('#cbQuickDefense')
@@ -507,12 +498,7 @@ def test_phone_quick_field_touch_swipe_does_not_drag_player(
     game_id = create_game(page, coachboard_url)
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',
@@ -681,12 +667,7 @@ def test_phone_draft_open_does_not_launch_authoritative_fill_modal(
     )
 
     try:
-        post_json(
-            page,
-            coachboard_url,
-            f'/api/live-game/{game_id}/start',
-            {},
-        )
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         page.goto(
             f'{coachboard_url}/game/{game_id}',

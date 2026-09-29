@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 
 from blueprints.live_game_write_lock import game_write_lock
+from game_day_helpers import duplicate_assignment_message
 from models import GameRotationEvent, PlayerPitchTarget
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
 from lineup_service import (
@@ -313,25 +314,6 @@ def delete_lineup(lineup_id):
     redirect_url = request.referrer or url_for('home', _anchor='lineups')
     return redirect(redirect_url)
 
-def _inning_label(key):
-    try:
-        number = float(key)
-    except (TypeError, ValueError):
-        return f'inning {key}'
-    if not number.is_integer():
-        return f'Inning {key}'
-    n = int(number)
-    suffix = 'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
-    return f'{n}{suffix} inning'
-
-
-_FIELD_ORDER = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'CF', 'RCF', 'RF']
-
-
-def _field_order(position):
-    return (_FIELD_ORDER.index(position) if position in _FIELD_ORDER else len(_FIELD_ORDER), position)
-
-
 def _duplicate_assignment(innings, stored_innings):
     """The first player placed at two positions in one inning, as a message.
 
@@ -347,18 +329,9 @@ def _duplicate_assignment(innings, stored_innings):
     for key, alignment in innings.items():
         if not isinstance(alignment, dict) or alignment == stored_innings.get(key):
             continue
-        spots = {}
-        for position, name in alignment.items():
-            name = name.strip() if isinstance(name, str) else name
-            if not name:
-                continue
-            spots.setdefault(name, []).append(str(position))
-        for name, positions in spots.items():
-            if len(positions) > 1:
-                positions = sorted(positions, key=_field_order)
-                listed = ', '.join(positions[:-1]) + f' and {positions[-1]}'
-                where = 'both ' if len(positions) == 2 else ''
-                return f'{name} is assigned to {where}{listed} in the {_inning_label(key)}.'
+        message = duplicate_assignment_message(alignment, key)
+        if message:
+            return message
     return None
 
 

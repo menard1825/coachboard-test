@@ -276,9 +276,11 @@ def _slow_start_check(monkeypatch, validated):
         rotation = db.session.query(Rotation).filter_by(
             associated_game_id=game.id, team_id=team.id,
         ).first()
-        validated.append(dict((rotation.innings or {}).get('1') or {}))
+        inning_one = dict((rotation.innings or {}).get('1') or {})
+        validated.append(inning_one)
         eventlet.sleep(0.1)
-        return {'ready': True, 'missing': []}
+        return {'ready': True, 'missing': [], 'hard_stops': [], 'inning_one': inning_one,
+                'open_positions': [], 'open_question': None}
 
     monkeypatch.setattr(live_game_api, 'can_start_game', check)
 
@@ -292,7 +294,7 @@ def test_start_game_validates_the_plan_it_starts_with_a_save_arriving_mid_start(
     _slow_start_check(monkeypatch, validated)
     replacement = dict(FULL, SS='Harper', CF='Finn')
 
-    starting = eventlet.spawn(lambda: _client(app).post(f'/api/live-game/{GAME_ID}/start', json={}))
+    starting = eventlet.spawn(lambda: _client(app).post(f'/api/live-game/{GAME_ID}/start', json={'inning_one': FULL}))
     eventlet.sleep(0.02)  # Start is inside its check, holding the lock
     saving = eventlet.spawn(_save, app, {'1': replacement}, rotation_id)
 
@@ -325,7 +327,8 @@ def test_a_save_in_progress_finishes_before_start_game_reads_the_plan(app, monke
 
     saving = eventlet.spawn(_save, app, {'1': replacement}, rotation_id)
     eventlet.sleep(0.02)  # the save is inside its check, holding the lock
-    starting = eventlet.spawn(lambda: _client(app).post(f'/api/live-game/{GAME_ID}/start', json={}))
+    # The coach starts after the save lands (the browser settles saves first).
+    starting = eventlet.spawn(lambda: _client(app).post(f'/api/live-game/{GAME_ID}/start', json={'inning_one': replacement}))
 
     status, body = saving.wait()
     started = starting.wait()

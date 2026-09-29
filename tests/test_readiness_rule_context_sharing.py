@@ -70,6 +70,16 @@ EXPECTED_RULE = {
 NON_DETERMINISTIC = {'local_today'}
 
 
+
+def _stored_inning_one(client, game_id):
+    """What the Start button sends: the stored 1st inning the coach reviewed."""
+    rotation = client.get(f'/api/game_data/{game_id}').get_json().get('rotation') or {}
+    innings = rotation.get('innings') or {}
+    if isinstance(innings, str):
+        import json
+        innings = json.loads(innings)
+    return dict(innings.get('1') or {})
+
 def _build_app(monkeypatch):
     monkeypatch.setenv('SECRET_KEY', 'readiness-rule-context-test')
     monkeypatch.setenv('COACHBOARD_ENV', 'test')
@@ -242,7 +252,7 @@ def test_shared_rule_payload_matches_the_unshared_path(
     assert shipped.status_code == reference.status_code == 200
     got, want = shipped.get_json(), reference.get_json()
 
-    assert sorted(got) == ['missing', 'readiness', 'ready', 'status']
+    assert sorted(got) == ['hard_stops', 'inning_one', 'missing', 'open_positions', 'open_question', 'readiness', 'ready', 'status']
     assert got['status'] == want['status'] == 'success'
     assert got['ready'] == want['ready']
     assert got['missing'] == want['missing']
@@ -471,7 +481,7 @@ def test_start_passes_no_preloads_to_can_start_game(
 
     client = app.test_client()
     _login(client)
-    response = client.post(f'/api/live-game/{READY}/start', json={})
+    response = client.post(f'/api/live-game/{READY}/start', json={'inning_one': _stored_inning_one(client, READY)})
 
     assert response.status_code == expected_status, response.get_data(as_text=True)
     assert seen == [{}], f'/start passed preloads: {seen}'

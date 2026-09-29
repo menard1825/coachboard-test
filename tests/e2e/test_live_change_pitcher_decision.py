@@ -22,6 +22,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     )
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 from e2e_cleanup import delete_players_named
 from test_next_inning_save_race import cleanup_game, login, post_json
@@ -104,7 +105,7 @@ def live_field(page: Page, coachboard_url: str):
             'innings': {'1': BASE},
             'associated_game_id': game_id,
         })
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         def open_field(before_load=None):
             if before_load:

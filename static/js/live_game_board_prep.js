@@ -1440,6 +1440,9 @@
     refreshTimer = setTimeout(refresh, ms);
   }
 
+  // Start Game refreshes the plan when the stored 1st inning has changed.
+  window.CBPregameDefense = {refresh: () => scheduleRefresh(0)};
+
   function wire() {
     // The shared rotation store notifies on every local edit from EITHER
     // module (e.g. game_logic.js's Add Inning) and on every save-status

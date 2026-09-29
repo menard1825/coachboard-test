@@ -28,6 +28,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     )
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -130,7 +131,7 @@ def cleanup_game(page: Page, coachboard_url: str, game_id: int):
 
 
 def open_dugout(page: Page, coachboard_url: str, game_id: int):
-    post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', {})
+    post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
     page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
     expect(page.locator('#live-game-overlay')).to_be_visible(timeout=15_000)
     expect(page.locator(HEADER)).to_be_visible(timeout=15_000)

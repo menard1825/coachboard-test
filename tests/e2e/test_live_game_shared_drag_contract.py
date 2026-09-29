@@ -27,6 +27,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from start_helpers import start_body  # noqa: E402
 
 from e2e_cleanup import delete_players_named, release_game
 from cdp_touch import (
@@ -190,7 +191,7 @@ def start_live_game(page: Page, url: str):
     try:
         player_name = add_bench_player(page, url)
         game_id = create_game(page, url)
-        post_json(page, url, f'/api/live-game/{game_id}/start', {})
+        post_json(page, url, f'/api/live-game/{game_id}/start', start_body(page.request, url, game_id))
         return game_id, player_name
     except BaseException:
         cleanup(page, url, game_id, player_name)
