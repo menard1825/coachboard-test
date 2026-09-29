@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let sortableInstances = {};
     let lineupEditorModal;
     let confirmDeleteModal;
+    let newTemplateInnings = [{}];
     
     // --- UTILITY FUNCTIONS ---
     const escapeHTML = str => String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
@@ -283,11 +284,67 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('rotationsAccordion');
         if (!container) return;
         const rotations = AppState.full_data.rotations.filter(r => !r.associated_game_id) || [];
-        container.innerHTML = rotations.length === 0 ? `<div class="text-center p-4 border rounded"><p class="mb-0">No unassigned rotations saved.</p><p class="small text-muted">Create rotations from the 'Manage' screen of any game.</p></div>` : rotations.map((r) => {
+        container.innerHTML = rotations.length === 0 ? `<div class="text-center p-4 border rounded"><p class="mb-0">No defense templates yet.</p><p class="small text-muted">Select Create New above to build one.</p></div>` : rotations.map((r) => {
             const inningsCount = r.innings ? Object.keys(r.innings).length : 0;
             const deleteButtonHtml = `<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_rotation/${r.id}" data-delete-name="${escapeHTML(r.title)}">Delete</button>`;
             return `<div class="accordion-item" data-rotation-id="${r.id}"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rotation-collapse-${r.id}"><strong>${escapeHTML(r.title)}</strong></button></h2><div id="rotation-collapse-${r.id}" class="accordion-collapse collapse" data-bs-parent="#rotationsAccordion"><div class="accordion-body"><div class="d-flex justify-content-end mb-3">${deleteButtonHtml}</div><p>This rotation has <strong>${inningsCount}</strong> inning(s) defined. You can manage this rotation by assigning it to a game.</p></div></div></div>`;
         }).join('');
+    }
+
+    function templateFeedback(message = '') {
+        const feedback = document.getElementById('rotationTemplateFeedback');
+        feedback.textContent = message;
+        feedback.classList.toggle('d-none', !message);
+    }
+
+    function renderNewTemplateEditor() {
+        const positions = ['P', 'C', '1B', '2B', '3B', 'SS',
+            ...(AppState.session.outfielder_count === 4 ? ['LF', 'LCF', 'RCF', 'RF'] : ['LF', 'CF', 'RF'])];
+        const roster = [...(AppState.full_data.roster || [])].sort((a, b) => a.name.localeCompare(b.name));
+        document.getElementById('newRotationTemplateInnings').innerHTML = newTemplateInnings.map((inning, index) => `
+            <div class="card mb-2" data-template-inning="${index}">
+                <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                    <strong>Inning ${index + 1}</strong>
+                    <div class="d-flex gap-2">
+                        ${index ? `<button type="button" class="btn btn-outline-secondary btn-sm" data-template-action="copy" data-inning="${index}">Copy previous</button>` : ''}
+                        ${newTemplateInnings.length > 1 ? `<button type="button" class="btn btn-outline-danger btn-sm" data-template-action="remove" data-inning="${index}">Remove</button>` : ''}
+                    </div>
+                </div>
+                <div class="card-body row g-2">${positions.map(position => `
+                    <div class="col-6 col-md-4"><label class="form-label small mb-1" for="template-pos-${index}-${position}">${position}</label>
+                        <select class="form-select form-select-sm" id="template-pos-${index}-${position}" data-inning="${index}" data-position="${position}">
+                            <option value="">Open</option>
+                            ${roster.map(player => `<option value="${escapeHTML(player.name)}" ${inning[position] === player.name ? 'selected' : ''}>${escapeHTML(player.name)}</option>`).join('')}
+                        </select>
+                    </div>`).join('')}</div>
+            </div>`).join('');
+    }
+
+    async function saveNewRotationTemplate() {
+        const title = document.getElementById('newRotationTemplateName').value.trim();
+        if (!title) { templateFeedback('Enter a template name.'); return; }
+        if (!newTemplateInnings.some(inning => Object.keys(inning).length)) {
+            templateFeedback('Assign at least one player before saving.'); return;
+        }
+        const button = document.getElementById('saveNewRotationTemplateBtn');
+        button.disabled = true;
+        templateFeedback();
+        try {
+            const innings = Object.fromEntries(newTemplateInnings.map((inning, index) => [String(index + 1), inning]));
+            const response = await fetch('/save_rotation_as_template', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title, innings})
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Could not save the template.');
+            AppState.full_data.rotations.push(result.new_template);
+            renderRotations();
+            bootstrap.Modal.getInstance(document.getElementById('rotationTemplateEditorModal')).hide();
+        } catch (error) {
+            templateFeedback(error.message);
+        } finally {
+            button.disabled = false;
+        }
     }
 
     function renderPitchingLog() {
@@ -1069,6 +1126,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupEventListeners() {
         document.getElementById('saveLineupBtn')?.addEventListener('click', saveLineup);
+        document.getElementById('rotationTemplateEditorModal')?.addEventListener('show.bs.modal', () => {
+            newTemplateInnings = [{}];
+            document.getElementById('newRotationTemplateName').value = '';
+            templateFeedback();
+            renderNewTemplateEditor();
+        });
+        document.getElementById('addTemplateInningBtn')?.addEventListener('click', () => {
+            if (newTemplateInnings.length >= 20) { templateFeedback('A template can have up to 20 innings.'); return; }
+            newTemplateInnings.push({});
+            renderNewTemplateEditor();
+        });
+        document.getElementById('newRotationTemplateInnings')?.addEventListener('change', event => {
+            const select = event.target.closest('select[data-position]');
+            if (!select) return;
+            const inning = newTemplateInnings[Number(select.dataset.inning)];
+            const position = select.dataset.position;
+            const player = select.value;
+            if (player && Object.entries(inning).some(([otherPosition, name]) => otherPosition !== position && name === player)) {
+                templateFeedback(`${player} is already on the field this inning.`);
+                renderNewTemplateEditor();
+                return;
+            }
+            if (player) inning[position] = player;
+            else delete inning[position];
+            templateFeedback();
+        });
+        document.getElementById('newRotationTemplateInnings')?.addEventListener('click', event => {
+            const button = event.target.closest('[data-template-action]');
+            if (!button) return;
+            const index = Number(button.dataset.inning);
+            if (button.dataset.templateAction === 'copy') newTemplateInnings[index] = {...newTemplateInnings[index - 1]};
+            else newTemplateInnings.splice(index, 1);
+            templateFeedback();
+            renderNewTemplateEditor();
+        });
+        document.getElementById('saveNewRotationTemplateBtn')?.addEventListener('click', saveNewRotationTemplate);
         document.getElementById('rosterSearch').addEventListener('input', renderRoster);
         
         const addScoutedPlayerForm = document.getElementById('addScoutedPlayerForm');

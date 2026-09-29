@@ -43,6 +43,21 @@ function initializeGameManagement(gameData) {
     const useTapDefenseEditor =
         ((window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
          (navigator.maxTouchPoints || 0) > 0);
+    let defenseGesture = null;
+    if (useTapDefenseEditor) {
+        document.getElementById('touch-defense-instructions')?.removeAttribute('hidden');
+        document.addEventListener('pointerdown', event => {
+            defenseGesture = event.target.closest('#rotation-board')
+                ? {id: event.pointerId, x: event.clientX, y: event.clientY, moved: false}
+                : null;
+        }, true);
+        document.addEventListener('pointermove', event => {
+            if (defenseGesture?.id === event.pointerId &&
+                Math.hypot(event.clientX - defenseGesture.x, event.clientY - defenseGesture.y) > 12) {
+                defenseGesture.moved = true;
+            }
+        }, true);
+    }
 
     // --- Rotation Editor Functions ---
     function renderRotationEditor() {
@@ -323,21 +338,29 @@ function initializeGameManagement(gameData) {
             return;
         }
 
-        const onEndHandler = () => {
-            const inningData = state.rotation.innings[state.currentInning] = {};
-
-            document.querySelectorAll(
-                '#diamond-parent-desktop .position-dropzone'
-            ).forEach(dz => {
-                const playerTag = dz.querySelector('.player-tag');
-                if (playerTag) {
-                    inningData[dz.dataset.position] =
-                        playerTag.dataset.playerName;
-                }
-            });
-
+        const onEndHandler = (evt) => {
+            const inningData = state.rotation.innings[state.currentInning] || {};
+            const from = evt.from.dataset.position;
+            const pointer = evt.originalEvent;
+            const zones = [...document.querySelectorAll('#bench-list-desktop, #diamond-parent-desktop .position-dropzone')];
+            const releasedOver = pointer && Number.isFinite(pointer.clientX) && Number.isFinite(pointer.clientY)
+                ? zones.find(zone => {
+                    const bounds = zone.getBoundingClientRect();
+                    return pointer.clientX >= bounds.left && pointer.clientX <= bounds.right &&
+                           pointer.clientY >= bounds.top && pointer.clientY <= bounds.bottom;
+                })
+                : evt.to;
+            const to = releasedOver?.dataset.position;
+            const playerName = evt.item.dataset.playerName;
+            // Sortable moves DOM nodes while hovering. Only a completed drop may
+            // change the saved defense, including a replacement at an occupied spot.
+            if (playerName && to && from !== to) {
+                if (from !== 'bench') delete inningData[from];
+                if (to !== 'bench') inningData[to] = playerName;
+                state.rotation.innings[state.currentInning] = inningData;
+                triggerAutosave();
+            }
             renderRotationEditor();
-            triggerAutosave();
         };
 
         const allContainers = [
@@ -349,19 +372,9 @@ function initializeGameManagement(gameData) {
         allContainers.forEach(container => {
             state.sortableInstances[container.id] = new Sortable(container, {
                 group: 'rotation',
+                draggable: '.player-tag',
                 animation: 150,
-                onEnd: onEndHandler,
-                onMove: (evt) => {
-                    if (
-                        evt.to.classList.contains('position-dropzone') &&
-                        evt.to.children.length > 1 &&
-                        evt.to !== evt.from
-                    ) {
-                        evt.from.appendChild(
-                            evt.to.querySelector('.player-tag')
-                        );
-                    }
-                }
+                onEnd: onEndHandler
             });
         });
     }
@@ -945,6 +958,13 @@ function applyOutOfPositionIndicators() {
         document.body.addEventListener('click', function(event){
             const dropzone = event.target.closest('.position-dropzone');
             if (dropzone) {
+                // Touch browsers can synthesize a click at the end of a drag.
+                // A gesture crossing the field must never remove an assignment.
+                if (useTapDefenseEditor && defenseGesture?.moved) {
+                    event.preventDefault();
+                    defenseGesture = null;
+                    return;
+                }
                 const isMobileDiamond = Boolean(
                     dropzone.closest('#diamond-parent-mobile')
                 );
