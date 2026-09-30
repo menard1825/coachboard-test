@@ -308,7 +308,7 @@ class GameRotationEvent(db.Model):
     id = Column(Integer, primary_key=True)
     inning = Column(String, nullable=False)
     sequence = Column(Integer, nullable=False)
-    event_type = Column(String, nullable=False)  # 'Pitcher Change', 'Defensive Change', 'End Inning'
+    event_type = Column(String, nullable=False)  # 'Pitcher Change', 'Defensive Change', 'End Inning', 'Player Arrived', ...
     timestamp = Column(DateTime, default=utcnow_naive)
     changed_by_user = Column(String)
 
@@ -318,6 +318,17 @@ class GameRotationEvent(db.Model):
     old_pitcher_id = Column(Integer, ForeignKey('players.id'), nullable=True)
     new_pitcher_id = Column(Integer, ForeignKey('players.id'), nullable=True)
     reverted = Column(Boolean, default=False, nullable=False)
+
+    # 'Player Arrived' / 'Player Left' only (game_availability.py): whose
+    # availability changed, and the inning the change counts from. SET NULL,
+    # as lineup_entries.player_id: deleting a player must not be blocked by
+    # their arrival/departure history.
+    subject_player_id = Column(Integer, ForeignKey('players.id', ondelete='SET NULL'), nullable=True)
+    effective_inning = Column(Integer, nullable=True)
+    # An On the Field change's answer to "Has the 4th inning started?"
+    # (live_history): True = a setup edit before the inning began, False = a
+    # change during play, NULL = recorded before the question existed.
+    pre_start = Column(Boolean, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     game_id = Column(Integer, ForeignKey('games.id'), nullable=False)

@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from db import db
+from live_history import gameplay_events
 from models import GameRotationEvent, PitchingOuting, Player
 from utils import normalize_baseball_innings
 from blueprints.live_game_api import (
@@ -36,9 +37,9 @@ def _actual_pitcher_order(game, team_id):
     _, actual_rotation, events = _actual_rotation(game, team_id)
     order = []
 
-    for event in events:
-        if event.reverted:
-            continue
+    # Who pitched, not every field edit: a setup edit before an inning began
+    # put nobody on the mound (live_history).
+    for event in gameplay_events(events):
         _append_pitcher(order, (event.before_alignment or {}).get('P'))
         _append_pitcher(order, (event.after_alignment or {}).get('P'))
 

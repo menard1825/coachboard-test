@@ -1,6 +1,8 @@
 from collections import defaultdict
 from datetime import datetime
 
+from live_history import gameplay_events
+
 
 def calculate_actual_position_game_stats(roster_players, rotations, rotation_events, games):
     """Count games in which each player appeared at each position.
@@ -17,8 +19,10 @@ def calculate_actual_position_game_stats(roster_players, rotations, rotation_eve
     for event in rotation_events or []:
         if event.game_id and not event.reverted:
             events_by_game[event.game_id].append(event)
-    for game_events in events_by_game.values():
-        game_events.sort(key=lambda event: (event.sequence or 0, event.id or 0))
+    for game_id, game_events in events_by_game.items():
+        # Positions played come from play: a setup edit before an inning
+        # began put nobody at a position (live_history).
+        events_by_game[game_id] = gameplay_events(game_events)
 
     for rotation in rotations or []:
         if rotation.associated_game_id:

@@ -24,7 +24,9 @@
 
   function pitcherOrder(state) {
     const order = [];
-    const events = [...(state.rotation_events || [])]
+    // Who pitched: the gameplay history, where a setup edit made before an
+    // inning began put nobody on the mound (live_history.py).
+    const events = [...(state.gameplay_events || state.rotation_events || [])]
       .filter(e => !e.reverted)
       .sort((a,b) => Number(a.sequence || 0) - Number(b.sequence || 0));
 

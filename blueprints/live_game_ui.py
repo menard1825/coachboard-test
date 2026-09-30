@@ -9,7 +9,8 @@ from sqlalchemy.exc import IntegrityError
 from asset_versioning import asset_url
 from db import db
 from extensions import socketio
-from models import Game, Player, PlayerGameAbsence, Rotation
+from game_availability import inning_has_only_setup_edits, present_players
+from models import Game, Rotation
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
@@ -52,15 +53,8 @@ def _allowed_positions(team):
 
 
 def _present_players(game, team_id):
-    absent_ids = {
-        row.player_id
-        for row in db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
-    }
-    return [
-        player
-        for player in db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
-        if player.id not in absent_ids
-    ]
+    # Here now, including late arrivals and departures (game_availability).
+    return present_players(game, team_id)
 
 
 def _clean_draft_alignment(candidate, game, team):
@@ -436,6 +430,9 @@ def next_inning_prep(game_id):
         'status': 'success',
         'game_id': game.id,
         'current_inning': current_inning,
+        # The current inning has only setup edits so far ("Not yet",
+        # live_history): they are not in-game adjustments.
+        'current_inning_setup_only': inning_has_only_setup_edits(game, team.id, current_inning),
         'next_inning': next_inning,
         'current_alignment': current_alignment,
         # planned_alignment stays the plan for the upcoming inning only.

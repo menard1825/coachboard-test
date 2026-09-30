@@ -4,7 +4,8 @@ from copy import deepcopy
 from flask import Blueprint, jsonify, request
 
 from db import db
-from models import Player, PlayerGameAbsence
+from game_availability import present_players
+from models import Player
 from blueprints.live_game_api import _authorized_context, get_authoritative_live_state
 
 
@@ -21,18 +22,8 @@ def _required_positions(team):
 
 
 def _present_names(game, team_id):
-    absent_ids = {
-        row.player_id
-        for row in db.session.query(PlayerGameAbsence).filter_by(
-            game_id=game.id,
-            team_id=team_id,
-        ).all()
-    }
-    return {
-        player.name
-        for player in db.session.query(Player).filter_by(team_id=team_id).all()
-        if player.id not in absent_ids
-    }
+    # Here now, including late arrivals and departures (game_availability).
+    return {player.name for player in present_players(game, team_id)}
 
 
 def _alignment_problem(alignment, game, team):

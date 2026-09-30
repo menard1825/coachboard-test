@@ -14,8 +14,11 @@
     return Boolean(value && typeof value === 'object' && Object.values(value).some(Boolean));
   }
 
+  // Baseball history: setup edits made before an inning began are not
+  // changes during play, and each inning shows the defense that actually
+  // took the field (live_history.py).
   function activeEvents(state) {
-    return [...(state.rotation_events || [])]
+    return [...(state.gameplay_events || state.rotation_events || [])]
       .filter(event => !event.reverted)
       .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0));
   }
@@ -46,8 +49,14 @@
     );
     if (firstMidInningChange) return firstMidInningChange.before_alignment;
 
+    // An inning edited before it began (setup edits are in rotation_events
+    // but not the gameplay history) was played by its recorded defense, not
+    // the plan.
+    const editedBeforeStart = (state.rotation_events || []).some(event =>
+      !event.reverted && event.pre_start === true && String(event.inning) === inning
+    );
     const planned = state.rotation?.innings?.[inning];
-    if (hasAlignment(planned)) return planned;
+    if (hasAlignment(planned) && !editedBeforeStart) return planned;
 
     return state.actual_rotation?.[inning] || {};
   }

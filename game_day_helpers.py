@@ -17,6 +17,7 @@ from models import (
 )
 from team_game_settings import regulation_innings_for_team
 from lineup_service import lineup_to_dict
+from live_history import _event_order_key, gameplay_events
 from utils import calculate_pitch_count_summary, get_pitching_rules_for_team
 
 
@@ -116,22 +117,6 @@ def _complete_alignment(alignment, required, present_names, optional_positions=N
 _UNSET = object()
 
 
-def _event_order_key(event):
-    """Python equivalent of ORDER BY sequence ASC, id ASC.
-
-    SQLite sorts NULLs first in an ascending clause, so a row with a missing
-    sequence or id has to sort ahead of any value rather than raising on a
-    None/int comparison. The leading 0/1 flag reproduces that, instead of
-    assuming both columns are always populated.
-    """
-    sequence = getattr(event, 'sequence', None)
-    identifier = getattr(event, 'id', None)
-    return (
-        (1, sequence) if sequence is not None else (0, 0),
-        (1, identifier) if identifier is not None else (0, 0),
-    )
-
-
 def _reconstruct_actual_game_rotation(rotation, events):
     """Rebuild the played defense from a rotation plan plus its events.
 
@@ -186,9 +171,9 @@ def _actual_pitcher_names(actual, events, reached=None):
         if name and name not in order:
             order.append(name)
 
-    for event in events or []:
-        if event.reverted:
-            continue
+    # Pitching history, not field edits: a setup edit before an inning began
+    # put nobody on the mound (live_history).
+    for event in gameplay_events(events):
         add((event.before_alignment or {}).get('P'))
         add((event.after_alignment or {}).get('P'))
 
@@ -684,9 +669,9 @@ def build_actual_game_report(game, team):
     pitching_stats_pending = bool(expected_pitchers) and not pitching_stats_complete
 
     changes = []
-    for event in events:
-        if event.reverted:
-            continue
+    # Changes made during play; setup edits before an inning began are not
+    # substitutions (live_history).
+    for event in gameplay_events(events):
         if event.event_type in {'Defensive Change', 'Pitcher Change', 'End Inning', 'Set New Defense', 'End Game'}:
             changes.append({
                 'inning': str(event.inning),

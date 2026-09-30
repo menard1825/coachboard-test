@@ -475,6 +475,7 @@ def take_pat_off_the_mound(page: Page, url: str, game_id: int):
     post_json(page, url, f'/api/live-game/{game_id}/complete-pitcher-change', {
         'base_sequence': 0, 'fast': True, 'new_pitcher_id': frank,
         'alignment': dict(BASE, P='First Frank', **{'1B': 'Pitcher Pat'}),
+        'inning_started': True,  # during play: Pat pitched, then came off the mound
     })
 
 

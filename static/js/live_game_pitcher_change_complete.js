@@ -139,6 +139,14 @@
     const data =
       await response.json().catch(() => ({}));
 
+    // "Cancel change" at "Has the 4th inning started?"
+    // (live_game_inning_clarity.js): nothing was saved and the pitcher is
+    // unchanged.
+    if (data.code === 'inning_start_cancelled') {
+      toast('Pitching change cancelled.');
+      return null;
+    }
+
     if (
       !response.ok ||
       data.status === 'error'

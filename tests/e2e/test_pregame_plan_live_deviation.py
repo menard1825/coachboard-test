@@ -98,7 +98,8 @@ def _change_pitcher(page, base_url, name):
     player_id = next(p['id'] for p in page.cb_api.request.get(f'{base_url}/api/roster').json() if p['name'] == name)
     alignment = {**{pos: v for pos, v in state['current_alignment'].items() if v}, 'P': name}
     response = page.cb_api.request.post(f'{base_url}/api/live-game/{page.cb_game}/complete-pitcher-change', data={
-        'base_sequence': _sequence(state), 'fast': True, 'new_pitcher_id': int(player_id), 'alignment': alignment})
+        'base_sequence': _sequence(state), 'fast': True, 'new_pitcher_id': int(player_id), 'alignment': alignment,
+        'inning_started': True})  # changes during play
     assert response.ok, response.text()[:300]
 
 
@@ -107,7 +108,7 @@ def _swap(page, base_url, a, b):
     current = {pos: v for pos, v in state['current_alignment'].items() if v}
     alignment = {**current, a: current[b], b: current[a]}
     response = page.cb_api.request.post(f'{base_url}/api/live-game/{page.cb_game}/defense-edit', data={
-        'base_sequence': _sequence(state), 'alignment': alignment})
+        'base_sequence': _sequence(state), 'alignment': alignment, 'inning_started': True})
     assert response.ok, response.text()[:300]
 
 
@@ -294,7 +295,7 @@ def test_long_names_fit_on_a_small_phone(live, coachboard_url):
     response = page.cb_api.request.post(
         f'{coachboard_url}/api/live-game/{page.cb_game}/complete-pitcher-change',
         data={'base_sequence': _sequence(state), 'fast': True, 'new_pitcher_id': int(player_id),
-              'alignment': {**current, 'P': long_name, 'CF': current['P']}})
+              'alignment': {**current, 'P': long_name, 'CF': current['P']}, 'inning_started': True})
     assert response.ok, response.text()[:200]
     _swap(page, coachboard_url, 'SS', '2B')
     for inning in (1, 2):

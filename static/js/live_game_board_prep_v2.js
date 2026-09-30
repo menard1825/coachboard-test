@@ -1925,7 +1925,13 @@
   }
 
   function deviationHeading(key) {
-    if (key === String(latest?.current_inning || '')) return 'In-game adjustments';
+    if (key === String(latest?.current_inning || '')) {
+      // Edits the coach said were made before the inning began are setup,
+      // not in-game adjustments (live_history.py).
+      return latest?.current_inning_setup_only
+        ? `Defense for the ${inningOrdinal(key)}`
+        : 'In-game adjustments';
+    }
     if (key === String(latest?.next_inning || '')) return `Heading into the ${inningOrdinal(key)}`;
     return `How the ${inningOrdinal(key)} finished`;
   }

@@ -1108,6 +1108,18 @@
     await getState();
   }
 
+  // "Cancel change" at "Has the 4th inning started?"
+  // (live_game_inning_clarity.js): nothing was saved, so there is nothing to
+  // report as a failure or retry -- the field is exactly as it was.
+  function settleCancelledChange(shell) {
+    saveMode = 'saved';
+    saveMessage = 'Change cancelled';
+    lastFailedMove = null;
+    quickDefenseSignature = '';
+    if (shell) renderQuickDefense(shell);
+    bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
+  }
+
   async function saveDefenseDraft(alignment, successMessage, baseSequence = null) {
     if (moveBusy) return;
     moveBusy = true;
@@ -1131,6 +1143,11 @@
       });
 
       const data = await response.json().catch(() => ({}));
+
+      if (data.code === 'inning_start_cancelled') {
+        settleCancelledChange(shell);
+        return;
+      }
 
       if (!response.ok || data.status === 'error') {
         if (
@@ -1249,6 +1266,10 @@
         }),
       });
       const data = await response.json().catch(() => ({}));
+      if (data.code === 'inning_start_cancelled') {
+        settleCancelledChange(shell);
+        return;
+      }
       if (!response.ok || data.status === 'error') {
         if (
           data.code === 'stale_live_state' ||

@@ -7,7 +7,9 @@ from sqlalchemy.orm import joinedload
 
 from db import db
 from extensions import socketio
+from game_availability import INNING_STARTED, game_availability, inning_has_started, inning_ordinal
 from game_day_helpers import required_positions
+from live_history import gameplay_events
 from game_start_readiness import can_start_game, normalized_inning_one
 from models import (
     Game,
@@ -195,6 +197,63 @@ def _stale_write_response(data, game, team):
     }), 409
 
 
+_YES = {True, 1, '1', 'true', 'yes'}
+_NOT_YET = {False, 0, '0', 'false', 'not_yet', 'no'}
+
+
+def _inning_start_answer(game, team, data):
+    """Ask whether the current inning has started, if CoachBoard doesn't know.
+
+    Returns (response, start_now, pre_start). Called by every On the Field
+    defensive change after all its own checks pass, just before it is saved,
+    so the coach answers once and only for a change that will be saved.
+    While the current inning has no 'Inning Started' marker
+    (game_availability), a request without `inning_started` gets the
+    question (409 inning_start_question); `inning_started: true` asks the
+    caller to record the marker immediately before its change
+    (_record_inning_start), and `false` ("Not yet") saves the change as a
+    setup edit (pre_start, live_history). Once the inning has started, a
+    change is made during play (pre_start False).
+    """
+    if inning_has_started(game, team.id):
+        return None, False, False
+
+    answer = data.get('inning_started')
+    if isinstance(answer, str):
+        answer = answer.strip().lower()
+    if answer in _YES:
+        return None, True, False
+    if answer in _NOT_YET:
+        return None, False, True
+
+    ordinal = inning_ordinal(game.live_current_inning or '1')
+    return (jsonify({
+        'status': 'error',
+        'code': 'inning_start_question',
+        'inning': str(game.live_current_inning or '1'),
+        'title': f'Has the {ordinal} inning started?',
+        'message': (
+            f'Not yet: this is a lineup fix before the {ordinal} begins. '
+            f'Yes: the players on the field now started the {ordinal}, '
+            'and everyone who plays any of it gets credit for playing it.'
+        ),
+        'not_yet_label': 'Not yet',
+        'yes_label': 'Yes, inning started',
+    }), 409), False, False
+
+
+def _record_inning_start(game, team_id, alignment):
+    """The defense that began the current inning, recorded just before a change."""
+    return _event(
+        game,
+        team_id,
+        INNING_STARTED,
+        game.live_current_inning or '1',
+        deepcopy(alignment),
+        deepcopy(alignment),
+    )
+
+
 def _player_name(player_id, team_id):
     if player_id is None:
         return None
@@ -258,10 +317,13 @@ def get_authoritative_live_state(game_id, team_id, game=None):
     roster = db.session.query(Player).filter_by(team_id=team_id).order_by(Player.name).all()
     roster_names = {p.name for p in roster}
     absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
-    absent_ids = {a.player_id for a in absences}
-    present_roster = [p for p in roster if p.id not in absent_ids]
 
     rotation, actual_rotation, events = _actual_rotation(game, team_id)
+    # Here now: Out at first pitch, then any late arrival or departure.
+    availability = game_availability(
+        game, team_id, roster=roster, absences=absences, events=events,
+    )
+    present_roster = [p for p in roster if availability.is_present(p.id)]
     current_inning = str(game.live_current_inning or '1')
     current_alignment = deepcopy(
         actual_rotation.get(current_inning, {}) or {}
@@ -304,9 +366,12 @@ def get_authoritative_live_state(game_id, team_id, game=None):
     if not roster_valid:
         alignment_warning = roster_warning
     elif alignment_availability_conflicts:
+        conflict = alignment_availability_conflicts[0]
+        left_names = {p.name for p in roster if p.id in availability.left_game}
         alignment_warning = (
-            f'{alignment_availability_conflicts[0]} '
-            'is marked Out for this game.'
+            f'{conflict} left the game.'
+            if conflict in left_names
+            else f'{conflict} is marked Out for this game.'
         )
     else:
         alignment_warning = None
@@ -340,11 +405,13 @@ def get_authoritative_live_state(game_id, team_id, game=None):
         current_game_id=game.id,
     )
     # Re-entry depends on this game's pitching history, which the
-    # pitch-count calculator does not see.
+    # pitch-count calculator does not see -- history, not setup edits made
+    # before an inning began (live_history).
+    history = gameplay_events(events)
     pitching_eligibility.apply_reentry_rule(
         pitch_summary,
         rules,
-        events,
+        history,
         current_alignment.get('P'),
         current_alignment,
     )
@@ -369,8 +436,12 @@ def get_authoritative_live_state(game_id, team_id, game=None):
         'planned_next_inning': next_inning,
         'planned_next_alignment': planned_next,
         'roster': [model_to_dict(p) for p in present_roster],
-        'absent_player_ids': list(absent_ids),
+        'absent_player_ids': sorted(availability.not_here_now()),
         'rotation_events': [model_to_dict(e) for e in events],
+        # The same timeline as baseball history (live_history): no setup
+        # edits, and each inning taking the field with the defense that
+        # actually began it. For who pitched and what changed during play.
+        'gameplay_events': [_gameplay_event_dict(e) for e in history],
         'pitch_count_summary': pitch_summary,
         'pitching_profiles': [model_to_dict(p) for p in profiles],
         'pitching_plans': [model_to_dict(p) for p in plans],
@@ -385,6 +456,19 @@ def get_authoritative_live_state(game_id, team_id, game=None):
     }
 
 
+def _gameplay_event_dict(event):
+    source = getattr(event, 'source', None)
+    if source is None:
+        return model_to_dict(event)
+    shown = model_to_dict(source)
+    shown.update({
+        'after_alignment': deepcopy(event.after_alignment),
+        'old_pitcher_id': event.old_pitcher_id,
+        'new_pitcher_id': event.new_pitcher_id,
+    })
+    return shown
+
+
 def _broadcast_state(game_id, team_id):
     state = get_authoritative_live_state(game_id, team_id)
     if state:
@@ -393,7 +477,7 @@ def _broadcast_state(game_id, team_id):
 
 
 def _event(game, team_id, event_type, inning, before_alignment, after_alignment,
-           old_pitcher_id=None, new_pitcher_id=None):
+           old_pitcher_id=None, new_pitcher_id=None, pre_start=None):
     event = GameRotationEvent(
         team_id=team_id,
         game_id=game.id,
@@ -405,6 +489,7 @@ def _event(game, team_id, event_type, inning, before_alignment, after_alignment,
         after_alignment=deepcopy(after_alignment),
         old_pitcher_id=old_pitcher_id,
         new_pitcher_id=new_pitcher_id,
+        pre_start=pre_start,
     )
     db.session.add(event)
     return event
@@ -585,6 +670,11 @@ def change_pitcher(game_id):
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
 
+    asked, start_now, pre_start = _inning_start_answer(game, team, data)
+    if asked:
+        return asked
+    if start_now:
+        _record_inning_start(game, team.id, before)
     _event(
         game,
         team.id,
@@ -594,6 +684,7 @@ def change_pitcher(game_id):
         after,
         old_pitcher_id=old_pitcher_id,
         new_pitcher_id=new_pitcher.id,
+        pre_start=pre_start,
     )
     db.session.commit()
     state = _broadcast_state(game.id, team.id)
@@ -628,14 +719,8 @@ def defensive_change(game_id):
     if not player:
         return jsonify({'status': 'error', 'message': 'Player is not on this team.'}), 400
 
-    absent_ids = {
-        row.player_id
-        for row in db.session.query(PlayerGameAbsence).filter_by(
-            game_id=game.id,
-            team_id=team.id,
-        ).all()
-    }
-    if player.id in absent_ids:
+    availability = game_availability(game, team.id)
+    if not availability.is_present(player.id):
         return jsonify({
             'status': 'error',
             'message': f'{player.name} is not available for this game.',
@@ -664,12 +749,17 @@ def defensive_change(game_id):
     present_names = {
         p.name
         for p in db.session.query(Player).filter_by(team_id=team.id).all()
-        if p.id not in absent_ids
+        if availability.is_present(p.id)
     }
     valid, message = _validate_alignment(after, present_names)
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
 
+    asked, start_now, pre_start = _inning_start_answer(game, team, data)
+    if asked:
+        return asked
+    if start_now:
+        _record_inning_start(game, team.id, before)
     old_pitcher_id = _player_id_by_name(before.get('P'), team.id)
     new_pitcher_id = _player_id_by_name(after.get('P'), team.id)
     _event(
@@ -681,6 +771,7 @@ def defensive_change(game_id):
         after,
         old_pitcher_id=old_pitcher_id if old_pitcher_id != new_pitcher_id else None,
         new_pitcher_id=new_pitcher_id if old_pitcher_id != new_pitcher_id else None,
+        pre_start=pre_start,
     )
     db.session.commit()
     state = _broadcast_state(game.id, team.id)
@@ -723,15 +814,29 @@ def undo(game_id):
     if stale:
         return stale
 
-    last_event = db.session.query(GameRotationEvent).filter_by(
-        game_id=game.id,
-        team_id=team.id,
-        reverted=False,
+    # Undo is for the coach's own changes. An 'Inning Started' marker is
+    # bookkeeping (game_availability): Undo passes over it, so undoing the
+    # change that followed "Yes, inning started" leaves the inning started.
+    last_event = db.session.query(GameRotationEvent).filter(
+        GameRotationEvent.game_id == game.id,
+        GameRotationEvent.team_id == team.id,
+        GameRotationEvent.reverted.is_(False),
+        GameRotationEvent.event_type != INNING_STARTED,
     ).order_by(GameRotationEvent.sequence.desc(), GameRotationEvent.id.desc()).first()
     if not last_event:
         return jsonify({'status': 'error', 'message': 'There is nothing to undo.'}), 409
 
     last_event.reverted = True
+    if last_event.event_type == 'End Inning':
+        # The inning it loaded is no longer being played, so neither is its
+        # start: a later End Inning into it begins unstarted again.
+        db.session.query(GameRotationEvent).filter_by(
+            game_id=game.id,
+            team_id=team.id,
+            inning=str(last_event.inning),
+            event_type=INNING_STARTED,
+            reverted=False,
+        ).update({'reverted': True}, synchronize_session='fetch')
 
     current_inning = '1'
     remaining = db.session.query(GameRotationEvent).filter_by(

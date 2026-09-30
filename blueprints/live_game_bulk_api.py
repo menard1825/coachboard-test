@@ -6,8 +6,8 @@ from flask import Blueprint, g, jsonify, request
 from asset_versioning import asset_url
 from db import db
 from extensions import socketio
+from game_availability import present_players
 import pitching_eligibility
-from models import Player, PlayerGameAbsence
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
@@ -15,7 +15,9 @@ from blueprints.live_game_api import (
     _current_alignment,
     _current_sequence,
     _event,
+    _inning_start_answer,
     _player_id_by_name,
+    _record_inning_start,
     _room_name,
     _validate_alignment,
     get_authoritative_live_state,
@@ -31,12 +33,8 @@ def _allowed_positions(team):
 
 
 def _present_players(game, team_id):
-    absent_ids = {
-        row.player_id
-        for row in db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
-    }
-    players = db.session.query(Player).filter_by(team_id=team_id).all()
-    return [player for player in players if player.id not in absent_ids]
+    # Here now, including late arrivals and departures (game_availability).
+    return present_players(game, team_id)
 
 
 PITCHING_DECISION_CODES = {
@@ -448,6 +446,11 @@ def complete_pitcher_change(game_id):
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
 
+    asked, start_now, pre_start = _inning_start_answer(game, team, data)
+    if asked:
+        return asked
+    if start_now:
+        _record_inning_start(game, team.id, before)
     old_pitcher_id = _player_id_by_name(old_pitcher_name, team.id)
     event = _event(
         game,
@@ -458,6 +461,7 @@ def complete_pitcher_change(game_id):
         deepcopy(after),
         old_pitcher_id=old_pitcher_id,
         new_pitcher_id=new_pitcher.id,
+        pre_start=pre_start,
     )
     db.session.commit()
 
@@ -539,6 +543,11 @@ def set_defense(game_id):
     if comparable_before == after:
         return jsonify({'status': 'error', 'message': 'No defensive changes were made.'}), 409
 
+    asked, start_now, pre_start = _inning_start_answer(game, team, data)
+    if asked:
+        return asked
+    if start_now:
+        _record_inning_start(game, team.id, before)
     _event(
         game,
         team.id,
@@ -546,6 +555,7 @@ def set_defense(game_id):
         game.live_current_inning,
         deepcopy(before),
         deepcopy(after),
+        pre_start=pre_start,
     )
     db.session.commit()
     state = _broadcast_state(game.id, team.id)
@@ -590,6 +600,11 @@ def defense_edit(game_id):
     if comparable_before == after:
         return jsonify({'status': 'error', 'message': 'No defensive changes were made.'}), 409
 
+    asked, start_now, pre_start = _inning_start_answer(game, team, data)
+    if asked:
+        return asked
+    if start_now:
+        _record_inning_start(game, team.id, before)
     event = _event(
         game,
         team.id,
@@ -597,6 +612,7 @@ def defense_edit(game_id):
         game.live_current_inning,
         deepcopy(before),
         deepcopy(after),
+        pre_start=pre_start,
     )
     db.session.commit()
     return _fast_success(game, team, event, after)

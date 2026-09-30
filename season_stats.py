@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from live_history import gameplay_events, setup_starting_defenses
 from utils import baseball_innings_to_outs, outs_to_baseball_innings
 
 
@@ -53,8 +54,12 @@ def build_game_inning_records(roster, rotations, rotation_events, games, game_ab
     for event in rotation_events or []:
         if event.game_id and not getattr(event, 'reverted', False):
             events_by_game[event.game_id].append(event)
-    for events in events_by_game.values():
-        events.sort(key=lambda item: (item.sequence or 0, item.id or 0))
+    setup_starts = {}
+    for game_id, events in events_by_game.items():
+        # Appearances come from play: a setup edit before an inning began
+        # put nobody in the game (live_history).
+        setup_starts.update(setup_starting_defenses(events))
+        events_by_game[game_id] = gameplay_events(events)
 
     absent_by_game = defaultdict(set)
     for row in game_absences or []:
@@ -71,6 +76,9 @@ def build_game_inning_records(roster, rotations, rotation_events, games, game_ab
         if events:
             max_inning = _live_max_played_inning(game, events)
             for raw_inning, alignment in planned.items():
+                # An inning whose loaded defense was edited before it began
+                # was played by the edited defense, not the plan.
+                alignment = setup_starts.get((game.id, str(raw_inning)), alignment)
                 _add_alignment(innings, _inning_number(raw_inning), alignment, max_inning)
             for event in events:
                 event_inning = _inning_number(event.inning)
