@@ -100,6 +100,9 @@ def create_app():
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_SECURE'] = _env_bool('SESSION_COOKIE_SECURE', runtime in {'production', 'prod'})
+    # Optional visible label for disposable/test instances. Empty by default,
+    # so normal deployments render exactly as before.
+    app.config['COACHBOARD_INSTANCE_LABEL'] = (os.environ.get('COACHBOARD_INSTANCE_LABEL') or '').strip()
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
     app.config['ALLOWED_EXTENSIONS'] = ALLOWED_LOGO_EXTENSIONS
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or (

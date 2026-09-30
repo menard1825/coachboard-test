@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     {% include '_coachboard_assets.html' %}
-    <title>{% block title %}{% if current_team %}{{ current_team.team_name }} - Coach Planner{% else %}Team Coach App{% endif %}{% endblock %}</title>
+    <title>{% if config.get('COACHBOARD_INSTANCE_LABEL') %}[{{ config.get('COACHBOARD_INSTANCE_LABEL') }}] {% endif %}{% block title %}{% if current_team %}{{ current_team.team_name }} - Coach Planner{% else %}Team Coach App{% endif %}{% endblock %}</title>
 
     <script>
     (() => {
@@ -118,6 +118,12 @@
           <span class="navbar-brand-text">
             {% if current_team %}{{ current_team.team_name }}{% else %}Coach Planner{% endif %}
           </span>
+          {% if config.get('COACHBOARD_INSTANCE_LABEL') %}
+          <span class="badge rounded-pill text-bg-warning text-dark border border-dark ms-2"
+                data-coachboard-instance-label>
+            <i class="bi bi-cone-striped me-1"></i>{{ config.get('COACHBOARD_INSTANCE_LABEL') }}
+          </span>
+          {% endif %}
         </a>
 
         {% if session.get('logged_in') and current_team %}
