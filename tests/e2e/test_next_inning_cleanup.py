@@ -2,13 +2,15 @@
 
 End Inning (live_game_contract.js):
 
-* "Start Inning Anyway" with CF open is remembered for exactly the inning
-  and defense started, like "Keep as Recorded": when that inning ends with
+* "Start 2nd with CF Open" is remembered for exactly the inning and
+  defense started, like "Keep as Recorded": when that inning ends with
   the same defense, "2nd inning record has an open position" is not asked.
   A different defense, or a different set of open spots, asks again.
 * Short-handed -- every player here is already on the field, so the open
-  spot cannot be filled -- starts the inning without "still open". A player
-  on the bench means the spot could be filled, so it still asks. An open P
+  spot cannot be filled -- starts the inning without asking. A player on
+  the bench means the spot could be filled, so it asks: "2nd inning defense
+  has CF open", with "Finish 2nd Inning Defense" and "Start 2nd with CF
+  Open" as two real choices. An open P
   is never accepted.
 
 The Next Inning board (live_game_board_prep_v2.js): tapping a player changes
@@ -140,6 +142,21 @@ def _set_field(page: Page, url, game_id, alignment):
     assert response.ok, response.text()[:300]
 
 
+def _expect_two_real_choices(modal, finish, start):
+    """Both answers look and act like actions: neither is disabled or faded."""
+    for name, style in ((finish, 'btn-outline-primary'), (start, 'btn-primary')):
+        button = modal.get_by_role('button', name=name, exact=True)
+        expect(button).to_be_visible()
+        expect(button).to_be_enabled()
+        expect(button).to_have_class(re.compile(rf'\b{style}\b'))
+        looks = button.evaluate("""el => {
+          const s = getComputedStyle(el);
+          return {opacity: s.opacity, pointer: s.pointerEvents, disabled: el.matches(':disabled, .disabled')};
+        }""")
+        assert looks == {'opacity': '1', 'pointer': 'auto', 'disabled': False}, (name, looks)
+    expect(modal.get_by_role('button', name='Start Inning Anyway')).to_have_count(0)
+
+
 def _start_the_2nd_anyway(setup, url):
     """1st full; the 2nd planned with CF open (Center Casey and the relievers
     on the bench, so End Inning asks); the 3rd planned full."""
@@ -147,8 +164,10 @@ def _start_the_2nd_anyway(setup, url):
     _watch_questions(page)
     page.locator('#liveEndInningBtn').click()
     incomplete = page.locator(INCOMPLETE)
-    expect(incomplete).to_contain_text('CF is still open for the 2nd inning.', timeout=15_000)
-    incomplete.get_by_role('button', name='Start Inning Anyway').click()
+    expect(incomplete.locator('.modal-title')).to_have_text('2nd inning defense has CF open', timeout=15_000)
+    expect(incomplete).to_contain_text('CF is open, and players are available on the bench.')
+    _expect_two_real_choices(incomplete, 'Finish 2nd Inning Defense', 'Start 2nd with CF Open')
+    incomplete.get_by_role('button', name='Start 2nd with CF Open').click()
     expect(page.locator('#live-inning-display')).to_have_text('2', timeout=20_000)
     assert filled(live_state(page, url, game_id)['current_alignment']) == NO_CF
     page.wait_for_timeout(800)
@@ -224,9 +243,69 @@ def test_a_player_on_the_bench_still_asks(setup, coachboard_url):
                            out=('Relief Rex', 'Relief Rae'))
     page.locator('#liveEndInningBtn').click()
     incomplete = page.locator(INCOMPLETE)
-    expect(incomplete).to_contain_text('CF is still open for the 2nd inning.', timeout=15_000)
+    expect(incomplete).to_contain_text('CF is open, and players are available on the bench.', timeout=15_000)
     incomplete.get_by_role('button', name='Finish 2nd Inning Defense').click()
     expect(incomplete).to_be_hidden()
+    assert _inning(page, coachboard_url, game_id) == '1'
+
+
+def test_several_open_spots_are_named_and_the_start_is_remembered(
+    page: Page, coachboard_url, next_board
+):
+    """CF and RF open with both players on the bench: one question naming
+    both. Starting with them open is remembered for that defense, so when
+    the 2nd ends only the 3rd's plan is asked about, never the 2nd's record."""
+    board, game_id = next_board
+    for pos in ('CF', 'RF'):
+        spot(board, pos).click()
+        board.get_by_role('button', name=re.compile(r'^Bench #\d+ ')).click()
+        expect(spot(board, pos)).to_have_attribute('data-next-player', '', timeout=IMMEDIATE_MS)
+    plan = {p: n for p, n in FULL.items() if p not in ('CF', 'RF')}
+    wait_for_server(page, coachboard_url, game_id, plan)
+    _watch_questions(page)
+
+    page.locator('#liveEndInningBtn').click()
+    incomplete = page.locator(INCOMPLETE)
+    expect(incomplete.locator('.modal-title')).to_have_text(
+        '2nd inning defense has open positions', timeout=15_000
+    )
+    expect(incomplete).to_contain_text('CF and RF are open, and players are available on the bench.')
+    _expect_two_real_choices(incomplete, 'Finish 2nd Inning Defense', 'Start 2nd with CF and RF Open')
+    incomplete.get_by_role('button', name='Start 2nd with CF and RF Open').click()
+    expect(page.locator('#live-inning-display')).to_have_text('2', timeout=20_000)
+    assert filled(live_state(page, coachboard_url, game_id)['current_alignment']) == plan
+    page.wait_for_timeout(800)
+
+    # The 3rd's plan is the same open defense: asked about; the 2nd's
+    # record (the defense just started on purpose) is not.
+    page.locator('#liveEndInningBtn').click()
+    expect(incomplete.locator('.modal-title')).to_have_text(
+        '3rd inning defense has open positions', timeout=15_000
+    )
+    incomplete.get_by_role('button', name='Finish 3rd Inning Defense').click()
+    expect(incomplete).to_be_hidden()
+    assert _asked(page) == ['cbIncompleteNextModal', 'cbIncompleteNextModal']
+    assert _inning(page, coachboard_url, game_id) == '2'
+
+
+def test_finish_defense_returns_to_next_inning_planning(page: Page, coachboard_url, next_board):
+    board, game_id = next_board
+    spot(board, 'RF').click()
+    board.get_by_role('button', name='Bench #9 Right Riley', exact=True).click()
+    wait_for_server(page, coachboard_url, game_id, {p: n for p, n in FULL.items() if p != 'RF'})
+
+    # Ending from On the Field: Finish brings the coach to the 2nd's plan.
+    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+    expect(board).to_be_hidden()
+    page.locator('#liveEndInningBtn').click()
+    incomplete = page.locator(INCOMPLETE)
+    expect(incomplete.locator('.modal-title')).to_have_text('2nd inning defense has RF open', timeout=15_000)
+    _expect_two_real_choices(incomplete, 'Finish 2nd Inning Defense', 'Start 2nd with RF Open')
+    incomplete.get_by_role('button', name='Finish 2nd Inning Defense').click()
+    expect(incomplete).to_be_hidden()
+    expect(board).to_be_visible(timeout=10_000)
+    expect(spot(board, 'RF')).to_have_attribute('data-next-player', '')
+    page.wait_for_timeout(500)
     assert _inning(page, coachboard_url, game_id) == '1'
 
 

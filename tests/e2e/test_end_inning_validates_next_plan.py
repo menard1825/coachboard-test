@@ -89,7 +89,7 @@ def test_screenshot_case_cf_open_on_the_field_but_filled_in_the_plan(
     expect(recorded).to_contain_text(
         'CF was left open on the recorded defense for the 1st inning.'
     )
-    expect(recorded).not_to_contain_text('still open')
+    expect(recorded).not_to_contain_text('available on the bench')
     recorded.get_by_role('button', name='Keep as Recorded').click()
 
     # Casey is at CF in the plan: no 2nd-inning CF warning, and the plan
@@ -110,11 +110,11 @@ def test_inverse_full_record_but_the_plan_has_cf_open(page: Page, coachboard_url
     end_inning(page)
     incomplete = page.locator(INCOMPLETE)
     expect(incomplete.locator('.modal-title')).to_have_text(
-        '2nd inning defense still open', timeout=10_000
+        '2nd inning defense has CF open', timeout=10_000
     )
-    expect(incomplete).to_contain_text('CF is still open for the 2nd inning.')
+    expect(incomplete).to_contain_text('CF is open, and players are available on the bench.')
     expect(page.locator(RECORDED)).not_to_be_visible()
-    incomplete.get_by_role('button', name='Start Inning Anyway').click()
+    incomplete.get_by_role('button', name='Start 2nd with CF Open').click()
     expect_started_with(page, coachboard_url, game_id, plan)
     assert filled(posts[-1]['alignment']) == plan
 
@@ -151,9 +151,9 @@ def test_move_leaving_old_spot_open_names_the_actual_open_spot(
 
     end_inning(page)
     incomplete = page.locator(INCOMPLETE)
-    expect(incomplete).to_contain_text('LF is still open for the 2nd inning.', timeout=10_000)
+    expect(incomplete).to_contain_text('LF is open, and players are available on the bench.', timeout=10_000)
     expect(incomplete).not_to_contain_text('CF')
-    incomplete.get_by_role('button', name='Start Inning Anyway').click()
+    incomplete.get_by_role('button', name='Start 2nd with LF Open').click()
     expect_started_with(page, coachboard_url, game_id, plan)
     assert filled(posts[-1]['alignment']) == plan
 
@@ -173,8 +173,8 @@ def test_resolved_chain_is_what_is_validated_and_sent(page: Page, coachboard_url
 
     end_inning(page)
     incomplete = page.locator(INCOMPLETE)
-    expect(incomplete).to_contain_text('SS is still open for the 2nd inning.', timeout=10_000)
-    incomplete.get_by_role('button', name='Start Inning Anyway').click()
+    expect(incomplete).to_contain_text('SS is open, and players are available on the bench.', timeout=10_000)
+    incomplete.get_by_role('button', name='Start 2nd with SS Open').click()
     expect_started_with(page, coachboard_url, game_id, plan)
     assert filled(posts[-1]['alignment']) == plan
 
@@ -221,7 +221,7 @@ def test_another_coachs_plan_is_the_one_validated(page: Page, coachboard_url, ne
     expect(spot(board, 'CF')).to_have_attribute('data-next-player', '', timeout=10_000)
 
     end_inning(page)
-    expect(page.locator(INCOMPLETE)).to_contain_text('CF is still open for the 2nd inning.', timeout=10_000)
+    expect(page.locator(INCOMPLETE)).to_contain_text('CF is open, and players are available on the bench.', timeout=10_000)
     assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
 
 

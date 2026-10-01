@@ -113,7 +113,7 @@ def test_ending_the_first_with_the_same_open_field_does_not_ask_again(setup, coa
     # The 2nd inning's plan still has CF open, which End Inning asks about;
     # the 1st inning's record was already decided at first pitch.
     expect(page.locator('#cbIncompleteNextModal')).to_contain_text(
-        'CF is still open for the 2nd inning.', timeout=15_000
+        'CF is open, and players are available on the bench.', timeout=15_000
     )
     expect(page.locator('#cbRecordedInningGapModal')).not_to_be_visible()
 

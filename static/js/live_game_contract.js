@@ -469,7 +469,8 @@
     );
   }
 
-  // A modal with a title, a message, a note and two actions.
+  // A modal with a title, a message, an optional note and two actions.
+  // Each action is [label, onChoose, buttonClass?].
   function endInningQuestion(id, {title, message, note, primary, secondary}) {
     let modal = $(id);
 
@@ -502,18 +503,21 @@
     const instance = bootstrap.Modal.getOrCreateInstance(modal);
     modal.querySelector('[data-cb-question-title]').textContent = title;
     modal.querySelector('[data-cb-question-message]').textContent = message;
-    modal.querySelector('[data-cb-question-note]').textContent = note;
+    const noteLine = modal.querySelector('[data-cb-question-note]');
+    noteLine.textContent = note || '';
+    noteLine.hidden = !note;
 
-    const wire = (selector, [label, onChoose]) => {
+    const wire = (selector, [label, onChoose, buttonClass], fallbackClass) => {
       const button = modal.querySelector(selector);
+      button.className = `btn ${buttonClass || fallbackClass}`;
       button.textContent = label;
       button.onclick = () => {
         modal.addEventListener('hidden.bs.modal', onChoose, {once: true});
         instance.hide();
       };
     };
-    wire('[data-cb-question-primary]', primary);
-    wire('[data-cb-question-secondary]', secondary);
+    wire('[data-cb-question-primary]', primary, 'btn-primary');
+    wire('[data-cb-question-secondary]', secondary, 'btn-outline-secondary');
 
     instance.show();
   }
@@ -579,21 +583,26 @@
   }
 
   // The next inning's plan: exactly the alignment advance-inning receives.
-  function warnIncompleteNextDefense(open, nextInning, retry) {
+  // Asked only when a player on the bench could fill the spot (a
+  // short-handed team starts without asking). Both answers are real
+  // choices, so both buttons read as actions.
+  function warnIncompleteNextDefense(open, nextInning, benchAvailable, retry) {
     const inning = ordinal(nextInning);
+    const listed = positionList(open);
+    const verb = open.length === 1 ? 'is' : 'are';
 
     endInningQuestion('cbIncompleteNextModal', {
-      title: `${inning} inning defense still open`,
-      message:
-        `${positionList(open)} ${open.length === 1 ? 'is' : 'are'} ` +
-        `still open for the ${inning} inning.`,
-      note:
-        `Finish the ${inning} inning defense, or start the inning with ` +
-        `the open ${open.length === 1 ? 'spot' : 'spots'}.`,
+      title: open.length === 1
+        ? `${inning} inning defense has ${open[0]} open`
+        : `${inning} inning defense has open positions`,
+      message: benchAvailable
+        ? `${listed} ${verb} open, and players are available on the bench.`
+        : `${listed} ${verb} open.`,
+      note: '',
       primary: [`Finish ${inning} Inning Defense`, () => {
         window.CBNextDefense?.showNext?.();
-      }],
-      secondary: ['Start Inning Anyway', retry],
+      }, 'btn-outline-primary'],
+      secondary: [`Start ${inning} with ${listed} Open`, retry, 'btn-primary'],
     });
   }
 
@@ -826,6 +835,7 @@
         warnIncompleteNextDefense(
           openNext,
           Number(currentInning) + 1,
+          presentNames.some(name => !assigned.has(name)),
           () => endInningFromNext(true, pitchingDecision)
         );
         return;

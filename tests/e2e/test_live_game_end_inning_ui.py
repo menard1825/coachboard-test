@@ -520,11 +520,11 @@ def test_end_inning_warns_but_can_continue_with_open_position(
         # Then the next inning's plan, which here follows the field.
         warning = page.locator('#cbIncompleteNextModal')
         expect(warning).to_be_visible(timeout=10_000)
-        expect(warning).to_contain_text('2B is still open for the 2nd inning.')
+        expect(warning).to_contain_text('2B is open, and players are available on the bench.')
         expect(
             warning.get_by_role('button', name='Finish 2nd Inning Defense')
         ).to_be_visible()
-        warning.get_by_role('button', name='Start Inning Anyway').click()
+        warning.get_by_role('button', name='Start 2nd with 2B Open').click()
 
         expect(
             page.locator('#live-inning-display')

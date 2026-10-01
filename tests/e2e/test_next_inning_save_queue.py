@@ -592,7 +592,7 @@ def test_fielder_to_pitcher_bench_choice_leaves_the_spot_open(
     page.locator('#liveEndInningBtn').click()
     modal = page.locator('#cbIncompleteNextModal')
     expect(modal).to_be_visible(timeout=10_000)
-    expect(modal).to_contain_text('SS is still open for the 2nd inning.')
+    expect(modal).to_contain_text('SS is open, and players are available on the bench.')
     modal.get_by_role('button', name='Finish 2nd Inning Defense').click()
     assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
 
@@ -954,8 +954,8 @@ def test_incomplete_defense_warns_and_confirms_before_starting(
     wait_for_server(page, coachboard_url, game_id, filled(board_alignment(page)))
     end_inning.click()
     expect(modal).to_be_visible(timeout=10_000)
-    expect(modal.locator('.modal-title')).to_have_text('2nd inning defense still open')
-    expect(modal).to_contain_text('SS is still open for the 2nd inning.')
+    expect(modal.locator('.modal-title')).to_have_text('2nd inning defense has SS open')
+    expect(modal).to_contain_text('SS is open, and players are available on the bench.')
     modal.get_by_role('button', name='Finish 2nd Inning Defense').click()
     expect(modal).to_be_hidden()
     expect(board).to_be_visible()
@@ -967,8 +967,9 @@ def test_incomplete_defense_warns_and_confirms_before_starting(
     wait_for_server(page, coachboard_url, game_id, board_alignment(page))
     end_inning.click()
     expect(modal).to_be_visible(timeout=10_000)
-    expect(modal).to_contain_text('SS and LF are still open for the 2nd inning.')
-    modal.get_by_role('button', name='Start Inning Anyway').click()
+    expect(modal.locator('.modal-title')).to_have_text('2nd inning defense has open positions')
+    expect(modal).to_contain_text('SS and LF are open, and players are available on the bench.')
+    modal.get_by_role('button', name='Start 2nd with SS and LF Open').click()
 
     expect(page.locator('#live-inning-display')).to_have_text(
         '2', timeout=20_000
@@ -1033,16 +1034,16 @@ def test_recorded_inning_gaps_and_next_inning_gaps_are_separate_questions(
     # Then the plan: only SS is open for the 2nd inning.
     expect(incomplete).to_be_visible(timeout=10_000)
     expect(incomplete.locator('.modal-title')).to_have_text(
-        '2nd inning defense still open'
+        '2nd inning defense has SS open'
     )
-    expect(incomplete).to_contain_text('SS is still open for the 2nd inning.')
+    expect(incomplete).to_contain_text('SS is open, and players are available on the bench.')
     expect(incomplete).not_to_contain_text('LF')
     incomplete.get_by_role('button', name='Finish 2nd Inning Defense').click()
     expect(incomplete).to_be_hidden()
     assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
 
     # A gap added to the plan is named too. The recorded gaps were already
-    # kept, so they are not asked again; "Start Inning Anyway" sends
+    # kept, so they are not asked again; "Start 2nd with SS and LF Open" sends
     # exactly the plan the warning described.
     bench(board, 'LF')
     wait_for_server(page, coachboard_url, game_id, board_alignment(page))
@@ -1050,10 +1051,10 @@ def test_recorded_inning_gaps_and_next_inning_gaps_are_separate_questions(
 
     page.locator('#liveEndInningBtn').click()
     expect(incomplete).to_contain_text(
-        'SS and LF are still open for the 2nd inning.', timeout=10_000
+        'SS and LF are open, and players are available on the bench.', timeout=10_000
     )
     expect(recorded).not_to_be_visible()
-    incomplete.get_by_role('button', name='Start Inning Anyway').click()
+    incomplete.get_by_role('button', name='Start 2nd with SS and LF Open').click()
     expect(page.locator('#live-inning-display')).to_have_text(
         '2', timeout=20_000
     )
