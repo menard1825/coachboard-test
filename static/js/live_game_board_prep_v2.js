@@ -20,6 +20,10 @@
   // chosen during (a new live inning opens the plan on its next inning).
   let planChoice = {inning: '', during: ''};
   let liveChangeTimer = null;
+  // One next-inning read at a time (see refresh()).
+  let readInFlight = null;
+  let readStale = false;
+  let readForce = false;
   let selected = null;
   let selectedPosition = '';
   // Next Inning saves in the background, one request at a time, like the
@@ -3658,18 +3662,59 @@
     return true;
   }
 
-  async function refresh({
+  // One read at a time. Start-up, building the tabs and the poll only need
+  // the latest data, so they share a read already in the air instead of
+  // sending the same request again (at start-up the tabs and the 140 ms
+  // read used to ask twice, ~40 ms apart). A caller reporting a change
+  // (`changed`) marks that read stale: its answer may predate the change,
+  // so it is dropped and read again -- the change always shows, and an
+  // older answer never lands on top of a newer one.
+  function refresh({
     force = false,
+    changed = false,
   } = {}) {
     // The queue owns the board while a save is in the air; its answer is
     // newer than anything this read could return.
-    if (activeSavePromise) return null;
+    if (activeSavePromise) return Promise.resolve(null);
 
-    const revision = localRevision;
+    readForce = readForce || force;
 
+    if (readInFlight) {
+      if (changed) readStale = true;
+      return readInFlight;
+    }
+
+    readInFlight = readUntilCurrent().finally(() => {
+      readInFlight = null;
+    });
+
+    return readInFlight;
+  }
+
+  async function readUntilCurrent() {
+    for (;;) {
+      readStale = false;
+
+      const revision = localRevision;
+      let data;
+
+      try {
+        data = await api('GET');
+      } catch (_) {
+        return null;
+      }
+
+      if (readStale && !activeSavePromise) continue;
+
+      const force = readForce;
+      readForce = false;
+
+      return applyRead(data, revision, force);
+    }
+  }
+
+  function applyRead(data, revision, force) {
     try {
-      const data = await api('GET');
-
       if (
         activeSavePromise ||
         revision !== localRevision
@@ -3715,7 +3760,7 @@
   // same change -- instead of waiting for the 3.5 s poll.
   function onLiveChange() {
     window.clearTimeout(liveChangeTimer);
-    liveChangeTimer = window.setTimeout(() => refresh(), 150);
+    liveChangeTimer = window.setTimeout(() => refresh({changed: true}), 150);
   }
 
   function afterAdvance() {
@@ -3731,8 +3776,11 @@
     lastSignature = '';
     applyView();
 
+    // A read already in the air is about the inning that just ended.
+    if (readInFlight) readStale = true;
+
     window.setTimeout(
-      () => refresh({force: true}),
+      () => refresh({force: true, changed: true}),
       120
     );
   }
@@ -3758,14 +3806,14 @@
         if (
           Number(payload?.game_id) === gameId
         ) {
-          refresh();
+          refresh({changed: true});
         }
       }
     );
   }
 
   window.CBNextDefense = {
-    refresh: () => refresh({force: true}),
+    refresh: () => refresh({force: true, changed: true}),
     useSame: useCurrentDefense,
     undo: undoNext,
     getAlignment: () => snapshot(),
@@ -3826,7 +3874,11 @@
       // answer has no board (or saved defense) to draw, so read it now.
       if (latest && latest.status !== 'inactive' && latest.is_live !== false) {
         renderCard();
+      } else if (latest) {
+        refresh({changed: true});
       } else {
+        // Nothing loaded yet: share the start-up read (in the air, or
+        // started here) rather than asking a second time.
         refresh();
       }
     }
@@ -3868,8 +3920,11 @@
     // next-inning response. NEXT and Pregame Plan hydrate afterwards.
     bootSurfaceWhenReady();
 
+    // The start-up read -- unless building the tabs already asked.
     window.setTimeout(
-      () => refresh({force: true}),
+      () => {
+        if (!latest) refresh({force: true});
+      },
       140
     );
 
@@ -3917,7 +3972,7 @@
 
     // Back online: read the server now instead of at the next poll, which
     // also sends any Next Inning changes still waiting to sync.
-    window.addEventListener('online', () => refresh());
+    window.addEventListener('online', () => refresh({changed: true}));
 
     registerDragSurface();
 
