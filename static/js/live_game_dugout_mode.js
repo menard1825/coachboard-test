@@ -130,7 +130,7 @@
       .cb-dh-time.warn{color:#ffd166}.cb-dh-time.danger{color:#ff8a80}
       .cb-dh-pitcher{text-align:right;min-width:0}
       .cb-dh-name{font-size:.88rem;font-weight:800;max-width:230px;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.05}
-      .cb-dh-btn{min-height:40px!important;border-radius:9px!important;font-weight:750!important}
+      .cb-dh-btn{min-height:44px!important;border-radius:9px!important;font-weight:750!important}
       /* Undo lives in this header. It used to be pinned into .coach-live-head,
          which Dugout Mode otherwise hides, so gameday_pitching_steppers.js had
          to un-hide that row purely to keep one button reachable -- a whole
@@ -138,7 +138,7 @@
          selectors carry two ids so they outrank every earlier placement rule
          (#liveUndoBtn.cb-command-undo, body.cb-dugout #liveUndoBtn) wherever
          those modules still load. */
-      body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;min-width:40px!important;min-height:40px!important;height:40px!important;width:auto!important;margin:0!important;padding:0 10px!important;border:1px solid #ffffff5c!important;border-radius:9px!important;background:transparent!important;color:#fff!important;box-shadow:none!important;font-size:.7rem!important;font-weight:800!important;line-height:1!important;letter-spacing:.02em;flex:none!important;touch-action:manipulation}
+      body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;min-width:44px!important;min-height:44px!important;height:44px!important;width:auto!important;margin:0!important;padding:0 10px!important;border:1px solid #ffffff5c!important;border-radius:9px!important;background:transparent!important;color:#fff!important;box-shadow:none!important;font-size:.7rem!important;font-weight:800!important;line-height:1!important;letter-spacing:.02em;flex:none!important;touch-action:manipulation}
       body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo i{display:inline-block!important;margin:0!important;font-size:1rem!important}
       body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo:disabled{opacity:.42!important;cursor:not-allowed!important}
       body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo[hidden]{display:none!important}
@@ -245,30 +245,34 @@
       }
       @media(max-width:575.98px){
         #cbDugoutHeader{margin:0 -10px 10px;padding:8px 9px}
-        /* The phone header has seven useful pieces of information/control.
-           Keeping all seven in one row makes long elapsed times collide with
-           the pitcher name. Put connection health on a slim status row, then
-           give the game state and controls six explicit tracks below it. */
-        .cb-dh-main{grid-template-columns:auto minmax(56px,.8fr) minmax(64px,1fr) auto auto auto;grid-template-areas:"live live live live live live" "inning clock pitcher undo clockbtn menu";gap:3px 4px}
-        .cb-dh-live{grid-area:live;display:flex;font-size:var(--cb-text-2xs);letter-spacing:.04em;gap:3px}
-        .cb-dh-dot{width:7px;height:7px}
-        .cb-dh-inning{grid-area:inning;min-width:43px;padding:0 5px;border-left:0}
-        .cb-dh-clock{grid-area:clock;min-width:0}
+        /* Phone: the controls get their own row -- status on the left,
+           Undo / Pause / Menu (44px, each with its word) on the right -- and
+           the game state gets the whole second row, so the inning, the clock
+           and the pitcher's name never squeeze into each other. */
+        .cb-dh-main{grid-template-columns:auto auto minmax(0,1fr) auto auto;grid-template-areas:"live live undo clockbtn menu" "inning clock pitcher pitcher pitcher";gap:6px 6px}
+        .cb-dh-live{grid-area:live;display:flex;font-size:var(--cb-text-2xs);letter-spacing:.04em;gap:4px;min-width:0}
+        .cb-dh-dot{width:8px;height:8px}
+        .cb-dh-inning{grid-area:inning;min-width:44px;padding:0 8px 0 0;border-left:0}
+        .cb-dh-clock{grid-area:clock;min-width:0;padding-right:8px;border-right:1px solid #ffffff2e}
+        /* The clock's tap area (live_game_clock_controls) must not spill
+           sideways into the inning and pitcher next to it. */
+        html body #cbDugoutHeader .cb-dh-clock{margin:-4px 0}
         .cb-dh-pitcher{grid-area:pitcher;display:block!important;text-align:left;min-width:0}
-        .cb-dh-undo-slot{grid-area:undo}
+        .cb-dh-undo-slot{grid-area:undo;justify-self:end}
         .cb-dh-main>[data-cb-clock]{grid-area:clockbtn}
         .cb-dh-main>[data-cb-menu]{grid-area:menu}
-        .cb-dh-inning strong{font-size:1.12rem}
-        .cb-dh-time{font-size:.84rem}
-        .cb-dh-name{font-size:var(--cb-text-xs);max-width:none}
-        .cb-dh-btn{font-size:var(--cb-text-xs)!important;padding:5px 6px!important}
-        body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{width:40px!important;padding:0!important;gap:0!important}
-        body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo .cb-dh-undo-text{display:none!important}
+        .cb-dh-inning strong{font-size:1.2rem}
+        .cb-dh-time{font-size:.95rem}
+        .cb-dh-name{font-size:.82rem;max-width:none;line-height:1.15}
+        .cb-dh-btn{font-size:.75rem!important;padding:5px 9px!important}
+        body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{padding:0 9px!important;font-size:.75rem!important}
         .cb-dh-title{display:none}
         body.cb-dugout .coach-actions>.btn{min-height:70px!important}
         .cb-qd-field{min-height:232px}
+        /* Names a little larger than before; the marker keeps its size so
+           long names still wrap between words without meeting a neighbour. */
         .cb-qd-spot{width:66px;min-height:30px}
-        :root{--cb-marker-name:.625rem;--cb-marker-pos:.6rem}
+        :root{--cb-marker-name:.66rem;--cb-marker-pos:.62rem}
         .cb-qd-name{padding:2px}
         /* The phone field is short. Lift SS and 2B and drop 3B and 1B a
            few pixels, so a two-line name at short or second never reaches
@@ -280,12 +284,17 @@
         #cbCoachBoardNavModal .cb-app-grid{grid-template-columns:1fr 1fr}
       }
       @media(max-width:374.98px){
-        .cb-dh-main{grid-template-columns:auto minmax(52px,.75fr) minmax(52px,.85fr) auto auto auto;gap:2px}
-        .cb-dh-live{font-size:.47rem;letter-spacing:.02em}
-        .cb-dh-inning{min-width:38px;padding:0 4px}
-        .cb-dh-time{font-size:.78rem}
-        .cb-dh-name{font-size:.64rem}
-        .cb-dh-btn{font-size:.58rem!important;padding:4px 5px!important}
+        /* 320px: the same two rows, a little tighter. */
+        .cb-dh-main{gap:5px 4px}
+        .cb-dh-live{font-size:.56rem;letter-spacing:.02em}
+        .cb-dh-inning{min-width:38px;padding-right:6px}
+        .cb-dh-clock{padding-right:6px}
+        .cb-dh-time{font-size:.88rem}
+        .cb-dh-name{font-size:.78rem}
+        .cb-dh-btn{font-size:.7rem!important;padding:4px 7px!important}
+        body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{padding:0 7px!important;font-size:.7rem!important}
+        /* Below 375px the field is too narrow for larger names: long ones
+           would run into the next marker. Markers keep their earlier size. */
         .cb-qd-spot{width:61px}
         :root{--cb-marker-name:.6rem;--cb-marker-pos:.5625rem}
       }
@@ -400,6 +409,11 @@
     bootstrap.Modal.getOrCreateInstance(ensureAppMenu()).show();
   }
   window.openCoachBoardLiveMenu = openAppMenu;
+  // End Inning's "Fix" and the "empty now" warning open the fill picker for
+  // a position on the field directly.
+  window.CBQuickField = {
+    fillOpen: position => openOpenPositionModal(position),
+  };
 
   // #liveUndoBtn is a template control (templates/_rotation_editor.html) that
   // live_game_coach_ui drops into #coach-action-slot and live_game_command_center
@@ -694,7 +708,12 @@
     if (title) {
       title.textContent = `Fill ${pos}`;
     }
-    setMoveModalHint('Only the player you choose moves.');
+    // Another spot open too: name it, so it's clear which one this fills.
+    const others = positions().filter(other => other !== pos && !currentAlignment()?.[other]);
+    setMoveModalHint(
+      'Only the player you choose moves.' +
+      (others.length ? ` Also open: ${others.join(', ')}.` : '')
+    );
 
     /*
      * Anyone can fill an open position: a bench player, or a player at

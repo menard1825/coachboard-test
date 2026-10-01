@@ -252,11 +252,20 @@ def test_phone_header_still_shows_undo_without_a_row(page: Page, coachboard_url:
                 .querySelector('#cbDugoutHeader #liveUndoBtn')
                 .getBoundingClientRect();
 
+              // The phone header puts Undo on the controls row and the
+              // pitcher on the row below, so "overlap" means the two boxes
+              // share any area.
+              const meets = (a, b) =>
+                a.left < b.right - 1 && b.left < a.right - 1 &&
+                a.top < b.bottom - 1 && b.top < a.bottom - 1;
+
               return {
                 timeRight: time.right,
                 pitcherLeft: pitcher.left,
                 nameRight: name.right,
                 undoLeft: undo.left,
+                sameRow: name.top < undo.bottom - 1 && undo.top < name.bottom - 1,
+                nameMeetsUndo: meets(name, undo),
                 scrollWidth: document.documentElement.scrollWidth,
                 clientWidth: document.documentElement.clientWidth,
               };
@@ -266,7 +275,13 @@ def test_phone_header_still_shows_undo_without_a_row(page: Page, coachboard_url:
         assert geometry['timeRight'] <= geometry['pitcherLeft'] + 1, (
             f'clock overlaps pitcher on phone: {geometry}'
         )
-        assert geometry['nameRight'] <= geometry['undoLeft'] + 1, (
+        # The original check, wherever the pitcher shares Undo's row ...
+        if geometry['sameRow']:
+            assert geometry['nameRight'] <= geometry['undoLeft'] + 1, (
+                f'pitcher overlaps Undo on phone: {geometry}'
+            )
+        # ... and the two never share any area in the two-row phone header.
+        assert not geometry['nameMeetsUndo'], (
             f'pitcher overlaps Undo on phone: {geometry}'
         )
         assert geometry['scrollWidth'] <= geometry['clientWidth'] + 2, (

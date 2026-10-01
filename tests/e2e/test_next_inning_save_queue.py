@@ -28,6 +28,7 @@ from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
 
 import pitching_eligibility
+from e2e_cleanup import wait_until_modal_shown, watch_modal_openings
 
 from test_next_inning_save_race import (
     cleanup_game,
@@ -915,6 +916,18 @@ def test_board_says_unknown_eligibility_cannot_be_confirmed(
 # -------------------------------------------------- incomplete defense
 
 
+def close_open_position_picker(page: Page, position):
+    """"Finish ... Defense" opens the picker for the open spot (it fixes
+    rather than only switching tabs); these tests just close it."""
+    picker = page.locator('#cbNextOpenPositionPicker')
+    expect(picker.locator('[data-open-position-title]')).to_contain_text(
+        f'Who plays {position}', timeout=10_000
+    )
+    wait_until_modal_shown(page, 'cbNextOpenPositionPicker')   # Escape is ignored mid-opening
+    page.keyboard.press('Escape')
+    expect(picker).to_be_hidden(timeout=10_000)
+
+
 def bench(board, position):
     spot(board, position).click()
     board.locator('[data-next-bench-selected]').click()
@@ -956,9 +969,11 @@ def test_incomplete_defense_warns_and_confirms_before_starting(
     expect(modal).to_be_visible(timeout=10_000)
     expect(modal.locator('.modal-title')).to_have_text('2nd inning defense has SS open')
     expect(modal).to_contain_text('SS is open, and players are available on the bench.')
+    watch_modal_openings(page)
     modal.get_by_role('button', name='Finish 2nd Inning Defense').click()
     expect(modal).to_be_hidden()
     expect(board).to_be_visible()
+    close_open_position_picker(page, 'SS')
     assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
 
     # Several open spots: every one is named; Start inning anyway advances.
@@ -1038,8 +1053,10 @@ def test_recorded_inning_gaps_and_next_inning_gaps_are_separate_questions(
     )
     expect(incomplete).to_contain_text('SS is open, and players are available on the bench.')
     expect(incomplete).not_to_contain_text('LF')
+    watch_modal_openings(page)
     incomplete.get_by_role('button', name='Finish 2nd Inning Defense').click()
     expect(incomplete).to_be_hidden()
+    close_open_position_picker(page, 'SS')
     assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
 
     # A gap added to the plan is named too. The recorded gaps were already

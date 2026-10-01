@@ -144,7 +144,8 @@ def _set_field(page: Page, url, game_id, alignment):
 
 def _expect_two_real_choices(modal, finish, start):
     """Both answers look and act like actions: neither is disabled or faded."""
-    for name, style in ((finish, 'btn-outline-primary'), (start, 'btn-primary')):
+    # Fixing is the prominent action; starting with the gap is deliberate.
+    for name, style in ((finish, 'btn-primary'), (start, 'btn-outline-primary')):
         button = modal.get_by_role('button', name=name, exact=True)
         expect(button).to_be_visible()
         expect(button).to_be_enabled()

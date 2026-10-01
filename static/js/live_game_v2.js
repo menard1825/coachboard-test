@@ -1107,13 +1107,15 @@
                 showPitcherPicker();
             } else if (id === 'liveUndoBtn') {
                 actionBusy = true;
-                await api('/undo', {
+                const result = await api('/undo', {
                     method: 'POST',
                     body: JSON.stringify({
                         base_sequence: sequenceFromState(),
                     }),
                 });
-                toast('✓ Last live change undone • Saved & Synced');
+                // Name what was taken back ("Undid starting the 2nd. Back
+                // in the 1st."); Undo itself stays in the header.
+                toast(`✓ ${result?.undone || 'Undid the last change.'} Saved.`);
             } else if (id === 'liveEndGameBtn') {
                 const pitched = new Set();
                 Object.values(liveState.actual_rotation || {}).forEach(inn => { if (inn?.P) pitched.add(inn.P); });

@@ -598,8 +598,11 @@
         `Go back and fix the ${inning} if that's wrong, or continue to the ` +
         `${next} and leave the ${inning} as saved.`,
       note: '',
+      // Fix opens the picker for the (first) empty spot on the field; any
+      // other empty spot stays marked Open, and the picker names it too.
       primary: [`Fix ${inning} Defense`, () => {
         document.querySelector('#cb-now-next-switch [data-now-next="now"]')?.click();
+        window.CBQuickField?.fillOpen?.(open[0]);
       }],
       secondary: [`Continue to ${next}`, () => {
         acknowledgeRecord(key);
@@ -625,10 +628,13 @@
         ? `${listed} ${verb} open, and players are available on the bench.`
         : `${listed} ${verb} open.`,
       note: '',
+      // Fixing is the prominent choice and opens the picker for the (first)
+      // open spot; starting with the gap stays a deliberate second choice.
       primary: [`Finish ${inning} Inning Defense`, () => {
-        window.CBNextDefense?.showNext?.();
-      }, 'btn-outline-primary'],
-      secondary: [`Start ${inning} with ${listed} Open`, retry, 'btn-primary'],
+        if (window.CBNextDefense?.fixOpen) window.CBNextDefense.fixOpen(open[0]);
+        else window.CBNextDefense?.showNext?.();
+      }, 'btn-primary'],
+      secondary: [`Start ${inning} with ${listed} Open`, retry, 'btn-outline-primary'],
     });
   }
 

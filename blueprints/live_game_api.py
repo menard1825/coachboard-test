@@ -776,6 +776,38 @@ def end_inning(game_id):
         ),
     }), 409
 
+def _ordinal(value):
+    try:
+        number = int(float(str(value)))
+    except (TypeError, ValueError):
+        return str(value or '')
+    suffix = 'th' if 11 <= number % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(number % 10, 'th')
+    return f'{number}{suffix}'
+
+
+def _describe_undo(event, back_in):
+    """What Undo just took back, in the coach's words."""
+    before = event.before_alignment or {}
+    after = event.after_alignment or {}
+    if event.event_type == 'End Inning':
+        return f'Undid starting the {_ordinal(event.inning)}. Back in the {_ordinal(back_in)}.'
+    if event.event_type in ('Player Arrived', 'Player Left'):
+        what = 'arrived' if event.event_type == 'Player Arrived' else 'gone'
+        return f'Undid marking a player as {what}.'
+    if before.get('P') != after.get('P') and before.get('P'):
+        return f"Undid the pitching change: {before['P']} is back on the mound."
+    restored = [
+        f'{before[pos]} back at {pos}' if before.get(pos) else f'{pos} open again'
+        for pos in before.keys() | after.keys()
+        if pos != 'P' and (before.get(pos) or '') != (after.get(pos) or '')
+    ]
+    if not restored:
+        return 'Undid the last change.'
+    restored.sort()
+    shown = '; '.join(restored[:3]) + ('; …' if len(restored) > 3 else '')
+    return f'Undid the last change: {shown}.'
+
+
 @live_game_api_bp.route('/<int:game_id>/undo', methods=['POST'])
 def undo(game_id):
     user, team, game = _authorized_context(game_id)
@@ -827,9 +859,10 @@ def undo(game_id):
         current_inning = str(event.inning)
     game.live_current_inning = current_inning
 
+    undone = _describe_undo(last_event, current_inning)
     db.session.commit()
     state = _broadcast_state(game.id, team.id)
-    return jsonify({'status': 'success', 'state': state})
+    return jsonify({'status': 'success', 'state': state, 'undone': undone})
 
 
 @live_game_api_bp.route('/<int:game_id>/end', methods=['POST'])

@@ -34,6 +34,8 @@
   // ('custom' after an edit, 'planned' after "Use 2nd-inning plan"), so the
   // header names it at once instead of the last saved source.
   let localSource = null;
+  // What the Next Inning Undo just took back; shown until the next change.
+  let undoNote = '';
   let activeSavePromise = null;
   let conflictCount = 0;
   let rejectCount = 0;
@@ -465,8 +467,11 @@
         ? (inning ? `Who's pitching in the ${inning}?` : "Who's pitching next inning?")
         : (inning ? `Who plays ${pos} in the ${inning}?` : `Who plays ${pos} next inning?`);
 
+    // Another spot open too: name it, so it's clear which one this fills.
+    const others = positions().filter(other => other !== pos && !board[other]);
     help.textContent =
-      'Choose a player. If they are already on the field, their current spot will be left open.';
+      'Choose a player. If they are already on the field, their current spot will be left open.' +
+      (others.length ? ` Also open: ${others.join(', ')}.` : '');
 
     choices.replaceChildren();
 
@@ -1039,7 +1044,26 @@
         color:#a12d26;
       }
 
+      #cbNowOpenWarning{
+        grid-column:1 / -1;
+        order:-2;
+        margin:0;
+        padding:4px 8px;
+        border:1px solid #efb5ae;
+        border-radius:8px;
+        background:#fff1ef;
+        color:#a12d26;
+        font-size:.72rem;
+        font-weight:850;
+        line-height:1.25;
+        text-align:center;
+        cursor:pointer;
+        touch-action:manipulation;
+      }
+
       #cbNextOpenWarning{
+        cursor:pointer;
+        touch-action:manipulation;
         grid-column:1 / -1;
         order:-1;
         margin:0;
@@ -1058,6 +1082,11 @@
         html body.cb-dugout.cb-next-open-warning .coach-live-shell{
           padding-bottom:
             calc(128px + env(safe-area-inset-bottom))!important;
+        }
+        /* Both lines showing: room for the second one. */
+        html body.cb-dugout.cb-now-open-warning .coach-live-shell{
+          padding-bottom:
+            calc(156px + env(safe-area-inset-bottom))!important;
         }
       }
 
@@ -1201,6 +1230,16 @@
         margin-top:8px;
       }
 
+      #${CARD_ID} .cb-next-undo-note{
+        border:1px solid #b8ddc4;
+        border-radius:9px;
+        background:#edf8f1;
+        color:#176b38;
+        padding:6px 9px;
+        font-size:var(--cb-text-xs);
+        font-weight:750;
+      }
+
       #${CARD_ID} .cb-next-plan-note{
         flex:1 1 100%;
         color:#5b4300;
@@ -1213,8 +1252,15 @@
         line-height:1.3;
       }
 
+      /* Plain secondary actions here read as actions, not disabled. */
+      #${CARD_ID} .cb-next-tools .btn-outline-secondary{
+        color:#344054;
+        border-color:#8a94a6;
+        background:#fff;
+      }
+
       #${CARD_ID} .cb-next-tools .btn{
-        min-height:38px;
+        min-height:44px;
         border-radius:9px;
         font-size:var(--cb-text-xs);
         font-weight:820;
@@ -1849,35 +1895,84 @@
   // End Inning starts the next inning with the Next Inning defense, so an
   // open spot there is worth seeing before tapping it -- including on a
   // phone, where the card's own warning sits below the fixed action dock.
+  // The field right now and the next inning are separate questions: a red
+  // line for a spot empty now (this inning), an amber one for the next
+  // inning's plan. Each opens the picker for its first open spot.
+  function currentOpenPositions() {
+    const field = latest?.current_alignment || {};
+    return positions().filter(pos => !field[pos]);
+  }
+
+  function warningLine(id, endInning, text, onTap) {
+    let line = $(id);
+    if (!text) {
+      line?.remove();
+      return false;
+    }
+    if (!line) {
+      line = document.createElement('div');
+      line.id = id;
+      line.setAttribute('role', 'status');
+      line.tabIndex = 0;
+      line.addEventListener('click', () => line._cbTap?.());
+      line.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        line._cbTap?.();
+      });
+    }
+    line._cbTap = onTap;
+    if (line.nextElementSibling !== endInning) {
+      endInning.parentNode.insertBefore(line, endInning);
+    }
+    if (line.textContent !== text) line.textContent = text;
+    return true;
+  }
+
   function syncOpenDefenseWarning(endInning) {
     const open = latest ? openPositions() : [];
-    let warning = $('cbNextOpenWarning');
+    const now = latest ? currentOpenPositions() : [];
+    const current = inningOrdinal(latest?.current_inning || '');
 
-    if (!endInning || !open.length) {
-      warning?.remove();
-      document.body.classList.remove('cb-next-open-warning');
+    if (!endInning) {
+      $('cbNowOpenWarning')?.remove();
+      $('cbNextOpenWarning')?.remove();
+      document.body.classList.remove('cb-next-open-warning', 'cb-now-open-warning');
       return;
     }
 
-    if (!warning) {
-      warning = document.createElement('div');
-      warning.id = 'cbNextOpenWarning';
-      warning.setAttribute('role', 'status');
+    const showsNow = warningLine(
+      'cbNowOpenWarning',
+      endInning,
+      now.length
+        ? `⚠ Empty now (${current} inning): ${now.join(', ')} · Tap to fix`
+        : '',
+      () => {
+        window.CBNextDefense?.showNow?.();
+        window.CBQuickField?.fillOpen?.(now[0]);
+      }
+    );
+    const showsNext = warningLine(
+      'cbNextOpenWarning',
+      endInning,
+      open.length
+        ? `⚠ Next inning: ${open.join(', ')} ${open.length === 1 ? 'is' : 'are'} open`
+        : '',
+      () => {
+        activeView = 'next';
+        applyView();
+        askOpenPosition(open[0]);
+      }
+    );
+    // Keep the order: the field now above the next inning.
+    const nowLine = $('cbNowOpenWarning');
+    const nextLine = $('cbNextOpenWarning');
+    if (nowLine && nextLine && nowLine.nextElementSibling !== nextLine) {
+      nextLine.parentNode.insertBefore(nowLine, nextLine);
     }
 
-    if (warning.nextElementSibling !== endInning) {
-      endInning.parentNode.insertBefore(warning, endInning);
-    }
-
-    const text =
-      `⚠ Next inning: ${open.join(', ')} ` +
-      `${open.length === 1 ? 'is' : 'are'} open`;
-
-    if (warning.textContent !== text) {
-      warning.textContent = text;
-    }
-
-    document.body.classList.add('cb-next-open-warning');
+    document.body.classList.toggle('cb-next-open-warning', showsNow || showsNext);
+    document.body.classList.toggle('cb-now-open-warning', showsNow && showsNext);
   }
 
   function applyView() {
@@ -2289,6 +2384,11 @@
             data-next-notice
             ${noticeMessage ? '' : 'hidden'}
           >${esc(noticeMessage)}</div>
+          ${
+            undoNote
+              ? `<div class="cb-next-undo-note" data-next-undo-note role="status">${esc(undoNote)}</div>`
+              : ''
+          }
           ${nextWarningsMarkup()}
         </div>
 
@@ -2506,6 +2606,7 @@
     draft = after;
     pendingMode = mode;
     localSource = mode;
+    undoNote = '';
     dirty = true;
     localRevision += 1;
     successMessage = message;
@@ -3450,13 +3551,25 @@
   function undoNext() {
     if (!undoStack.length) return Promise.resolve();
 
-    return commitLocalChange(
-      undoStack.pop(),
+    const before = snapshot();
+    const restored = normalize(undoStack.pop());
+    const back = positions()
+      .filter(pos => (before[pos] || '') !== (restored[pos] || ''))
+      .map(pos => (restored[pos] ? `${restored[pos]} back at ${pos}` : `${pos} open again`));
+    const inning = inningOrdinal(latest?.next_inning || '');
+    const saving = commitLocalChange(
+      restored,
       {
         pushUndo: false,
         message: 'Restored ✓',
       }
     );
+    // Say what came back, after commitLocalChange cleared the last note.
+    undoNote =
+      `Undid your last change to the ${inning}` +
+      (back.length ? `: ${back.slice(0, 3).join('; ')}${back.length > 3 ? '; …' : ''}.` : '.');
+    renderCard();
+    return saving;
   }
 
   function showError(message) {
@@ -3610,6 +3723,7 @@
     selected = null;
     selectedPosition = '';
     undoStack = [];
+    undoNote = '';
     errorMessage = '';
     noticeMessage = '';
     serverBase = null;
@@ -3667,6 +3781,13 @@
     showNow: () => {
       activeView = 'now';
       applyView();
+    },
+    // End Inning's "Finish ... Defense" and the next-inning warning open the
+    // picker for that open position directly.
+    fixOpen: pos => {
+      activeView = 'next';
+      applyView();
+      askOpenPosition(pos);
     },
   };
 
@@ -3780,6 +3901,17 @@
       ) {
         pitchSummary = detail.state.pitch_count_summary;
         renderPitcherStatus();
+      }
+      // The field right now, for the "Empty now" line -- updated with the
+      // live state (an Undo, a fill) rather than at the next poll.
+      if (
+        Number(detail.game_id) === gameId &&
+        latest &&
+        detail.state?.current_alignment &&
+        String(detail.state.current_inning || '') === String(latest.current_inning || '')
+      ) {
+        latest.current_alignment = detail.state.current_alignment;
+        syncLiveActions();
       }
     });
 

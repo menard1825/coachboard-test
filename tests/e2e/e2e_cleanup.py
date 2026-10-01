@@ -38,3 +38,23 @@ def delete_players_named(request, base_url, names):
         if player['name'] in names:
             request.get(f'{base_url}/delete_player/{player["id"]}')
     return sorted(p['name'] for p in request.get(f'{base_url}/api/roster').json() if p['name'] in names)
+
+
+def watch_modal_openings(page):
+    """Record each Bootstrap modal that has finished opening ('shown.bs.modal'
+    bubbles to the document). Bootstrap ignores Escape and hide() while a
+    modal is still animating open, so tests wait for this, not a sleep."""
+    page.evaluate("""() => {
+      if (window.__cbShownModals) return;
+      window.__cbShownModals = [];
+      document.addEventListener('shown.bs.modal', event => {
+        window.__cbShownModals.push(event.target.id);
+      });
+    }""")
+
+
+def wait_until_modal_shown(page, modal_id, timeout=10_000):
+    page.wait_for_function(
+        "id => (window.__cbShownModals || []).includes(id)", arg=modal_id, timeout=timeout)
+    page.evaluate("id => { window.__cbShownModals = window.__cbShownModals.filter(x => x !== id); }",
+                  modal_id)
