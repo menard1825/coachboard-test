@@ -8,6 +8,7 @@ The page lists designated pitchers only: players whose Pitcher Role is not
 
 import re
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from werkzeug.security import generate_password_hash
 
@@ -47,9 +48,13 @@ def _build_app(monkeypatch, players, *, competition_rule='MLB Pitch Smart',
                                   team_id=1, pitcher_role=pitcher_role))
             ids[name] = index
         db.session.flush()
+        # Outing dates are calendar dates in the team's time zone (the page
+        # judges "today" there); the container clock is UTC.
+        team_today = datetime.now(ZoneInfo('America/Indiana/Indianapolis')).date()
         for name, days_ago, pitches in outings:
             db.session.add(PitchingOuting(
-                date=datetime.now() - timedelta(days=days_ago), opponent='Prior',
+                date=datetime.combine(team_today - timedelta(days=days_ago), datetime.min.time()),
+                opponent='Prior',
                 pitches=pitches, innings=3.0, pitcher_type='Starter',
                 outing_type='Game', team_id=1, player_id=ids[name]))
         db.session.commit()

@@ -422,6 +422,8 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
 
             max_daily = None
             pitches_remaining_today = None
+            next_available_after_today = None
+            rest_days_after_today = None
             daily_outs = None
             rolling_3_day_outs = None
             innings_remaining_today_outs = None
@@ -430,7 +432,12 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                 max_daily = int(rules.get('max_daily', 85))
                 thresholds = rules.get('rest_thresholds', [])
 
-                relevant_dates = [d for d in games_by_date if 0 <= (today - d).days <= 7]
+                # A missing count can only matter while some count could
+                # still require rest: no game can need more rest than the
+                # daily maximum does. Past that, the day is settled whatever
+                # was thrown, so a future game isn't held up by it.
+                unknown_window = _required_rest_days(max_daily, thresholds) or 0
+                relevant_dates = [d for d in games_by_date if 0 <= (today - d).days <= unknown_window]
                 missing_game_counts = any(
                     o.pitches is None for d in relevant_dates for o in games_by_date[d]
                 )
@@ -442,6 +449,10 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                     official_history_complete = False
                 else:
                     for outing_date in sorted((d for d in games_by_date if d < today), reverse=True):
+                        if any(o.pitches is None for o in games_by_date[outing_date]):
+                            # Outside the window above: no count could
+                            # still require rest from that day.
+                            continue
                         day_pitches = sum(int(o.pitches) for o in games_by_date[outing_date])
                         rest_days = _required_rest_days(day_pitches, thresholds)
                         eligible_date = outing_date + timedelta(days=rest_days + 1)
@@ -465,6 +476,11 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                         else:
                             today_rest_days = _required_rest_days(official_daily_pitches, thresholds)
                             after_today_date = today + timedelta(days=today_rest_days + 1)
+                            # Today's pitching already sets the next game
+                            # date; say it now, not only once tomorrow comes.
+                            if today_rest_days:
+                                rest_days_after_today = today_rest_days
+                                next_available_after_today = after_today_date.strftime('%a, %b %d')
 
                             same_current_game_only = (
                                 current_game_id is not None
@@ -550,6 +566,43 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                 next_available = 'Verify event rules'
                 official_history_complete = False
 
+            # Pitching CoachBoard knows about but has no count for yet
+            # (unrecorded_pitching): say what happened, never "0 pitches".
+            workload_state = None
+            # Only the days whose count still matters (see unknown_window).
+            horizon = (
+                (_required_rest_days(max_daily, rules.get('rest_thresholds', [])) or 0)
+                if rule_type == 'pitch_count' else 3
+            )
+            unrecorded = [
+                o for o in game_outings
+                if getattr(o, 'unrecorded', False) and 0 <= (today - local_date(o.date)).days <= horizon
+            ]
+            if unrecorded and status in ('Pitch Count Incomplete', 'Innings Incomplete'):
+                needed = 'innings needed' if rule_type == 'innings' else 'count needed'
+                on_mound = [
+                    o for o in unrecorded
+                    if getattr(o, 'pitching_now', False) and local_date(o.date) == today
+                ]
+                if on_mound:
+                    workload_state = 'pitching_now'
+                    opponent = getattr(on_mound[0], 'opponent', '') or ''
+                    status_detail = (
+                        f"Pitching now{f' vs {opponent}' if opponent else ''}. Enter the "
+                        f"{'innings' if rule_type == 'innings' else 'pitch count'} when the game ends."
+                    )
+                    next_available = 'After this game'
+                else:
+                    workload_state = 'count_needed'
+                    latest = max(local_date(o.date) for o in unrecorded)
+                    when = 'today' if latest == today else latest.strftime('%a, %b %d')
+                    status_detail = f'Pitched {when} — {needed}.'
+                    next_available = f"Enter the {'innings' if rule_type == 'innings' else 'pitch count'}"
+                # Counts already entered today stay visible beside the
+                # missing one; the total stays unknown until it's entered.
+                if rule_type == 'pitch_count' and official_daily_pitches is None and official_daily_known:
+                    status_detail += f' {official_daily_known} game pitches already entered today.'
+
             today_string = today.strftime('%Y-%m-%d')
             player_targets = [t for t in all_targets if t.player_id == player.id and t.local_date == today_string]
             game_target = next((t for t in player_targets if current_game_id is not None and t.game_id == current_game_id), None)
@@ -598,6 +651,9 @@ def calculate_pitch_count_summary(roster, all_outings, rules, target_date=None, 
                 'advisory': status == 'Same-Day Game Advisory',
                 'max_daily': max_daily,
                 'pitches_remaining_today': pitches_remaining_today,
+                'rest_days_after_today': rest_days_after_today,
+                'next_available_after_today': next_available_after_today,
+                'workload_state': workload_state,
                 'last_outing_display': last_game_outing,
                 'daily_outs': daily_outs,
                 'daily_innings': outs_to_baseball_innings(daily_outs) if daily_outs is not None else None,

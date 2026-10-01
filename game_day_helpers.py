@@ -19,6 +19,7 @@ from team_game_settings import regulation_innings_for_team
 from lineup_service import lineup_to_dict
 from live_history import _event_order_key, gameplay_events
 from utils import calculate_pitch_count_summary, get_pitching_rules_for_team
+from unrecorded_pitching import with_unrecorded
 
 
 def team_now(team):
@@ -404,7 +405,7 @@ def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation
     rules = get_pitching_rules_for_team(team)
     pitch_summary = calculate_pitch_count_summary(
         roster,
-        all_outings,
+        with_unrecorded(team_id, all_outings, game.date.date(), exclude_game_id=game.id, roster=roster),
         rules,
         target_date=game.date,
         all_targets=all_targets,

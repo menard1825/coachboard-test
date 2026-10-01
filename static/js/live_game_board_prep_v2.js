@@ -2950,10 +2950,16 @@
         ? word
         : [word, status].filter(Boolean).join(' · ');
     const daily = summary?.daily;
+    // This game's count is entered when it ends: say what is known.
+    const earlier = Number(daily) > 0 ? ` · ${daily} game pitches earlier today` : '';
     const today =
-      daily === null || daily === undefined
-        ? ''
-        : `${daily} ${Number(daily) === 1 ? 'pitch' : 'pitches'} today`;
+      summary?.pitching_now
+        ? `Pitching now${earlier}`
+        : summary?.pitched_this_game
+          ? `Pitched this game · count entered after the game${earlier}`
+          : daily === null || daily === undefined
+            ? ''
+            : `${daily} ${Number(daily) === 1 ? 'pitch' : 'pitches'} today`;
     // The server's wording names the rule set and the reason.
     const detail = String(
       summary?.eligibility_message ||

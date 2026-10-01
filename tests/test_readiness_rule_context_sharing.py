@@ -120,8 +120,12 @@ def _build_app(monkeypatch):
             if not complete:
                 innings['1'].pop('RF')
                 innings['3'] = {}
+            # The live game is a different week: a pitcher on the mound in
+            # another live game the same day is a question at Start
+            # (unrecorded_pitching), which these tests are not about.
             db.session.add(Game(
-                id=game_id, date=datetime(2026, 8, 31, 18, 0, 0),
+                id=game_id,
+                date=datetime(2026, 8, 10, 18, 0, 0) if is_live else datetime(2026, 8, 31, 18, 0, 0),
                 start_time='18:00', opponent=f'Opponent {game_id}', team_id=1,
                 is_live=is_live, live_current_inning='1'))
             db.session.add(Rotation(
@@ -612,9 +616,12 @@ def test_game_day_home_and_report_views_render(monkeypatch):
 # --- SQL counts -----------------------------------------------------------
 
 @pytest.mark.parametrize('fixture,game_id,expected', [
-    ('pregame_incomplete', INCOMPLETE, 15),
-    ('pregame_ready', READY, 16),
-    ('live', LIVE, 16),
+    # One more than before unrecorded_pitching: the team's started games
+    # still missing pitch counts, so a pitcher on the mound in another game
+    # (or with no count entered) is never shown Ready.
+    ('pregame_incomplete', INCOMPLETE, 16),
+    ('pregame_ready', READY, 17),
+    ('live', LIVE, 17),
 ], ids=['pregame_incomplete', 'pregame_ready', 'live'])
 def test_selected_rule_endpoint_sql_counts(monkeypatch, fixture, game_id, expected, capsys):
     app = _build_app(monkeypatch)
@@ -641,7 +648,8 @@ def test_selected_rule_endpoint_sql_counts(monkeypatch, fixture, game_id, expect
 
 
 def test_unselected_rule_endpoint_justifies_the_budget_headroom(monkeypatch, capsys):
-    """Why the budget is 17 rather than 16.
+    """Why the budget is 18 rather than 17 (17 selected, after the one
+    statement unrecorded_pitching adds).
 
     With no competition rule selected, request_aware_gameplay_rules() reads the
     team preferences a second time to find the arm-care fallback. That is a
@@ -665,7 +673,7 @@ def test_unselected_rule_endpoint_justifies_the_budget_headroom(monkeypatch, cap
               f'tps={counts["team_pitching_settings"]}, writes={len(writes)}')
 
     assert response.status_code == 200
-    assert len(statements) == 17, '\n'.join(statements)
+    assert len(statements) == 18, '\n'.join(statements)
     assert counts['game_pitching_rules'] == 1, '\n'.join(statements)
     assert counts['team_pitching_settings'] == 2, '\n'.join(statements)
     assert writes == []

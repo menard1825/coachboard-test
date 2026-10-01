@@ -196,6 +196,21 @@ def create_app():
         leave_room(room_name)
         return {'status': 'success'}
 
+    @app.template_filter('format_calendar_date')
+    def format_calendar_date_filter(value):
+        """A calendar date (a game day, a throwing date), stored at midnight
+        with no time zone. Shown as that same date -- never converted as if
+        it were a UTC timestamp, which moved Oct 1 to "Sep 30, 8:00 PM"."""
+        if isinstance(value, str):
+            # A serialized date ("2026-10-01" or "2026-10-01T00:00:00").
+            try:
+                value = date.fromisoformat(value[:10])
+            except ValueError:
+                return value
+        if isinstance(value, (datetime, date)):
+            return value.strftime('%A, %m/%d/%y')
+        return value
+
     @app.template_filter('format_datetime')
     def format_datetime_filter(dt):
         if not dt or not isinstance(dt, (datetime, date)):

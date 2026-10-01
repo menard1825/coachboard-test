@@ -11,6 +11,10 @@ to 18; resolving the game's rule payload once and sharing it took it to 16.
 The budget is 17, not 19, on purpose: a looser ceiling would let one of those
 duplicate reads come back without failing anything.
 
+Plus one: unrecorded_pitching reads the team's started games that are still
+missing pitch counts (one statement, cached for the request), so a pitcher on
+the mound in another game is never shown Ready. The budget is now 18.
+
 The one statement of headroom is accounted for rather than spare. When no
 competition rule is selected, request_aware_gameplay_rules() reads the team
 preferences a second time for the arm-care fallback, so that path measures 17.
@@ -33,7 +37,7 @@ from sqlalchemy import event
 from werkzeug.security import generate_password_hash
 
 
-MAX_READINESS_STATEMENTS = 17
+MAX_READINESS_STATEMENTS = 18
 
 ALIGNMENT = {
     'P': 'Pitcher Pat', 'C': 'Catcher Cole', '1B': 'First Frank',
@@ -114,9 +118,11 @@ def _build_app(monkeypatch):
                 innings['1'].pop('RF')
                 innings['3'] = {}
 
+            # The live game is a different week, so it is not "another live
+            # game the same day" for the pregame ones (unrecorded_pitching).
             db.session.add(Game(
                 id=game_id,
-                date=datetime(2026, 8, 31, 18, 0, 0),
+                date=datetime(2026, 8, 10, 18, 0, 0) if is_live else datetime(2026, 8, 31, 18, 0, 0),
                 start_time='18:00',
                 opponent=f'Opponent {game_id}',
                 team_id=1,

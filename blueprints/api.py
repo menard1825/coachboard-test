@@ -6,6 +6,7 @@ from team_game_settings import regulation_innings_for_team
 from utils import model_to_dict, pitching_outing_to_dict, get_pitching_rules_for_team, calculate_pitch_count_summary, calculate_cumulative_pitching_stats
 from lineup_service import lineup_to_dict
 from sqlalchemy.orm import joinedload
+from unrecorded_pitching import local_today, with_unrecorded
 from sqlalchemy import func
 from functools import wraps
 from datetime import datetime
@@ -80,7 +81,7 @@ def get_pitching_data():
     all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
 
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules, all_targets=all_targets, team_timezone=team.timezone)
+    pitch_count_summary = calculate_pitch_count_summary(roster_db, with_unrecorded(team_id, pitching_outings_db, local_today(team), roster=roster_db), rules, all_targets=all_targets, team_timezone=team.timezone)
 
     return jsonify({
         'pitching': [pitching_outing_to_dict(po) for po in pitching_outings_db],
@@ -210,7 +211,7 @@ def get_overview_data():
     from models import PlayerPitchTarget
     all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_db, pitching_outings_db, rules, all_targets=all_targets, team_timezone=team.timezone)
+    pitch_count_summary = calculate_pitch_count_summary(roster_db, with_unrecorded(team_id, pitching_outings_db, local_today(team), roster=roster_db), rules, all_targets=all_targets, team_timezone=team.timezone)
     pitchers_on_rest = {name: data for name, data in pitch_count_summary.items() if data['status'] == 'Resting'}
 
     recent_notes = db.session.query(CollaborationNote).filter_by(team_id=team_id).order_by(CollaborationNote.timestamp.desc()).limit(5).all()
@@ -246,7 +247,7 @@ def get_live_game_state(game_id, team_id):
     pitching_profiles = db.session.query(PlayerPitchingProfile).filter_by(team_id=team_id).all()
 
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone, current_game_id=game.id)
+    pitch_count_summary = calculate_pitch_count_summary(roster_objects, with_unrecorded(team_id, all_pitching_outings, game.date.date(), exclude_game_id=game.id, roster=roster_objects), rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone, current_game_id=game.id)
 
     lineup_templates = db.session.query(Lineup).filter_by(
         team_id=team_id,

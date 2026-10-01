@@ -11,6 +11,7 @@ from blueprints.live_game_write_lock import game_write_lock
 from game_day_helpers import duplicate_assignment_message
 from models import GameRotationEvent, PlayerPitchTarget
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
+from unrecorded_pitching import with_unrecorded
 from lineup_service import (
     LineupValidationError,
     lineup_to_dict,
@@ -64,7 +65,7 @@ def game_management(game_id):
     from models import PlayerPitchTarget
     all_targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team.id).all()
     rules = get_pitching_rules_for_team(team)
-    pitch_count_summary = calculate_pitch_count_summary(roster_objects, all_pitching_outings, rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone, current_game_id=game.id)
+    pitch_count_summary = calculate_pitch_count_summary(roster_objects, with_unrecorded(team.id, all_pitching_outings, game.date.date(), exclude_game_id=game.id, roster=roster_objects), rules, target_date=game.date, all_targets=all_targets, team_timezone=team.timezone, current_game_id=game.id)
 
     lineup_templates = db.session.query(Lineup).filter_by(
         team_id=team.id,

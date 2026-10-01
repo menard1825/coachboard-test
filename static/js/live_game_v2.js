@@ -547,6 +547,18 @@
         }[kind] || ['Rule conflict', 'text-danger']);
 
         const pitchesToday = summary => {
+            // This game's count is entered when it ends: say what is known.
+            // Counts already entered from earlier games today stay shown.
+            const earlier = Number(summary?.daily) > 0
+                ? ` · ${summary.daily} game pitches earlier today`
+                : '';
+            if (summary?.pitching_now) {
+                return `Pitching now · count entered after the game${earlier}`;
+            }
+            if (summary?.pitched_this_game) {
+                return `Pitched this game · count entered after the game${earlier}`;
+            }
+
             const value =
                 summary?.daily;
 

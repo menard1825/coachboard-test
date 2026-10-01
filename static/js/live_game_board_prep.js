@@ -665,12 +665,51 @@
           <small>${detail(position)}</small>
         </button>`).join('')}`;
 
-    list.onclick = (event) => {
+    // Who can pitch on this game's date, from the server's own check
+    // (pitching_eligibility.py), shown on each choice. Nothing is decided
+    // here: a pitcher who isn't ready is asked about, as in the live game.
+    const verdicts = pos === 'P' ? fetchPitchingSummary() : null;
+    if (verdicts) {
+      verdicts.then((summary) => {
+        if (list.dataset.pdePosition !== 'P') return;
+        list.querySelectorAll('.pde-choice[data-player]').forEach((button) => {
+          const text = eligibilityText(summary[button.dataset.player]);
+          if (!text || button.querySelector('.pde-eligibility')) return;
+          const line = document.createElement('small');
+          line.className = `pde-eligibility d-block pde-eligibility-${summary[button.dataset.player].eligibility}`;
+          line.textContent = text;
+          button.appendChild(line);
+        });
+      });
+    }
+
+    list.onclick = async (event) => {
       const choice = event.target.closest('.pde-choice');
       if (!choice) return;
       const playerName = choice.dataset.player;
       // A snapshot of the inning as the coach saw it when the move began.
       const start = {...(alignment() || {})};
+
+      if (verdicts && playerName && playerName !== pitcher) {
+        list.onclick = null;
+        const verdict = (await verdicts)[playerName];
+        if (!(await confirmPitcher(modal, playerName, verdict))) return;
+        if (pitcher) {
+          void chooseNewPitcher(modal, start, playerName);
+          return;
+        }
+        const next = {...alignment(), P: playerName};
+        const sourcePos = playerPosition(playerName, start);
+        if (sourcePos && sourcePos !== 'P') delete next[sourcePos];
+        state.rotation.innings[inning] = next;
+        closePlayerModal(modal);
+        render();
+        toast(sourcePos
+          ? `${playerName}: ${sourcePos} → P. ${sourcePos} is now open.`
+          : `${playerName} set at P.`);
+        saveRotation();
+        return;
+      }
 
       if (pos === 'P' && choice.dataset.clear) {
         list.onclick = null;
@@ -794,6 +833,39 @@
         resolve(options[Number(button.dataset.answer)].value);
       };
     });
+  }
+
+  // This game's pitching check, for its scheduled date. Empty on failure:
+  // the picker still works, it just can't show a status.
+  async function fetchPitchingSummary() {
+    try {
+      const response = await fetch(`/api/live-game/${gameId}/state`, {cache: 'no-store'});
+      if (!response.ok) return {};
+      const data = await response.json();
+      return data?.pitch_count_summary || {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  // A pitcher who isn't ready for this game: the same choices the live
+  // game gives -- Continue (advisory), I verified (can't confirm), or Use
+  // Anyway (a rule conflict) -- or Cancel. Resolves true to go ahead.
+  async function confirmPitcher(modal, name, verdict) {
+    const kind = verdict?.eligibility;
+    if (!kind || kind === 'ready') return true;
+    const label = {
+      advisory: `Continue with ${name}`,
+      unknown: `I verified ${name} can pitch`,
+      rule_conflict: `Use ${name} anyway`,
+    }[kind] || `Use ${name} anyway`;
+    const answer = await ask(modal, {
+      title: `${name} — ${ELIGIBILITY_WORD[kind] || 'Check eligibility'}`,
+      help: String(verdict.eligibility_message || verdict.status_detail || verdict.status || '').trim(),
+      options: [{label, detail: verdict.next_available && !/^today$/i.test(verdict.next_available)
+        ? `Next available: ${verdict.next_available}` : '', value: true, danger: kind === 'rule_conflict'}],
+    });
+    return answer === true;
   }
 
   async function pitchingSummary(modal) {

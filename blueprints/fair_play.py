@@ -12,6 +12,7 @@ from models import (
     User,
 )
 from utils import PITCHING_RULES, calculate_pitch_count_summary
+from unrecorded_pitching import local_today, with_unrecorded
 
 
 fair_play_bp = Blueprint('fair_play', __name__)
@@ -427,7 +428,13 @@ def arm_care_summary():
     rules = pitching_rules_for_name(team, arm_care_rule)
     summary = calculate_pitch_count_summary(
         roster,
-        all_outings,
+        with_unrecorded(
+            team.id,
+            all_outings,
+            game.date.date() if game else local_today(team),
+            exclude_game_id=game.id if game else None,
+            roster=roster,
+        ),
         rules,
         target_date=game.date if game else None,
         all_targets=all_targets,

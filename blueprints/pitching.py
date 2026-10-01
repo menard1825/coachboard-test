@@ -14,6 +14,8 @@ from datetime import datetime
 from functools import wraps
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from unrecorded_pitching import with_unrecorded
+
 pitching_bp = Blueprint('pitching', __name__, template_folder='templates')
 
 OUTING_TYPES = {'Game', 'Practice', 'External/Lesson'}
@@ -293,7 +295,8 @@ def pitching_page():
     rules = get_pitching_rules_for_team(team)
     pitch_count_summary = calculate_pitch_count_summary(
         all_players,
-        all_outings,
+        # Pitching in a started game whose counts aren't entered yet.
+        with_unrecorded(team_id, all_outings, local_today, roster=all_players),
         rules,
         all_targets=all_targets,
         team_timezone=team.timezone,

@@ -109,17 +109,24 @@ SCENARIO_IDS = [label for label, _ in SCENARIOS]
 # below measures it rather than trusting this comment). It runs one statement
 # above the removed code's own total, because the processor now refreshes the
 # Team before the blanket expires it again.
+#
+# Pitching status checks the team's started games for pitchers whose count
+# isn't entered (unrecorded_pitching): one statement per request (the
+# started games), plus two -- those games' events and plans, in bulk --
+# when one falls in the 8-day look-back. Measured before -> after:
+# A 22->23, B 21->22, C 21->22, D 42->45, E 42->42 (its started games are
+# older than the look-back), /game-day 37->40, /pitching 10->13.
 MAX_GAME_DAY_STATEMENTS = {          # blanket:
-    'A simple future': 22,           #   28
-    'B typical game day': 21,        #   26
-    'C completed today': 21,         #   25
-    'D follow-up heavy': 42,         #   56
+    'A simple future': 23,           #   28
+    'B typical game day': 22,        #   26
+    'C completed today': 22,         #   25
+    'D follow-up heavy': 45,         #   56
     'E worst-case 20 scan': 42,      #   63
 }
 MAX_ROUTE_STATEMENTS = {             # blanket:
     '/': 6,                          #    7
-    '/game-day': 37,                 #   51
-    '/pitching': 10,                 #   27
+    '/game-day': 40,                 #   51
+    '/pitching': 13,                 #   27
     '/admin/users': 5,               #    8
     '/admin/settings': 5,            #    6
 }

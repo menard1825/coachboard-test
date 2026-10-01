@@ -169,6 +169,8 @@
   }
 
   function classifyPitcherCard(card) {
+    // The page's own grouping (pitching.html); the text match is a fallback.
+    if (card.dataset.group) return card.dataset.group;
     const status = (card.querySelector('.cb-pitch-status')?.textContent || '').trim().toLowerCase();
     if (status.includes('eligible')) return 'eligible';
     if (status.includes('verify') || status.includes('rules needed')) return 'review';

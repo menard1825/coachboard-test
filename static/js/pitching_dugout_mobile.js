@@ -23,6 +23,7 @@
   }
 
   function cardGroup(card) {
+    if (card.dataset.group) return card.dataset.group;
     if (card.dataset.availabilityGroup) return card.dataset.availabilityGroup;
     const status = (card.querySelector('.cb-pitch-status')?.textContent || '').trim().toLowerCase();
     if (status.includes('eligible') || status.includes('ready')) return 'eligible';
@@ -127,7 +128,10 @@
       return;
     }
     const group = setCardGroup(card);
-    badge.textContent = group === 'eligible' ? 'READY' : group === 'unavailable' ? 'OUT' : 'CHECK';
+    // An advisory, a pitcher on the mound, or a missing count says so, never
+    // a bare READY or OUT that contradicts the card's own text.
+    badge.textContent = card.dataset.badgeShort ||
+      (group === 'eligible' ? 'READY' : group === 'unavailable' ? 'OUT' : 'CHECK');
   }
 
   function preparePitcherCards() {

@@ -49,10 +49,14 @@ def _build_app(monkeypatch):
 
 
 def _game_selects(statements):
+    """Reads of this game's row. The team-wide read of started games still
+    missing pitch counts (unrecorded_pitching) is another question, not a
+    re-read of the supplied game."""
     return [
         sql
         for sql in statements
         if ' from games ' in f' {sql.lower()} '
+        and 'from game_rotation_events' not in sql.lower()
     ]
 
 

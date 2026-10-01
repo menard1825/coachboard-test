@@ -28,6 +28,7 @@ from models import (
 )
 import pitching_eligibility
 from utils import calculate_pitch_count_summary, get_pitching_rules_for_team, model_to_dict
+from unrecorded_pitching import with_unrecorded
 
 live_game_api_bp = Blueprint('live_game_api', __name__, url_prefix='/api/live-game')
 
@@ -357,7 +358,9 @@ def get_authoritative_live_state(game_id, team_id, game=None):
     rules = get_pitching_rules_for_team(team)
     pitch_summary = calculate_pitch_count_summary(
         roster,
-        all_outings,
+        # Another started game's pitching with no count yet. This game's
+        # own pitching is shown from its history (pitching_now below).
+        with_unrecorded(team_id, all_outings, game.date.date(), exclude_game_id=game.id, roster=roster),
         rules,
         target_date=game.date,
         all_targets=targets,
@@ -377,6 +380,21 @@ def get_authoritative_live_state(game_id, team_id, game=None):
     )
     # Every screen shows the same classification, rule set and reason.
     pitching_eligibility.annotate(pitch_summary, rules)
+    # This game's pitches are entered when it ends, so its pitchers have no
+    # count yet: say "pitching now" / "pitched this game", never "0 today".
+    if game.is_live:
+        recorded = {o.player_id for o in all_outings if o.game_id == game.id}
+        on_mound = current_alignment.get('P') or ''
+        pitched = {on_mound} if on_mound else set()
+        for event in history:
+            for alignment in (event.before_alignment, event.after_alignment):
+                if (alignment or {}).get('P'):
+                    pitched.add(alignment['P'])
+        for name in pitched:
+            item = pitch_summary.get(name)
+            if item and item.get('id') not in recorded:
+                item['pitched_this_game'] = True
+                item['pitching_now'] = name == on_mound
 
     profiles = db.session.query(PlayerPitchingProfile).filter_by(team_id=team_id).all()
     plans = db.session.query(GamePitchingPlan).filter_by(game_id=game.id, team_id=team_id).all()
