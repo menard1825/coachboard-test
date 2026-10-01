@@ -11,6 +11,7 @@
   const SWITCH_ID = 'cb-now-next-switch';
   const STYLE_ID = 'live-next-defense-styles';
   const PITCH_MODAL_ID = 'cbNextPitchingChange';
+  const OPEN_PICKER_ID = 'cbNextOpenPositionPicker';
 
   let latest = null;
   let draft = {};
@@ -245,24 +246,6 @@
         </div>`;
     }
 
-    if (selectedPosition) {
-      return `
-        <div class="cb-next-selection active" role="status" aria-live="polite">
-          <div class="cb-next-step">STEP 2 · CHOOSE PLAYER</div>
-          <div class="cb-next-selection-main">
-            Who should play <strong>${esc(selectedPosition)}</strong>?
-          </div>
-          <div class="cb-next-selection-sub">
-            Tap a player on the field or bench.
-          </div>
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-secondary mt-2"
-            data-next-cancel
-          >Cancel move</button>
-        </div>`;
-    }
-
     return '';
   }
 
@@ -406,6 +389,141 @@
           }
         </div>
       </div>`;
+  }
+
+
+  function openPositionPickerModal() {
+    let modal = $(OPEN_PICKER_ID);
+
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = OPEN_PICKER_ID;
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.setAttribute('aria-labelledby', `${OPEN_PICKER_ID}-title`);
+
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5
+              class="modal-title"
+              id="${OPEN_PICKER_ID}-title"
+              data-open-position-title
+            ></h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div
+              class="small text-muted mb-3"
+              data-open-position-help
+            ></div>
+            <div data-open-position-choices></div>
+          </div>
+        </div>
+      </div>`;
+
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  // An open spot is a "who plays here?" decision, not a two-step move mode.
+  // Bench players fill it directly; choosing a fielder moves them here and
+  // leaves their old spot open. Moves involving P still flow through
+  // movePlayer(), which owns the special pitching questions.
+  function askOpenPosition(pos) {
+    const board = snapshot();
+
+    if (!pos || board[pos]) return;
+
+    const modal = openPositionPickerModal();
+    const instance = bootstrap.Modal.getOrCreateInstance(modal);
+    const title = modal.querySelector('[data-open-position-title]');
+    const help = modal.querySelector('[data-open-position-help]');
+    const choices = modal.querySelector('[data-open-position-choices]');
+    const inning = inningOrdinal(latest?.next_inning || '');
+
+    title.textContent =
+      pos === 'P'
+        ? (inning ? `Who's pitching in the ${inning}?` : "Who's pitching next inning?")
+        : (inning ? `Who plays ${pos} in the ${inning}?` : `Who plays ${pos} next inning?`);
+
+    help.textContent =
+      'Choose a player. If they are already on the field, their current spot will be left open.';
+
+    choices.replaceChildren();
+
+    const addHeading = label => {
+      const heading = document.createElement('div');
+      heading.className =
+        'small fw-bold text-uppercase text-muted mt-2 mb-1';
+      heading.textContent = label;
+      choices.appendChild(heading);
+    };
+
+    const choose = name => {
+      const apply = () => {
+        if (!sameAlignment(snapshot(), board) || (snapshot()[pos] || '')) {
+          noticeMessage =
+            'The defense changed while you were choosing. Nothing was moved.';
+          renderSyncState();
+          return;
+        }
+
+        movePlayer(name, findSource(name), pos);
+      };
+
+      modal.addEventListener('hidden.bs.modal', apply, {once: true});
+      instance.hide();
+    };
+
+    const addPlayer = (name, detail = '') => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className =
+        'btn btn-outline-primary w-100 text-start mb-2';
+      button.textContent =
+        detail
+          ? `${playerLabel(name)} · ${detail}`
+          : playerLabel(name);
+      button.addEventListener('click', () => choose(name));
+      choices.appendChild(button);
+    };
+
+    const bench = benchPlayers();
+
+    if (bench.length) {
+      addHeading('Bench');
+      bench.forEach(player => addPlayer(player.name));
+    }
+
+    const fielders = positions()
+      .filter(position => board[position] && position !== pos)
+      .map(position => ({
+        position,
+        name: board[position],
+      }));
+
+    if (fielders.length) {
+      addHeading('On the field');
+      fielders.forEach(player => addPlayer(player.name, player.position));
+    }
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn btn-outline-secondary w-100 mt-1';
+    cancel.textContent = 'Cancel';
+    cancel.setAttribute('data-bs-dismiss', 'modal');
+    choices.appendChild(cancel);
+
+    instance.show();
   }
 
   function installStyles() {
@@ -2203,27 +2321,19 @@
               return;
             }
 
-            if (selectedPosition && name) {
-              movePlayer(
-                name,
-                pos,
-                selectedPosition
-              );
-              return;
-            }
-
             if (name) {
               selected = {
                 name,
                 source: pos,
               };
               selectedPosition = '';
-            } else {
-              selected = null;
-              selectedPosition = pos;
+              renderCard();
+              return;
             }
 
-            renderCard();
+            selected = null;
+            selectedPosition = '';
+            askOpenPosition(pos);
           }
         );
       });
@@ -2238,15 +2348,6 @@
               button.dataset.nextBenchPlayer || '';
 
             if (!name) return;
-
-            if (selectedPosition) {
-              movePlayer(
-                name,
-                'BENCH',
-                selectedPosition
-              );
-              return;
-            }
 
             selected = {
               name,
