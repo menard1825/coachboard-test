@@ -235,7 +235,7 @@ def test_rapid_swaps_on_a_slow_connection_are_all_kept(
         expect(spot(board, target)).to_contain_text(
             want[target], timeout=IMMEDIATE_MS
         )
-        expect(board.locator('[data-next-cancel]')).to_have_count(
+        expect(board.locator('.cb-next-hint')).to_have_count(
             0, timeout=IMMEDIATE_MS
         )
 
@@ -510,14 +510,14 @@ def test_another_coachs_change_clears_a_selection_with_a_notice(
     other = expected_after(('LF', 'RF'))
 
     spot(board, 'SS').click()
-    expect(board.locator('[data-next-cancel]')).to_have_count(1)
+    expect(board.locator('.cb-next-hint')).to_have_count(1)
 
     other_coach_sets(page, coachboard_url, game_id, other)
 
     expect(board.locator('[data-next-notice]')).to_have_text(
         'Defense updated by another coach.', timeout=10_000
     )
-    expect(board.locator('[data-next-cancel]')).to_have_count(0)
+    expect(board.locator('.cb-next-hint')).to_have_count(0)
     assert board_alignment(page) == other
 
 

@@ -33,9 +33,12 @@ def test_idle_next_board_does_not_show_step_one_instructions():
         not in source
     )
 
-    # Contextual guidance remains available once a coach begins a move.
-    assert "STEP 2 · CHOOSE DESTINATION" in source
-    assert "STEP 2 · CHOOSE PLAYER" in source
+    # A move is guided by one header line, not a STEP 2 panel that pushes
+    # the field down.
+    assert "STEP 2" not in source
+    assert "CHOOSE DESTINATION" not in source
+    assert "TO BENCH" not in source
+    assert "Moving ${who} — tap a spot or Bench" in source
 
 def test_next_inning_ux_uses_baseball_language_not_next_state_language():
     source = BOARD.read_text()

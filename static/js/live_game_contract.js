@@ -805,11 +805,23 @@
         prep
       );
 
+      // Short-handed: every player here is already on the field, so the
+      // open spots cannot be filled. Nothing to ask (the board still warns).
+      // A player on the bench means the coach could fill a spot, so ask.
+      const presentNames = (prep?.roster || [])
+        .map(player => String(player?.name || '').trim())
+        .filter(Boolean);
+      const shortHanded =
+        openNext.length > 0 &&
+        presentNames.length > 0 &&
+        presentNames.every(name => assigned.has(name));
+
       // Validated and sent are the same alignment: the warning names the
       // spots open in the plan, and "Start inning anyway" sends that plan.
       if (
         openNext.length &&
-        !allowOpenNext
+        !allowOpenNext &&
+        !shortHanded
       ) {
         warnIncompleteNextDefense(
           openNext,
@@ -840,6 +852,17 @@
             : {}),
         }
       );
+
+      // A deliberate open start ("Start Inning Anyway", or short-handed) is
+      // remembered for exactly this inning and defense, like "Keep as
+      // Recorded": its End Inning does not ask about the same open spots
+      // again. Any change to that defense asks again.
+      if (openNext.length) {
+        acknowledgeRecord(recordKey({
+          current_inning: String(Number(currentInning) + 1),
+          current_alignment: alignment,
+        }));
+      }
 
       if (result?.delta) {
         document.dispatchEvent(

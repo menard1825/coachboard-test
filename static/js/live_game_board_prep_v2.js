@@ -227,26 +227,14 @@
       : 'Changes saved';
   }
 
-  function selectionHelp() {
-    if (selected) {
-      return `
-        <div class="cb-next-selection active" role="status" aria-live="polite">
-          <div class="cb-next-step">STEP 2 · CHOOSE DESTINATION</div>
-          <div class="cb-next-selection-main">
-            Moving <strong>${esc(playerLabel(selected.name))}</strong>
-          </div>
-          <div class="cb-next-selection-sub">
-            Tap the position where this player should go.
-          </div>
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-secondary mt-2"
-            data-next-cancel
-          >Cancel move</button>
-        </div>`;
-    }
-
-    return '';
+  // One line in the card header while a player is moving. It replaces the
+  // plan line in place, so the field never moves when a player is tapped.
+  function moveHint() {
+    if (!selected) return '';
+    const who = playerLabel(selected.name);
+    return selected.source === 'BENCH'
+      ? `Moving ${who} — tap a spot`
+      : `Moving ${who} — tap a spot or Bench`;
   }
 
   function fieldSpot(pos, left, top) {
@@ -339,33 +327,29 @@
 
   function benchMarkup() {
     const bench = benchPlayers();
+    // A fielder is moving: "Bench #27 Riggins" (and the Bench's empty
+    // space) benches them. A bench player's own chip never does -- it
+    // selects that player instead.
+    const benchTarget = Boolean(selected) && selected.source !== 'BENCH';
+    const who = selected ? playerLabel(selected.name) : '';
 
     return `
-      <div class="cb-next-bench ${selected ? 'destination-active' : ''}">
+      <div
+        class="cb-next-bench ${benchTarget ? 'destination-active' : ''}"
+        ${benchTarget ? 'data-next-bench-area' : ''}
+      >
         <div class="cb-next-bench-head">
           <strong>Bench · ${bench.length}</strong>
-          <span>
-            ${
-              selected
-                ? 'Bench is also a destination'
-                : 'Tap a bench player to move them'
-            }
-          </span>
+          ${
+            benchTarget
+              ? `<button
+                  type="button"
+                  class="cb-next-bench-cta"
+                  data-next-bench-selected
+                >Bench ${esc(who)}</button>`
+              : '<span>Tap a bench player to move them</span>'
+          }
         </div>
-
-        ${
-          selected && selected.source !== 'BENCH'
-            ? `
-              <button
-                type="button"
-                class="cb-next-send-bench"
-                data-next-bench-selected
-              >
-                SEND ${esc(playerLabel(selected.name))} TO BENCH
-              </button>
-            `
-            : ''
-        }
 
         <div class="cb-next-bench-chips">
           ${
@@ -894,10 +878,50 @@
         font-weight:900;
       }
 
+      /*
+       * Title and save chip share the first row; the plan / move hint and
+       * the pitcher line below them use the card's full width, so the move
+       * hint fits on one line on a phone.
+       */
+      #${CARD_ID} .cb-next-head{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        align-items:center;
+        column-gap:10px;
+      }
+
+      #${CARD_ID} .cb-next-head-main{
+        display:contents;
+      }
+
+      #${CARD_ID} .cb-next-title{
+        grid-column:1;
+        grid-row:1;
+      }
+
+      #${CARD_ID} .cb-next-save{
+        grid-column:2;
+        grid-row:1;
+      }
+
+      #${CARD_ID} .cb-next-head-main > :not(.cb-next-title){
+        grid-column:1 / -1;
+        min-width:0;
+      }
+
+      /* One line, plan or move hint, so tapping a player shifts nothing. */
       #${CARD_ID} .cb-next-sub{
         margin-top:2px;
         color:#667085;
         font-size:var(--cb-text-xs);
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
+
+      #${CARD_ID} .cb-next-sub.cb-next-hint{
+        color:#173b78;
+        font-weight:850;
       }
 
       #${CARD_ID} .cb-next-save{
@@ -1007,50 +1031,6 @@
         padding:10px 11px 11px;
       }
 
-      #${CARD_ID} .cb-next-selection{
-        min-height:42px;
-        margin-bottom:8px;
-        padding:9px 10px;
-        border:1px solid #b9cbea;
-        border-radius:10px;
-        background:#f3f7fd;
-        color:#344054;
-        font-size:.72rem;
-      }
-
-      #${CARD_ID} .cb-next-selection.active{
-        border:2px solid #315d98;
-        background:#eef4ff;
-        box-shadow:0 0 0 3px rgba(49,93,152,.12);
-      }
-
-      #${CARD_ID} .cb-next-selection.quiet{
-        border-color:#e3e7ec;
-        background:#fafbfc;
-        color:#667085;
-      }
-
-      #${CARD_ID} .cb-next-step{
-        color:#315d98;
-        font-size:.59rem;
-        font-weight:950;
-        letter-spacing:.08em;
-        text-transform:uppercase;
-      }
-
-      #${CARD_ID} .cb-next-selection-main{
-        margin-top:2px;
-        color:#172033;
-        font-size:.79rem;
-        font-weight:850;
-      }
-
-      #${CARD_ID} .cb-next-selection-sub{
-        margin-top:2px;
-        color:#667085;
-        font-size:.66rem;
-      }
-
       #${CARD_ID} .cb-next-field{
         width:min(100%,760px);
         min-height:0;
@@ -1092,7 +1072,8 @@
       #${CARD_ID} .cb-next-selected .cb-qd-name{
         outline:4px solid rgba(23,59,120,.32);
         border-color:#173b78!important;
-        background:#eaf1ff!important;
+        background:#173b78!important;
+        color:#fff!important;
       }
 
       #${CARD_ID} .cb-next-destination .cb-qd-name{
@@ -1100,15 +1081,6 @@
         box-shadow:
           0 0 0 3px rgba(77,117,179,.15),
           0 2px 5px rgba(16,24,40,.12)!important;
-      }
-
-      #${CARD_ID} .cb-next-destination .cb-qd-num{
-        display:none;
-      }
-
-      #${CARD_ID} .cb-next-destination .cb-qd-pos::after{
-        content:" · TAP HERE";
-        color:#fff;
       }
 
       #${CARD_ID} .cb-next-bench{
@@ -1161,22 +1133,29 @@
         color:#fff;
       }
 
+      /* Border colour and a shadow only: the Bench keeps its size. */
       #${CARD_ID} .cb-next-bench.destination-active{
-        border:2px solid #4d75b3;
+        border-color:#4d75b3;
         background:#f3f7fd;
+        box-shadow:0 0 0 2px rgba(77,117,179,.35);
+        cursor:pointer;
       }
 
-      #${CARD_ID} .cb-next-send-bench{
-        width:100%;
-        min-height:44px;
-        margin:0 0 8px;
-        border:2px dashed #b5473d;
-        border-radius:9px;
-        background:#fff3f1;
-        color:#912d28;
-        font-size:.68rem;
-        font-weight:900;
-        letter-spacing:.02em;
+      /* Sized like the hint it replaces, so the Bench keeps its height. */
+      #${CARD_ID} .cb-next-bench-head .cb-next-bench-cta{
+        margin:0;
+        padding:0;
+        border:0;
+        background:none;
+        color:#315d98;
+        font:inherit;
+        font-size:var(--cb-text-xs);
+        font-weight:850;
+        line-height:inherit;
+        white-space:nowrap;
+        text-decoration:underline;
+        text-underline-offset:2px;
+        cursor:pointer;
         touch-action:manipulation;
       }
 
@@ -1265,10 +1244,6 @@
           min-height:36px;
           padding:5px 7px;
           font-size:.64rem;
-        }
-
-        #${CARD_ID} .cb-next-selection{
-          margin-bottom:6px;
         }
 
         /*
@@ -1372,7 +1347,7 @@
        * below the fold. Size from the viewport height instead.
        *
        * Next Inning gets a smaller cap than On the Field on purpose. It
-       * carries its own heading, save chip and STEP instruction above the
+       * carries its own heading and save chip above the
        * field, so the same field height does not leave the same room.
        *
        * The bench, tools and warnings move beside the field here, mirroring
@@ -1391,7 +1366,6 @@
           display:grid;
           grid-template-columns:minmax(0,1.5fr) minmax(220px,.8fr);
           grid-template-areas:
-            "selection selection"
             "field bench"
             "field tools"
             "field warnings"
@@ -1399,13 +1373,6 @@
           gap:8px 12px;
           align-items:start;
           padding:9px 11px 11px;
-        }
-
-        #${CARD_ID} .cb-next-selection{
-          grid-area:selection;
-          min-height:38px;
-          margin-bottom:0;
-          padding:7px 9px;
         }
 
         #${CARD_ID} .cb-next-field{
@@ -1454,39 +1421,6 @@
         #${CARD_ID} .cb-next-field .cb-qd-spot{
           width:clamp(56px,17%,112px);
           min-height:44px;
-        }
-      }
-
-      /*
-       * Short landscape screens (a 1024x768 iPad): the STEP 2 guidance spans
-       * the full width above the field, and its Cancel button on a row of its
-       * own pushed End Inning below the fold mid-move. Put Cancel beside the
-       * text instead; the text itself keeps its size.
-       */
-      @media(
-        min-width:700px
-      ) and (
-        min-height:500px
-      ) and (
-        max-height:800px
-      ) and (
-        orientation:landscape
-      ){
-        #${CARD_ID} .cb-next-selection.active{
-          display:grid;
-          grid-template-columns:minmax(0,1fr) auto;
-          column-gap:12px;
-          align-items:center;
-        }
-
-        #${CARD_ID} .cb-next-selection.active > :not([data-next-cancel]){
-          grid-column:1;
-        }
-
-        #${CARD_ID} .cb-next-selection.active [data-next-cancel]{
-          grid-column:2;
-          grid-row:1 / span 3;
-          margin-top:0!important;
         }
       }
 
@@ -2223,6 +2157,12 @@
     }
   }
 
+  function cancelMove() {
+    selected = null;
+    selectedPosition = '';
+    renderCard();
+  }
+
   function renderCard() {
     const card = ensureSurface();
 
@@ -2241,13 +2181,15 @@
 
     card.innerHTML = `
       <div class="cb-next-head">
-        <div>
+        <div class="cb-next-head-main">
           <div class="cb-next-title">
             ${esc(inningLabel)} Inning Defense
           </div>
-          <div class="cb-next-sub">
-            ${esc(planStateText())}
-          </div>
+          <div
+            class="cb-next-sub ${selected ? 'cb-next-hint' : ''}"
+            data-next-hint
+            role="status"
+          >${esc(selected ? moveHint() : planStateText())}</div>
           ${pitcherStatusMarkup()}
         </div>
 
@@ -2259,8 +2201,6 @@
       </div>
 
       <div class="cb-next-body">
-        ${selectionHelp()}
-
         ${fieldMarkup()}
 
         ${benchMarkup()}
@@ -2313,6 +2253,12 @@
               button.dataset.nextPlayer || '';
 
             if (selected) {
+              // Tapping the moving player again cancels the move.
+              if (selected.source === pos) {
+                cancelMove();
+                return;
+              }
+
               movePlayer(
                 selected.name,
                 selected.source,
@@ -2343,11 +2289,24 @@
       .forEach(button => {
         button.addEventListener(
           'click',
-          () => {
+          event => {
             const name =
               button.dataset.nextBenchPlayer || '';
 
             if (!name) return;
+
+            // Never a Bench destination: a chip names its own player.
+            // Tapping it while someone else is moving switches the
+            // selection to this bench player; nothing moves.
+            event.stopPropagation();
+
+            if (
+              selected?.source === 'BENCH' &&
+              selected.name === name
+            ) {
+              cancelMove();
+              return;
+            }
 
             selected = {
               name,
@@ -2360,36 +2319,36 @@
       });
 
     card
-      .querySelector('[data-next-cancel]')
-      ?.addEventListener(
-        'click',
-        () => {
-          selected = null;
-          selectedPosition = '';
-          renderCard();
-        }
-      );
-
-    card
       .querySelector('[data-next-use-current]')
       ?.addEventListener(
         'click',
         useCurrentDefense
       );
 
+    const benchSelected = () => {
+      if (!selected || selected.source === 'BENCH') return;
+
+      movePlayerToBench(
+        selected.name,
+        selected.source
+      );
+    };
+
     card
       .querySelector('[data-next-bench-selected]')
-      ?.addEventListener(
-        'click',
-        () => {
-          if (!selected) return;
+      ?.addEventListener('click', event => {
+        event.stopPropagation();
+        benchSelected();
+      });
 
-          movePlayerToBench(
-            selected.name,
-            selected.source
-          );
-        }
-      );
+    // The Bench's empty space is the same destination. Bench chips stop
+    // their own taps, so they never reach here.
+    card
+      .querySelector('[data-next-bench-area]')
+      ?.addEventListener('click', event => {
+        if (event.target.closest('button')) return;
+        benchSelected();
+      });
 
     applyView();
   }

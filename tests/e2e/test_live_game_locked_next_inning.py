@@ -1185,7 +1185,7 @@ def test_next_touch_swipe_leaves_tap_flow_clean(
         catcher.click()
 
         expect(
-            board.locator('.cb-next-selection')
+            board.locator('[data-next-hint]')
         ).to_contain_text(
             'Catcher Cole',
             timeout=2_000,

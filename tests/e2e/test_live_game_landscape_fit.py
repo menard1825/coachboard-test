@@ -303,9 +303,8 @@ def test_next_inning_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
     try:
         open_live_game(page, coachboard_url, game_id)
         show(page, 'next')
-        # At rest there is no STEP instruction any more (96a13c5); it only
-        # appears once a move has started.
-        expect(page.locator('#live-board-prep-v3 .cb-next-selection')).to_have_count(0)
+        # At rest there is no move instruction; the header shows the plan.
+        expect(page.locator(HINT)).not_to_contain_text('Moving')
 
         data = measure(page, NEXT_FIELD, {
             'heading': '#live-board-prep-v3 .cb-next-title',
@@ -474,31 +473,32 @@ def test_portrait_and_phone_are_untouched_by_landscape_sizing(page: Page, coachb
         cleanup_game(page, coachboard_url, game_id)
 
 
-GUIDANCE = '#live-board-prep-v3 .cb-next-selection'
-CANCEL = '#live-board-prep-v3 [data-next-cancel]'
+HINT = '#live-board-prep-v3 [data-next-hint]'
 
-GUIDANCE_READABLE = """(sel) => {
-  const box = document.querySelector(sel);
-  const parts = ['.cb-next-step', '.cb-next-selection-main', '.cb-next-selection-sub']
-    .map(s => box.querySelector(s));
-  const r = el => el.getBoundingClientRect();
-  const cancel = box.querySelector('[data-next-cancel]');
+# The move hint is one line in the card header, in place of the plan line.
+HINT_LINE = """(sel) => {
+  const el = document.querySelector(sel);
+  const style = getComputedStyle(el);
   return {
-    fonts: parts.map(el => parseFloat(getComputedStyle(el).fontSize)),
-    clipped: parts.filter(el => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1).length,
-    insideBox: [...parts, cancel].every(el => r(el).bottom <= r(box).bottom + 1 && r(el).right <= r(box).right + 1),
-    cancelBesideText: r(cancel).top < r(parts[2]).bottom && r(cancel).left >= r(parts[1]).right,
+    height: el.getBoundingClientRect().height,
+    font: parseFloat(style.fontSize),
+    clipped: el.scrollWidth > el.clientWidth + 1,
   };
 }"""
 
 
 def start_move(page: Page, position='SS'):
     page.locator(f'{NEXT_FIELD} [data-next-position="{position}"]').click()
-    expect(page.locator(GUIDANCE)).to_contain_text('STEP 2')
+    expect(page.locator(HINT)).to_contain_text('Moving')
+
+
+def field_top(page: Page):
+    return page.locator(NEXT_FIELD).bounding_box()['y']
 
 
 def test_next_inning_mid_move_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
-    """STEP 2 guidance used to push End Inning 16px below the fold here."""
+    """The old STEP 2 panel pushed the field down and End Inning below the
+    fold. Mid-move now changes one header line and nothing moves."""
     page.set_viewport_size({'width': 1024, 'height': 768})
     login(page, coachboard_url)
     game_id = create_live_game(page, coachboard_url, 'Landscape Mid Move')
@@ -506,36 +506,42 @@ def test_next_inning_mid_move_fits_a_1024x768_tablet(page: Page, coachboard_url:
     try:
         open_live_game(page, coachboard_url, game_id)
         show(page, 'next')
+        expect(page.locator(f'{NEXT_FIELD} [data-next-position="SS"]')).to_contain_text('Shortstop Shawn')
+        at_rest = measure(page, NEXT_FIELD, {'bench': '#live-board-prep-v3 .cb-next-bench'})
         start_move(page)
 
         data = measure(page, NEXT_FIELD, {
-            'guidance': GUIDANCE, 'cancel': CANCEL,
-            'bench': '#live-board-prep-v3 .cb-next-bench',
+            'hint': HINT, 'bench': '#live-board-prep-v3 .cb-next-bench',
         })
         height = data['viewport']['height']
-        for name in ('guidance', 'cancel', 'field', 'bench', 'endInning'):
+        for name in ('hint', 'field', 'bench', 'endInning'):
             box = data['boxes'][name]
             assert box and box['bottom'] <= height, f'mid-move at 1024x768: {name} {box} below {height}'
+        for name in ('field', 'bench', 'endInning'):
+            assert abs(data['boxes'][name]['top'] - at_rest['boxes'][name]['top']) <= 1, (
+                f'{name} moved when a player was tapped'
+            )
         assert_no_horizontal_overflow(data, 'Next Inning mid-move at 1024x768')
         assert_markers_are_tappable(data, 'Next Inning mid-move at 1024x768')
         assert_field_inside_card(page, NEXT_FIELD, '#live-board-prep-v3', 'Next Inning mid-move at 1024x768')
 
-        guidance = page.evaluate(GUIDANCE_READABLE, GUIDANCE)
-        assert guidance['clipped'] == 0 and guidance['insideBox'], guidance
-        assert guidance['fonts'][1] >= 12 and guidance['fonts'][2] >= 10, guidance
-        assert guidance['cancelBesideText'], guidance
+        hint = page.evaluate(HINT_LINE, HINT)
+        assert not hint['clipped'] and hint['font'] >= 10, hint
 
-        # Finishing the move still works: SS and 2B swap, and the guidance goes.
+        # Finishing the move still works: SS onto 2B asks where Second Sam goes.
         page.locator(f'{NEXT_FIELD} [data-next-position="2B"]').click()
-        expect(page.locator(GUIDANCE)).to_have_count(0, timeout=10_000)
+        sheet = page.locator('#cbNextPitchingChange')
+        expect(sheet).to_contain_text('Where should Second Sam go?', timeout=5_000)
+        sheet.get_by_role('button', name='Put Second Sam at SS', exact=True).click()
+        expect(page.locator(HINT)).not_to_contain_text('Moving', timeout=10_000)
         expect(page.locator(f'{NEXT_FIELD} [data-next-position="2B"]')).to_contain_text('Shortstop Shawn', timeout=10_000)
         expect(page.locator(f'{NEXT_FIELD} [data-next-position="SS"]')).to_contain_text('Second Sam')
         assert measure(page, NEXT_FIELD)['boxes']['endInning']['bottom'] <= height
 
-        # Cancelling leaves the field as it was.
+        # Tapping the moving player again cancels; the field is as it was.
         start_move(page, 'CF')
-        page.locator(CANCEL).click()
-        expect(page.locator(GUIDANCE)).to_have_count(0)
+        page.locator(f'{NEXT_FIELD} [data-next-position="CF"]').click()
+        expect(page.locator(HINT)).not_to_contain_text('Moving')
         expect(page.locator(f'{NEXT_FIELD} [data-next-position="CF"]')).to_contain_text('Center Casey')
     finally:
         cleanup_game(page, coachboard_url, game_id)
@@ -543,8 +549,8 @@ def test_next_inning_mid_move_fits_a_1024x768_tablet(page: Page, coachboard_url:
 
 @pytest.mark.parametrize('size', [(1180, 820), (1440, 900), (768, 1024), (390, 844)],
                          ids=lambda s: f'{s[0]}x{s[1]}')
-def test_mid_move_guidance_keeps_its_layout_elsewhere(page: Page, coachboard_url: str, size):
-    """Taller landscape screens, portrait and phones keep Cancel under the text."""
+def test_a_move_keeps_the_field_in_place_elsewhere(page: Page, coachboard_url: str, size):
+    """Landscape, portrait and phone: the hint is one line and the field stays put."""
     width, height = size
     page.set_viewport_size({'width': width, 'height': height})
     login(page, coachboard_url)
@@ -553,10 +559,13 @@ def test_mid_move_guidance_keeps_its_layout_elsewhere(page: Page, coachboard_url
     try:
         open_live_game(page, coachboard_url, game_id)
         show(page, 'next')
+        expect(page.locator(f'{NEXT_FIELD} [data-next-position="SS"]')).to_contain_text('Shortstop Shawn')
+        before = field_top(page)
+        resting = page.evaluate(HINT_LINE, HINT)
         start_move(page)
-        guidance = page.evaluate(GUIDANCE_READABLE, GUIDANCE)
-        assert guidance['clipped'] == 0 and guidance['insideBox'], guidance
-        assert not guidance['cancelBesideText'], guidance
+        assert abs(field_top(page) - before) < 1, f'field moved at {width}x{height}'
+        hint = page.evaluate(HINT_LINE, HINT)
+        assert abs(hint['height'] - resting['height']) < 1, (resting, hint)
         assert_no_horizontal_overflow(measure(page, NEXT_FIELD), f'mid-move at {width}x{height}')
     finally:
         cleanup_game(page, coachboard_url, game_id)
