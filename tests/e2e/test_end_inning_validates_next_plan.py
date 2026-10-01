@@ -1,9 +1,9 @@
 """End Inning asks two separate, clearly labelled questions.
 
 1. The inning being recorded: an open position On the Field may be a
-   recording mistake, so it is asked about -- as that inning's record,
-   never as if the next inning's plan were open. "Keep as Recorded" is
-   remembered for that exact recorded defense.
+   recording mistake, so it is asked about -- "Center field is empty at the
+   end of the 1st" -- never as if the next inning's plan were open.
+   "Continue to 2nd" is remembered for that exact recorded defense.
 2. The next inning's plan (prep.confirmed.alignment, after the save queue
    settles): its open positions are named for that inning, and the same
    alignment is what advance-inning receives.
@@ -84,13 +84,13 @@ def test_screenshot_case_cf_open_on_the_field_but_filled_in_the_plan(
     # Asked about the 1st inning's record -- not the 2nd inning's plan.
     recorded = page.locator(RECORDED)
     expect(recorded.locator('.modal-title')).to_have_text(
-        '1st inning record has an open position', timeout=10_000
+        'Center field is empty at the end of the 1st', timeout=10_000
     )
     expect(recorded).to_contain_text(
-        'CF was left open on the recorded defense for the 1st inning.'
+        "Nobody was in CF when the 1st ended. Go back and fix the 1st if that's wrong, or continue to the 2nd and leave the 1st as saved."
     )
     expect(recorded).not_to_contain_text('available on the bench')
-    recorded.get_by_role('button', name='Keep as Recorded').click()
+    recorded.get_by_role('button', name='Continue to 2nd').click()
 
     # Casey is at CF in the plan: no 2nd-inning CF warning, and the plan
     # with Casey at CF is what advance-inning receives.
@@ -129,7 +129,7 @@ def test_fix_first_inning_goes_back_without_advancing(page: Page, coachboard_url
     end_inning(page)
     recorded = page.locator(RECORDED)
     expect(recorded).to_be_visible(timeout=10_000)
-    recorded.get_by_role('button', name='Fix 1st Inning').click()
+    recorded.get_by_role('button', name='Fix 1st Defense').click()
     expect(recorded).not_to_be_visible(timeout=10_000)
     expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=10_000)
     page.wait_for_timeout(500)

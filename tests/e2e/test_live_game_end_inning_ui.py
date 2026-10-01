@@ -493,16 +493,13 @@ def test_end_inning_warns_but_can_continue_with_open_position(
         recorded = page.locator('#cbRecordedInningGapModal')
         expect(recorded).to_be_visible(timeout=10_000)
         expect(recorded.locator('.modal-title')).to_have_text(
-            '1st inning record has an open position'
+            'Second base is empty at the end of the 1st'
         )
         expect(recorded).to_contain_text(
-            '2B was left open on the recorded defense for the 1st inning.'
-        )
-        expect(recorded).to_contain_text(
-            'fix the 1st inning defense before starting the 2nd'
+            "Nobody was in 2B when the 1st ended. Go back and fix the 1st if that's wrong, or continue to the 2nd and leave the 1st as saved."
         )
         expect(
-            recorded.get_by_role('button', name='Fix 1st Inning')
+            recorded.get_by_role('button', name='Fix 1st Defense')
         ).to_be_visible()
 
         # Closing the question changes nothing.
@@ -515,7 +512,7 @@ def test_end_inning_warns_but_can_continue_with_open_position(
 
         page.locator('#liveEndInningBtn').click()
         expect(recorded).to_be_visible(timeout=10_000)
-        recorded.get_by_role('button', name='Keep as Recorded').click()
+        recorded.get_by_role('button', name='Continue to 2nd').click()
 
         # Then the next inning's plan, which here follows the field.
         warning = page.locator('#cbIncompleteNextModal')

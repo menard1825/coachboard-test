@@ -130,7 +130,7 @@ def test_a_field_changed_after_start_gets_the_normal_record_warning(setup, coach
     page.reload(wait_until='domcontentloaded')
     page.locator('#liveEndInningBtn').click()
     expect(page.locator('#cbRecordedInningGapModal .modal-title')).to_have_text(
-        '1st inning record has an open position', timeout=15_000
+        'Left field and center field are empty at the end of the 1st', timeout=15_000
     )
 
 

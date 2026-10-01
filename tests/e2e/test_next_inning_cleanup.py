@@ -3,8 +3,8 @@
 End Inning (live_game_contract.js):
 
 * "Start 2nd with CF Open" is remembered for exactly the inning and
-  defense started, like "Keep as Recorded": when that inning ends with
-  the same defense, "2nd inning record has an open position" is not asked.
+  defense started, like "Continue to 3rd": when that inning ends with the
+  same defense, "Center field is empty at the end of the 2nd" is not asked.
   A different defense, or a different set of open spots, asks again.
 * Short-handed -- every player here is already on the field, so the open
   spot cannot be filled -- starts the inning without asking. A player on
@@ -157,6 +157,13 @@ def _expect_two_real_choices(modal, finish, start):
     expect(modal.get_by_role('button', name='Start Inning Anyway')).to_have_count(0)
 
 
+def _expect_coach_words(modal):
+    """Coach words only: no record keeping, no app name."""
+    text = modal.inner_text()
+    for word in ('record', 'open position', 'Keep as Recorded', 'CoachBoard'):
+        assert word.lower() not in text.lower(), (word, text)
+
+
 def _start_the_2nd_anyway(setup, url):
     """1st full; the 2nd planned with CF open (Center Casey and the relievers
     on the bench, so End Inning asks); the 3rd planned full."""
@@ -199,10 +206,20 @@ def test_a_changed_defense_with_the_same_open_spot_asks_again(setup, coachboard_
     page.locator('#liveEndInningBtn').click()
     recorded = page.locator(RECORDED)
     expect(recorded.locator('.modal-title')).to_have_text(
-        '2nd inning record has an open position', timeout=15_000
+        'Center field is empty at the end of the 2nd', timeout=15_000
     )
-    expect(recorded).to_contain_text('CF was left open on the recorded defense for the 2nd inning.')
-    recorded.get_by_role('button', name='Fix 2nd Inning').click()
+    expect(recorded.locator('.modal-body')).to_have_text(
+        "Nobody was in CF when the 2nd ended. Go back and fix the 2nd if that's wrong, or continue to the 3rd and leave the 2nd as saved."
+    )
+    _expect_coach_words(recorded)
+    # Fix is the solid navy action; Continue a navy outline, clearly available.
+    expect(recorded.get_by_role('button', name='Fix 2nd Defense', exact=True)).to_have_class(
+        re.compile(r'\bbtn-primary\b'))
+    go_on = recorded.get_by_role('button', name='Continue to 3rd', exact=True)
+    expect(go_on).to_be_enabled()
+    expect(go_on).to_have_class(re.compile(r'\bbtn-outline-primary\b'))
+    assert go_on.evaluate('el => getComputedStyle(el).opacity') == '1'
+    recorded.get_by_role('button', name='Fix 2nd Defense', exact=True).click()
     expect(recorded).to_be_hidden()
     assert _inning(page, coachboard_url, game_id) == '2'
 
@@ -214,10 +231,43 @@ def test_a_different_open_set_asks_again(setup, coachboard_url):
     page.locator('#liveEndInningBtn').click()
     recorded = page.locator(RECORDED)
     expect(recorded).to_contain_text(
-        'LF and CF were left open on the recorded defense for the 2nd inning.', timeout=15_000
+        'Nobody was in LF or CF when the 2nd ended.', timeout=15_000
     )
-    recorded.get_by_role('button', name='Fix 2nd Inning').click()
+    expect(recorded.locator('.modal-title')).to_have_text(
+        'Left field and center field are empty at the end of the 2nd'
+    )
+    recorded.get_by_role('button', name='Fix 2nd Defense').click()
     assert _inning(page, coachboard_url, game_id) == '2'
+
+
+def test_three_empty_spots_read_naturally_and_continue_goes_on(setup, coachboard_url):
+    page, game_id = _start_the_2nd_anyway(setup, coachboard_url)
+    third = {p: n for p, n in NO_CF.items() if p not in ('LF', 'RF')}
+    _set_field(page, coachboard_url, game_id, third)
+
+    page.locator('#liveEndInningBtn').click()
+    recorded = page.locator(RECORDED)
+    expect(recorded.locator('.modal-title')).to_have_text(
+        'Left field, center field, and right field are empty at the end of the 2nd', timeout=15_000
+    )
+    expect(recorded.locator('.modal-body')).to_have_text(
+        "Nobody was in LF, CF, or RF when the 2nd ended. Go back and fix the 2nd if that's wrong, or continue to the 3rd and leave the 2nd as saved."
+    )
+    _expect_coach_words(recorded)
+
+    # Continue keeps the 2nd as saved and goes on to the 3rd's own check:
+    # its plan follows the changed field, so it has the same spots open.
+    recorded.get_by_role('button', name='Continue to 3rd', exact=True).click()
+    incomplete = page.locator(INCOMPLETE)
+    expect(incomplete.locator('.modal-title')).to_have_text(
+        '3rd inning defense has open positions', timeout=15_000
+    )
+    assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '2'
+    incomplete.get_by_role('button', name='Start 3rd with LF, CF, and RF Open', exact=True).click()
+    expect(page.locator('#live-inning-display')).to_have_text('3', timeout=20_000)
+    events = sorted(live_state(page, coachboard_url, game_id)['rotation_events'], key=lambda e: e['sequence'])
+    ended = [e for e in events if e['event_type'] == 'End Inning' and not e.get('reverted')]
+    assert filled(ended[-1]['before_alignment']) == third
 
 
 SHORT = ('Center Casey', 'Relief Rex', 'Relief Rae')      # eight players here

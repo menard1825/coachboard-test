@@ -527,7 +527,7 @@
    * may be a recording mistake that would make the Game Report and
    * playing time wrong, so it is worth one clear question -- about THAT
    * inning, never worded as if the next inning's plan were open.
-   * "Keep as Recorded" is remembered for this exact recorded defense.
+   * "Continue to 6th" is remembered for this exact recorded defense.
    */
   // Remembered for this tab (sessionStorage), so a deliberate "Start with CF
   // Open" at first pitch survives the page reload into live play.
@@ -559,26 +559,52 @@
     ]);
   }
 
+  const POSITION_NAMES = {
+    P: 'pitcher',
+    C: 'catcher',
+    '1B': 'first base',
+    '2B': 'second base',
+    '3B': 'third base',
+    SS: 'shortstop',
+    LF: 'left field',
+    CF: 'center field',
+    RF: 'right field',
+    LCF: 'left-center field',
+    RCF: 'right-center field',
+  };
+
+  // ['LF', 'CF', 'RF'] -> "LF, CF, or RF" (conjunction 'or' / 'and').
+  function joinWords(items, conjunction) {
+    if (items.length <= 1) return items[0] || '';
+    if (items.length === 2) return `${items[0]} ${conjunction} ${items[1]}`;
+    return `${items.slice(0, -1).join(', ')}, ${conjunction} ${items[items.length - 1]}`;
+  }
+
+  // Coach words, not record keeping: "Right field is empty at the end of
+  // the 5th". "Continue to 6th", not "Start": the next inning's own check
+  // may still come before it begins.
   function warnRecordedInningGap(open, liveState, retry) {
     const inning = ordinal(liveState?.current_inning);
     const next = ordinal(Number(liveState?.current_inning) + 1);
     const key = recordKey(liveState);
+    const named = joinWords(open.map(pos => POSITION_NAMES[pos] || pos), 'and');
 
     endInningQuestion('cbRecordedInningGapModal', {
-      title: `${inning} inning record has an open position`,
+      title:
+        `${named.charAt(0).toUpperCase()}${named.slice(1)} ` +
+        `${open.length === 1 ? 'is' : 'are'} empty at the end of the ${inning}`,
       message:
-        `${positionList(open)} ${open.length === 1 ? 'was' : 'were'} ` +
-        `left open on the recorded defense for the ${inning} inning.`,
-      note:
-        'If that is correct, you can continue. Otherwise, go back and fix ' +
-        `the ${inning} inning defense before starting the ${next}.`,
-      primary: [`Fix ${inning} Inning`, () => {
+        `Nobody was in ${joinWords(open, 'or')} when the ${inning} ended. ` +
+        `Go back and fix the ${inning} if that's wrong, or continue to the ` +
+        `${next} and leave the ${inning} as saved.`,
+      note: '',
+      primary: [`Fix ${inning} Defense`, () => {
         document.querySelector('#cb-now-next-switch [data-now-next="now"]')?.click();
       }],
-      secondary: ['Keep as Recorded', () => {
+      secondary: [`Continue to ${next}`, () => {
         acknowledgeRecord(key);
         retry();
-      }],
+      }, 'btn-outline-primary'],
     });
   }
 

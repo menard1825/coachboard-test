@@ -1005,7 +1005,7 @@ def test_recorded_inning_gaps_and_next_inning_gaps_are_separate_questions(
     page: Page, coachboard_url, next_board
 ):
     """The inning being recorded and the next inning's plan are asked
-    about separately, each naming its own inning. "Keep as Recorded" is
+    about separately, each naming its own inning. "Continue to 2nd" is
     remembered for that recorded defense; the plan is what gets sent."""
     board, game_id = next_board
     recorded = page.locator('#cbRecordedInningGapModal')
@@ -1024,12 +1024,12 @@ def test_recorded_inning_gaps_and_next_inning_gaps_are_separate_questions(
     page.locator('#liveEndInningBtn').click()
     expect(recorded).to_be_visible(timeout=10_000)
     expect(recorded.locator('.modal-title')).to_have_text(
-        '1st inning record has an open position'
+        'Shortstop and left field are empty at the end of the 1st'
     )
     expect(recorded).to_contain_text(
-        'SS and LF were left open on the recorded defense for the 1st inning.'
+        "Nobody was in SS or LF when the 1st ended. Go back and fix the 1st if that's wrong, or continue to the 2nd and leave the 1st as saved."
     )
-    recorded.get_by_role('button', name='Keep as Recorded').click()
+    recorded.get_by_role('button', name='Continue to 2nd').click()
 
     # Then the plan: only SS is open for the 2nd inning.
     expect(incomplete).to_be_visible(timeout=10_000)
