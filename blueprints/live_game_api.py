@@ -29,6 +29,7 @@ from models import (
 import pitching_eligibility
 from utils import calculate_pitch_count_summary, get_pitching_rules_for_team, model_to_dict
 from unrecorded_pitching import with_unrecorded
+from team_game_settings import regulation_innings_for_team
 
 live_game_api_bp = Blueprint('live_game_api', __name__, url_prefix='/api/live-game')
 
@@ -424,6 +425,9 @@ def get_authoritative_live_state(game_id, team_id, game=None):
         'pitching_profiles': [model_to_dict(p) for p in profiles],
         'pitching_plans': [model_to_dict(p) for p in plans],
         'outfielder_count': team.outfielder_count,
+        # How many innings the game is scheduled for (Bench Report names
+        # the unplanned ones rather than leaving them out).
+        'regulation_innings': regulation_innings_for_team(team),
         'game_pitching_log': [
             {
                 **model_to_dict(o),

@@ -1,6 +1,6 @@
 """Pregame Plan notes where the game has gone its own way from the plan.
 
-"Changed from Inning 1: ..." (amber) is a change inside the original plan.
+"Plan change from Inning 1: ..." (amber) is a change inside the original plan.
 A quiet team-colored note compares the plan for an inning with the defense
 the game is really using, in plain baseball terms:
 
@@ -212,7 +212,7 @@ def test_no_message_while_the_game_follows_the_plan(live, coachboard_url, device
     card.locator('[data-plan-inning="2"]').click()                 # next inning follows its plan too
     page.wait_for_timeout(500)
     expect(card.locator('.cb-plan-live')).to_have_count(0)
-    expect(card.locator('.cb-plan-changes')).to_have_text('Changed from Inning 1: P, 1B')
+    expect(card.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 1: P, 1B')
     assert page.cb_errors == []
 
 

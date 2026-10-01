@@ -144,6 +144,11 @@ def _seed_next_alignment(current_alignment, planned_alignment, team, field_chang
     }, 'current'
 
 
+def _planned_seed(current_alignment, planned_alignment, team):
+    seeded, source = _seed_next_alignment(current_alignment, planned_alignment, team)
+    return seeded if source == 'planned' else None
+
+
 def _prep_dict(prep):
     if not prep:
         return None
@@ -438,6 +443,10 @@ def next_inning_prep(game_id):
         # planned_alignment stays the plan for the upcoming inning only.
         # The two below are whole-game reference data for Pregame Plan.
         'planned_alignment': planned_alignment,
+        # The upcoming inning's own plan as "Use 2nd-inning plan" would set it
+        # (mode 'planned'), or None when the inning has no separate plan --
+        # then the field simply carries forward.
+        'planned_seed': _planned_seed(current_alignment, planned_alignment, team),
         'pregame_rotation': pregame_rotation,
         'actual_rotation': actual_rotation,
         'confirmed': _prep_dict(prep),

@@ -126,19 +126,19 @@ def test_bench_report_shows_actual_and_future_planned_sits(page: Page, coachboar
 
         modal = page.locator('#cbBenchReportModal')
         expect(modal).to_be_visible(timeout=10_000)
-        expect(modal).to_contain_text('Actual + planned bench innings')
+        expect(modal).to_contain_text('Actual + projected bench innings')
 
         bench_row = modal.locator('.cb-br-row').filter(has_text=BENCH_NAME)
         expect(bench_row).to_have_count(1)
         expect(bench_row).to_have_class(re.compile(r'\bcurrent\b'))
         expect(bench_row).to_contain_text('Sat: None')
         expect(bench_row).to_contain_text('Inning 1 now')
-        expect(bench_row).to_contain_text('Planned to sit: 3')
+        expect(bench_row).to_contain_text('Projected to sit: 3')
 
         catcher_row = modal.locator('.cb-br-row').filter(has_text='Catcher Cole')
         expect(catcher_row).to_have_count(1)
         expect(catcher_row).to_contain_text('Sat: None')
-        expect(catcher_row).to_contain_text('Planned to sit: 2')
+        expect(catcher_row).to_contain_text('Projected to sit: 2')
 
         modal.get_by_role('button', name='Back to Game').click()
         expect(modal).to_be_hidden()

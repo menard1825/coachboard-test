@@ -30,6 +30,10 @@
   let serverBase = null;
   let dirty = false;
   let pendingMode = 'custom';
+  // Where the board's defense came from while a change is still saving
+  // ('custom' after an edit, 'planned' after "Use 2nd-inning plan"), so the
+  // header names it at once instead of the last saved source.
+  let localSource = null;
   let activeSavePromise = null;
   let conflictCount = 0;
   let rejectCount = 0;
@@ -202,7 +206,7 @@
   }
 
   function planStateText() {
-    const source = latest?.confirmed?.source || '';
+    const source = boardSource();
     const nextLabel = inningOrdinal(
       latest?.next_inning || ''
     );
@@ -225,6 +229,28 @@
     return nextLabel
       ? `Changes saved for the ${nextLabel}`
       : 'Changes saved';
+  }
+
+  function boardSource() {
+    return localSource || latest?.confirmed?.source || '';
+  }
+
+  // The upcoming inning's own plan, when it has one ("planned_seed").
+  function plannedSeed() {
+    const seed = latest?.planned_seed;
+    return seed && Object.values(seed).some(Boolean) ? normalize(seed) : null;
+  }
+
+  // A separately planned upcoming inning that the board is not using: say so
+  // and offer it back. An inning with no plan just carries the field forward.
+  function skippedPlanText() {
+    const seed = plannedSeed();
+    if (!seed || sameAlignment(seed, draft)) return '';
+    const next = inningOrdinal(latest?.next_inning || '');
+    const current = inningOrdinal(latest?.current_inning || '');
+    return boardSource() === 'current'
+      ? `Using the ${current}-inning field. Your ${next}-inning plan won't be used.`
+      : `Changed for the ${next}. Your ${next}-inning plan won't be used.`;
   }
 
   // One line in the card header while a player is moving. It replaces the
@@ -761,6 +787,14 @@
         font-weight:900;
       }
 
+      #${PLAN_CARD_ID} .cb-plan-live-kind{
+        display:block;
+        margin:-1px 0 3px;
+        color:#526176;
+        font-size:var(--cb-text-2xs, 11px);
+        font-weight:700;
+      }
+
       #${PLAN_CARD_ID} .cb-plan-live ul{
         margin:0;
         padding:0;
@@ -1165,6 +1199,18 @@
         gap:6px;
         align-items:center;
         margin-top:8px;
+      }
+
+      #${CARD_ID} .cb-next-plan-note{
+        flex:1 1 100%;
+        color:#5b4300;
+        background:#fff8e6;
+        border:1px solid #f1d38a;
+        border-radius:9px;
+        padding:6px 9px;
+        font-size:var(--cb-text-xs);
+        font-weight:750;
+        line-height:1.3;
       }
 
       #${CARD_ID} .cb-next-tools .btn{
@@ -2103,15 +2149,18 @@
           </div>
           <div class="cb-plan-changes${changed.length ? ' has-changes' : ''}">${
             previous
+              // Plan against plan. The note below is the game against
+              // this plan; each says which it is.
               ? changed.length
-                ? `Changed from ${esc(planInningLabel(previous.key))}: ${esc(changed.join(', '))}`
-                : `Same as ${esc(planInningLabel(previous.key))}`
+                ? `Plan change from ${esc(planInningLabel(previous.key))}: ${esc(changed.join(', '))}`
+                : `Plan: same as ${esc(planInningLabel(previous.key))}`
               : 'First inning of the plan'
           }</div>
           ${
             deviations.length
               ? `<div class="cb-plan-live">
                   <strong>${esc(deviationHeading(entry.key))}</strong>
+                  <span class="cb-plan-live-kind">The game compared with this plan</span>
                   <ul>${deviations.map(item => `<li>${esc(deviationLine(
                     item,
                     entry.key === String(latest?.current_inning || '') ||
@@ -2206,6 +2255,20 @@
         ${benchMarkup()}
 
         <div class="cb-next-tools">
+          ${
+            skippedPlanText()
+              ? `
+                <div class="cb-next-plan-note" data-next-plan-note role="note">
+                  ${esc(skippedPlanText())}
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-outline-primary"
+                  data-next-use-plan
+                >Use ${esc(inningLabel)}-inning plan</button>
+              `
+              : ''
+          }
           <button
             type="button"
             class="btn btn-outline-secondary"
@@ -2325,6 +2388,13 @@
         useCurrentDefense
       );
 
+    card
+      .querySelector('[data-next-use-plan]')
+      ?.addEventListener(
+        'click',
+        usePlannedDefense
+      );
+
     const benchSelected = () => {
       if (!selected || selected.source === 'BENCH') return;
 
@@ -2360,6 +2430,14 @@
     const card = $(CARD_ID);
     const badge = card?.querySelector('[data-next-save-state]');
     const notice = card?.querySelector('[data-next-notice]');
+    const hint = card?.querySelector('[data-next-hint]');
+
+    // The plan line follows the saved source ("Changes saved for the 3rd"
+    // after an edit), in place, like the badge.
+    if (hint && !selected) {
+      const text = planStateText();
+      if (hint.textContent !== text) hint.textContent = text;
+    }
 
     if (badge) {
       badge.className = `cb-next-save ${saveMode}`;
@@ -2427,6 +2505,7 @@
 
     draft = after;
     pendingMode = mode;
+    localSource = mode;
     dirty = true;
     localRevision += 1;
     successMessage = message;
@@ -2496,6 +2575,7 @@
         lastSignature = JSON.stringify(data);
         localRevision += 1;
         serverBase = normalize(data?.confirmed?.alignment || sent);
+        if (!dirty) localSource = null;
 
         // Newer moves are still on the board and go out next; only adopt the
         // server's copy when nothing newer is waiting.
@@ -2525,6 +2605,7 @@
   // waiting changes and show what the server has now.
   async function resolveConflict() {
     dirty = false;
+    localSource = null;
     undoStack = [];
     conflictCount += 1;
 
@@ -2565,6 +2646,7 @@
   // longer available). Put the board back to what the server has.
   function rejectLocalChange(error) {
     dirty = false;
+    localSource = null;
     undoStack = [];
     rejectCount += 1;
     draft = normalize(serverBase || {});
@@ -3344,6 +3426,22 @@
       latest.current_alignment || {},
       {
         mode: 'current',
+        message: 'Saved ✓',
+      }
+    );
+  }
+
+  // The upcoming inning's saved plan, chosen by the coach. Saved as
+  // 'planned' by the coach, so later live changes, redraws and reloads keep
+  // it. A different pitcher in it is checked at End Inning, like any other.
+  function usePlannedDefense() {
+    const seed = plannedSeed();
+    if (!seed) return Promise.resolve();
+
+    return commitLocalChange(
+      seed,
+      {
+        mode: 'planned',
         message: 'Saved ✓',
       }
     );

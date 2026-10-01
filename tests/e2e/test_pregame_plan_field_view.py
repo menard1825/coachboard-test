@@ -160,7 +160,7 @@ def test_changes_from_the_inning_before_are_marked(open_plan, device):
 
     # Inning 2: the pitcher and first baseman swapped.
     assert _changed(page) == ['1B', 'P']
-    expect(card.locator('.cb-plan-changes')).to_have_text('Changed from Inning 1: P, 1B')
+    expect(card.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 1: P, 1B')
     label = card.locator('[data-plan-position="P"]').get_attribute('aria-label')
     assert INNING_2['P'] in label and 'changed' in label.lower(), label
     # A changed marker looks different from an unchanged one.
@@ -169,7 +169,7 @@ def test_changes_from_the_inning_before_are_marked(open_plan, device):
 
     _show(page, 3)
     assert _changed(page) == ['2B', 'SS']
-    expect(card.locator('.cb-plan-changes')).to_have_text('Changed from Inning 2: 2B, SS')
+    expect(card.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 2: 2B, SS')
 
     _show(page, 1)
     assert _changed(page) == []
