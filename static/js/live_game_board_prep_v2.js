@@ -19,6 +19,9 @@
   // Pregame Plan: the inning being looked at, and the live inning it was
   // chosen during (a new live inning opens the plan on its next inning).
   let planChoice = {inning: '', during: ''};
+  // Pregame Plan's List / Field choice (phones) and its Only changes filter.
+  let planView = 'list';
+  let planOnlyChanges = false;
   let liveChangeTimer = null;
   // One next-inning read at a time (see refresh()).
   let readInFlight = null;
@@ -597,299 +600,659 @@
         }
       }
 
+      /* Pregame Plan: the coach's plan as a reference next to what the game
+         actually has. Violet is only ever the plan; black is the game. */
       #${PLAN_CARD_ID}{
-        border:1.5px solid #cfd6df;
+        --cb-plan-ink:#1b1f2a;
+        --cb-plan-muted:#5c6576;
+        --cb-plan-line:#dde1e8;
+        --cb-plan-ref:#4b3fa8;
+        --cb-plan-ref-bg:#f1efff;
+        --cb-plan-ref-line:#d4cff7;
+        --cb-plan-chg:#8a4f00;
+        --cb-plan-chg-bg:#fff3dc;
+        --cb-plan-red:#b42318;
+        --cb-plan-red-bg:#fff0ee;
+        --cb-plan-ok:#067647;
+        border:1.5px solid var(--cb-plan-ref-line);
         border-radius:14px;
-        background:#fff;
-        overflow:hidden;
+        background:linear-gradient(#fbfaff,#fff 64px);
         margin:0 0 10px;
         box-shadow:0 2px 7px rgba(16,24,40,.08);
+        color:var(--cb-plan-ink);
+        padding:12px;
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+        min-width:0;
       }
 
       #${PLAN_CARD_ID}[hidden]{
         display:none!important;
       }
 
+      #${PLAN_CARD_ID} button{
+        font-family:inherit;
+        touch-action:manipulation;
+      }
+
+      #${PLAN_CARD_ID} button:focus-visible{
+        outline:3px solid #f5c400;
+        outline-offset:2px;
+      }
+
       #${PLAN_CARD_ID} .cb-plan-head{
         display:flex;
         justify-content:space-between;
-        align-items:flex-start;
-        gap:10px;
-        padding:11px 12px 9px;
-        border-bottom:1px solid #e7ebef;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-kicker{
-        color:#667085;
-        font-size:.6rem;
-        font-weight:900;
-        text-transform:uppercase;
-        letter-spacing:.09em;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-title{
-        color:#172033;
-        font-size:1.05rem;
-        line-height:1.15;
-        font-weight:900;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-sub{
-        margin-top:2px;
-        color:#667085;
-        font-size:.67rem;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-readonly{
-        flex:0 0 auto;
-        padding:5px 9px;
-        border:1px solid #e4c46d;
-        border-radius:999px;
-        background:#fff8e7;
-        color:#8b5c00;
-        font-size:.62rem;
-        font-weight:850;
-        white-space:nowrap;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-body{
-        padding:10px 11px 11px;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-empty{
-        padding:18px 12px;
-        border:1px dashed #d6dce4;
-        border-radius:10px;
-        background:#fafbfc;
-        color:#667085;
-        font-size:.8rem;
-        text-align:center;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-innings{
-        display:flex;
-        gap:6px;
-        overflow-x:auto;
-        padding:1px 1px 3px;
-        margin-bottom:9px;
-        scrollbar-width:thin;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-inning-btn{
-        position:relative;
-        flex:0 0 auto;
-        min-width:48px;
-        min-height:44px;
-        padding:4px 10px;
-        border:1.5px solid #cfd6df;
-        border-radius:10px;
-        background:#fff;
-        color:#172033;
-        font-size:1rem;
-        font-weight:900;
-        line-height:1.05;
-        transition:none;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-inning-btn[aria-pressed="true"]{
-        border-color:#172033;
-        background:#172033;
-        color:#fff;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-inning-btn small{
-        display:block;
-        font-size:var(--cb-text-2xs, 11px);
-        font-weight:850;
-        letter-spacing:.03em;
-        text-transform:uppercase;
-        color:#315d98;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-inning-btn[aria-pressed="true"] small{
-        color:#c9d7ef;
+        align-items:center;
+        gap:8px;
+        flex-wrap:wrap;
       }
 
       #${PLAN_CARD_ID} .cb-plan-inning-title{
-        color:#172033;
-        font-size:.95rem;
+        margin:0;
+        font-size:1.15rem;
         font-weight:900;
+        line-height:1.2;
+        min-width:0;
       }
 
-      #${PLAN_CARD_ID} .cb-plan-inning-title span{
+      #${PLAN_CARD_ID} .cb-plan-inning-title .cb-plan-tag{
+        display:inline-block;
         margin-left:6px;
         padding:2px 8px;
         border-radius:999px;
-        background:#e8eef8;
-        color:#1f3f6e;
-        font-size:var(--cb-text-2xs, 11px);
-        font-weight:900;
-        letter-spacing:.05em;
-        text-transform:uppercase;
-        vertical-align:2px;
+        background:#eef0f3;
+        color:#344054;
+        font-size:.75rem;
+        font-weight:800;
+        vertical-align:3px;
       }
 
-      #${PLAN_CARD_ID} .cb-plan-changes{
-        margin:3px 0 8px;
+      #${PLAN_CARD_ID} .cb-plan-readonly{
+        font-size:.75rem;
+        font-weight:800;
+        color:var(--cb-plan-ref);
+        background:var(--cb-plan-ref-bg);
+        border:1px solid var(--cb-plan-ref-line);
+        border-radius:999px;
+        padding:4px 10px;
+        white-space:nowrap;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-empty,
+      #${PLAN_CARD_ID} .cb-plan-note{
+        color:var(--cb-plan-muted);
+        font-size:.9rem;
+        font-weight:600;
+        line-height:1.35;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-innings{
+        display:grid;
+        gap:5px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn{
+        min-height:50px;
+        min-width:0;
+        border:1.5px solid var(--cb-plan-line);
+        border-radius:11px;
+        background:#fff;
+        color:var(--cb-plan-ink);
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:2px;
+        padding:4px 2px;
+        font-size:1.05rem;
+        font-weight:900;
+        line-height:1;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn small{
+        font-size:.68rem;
+        font-weight:800;
+        color:var(--cb-plan-muted);
+        line-height:1.05;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn[data-plan-has="false"]{
+        background:#f6f7f9;
+        border-style:dashed;
+        border-color:#b8bec9;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-inning-btn[aria-pressed="true"]{
+        border-color:#0e0b6e;
+        box-shadow:0 0 0 2px #0e0b6e inset;
+        background:#fff;
+      }
+
+      /* The game differed from this inning's plan. */
+      #${PLAN_CARD_ID} .cb-plan-inning-btn[data-plan-live-differs="true"] b::after{
+        content:"";
+        display:inline-block;
+        width:7px;
+        height:7px;
+        margin-left:3px;
+        border-radius:50%;
+        background:var(--cb-plan-chg);
+        vertical-align:3px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-key{
+        display:flex;
+        flex-wrap:wrap;
+        gap:4px 12px;
+        font-size:.75rem;
+        color:var(--cb-plan-muted);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-key span{
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        white-space:nowrap;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-key i{
+        display:inline-block;
+        width:12px;
+        height:12px;
+        border-radius:3px;
+        border:1.5px solid var(--cb-plan-line);
+        background:#fff;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-key i.none{
+        border-style:dashed;
+        border-color:#b8bec9;
+        background:#f6f7f9;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-key i.dot{
+        width:8px;
+        height:8px;
+        border:0;
+        border-radius:50%;
+        background:var(--cb-plan-chg);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-summary{
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-chip{
+        font-size:.8rem;
+        font-weight:800;
+        border-radius:999px;
+        padding:4px 10px;
+        background:#eef0f3;
         color:#475467;
-        font-size:var(--cb-text-xs, 12px);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-chip[data-kind="changed"]{background:var(--cb-plan-chg-bg);color:var(--cb-plan-chg)}
+      #${PLAN_CARD_ID} .cb-plan-chip[data-kind="empty"]{background:var(--cb-plan-red-bg);color:var(--cb-plan-red)}
+      #${PLAN_CARD_ID} .cb-plan-chip[data-kind="match"]{background:#e6f6ec;color:var(--cb-plan-ok)}
+      #${PLAN_CARD_ID} .cb-plan-chip[data-kind="norec"]{background:#f1f2f4;color:#5c6576;border:1px dashed #b8bec9}
+
+      /* Plan against the plan's inning before. */
+      #${PLAN_CARD_ID} .cb-plan-changes{
+        color:var(--cb-plan-muted);
+        font-size:.8rem;
         font-weight:750;
       }
 
       #${PLAN_CARD_ID} .cb-plan-changes.has-changes{
-        color:#7a4b00;
+        color:var(--cb-plan-ref);
       }
 
-      #${PLAN_CARD_ID} .cb-plan-field{
-        width:min(100%,640px);
-        min-height:0;
-        margin-inline:auto;
-        aspect-ratio:1.28/1;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-spot{
-        cursor:default;
-        width:clamp(58px,17%,112px);
-        min-height:40px;
-      }
-
-      /* A position that changed from the inning before: amber ring and dot. */
-      #${PLAN_CARD_ID} .cb-plan-spot[data-plan-changed="true"] .cb-qd-name{
-        border-color:#d18a00!important;
-        box-shadow:0 0 0 2.5px #f5b83d, 0 2px 6px rgba(16,24,40,.22)!important;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-spot[data-plan-changed="true"] .cb-qd-pos::after{
-        content:'';
-        display:inline-block;
-        width:7px;
-        height:7px;
-        margin-left:4px;
-        border-radius:50%;
-        background:#f5b83d;
-        box-shadow:0 0 0 1.5px #fff;
-        vertical-align:1px;
-      }
-
-      /* Where the game has gone its own way from the plan: a quiet
-         team-colored dashed outline, and a small dot on the inning button.
-         Amber stays reserved for changes inside the original plan. */
-      #${PLAN_CARD_ID} .cb-plan-spot[data-plan-live-differs="true"] .cb-qd-name{
-        outline:2px dashed var(--cb-primary-text, #1f3f6e);
-        outline-offset:2px;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-live{
-        margin:0 0 9px;
-        padding:6px 10px 7px;
-        border-left:3px solid var(--cb-primary-text, #1f3f6e);
-        background:#f5f7fa;
-        color:#172033;
-        font-size:var(--cb-text-xs, 12px);
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-live strong{
-        display:block;
-        margin-bottom:2px;
-        color:var(--cb-primary-text, #1f3f6e);
-        font-size:var(--cb-text-xs, 12px);
-        font-weight:900;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-live-kind{
-        display:block;
-        margin:-1px 0 3px;
-        color:#526176;
-        font-size:var(--cb-text-2xs, 11px);
-        font-weight:700;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-live ul{
-        margin:0;
-        padding:0;
-        list-style:none;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-live li{
-        font-weight:750;
-        line-height:1.35;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-live li + li{
-        margin-top:3px;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-inning-btn[data-plan-live-differs="true"]::after{
-        content:'';
-        position:absolute;
-        top:5px;
-        right:5px;
-        width:7px;
-        height:7px;
-        border-radius:50%;
-        background:var(--cb-primary-text, #1f3f6e);
-        box-shadow:0 0 0 1.5px #fff;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-inning-btn[aria-pressed="true"][data-plan-live-differs="true"]::after{
-        background:#fff;
-        box-shadow:0 0 0 1.5px var(--cb-primary-text, #1f3f6e);
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-bench{
-        margin-top:9px;
-        padding:8px 10px;
-        border:1px solid #e3e7ec;
-        border-radius:10px;
-        background:#fafbfc;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-bench strong{
-        display:block;
-        margin-bottom:5px;
-        color:#344054;
-        font-size:var(--cb-text-xs, 12px);
-        font-weight:900;
-      }
-
-      #${PLAN_CARD_ID} .cb-plan-bench-chips{
+      #${PLAN_CARD_ID} .cb-plan-toolbar{
         display:flex;
-        flex-wrap:wrap;
-        gap:5px;
+        background:#e1e4ea;
+        border-radius:10px;
+        padding:3px;
+        gap:3px;
       }
 
-      #${PLAN_CARD_ID} .cb-plan-bench-chips span{
-        padding:4px 8px;
-        border:1px solid #dce1e5;
-        border-radius:999px;
+      #${PLAN_CARD_ID} .cb-plan-toolbar button{
+        flex:1 1 auto;
+        min-height:44px;
+        border:0;
+        border-radius:8px;
+        background:transparent;
+        color:#344054;
+        font-size:.85rem;
+        font-weight:800;
+        padding:0 6px;
+        white-space:nowrap;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-toolbar button[aria-pressed="true"]{
         background:#fff;
-        color:#172033;
-        font-size:var(--cb-text-xs, 12px);
+        color:var(--cb-plan-ink);
+        box-shadow:0 1px 2px rgba(0,0,0,.15);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-toolbar button:disabled{
+        color:#8a94a6;
+        cursor:not-allowed;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-views{
+        container-type:inline-size;
+        min-width:0;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-views-grid{
+        display:grid;
+        grid-template-columns:minmax(0,1fr);
+        gap:10px;
+        align-items:start;
+      }
+
+      /* Phones: one view at a time, the list first. */
+      @media(max-width:743.98px){
+        #${PLAN_CARD_ID} .cb-plan-views[data-plan-view="list"] .cb-plan-fieldwrap,
+        #${PLAN_CARD_ID} .cb-plan-views[data-plan-view="field"] .cb-plan-listwrap{
+          display:none;
+        }
+      }
+
+      /* Wider screens: both, so the List/Field switch isn't needed and the
+         filter is a small switch of its own. */
+      @media(min-width:744px){
+        #${PLAN_CARD_ID} [data-plan-view-btn]{
+          display:none;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-toolbar{
+          align-self:flex-start;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-toolbar button{
+          padding:0 16px;
+        }
+      }
+
+      /* Side by side only when both are readable; stacked otherwise. */
+      @container (min-width:680px){
+        #${PLAN_CARD_ID} .cb-plan-views-grid{
+          grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+        }
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-list{
+        display:flex;
+        flex-direction:column;
+        border:1px solid var(--cb-plan-line);
+        border-radius:12px;
+        background:#fff;
+        overflow:hidden;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-row{
+        display:grid;
+        grid-template-columns:38px minmax(0,1fr) minmax(0,1fr);
+        gap:8px;
+        align-items:center;
+        min-height:50px;
+        padding:5px 8px;
+        border-top:1px solid var(--cb-plan-line);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-list.single .cb-plan-row{
+        grid-template-columns:38px minmax(0,1fr);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-row.cb-plan-colhead{
+        min-height:0;
+        padding:7px 8px 6px;
+        border-top:0;
+        background:#f8f9fb;
+        font-size:.72rem;
+        font-weight:800;
+        letter-spacing:.04em;
+        text-transform:uppercase;
+        color:var(--cb-plan-muted);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-colhead .cb-plan-planned{
+        color:var(--cb-plan-ref);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-row[data-plan-changed="true"]{
+        background:var(--cb-plan-chg-bg);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-pos{
+        font-size:.95rem;
+        font-weight:900;
+        color:#344054;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-nm{
+        display:block;
+        font-size:1rem;
+        font-weight:700;
+        line-height:1.15;
+        overflow-wrap:anywhere;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-nm small{
+        margin-left:4px;
+        font-size:.75rem;
+        font-weight:600;
+        color:var(--cb-plan-muted);
+        white-space:nowrap;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-planned .cb-plan-nm{
+        color:var(--cb-plan-ref);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-na{
+        font-size:.85rem;
+        font-weight:600;
+        font-style:italic;
+        color:#6b7385;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-flag{
+        display:inline-block;
+        margin-top:3px;
+        padding:1px 7px;
+        border-radius:999px;
+        background:#ffe1ad;
+        color:var(--cb-plan-chg);
+        font-size:.7rem;
         font-weight:800;
       }
 
-      @media(max-width:575.98px){
-        #${PLAN_CARD_ID} .cb-plan-field{
-          width:100%;
-        }
+      #${PLAN_CARD_ID} .cb-plan-emp{
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        color:var(--cb-plan-red);
+        font-size:.95rem;
+        font-weight:800;
+      }
 
-        /* Wider than the live board's markers, and never narrower than the
-           longest word in the name: the plan is not sharing the screen with
-           End Inning, so names wrap between words, not inside them. */
+      #${PLAN_CARD_ID} .cb-plan-emp::before{
+        content:"";
+        width:9px;
+        height:9px;
+        border-radius:50%;
+        background:var(--cb-plan-red);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-norec{
+        font-size:.85rem;
+        font-weight:600;
+        color:#5c6576;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-bench{
+        align-items:start;
+        font-size:.875rem;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-bench .cb-plan-pos{
+        padding-top:2px;
+        font-size:.72rem;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-bench .cb-plan-planned{
+        color:var(--cb-plan-ref);
+        font-weight:600;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-fieldwrap{
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+        min-width:0;
+        container-type:inline-size;
+      }
+
+
+      #${PLAN_CARD_ID} .cb-plan-field{
+        position:relative;
+        width:100%;
+        aspect-ratio:1/1.3;
+        max-height:560px;
+        overflow:hidden;
+        border-radius:12px;
+        background:linear-gradient(#3d8b4c,#357d43);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-field::before{
+        content:"";
+        position:absolute;
+        left:50%;
+        bottom:-24%;
+        width:118%;
+        aspect-ratio:1;
+        transform:translateX(-50%);
+        border:2px solid rgba(255,255,255,.22);
+        border-radius:50%;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-diamond{
+        position:absolute;
+        left:50%;
+        top:47%;
+        width:30%;
+        aspect-ratio:1;
+        background:#c9a06a;
+        transform:translate(-50%,0) rotate(45deg);
+        border-radius:4px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot{
+        position:absolute;
+        transform:translate(-50%,-50%);
+        width:31%;
+        min-height:56px;
+        border-radius:10px;
+        background:#fff;
+        border:1.5px solid #cfd4dc;
+        padding:4px;
+        text-align:center;
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
+        gap:2px;
+        line-height:1.1;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot[data-plan-changed="true"]{
+        border:2.5px solid #e3a33a;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot-pos{
+        font-size:.75rem;
+        font-weight:900;
+        color:#344054;
+      }
+
+      /* Short names ("Alexander M.") on one line, so a marker never grows
+         into its neighbour; the list and the marker's label have full names. */
+      #${PLAN_CARD_ID} .cb-plan-spot-plan,
+      #${PLAN_CARD_ID} .cb-plan-spot-game{
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot-plan{
+        font-size:.8rem;
+        font-weight:700;
+        color:var(--cb-plan-ref);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot-game{
+        font-size:.84rem;
+        font-weight:800;
+        border-top:1px solid #e4e7ec;
+        padding-top:2px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot .cb-plan-emp{
+        font-size:.8rem;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-spot .cb-plan-na,
+      #${PLAN_CARD_ID} .cb-plan-spot .cb-plan-norec{
+        font-size:.75rem;
+      }
+
+      /* After the marker rules above, so these win. A narrow field (small phones, the iPad's side-by-side column): wider
+         markers and slightly smaller type, so "Alexander M." still fits. */
+      @container (max-width:360px){
         #${PLAN_CARD_ID} .cb-plan-spot{
-          width:min-content!important;
-          min-width:clamp(60px,21vw,84px);
-          min-height:30px!important;
+          width:32.5%;
+          padding:4px 2px;
         }
 
-        #${PLAN_CARD_ID} .cb-plan-spot .cb-qd-name{
-          overflow-wrap:normal;
-          word-break:normal;
+        #${PLAN_CARD_ID} .cb-plan-spot-plan{
+          font-size:.72rem;
         }
 
-        #${PLAN_CARD_ID} .cb-plan-spot .cb-qd-name{
-          font-size:var(--cb-marker-name)!important;
+        #${PLAN_CARD_ID} .cb-plan-spot-game{
+          font-size:.76rem;
         }
+      }
+
+      /* 320px phones (a field about 288px wide). */
+      @container (max-width:300px){
+        #${PLAN_CARD_ID} .cb-plan-spot{
+          width:33%;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-spot-plan,
+        #${PLAN_CARD_ID} .cb-plan-spot-game{
+          font-size:.68rem;
+          font-weight:750;
+        }
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-legend{
+        display:flex;
+        flex-wrap:wrap;
+        gap:4px 12px;
+        font-size:.75rem;
+        color:var(--cb-plan-muted);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-legend b.ref{
+        color:var(--cb-plan-ref);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-next{
+        border:1.5px solid #c7d6f5;
+        border-radius:12px;
+        background:#f5f8ff;
+        padding:10px 12px;
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-next-head{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:8px;
+        flex-wrap:wrap;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-next-head strong{
+        display:block;
+        font-size:1rem;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-next-head span{
+        display:block;
+        font-size:.85rem;
+        color:var(--cb-plan-muted);
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-edit-next{
+        min-height:44px;
+        border-radius:10px;
+        border:1.5px solid #0e0b6e;
+        background:#fff;
+        color:#0e0b6e;
+        font-size:.875rem;
+        font-weight:800;
+        padding:0 12px;
+        white-space:nowrap;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-next-list{
+        display:grid;
+        grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+        gap:4px 12px;
+        margin:0;
+        padding:0;
+        list-style:none;
+        font-size:.9rem;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-next-list li{
+        min-width:0;
+        overflow-wrap:anywhere;
+      }
+
+      #${PLAN_CARD_ID} .cb-plan-next-list b{
+        display:inline-block;
+        min-width:30px;
+        color:#344054;
+      }
+
+      @media(max-width:399.98px){
+        #${PLAN_CARD_ID} .cb-plan-inw{
+          display:none;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-inning-title{
+          font-size:1.05rem;
+        }
+      }
+
+      @media(max-width:374.98px){
+        #${PLAN_CARD_ID}{
+          padding:10px 8px;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-toolbar button{
+          font-size:.8rem;
+          padding:0 4px;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-row{
+          grid-template-columns:32px minmax(0,1fr) minmax(0,1fr);
+          gap:6px;
+          padding:5px 6px;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-list.single .cb-plan-row{
+          grid-template-columns:32px minmax(0,1fr);
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-nm{
+          font-size:.94rem;
+        }
+
+        #${PLAN_CARD_ID} .cb-plan-inning-btn small{
+          font-size:.66rem;
+        }
+
       }
 
       #${CARD_ID}{
@@ -2017,126 +2380,336 @@
     syncLiveActions();
   }
 
-  function planInnings() {
-    const plan = latest?.pregame_rotation || {};
-
-    return Object.keys(plan)
-      .map(key => ({
-        key,
-        sort: Number.parseFloat(key),
-        alignment: plan[key] || {},
-      }))
-      .filter(entry =>
-        Number.isFinite(entry.sort) &&
-        Object.values(entry.alignment).some(name => name)
-      )
-      .sort((a, b) => a.sort - b.sort);
-  }
-
-  function planSpot(pos, left, top, name, changed, live) {
-    const number = name
-      ? String(playerByName(name)?.number ?? '').trim()
-      : '';
-
-    return `
-      <div
-        class="cb-qd-spot cb-plan-spot ${pos === 'P' ? 'pitcher' : ''}"
-        style="left:${left}%;top:${top}%"
-        data-plan-position="${esc(pos)}"
-        data-plan-changed="${changed ? 'true' : 'false'}"
-        data-plan-live-differs="${live ? 'true' : 'false'}"
-        role="img"
-        aria-label="${esc(
-          `${pos}: ${name ? playerLabel(name) : 'open'}`
-          + `${changed ? ', changed from the inning before' : ''}`
-          + `${live ? `, in the game: ${live.name ? playerLabel(live.name) : 'open'}` : ''}`
-        )}"
-      >
-        <span class="cb-qd-pos">${esc(pos)}${number ? ` <span class="cb-qd-num">#${esc(number)}</span>` : ''}</span>
-        <span class="cb-qd-name">${esc(name || 'OPEN')}</span>
-      </div>`;
-  }
-
   /*
-   * The defense the live game is actually using for a planned inning:
+   * Pregame Plan: the plan the coach set before first pitch, next to what
+   * the game actually has for that inning. Reference only -- nothing here
+   * changes the game.
+   *
+   * Where the game's side comes from (all from this board's own data):
    *   - the inning being played: the field right now;
-   *   - the next inning: what End Inning would put out (the carried-forward
-   *     field, the plan, or the coach's own Next Inning edit);
-   *   - an inning already played: the defense it ended with.
-   * Later innings and planned mid-inning changes have none yet.
+   *   - the next inning: this board's Next Inning defense -- saved edits,
+   *     the coach's explicit choice, edits still waiting to save -- which is
+   *     what End Inning sends;
+   *   - an inning already played: how it ended (the plan plus the game's
+   *     changes, the same record as the Game Report's "Defense by inning");
+   *   - a played inning with nothing recorded: "No record", never "Empty";
+   *   - later innings: nothing yet.
    */
-  function liveAlignmentFor(key) {
-    if (!latest || String(key).includes('.')) return null;
+  function planFor(key) {
+    const alignment = latest?.pregame_rotation?.[key];
 
-    const current = String(latest.current_inning || '');
-
-    if (key === current) return latest.current_alignment || null;
-    if (key === String(latest.next_inning || '')) {
-      return latest.confirmed?.alignment || null;
-    }
-
-    const inning = Number.parseFloat(key);
-    const playing = Number.parseFloat(current);
-
-    return Number.isFinite(inning) && Number.isFinite(playing) && inning < playing
-      ? latest.actual_rotation?.[key] || null
+    return alignment && Object.values(alignment).some(Boolean)
+      ? alignment
       : null;
   }
 
-  function liveDeviations(entry, order) {
-    const live = liveAlignmentFor(entry.key);
+  // One button per scheduled inning: the game's inning count, widened to
+  // the inning being played and to any planned inning beyond it.
+  function scheduledInnings() {
+    const playing = Number.parseInt(latest?.current_inning || '', 10) || 1;
+    const planned = Object.keys(latest?.pregame_rotation || {})
+      .filter(key => /^\d+$/.test(key) && planFor(key))
+      .map(Number);
 
-    if (!live) return [];
-
-    return order
-      .filter(pos => (entry.alignment[pos] || '') !== (live[pos] || ''))
-      .map(pos => ({pos, name: live[pos] || '', planned: entry.alignment[pos] || ''}));
+    return Math.max(Number(latest?.regulation_innings) || 0, playing, ...planned, 1);
   }
 
-  /*
-   * One line per position, in plain baseball terms. These compare the plan
-   * with the defense on the field (or the one End Inning would put out) --
-   * they do not know the order moves were made in, so they state what is,
-   * not a story of how it happened ("came in", "moved", "switched").
-   */
-  function deviationLine(item, kind) {
-    const spot = item.pos === 'P'
-      ? 'on the mound'
-      : ['LF', 'CF', 'RF', 'LCF', 'RCF'].includes(item.pos)
-        ? `in ${item.pos}`
-        : `at ${item.pos}`;
+  function gameDefenseFor(key) {
+    const current = String(latest?.current_inning || '');
+    const ordinal = inningOrdinal(key);
 
-    if (!item.name) {
-      return `${item.pos} open (plan: ${item.planned || 'open'})`;
+    if (key === current) {
+      return {kind: 'now', label: 'On the field now', alignment: latest?.current_alignment || {}};
     }
 
-    if (!item.planned) {
-      return `${item.name} ${spot} (plan: open)`;
+    if (key === String(latest?.next_inning || '')) {
+      return {kind: 'next', label: 'Next inning', alignment: snapshot()};
     }
 
-    if (item.pos === 'P') {
-      return `${item.name} ${kind === 'done' ? 'pitched' : 'pitching'} instead of ${item.planned}`;
+    const inning = Number.parseInt(key, 10);
+    const playing = Number.parseInt(current, 10);
+
+    if (Number.isFinite(inning) && Number.isFinite(playing) && inning < playing) {
+      const record = latest?.actual_rotation?.[key];
+
+      return record && Object.values(record).some(Boolean)
+        ? {kind: 'played', label: `How the ${ordinal} ended`, alignment: record}
+        : {kind: 'norec', label: `How the ${ordinal} ended`, alignment: null};
     }
 
-    return `${item.name} ${spot} instead of ${item.planned}`;
+    return {kind: 'later', label: '', alignment: null};
   }
 
-  function deviationHeading(key) {
-    if (key === String(latest?.current_inning || '')) {
-      // Edits the coach said were made before the inning began are setup,
-      // not in-game adjustments (live_history.py).
-      return latest?.current_inning_setup_only
-        ? `Defense for the ${inningOrdinal(key)}`
-        : 'In-game adjustments';
-    }
-    if (key === String(latest?.next_inning || '')) return `Heading into the ${inningOrdinal(key)}`;
-    return `How the ${inningOrdinal(key)} finished`;
+  function planRows(plan, game) {
+    return positions().map(pos => {
+      const planned = plan?.[pos] || '';
+      const actual = game.alignment ? game.alignment[pos] || '' : '';
+
+      return {
+        pos,
+        planned,
+        actual,
+        // The plan named someone and a different player is there.
+        changed: Boolean(plan && game.alignment && planned && actual && planned !== actual),
+        // Known to be empty -- never for a missing record.
+        empty: Boolean(game.alignment) && !actual,
+        // Anything not matching the plan, empty positions included.
+        differs: Boolean(plan && game.alignment) && planned !== actual,
+      };
+    });
   }
 
-  function planInningLabel(key) {
-    return String(key).includes('.')
-      ? `Change during Inning ${Math.floor(Number.parseFloat(key))}`
-      : `Inning ${key}`;
+  function planDiffers(key) {
+    const plan = planFor(key);
+    const game = gameDefenseFor(key);
+
+    return Boolean(plan && game.alignment) &&
+      planRows(plan, game).some(row => row.differs);
+  }
+
+  function shortName(name) {
+    const parts = String(name || '').trim().split(/\s+/);
+
+    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0] || '';
+  }
+
+  function planName(name) {
+    const player = playerByName(name);
+    const number = String(player?.number ?? '').trim();
+
+    return `<span class="cb-plan-nm">${esc(name)}${
+      number ? `<small>#${esc(number)}</small>` : player ? '' : '<small>Not here</small>'
+    }</span>`;
+  }
+
+  function gameCell(row, game) {
+    if (game.kind === 'norec') return '<span class="cb-plan-norec">No record</span>';
+    if (game.kind === 'later') return '<span class="cb-plan-norec">Not set yet</span>';
+    if (row.empty) return '<span class="cb-plan-emp">Empty</span>';
+
+    return `${planName(row.actual)}${row.changed ? '<span class="cb-plan-flag">Changed</span>' : ''}`;
+  }
+
+  function rowState(row, game) {
+    if (game.kind === 'norec') return 'norec';
+    if (game.kind === 'later') return 'later';
+    return row.empty ? 'empty' : 'name';
+  }
+
+  function rowData(row, game) {
+    return `data-plan-live-differs="${row.differs ? 'true' : 'false'}" data-plan-changed="${row.changed ? 'true' : 'false'}" data-plan-planned="${esc(row.planned)}" data-plan-actual="${esc(row.actual)}" data-plan-state="${rowState(row, game)}"`;
+  }
+
+  function plannedCell(row) {
+    return row.planned ? planName(row.planned) : '<span class="cb-plan-na">Not in plan</span>';
+  }
+
+  function benchNames(names) {
+    const used = new Set(names.filter(Boolean));
+    const bench = (latest?.roster || [])
+      .filter(player => !used.has(player.name))
+      .map(player => player.name)
+      .sort((a, b) => a.localeCompare(b));
+
+    return bench.length ? bench.map(name => esc(playerLabel(name))).join(', ') : 'Nobody';
+  }
+
+  // The plan stores no bench of its own: list who it leaves out only when it
+  // places every position. Players here for this game (the roster sent with
+  // the board) are the only ones listed.
+  function planBench(plan) {
+    return positions().every(pos => plan[pos])
+      ? benchNames(positions().map(pos => plan[pos]))
+      : '<span class="cb-plan-na">Bench not specified</span>';
+  }
+
+  function planList(key, plan, game, rows, onlyChanges) {
+    const ordinal = inningOrdinal(key);
+
+    if (!plan && !game.alignment) {
+      return `<div class="cb-plan-note">${
+        game.kind === 'norec'
+          ? `No pregame plan and no record for the ${esc(ordinal)}.`
+          : `No pregame plan and no defense set yet for the ${esc(ordinal)}.`
+      }</div>`;
+    }
+
+    // Only one side to show: the plan alone, or the game alone.
+    if (!plan || !game.alignment) {
+      const note = !plan
+        ? ''
+        : game.kind === 'norec'
+          ? `<div class="cb-plan-note">No record of how the ${esc(ordinal)} ended. Showing the pregame plan only.</div>`
+          : '';
+      const heading = plan ? 'Pregame plan' : game.label;
+
+      return `${note}<div class="cb-plan-list single">
+        <div class="cb-plan-row cb-plan-colhead"><span>Pos</span><span class="${plan ? 'cb-plan-planned' : 'cb-plan-game'}">${esc(heading)}</span></div>
+        ${rows.map(row => `
+          <div class="cb-plan-row" data-plan-row="${esc(row.pos)}" ${rowData(row, game)}>
+            <span class="cb-plan-pos">${esc(row.pos)}</span>
+            ${plan
+              ? `<span class="cb-plan-planned">${plannedCell(row)}</span>`
+              : `<span class="cb-plan-game">${gameCell(row, game)}</span>`}
+          </div>`).join('')}
+        <div class="cb-plan-row cb-plan-bench" data-plan-row="bench">
+          <span class="cb-plan-pos">Bench</span>
+          ${plan
+            ? `<span class="cb-plan-planned">${planBench(plan)}</span>`
+            : `<span class="cb-plan-game">${benchNames(positions().map(pos => game.alignment[pos]))}</span>`}
+        </div>
+      </div>`;
+    }
+
+    const shown = onlyChanges ? rows.filter(row => row.differs || row.empty) : rows;
+
+    return `<div class="cb-plan-list">
+      <div class="cb-plan-row cb-plan-colhead"><span>Pos</span><span class="cb-plan-planned">Pregame plan</span><span class="cb-plan-game">${esc(game.label)}</span></div>
+      ${shown.map(row => `
+        <div class="cb-plan-row" data-plan-row="${esc(row.pos)}" ${rowData(row, game)}>
+          <span class="cb-plan-pos">${esc(row.pos)}</span>
+          <span class="cb-plan-planned">${plannedCell(row)}</span>
+          <span class="cb-plan-game">${gameCell(row, game)}</span>
+        </div>`).join('')}
+      ${shown.length ? '' : '<div class="cb-plan-row"><span></span><span class="cb-plan-note">No changes or empty positions.</span></div>'}
+      <div class="cb-plan-row cb-plan-bench" data-plan-row="bench">
+        <span class="cb-plan-pos">Bench</span>
+        <span class="cb-plan-planned">${planBench(plan)}</span>
+        <span class="cb-plan-game">${benchNames(positions().map(pos => game.alignment[pos]))}</span>
+      </div>
+    </div>`;
+  }
+
+  function planFieldPlaces() {
+    return Number(latest?.outfielder_count) === 4
+      ? {LF: [17, 27], LCF: [34, 10], RCF: [66, 10], RF: [83, 27], SS: [33, 44], '2B': [67, 44], '3B': [17, 66], P: [50, 63], '1B': [83, 66], C: [50, 87]}
+      : {LF: [18, 25], CF: [50, 9], RF: [82, 25], SS: [33, 44], '2B': [67, 44], '3B': [17, 66], P: [50, 63], '1B': [83, 66], C: [50, 87]};
+  }
+
+  function planField(key, plan, game, rows) {
+    const ordinal = inningOrdinal(key);
+
+    if (!plan && !game.alignment) {
+      return `<div class="cb-plan-note">${
+        game.kind === 'norec' ? `No record of how the ${esc(ordinal)} ended.` : 'Nothing to show on the field yet.'
+      }</div>`;
+    }
+
+    const places = planFieldPlaces();
+    const spots = rows.map(row => {
+      const [left, top] = places[row.pos] || [50, 50];
+      const planned = plan
+        ? `<span class="cb-plan-spot-plan">${row.planned ? esc(shortName(row.planned)) : '<span class="cb-plan-na">Not in plan</span>'}</span>`
+        : '';
+      const actual = game.kind === 'later'
+        ? ''
+        : `<span class="cb-plan-spot-game">${
+            game.kind === 'norec'
+              ? '<span class="cb-plan-norec">No record</span>'
+              : row.empty
+                ? '<span class="cb-plan-emp">Empty</span>'
+                : esc(shortName(row.actual))
+          }</span>`;
+      const label = [
+        row.pos,
+        plan ? `plan: ${row.planned || 'not in plan'}` : '',
+        game.kind === 'later' ? '' : `${game.label.toLowerCase()}: ${
+          game.kind === 'norec' ? 'no record' : row.actual || 'empty'
+        }`,
+        row.changed ? 'changed' : '',
+      ].filter(Boolean).join(', ');
+
+      return `<div class="cb-plan-spot" style="left:${left}%;top:${top}%" data-plan-position="${esc(row.pos)}" ${rowData(row, game)} role="img" aria-label="${esc(label)}"><span class="cb-plan-spot-pos">${esc(row.pos)}</span>${planned}${actual}</div>`;
+    }).join('');
+
+    return `<div class="cb-plan-field"><div class="cb-plan-diamond"></div>${spots}</div>
+      <div class="cb-plan-legend">${plan ? '<span><b class="ref">Violet</b> = pregame plan</span>' : ''}${
+        game.alignment || game.kind === 'norec' ? `<span><b>Black</b> = ${esc(game.label.toLowerCase())}</span>` : ''
+      }${plan && game.alignment ? '<span>Gold border = changed</span>' : ''}</div>`;
+  }
+
+  // Who takes the field next, from this board's Next Inning defense.
+  function planNextPreview() {
+    const next = String(latest?.next_inning || '');
+    const number = Number.parseInt(next, 10);
+    const current = inningOrdinal(latest?.current_inning || '');
+
+    if (!next || !Number.isFinite(number) || number > scheduledInnings()) {
+      return `<div class="cb-plan-next" data-plan-next="none"><span class="cb-plan-note">No more scheduled innings after the ${esc(current)}.</span></div>`;
+    }
+
+    const upcoming = snapshot();
+    const field = latest?.current_alignment || {};
+    const changes = positions().filter(pos => (upcoming[pos] || '') !== (field[pos] || ''));
+    const summary = changes.length
+      ? `${planStateText()} · ${changes.length} ${changes.length === 1 ? 'change' : 'changes'} from the field now`
+      : `Same defense as the ${current}`;
+
+    return `<div class="cb-plan-next" data-plan-next="${changes.length ? 'changed' : 'same'}">
+      <div class="cb-plan-next-head">
+        <div><strong>Next inning · ${esc(inningOrdinal(next))}</strong><span data-plan-next-summary>${esc(summary)}</span></div>
+        <button type="button" class="cb-plan-edit-next" data-plan-edit-next>Edit next inning</button>
+      </div>
+      ${changes.length ? `<ul class="cb-plan-next-list">${changes.map(pos => `<li data-plan-next-pos="${esc(pos)}"><b>${esc(pos)}</b>${
+        upcoming[pos] ? esc(playerLabel(upcoming[pos])) : '<span class="cb-plan-emp">Empty</span>'
+      }</li>`).join('')}</ul>` : ''}
+    </div>`;
+  }
+
+  // Plan against the plan's own inning before (unchanged wording).
+  function planChangeLine(key, plan) {
+    const earlier = Object.keys(latest?.pregame_rotation || {})
+      .filter(other => /^\d+$/.test(other) && Number(other) < Number(key) && planFor(other))
+      .sort((a, b) => Number(b) - Number(a))[0];
+
+    if (!earlier) return '<div class="cb-plan-changes">First inning of the plan</div>';
+
+    const before = planFor(earlier);
+    // A partial plan only speaks for the positions it names.
+    const changed = positions().filter(pos => plan[pos] && plan[pos] !== (before[pos] || ''));
+
+    return `<div class="cb-plan-changes${changed.length ? ' has-changes' : ''}">${
+      changed.length
+        ? `Plan change from Inning ${esc(earlier)}: ${esc(changed.join(', '))}`
+        : `Plan: same as Inning ${esc(earlier)}`
+    }</div>`;
+  }
+
+  function planSummary(key, plan, game, rows) {
+    const chips = [];
+    const count = positions().length;
+    const ordinal = inningOrdinal(key);
+
+    if (!plan) {
+      chips.push(`<span class="cb-plan-chip" data-kind="noplan">No pregame plan for the ${esc(ordinal)}</span>`);
+    } else {
+      const set = positions().filter(pos => plan[pos]).length;
+      chips.push(`<span class="cb-plan-chip" data-kind="plan">Plan: ${set === count ? `all ${count} positions` : `${set} of ${count} positions`}</span>`);
+
+      if (game.alignment) {
+        const changed = rows.filter(row => row.changed).map(row => row.pos);
+
+        if (changed.length) {
+          chips.push(`<span class="cb-plan-chip" data-kind="changed">${changed.length} changed: ${esc(changed.join(', '))}</span>`);
+        }
+        // Every position the same, empty ones included.
+        if (rows.every(row => !row.differs)) {
+          chips.push('<span class="cb-plan-chip" data-kind="match">Matches the plan</span>');
+        }
+      }
+    }
+
+    const empty = rows.filter(row => row.empty).map(row => row.pos);
+
+    if (empty.length) {
+      chips.push(`<span class="cb-plan-chip" data-kind="empty">Empty: ${esc(empty.join(', '))}</span>`);
+    }
+
+    if (game.kind === 'norec') {
+      chips.push('<span class="cb-plan-chip" data-kind="norec">No record for this inning</span>');
+    }
+
+    return `<div class="cb-plan-summary">${chips.join('')}</div>`;
   }
 
   function renderPlanCard() {
@@ -2144,142 +2717,82 @@
 
     if (!card) return;
 
-    const innings = planInnings();
+    const hasAnyPlan = Object.keys(latest?.pregame_rotation || {})
+      .some(key => /^\d+$/.test(key) && planFor(key));
     let html;
 
-    if (!innings.length) {
+    if (!hasAnyPlan) {
       html = `
         <div class="cb-plan-head">
-          <div>
-            <div class="cb-plan-kicker">PREGAME PLAN</div>
-            <div class="cb-plan-title">Pregame Defense</div>
-          </div>
+          <h3 class="cb-plan-inning-title">Pregame plan</h3>
           <div class="cb-plan-readonly">Reference only</div>
         </div>
-        <div class="cb-plan-body">
-          <div class="cb-plan-empty">
-            No pregame defensive plan was saved for this game.
-          </div>
-        </div>`;
+        <div class="cb-plan-empty">No pregame defensive plan was saved for this game.</div>
+        ${planNextPreview()}`;
     } else {
       const currentInning = String(latest?.current_inning || '');
       const nextInning = String(latest?.next_inning || '');
-      const keys = innings.map(entry => entry.key);
+      const total = scheduledInnings();
+      const keys = Array.from({length: total}, (_, index) => String(index + 1));
 
-      // Open on the next inning -- usually what a coach wants mid-game --
-      // and keep the coach's choice until the live inning moves on.
-      if (
-        planChoice.during !== currentInning ||
-        !keys.includes(planChoice.inning)
-      ) {
+      // Open on the next inning -- usually what a coach wants between
+      // innings -- and keep the coach's choice until the live inning moves.
+      if (planChoice.during !== currentInning || !keys.includes(planChoice.inning)) {
         planChoice = {
-          inning:
-            [nextInning, currentInning].find(key => keys.includes(key)) ||
-            keys[0],
+          inning: [nextInning, currentInning].find(key => keys.includes(key)) || keys[0],
           during: currentInning,
         };
       }
 
-      const index = keys.indexOf(planChoice.inning);
-      const entry = innings[index];
-      const previous = index > 0 ? innings[index - 1] : null;
-      const order = positions(latest?.outfielder_count);
-      const changed = previous
-        ? order.filter(pos =>
-            (entry.alignment[pos] || '') !== (previous.alignment[pos] || '')
-          )
-        : [];
-
-      const deviations = liveDeviations(entry, order);
-      const liveAt = pos => deviations.find(item => item.pos === pos) || null;
-
-      const assigned = new Set(
-        order.map(pos => entry.alignment[pos]).filter(Boolean)
-      );
-      const bench = (latest?.roster || [])
-        .filter(player => !assigned.has(player.name))
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      const tag = entry.key === currentInning
+      const key = planChoice.inning;
+      const plan = planFor(key);
+      const game = gameDefenseFor(key);
+      const rows = planRows(plan, game);
+      const comparable = Boolean(plan && game.alignment);
+      const onlyChanges = comparable && planOnlyChanges;
+      const playing = Number.parseInt(currentInning, 10);
+      const when = value => {
+        const number = Number(value);
+        if (value === currentInning) return 'Now';
+        if (value === nextInning) return 'Next';
+        return Number.isFinite(playing) && number < playing ? 'Played' : 'Later';
+      };
+      const tag = key === currentInning
         ? 'On now'
-        : entry.key === nextInning
+        : key === nextInning
           ? 'Next inning'
-          : '';
+          : when(key);
 
-      const buttons = innings.map(item => `
-        <button
-          type="button"
-          class="cb-plan-inning-btn"
-          data-plan-inning="${esc(item.key)}"
-          data-plan-live-differs="${liveDeviations(item, order).length ? 'true' : 'false'}"
-          aria-pressed="${item.key === entry.key ? 'true' : 'false'}"
-          aria-label="${esc(planInningLabel(item.key))}${item.key === currentInning ? ' (on now)' : ''}"
-        >${esc(item.key.includes('.') ? `${Math.floor(Number.parseFloat(item.key))}+` : item.key)}${
-          item.key === currentInning ? '<small>Now</small>' : ''
-        }</button>`).join('');
+      const buttons = keys.map(value => {
+        const has = Boolean(planFor(value));
+        const differs = planDiffers(value);
 
-      const field = `
-        <div class="cb-qd-field cb-plan-field">
-          ${fieldArt()}
-          ${spots().map(([pos, left, top]) =>
-            planSpot(pos, left, top, entry.alignment[pos] || '', changed.includes(pos), liveAt(pos))
-          ).join('')}
-        </div>`;
+        return `<button type="button" class="cb-plan-inning-btn" data-plan-inning="${esc(value)}" data-plan-has="${has ? 'true' : 'false'}" data-plan-live-differs="${differs ? 'true' : 'false'}" aria-pressed="${value === key ? 'true' : 'false'}" aria-label="${esc(
+          `${inningOrdinal(value)} inning, ${when(value).toLowerCase()}, ${has ? 'has a pregame plan' : 'no pregame plan'}${differs ? ', game differed from the plan' : ''}`
+        )}"><b>${esc(value)}</b><small>${esc(when(value))}</small></button>`;
+      }).join('');
 
       html = `
         <div class="cb-plan-head">
-          <div>
-            <div class="cb-plan-kicker">
-              PREGAME PLAN · ${esc(String(innings.length))} ${
-                innings.length === 1 ? 'INNING' : 'INNINGS'
-              }
-            </div>
-            <div class="cb-plan-title">Pregame Defense</div>
-            <div class="cb-plan-sub">
-              What you set before first pitch. Nothing here changes the live game.
-            </div>
-          </div>
+          <h3 class="cb-plan-inning-title">Pregame plan · ${esc(inningOrdinal(key))}<span class="cb-plan-inw"> inning</span><span class="cb-plan-tag">${esc(tag)}</span></h3>
           <div class="cb-plan-readonly">Reference only</div>
         </div>
-        <div class="cb-plan-body">
-          <div class="cb-plan-innings" aria-label="Planned innings">${buttons}</div>
-          <div class="cb-plan-inning-title">
-            ${esc(planInningLabel(entry.key))}${tag ? `<span>${esc(tag)}</span>` : ''}
+        <div class="cb-plan-innings" role="group" aria-label="Choose inning" style="grid-template-columns:repeat(${Math.min(total, 9)},minmax(0,1fr))">${buttons}</div>
+        <div class="cb-plan-key"><span><i></i>Has a plan</span><span><i class="none"></i>No plan</span><span><i class="dot"></i>Game differed</span></div>
+        ${planSummary(key, plan, game, rows)}
+        ${plan ? planChangeLine(key, plan) : ''}
+        <div class="cb-plan-toolbar" role="group" aria-label="Show">
+          <button type="button" data-plan-view-btn="list" aria-pressed="${planView === 'list' ? 'true' : 'false'}">List</button>
+          <button type="button" data-plan-view-btn="field" aria-pressed="${planView === 'field' ? 'true' : 'false'}">Field</button>
+          <button type="button" data-plan-only aria-pressed="${onlyChanges ? 'true' : 'false'}"${comparable ? '' : ' disabled title="Nothing to compare for this inning"'}>Only changes</button>
+        </div>
+        <div class="cb-plan-views" data-plan-view="${esc(planView)}">
+          <div class="cb-plan-views-grid">
+            <div class="cb-plan-listwrap">${planList(key, plan, game, rows, onlyChanges)}</div>
+            <div class="cb-plan-fieldwrap">${planField(key, plan, game, rows)}</div>
           </div>
-          <div class="cb-plan-changes${changed.length ? ' has-changes' : ''}">${
-            previous
-              // Plan against plan. The note below is the game against
-              // this plan; each says which it is.
-              ? changed.length
-                ? `Plan change from ${esc(planInningLabel(previous.key))}: ${esc(changed.join(', '))}`
-                : `Plan: same as ${esc(planInningLabel(previous.key))}`
-              : 'First inning of the plan'
-          }</div>
-          ${
-            deviations.length
-              ? `<div class="cb-plan-live">
-                  <strong>${esc(deviationHeading(entry.key))}</strong>
-                  <span class="cb-plan-live-kind">The game compared with this plan</span>
-                  <ul>${deviations.map(item => `<li>${esc(deviationLine(
-                    item,
-                    entry.key === String(latest?.current_inning || '') ||
-                      entry.key === String(latest?.next_inning || '')
-                      ? 'live'
-                      : 'done'
-                  ))}</li>`).join('')}</ul>
-                </div>`
-              : ''
-          }
-          ${field}
-          <div class="cb-plan-bench">
-            <strong>Bench · ${bench.length}</strong>
-            <div class="cb-plan-bench-chips">${
-              bench.length
-                ? bench.map(player => `<span>${esc(playerLabel(player.name))}</span>`).join('')
-                : '<span>Nobody</span>'
-            }</div>
-          </div>
-        </div>`;
+        </div>
+        ${planNextPreview()}`;
     }
 
     // The board refreshes every few seconds; only touch the DOM when the
@@ -2292,14 +2805,28 @@
     if (!card.dataset.cbPlanBound) {
       card.dataset.cbPlanBound = '1';
       card.addEventListener('click', event => {
-        const button = event.target.closest('[data-plan-inning]');
+        const inning = event.target.closest('[data-plan-inning]');
+        const view = event.target.closest('[data-plan-view-btn]');
+        const only = event.target.closest('[data-plan-only]');
 
-        if (!button) return;
+        if (inning) {
+          planChoice = {
+            inning: inning.dataset.planInning,
+            during: String(latest?.current_inning || ''),
+          };
+        } else if (view) {
+          planView = view.dataset.planViewBtn === 'field' ? 'field' : 'list';
+        } else if (only && !only.disabled) {
+          planOnlyChanges = !planOnlyChanges;
+        } else if (event.target.closest('[data-plan-edit-next]')) {
+          // The Next Inning tab itself, exactly as tapping it; nothing
+          // changes here.
+          $(SWITCH_ID)?.querySelector('[data-now-next="next"]')?.click();
+          return;
+        } else {
+          return;
+        }
 
-        planChoice = {
-          inning: button.dataset.planInning,
-          during: String(latest?.current_inning || ''),
-        };
         renderPlanCard();
       });
     }
@@ -3957,8 +4484,9 @@
         pitchSummary = detail.state.pitch_count_summary;
         renderPitcherStatus();
       }
-      // The field right now, for the "Empty now" line -- updated with the
-      // live state (an Undo, a fill) rather than at the next poll.
+      // The field right now, for the "Empty now" line and Pregame Plan's
+      // "On the field now" -- updated with the live state (an Undo, a fill)
+      // rather than at the next poll.
       if (
         Number(detail.game_id) === gameId &&
         latest &&
@@ -3967,6 +4495,7 @@
       ) {
         latest.current_alignment = detail.state.current_alignment;
         syncLiveActions();
+        renderPlanCard();
       }
     });
 

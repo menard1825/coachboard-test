@@ -11,6 +11,7 @@ from db import db
 from extensions import socketio
 from game_availability import inning_has_only_setup_edits, present_players
 from models import Game, Rotation
+from team_game_settings import regulation_innings_for_team
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
@@ -449,6 +450,9 @@ def next_inning_prep(game_id):
         'planned_seed': _planned_seed(current_alignment, planned_alignment, team),
         'pregame_rotation': pregame_rotation,
         'actual_rotation': actual_rotation,
+        # The game's scheduled innings (the team's effective regulation
+        # innings, as Game Prep and the live state use), for Pregame Plan.
+        'regulation_innings': regulation_innings_for_team(team),
         'confirmed': _prep_dict(prep),
         'roster': [
             {

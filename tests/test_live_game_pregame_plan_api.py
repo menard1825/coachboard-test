@@ -250,3 +250,24 @@ def test_non_live_game_keeps_its_inactive_shape(monkeypatch):
     assert payload['is_live'] is False
     assert payload['pregame_rotation'] == {}
     assert payload['actual_rotation'] == {}
+
+
+def test_get_returns_the_games_scheduled_innings(monkeypatch):
+    """Pregame Plan shows one inning button per scheduled inning: the team's
+    effective regulation innings (Auto from the age group, or its override),
+    not just the innings the plan happens to cover."""
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    # 9U on Auto: six innings, although the plan covers only three.
+    assert _prep(client)['regulation_innings'] == 6
+
+    from db import db
+    from models import Team
+
+    with app.app_context():
+        db.session.get(Team, 1).regulation_innings = 7
+        db.session.commit()
+
+    assert _prep(client)['regulation_innings'] == 7

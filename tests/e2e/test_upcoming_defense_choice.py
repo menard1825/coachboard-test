@@ -146,7 +146,8 @@ def test_a_live_change_says_the_plan_wont_be_used(page: Page, coachboard_url, ga
     expect(page.get_by_text('Reference only').first).to_be_visible(timeout=10_000)
     # Plan against plan, and the game against this plan, each labelled.
     expect(page.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 1: 1B, 2B, LF, RF')
-    expect(page.locator('.cb-plan-live-kind')).to_have_text('The game compared with this plan')
+    expect(page.locator('.cb-plan-colhead .cb-plan-planned')).to_have_text('Pregame plan')
+    expect(page.locator('.cb-plan-colhead .cb-plan-game')).to_have_text('Next inning')
 
 
 # 3. Choosing the saved plan, keeping it, and starting with exactly it -----------------------

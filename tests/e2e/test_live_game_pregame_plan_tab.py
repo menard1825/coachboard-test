@@ -185,20 +185,29 @@ def test_pregame_plan_tab_renders_every_planned_inning(page: Page, coachboard_ur
 
         plan = page.locator(PLAN_CARD)
         expect(plan).to_be_visible(timeout=10_000)
-        expect(plan).to_contain_text('Pregame Defense')
+        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('Pregame plan')
         expect(plan).to_contain_text('Reference only')
 
-        # One planned inning at a time, each a tap away.
+        # One inning at a time, each a tap away: a button for every
+        # scheduled inning of the game, the planned ones marked as such.
+        scheduled = page.request.get(
+            f'{coachboard_url}/api/live-game/{game_id}/next-inning-prep').json()['regulation_innings']
+        assert scheduled >= 3, scheduled
         innings = plan.locator('[data-plan-inning]')
-        expect(innings).to_have_count(3)
-        assert innings.evaluate_all('els => els.map(el => el.dataset.planInning)') == ['1', '2', '3']
+        expect(innings).to_have_count(scheduled)
+        assert innings.evaluate_all('els => els.map(el => el.dataset.planInning)') == [
+            str(n) for n in range(1, scheduled + 1)]
+        assert innings.evaluate_all('els => els.map(el => el.dataset.planHas)') == [
+            'true' if n <= 3 else 'false' for n in range(1, scheduled + 1)]
 
         # It opens on the next inning. The plan as written, not the live
         # alignment: inning 2 planned Second Sam on the mound and Pitcher Pat
         # at second.
-        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('Inning 2')
-        expect(plan.locator('[data-plan-position="P"] .cb-qd-name')).to_have_text('Second Sam')
-        expect(plan.locator('[data-plan-position="2B"] .cb-qd-name')).to_have_text('Pitcher Pat')
+        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('2nd')
+        expect(plan.locator('[data-plan-row="P"]')).to_have_attribute('data-plan-planned', 'Second Sam')
+        expect(plan.locator('[data-plan-row="2B"]')).to_have_attribute('data-plan-planned', 'Pitcher Pat')
+        expect(plan.locator('[data-plan-row="P"] .cb-plan-planned')).to_contain_text('Second Sam')
+        expect(plan.locator('[data-plan-row="2B"] .cb-plan-planned')).to_contain_text('Pitcher Pat')
 
         # The inning actually being played is called out.
         expect(innings.nth(0)).to_contain_text('Now')
@@ -206,7 +215,7 @@ def test_pregame_plan_tab_renders_every_planned_inning(page: Page, coachboard_ur
         innings.nth(0).click()
         expect(plan.locator('.cb-plan-inning-title')).to_contain_text('On now')
         innings.nth(2).click()
-        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('Inning 3')
+        expect(plan.locator('.cb-plan-inning-title')).to_contain_text('3rd')
     finally:
         cleanup_game(page, coachboard_url, game_id)
 
@@ -223,9 +232,23 @@ def test_pregame_plan_tab_offers_no_way_to_edit(page: Page, coachboard_url: str)
         plan = page.locator(PLAN_CARD)
         expect(plan).to_be_visible(timeout=10_000)
 
-        # The only buttons choose which planned inning to look at.
+        # The only buttons choose what to look at -- an inning, List or
+        # Field, Only changes -- or open the Next Inning tab. None of them
+        # sends anything.
+        writes = []
+        page.on('request', lambda request: writes.append(request.url)
+                if request.method != 'GET' and '/api/live-game/' in request.url else None)
         buttons = plan.locator('button')
-        assert buttons.count() == plan.locator('button[data-plan-inning]').count() > 0
+        looking = plan.locator(
+            'button[data-plan-inning], button[data-plan-view-btn], button[data-plan-only]')
+        assert plan.locator('button[data-plan-inning]').count() > 0
+        assert buttons.count() == looking.count() + plan.locator('button[data-plan-edit-next]').count()
+        for index in range(looking.count()):
+            button = looking.nth(index)
+            if button.is_visible() and button.is_enabled():
+                button.click()
+        page.wait_for_timeout(600)
+        assert writes == []
 
         for selector in (
             'input',

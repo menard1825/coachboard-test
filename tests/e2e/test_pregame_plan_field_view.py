@@ -1,10 +1,9 @@
-"""Pregame Plan shows one planned inning at a time, on the field.
+"""Pregame Plan shows one inning at a time, as a list and on a field.
 
-The tab used to list every inning as a block of nine same-looking tiles with
-the position in tiny grey type, which was slow to read mid-game. It now uses
-the same field as On the Field and Next Inning: inning buttons across the top
-(opening on the next inning), the planned defense on the field, what changed
-from the inning before, and who sits. It is still reference only.
+Inning buttons across the top (opening on the next inning), the planned
+defense next to what the game has for that inning, what changed in the plan
+from the inning before, and who sits. Phones show the list first with a Field
+switch; wider screens show both. It is still reference only.
 """
 
 import os
@@ -25,6 +24,7 @@ from live_field_markers import LINEUP, create_named_live_game, login, remove_nam
 
 PHONE = ('phone', {'width': 390, 'height': 844}, {'is_mobile': True, 'has_touch': True})
 SMALL_PHONE = ('small-phone', {'width': 360, 'height': 740}, {'is_mobile': True, 'has_touch': True})
+TINY_PHONE = ('tiny-phone', {'width': 320, 'height': 640}, {'is_mobile': True, 'has_touch': True})
 DESKTOP = ('desktop', {'width': 1440, 'height': 900}, {})
 DEVICES = pytest.mark.parametrize('device', [PHONE, DESKTOP], ids=lambda d: d[0])
 CARD = '#live-board-pregame-plan'
@@ -36,21 +36,22 @@ INNING_2 = {**INNING_1, 'P': INNING_1['1B'], '1B': INNING_1['P']}
 INNING_3 = {**INNING_2, 'SS': INNING_2['2B'], '2B': INNING_2['SS']}
 PLAN = {'1': INNING_1, '2': INNING_2, '3': INNING_3}
 
-#: Every marker on the plan field: where it sits and whether its name fits.
+#: Every marker on the plan field: where it sits, and whether each name line
+#: in it (the plan's, and the game's) fits without being cut short.
 MEASURE = """(field) => {
   const f = field.getBoundingClientRect();
   const markers = [...field.querySelectorAll('[data-plan-position]')].map(spot => {
-    const name = spot.querySelector('.cb-qd-name');
-    const r = spot.getBoundingClientRect(), n = name.getBoundingClientRect();
+    const names = [...spot.querySelectorAll('.cb-plan-spot-plan, .cb-plan-spot-game')];
+    const r = spot.getBoundingClientRect();
     return {pos: spot.dataset.planPosition, tag: spot.tagName,
             box: {left: r.left, right: r.right, top: r.top, bottom: r.bottom},
-            name: {left: n.left, right: n.right, top: n.top, bottom: n.bottom},
-            fits: name.scrollWidth <= name.clientWidth + 1 && name.scrollHeight <= name.clientHeight + 1,
-            px: parseFloat(getComputedStyle(name).fontSize)};
+            texts: names.map(n => n.innerText.trim()),
+            fits: names.length > 0 && names.every(n => n.scrollWidth <= n.clientWidth + 1 && n.scrollHeight <= n.clientHeight + 1),
+            px: Math.min(...names.map(n => parseFloat(getComputedStyle(n).fontSize)))};
   });
   const hit = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
   const overlaps = [];
-  markers.forEach((a, i) => markers.forEach((b, j) => { if (i < j && hit(a.name, b.name)) overlaps.push([a.pos, b.pos]); }));
+  markers.forEach((a, i) => markers.forEach((b, j) => { if (i < j && hit(a.box, b.box)) overlaps.push([a.pos, b.pos]); }));
   const outside = markers.filter(m => m.box.left < f.left - 1 || m.box.right > f.right + 1 || m.box.top < f.top - 1 || m.box.bottom > f.bottom + 1).map(m => m.pos);
   return {markers, overlaps, outside};
 }"""
@@ -88,6 +89,8 @@ def open_plan(browser, coachboard_url, game):
         page.goto(f'{coachboard_url}/game/{game}')
         page.locator('#cbQuickDefense').wait_for(state='visible', timeout=20_000)
         page.locator('#cb-now-next-switch [data-now-next="plan"]').click()
+        # Phones open on the list; the field is one tap away.
+        show_field(page)
         # Shown at once, not after the next background refresh.
         expect(page.locator(f'{CARD} .cb-plan-field')).to_be_visible(timeout=1_500)
         return page
@@ -97,9 +100,30 @@ def open_plan(browser, coachboard_url, game):
         context.close()
 
 
+def show_field(page):
+    """The Field switch exists on phones only; wider screens show the field."""
+    switch = page.locator(f'{CARD} [data-plan-view-btn="field"]')
+    if switch.is_visible():
+        switch.click()
+        expect(switch).to_have_attribute('aria-pressed', 'true')
+
+
+def show_list(page):
+    switch = page.locator(f'{CARD} [data-plan-view-btn="list"]')
+    if switch.is_visible():
+        switch.click()
+        expect(switch).to_have_attribute('aria-pressed', 'true')
+
+
 def _names(page):
-    return {pos: page.locator(f'{CARD} [data-plan-position="{pos}"] .cb-qd-name').inner_text().strip()
-            for pos in INNING_1}
+    """The planned name at each field position, in full (the marker itself
+    shows a short form; its label and data carry the whole name)."""
+    names = {pos: page.locator(f'{CARD} [data-plan-position="{pos}"]').get_attribute('data-plan-planned')
+             for pos in INNING_1}
+    for pos, name in names.items():
+        label = page.locator(f'{CARD} [data-plan-position="{pos}"]').get_attribute('aria-label')
+        assert f'plan: {name}' in label, (pos, label)
+    return names
 
 
 def _show(page, inning):
@@ -118,7 +142,7 @@ def test_plan_opens_on_the_next_inning_as_a_field(open_plan, device):
     card = page.locator(CARD)
     expect(card.locator('.cb-plan-readonly')).to_have_text('Reference only')
     expect(card.locator('[data-plan-inning="2"]')).to_have_attribute('aria-pressed', 'true')
-    expect(card.locator('.cb-plan-inning-title')).to_contain_text('Inning 2')
+    expect(card.locator('.cb-plan-inning-title')).to_contain_text('2nd')
     expect(card.locator('.cb-plan-inning-title')).to_contain_text('Next inning')
     assert _names(page) == INNING_2
 
@@ -136,7 +160,11 @@ def test_every_planned_inning_is_one_tap_away(open_plan, device):
     page = open_plan(device)
     card = page.locator(CARD)
     buttons = card.locator('[data-plan-inning]')
-    assert buttons.evaluate_all('els => els.map(el => el.dataset.planInning)') == ['1', '2', '3']
+    keys = buttons.evaluate_all('els => els.map(el => el.dataset.planInning)')
+    # A button for every scheduled inning; the three planned ones say so.
+    assert keys == [str(n) for n in range(1, len(keys) + 1)] and len(keys) >= 3, keys
+    assert card.locator('[data-plan-inning][data-plan-has="true"]').evaluate_all(
+        'els => els.map(el => el.dataset.planInning)') == ['1', '2', '3']
     expect(card.locator('[data-plan-inning="1"]')).to_contain_text('Now')
 
     _show(page, 3)
@@ -158,18 +186,17 @@ def test_changes_from_the_inning_before_are_marked(open_plan, device):
     page = open_plan(device)
     card = page.locator(CARD)
 
-    # Inning 2: the pitcher and first baseman swapped.
-    assert _changed(page) == ['1B', 'P']
+    # Inning 2: the pitcher and first baseman swapped in the plan. That is
+    # the plan against its own inning before, said in words; the markers'
+    # "changed" is the game against the plan, and this game follows it.
     expect(card.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 1: P, 1B')
+    assert _changed(page) == []
     label = card.locator('[data-plan-position="P"]').get_attribute('aria-label')
-    assert INNING_2['P'] in label and 'changed' in label.lower(), label
-    # A changed marker looks different from an unchanged one.
-    look = 'el => getComputedStyle(el.querySelector(".cb-qd-name")).boxShadow + getComputedStyle(el.querySelector(".cb-qd-name")).borderColor'
-    assert card.locator('[data-plan-position="P"]').evaluate(look) != card.locator('[data-plan-position="C"]').evaluate(look)
+    assert INNING_2['P'] in label and 'changed' not in label.lower(), label
 
     _show(page, 3)
-    assert _changed(page) == ['2B', 'SS']
     expect(card.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 2: 2B, SS')
+    assert _changed(page) == []
 
     _show(page, 1)
     assert _changed(page) == []
@@ -180,6 +207,7 @@ def test_changes_from_the_inning_before_are_marked(open_plan, device):
 @DEVICES
 def test_bench_lists_who_sits_that_inning(open_plan, device):
     page = open_plan(device)
+    show_list(page)                                  # the bench is a row of the list
     bench = page.locator(f'{CARD} .cb-plan-bench')
     expect(bench).to_be_visible()
     text = bench.inner_text()
@@ -194,21 +222,27 @@ def test_looking_at_the_plan_changes_nothing(open_plan, device):
     page = open_plan(device)
     for inning in (1, 3, 2):
         _show(page, inning)
+    # The view switches and the filter only change what is shown.
+    show_list(page)
+    page.locator(f'{CARD} [data-plan-only]').click()
+    page.locator(f'{CARD} [data-plan-only]').click()
+    show_field(page)
     page.wait_for_timeout(600)
     assert page.cb_writes == []
     assert page.cb_errors == []
 
 
-@pytest.mark.parametrize('device', [PHONE, SMALL_PHONE], ids=lambda d: d[0])
+@pytest.mark.parametrize('device', [PHONE, SMALL_PHONE, TINY_PHONE], ids=lambda d: d[0])
 def test_long_names_stay_whole_on_a_phone(open_plan, device):
-    """Names wrap between words, never inside one ("Hollingsw-orth")."""
+    """Names never break inside a word ("Hollingsw-orth") or get cut short."""
     page = open_plan(device)
     field = page.locator(f'{CARD} .cb-plan-field')
     for inning in (2, 3):
         _show(page, inning)
         data = field.evaluate(MEASURE)
         assert data['outside'] == [] and data['overlaps'] == [], (inning, data)
-        split = field.locator('.cb-qd-name').evaluate_all("""els => els.filter(el => {
+        assert all(m['fits'] and m['px'] >= 10 for m in data['markers']), (inning, data['markers'])
+        split = field.locator('.cb-plan-spot-plan, .cb-plan-spot-game').evaluate_all("""els => els.filter(el => {
           const range = document.createRange(); range.selectNodeContents(el);
           const lines = new Set([...range.getClientRects()].filter(r => r.width > 1).map(r => Math.round(r.top))).size;
           return lines > el.innerText.trim().split(/\\s+/).length;
