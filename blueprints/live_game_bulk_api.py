@@ -15,7 +15,6 @@ from blueprints.live_game_api import (
     _current_alignment,
     _current_sequence,
     _event,
-    _inning_start_answer,
     _player_id_by_name,
     _record_inning_start,
     _room_name,
@@ -446,11 +445,6 @@ def complete_pitcher_change(game_id):
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
 
-    asked, start_now, pre_start = _inning_start_answer(game, team, data)
-    if asked:
-        return asked
-    if start_now:
-        _record_inning_start(game, team.id, before)
     old_pitcher_id = _player_id_by_name(old_pitcher_name, team.id)
     event = _event(
         game,
@@ -461,7 +455,7 @@ def complete_pitcher_change(game_id):
         deepcopy(after),
         old_pitcher_id=old_pitcher_id,
         new_pitcher_id=new_pitcher.id,
-        pre_start=pre_start,
+        pre_start=False,
     )
     db.session.commit()
 
@@ -543,11 +537,6 @@ def set_defense(game_id):
     if comparable_before == after:
         return jsonify({'status': 'error', 'message': 'No defensive changes were made.'}), 409
 
-    asked, start_now, pre_start = _inning_start_answer(game, team, data)
-    if asked:
-        return asked
-    if start_now:
-        _record_inning_start(game, team.id, before)
     _event(
         game,
         team.id,
@@ -555,7 +544,7 @@ def set_defense(game_id):
         game.live_current_inning,
         deepcopy(before),
         deepcopy(after),
-        pre_start=pre_start,
+        pre_start=False,
     )
     db.session.commit()
     state = _broadcast_state(game.id, team.id)
@@ -600,11 +589,6 @@ def defense_edit(game_id):
     if comparable_before == after:
         return jsonify({'status': 'error', 'message': 'No defensive changes were made.'}), 409
 
-    asked, start_now, pre_start = _inning_start_answer(game, team, data)
-    if asked:
-        return asked
-    if start_now:
-        _record_inning_start(game, team.id, before)
     event = _event(
         game,
         team.id,
@@ -612,7 +596,7 @@ def defense_edit(game_id):
         game.live_current_inning,
         deepcopy(before),
         deepcopy(after),
-        pre_start=pre_start,
+        pre_start=False,
     )
     db.session.commit()
     return _fast_success(game, team, event, after)
@@ -768,6 +752,10 @@ def advance_inning(game_id):
     old_pitcher_id = _player_id_by_name(old_pitcher, team.id)
     new_pitcher_id = _player_id_by_name(new_pitcher, team.id)
 
+    # End Inning -> Start Next Inning starts the next inning with the defense
+    # it sends out (game_availability). Recorded first, so the End Inning is
+    # the change this request returns and Undo takes back (with the start).
+    _record_inning_start(game, team.id, next_inning, after)
     event = _event(
         game,
         team.id,

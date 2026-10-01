@@ -179,7 +179,6 @@ def test_defensive_change_moves_actual_but_never_the_pregame_plan(monkeypatch):
     assert before['pregame_rotation']['2']['RF'] == 'Jack'
 
     edit = client.post('/api/live-game/70/defense-edit', json={
-        'inning_started': False,
         'base_sequence': 0,
         'alignment': dict(INNING_TWO, RF='Gavin', LF='Jack'),
     })

@@ -89,7 +89,6 @@ def _prep(client):
 def _change_pitcher_to_jack(client):
     alignment = dict(_state(client)['current_alignment'], P='Jack')
     response = client.post('/api/live-game/80/complete-pitcher-change', json={
-        'inning_started': False,
         'base_sequence': _sequence(client), 'fast': True, 'new_pitcher_id': JACK_ID, 'alignment': alignment,
     })
     assert response.status_code == 200, response.get_data(as_text=True)
@@ -99,7 +98,6 @@ def _swap_left_and_right(client):
     current = _state(client)['current_alignment']
     alignment = dict(current, LF=current['RF'], RF=current['LF'])
     response = client.post('/api/live-game/80/defense-edit', json={
-        'inning_started': False,
         'base_sequence': _sequence(client), 'alignment': alignment,
     })
     assert response.status_code == 200, response.get_data(as_text=True)

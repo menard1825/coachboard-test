@@ -91,11 +91,11 @@ def test_bench_player_fills_the_vacated_spot(page: Page, coachboard_url, live_fi
     game_id = live_field()
     writes = defense_writes(page)
     sheet = bench_from(page, 'SS')
-    choice(sheet, RELIEVER).click()
-    expect_review(sheet, ['Shortstop Shawn: SS → Bench', f'{RELIEVER}: Bench → SS'])
     assert writes == []
-    pick(sheet, 'Make this change')
+    # Two players, both placed by the coach: saved on that choice.
+    choice(sheet, RELIEVER).click()
     wait_for_field(page, coachboard_url, game_id, dict(BASE, SS=RELIEVER))
+    expect(sheet).not_to_be_visible(timeout=10_000)
     assert len(writes) == 1
 
     page.locator('#liveUndoBtn').click()
@@ -108,8 +108,6 @@ def test_fielder_fills_the_vacated_spot_and_their_spot_is_left_open(
     game_id = live_field()
     sheet = bench_from(page, 'SS')
     choice(sheet, 'Second Sam').click()
-    expect_review(sheet, ['Shortstop Shawn: SS → Bench', 'Second Sam: 2B → SS', '2B: open'])
-    pick(sheet, 'Make this change')
     expected = {pos: name for pos, name in BASE.items() if pos not in ('SS', '2B')}
     expected['SS'] = 'Second Sam'
     wait_for_field(page, coachboard_url, game_id, expected)
@@ -134,11 +132,6 @@ def test_cancel_changes_nothing(page: Page, coachboard_url, live_field):
     writes = defense_writes(page)
 
     sheet = bench_from(page, 'SS')
-    pick(sheet, 'Cancel')
-    expect(sheet).not_to_be_visible(timeout=10_000)
-
-    sheet = bench_from(page, 'SS')
-    choice(sheet, RELIEVER).click()
     pick(sheet, 'Cancel')
     expect(sheet).not_to_be_visible(timeout=10_000)
 

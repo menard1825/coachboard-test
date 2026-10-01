@@ -29,129 +29,6 @@
     window.io = exposedIo;
   }
 
-  // Every On the Field defensive change. While the current inning has no
-  // start marker the server asks "Has the 4th inning started?"
-  // (inning_start_question, see game_availability.py) instead of saving;
-  // askInningStarted() puts that to the coach and the same request is sent
-  // again with the answer. CoachBoard counts no outs, so only the coach
-  // knows whether play has begun. "Cancel change" sends nothing: the caller
-  // gets inning_start_cancelled (cancelledChange) and the field stays as it
-  // was.
-  const ON_THE_FIELD = new Set([
-    'defensive-change',
-    'defense-edit',
-    'set-defense',
-    'complete-pitcher-change',
-    'change-pitcher',
-  ]);
-  const INNING_START_MODAL_ID = 'cbInningStartModal';
-  let pendingInningQuestion = null;
-
-  function onTheFieldPath(pathname) {
-    const prefix = `/api/live-game/${gameId}/`;
-    return pathname.startsWith(prefix) && ON_THE_FIELD.has(pathname.slice(prefix.length));
-  }
-
-  function inningStartModal() {
-    let modal = document.getElementById(INNING_START_MODAL_ID);
-    if (modal) return modal;
-    modal = document.createElement('div');
-    modal.id = INNING_START_MODAL_ID;
-    modal.className = 'modal fade';
-    modal.tabIndex = -1;
-    modal.setAttribute('aria-hidden', 'true');
-    modal.setAttribute('data-bs-backdrop', 'static');
-    modal.setAttribute('data-bs-keyboard', 'false');
-    modal.innerHTML = `
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header"><h5 class="modal-title" data-cb-inning-start-title></h5></div>
-          <div class="modal-body"><div data-cb-inning-start-message></div></div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-link text-secondary me-auto" data-cb-inning-start="cancel">Cancel change</button>
-            <button type="button" class="btn btn-outline-secondary" data-cb-inning-start="not_yet"></button>
-            <button type="button" class="btn btn-primary" data-cb-inning-start="yes"></button>
-          </div>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-    return modal;
-  }
-
-  // Resolves 'yes', 'not_yet' or 'cancel'. Changes waiting on the same inning
-  // share one question, so one Cancel abandons all of them. The answer counts on the tap, even while the sheet is still
-  // opening (Bootstrap ignores hide() mid-transition).
-  function askInningStarted(question) {
-    const inning = String(question.inning || '');
-    if (pendingInningQuestion && pendingInningQuestion.inning === inning) {
-      return pendingInningQuestion.answer;
-    }
-    const answer = (async () => {
-      const modal = inningStartModal();
-      if (modal.style.display === 'block' && !modal.classList.contains('show')) {
-        await new Promise(resolve => modal.addEventListener('hidden.bs.modal', resolve, {once: true}));
-      }
-      setText(modal.querySelector('[data-cb-inning-start-title]'), question.title || 'Has this inning started?');
-      setText(modal.querySelector('[data-cb-inning-start-message]'), question.message || '');
-      const notYet = modal.querySelector('[data-cb-inning-start="not_yet"]');
-      const yes = modal.querySelector('[data-cb-inning-start="yes"]');
-      setText(notYet, question.not_yet_label || 'Not yet');
-      setText(yes, question.yes_label || 'Yes, inning started');
-
-      if (!window.bootstrap?.Modal) return 'cancel';
-      return new Promise(resolve => {
-        const instance = window.bootstrap.Modal.getOrCreateInstance(modal, {backdrop: 'static', keyboard: false});
-        let answered = false;
-        const decide = value => {
-          if (!answered) {
-            answered = true;
-            resolve(value);
-          }
-          instance.hide();
-        };
-        const cancel = modal.querySelector('[data-cb-inning-start="cancel"]');
-        notYet.onclick = () => decide('not_yet');
-        yes.onclick = () => decide('yes');
-        cancel.onclick = () => decide('cancel');
-        modal.addEventListener('shown.bs.modal', () => { if (answered) instance.hide(); }, {once: true});
-        instance.show();
-      });
-    })();
-    const entry = {inning, answer};
-    pendingInningQuestion = entry;
-    answer.finally(() => {
-      if (pendingInningQuestion === entry) pendingInningQuestion = null;
-    });
-    return answer;
-  }
-
-  function cancelledChange() {
-    return new Response(JSON.stringify({
-      status: 'error',
-      code: 'inning_start_cancelled',
-      message: 'Change cancelled. Nothing was saved.',
-    }), {status: 409, headers: {'Content-Type': 'application/json'}});
-  }
-
-  async function answerInningStart(input, init) {
-    const response = await bridgeDefensiveChange(input, init);
-    if (response.status !== 409 || typeof input !== 'string') return response;
-    const method = String(init?.method || 'GET').toUpperCase();
-    let pathname = '';
-    try { pathname = new URL(input, window.location.href).pathname; } catch (_) {}
-    if (method !== 'POST' || !onTheFieldPath(pathname)) return response;
-
-    const question = await response.clone().json().catch(() => null);
-    if (question?.code !== 'inning_start_question') return response;
-
-    let body = {};
-    try { body = JSON.parse(init.body || '{}'); } catch (_) { return response; }
-    const answer = await askInningStarted(question);
-    if (answer !== 'yes' && answer !== 'not_yet') return cancelledChange();
-    body.inning_started = answer === 'yes';
-    return bridgeDefensiveChange(input, {...init, body: JSON.stringify(body)});
-  }
-
   async function bridgeDefensiveChange(input, init = {}) {
     const url = typeof input === 'string' ? input : input?.url;
     const method = String(init?.method || (typeof input !== 'string' ? input?.method : '') || 'GET').toUpperCase();
@@ -206,7 +83,6 @@
       body:JSON.stringify({
         alignment:after,
         base_sequence:requested.base_sequence,
-        ...(requested.inning_started === undefined ? {} : {inning_started:requested.inning_started}),
       }),
     });
     if (!editResponse.ok) return editResponse;
@@ -226,7 +102,7 @@
     });
   }
 
-  window.fetch = answerInningStart;
+  window.fetch = bridgeDefensiveChange;
 
   function installStyles() {
     if (document.getElementById(STYLE_ID)) return;

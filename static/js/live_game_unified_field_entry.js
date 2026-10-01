@@ -248,14 +248,6 @@
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (data.code === 'inning_start_cancelled') {
-        // "Cancel change" at "Has the 4th inning started?"
-        // (live_game_inning_clarity.js): nothing was saved. Put the field
-        // back as it was; there is nothing to report or retry.
-        if (draft === savedDraft) clearDraft({restore: true});
-        setSaveBadge('', 'Change cancelled');
-        return;
-      }
       if (!response.ok || data.status === 'error') {
         const saveError = new Error(
           data.message ||

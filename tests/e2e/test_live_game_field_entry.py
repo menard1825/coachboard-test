@@ -107,7 +107,6 @@ def test_phone_current_fielder_uses_quick_field_move_sheet(page: Page, coachboar
         # explicitly sends Sam to the vacated SS.
         move_sheet.locator('[data-cb-destination="2B"]').click()
         move_sheet.get_by_role('button', name='Put Second Sam at SS', exact=True).click()
-        move_sheet.get_by_role('button', name='Make this change', exact=True).click()
         expect(move_sheet).not_to_be_visible(timeout=10_000)
         expect(quick.locator('[data-cb-position="2B"]')).to_contain_text('Shortstop Shawn', timeout=10_000)
         expect(quick.locator('[data-cb-position="SS"]')).to_contain_text('Second Sam', timeout=10_000)

@@ -224,10 +224,9 @@ def test_on_the_field_drag_still_swaps_players(open_page, coachboard_url, game, 
 
 def _choose_swap(page, displaced, vacated):
     """On the Field never swaps by itself: the coach sends the displaced
-    player to the vacated position, then confirms the change."""
+    player to the vacated position, which saves the swap."""
     sheet = page.locator('#cbQuickMoveModal')
     sheet.get_by_role('button', name=f'Put {displaced} at {vacated}', exact=True).click()
-    sheet.get_by_role('button', name='Make this change', exact=True).click()
     expect(sheet).to_be_hidden(timeout=10_000)
 
 

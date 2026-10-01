@@ -1,17 +1,19 @@
 """Setup edits before an inning begins are not baseball history (live_history).
 
-"Not yet" at "Has the 4th inning started?" saves an official field edit
-(pre_start True): it builds the field, the inning's starting defense and
-Undo, but no substitution or pitching change happened. Every consumer that
+An earlier version asked "Has the 4th inning started?" at the first On the
+Field change of an inning; "Not yet" saved an official field edit with
+pre_start True. It built the field, the inning's starting defense and Undo,
+but no substitution or pitching change happened, and every consumer that
 reads events as history -- who pitched, pitching changes and re-entry, the
 game report's changes, End Game's pitch-count list, season and position
-appearances -- reads gameplay_events(). Games recorded before the question
-existed (pre_start None) keep their history exactly.
+appearances -- still reads gameplay_events(), so that recorded data keeps its
+meaning. Games recorded before the question existed (pre_start None) keep
+their history exactly. Changes made today are play (pre_start False).
 
-The pitcher example: End Inning loads Jules at P for the 2nd; before the
-2nd begins the coach makes Indy the pitcher. Indy pitched the 2nd. Jules did
-not pitch, was never removed from the mound, and there was no Jules -> Indy
-pitching change. Said after "Yes, inning started", the same change is a real
+The pitcher example: End Inning loaded Jules at P for the 2nd; before the
+2nd began the coach made Indy the pitcher, answering Not yet. Indy pitched
+the 2nd. Jules did not pitch, was never removed from the mound, and there
+was no Jules -> Indy pitching change. The same change made today is a real
 pitching change.
 """
 
@@ -122,12 +124,26 @@ LOADED = dict(FULL, P='Jules', RF='Indy')          # End Inning loads Jules at P
 INDY_P = dict(FULL, P='Indy', RF='Jules')          # before the 2nd: Indy pitches, Jules to RF
 
 
-def _change_pitcher_in_the_2nd(app, started):
+def _recorded_setup_edit(app, inning, before, after, *, event_type='Pitcher Change'):
+    """A "Not yet" setup edit as the earlier version saved it."""
+    from db import db
+    from models import GameRotationEvent
+
+    with app.app_context():
+        last = db.session.query(GameRotationEvent).order_by(GameRotationEvent.sequence.desc()).first()
+        db.session.add(GameRotationEvent(
+            team_id=TEAM_ID, game_id=GAME_ID, inning=inning, sequence=(last.sequence + 1) if last else 1,
+            event_type=event_type, before_alignment=dict(before), after_alignment=dict(after),
+            old_pitcher_id=10 if before.get('P') == 'Jules' else 1, new_pitcher_id=9, pre_start=True,
+        ))
+        db.session.commit()
+
+
+def _change_pitcher_in_the_2nd(app):
     _go_live(app)
     _enter_inning(app, '2', LOADED)
     response = _client(app).post(f'/api/live-game/{GAME_ID}/complete-pitcher-change', json={
         'new_pitcher_id': 9, 'alignment': INDY_P, 'base_sequence': _sequence(app),
-        'inning_started': started,
     })
     assert response.status_code == 200, response.get_json()
 
@@ -175,8 +191,10 @@ def _season_positions(app):
         return second['positions_by_player'], positions
 
 
-def test_not_yet_the_loaded_pitcher_did_not_pitch(app):
-    _change_pitcher_in_the_2nd(app, started=False)
+def test_a_recorded_not_yet_pitching_change_is_still_setup(app):
+    _go_live(app)
+    _enter_inning(app, '2', LOADED)
+    _recorded_setup_edit(app, '2', LOADED, INDY_P)
     state = _state(app)
 
     # The field still has the setup edit.
@@ -199,8 +217,8 @@ def test_not_yet_the_loaded_pitcher_did_not_pitch(app):
     assert 'P' not in positions['Jules']
 
 
-def test_yes_the_same_change_is_a_real_pitching_change(app):
-    _change_pitcher_in_the_2nd(app, started=True)
+def test_the_same_change_made_today_is_a_real_pitching_change(app):
+    _change_pitcher_in_the_2nd(app)
     state = _state(app)
     assert [e['event_type'] for e in state['gameplay_events']] == ['End Inning', 'Pitcher Change']
     assert state['pitch_count_summary']['Jules']['status'] == 'Already Pitched This Game'
@@ -213,14 +231,10 @@ def test_yes_the_same_change_is_a_real_pitching_change(app):
     assert positions['Jules']['P'] == 1
 
 
-def test_a_setup_edit_in_the_1st_is_not_the_plan(app):
+def test_a_recorded_setup_edit_in_the_1st_is_not_the_plan(app):
     _go_live(app)
-    response = _client(app).post(f'/api/live-game/{GAME_ID}/complete-pitcher-change', json={
-        'new_pitcher_id': 9, 'alignment': dict(FULL, P='Indy', RF='Alex'), 'base_sequence': 0,
-        'inning_started': False,
-    })
-    assert response.status_code == 200, response.get_json()
     indy_p = dict(FULL, P='Indy', RF='Alex')
+    _recorded_setup_edit(app, '1', FULL, indy_p)
     _enter_inning(app, '2', indy_p, before=indy_p)
     assert _end_game_pitchers(app) == ['Indy']
     first = next(row for row in _season_record(app) if row['inning'] == 1)
@@ -240,22 +254,16 @@ def _season_record(app):
         return records[0]['innings']
 
 
-def test_plan_notes_call_setup_edits_setup_not_in_game_adjustments(app):
+def test_plan_notes_call_recorded_setup_edits_setup_not_in_game_adjustments(app):
     prep = f'/api/live-game/{GAME_ID}/next-inning-prep'
     _go_live(app)
     _enter_inning(app, '2', LOADED)
     assert _client(app).get(prep).get_json()['current_inning_setup_only'] is False   # loaded only
-    _change_pitcher_in_the_2nd_answered(app, False)
+    _recorded_setup_edit(app, '2', LOADED, INDY_P)
     assert _client(app).get(prep).get_json()['current_inning_setup_only'] is True
+    # A change made during play: the 2nd is being played.
     edit = _client(app).post(f'/api/live-game/{GAME_ID}/defense-edit', json={
-        'alignment': dict(INDY_P, SS='Harper', CF='Finn'), 'base_sequence': _sequence(app), 'inning_started': True,
+        'alignment': dict(INDY_P, SS='Harper', CF='Finn'), 'base_sequence': _sequence(app),
     })
     assert edit.status_code == 200, edit.get_json()
     assert _client(app).get(prep).get_json()['current_inning_setup_only'] is False
-
-
-def _change_pitcher_in_the_2nd_answered(app, started):
-    response = _client(app).post(f'/api/live-game/{GAME_ID}/complete-pitcher-change', json={
-        'new_pitcher_id': 9, 'alignment': INDY_P, 'base_sequence': _sequence(app), 'inning_started': started,
-    })
-    assert response.status_code == 200, response.get_json()

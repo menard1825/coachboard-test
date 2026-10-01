@@ -32,30 +32,29 @@ Innings are whole innings. Nothing here counts outs.
 
 Inning started
 --------------
-End Inning (and Start Game, for the 1st) only loads an inning's defense: it
-can still be edited before that defense takes the field. CoachBoard counts
-no outs, so it learns that an inning has begun from the coach. The first On
-the Field change to an inning without a start marker asks "Has the 4th
-inning started?":
+CoachBoard's transition actions are the inning boundary, and nothing else
+asks or decides whether an inning has begun:
 
-* Not yet -- the change is saved as a pre-start edit, and the inning stays
-  unstarted (the next change asks again);
-* Yes, inning started -- an 'Inning Started' event is recorded immediately
-  before the change, holding the defense that began the inning.
+* Start Game records the 1st inning as started ('Inning Started'), with the
+  exact defense being started;
+* End Inning -> Start Next Inning ("End 2nd -> Start 3rd") records the new
+  inning as started, with the exact defense it sends out.
 
-Once an inning has an unreverted marker it has started, and nothing asks
-again. The marker is bookkeeping for participation, not a coach decision:
-ordinary Undo passes over it (so undoing the change keeps the inning
-started), and only undoing the End Inning that loaded the inning withdraws
+On the Field changes after that are changes during play (pre_start False);
+the coach never classifies them. The marker is bookkeeping: ordinary Undo
+passes over it, and undoing the End Inning that started an inning withdraws
 it. Arrived / Left events never start an inning.
 
-A mistaken "Yes, inning started" therefore cannot be taken back by ordinary
-Undo: undoing a baseball move must not normally erase the fact that the
-inning began. If field use shows coaches need it, an explicit inning-status
-correction can be added later.
+The one exception is asked where it matters: ending a game on a time limit
+when the newly started inning was never played. The coach says so, and the
+clock withdraws that inning's transition and its start marker
+(live_game_clock). An inning with a defensive change recorded during it was
+played and is not withdrawn.
 
-The answer is saved on the change itself (pre_start); live_history.py keeps
-setup edits made before the inning began out of baseball history.
+Games recorded by an earlier version asked "Has the 4th inning started?" at
+the first On the Field change instead; their "Not yet" edits (pre_start
+True) stay setup edits, and live_history.py keeps them out of baseball
+history. Older games with no markers at all keep their recorded defense.
 
 Defensive participation
 -----------------------
@@ -64,11 +63,12 @@ inning. For each reached inning:
 
 * with a start marker: everyone in the marker's defense, plus the before
   and after alignments of every unreverted change after the marker. Changes
-  before the marker were pre-start edits and give no credit;
+  before the marker (setup edits recorded by the earlier version) give no
+  credit;
 * without a marker, once the inning is completed: its final recorded
-  defense (every pre-start edit left the defense that then played);
-* without a marker in the inning being played now: nobody yet -- the inning
-  is not known to have begun, and is left out of the result.
+  defense (older games, and innings an earlier version never marked);
+* without a marker in the inning being played now: nobody yet, and it is
+  left out of the result.
 
 A Postgame Correction restates an inning's record: anyone it removes from
 the recorded alignment is taken out of that inning's participation too,
@@ -286,8 +286,9 @@ def inning_has_started(game, team_id, inning=None):
 
 
 def inning_has_only_setup_edits(game, team_id, inning=None):
-    """True while this inning (default: the current one) has setup edits --
-    changes answered "Not yet" -- and has not been marked started."""
+    """True while this inning (default: the current one) has only setup edits
+    -- changes an earlier version saved as "Not yet" -- and nothing since
+    shows it being played (a start marker, or a change made during play)."""
     inning = str(inning if inning is not None else (game.live_current_inning or '1'))
     rows = db.session.query(GameRotationEvent.event_type, GameRotationEvent.pre_start).filter_by(
         game_id=game.id,
@@ -295,20 +296,9 @@ def inning_has_only_setup_edits(game, team_id, inning=None):
         inning=inning,
         reverted=False,
     ).all()
-    if any(event_type == INNING_STARTED for event_type, _ in rows):
+    if any(event_type == INNING_STARTED or pre_start is False for event_type, pre_start in rows):
         return False
     return any(pre_start is True for _, pre_start in rows)
-
-
-def inning_ordinal(inning):
-    number = _inning_number(inning)
-    if number is None:
-        return str(inning)
-    if 10 <= number % 100 <= 20:
-        suffix = 'th'
-    else:
-        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(number % 10, 'th')
-    return f'{number}{suffix}'
 
 
 def _names(alignment):

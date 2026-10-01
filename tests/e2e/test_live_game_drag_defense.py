@@ -381,7 +381,6 @@ def test_phone_quick_field_swaps_two_fielders_without_second_editor(page: Page, 
             'Where should Second Sam go?', timeout=10_000
         )
         chain.get_by_role('button', name='Put Second Sam at SS', exact=True).click()
-        chain.get_by_role('button', name='Make this change', exact=True).click()
         expect(chain).not_to_be_visible(timeout=10_000)
 
         # First prove the drag was accepted by the Quick Field UI. This also
@@ -453,7 +452,6 @@ def test_phone_quick_field_swaps_two_fielders_without_second_editor(page: Page, 
         # failing with stale_live_state / HTTP 409.
         one_b_destination.click()
         modal.get_by_role('button', name='Put First Frank at SS', exact=True).click()
-        modal.get_by_role('button', name='Make this change', exact=True).click()
 
         expect(modal).not_to_be_visible(timeout=10_000)
         expect(

@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from db import db
 from extensions import socketio
-from game_availability import INNING_STARTED, game_availability, inning_has_started, inning_ordinal
+from game_availability import INNING_STARTED, game_availability, inning_has_started
 from game_day_helpers import required_positions
 from live_history import gameplay_events
 from game_start_readiness import can_start_game, normalized_inning_one
@@ -197,60 +197,20 @@ def _stale_write_response(data, game, team):
     }), 409
 
 
-_YES = {True, 1, '1', 'true', 'yes'}
-_NOT_YET = {False, 0, '0', 'false', 'not_yet', 'no'}
+def _record_inning_start(game, team_id, inning, alignment):
+    """The inning begins with this defense (game_availability).
 
-
-def _inning_start_answer(game, team, data):
-    """Ask whether the current inning has started, if CoachBoard doesn't know.
-
-    Returns (response, start_now, pre_start). Called by every On the Field
-    defensive change after all its own checks pass, just before it is saved,
-    so the coach answers once and only for a change that will be saved.
-    While the current inning has no 'Inning Started' marker
-    (game_availability), a request without `inning_started` gets the
-    question (409 inning_start_question); `inning_started: true` asks the
-    caller to record the marker immediately before its change
-    (_record_inning_start), and `false` ("Not yet") saves the change as a
-    setup edit (pre_start, live_history). Once the inning has started, a
-    change is made during play (pre_start False).
+    Start Game and End Inning -> Start Next Inning are the inning boundary:
+    each records the inning it starts, with the exact defense it sends out.
+    Nothing else asks or decides whether an inning has begun.
     """
-    if inning_has_started(game, team.id):
-        return None, False, False
-
-    answer = data.get('inning_started')
-    if isinstance(answer, str):
-        answer = answer.strip().lower()
-    if answer in _YES:
-        return None, True, False
-    if answer in _NOT_YET:
-        return None, False, True
-
-    ordinal = inning_ordinal(game.live_current_inning or '1')
-    return (jsonify({
-        'status': 'error',
-        'code': 'inning_start_question',
-        'inning': str(game.live_current_inning or '1'),
-        'title': f'Has the {ordinal} inning started?',
-        'message': (
-            f'Not yet: this is a lineup fix before the {ordinal} begins. '
-            f'Yes: the players on the field now started the {ordinal}, '
-            'and everyone who plays any of it gets credit for playing it.'
-        ),
-        'not_yet_label': 'Not yet',
-        'yes_label': 'Yes, inning started',
-    }), 409), False, False
-
-
-def _record_inning_start(game, team_id, alignment):
-    """The defense that began the current inning, recorded just before a change."""
     return _event(
         game,
         team_id,
         INNING_STARTED,
-        game.live_current_inning or '1',
-        deepcopy(alignment),
-        deepcopy(alignment),
+        str(inning),
+        deepcopy(alignment or {}),
+        deepcopy(alignment or {}),
     )
 
 
@@ -585,6 +545,12 @@ def start(game_id):
     # The game going live and the record of an accepted pitching decision
     # commit together: if the record can't be written, the game doesn't start.
     try:
+        # Start Game starts the 1st inning with the defense just verified,
+        # in the same commit as the game going live.
+        first = str(game.live_current_inning or '1')
+        if not inning_has_started(game, team.id, first):
+            _, planned = _planned_rotation(game, team.id)
+            _record_inning_start(game, team.id, first, planned.get(first) or start_readiness['inning_one'])
         game.is_live = True
         if not game.live_current_inning:
             game.live_current_inning = '1'
@@ -670,11 +636,6 @@ def change_pitcher(game_id):
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
 
-    asked, start_now, pre_start = _inning_start_answer(game, team, data)
-    if asked:
-        return asked
-    if start_now:
-        _record_inning_start(game, team.id, before)
     _event(
         game,
         team.id,
@@ -684,7 +645,7 @@ def change_pitcher(game_id):
         after,
         old_pitcher_id=old_pitcher_id,
         new_pitcher_id=new_pitcher.id,
-        pre_start=pre_start,
+        pre_start=False,
     )
     db.session.commit()
     state = _broadcast_state(game.id, team.id)
@@ -755,11 +716,6 @@ def defensive_change(game_id):
     if not valid:
         return jsonify({'status': 'error', 'message': message}), 409
 
-    asked, start_now, pre_start = _inning_start_answer(game, team, data)
-    if asked:
-        return asked
-    if start_now:
-        _record_inning_start(game, team.id, before)
     old_pitcher_id = _player_id_by_name(before.get('P'), team.id)
     new_pitcher_id = _player_id_by_name(after.get('P'), team.id)
     _event(
@@ -771,7 +727,7 @@ def defensive_change(game_id):
         after,
         old_pitcher_id=old_pitcher_id if old_pitcher_id != new_pitcher_id else None,
         new_pitcher_id=new_pitcher_id if old_pitcher_id != new_pitcher_id else None,
-        pre_start=pre_start,
+        pre_start=False,
     )
     db.session.commit()
     state = _broadcast_state(game.id, team.id)

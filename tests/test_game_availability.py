@@ -363,10 +363,9 @@ def _names(players):
     return sorted(player['name'] for player in players)
 
 
-def _place(app, player_id, position, sequence, started=False):
+def _place(app, player_id, position, sequence):
     return _client(app).post(f'/api/live-game/{GAME_ID}/defensive-change', json={
         'player_id': player_id, 'destination_position': position, 'base_sequence': sequence,
-        'inning_started': started,
     })
 
 
@@ -478,12 +477,13 @@ def test_deleting_a_player_keeps_their_availability_history_without_blocking(app
         assert event is not None and event.subject_player_id is None
 
 
-# --- "Has the 4th inning started?" on the server ------------------------------------------------
+# --- Start Game and End Inning start innings ---------------------------------------------------
 
 EDIT = f'/api/live-game/{GAME_ID}/defense-edit'
 UNDO = f'/api/live-game/{GAME_ID}/undo'
 WITH_JULES = dict(FULL, RF='Jules')    # Indy (RF) out, Jules in
 WITH_INDY_CF = dict(FULL, CF='Indy', RF='Harper')
+SECOND = dict(FULL, CF='Jules', RF='Indy')   # what End 1st sends out for the 2nd
 
 
 def _sequence(app):
@@ -493,8 +493,8 @@ def _sequence(app):
         return _current_sequence(GAME_ID, TEAM_ID)
 
 
-def _edit(app, alignment, **answer):
-    return _client(app).post(EDIT, json={'alignment': alignment, 'base_sequence': _sequence(app), **answer})
+def _edit(app, alignment, **extra):
+    return _client(app).post(EDIT, json={'alignment': alignment, 'base_sequence': _sequence(app), **extra})
 
 
 def _events(app):
@@ -506,6 +506,10 @@ def _events(app):
             (e.event_type, e.inning, bool(e.reverted), dict(e.before_alignment or {}), dict(e.after_alignment or {}))
             for e in db.session.query(GameRotationEvent).order_by(GameRotationEvent.sequence).all()
         ]
+
+
+def _kinds(app):
+    return [(kind, inning, reverted) for kind, inning, reverted, _, _ in _events(app)]
 
 
 def _has_started(app, inning=None):
@@ -527,7 +531,7 @@ def _played(app):
 
 
 def _enter_inning(app, inning, alignment=FULL, before=FULL):
-    """As End Inning does: load the next inning's defense."""
+    """An End Inning recorded directly (no start marker, as older data)."""
     from db import db
     from models import Game
 
@@ -537,91 +541,103 @@ def _enter_inning(app, inning, alignment=FULL, before=FULL):
         db.session.commit()
 
 
-def test_the_first_change_of_an_unstarted_inning_asks(app):
-    _go_live(app)
-    response = _edit(app, WITH_JULES)
-    assert response.status_code == 409
-    body = response.get_json()
-    assert body['code'] == 'inning_start_question'
-    assert body['title'] == 'Has the 1st inning started?'
-    assert (body['not_yet_label'], body['yes_label']) == ('Not yet', 'Yes, inning started')
-    assert _events(app) == []
+def _start_game(app):
+    _plan(app, {'1': FULL, '2': FULL})
+    response = _client(app).post(f'/api/live-game/{GAME_ID}/start', json={'inning_one': FULL})
+    assert response.status_code == 200, response.get_json()
 
 
-def test_not_yet_saves_a_pre_start_edit_and_the_next_change_asks_again(app):
-    _go_live(app)
-    assert _edit(app, WITH_JULES, inning_started=False).status_code == 200
-    assert [e[0] for e in _events(app)] == ['Bulk Defensive Change']
-    assert not _has_started(app)
-    assert _edit(app, FULL).get_json()['code'] == 'inning_start_question'
-
-
-def test_yes_records_the_start_just_before_the_first_in_inning_change(app):
-    _go_live(app)
-    _edit(app, WITH_JULES, inning_started=False)                   # before the 1st
-    assert _edit(app, WITH_INDY_CF, inning_started=True).status_code == 200
-    kinds = [e[0] for e in _events(app)]
-    assert kinds == ['Bulk Defensive Change', INNING_STARTED, 'Bulk Defensive Change']
-    marker = _events(app)[1]
-    assert marker[3] == marker[4] == WITH_JULES                   # the defense that began the 1st
-    # Started: the next change is not asked about.
-    assert _edit(app, FULL).status_code == 200
-    played = _played(app)['1']
-    assert {'Jules', 'Indy', 'Harper', 'Casey'} <= played        # began, moved, or came in
-    assert 'Indy' in played
-
-
-def test_undo_passes_over_the_start_marker(app):
-    _go_live(app)
-    _edit(app, WITH_JULES, inning_started=True)
-    undone = _client(app).post(UNDO, json={'base_sequence': _sequence(app)})
-    assert undone.status_code == 200, undone.get_json()
-    assert [(e[0], e[2]) for e in _events(app)] == [(INNING_STARTED, False), ('Bulk Defensive Change', True)]
-    assert _has_started(app)
-    nothing = _client(app).post(UNDO, json={'base_sequence': _sequence(app)})
-    assert nothing.status_code == 409
-    assert nothing.get_json()['message'] == 'There is nothing to undo.'
-    assert _has_started(app)
-    # Still started: no question.
-    assert _edit(app, WITH_JULES).status_code == 200
-
-
-def test_undoing_the_end_inning_withdraws_that_innings_start(app):
-    _go_live(app)
-    _enter_inning(app, '2')
-    _edit(app, WITH_JULES, inning_started=True)
-    client = _client(app)
-    assert client.post(UNDO, json={'base_sequence': _sequence(app)}).status_code == 200   # the change
-    assert _has_started(app, '2')
-    assert client.post(UNDO, json={'base_sequence': _sequence(app)}).status_code == 200   # End Inning
-    assert not _has_started(app, '2')
-    assert _state(app)['current_inning'] == '1'
-
-
-def test_availability_events_do_not_start_an_inning(app):
-    _out(app, 'Jules')
-    _go_live(app)
-    _write_event(app, ARRIVED, subject=JULES, from_inning=1)
-    assert not _has_started(app)
-    assert '1' not in _played(app)
-    assert _edit(app, WITH_JULES).get_json()['code'] == 'inning_start_question'
-
-
-def test_an_inning_without_changes_needs_no_answer_and_its_defense_played(app):
+def _end_inning(app, next_alignment=SECOND, next_inning='2'):
     from blueprints.live_game_ui import GameNextInningPrep
     from db import db
 
-    _go_live(app)
     with app.app_context():
-        db.session.add(GameNextInningPrep(inning='2', alignment=dict(FULL), source='custom',
+        db.session.add(GameNextInningPrep(inning=next_inning, alignment=dict(next_alignment), source='custom',
                                           updated_by='Test Coach', game_id=GAME_ID, team_id=TEAM_ID))
         db.session.commit()
-    ended = _client(app).post(f'/api/live-game/{GAME_ID}/advance-inning', json={
-        'base_sequence': 0, 'alignment': dict(FULL),
+    response = _client(app).post(f'/api/live-game/{GAME_ID}/advance-inning', json={
+        'base_sequence': _sequence(app), 'alignment': dict(next_alignment),
     })
-    assert ended.status_code == 200, ended.get_json()
-    assert _played(app)['1'] == frozenset(FULL.values())
-    assert '2' not in _played(app)
+    assert response.status_code == 200, response.get_json()
+    return response.get_json()
+
+
+def test_start_game_starts_the_1st_with_the_defense_being_started(app):
+    _start_game(app)
+    events = _events(app)
+    assert [(kind, inning) for kind, inning, *_ in events] == [(INNING_STARTED, '1')]
+    assert {pos: name for pos, name in events[0][4].items() if name} == FULL
+    assert _has_started(app, '1')
+    assert _played(app) == {'1': frozenset(FULL.values())}
+
+
+def test_end_inning_starts_the_next_inning_with_the_defense_sent_out(app):
+    _start_game(app)
+    body = _end_inning(app)
+    assert _kinds(app) == [(INNING_STARTED, '1', False), (INNING_STARTED, '2', False), ('End Inning', '2', False)]
+    marker = _events(app)[1]
+    assert marker[3] == marker[4] == SECOND
+    # The response carries the live version: the End Inning is the latest event.
+    assert body['delta']['sequence'] == _sequence(app)
+    assert body['delta']['event']['event_type'] == 'End Inning'
+    assert _played(app)['2'] == frozenset(SECOND.values())
+
+
+@pytest.mark.parametrize('route, body', [
+    ('defense-edit', {'alignment': WITH_JULES}),
+    ('defensive-change', {'player_id': 10, 'destination_position': 'RF'}),
+    ('set-defense', {'alignment': WITH_JULES}),
+    ('complete-pitcher-change', {'new_pitcher_id': 10, 'alignment': dict(FULL, P='Jules'), 'fast': True}),
+])
+def test_no_on_the_field_change_asks_whether_the_inning_started(app, route, body):
+    _start_game(app)
+    response = _client(app).post(f'/api/live-game/{GAME_ID}/{route}', json={**body, 'base_sequence': _sequence(app)})
+    assert response.status_code == 200, response.get_json()
+    change = _events(app)[-1]
+    assert change[0] not in (INNING_STARTED,)
+    from db import db
+    from models import GameRotationEvent
+
+    with app.app_context():
+        saved = db.session.query(GameRotationEvent).order_by(GameRotationEvent.sequence.desc()).first()
+        assert saved.pre_start is False
+
+
+def test_a_game_started_before_markers_existed_is_not_asked_either(app):
+    _go_live(app)                                   # live, no start marker
+    response = _edit(app, WITH_JULES)
+    assert response.status_code == 200, response.get_json()
+    assert 'code' not in response.get_json()
+
+
+def test_a_change_after_the_start_is_play_and_everyone_involved_played(app):
+    _start_game(app)
+    _end_inning(app)
+    assert _edit(app, dict(SECOND, CF='Harper', RF='Indy')).status_code == 200
+    # Jules started the 2nd in CF and was replaced during it: both played.
+    assert {'Jules', 'Harper'} <= _played(app)['2']
+
+
+def test_undo_passes_over_the_start_marker(app):
+    _start_game(app)
+    assert _edit(app, WITH_JULES).status_code == 200
+    undone = _client(app).post(UNDO, json={'base_sequence': _sequence(app)})
+    assert undone.status_code == 200, undone.get_json()
+    assert _kinds(app) == [(INNING_STARTED, '1', False), ('Bulk Defensive Change', '1', True)]
+    nothing = _client(app).post(UNDO, json={'base_sequence': _sequence(app)})
+    assert nothing.status_code == 409
+    assert nothing.get_json()['message'] == 'There is nothing to undo.'
+    assert _has_started(app, '1')
+
+
+def test_undoing_end_inning_withdraws_the_start_it_recorded(app):
+    _start_game(app)
+    _end_inning(app)
+    undone = _client(app).post(UNDO, json={'base_sequence': _sequence(app)})
+    assert undone.status_code == 200, undone.get_json()
+    assert _kinds(app) == [(INNING_STARTED, '1', False), (INNING_STARTED, '2', True), ('End Inning', '2', True)]
+    assert not _has_started(app, '2')
+    assert _state(app)['current_inning'] == '1'
 
 
 def _end_for_time_limit(app, played):
@@ -630,28 +646,27 @@ def _end_for_time_limit(app, played):
     })
 
 
-def test_time_limit_can_drop_an_inning_that_never_started(app):
+def test_time_limit_withdraws_an_inning_that_was_not_played(app):
     _out(app, 'Jules')
-    _go_live(app)
-    _enter_inning(app, '2')
-    _write_event(app, ARRIVED, subject=JULES, from_inning=2, inning='2')
-    _edit(app, WITH_JULES, inning_started=False)                   # a lineup fix before the 2nd
+    _start_game(app)
+    _end_inning(app, dict(FULL))
+    _write_event(app, ARRIVED, subject=JULES, from_inning=2, inning='2')   # arrived, not play
     response = _end_for_time_limit(app, False)
     assert response.status_code == 200, response.get_json()
-    events = _events(app)
-    assert ('End Inning', '2', True) == events[0][:3]
-    assert ('Bulk Defensive Change', '2', True) == events[2][:3]    # withdrawn with the inning
-    assert (ARRIVED, '1', False) == events[1][:3]                  # still happened, in the last inning played
+    kinds = _kinds(app)
+    assert (INNING_STARTED, '2', True) in kinds                  # the auto-recorded start is withdrawn
+    assert ('End Inning', '2', True) in kinds
+    assert (ARRIVED, '1', False) in kinds                        # still happened, in the last inning played
     assert _state(app)['current_inning'] == '1'
     assert set(_played(app)) == {'1'}
 
 
-def test_time_limit_keeps_an_inning_that_started(app):
-    _go_live(app)
-    _enter_inning(app, '2')
-    _edit(app, WITH_JULES, inning_started=True)
+def test_time_limit_keeps_an_inning_with_a_change_recorded_during_it(app):
+    _start_game(app)
+    _end_inning(app)
+    assert _edit(app, dict(SECOND, CF='Harper', RF='Indy')).status_code == 200
     refused = _end_for_time_limit(app, False)
     assert refused.status_code == 409
-    assert 'was recorded as started' in refused.get_json()['message']
+    assert 'already has a recorded live change' in refused.get_json()['message']
     assert _end_for_time_limit(app, True).status_code == 200
-    assert 'Jules' in _played(app)['2']
+    assert 'Harper' in _played(app)['2']

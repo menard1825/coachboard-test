@@ -205,7 +205,6 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         # vacated SS (inning 2's names come from the prepared defense).
         at_second = next_alignment['2B']
         move.get_by_role('button', name=f'Put {at_second} at SS', exact=True).click()
-        move.get_by_role('button', name='Make this change', exact=True).click()
         expect(move).not_to_be_visible(timeout=10_000)
         expect(quick.locator('.cb-save-state')).to_contain_text('Saved', timeout=10_000)
         phone.locator('#liveUndoBtn').click()
@@ -356,15 +355,12 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
             )
         ).to_be_visible(timeout=10_000)
 
-        # 2B is occupied, so the coach first says where Sam goes. This
-        # decision is local (no request); only "Make this change" writes.
+        # 2B is occupied, so the coach says where Sam goes. Asking is local
+        # (no request); the coach's answer completes the swap and writes.
         move_b.locator('[data-cb-destination="2B"]').click()
-        move_b.get_by_role(
-            'button', name='Put Second Sam at SS', exact=True
-        ).click()
         expect(
             move_b.get_by_role(
-                'button', name='Make this change', exact=True
+                'button', name='Put Second Sam at SS', exact=True
             )
         ).to_be_visible(timeout=10_000)
 
@@ -415,7 +411,7 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
             """() => {
                 const button = [...document.querySelectorAll(
                     '#cbQuickMoveModal button'
-                )].find(node => node.textContent.trim() === 'Make this change');
+                )].find(node => node.textContent.trim() === 'Put Second Sam at SS');
 
                 if (!button) {
                     throw new Error(
@@ -462,9 +458,6 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
         ).click()
         move_a.get_by_role(
             'button', name='Put Third Theo at 1B', exact=True
-        ).click()
-        move_a.get_by_role(
-            'button', name='Make this change', exact=True
         ).click()
 
         expect(move_a).not_to_be_visible(timeout=10_000)

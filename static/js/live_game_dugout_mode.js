@@ -24,6 +24,7 @@
   let queued = false;
   let moveBusy = false;
   let lastFailedMove = null;
+  let lastFailedDraft = null;
   let saveMode = 'saved';
   let saveMessage = 'Saved';
   let quickDefenseSignature = '';
@@ -570,7 +571,7 @@
 
   function saveStateMarkup() {
     const icon = saveMode === 'saving' ? 'bi-arrow-repeat' : saveMode === 'error' ? 'bi-exclamation-triangle' : 'bi-check-circle-fill';
-    const retry = saveMode === 'error' && lastFailedMove ? ' data-cb-retry-move role="button" tabindex="0"' : '';
+    const retry = saveMode === 'error' && (lastFailedMove || lastFailedDraft) ? ' data-cb-retry-move role="button" tabindex="0"' : '';
     return `<div class="cb-save-state ${saveMode}"${retry}><i class="bi ${icon}"></i><span>${esc(saveMessage)}</span></div>`;
   }
 
@@ -597,7 +598,7 @@
       outfielderCount: state?.outfielder_count || 3,
       saveMode,
       saveMessage,
-      retry: lastFailedMove ? [lastFailedMove.playerId, lastFailedMove.destination] : null,
+      retry: lastFailedMove ? [lastFailedMove.playerId, lastFailedMove.destination] : Boolean(lastFailedDraft),
     });
   }
 
@@ -611,11 +612,7 @@
       if (actions) actions.insertAdjacentElement('beforebegin', card);
       else shell.prepend(card);
       card.addEventListener('click', event => {
-        const retry = event.target.closest('[data-cb-retry-move]');
-        if (retry && lastFailedMove) {
-          saveMove(lastFailedMove.playerId, lastFailedMove.destination, lastFailedMove.name);
-          return;
-        }
+        if (event.target.closest('[data-cb-retry-move]') && retryLastFailedSave()) return;
         const player = event.target.closest('[data-cb-move-player]');
         if (!player) return;
 
@@ -644,9 +641,9 @@
         openMoveModal(name);
       });
       card.addEventListener('keydown', event => {
-        if ((event.key === 'Enter' || event.key === ' ') && event.target.closest('[data-cb-retry-move]') && lastFailedMove) {
+        if ((event.key === 'Enter' || event.key === ' ') && event.target.closest('[data-cb-retry-move]')) {
           event.preventDefault();
-          saveMove(lastFailedMove.playerId, lastFailedMove.destination, lastFailedMove.name);
+          retryLastFailedSave();
         }
       });
     }
@@ -789,11 +786,11 @@
             return;
           }
 
-          saveMove(
+          closeMoveSheetThen(() => saveMove(
             choice.player.id,
             pos,
             choice.player.name
-          );
+          ));
         }
       );
     });
@@ -867,7 +864,74 @@
       askOccupiedMove(player, source, target);
       return;
     }
-    saveMove(player.id, target, name);
+    closeMoveSheetThen(() => saveMove(player.id, target, name));
+  }
+
+  /*
+   * A decision is finished: close the move sheet, then save. The sheet is
+   * never left open waiting on the network, so nothing (a server question,
+   * another sheet) can stack on it, and the save's outcome is reported once,
+   * on the Quick Field status -- Retry for a lost connection, the reason for
+   * a refused change.
+   */
+  function closeMoveSheetThen(save) {
+    // The decision is made: say so now, not after the sheet finishes closing.
+    saveMode = 'saving';
+    saveMessage = 'Saving…';
+    quickDefenseSignature = '';
+    const shell = document.querySelector('#live-game-overlay .coach-live-shell');
+    if (shell) renderQuickDefense(shell);
+
+    const modal = $('cbQuickMoveModal');
+    const open = modal && (modal.classList.contains('show') || modal.style.display === 'block');
+    if (!open) {
+      save();
+      return;
+    }
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+      save();
+    };
+    modal.addEventListener('hidden.bs.modal', start, {once: true});
+    bootstrap.Modal.getOrCreateInstance(modal).hide();
+    // Bootstrap ignores hide() mid-transition; never let that hold a save.
+    window.setTimeout(() => {
+      if (started) return;
+      bootstrap.Modal.getOrCreateInstance(modal).hide();
+      start();
+    }, 600);
+  }
+
+  function retryLastFailedSave() {
+    if (lastFailedMove) {
+      saveMove(lastFailedMove.playerId, lastFailedMove.destination, lastFailedMove.name);
+      return true;
+    }
+    if (lastFailedDraft) {
+      const {alignment, successMessage, baseSequence} = lastFailedDraft;
+      saveDefenseDraft(alignment, successMessage, baseSequence);
+      return true;
+    }
+    return false;
+  }
+
+  // One place a save's failure is shown. A lost connection can be retried
+  // exactly as decided; a refused change (the field changed on another
+  // device, a player no longer available) says why and is not retried.
+  function reportSaveFailure(error, retry) {
+    lastFailureKind = failureKind(error);
+    saveMode = 'error';
+    if (lastFailureKind === 'network') {
+      saveMessage = 'Not saved — Retry';
+      retry();
+    } else {
+      saveMessage = `Not saved — ${error.message}`;
+    }
+    quickDefenseSignature = '';
+    const shell = document.querySelector('#live-game-overlay .coach-live-shell');
+    if (shell) renderQuickDefense(shell);
   }
 
   /*
@@ -879,10 +943,13 @@
    * picks for the coach: no automatic swap, bench or move. Choosing
    * another occupied position asks about that player next.
    *
-   * The whole chain is built locally and shown as a review; "Make this
-   * change" saves it as one defensive change (one Undo). Cancel, or the
-   * sheet closing, changes nothing. If the official field changes while
-   * the chain is open, it is discarded -- never applied to newer state.
+   * The whole chain is built locally and saved as one defensive change
+   * (one Undo). Once the coach has placed every displaced player it is
+   * saved -- a change involving two players needs no second confirmation;
+   * one involving three or more is shown once for review ("Make this
+   * change"). Cancel, or the sheet closing, changes nothing. If the
+   * official field changes while the chain is open, it is discarded --
+   * never applied to newer state.
    *
    * No loops: players already placed by this chain are never offered
    * again, and P is never an ordinary destination.
@@ -979,22 +1046,30 @@
       moves.push({name, from, to});
     };
 
+    // The decision is complete: close the sheet, then save it as one change.
+    const commit = message => {
+      stop();
+      const alignment = {...draft};
+      closeMoveSheetThen(() => saveDefenseDraft(alignment, message, baseSequence));
+    };
+    const summary = () => moves.map(move => `${move.name} to ${move.to}`).join(' · ');
+
     const review = () => {
       const lines = [
         ...moves.map(move => `${move.name}: ${fromLabel(move.from)} → ${move.to}`),
         ...openSpots().map(pos => `${pos}: open`),
       ];
       render('Check the defensive change', 'This is the field after the change:', [
-        ['Make this change', 'btn-primary', () => {
-          stop();
-          saveDefenseDraft(
-            {...draft},
-            moves.map(move => `${move.name} to ${move.to}`).join(' · '),
-            baseSequence,
-          );
-        }],
+        ['Make this change', 'btn-primary', () => commit(summary())],
         cancel,
       ], lines);
+    };
+
+    // Every displaced player has a place the coach chose. Two players: the
+    // coach's own choices are the confirmation. Three or more: one review.
+    const finish = () => {
+      if (moves.length >= 3) review();
+      else commit(summary());
     };
 
     // "Where should <name> go?" -- name was at `from` until just now.
@@ -1004,7 +1079,7 @@
         'btn-outline-primary',
         () => {
           place(name, from, pos);
-          review();
+          finish();
         },
       ]);
       if (takenSpots().length) {
@@ -1016,7 +1091,7 @@
       }
       buttons.push([`Bench ${name}`, 'btn-outline-primary', () => {
         place(name, from, 'Bench');
-        review();
+        finish();
       }]);
       buttons.push(cancel);
       render(`${mover} is moving to ${from}`, `Where should ${name} go?`, buttons);
@@ -1048,16 +1123,13 @@
       const bench = benchPlayers().filter(candidate => !placed.has(candidate.name));
       const fielders = spots.filter(spot => draft[spot] && !placed.has(draft[spot]));
       render(`${player.name} is going to the bench`, `What should happen at ${pos}?`, [
-        [`Leave ${pos} open`, 'btn-primary', () => {
-          stop();
-          saveDefenseDraft({...draft}, `${player.name} to Bench · ${pos} open`, baseSequence);
-        }],
+        [`Leave ${pos} open`, 'btn-primary', () => commit(`${player.name} to Bench · ${pos} open`)],
         ...bench.map(candidate => [
           `${numbered(candidate.name)} — Bench → ${pos}`,
           'btn-outline-primary',
           () => {
             place(candidate.name, 'BENCH', pos);
-            review();
+            finish();
           },
         ]),
         ...fielders.map(spot => [
@@ -1067,7 +1139,7 @@
             const name = draft[spot];
             delete draft[spot];
             place(name, spot, pos);
-            review();
+            finish();
           },
         ]),
         cancel,
@@ -1108,24 +1180,13 @@
     await getState();
   }
 
-  // "Cancel change" at "Has the 4th inning started?"
-  // (live_game_inning_clarity.js): nothing was saved, so there is nothing to
-  // report as a failure or retry -- the field is exactly as it was.
-  function settleCancelledChange(shell) {
-    saveMode = 'saved';
-    saveMessage = 'Change cancelled';
-    lastFailedMove = null;
-    quickDefenseSignature = '';
-    if (shell) renderQuickDefense(shell);
-    bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
-  }
-
   async function saveDefenseDraft(alignment, successMessage, baseSequence = null) {
     if (moveBusy) return;
     moveBusy = true;
     saveMode = 'saving';
     saveMessage = 'Saving…';
     lastFailedMove = null;
+    lastFailedDraft = null;
     quickDefenseSignature = '';
 
     const shell = document.querySelector('#live-game-overlay .coach-live-shell');
@@ -1143,11 +1204,6 @@
       });
 
       const data = await response.json().catch(() => ({}));
-
-      if (data.code === 'inning_start_cancelled') {
-        settleCancelledChange(shell);
-        return;
-      }
 
       if (!response.ok || data.status === 'error') {
         if (
@@ -1173,25 +1229,11 @@
       saveMessage = 'Saved ✓';
       quickDefenseSignature = '';
 
-      bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
       queue();
     } catch (error) {
-      lastFailureKind = failureKind(error);
-      saveMode = 'error';
-      saveMessage = 'Not saved';
-      quickDefenseSignature = '';
-
-      if (shell) renderQuickDefense(shell);
-
-      const modal = ensureMoveModal();
-      const modalBody = modal.querySelector('.modal-body');
-
-      if (modalBody && !modalBody.querySelector('.alert-danger')) {
-        modalBody.insertAdjacentHTML(
-          'afterbegin',
-          `<div class="alert alert-danger py-2 small"><strong>Change was not saved.</strong><br>${esc(error.message)}</div>`
-        );
-      }
+      reportSaveFailure(error, () => {
+        lastFailedDraft = {alignment, successMessage, baseSequence};
+      });
     } finally {
       moveBusy = false;
     }
@@ -1266,10 +1308,6 @@
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (data.code === 'inning_start_cancelled') {
-        settleCancelledChange(shell);
-        return;
-      }
       if (!response.ok || data.status === 'error') {
         if (
           data.code === 'stale_live_state' ||
@@ -1290,20 +1328,11 @@
       saveMode = 'saved';
       saveMessage = 'Saved ✓';
       quickDefenseSignature = '';
-      bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
       queue();
     } catch (error) {
-      lastFailureKind = failureKind(error);
-      saveMode = 'error';
-      saveMessage = 'Not saved — Retry';
-      lastFailedMove = { playerId, destination, name };
-      quickDefenseSignature = '';
-      if (shell) renderQuickDefense(shell);
-      const modal = ensureMoveModal();
-      const body = modal.querySelector('.modal-body');
-      if (body && !body.querySelector('.alert-danger')) {
-        body.insertAdjacentHTML('afterbegin', `<div class="alert alert-danger py-2 small"><strong>Change was not saved.</strong><br>${esc(error.message)}</div>`);
-      }
+      reportSaveFailure(error, () => {
+        lastFailedMove = {playerId, destination, name};
+      });
     } finally {
       moveBusy = false;
     }

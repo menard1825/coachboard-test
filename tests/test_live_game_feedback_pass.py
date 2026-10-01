@@ -117,7 +117,6 @@ def test_defense_edit_saves_one_event_and_returns_light_delta(monkeypatch):
     _login(client)
 
     response = client.post('/api/live-game/70/defense-edit', json={
-        'inning_started': False,
         'base_sequence': 0,
         'alignment': _inning_two_with_jack_in_right(),
     })
@@ -162,7 +161,6 @@ def test_defense_edit_allows_open_non_pitcher_and_broadcasts_it(monkeypatch):
     response = client.post(
         '/api/live-game/70/defense-edit',
         json={
-            'inning_started': False,
             'base_sequence': 0,
             'alignment': alignment,
         },
@@ -211,7 +209,6 @@ def test_stale_second_coach_edit_is_rejected_without_overwriting_first(monkeypat
     _login(second_client)
 
     first = first_client.post('/api/live-game/70/defense-edit', json={
-        'inning_started': False,
         'base_sequence': 0,
         'alignment': _inning_two_with_jack_in_right(),
     })
@@ -229,7 +226,6 @@ def test_stale_second_coach_edit_is_rejected_without_overwriting_first(monkeypat
         'RF': 'Isaac',
     }
     second = second_client.post('/api/live-game/70/defense-edit', json={
-        'inning_started': False,
         'base_sequence': 0,
         'alignment': stale_attempt,
     })
@@ -302,7 +298,14 @@ def test_advance_inning_commits_new_defense_and_inning_together(monkeypatch):
     with app.app_context():
         game = db.session.get(Game, 70)
         assert game.live_current_inning == '3'
-        event = db.session.query(GameRotationEvent).filter_by(game_id=70, team_id=1).one()
+        # End Inning -> Start 3rd: the transition, and the 3rd starting with
+        # the defense it sent out (game_availability).
+        started, event = db.session.query(GameRotationEvent).filter_by(
+            game_id=70, team_id=1,
+        ).order_by(GameRotationEvent.sequence).all()
+        assert (started.event_type, started.inning, started.after_alignment) == (
+            'Inning Started', '3', next_alignment,
+        )
         assert event.event_type == 'End Inning'
         assert event.inning == '3'
         assert event.after_alignment == next_alignment
@@ -527,7 +530,6 @@ def test_complete_pitcher_change_blocks_via_shared_helper(monkeypatch, pitch_cou
         'RF': 'Isaac',
     }
     response = client.post('/api/live-game/70/complete-pitcher-change', json={
-        'inning_started': False,
         'base_sequence': 0,
         'fast': True,
         'new_pitcher_id': 3,
@@ -568,7 +570,6 @@ CARTER_TO_P = {
 
 def _change_to_carter(client, **flags):
     return client.post('/api/live-game/70/complete-pitcher-change', json={
-        'inning_started': False,
         'base_sequence': 0,
         'fast': True,
         'new_pitcher_id': 3,
@@ -828,7 +829,6 @@ def test_field_player_can_take_mound_without_benching_outgoing_pitcher(monkeypat
         'RF': 'Isaac',
     }
     response = client.post('/api/live-game/70/complete-pitcher-change', json={
-        'inning_started': False,
         'base_sequence': 0,
         'fast': True,
         'new_pitcher_id': 3,
@@ -863,7 +863,6 @@ def test_quick_field_rejects_player_marked_out(monkeypatch):
         db.session.commit()
 
     response = client.post('/api/live-game/70/defensive-change', json={
-        'inning_started': False,
         'player_id': 10,
         'destination_position': 'RF',
         'base_sequence': 0,
@@ -900,7 +899,6 @@ def test_weekend_multicoach_write_guards(monkeypatch):
     response = first_client.post(
         '/api/live-game/70/defensive-change',
         json={
-            'inning_started': False,
             'player_id': 10,
             'destination_position': 'RF',
         },
@@ -915,7 +913,6 @@ def test_weekend_multicoach_write_guards(monkeypatch):
     response = first_client.post(
         '/api/live-game/70/defensive-change',
         json={
-            'inning_started': False,
             'player_id': 10,
             'destination_position': 'RF',
             'base_sequence': 0,
@@ -936,7 +933,6 @@ def test_weekend_multicoach_write_guards(monkeypatch):
     response = second_client.post(
         '/api/live-game/70/defensive-change',
         json={
-            'inning_started': False,
             'player_id': 10,
             'destination_position': 'CF',
             'base_sequence': 0,
@@ -1107,7 +1103,6 @@ def test_reverted_event_does_not_count_as_active_version(monkeypatch):
     response = client.post(
         '/api/live-game/70/defense-edit',
         json={
-            'inning_started': False,
             'base_sequence': 0,
             'alignment': _inning_two_with_jack_in_right(),
         },
@@ -1267,7 +1262,6 @@ def test_a_resolved_defensive_chain_is_one_pitching_change_and_one_undo(monkeypa
 
     after = dict(INNING_TWO, P='Jack', **{'1B': 'Aiden', 'LF': 'Carter'})
     response = client.post('/api/live-game/70/complete-pitcher-change', json={
-        'inning_started': False,
         'base_sequence': 0, 'fast': True, 'new_pitcher_id': 10, 'alignment': after,
     })
     assert response.status_code == 200, response.get_json()
@@ -1312,7 +1306,6 @@ def test_a_chain_cannot_put_one_player_in_two_positions(monkeypatch, alignment):
     _patch_summary(monkeypatch, {'Jack': {'status': 'Available'}})
 
     response = client.post('/api/live-game/70/complete-pitcher-change', json={
-        'inning_started': False,
         'base_sequence': 0, 'fast': True, 'new_pitcher_id': 10, 'alignment': alignment,
     })
     assert response.status_code == 409

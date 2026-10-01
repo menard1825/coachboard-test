@@ -5,12 +5,15 @@ from sqlalchemy import UniqueConstraint
 
 from db import db
 from extensions import socketio
-from game_availability import AVAILABILITY_EVENTS, inning_has_started
+from game_availability import AVAILABILITY_EVENTS, INNING_STARTED
 from models import Game, GameRotationEvent
 from blueprints.live_game_api import _authorized_context, _broadcast_state
 
 
 live_game_clock_bp = Blueprint('live_game_clock', __name__, url_prefix='/api/live-game')
+
+# Recorded events that are not a defensive change made during play.
+NOT_PLAY = frozenset({'End Inning', 'End Game', INNING_STARTED}) | AVAILABILITY_EVENTS
 
 
 def _utcnow_naive():
@@ -120,15 +123,37 @@ def _response_succeeded(response):
 
 
 def _current_inning_has_recorded_activity(game, team_id):
-    """Return True when the current inning is known to have begun.
+    """Return True when current-inning live changes prove that inning was used.
 
-    The same "inning started" participation uses (game_availability): the
-    coach answered "Yes, inning started" at an On the Field change, which
-    recorded an 'Inning Started' marker. Changes saved as "Not yet" were
-    lineup fixes before the inning, and Arrived / Left events are
-    bookkeeping; neither proves the inning was played.
+    End Inning starts the next inning (with an 'Inning Started' marker,
+    game_availability), but time can be called before it is played. Only a
+    defensive change recorded after that transition proves play. The start
+    marker, an arrival or departure, and a setup edit saved as "Not yet" by
+    an older version of CoachBoard (pre_start) are bookkeeping, not play.
     """
-    return inning_has_started(game, team_id)
+    current = str(game.live_current_inning or '1')
+    transition = db.session.query(GameRotationEvent).filter_by(
+        game_id=game.id,
+        team_id=team_id,
+        inning=current,
+        event_type='End Inning',
+        reverted=False,
+    ).order_by(GameRotationEvent.sequence.desc(), GameRotationEvent.id.desc()).first()
+    transition_sequence = int(transition.sequence or 0) if transition else 0
+
+    events = db.session.query(GameRotationEvent).filter_by(
+        game_id=game.id,
+        team_id=team_id,
+        inning=current,
+        reverted=False,
+    ).order_by(GameRotationEvent.sequence.asc(), GameRotationEvent.id.asc()).all()
+
+    return any(
+        event.event_type not in NOT_PLAY
+        and event.pre_start is not True
+        and int(event.sequence or 0) > transition_sequence
+        for event in events
+    )
 
 
 def _adjust_unplayed_current_inning(game, team_id):
@@ -165,10 +190,10 @@ def _adjust_unplayed_current_inning(game, team_id):
         reverted=False,
     ).order_by(GameRotationEvent.sequence.desc(), GameRotationEvent.id.desc()).first()
 
-    # The inning never began, so nothing recorded in it happened on the
-    # field: "Not yet" edits to its loaded defense are withdrawn with the
-    # transition, while an arrival or departure stays a fact of the game and
-    # moves back to the last inning played, as the End Game marker does.
+    # The inning was never played: its start marker (and any setup edit an
+    # older version saved as "Not yet") is withdrawn with the transition,
+    # while an arrival or departure stays a fact of the game and moves back
+    # to the last inning played, as the End Game marker does.
     unplayed = db.session.query(GameRotationEvent).filter(
         GameRotationEvent.game_id == game.id,
         GameRotationEvent.team_id == team_id,
@@ -307,8 +332,8 @@ def capture_live_game_clock_lifecycle():
             return jsonify({
                 'status': 'error',
                 'message': (
-                    f'Inning {game.live_current_inning} was recorded as started, so CoachBoard will not erase it as unplayed. '
-                    'Choose that the inning was played.'
+                    f'Inning {game.live_current_inning} already has a recorded live change, so CoachBoard will not erase it as unplayed. '
+                    'Choose that the inning was played, or undo the recorded change first.'
                 ),
             }), 409
     return None

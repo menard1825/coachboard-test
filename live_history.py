@@ -1,17 +1,16 @@
 """Live events as baseball history: setup before an inning begins vs play.
 
-End Inning (and Start Game, for the 1st) only loads an inning's defense.
-The coach may still edit it before the inning begins: the first On the
-Field change of an inning asks "Has the 4th inning started?"
-(game_availability.py). The answer is saved on the change:
+An earlier version asked "Has the 4th inning started?" at the first On the
+Field change of an inning, and saved the answer on the change. Today Start
+Game and End Inning start each inning (game_availability.py) and every
+change is made during play, but the recorded answers stay meaningful:
 
 * pre_start = True  -- "Not yet": a setup edit. It is an official field edit
   (it builds the current alignment and the inning's starting defense, and
   Undo takes it back), but no baseball happened: it is not a substitution
   or a pitching change.
-* pre_start = False -- made after the coach said the inning had started (an
-  'Inning Started' marker precedes it in that inning): an in-game change.
-* pre_start = None  -- recorded before this question existed. Such games keep
+* pre_start = False -- a change during play.
+* pre_start = None  -- recorded before the question existed. Such games keep
   exactly their existing history.
 
 Field reconstruction (_actual_rotation, actual_game_rotation) uses every

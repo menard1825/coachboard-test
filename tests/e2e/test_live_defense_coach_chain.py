@@ -3,8 +3,9 @@
 "Sam is moving to SS" says nothing about Shawn, who is at SS. CoachBoard
 asks where Shawn goes -- never swapping, benching or moving him on its own
 -- and follows the chain until every displaced player has a place the coach
-chose. The whole chain is shown for review and saved as one defensive
-change (one Undo). Tap and drag ask the same question.
+chose. The whole chain is saved as one defensive change (one Undo): a
+change involving two players as soon as the coach makes the second choice,
+three or more after one final review. Tap and drag ask the same question.
 """
 
 import os
@@ -112,15 +113,14 @@ def test_explicit_swap_is_one_change_and_one_undo(page: Page, coachboard_url, li
         'Put Shortstop Shawn at 2B', 'Move Shortstop Shawn to another position…',
         'Bench Shortstop Shawn', 'Cancel',
     ]
-    pick(sheet, 'Put Shortstop Shawn at 2B')
-    # The swap is complete once chosen: nobody is asked about again.
-    expect_review(sheet, ['Second Sam: 2B → SS', 'Shortstop Shawn: SS → 2B'])
     page.wait_for_timeout(400)
     assert writes == []
     assert filled(live_state(page, coachboard_url, game_id)['current_alignment']) == BASE
 
-    pick(sheet, 'Make this change')
+    # The coach's second choice completes the swap: saved, no second confirmation.
+    pick(sheet, 'Put Shortstop Shawn at 2B')
     wait_for_field(page, coachboard_url, game_id, SWAPPED)
+    expect(sheet).not_to_be_visible(timeout=10_000)
     assert len(writes) == 1
     state = live_state(page, coachboard_url, game_id)
     assert len(events(state)) == before_events + 1
@@ -133,8 +133,6 @@ def test_displaced_player_to_bench(page: Page, coachboard_url, live_field):
     game_id = live_field()
     sheet = tap_move(page, field_player('2B'), 'SS')
     pick(sheet, 'Bench Shortstop Shawn')
-    expect_review(sheet, ['Second Sam: 2B → SS', 'Shortstop Shawn: SS → Bench', '2B: open'])
-    pick(sheet, 'Make this change')
     expected = {pos: n for pos, n in BASE.items() if pos != '2B'}
     expected['SS'] = 'Second Sam'
     wait_for_field(page, coachboard_url, game_id, expected)
@@ -177,9 +175,8 @@ def test_bench_player_in_occupant_to_bench(page: Page, coachboard_url, live_fiel
         'Move Shortstop Shawn to another position…', 'Bench Shortstop Shawn', 'Cancel',
     ]
     pick(sheet, 'Bench Shortstop Shawn')
-    expect_review(sheet, [f'{RELIEVER}: Bench → SS', 'Shortstop Shawn: SS → Bench'])
-    pick(sheet, 'Make this change')
     wait_for_field(page, coachboard_url, game_id, dict(BASE, SS=RELIEVER))
+    expect(sheet).not_to_be_visible(timeout=10_000)
 
 
 def test_bench_player_in_occupant_to_another_position(page: Page, coachboard_url, live_field):
@@ -214,8 +211,10 @@ def test_cancel_at_first_step_and_midway_changes_nothing(page: Page, coachboard_
     expect(sheet).not_to_be_visible(timeout=10_000)
 
     sheet = tap_move(page, field_player('2B'), 'SS')
-    pick(sheet, 'Put Shortstop Shawn at 2B')
-    pick(sheet, 'Cancel')
+    pick(sheet, 'Move Shortstop Shawn to another position…')
+    pick(sheet, '1B · First Frank')
+    pick(sheet, 'Put First Frank at 2B')
+    pick(sheet, 'Cancel')                      # at the three-player review
     expect(sheet).not_to_be_visible(timeout=10_000)
 
     page.wait_for_timeout(500)
@@ -269,7 +268,6 @@ def test_drag_asks_the_same_question_and_makes_the_same_change(
     assert filled(live_state(page, coachboard_url, game_id)['current_alignment']) == BASE
 
     pick(sheet, 'Put Shortstop Shawn at 2B')
-    pick(sheet, 'Make this change')
     wait_for_field(page, coachboard_url, game_id, SWAPPED)
     assert len(writes) == 1
 

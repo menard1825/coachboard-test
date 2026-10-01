@@ -103,6 +103,15 @@ def finish_game(page: Page, url: str, game_id: int, pitcher: str, pitches, innin
     assert response.ok, response.text()[:300]
 
 
+def current_sequence(state):
+    """The live version to save against (Start Game already recorded the 1st
+    inning's start)."""
+    return max(
+        [int(e.get('sequence') or 0) for e in state.get('rotation_events', []) if not e.get('reverted')]
+        or [0]
+    )
+
+
 def live_state(page: Page, url: str, game_id: int):
     response = page.request.get(f'{url}/api/live-game/{game_id}/state')
     assert response.ok, response.text()[:300]
@@ -291,7 +300,7 @@ def test_old_pitch_anyway_cannot_bypass_the_warning(
         response = page.request.post(
             f'{coachboard_url}/api/live-game/{game_id}/complete-pitcher-change',
             data={
-                'base_sequence': 0, 'fast': True, 'new_pitcher_id': shawn_id,
+                'base_sequence': current_sequence(state), 'fast': True, 'new_pitcher_id': shawn_id,
                 'alignment': dict(BASE, P='Shortstop Shawn', SS='Pitcher Pat'),
                 **flags,
             },
@@ -302,7 +311,7 @@ def test_old_pitch_anyway_cannot_bypass_the_warning(
     # The deprecated route has no decision path at all.
     response = page.request.post(
         f'{coachboard_url}/api/live-game/{game_id}/change-pitcher',
-        data={'base_sequence': 0, 'new_pitcher_id': shawn_id, 'pitch_anyway': True},
+        data={'base_sequence': current_sequence(state), 'new_pitcher_id': shawn_id, 'pitch_anyway': True},
     )
     assert response.status == 409, response.text()
     assert response.json().get('code') == 'pitcher_rule_conflict', response.text()
@@ -473,9 +482,8 @@ def take_pat_off_the_mound(page: Page, url: str, game_id: int):
     state = live_state(page, url, game_id)
     frank = next(p['id'] for p in state['roster'] if p['name'] == 'First Frank')
     post_json(page, url, f'/api/live-game/{game_id}/complete-pitcher-change', {
-        'base_sequence': 0, 'fast': True, 'new_pitcher_id': frank,
+        'base_sequence': current_sequence(state), 'fast': True, 'new_pitcher_id': frank,
         'alignment': dict(BASE, P='First Frank', **{'1B': 'Pitcher Pat'}),
-        'inning_started': True,  # during play: Pat pitched, then came off the mound
     })
 
 
