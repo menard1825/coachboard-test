@@ -9,6 +9,7 @@ the save queue as one alignment; an unresolved one never does.
 """
 
 import os
+import re
 
 import pytest
 
@@ -86,6 +87,61 @@ def test_open_and_bench_moves_stay_immediate(page: Page, coachboard_url, next_bo
     expected = dict(START, CF='Left Lee', LF='Center Casey')
     wait_for_server(page, coachboard_url, game_id, expected)
     assert posts
+
+
+
+def test_tapping_open_position_asks_who_plays_there(
+    page: Page, coachboard_url, next_board
+):
+    board, game_id = next_board
+
+    # Make 2B open, then start from the coaching question: "Who plays 2B?"
+    bench(board, '2B')
+    wait_for_server(
+        page, coachboard_url, game_id,
+        {pos: name for pos, name in START.items() if pos != '2B'},
+    )
+
+    spot(board, '2B').click()
+    picker = page.locator('#cbNextOpenPositionPicker')
+    expect(picker).to_be_visible(timeout=5_000)
+    expect(picker.locator('[data-open-position-title]')).to_have_text(
+        'Who plays 2B in the 2nd?'
+    )
+    expect(picker).to_contain_text('Bench')
+    expect(picker).to_contain_text('On the field')
+
+    # The old full-board "STEP 2 · CHOOSE PLAYER" mode is gone.
+    expect(board.locator('[data-next-cancel]')).to_have_count(0)
+
+    # Choosing a fielder moves them into the open spot and leaves their
+    # previous position open.
+    picker.get_by_role(
+        'button',
+        name=re.compile(r'Shortstop Shawn .* SS'),
+    ).click()
+    expect(picker).to_be_hidden(timeout=5_000)
+
+    expected = {
+        pos: name for pos, name in START.items()
+        if pos not in {'2B', 'SS'}
+    }
+    expected['2B'] = 'Shortstop Shawn'
+    wait_for_server(page, coachboard_url, game_id, expected)
+
+    # Fill the newly open SS directly from the bench.
+    spot(board, 'SS').click()
+    expect(picker).to_be_visible(timeout=5_000)
+    expect(picker.locator('[data-open-position-title]')).to_have_text(
+        'Who plays SS in the 2nd?'
+    )
+    picker.get_by_role(
+        'button',
+        name=re.compile(r'Second Sam'),
+    ).click()
+
+    swapped = dict(START, SS='Second Sam', **{'2B': 'Shortstop Shawn'})
+    wait_for_server(page, coachboard_url, game_id, swapped)
 
 
 def test_occupied_move_asks_and_an_explicit_swap_saves_once(page: Page, coachboard_url, next_board):
