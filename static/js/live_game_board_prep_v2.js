@@ -2403,41 +2403,89 @@
       : null;
   }
 
+  // Every saved plan key with a defense, in order: whole innings ("3") and
+  // planned changes during an inning ("3.5", shown as "3+").
+  function planKeys() {
+    return Object.keys(latest?.pregame_rotation || {})
+      .filter(key => Number.isFinite(Number.parseFloat(key)) && planFor(key))
+      .sort((a, b) => Number.parseFloat(a) - Number.parseFloat(b));
+  }
+
+  const isMidInning = key => String(key).includes('.');
+  const wholeInning = key => String(Math.floor(Number.parseFloat(key)));
+
   // One button per scheduled inning: the game's inning count, widened to
   // the inning being played and to any planned inning beyond it.
   function scheduledInnings() {
     const playing = Number.parseInt(latest?.current_inning || '', 10) || 1;
-    const planned = Object.keys(latest?.pregame_rotation || {})
-      .filter(key => /^\d+$/.test(key) && planFor(key))
-      .map(Number);
+    const planned = planKeys().map(key => Math.floor(Number.parseFloat(key)));
 
     return Math.max(Number(latest?.regulation_innings) || 0, playing, ...planned, 1);
+  }
+
+  // The scheduled innings, each followed by any change planned during it.
+  function planNavKeys() {
+    const total = scheduledInnings();
+    const mid = planKeys().filter(isMidInning);
+    const keys = [];
+
+    for (let inning = 1; inning <= total; inning += 1) {
+      keys.push(String(inning));
+      mid.filter(key => wholeInning(key) === String(inning)).forEach(key => keys.push(key));
+    }
+    return keys;
+  }
+
+  function presentNames() {
+    return new Set((latest?.roster || []).map(player => player.name));
+  }
+
+  // Who was here for an inning: for an inning already played, what the game
+  // recorded for that inning (null when it has nothing); otherwise today.
+  function hereFor(key) {
+    const inning = Number.parseInt(key, 10);
+    const playing = Number.parseInt(latest?.current_inning || '', 10);
+
+    if (Number.isFinite(inning) && Number.isFinite(playing) && inning < playing) {
+      const available = latest?.played_innings?.[String(inning)]?.available;
+      return Array.isArray(available) ? new Set(available) : null;
+    }
+    return presentNames();
   }
 
   function gameDefenseFor(key) {
     const current = String(latest?.current_inning || '');
     const ordinal = inningOrdinal(key);
+    const here = hereFor(key);
+
+    // A change planned during an inning: the game keeps no record of its own
+    // for it, so the plan is shown on its own.
+    if (isMidInning(key)) {
+      return {kind: 'midplan', label: '', alignment: null, here};
+    }
 
     if (key === current) {
-      return {kind: 'now', label: 'On the field now', alignment: latest?.current_alignment || {}};
+      return {kind: 'now', label: 'On the field now', alignment: latest?.current_alignment || {}, here};
     }
 
     if (key === String(latest?.next_inning || '')) {
-      return {kind: 'next', label: 'Next inning', alignment: snapshot()};
+      return {kind: 'next', label: 'Next inning', alignment: snapshot(), here};
     }
 
     const inning = Number.parseInt(key, 10);
     const playing = Number.parseInt(current, 10);
 
     if (Number.isFinite(inning) && Number.isFinite(playing) && inning < playing) {
-      const record = latest?.actual_rotation?.[key];
+      // Only what the game recorded (End Inning, or a later correction) --
+      // never the plan, however untouched (live_game_ui._played_innings).
+      const record = latest?.played_innings?.[key]?.alignment;
 
       return record && Object.values(record).some(Boolean)
-        ? {kind: 'played', label: `How the ${ordinal} ended`, alignment: record}
-        : {kind: 'norec', label: `How the ${ordinal} ended`, alignment: null};
+        ? {kind: 'played', label: `How the ${ordinal} ended`, alignment: record, here}
+        : {kind: 'norec', label: `How the ${ordinal} ended`, alignment: null, here};
     }
 
-    return {kind: 'later', label: '', alignment: null};
+    return {kind: 'later', label: '', alignment: null, here};
   }
 
   function planRows(plan, game) {
@@ -2473,26 +2521,27 @@
     return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0] || '';
   }
 
-  function planName(name) {
-    const player = playerByName(name);
-    const number = String(player?.number ?? '').trim();
+  // "Not here": not available in that inning (unknown availability: no
+  // label rather than a guess).
+  function planName(name, here) {
+    const number = String(playerByName(name)?.number ?? '').trim();
 
     return `<span class="cb-plan-nm">${esc(name)}${
-      number ? `<small>#${esc(number)}</small>` : player ? '' : '<small>Not here</small>'
-    }</span>`;
+      number ? `<small>#${esc(number)}</small>` : ''
+    }${here && !here.has(name) ? '<small>Not here</small>' : ''}</span>`;
   }
 
   function gameCell(row, game) {
     if (game.kind === 'norec') return '<span class="cb-plan-norec">No record</span>';
-    if (game.kind === 'later') return '<span class="cb-plan-norec">Not set yet</span>';
+    if (game.kind === 'later' || game.kind === 'midplan') return '<span class="cb-plan-norec">Not set yet</span>';
     if (row.empty) return '<span class="cb-plan-emp">Empty</span>';
 
-    return `${planName(row.actual)}${row.changed ? '<span class="cb-plan-flag">Changed</span>' : ''}`;
+    return `${planName(row.actual, game.here)}${row.changed ? '<span class="cb-plan-flag">Changed</span>' : ''}`;
   }
 
   function rowState(row, game) {
     if (game.kind === 'norec') return 'norec';
-    if (game.kind === 'later') return 'later';
+    if (game.kind === 'later' || game.kind === 'midplan') return 'later';
     return row.empty ? 'empty' : 'name';
   }
 
@@ -2500,26 +2549,29 @@
     return `data-plan-live-differs="${row.differs ? 'true' : 'false'}" data-plan-changed="${row.changed ? 'true' : 'false'}" data-plan-planned="${esc(row.planned)}" data-plan-actual="${esc(row.actual)}" data-plan-state="${rowState(row, game)}"`;
   }
 
-  function plannedCell(row) {
-    return row.planned ? planName(row.planned) : '<span class="cb-plan-na">Not in plan</span>';
+  function plannedCell(row, game) {
+    return row.planned ? planName(row.planned, game.here) : '<span class="cb-plan-na">Not in plan</span>';
   }
 
-  function benchNames(names) {
+  // Who sits: the players here for that inning (game.here) less the
+  // defense. An inning already played uses that inning's recorded
+  // availability, never today's; with none recorded, no list is made up.
+  function benchNames(names, here) {
+    if (!here) return '<span class="cb-plan-na">Bench not recorded</span>';
+
     const used = new Set(names.filter(Boolean));
-    const bench = (latest?.roster || [])
-      .filter(player => !used.has(player.name))
-      .map(player => player.name)
+    const bench = [...here]
+      .filter(name => !used.has(name))
       .sort((a, b) => a.localeCompare(b));
 
     return bench.length ? bench.map(name => esc(playerLabel(name))).join(', ') : 'Nobody';
   }
 
   // The plan stores no bench of its own: list who it leaves out only when it
-  // places every position. Players here for this game (the roster sent with
-  // the board) are the only ones listed.
-  function planBench(plan) {
+  // places every position.
+  function planBench(plan, here) {
     return positions().every(pos => plan[pos])
-      ? benchNames(positions().map(pos => plan[pos]))
+      ? benchNames(positions().map(pos => plan[pos]), here)
       : '<span class="cb-plan-na">Bench not specified</span>';
   }
 
@@ -2540,7 +2592,9 @@
         ? ''
         : game.kind === 'norec'
           ? `<div class="cb-plan-note">No record of how the ${esc(ordinal)} ended. Showing the pregame plan only.</div>`
-          : '';
+          : game.kind === 'midplan'
+            ? `<div class="cb-plan-note">A change the plan makes during the ${esc(ordinal)}. The game keeps no separate record of it, so this is the plan only.</div>`
+            : '';
       const heading = plan ? 'Pregame plan' : game.label;
 
       return `${note}<div class="cb-plan-list single">
@@ -2549,14 +2603,14 @@
           <div class="cb-plan-row" data-plan-row="${esc(row.pos)}" ${rowData(row, game)}>
             <span class="cb-plan-pos">${esc(row.pos)}</span>
             ${plan
-              ? `<span class="cb-plan-planned">${plannedCell(row)}</span>`
+              ? `<span class="cb-plan-planned">${plannedCell(row, game)}</span>`
               : `<span class="cb-plan-game">${gameCell(row, game)}</span>`}
           </div>`).join('')}
         <div class="cb-plan-row cb-plan-bench" data-plan-row="bench">
           <span class="cb-plan-pos">Bench</span>
           ${plan
-            ? `<span class="cb-plan-planned">${planBench(plan)}</span>`
-            : `<span class="cb-plan-game">${benchNames(positions().map(pos => game.alignment[pos]))}</span>`}
+            ? `<span class="cb-plan-planned">${planBench(plan, game.here)}</span>`
+            : `<span class="cb-plan-game">${benchNames(positions().map(pos => game.alignment[pos]), game.here)}</span>`}
         </div>
       </div>`;
     }
@@ -2568,14 +2622,14 @@
       ${shown.map(row => `
         <div class="cb-plan-row" data-plan-row="${esc(row.pos)}" ${rowData(row, game)}>
           <span class="cb-plan-pos">${esc(row.pos)}</span>
-          <span class="cb-plan-planned">${plannedCell(row)}</span>
+          <span class="cb-plan-planned">${plannedCell(row, game)}</span>
           <span class="cb-plan-game">${gameCell(row, game)}</span>
         </div>`).join('')}
       ${shown.length ? '' : '<div class="cb-plan-row"><span></span><span class="cb-plan-note">No changes or empty positions.</span></div>'}
       <div class="cb-plan-row cb-plan-bench" data-plan-row="bench">
         <span class="cb-plan-pos">Bench</span>
-        <span class="cb-plan-planned">${planBench(plan)}</span>
-        <span class="cb-plan-game">${benchNames(positions().map(pos => game.alignment[pos]))}</span>
+        <span class="cb-plan-planned">${planBench(plan, game.here)}</span>
+        <span class="cb-plan-game">${benchNames(positions().map(pos => game.alignment[pos]), game.here)}</span>
       </div>
     </div>`;
   }
@@ -2601,7 +2655,7 @@
       const planned = plan
         ? `<span class="cb-plan-spot-plan">${row.planned ? esc(shortName(row.planned)) : '<span class="cb-plan-na">Not in plan</span>'}</span>`
         : '';
-      const actual = game.kind === 'later'
+      const actual = game.kind === 'later' || game.kind === 'midplan'
         ? ''
         : `<span class="cb-plan-spot-game">${
             game.kind === 'norec'
@@ -2613,7 +2667,7 @@
       const label = [
         row.pos,
         plan ? `plan: ${row.planned || 'not in plan'}` : '',
-        game.kind === 'later' ? '' : `${game.label.toLowerCase()}: ${
+        game.kind === 'later' || game.kind === 'midplan' ? '' : `${game.label.toLowerCase()}: ${
           game.kind === 'norec' ? 'no record' : row.actual || 'empty'
         }`,
         row.changed ? 'changed' : '',
@@ -2656,11 +2710,16 @@
     </div>`;
   }
 
+  // "3" for an inning, "3+" for a change planned during it.
+  function planKeyLabel(key) {
+    return isMidInning(key) ? `${wholeInning(key)}+` : String(key);
+  }
+
   // Plan against the plan's own inning before (unchanged wording).
   function planChangeLine(key, plan) {
-    const earlier = Object.keys(latest?.pregame_rotation || {})
-      .filter(other => /^\d+$/.test(other) && Number(other) < Number(key) && planFor(other))
-      .sort((a, b) => Number(b) - Number(a))[0];
+    const earlier = planKeys()
+      .filter(other => Number.parseFloat(other) < Number.parseFloat(key))
+      .pop();
 
     if (!earlier) return '<div class="cb-plan-changes">First inning of the plan</div>';
 
@@ -2670,8 +2729,8 @@
 
     return `<div class="cb-plan-changes${changed.length ? ' has-changes' : ''}">${
       changed.length
-        ? `Plan change from Inning ${esc(earlier)}: ${esc(changed.join(', '))}`
-        : `Plan: same as Inning ${esc(earlier)}`
+        ? `Plan change from Inning ${esc(planKeyLabel(earlier))}: ${esc(changed.join(', '))}`
+        : `Plan: same as Inning ${esc(planKeyLabel(earlier))}`
     }</div>`;
   }
 
@@ -2717,8 +2776,7 @@
 
     if (!card) return;
 
-    const hasAnyPlan = Object.keys(latest?.pregame_rotation || {})
-      .some(key => /^\d+$/.test(key) && planFor(key));
+    const hasAnyPlan = planKeys().length > 0;
     let html;
 
     if (!hasAnyPlan) {
@@ -2732,8 +2790,7 @@
     } else {
       const currentInning = String(latest?.current_inning || '');
       const nextInning = String(latest?.next_inning || '');
-      const total = scheduledInnings();
-      const keys = Array.from({length: total}, (_, index) => String(index + 1));
+      const keys = planNavKeys();
 
       // Open on the next inning -- usually what a coach wants between
       // innings -- and keep the coach's choice until the live inning moves.
@@ -2752,32 +2809,36 @@
       const onlyChanges = comparable && planOnlyChanges;
       const playing = Number.parseInt(currentInning, 10);
       const when = value => {
-        const number = Number(value);
-        if (value === currentInning) return 'Now';
-        if (value === nextInning) return 'Next';
-        return Number.isFinite(playing) && number < playing ? 'Played' : 'Later';
+        const inning = wholeInning(value);
+        if (inning === currentInning) return 'Now';
+        if (inning === nextInning) return 'Next';
+        return Number.isFinite(playing) && Number(inning) < playing ? 'Played' : 'Later';
       };
-      const tag = key === currentInning
-        ? 'On now'
-        : key === nextInning
-          ? 'Next inning'
-          : when(key);
+      const tag = isMidInning(key)
+        ? 'Planned change'
+        : key === currentInning
+          ? 'On now'
+          : key === nextInning
+            ? 'Next inning'
+            : when(key);
 
       const buttons = keys.map(value => {
         const has = Boolean(planFor(value));
         const differs = planDiffers(value);
 
-        return `<button type="button" class="cb-plan-inning-btn" data-plan-inning="${esc(value)}" data-plan-has="${has ? 'true' : 'false'}" data-plan-live-differs="${differs ? 'true' : 'false'}" aria-pressed="${value === key ? 'true' : 'false'}" aria-label="${esc(
-          `${inningOrdinal(value)} inning, ${when(value).toLowerCase()}, ${has ? 'has a pregame plan' : 'no pregame plan'}${differs ? ', game differed from the plan' : ''}`
-        )}"><b>${esc(value)}</b><small>${esc(when(value))}</small></button>`;
+        const label = isMidInning(value)
+          ? `Change planned during the ${inningOrdinal(value)} inning, ${when(value).toLowerCase()}`
+          : `${inningOrdinal(value)} inning, ${when(value).toLowerCase()}, ${has ? 'has a pregame plan' : 'no pregame plan'}${differs ? ', game differed from the plan' : ''}`;
+
+        return `<button type="button" class="cb-plan-inning-btn" data-plan-inning="${esc(value)}" data-plan-has="${has ? 'true' : 'false'}" data-plan-live-differs="${differs ? 'true' : 'false'}" aria-pressed="${value === key ? 'true' : 'false'}" aria-label="${esc(label)}"><b>${esc(planKeyLabel(value))}</b><small>${esc(when(value))}</small></button>`;
       }).join('');
 
       html = `
         <div class="cb-plan-head">
-          <h3 class="cb-plan-inning-title">Pregame plan · ${esc(inningOrdinal(key))}<span class="cb-plan-inw"> inning</span><span class="cb-plan-tag">${esc(tag)}</span></h3>
+          <h3 class="cb-plan-inning-title">Pregame plan · ${isMidInning(key) ? 'during the ' : ''}${esc(inningOrdinal(key))}<span class="cb-plan-inw"> inning</span><span class="cb-plan-tag">${esc(tag)}</span></h3>
           <div class="cb-plan-readonly">Reference only</div>
         </div>
-        <div class="cb-plan-innings" role="group" aria-label="Choose inning" style="grid-template-columns:repeat(${Math.min(total, 9)},minmax(0,1fr))">${buttons}</div>
+        <div class="cb-plan-innings" role="group" aria-label="Choose inning" style="grid-template-columns:repeat(${Math.min(keys.length, 9)},minmax(0,1fr))">${buttons}</div>
         <div class="cb-plan-key"><span><i></i>Has a plan</span><span><i class="none"></i>No plan</span><span><i class="dot"></i>Game differed</span></div>
         ${planSummary(key, plan, game, rows)}
         ${plan ? planChangeLine(key, plan) : ''}

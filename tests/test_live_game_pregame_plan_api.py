@@ -271,3 +271,102 @@ def test_get_returns_the_games_scheduled_innings(monkeypatch):
         db.session.commit()
 
     assert _prep(client)['regulation_innings'] == 7
+
+
+# How a played inning ended: recorded evidence only ---------------------------
+
+ENDED_ONE = dict(INNING_ONE, RF='Jack')     # the 1st as the game recorded it
+
+
+def _add_event(app, sequence, event_type, inning, before=None, after=None, **extra):
+    from db import db
+    from models import GameRotationEvent
+
+    with app.app_context():
+        db.session.add(GameRotationEvent(
+            game_id=70,
+            team_id=1,
+            sequence=sequence,
+            event_type=event_type,
+            inning=inning,
+            before_alignment=before,
+            after_alignment=after,
+            reverted=extra.pop('reverted', False),
+            **extra,
+        ))
+        db.session.commit()
+
+
+def test_an_untouched_plan_is_not_how_a_played_inning_ended(monkeypatch):
+    """The game is in the 2nd but nothing recorded how the 1st ended: the
+    plan, copied into actual_rotation, must not be presented as the record."""
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+    _login(client)
+
+    payload = _prep(client)
+
+    assert payload['actual_rotation']['1'] == INNING_ONE      # the plan, as before
+    assert payload['played_innings']['1']['alignment'] is None
+    assert payload['played_innings']['1']['recorded_by'] is None
+    assert list(payload['played_innings']) == ['1']          # the 2nd is being played
+
+
+def test_end_inning_records_how_the_inning_ended(monkeypatch):
+    app = _build_app(monkeypatch)
+    _add_event(app, 1, 'End Inning', '2', before=ENDED_ONE, after=INNING_TWO)
+    client = app.test_client()
+    _login(client)
+
+    played = _prep(client)['played_innings']['1']
+
+    assert played['alignment'] == ENDED_ONE
+    assert played['recorded_by'] == 'end_inning'
+
+
+def test_an_undone_end_inning_is_no_record(monkeypatch):
+    app = _build_app(monkeypatch)
+    _add_event(app, 1, 'End Inning', '2', before=ENDED_ONE, after=INNING_TWO, reverted=True)
+    client = app.test_client()
+    _login(client)
+
+    assert _prep(client)['played_innings']['1']['alignment'] is None
+
+
+def test_a_later_correction_is_the_record(monkeypatch):
+    corrected = dict(ENDED_ONE, LF='Jack', RF='Gavin')
+    app = _build_app(monkeypatch)
+    _add_event(app, 1, 'End Inning', '2', before=ENDED_ONE, after=INNING_TWO)
+    _add_event(app, 2, 'Postgame Correction', '1', before=ENDED_ONE, after=corrected)
+    client = app.test_client()
+    _login(client)
+
+    played = _prep(client)['played_innings']['1']
+
+    assert played['alignment'] == corrected
+    assert played['recorded_by'] == 'correction'
+
+
+def test_a_played_innings_availability_is_that_innings_not_todays(monkeypatch):
+    """Jack was Out at first pitch and arrived for the 2nd: here now, but not
+    available in the 1st -- so not on the 1st inning's bench."""
+    app = _build_app(monkeypatch)
+
+    from db import db
+    from models import PlayerGameAbsence
+
+    with app.app_context():
+        db.session.add(PlayerGameAbsence(player_id=10, game_id=70, team_id=1))
+        db.session.commit()
+    _add_event(app, 1, 'End Inning', '2', before=INNING_ONE, after=INNING_TWO)
+    _add_event(app, 2, 'Player Arrived', '2', before=INNING_TWO, after=INNING_TWO,
+               subject_player_id=10, effective_inning=2)
+    client = app.test_client()
+    _login(client)
+
+    payload = _prep(client)
+
+    assert 'Jack' in {player['name'] for player in payload['roster']}      # here now
+    assert 'Jack' not in payload['played_innings']['1']['available']       # not in the 1st
+    assert set(payload['played_innings']['1']['available']) == {
+        'Aiden', 'Bennett', 'Carter', 'Drew', 'Eli', 'Finn', 'Gavin', 'Hudson', 'Isaac'}

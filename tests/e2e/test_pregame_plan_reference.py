@@ -233,11 +233,11 @@ def test_a_played_inning_with_no_record_is_never_called_empty(live, coachboard_u
     page = live(device)
     _advance(page, coachboard_url)
 
-    # An older game: the 1st inning has no saved record at all.
+    # An older game: nothing recorded how the 1st ended.
     def drop_record(route):
         response = route.fetch()
         payload = response.json()
-        payload.get('actual_rotation', {}).pop('1', None)
+        payload['played_innings']['1'].update(alignment=None, recorded_by=None)
         route.fulfill(response=response, body=json.dumps(payload))
 
     page.route('**/next-inning-prep', drop_record)
@@ -421,4 +421,121 @@ def test_layout_reads_at_every_size(live, coachboard_url, size):
         stacked = data['field']['t'] >= data['list']['b'] - 1
         assert side_by_side or stacked, data
         assert side_by_side, ('iPad and wider show list and field together', data)
+    assert page.cb_errors == []
+
+
+# Recorded history ---------------------------------------------------------------------------
+
+def test_an_untouched_plan_never_becomes_how_an_inning_ended(live, coachboard_url):
+    """The game's own data copies the plan for every inning (actual_rotation);
+    only End Inning (or a correction) records how a played inning ended. Here
+    the 3rd is being played but nothing was recorded for the 1st or the 2nd."""
+    page = live(DESKTOP)
+    seen = {}
+
+    def in_the_third(route):
+        response = route.fetch()
+        payload = response.json()
+        payload.update(current_inning='3', next_inning='4', played_innings={})
+        seen.update(payload)
+        route.fulfill(response=response, body=json.dumps(payload))
+
+    page.route('**/next-inning-prep', in_the_third)
+    card = _open_plan(page, coachboard_url, 2)
+    assert seen['actual_rotation']['2'] == INNING_2            # the trap: the plan, copied
+    expect(card.locator('[data-plan-row="P"]')).to_have_attribute('data-plan-state', 'norec')
+    assert set(_states(card).values()) == {'norec'}, _states(card)
+    expect(card).not_to_contain_text('How the 2nd ended')
+    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_count(0)
+    expect(card.locator('[data-plan-inning="2"]')).to_have_attribute('data-plan-live-differs', 'false')
+    # No availability recorded for the 2nd either: no bench made up from today.
+    expect(card.locator('.cb-plan-bench .cb-plan-planned')).to_have_text('Bench not recorded')
+    page.unroute('**/next-inning-prep')
+    assert page.cb_errors == []
+
+
+def test_a_played_innings_bench_is_that_innings_not_todays(live, coachboard_url):
+    page = live(DESKTOP)
+    _advance(page, coachboard_url)
+    left_early = 'Pitcher Pat'                    # on the bench, here today
+
+    # Pitcher Pat was not here in the 1st (as the game recorded it).
+    def without_pat_in_the_first(route):
+        response = route.fetch()
+        payload = response.json()
+        first = payload['played_innings']['1']
+        first['available'] = [name for name in first['available'] if name != left_early]
+        route.fulfill(response=response, body=json.dumps(payload))
+
+    page.route('**/next-inning-prep', without_pat_in_the_first)
+    card = _open_plan(page, coachboard_url, 1)
+    expect(card.locator('.cb-plan-colhead .cb-plan-game')).to_have_text('How the 1st ended')
+    for column in ('.cb-plan-planned', '.cb-plan-game'):
+        bench = card.locator(f'.cb-plan-bench {column}').inner_text()
+        assert bench and left_early not in bench, (column, bench)
+    # The inning being played uses today's availability: Pat is on that bench.
+    _show(page, 2)
+    assert left_early in card.locator('.cb-plan-bench .cb-plan-game').inner_text()
+    page.unroute('**/next-inning-prep')
+    assert page.cb_errors == []
+
+
+# Mid-inning plan keys --------------------------------------------------------------------
+
+def test_a_change_planned_during_an_inning_stays_reachable(live, coachboard_url):
+    page = live(PHONE)
+    during_second = {**INNING_2, 'P': INNING_1['P'], '1B': INNING_1['1B']}
+
+    def with_a_mid_inning_change(route):
+        response = route.fetch()
+        payload = response.json()
+        payload['pregame_rotation']['2.5'] = during_second
+        route.fulfill(response=response, body=json.dumps(payload))
+
+    page.route('**/next-inning-prep', with_a_mid_inning_change)
+    card = _open_plan(page, coachboard_url)
+    keys = card.locator('[data-plan-inning]').evaluate_all('els => els.map(el => el.dataset.planInning)')
+    assert keys[:4] == ['1', '2', '2.5', '3'], keys
+    button = card.locator('[data-plan-inning="2.5"]')
+    expect(button.locator('b')).to_have_text('2+')
+    assert 'during the 2nd' in button.get_attribute('aria-label')
+
+    _show(page, '2.5')
+    expect(card.locator('.cb-plan-inning-title')).to_contain_text('during the 2nd')
+    expect(card.locator('.cb-plan-inning-title')).to_contain_text('Planned change')
+    expect(card.locator('.cb-plan-listwrap .cb-plan-note')).to_contain_text('the plan only')
+    expect(card.locator('.cb-plan-list.single .cb-plan-colhead .cb-plan-planned')).to_have_text('Pregame plan')
+    for pos, name in during_second.items():
+        expect(card.locator(f'[data-plan-row="{pos}"]')).to_have_attribute('data-plan-planned', name)
+    expect(card.locator('[data-plan-only]')).to_be_disabled()
+    expect(card.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 2: P, 1B')
+    # The next planned inning compares with it, labelled as the mid-inning
+    # change: the 3rd's plan names first and third, as planned during the 2nd.
+    _show(page, '3')
+    expect(card.locator('.cb-plan-changes')).to_have_text('Plan: same as Inning 2+')
+    page.unroute('**/next-inning-prep')
+    assert page.cb_writes == []
+    assert page.cb_errors == []
+
+
+# Partial plans, unfiltered ---------------------------------------------------------------
+
+@DEVICES
+def test_a_partial_plan_shows_all_nine_positions_against_the_game(live, coachboard_url, device):
+    page = live(device, plan={'1': INNING_1, '2': INNING_3})     # the 2nd planned in part
+    _set_next(page, coachboard_url, INNING_1)                     # the whole field goes out
+    card = _open_plan(page, coachboard_url, 2)
+    rows = card.locator('.cb-plan-list [data-plan-row]:not([data-plan-row="bench"])')
+    expect(rows).to_have_count(9)
+    for pos, name in INNING_1.items():
+        row = card.locator(f'[data-plan-row="{pos}"]')
+        expect(row.locator('.cb-plan-game')).to_contain_text(name)
+        if pos in INNING_3:
+            expect(row.locator('.cb-plan-planned')).to_contain_text(INNING_3[pos])
+        else:
+            expect(row.locator('.cb-plan-planned')).to_have_text('Not in plan')
+            expect(row).to_have_attribute('data-plan-live-differs', 'true')
+    assert ['plan', 'Plan: 2 of 9 positions'] in _chips(card)
+    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_count(0)
+    expect(card.locator('.cb-plan-bench .cb-plan-planned')).to_have_text('Bench not specified')
     assert page.cb_errors == []

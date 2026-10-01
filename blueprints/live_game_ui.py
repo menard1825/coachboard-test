@@ -9,12 +9,14 @@ from sqlalchemy.exc import IntegrityError
 from asset_versioning import asset_url
 from db import db
 from extensions import socketio
-from game_availability import inning_has_only_setup_edits, present_players
-from models import Game, Rotation
+from game_availability import game_availability, inning_has_only_setup_edits, present_players
+from live_history import _event_order_key
+from models import Game, Player, Rotation
 from team_game_settings import regulation_innings_for_team
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
+    _events,
 )
 
 
@@ -184,6 +186,66 @@ def _next_prep_conflict(data, next_inning, prep, team):
     if filled(base) != filled(prep.alignment if prep else {}):
         return 'The Next Inning defense changed on another device.'
     return None
+
+
+def _played_innings(game, team, current_inning):
+    """For each inning before the current one: how it ended, if the game
+    recorded it, and who was here that inning.
+
+    The record is evidence, never the plan. End Inning stores the field
+    exactly as the inning ended (its before_alignment) on the event for the
+    inning it starts; a later postgame correction of an inning stores the
+    corrected defense. An inning with neither -- an untouched plan, an older
+    game -- has 'alignment': None, however its plan reads.
+
+    'available' is who was here in that inning: first-pitch Outs plus the
+    arrivals and departures recorded during the game, as the availability
+    windows replay them -- not today's availability.
+    """
+    try:
+        playing = float(str(current_inning))
+    except (TypeError, ValueError):
+        return {}
+    if playing <= 1:
+        return {}
+
+    events = sorted(_events(game.id, team.id), key=_event_order_key)
+    records = {}
+    inning = '1'
+    for event in events:
+        if event.reverted:
+            continue
+        if event.event_type == 'End Inning':
+            records[inning] = {
+                'alignment': deepcopy(event.before_alignment or {}),
+                'recorded_by': 'end_inning',
+            }
+            inning = str(event.inning)
+        elif event.event_type == 'Postgame Correction':
+            records[str(event.inning)] = {
+                'alignment': deepcopy(event.after_alignment or {}),
+                'recorded_by': 'correction',
+            }
+        elif event.event_type == 'Resume Game':
+            inning = str(event.inning)
+
+    roster = db.session.query(Player).filter_by(team_id=team.id).all()
+    availability = game_availability(game, team.id, roster=roster, events=events)
+    played = {}
+    for number in range(1, int(playing)):
+        key = str(number)
+        record = records.get(key)
+        if record and not any((record['alignment'] or {}).values()):
+            record = None
+        played[key] = {
+            'alignment': record['alignment'] if record else None,
+            'recorded_by': record['recorded_by'] if record else None,
+            'available': sorted(
+                player.name for player in roster
+                if availability.available_in(player.id, key)
+            ),
+        }
+    return played
 
 
 def _prep_for_game(game_id, team_id):
@@ -453,6 +515,9 @@ def next_inning_prep(game_id):
         # The game's scheduled innings (the team's effective regulation
         # innings, as Game Prep and the live state use), for Pregame Plan.
         'regulation_innings': regulation_innings_for_team(team),
+        # Innings already played: how each ended, only where the game
+        # recorded it, and who was here that inning (see _played_innings).
+        'played_innings': _played_innings(game, team, current_inning),
         'confirmed': _prep_dict(prep),
         'roster': [
             {
