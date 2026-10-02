@@ -40,6 +40,8 @@ A status nobody has named here is treated as a rule conflict: an unrecognized
 status must never pass without the coach's strongest confirmation.
 """
 
+from types import SimpleNamespace
+
 READY = 'ready'
 ADVISORY = 'advisory'
 RULE_CONFLICT = 'rule_conflict'
@@ -338,6 +340,54 @@ def carry_planned_pitcher(planned, current_alignment, events, present_names=None
         here = present_names is None or planned_p in present_names
         alignment[spot] = planned_p if here else ''
     return alignment, {'pitcher': current_p, 'planned_pitcher': planned_p, 'position': spot}
+
+
+def project_planned_innings(plan, first_inning, first_alignment, events, present_names=None):
+    """The defenses later innings would start with, inning by inning, as the
+    live game prepares them: each inning's saved plan with the pitcher
+    carried forward (carry_planned_pitcher) from the inning before, starting
+    from `first_alignment` -- the next inning's actual saved defense.
+
+    A projected change of pitcher counts as removing the earlier pitcher for
+    the innings after it, so a later plan naming him again is carried too.
+    Those changes exist only in this calculation; nothing is recorded, and
+    the played history (`events`) is only read. A plan with an open P takes
+    the pitcher before it, as the live seed does. Innings with no plan are
+    left out (the caller reports them as not projected) and keep the
+    pitcher from the inning before.
+
+    Returns {inning: alignment} for planned innings after `first_inning`.
+    """
+    def number(value):
+        try:
+            return float(str(value))
+        except (TypeError, ValueError):
+            return None
+
+    start = number(first_inning)
+    if start is None:
+        return {}
+    history = list(events or ())
+    pitcher = str((first_alignment or {}).get('P') or '').strip()
+    projected = {}
+    later = sorted(
+        (key for key in (plan or {}) if number(key) is not None and number(key) > start and number(key) == int(number(key))),
+        key=number,
+    )
+    for inning in later:
+        planned = dict((plan or {}).get(inning) or {})
+        if not any(str(name or '').strip() for name in planned.values()):
+            continue
+        alignment, _ = carry_planned_pitcher(planned, {'P': pitcher}, history, present_names)
+        if not str(alignment.get('P') or '').strip() and pitcher:
+            alignment['P'] = pitcher
+        projected[str(inning)] = alignment
+        new_pitcher = str(alignment.get('P') or '').strip()
+        if pitcher and new_pitcher and new_pitcher != pitcher:
+            history.append(SimpleNamespace(
+                reverted=False, before_alignment={'P': pitcher}, after_alignment={'P': new_pitcher}))
+        pitcher = new_pitcher or pitcher
+    return projected
 
 
 def _flag(summary, name, status, detail, kind, next_available):

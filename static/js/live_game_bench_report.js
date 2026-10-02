@@ -146,7 +146,9 @@
   /*
    * Innings ahead, each with the defense it will use: the upcoming inning as
    * it will actually start (the Next Inning defense -- carried forward, the
-   * plan, or the coach's edit), later innings from the pregame plan. An
+   * plan, or the coach's edit), later innings from the pregame plan with the
+   * pitcher carried forward as the game would (no removed pitcher brought
+   * back; a planned new pitcher still takes over). An
    * inning that can't be projected -- a position open, or no plan at all --
    * is named instead of being left out silently.
    */
@@ -155,6 +157,11 @@
     const plannedInnings = parseInnings(state?.rotation?.innings);
     const nextKey = String(prep?.next_inning || '');
     const upcoming = prep?.confirmed?.alignment || null;
+    // Later innings as the game would prepare them: the plan with the
+    // pitcher carried forward from the inning before (next-inning-prep's
+    // projected_innings). The saved plan when that is not available.
+    const carried = prep?.projected_innings && typeof prep.projected_innings === 'object'
+      ? prep.projected_innings : {};
     const keys = new Set(Object.keys(plannedInnings));
     if (nextKey && upcoming) keys.add(nextKey);
     // Every regulation inning ahead, planned or not.
@@ -170,7 +177,7 @@
       .sort((a, b) => a.value - b.value)
       .forEach(({inning}) => {
         const isNext = inning === nextKey && upcoming;
-        const alignment = isNext ? upcoming : (plannedInnings[inning] || {});
+        const alignment = isNext ? upcoming : (carried[inning] || plannedInnings[inning] || {});
         const named = Object.values(alignment).some(name => String(name || '').trim());
         if (!named) {
           unprojected.push({inning, reason: 'not planned'});

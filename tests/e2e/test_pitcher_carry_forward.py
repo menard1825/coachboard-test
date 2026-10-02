@@ -97,3 +97,40 @@ def test_the_new_pitcher_keeps_pitching_after_the_planned_takeover(live, coachbo
     prep = page.cb_api.request.get(_api(page, coachboard_url, 'next-inning-prep')).json()
     assert prep['pregame_rotation']['4']['P'] == LUKE
     assert page.cb_errors == []
+
+
+# The Bench Report's projected sits -------------------------------------------------------
+
+OWEN, COLE = INNING_1['2B'], 'Catcher Cole'        # a third pitcher; a tenth player
+SIT_PLAN = {str(i): dict(INNING_1) for i in range(1, 7)}
+SIT_PLAN['3'] = dict(INNING_1, P=MATEO, **{'1B': LUKE})            # Mateo takes over
+SIT_PLAN['5'] = dict(INNING_1, **{'1B': COLE})                     # Mateo planned to sit
+SIT_PLAN['6'] = dict(INNING_1, P=OWEN, **{'2B': LUKE})             # Owen takes over
+
+
+def _projected(report, name):
+    plan = report.locator(f'[data-cb-br-player="{name}"] .cb-br-plan')
+    return plan.inner_text() if plan.count() else ''
+
+
+def test_the_bench_report_projects_the_carried_pitcher(live, coachboard_url):
+    page = live(PHONE, plan=SIT_PLAN)
+    _advance(page, coachboard_url)
+    _advance(page, coachboard_url)                                 # in the 3rd
+    _open(page, coachboard_url)
+    page.locator('[data-cb-bench-report]').click()
+    report = page.locator('#cbBenchReportModal')
+    expect(report.locator('[data-cb-br-sitting]')).to_be_visible(timeout=10_000)
+
+    # The 5th: Mateo keeps pitching, so Luke -- not Mateo -- takes the sit
+    # the plan gave Mateo. The 6th: Owen pitches, everyone else as planned.
+    expect(report.locator(f'[data-cb-br-player="{LUKE}"] .cb-br-plan')).to_have_text('Projected to sit: 5')
+    assert _projected(report, MATEO) == ''
+    expect(report.locator(f'[data-cb-br-player="{COLE}"] .cb-br-plan')).to_have_text('Projected to sit: 4, 6')
+
+    # The games the app prepares agree.
+    _advance(page, coachboard_url)                                 # the 4th
+    _advance(page, coachboard_url)                                 # the 5th
+    field = _filled(_state(page, coachboard_url)['current_alignment'])
+    assert field['P'] == MATEO and field['1B'] == COLE and LUKE not in field.values()
+    assert page.cb_errors == []

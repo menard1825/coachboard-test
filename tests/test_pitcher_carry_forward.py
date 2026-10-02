@@ -223,3 +223,90 @@ def test_the_carry_rule_on_its_own():
     # The returning pitcher has left the game: their spot is left open.
     carried, _ = carry_planned_pitcher(plan, {'P': 'Bennett'}, history, present_names=set(BASE.values()) - {'Aiden'})
     assert carried['C'] == '' and 'Aiden' not in carried.values()
+
+
+# Projected innings (the Bench Report's future sits) ----------------------------------------
+
+# Bennett from the 3rd; the 4th and 5th still name Aiden at P. The 5th
+# plan has Bennett sitting (Jack catches); a third pitcher, Carter, takes
+# over in the 6th.
+SIT_PLAN = {str(i): dict(BASE) for i in range(1, 7)}
+SIT_PLAN['3'] = dict(BASE, P='Bennett', C='Aiden')
+SIT_PLAN['5'] = dict(BASE, C='Jack')                               # Bennett planned to sit
+SIT_PLAN['6'] = dict(BASE, P='Carter', C='Bennett', **{'1B': 'Aiden'})
+
+
+def _sit_game(monkeypatch):
+    app, client = _game(monkeypatch)
+    from db import db
+    from models import Rotation
+
+    with app.app_context():
+        db.session.get(Rotation, 1).innings = {k: dict(v) for k, v in SIT_PLAN.items()}
+        db.session.commit()
+    return app, client
+
+
+def _sitting(alignment, roster=frozenset(BASE.values()) | {'Jack'}):
+    return sorted(roster - {name for name in alignment.values() if name})
+
+
+def test_projected_innings_carry_the_pitcher_and_the_sit(monkeypatch):
+    app, client = _sit_game(monkeypatch)
+    for _ in range(2):
+        _end_inning(client)                                         # in the 3rd
+    before = _state(client)['rotation_events']
+    prep = _prep(client)
+    projected = prep['projected_innings']
+
+    # The 4th (the saved Next Inning defense) is the starting point; the
+    # 5th and 6th are projected from it.
+    assert _filled(prep['confirmed']['alignment']) == dict(BASE, P='Bennett', C='Aiden')
+    assert sorted(projected) == ['5', '6']
+    # Bennett keeps pitching in the 5th; Aiden takes Bennett's planned sit.
+    assert _filled(projected['5']) == dict(BASE, P='Bennett', C='Jack')
+    assert _sitting(projected['5']) == ['Aiden']
+    # The third pitcher takes over in the 6th, as planned.
+    assert _filled(projected['6']) == SIT_PLAN['6']
+    assert _sitting(projected['6']) == ['Jack']
+    # The saved plan is unchanged, and nothing was recorded.
+    assert prep['pregame_rotation'] == SIT_PLAN
+    assert _state(client)['rotation_events'] == before
+
+
+def test_projected_innings_match_the_defenses_the_game_prepares(monkeypatch):
+    app, client = _sit_game(monkeypatch)
+    for _ in range(2):
+        _end_inning(client)
+    projected = _prep(client)['projected_innings']
+
+    _end_inning(client)                                             # into the 4th
+    assert _filled(_prep(client)['confirmed']['alignment']) == _filled(projected['5'])
+    _end_inning(client)                                             # into the 5th
+    assert _field(_state(client)) == _filled(projected['5'])
+    assert _filled(_prep(client)['confirmed']['alignment']) == _filled(projected['6'])
+    assert _field(_end_inning(client)) == _filled(projected['6'])    # the 6th, Carter pitching
+
+
+def test_a_coach_edit_to_the_next_inning_leads_the_projection(monkeypatch):
+    app, client = _sit_game(monkeypatch)
+    for _ in range(2):
+        _end_inning(client)
+    # The coach brings Aiden back to pitch the 4th (an explicit decision).
+    base = _prep(client)['confirmed']['alignment']
+    response = client.post(PREP, json={'mode': 'custom', 'alignment': SIT_PLAN['4'],
+                                       'base_alignment': base, 'inning': '4'})
+    assert response.status_code == 200
+    projected = response.get_json()['projected_innings']
+    # Aiden on the mound in the 4th: the 5th plan's Aiden is no change, and
+    # Bennett -- now removed again -- sits as planned.
+    assert _filled(projected['5']) == SIT_PLAN['5']
+
+
+def test_unplanned_and_open_innings_are_left_to_the_report():
+    from pitching_eligibility import project_planned_innings
+
+    plan = {'4': dict(BASE), '5': {}, '6': dict(BASE, P='')}
+    projected = project_planned_innings(plan, '3', dict(BASE, P='Bennett', C='Aiden'), [])
+    assert '5' not in projected                                     # not planned
+    assert projected['6']['P'] == 'Aiden'                           # an open P takes the pitcher before

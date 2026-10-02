@@ -12,7 +12,7 @@ from extensions import socketio
 from game_availability import game_availability, inning_has_only_setup_edits, present_players
 from live_history import _event_order_key
 from models import Game, Player, Rotation
-from pitching_eligibility import carry_planned_pitcher
+from pitching_eligibility import carry_planned_pitcher, project_planned_innings
 from team_game_settings import regulation_innings_for_team
 from blueprints.live_game_api import (
     _actual_rotation,
@@ -592,6 +592,18 @@ def _next_prep_response(game, team, current_inning, next_inning, current_alignme
             'planned_pitcher': saved_plan.get('P'),
             'position': next((pos for pos, name in saved_plan.items() if pos != 'P' and name == pitcher), None),
         }
+    # The innings after the next one as they would start: the saved plan,
+    # with the pitcher carried forward inning by inning from the next
+    # inning's actual saved defense. For the Bench Report's projected sits.
+    projected_innings = {}
+    if prep and next_inning:
+        projected_innings = project_planned_innings(
+            pregame_rotation,
+            next_inning,
+            prep.alignment or {},
+            _events(game.id, team.id),
+            {player.name for player in _present_players(game, team.id)},
+        )
     return jsonify({
         'status': 'success',
         'game_id': game.id,
@@ -608,6 +620,7 @@ def _next_prep_response(game, team, current_inning, next_inning, current_alignme
         # who carries on instead ({'pitcher', 'planned_pitcher', 'position'}),
         # else None. planned_seed and the automatic defense already use it.
         'pitcher_carry': pitcher_carry,
+        'projected_innings': projected_innings,
         # The upcoming inning's own plan as "Use 2nd-inning plan" would set it
         # (mode 'planned'), or None when the inning has no separate plan --
         # then the field simply carries forward.
