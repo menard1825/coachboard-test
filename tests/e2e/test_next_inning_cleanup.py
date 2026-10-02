@@ -256,9 +256,13 @@ def test_three_empty_spots_read_naturally_and_continue_goes_on(setup, coachboard
     )
     _expect_coach_words(recorded)
 
-    # Continue keeps the 2nd as saved and goes on to the 3rd's own check:
-    # its plan follows the changed field, so it has the same spots open.
+    # Continue keeps the 2nd as saved. The 3rd is planned full, but the
+    # changed field was carried forward instead, so End Inning asks before
+    # that plan is skipped; keeping the field leaves the same spots open.
     recorded.get_by_role('button', name='Continue to 3rd', exact=True).click()
+    skipped = page.locator('#cbSkippedPlanModal')
+    expect(skipped.locator('.modal-title')).to_have_text('Use the 3rd-inning plan?', timeout=15_000)
+    skipped.get_by_role('button', name='Keep this defense', exact=True).click()
     incomplete = page.locator(INCOMPLETE)
     expect(incomplete.locator('.modal-title')).to_have_text(
         '3rd inning defense has open positions', timeout=15_000

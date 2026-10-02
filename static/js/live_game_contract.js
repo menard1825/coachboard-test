@@ -731,6 +731,45 @@
     instance.show();
   }
 
+  function sameDefense(a, b) {
+    const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+    return [...keys].every(pos => (a?.[pos] || '') === (b?.[pos] || ''));
+  }
+
+  function planSkippedByDefault(prep) {
+    const seed = prep?.planned_seed;
+    return Boolean(
+      seed &&
+      Object.values(seed).some(Boolean) &&
+      prep?.confirmed?.updated_by === 'Auto' &&
+      !sameDefense(seed, prep.confirmed.alignment)
+    );
+  }
+
+  function askAboutSkippedPlan(prep, retry) {
+    const next = ordinal(prep.next_inning);
+    const current = ordinal(prep.current_inning);
+    const choose = action => async () => {
+      try {
+        await action();
+        retry();
+      } catch (error) {
+        window.CBNextDefense?.showError?.(error?.message || 'Unable to save that choice.');
+        window.CBNextDefense?.showNext?.();
+      }
+    };
+
+    endInningQuestion('cbSkippedPlanModal', {
+      title: `Use the ${next}-inning plan?`,
+      message:
+        `A change this inning carried the ${current}-inning defense forward, ` +
+        `so your ${next}-inning pregame plan won't be used unless you choose it.`,
+      note: '',
+      primary: [`Use the ${next}-inning plan`, choose(() => window.CBNextDefense.usePlan()), 'btn-primary'],
+      secondary: ['Keep this defense', choose(() => window.CBNextDefense.useSame()), 'btn-outline-primary'],
+    });
+  }
+
   async function endInningFromNext(
     allowOpenNext = false,
     pitchingDecision = null
@@ -799,6 +838,18 @@
         warnRecordedInningGap(
           openRecorded,
           liveState,
+          () => endInningFromNext(allowOpenNext, pitchingDecision)
+        );
+        return;
+      }
+
+      // The next inning has its own pregame plan, but a live change this
+      // inning carried the field forward instead -- and no coach chose
+      // either. Ask once; the answer is saved as the coach's choice, so it
+      // is not asked again and later live changes keep it.
+      if (planSkippedByDefault(prep)) {
+        askAboutSkippedPlan(
+          prep,
           () => endInningFromNext(allowOpenNext, pitchingDecision)
         );
         return;

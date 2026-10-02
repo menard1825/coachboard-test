@@ -46,6 +46,10 @@
   let undoNote = '';
   let activeSavePromise = null;
   let conflictCount = 0;
+  // Another device's defense replaced a change of this coach's that never
+  // saved. End Inning waits until the coach has looked at what is there
+  // now ("Use this defense") or changed it again.
+  let conflictPending = false;
   let rejectCount = 0;
   // Bumped by every local move and every confirmed save, so a poll that was
   // already on its way cannot put an older board back afterwards.
@@ -1330,7 +1334,8 @@
         color:#315d98;
       }
 
-      #${CARD_ID} .cb-next-save.error{
+      #${CARD_ID} .cb-next-save.error,
+      #${CARD_ID} .cb-next-save.conflict{
         border-color:#efb5ae;
         background:#fff1ef;
         color:#a12d26;
@@ -2104,6 +2109,36 @@
     }
   }
 
+  // Beside End Inning on every tab: which defense takes the field next, from
+  // this board's own state (saved source, save state, a skipped plan).
+  function endInningSource(inningLabel, currentLabel) {
+    if (conflictPending || saveMode === 'conflict') return `Not saved — check the ${inningLabel}`;
+    if (saveMode === 'error') return `${inningLabel} defense not saved`;
+    if (saveMode === 'waiting') return `${inningLabel} defense not synced yet`;
+    if (saveMode === 'saving' || dirty || activeSavePromise) return `Saving the ${inningLabel} defense…`;
+
+    const source = boardSource();
+    if (source === 'planned') return `Plan for the ${inningLabel}`;
+    if (source === 'current') {
+      return skippedPlanByDefault()
+        ? `Same as the ${currentLabel} · plan not used`
+        : `Same as the ${currentLabel}`;
+    }
+    return `Your changes for the ${inningLabel}`;
+  }
+
+  // A separate plan for the next inning that the automatic defense is not
+  // using, and that no coach has decided about yet.
+  function skippedPlanByDefault() {
+    const seed = plannedSeed();
+    return Boolean(
+      seed &&
+      !localSource &&
+      latest?.confirmed?.updated_by === 'Auto' &&
+      !sameAlignment(seed, snapshot())
+    );
+  }
+
   function syncUpcomingInningLabels() {
     const inning = upcomingInning();
     const inningLabel = inningOrdinal(inning);
@@ -2161,7 +2196,7 @@
       ? `End ${currentLabel} → Start ${inningLabel}`
       : `Start ${inningLabel}`;
 
-    const noteText = `${inningLabel} inning defense`;
+    const noteText = endInningSource(inningLabel, currentLabel);
 
     if (title.textContent !== buttonTitle) {
       title.textContent = buttonTitle;
@@ -3024,6 +3059,9 @@
             data-next-notice
             ${noticeMessage ? '' : 'hidden'}
           >${esc(noticeMessage)}</div>
+          ${conflictPending
+            ? '<button type="button" class="btn btn-outline-primary btn-sm cb-next-conflict-ack" data-next-conflict-ack>Use this defense</button>'
+            : ''}
           ${
             undoNote
               ? `<div class="cb-next-undo-note" data-next-undo-note role="status">${esc(undoNote)}</div>`
@@ -3135,6 +3173,13 @@
         usePlannedDefense
       );
 
+    card
+      .querySelector('[data-next-conflict-ack]')
+      ?.addEventListener(
+        'click',
+        acceptConflict
+      );
+
     const benchSelected = () => {
       if (!selected || selected.source === 'BENCH') return;
 
@@ -3209,6 +3254,9 @@
     } else if (state === 'error') {
       saveMode = 'error';
       saveMessage = 'Not saved';
+    } else if (state === 'conflict') {
+      saveMode = 'conflict';
+      saveMessage = 'Not saved';
     } else {
       saveMode = 'saved';
       saveMessage = successMessage;
@@ -3246,6 +3294,7 @@
     draft = after;
     pendingMode = mode;
     localSource = mode;
+    conflictPending = false;
     undoNote = '';
     dirty = true;
     localRevision += 1;
@@ -3349,6 +3398,7 @@
     localSource = null;
     undoStack = [];
     conflictCount += 1;
+    conflictPending = true;
 
     let data = null;
 
@@ -3374,13 +3424,25 @@
       renderCard();
     }
 
-    noticeMessage =
-      'The Next Inning defense changed on another device before your ' +
-      'change could sync. Showing the latest defense — check it before ' +
-      'ending the inning.';
+    noticeMessage = conflictNotice();
+    setSyncState('conflict');
+    renderCard();
+  }
+
+  function conflictNotice() {
+    const inning = inningOrdinal(latest?.next_inning || '');
+    return `Your change wasn't saved. The ${inning || 'next'} inning defense was ` +
+      'changed on another device, and that defense is shown now. Check it, ' +
+      'then tap Use this defense or change it.';
+  }
+
+  // The coach has looked at the other device's defense and keeps it.
+  function acceptConflict() {
+    conflictPending = false;
+    noticeMessage = '';
     successMessage = 'Saved ✓';
     setSyncState('saved');
-    renderSyncState();
+    renderCard();
   }
 
   // The server refused the change itself (for example, a player who is no
@@ -3452,9 +3514,12 @@
       }
     }
 
-    if (conflictCount !== conflictsBefore) {
+    if (conflictPending || conflictCount !== conflictsBefore) {
+      const inning = inningOrdinal(latest?.next_inning || '');
       throw new Error(
-        'The Next Inning defense changed on another device. Check it, then try ending the inning again.'
+        `Your change to the ${inning || 'next'} inning wasn't saved: another ` +
+        'device changed that defense. Check it, tap Use this defense or ' +
+        'change it, then end the inning.'
       );
     }
 
@@ -4288,7 +4353,7 @@
       selectedPosition = '';
     }
 
-    if (saveMode !== 'error') {
+    if (saveMode !== 'error' && !conflictPending) {
       successMessage = 'Saved ✓';
       setSyncState('saved');
     }
@@ -4405,6 +4470,7 @@
     selectedPosition = '';
     undoStack = [];
     undoNote = '';
+    conflictPending = false;
     errorMessage = '';
     noticeMessage = '';
     serverBase = null;
@@ -4451,6 +4517,7 @@
   window.CBNextDefense = {
     refresh: () => refresh({force: true, changed: true}),
     useSame: useCurrentDefense,
+    usePlan: usePlannedDefense,
     undo: undoNext,
     getAlignment: () => snapshot(),
     flush: flushPendingSave,
