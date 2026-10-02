@@ -752,6 +752,15 @@ def inject_live_game_assets(response):
     # routes -- On the Field from the template, Next Inning injected
     # before </body> below -- so </head> is the only point that precedes
     # both.
+    # Focus around every live dialog (live_game_modal_focus.js) listens at
+    # the document, so it only has to load before the first dialog opens.
+    if 'live_game_modal_focus.js' not in html:
+        focus_asset = f'<script src="{_versioned_static("js/live_game_modal_focus.js")}"></script>\n'
+        if '</head>' in html:
+            html = html.replace('</head>', focus_asset + '</head>', 1)
+        else:
+            html = focus_asset + html
+
     if 'live_game_drag_controller.js' not in html:
         drag_asset = f'<script src="{_versioned_static("js/live_game_drag_controller.js")}"></script>\n'
         if '</head>' in html:
