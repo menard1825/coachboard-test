@@ -12,7 +12,7 @@ from extensions import socketio
 from game_availability import ARRIVED, LEFT, game_availability, inning_has_only_setup_edits, present_players
 from live_history import INNING_STARTED, _event_order_key
 from models import Game, Player, Rotation
-from pitching_eligibility import carry_planned_pitcher, project_planned_innings
+from pitching_eligibility import carry_planned_pitcher, fill_open_pitcher, project_planned_innings
 from team_game_settings import regulation_innings_for_team
 from blueprints.live_game_api import (
     _actual_rotation,
@@ -157,9 +157,10 @@ def _seed_next_alignment(current_alignment, planned_alignment, team, field_chang
         }
 
         # A specifically planned pitcher wins. Only carry the current
-        # pitcher when the written next-inning plan leaves P blank.
-        if not seeded.get('P'):
-            seeded['P'] = current.get('P') or ''
+        # pitcher when the written next-inning plan leaves P blank -- and if
+        # the plan has him elsewhere too, that spot is left open
+        # (fill_open_pitcher), never the same player twice.
+        fill_open_pitcher(seeded, current.get('P'))
 
         return seeded, 'planned'
 

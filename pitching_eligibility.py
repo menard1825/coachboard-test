@@ -347,6 +347,24 @@ def carry_planned_pitcher(planned, current_alignment, events, present_names=None
     return alignment, {'pitcher': current_p, 'planned_pitcher': planned_p, 'position': spot}
 
 
+def fill_open_pitcher(alignment, pitcher):
+    """A plan that leaves P open keeps the pitcher on the mound. If the plan
+    also has him at another position, that spot is left open -- never the
+    same player twice, never a guessed replacement, no one else moved. The
+    open spot shows like any other, for the coach to fill.
+    Returns the spot left open, or None."""
+    pitcher = str(pitcher or '').strip()
+    if str(alignment.get('P') or '').strip() or not pitcher:
+        return None
+    alignment['P'] = pitcher
+    vacated = None
+    for pos in list(alignment):
+        if pos != 'P' and str(alignment.get(pos) or '').strip() == pitcher:
+            alignment[pos] = ''
+            vacated = vacated or pos
+    return vacated
+
+
 def project_planned_innings(plan, first_inning, first_alignment, events, present_names=None):
     """The defenses later innings would start with, inning by inning, as the
     live game prepares them: each inning's saved plan with the pitcher
@@ -384,8 +402,7 @@ def project_planned_innings(plan, first_inning, first_alignment, events, present
         if not any(str(name or '').strip() for name in planned.values()):
             continue
         alignment, _ = carry_planned_pitcher(planned, {'P': pitcher}, history, present_names)
-        if not str(alignment.get('P') or '').strip() and pitcher:
-            alignment['P'] = pitcher
+        fill_open_pitcher(alignment, pitcher)
         projected[str(inning)] = alignment
         new_pitcher = str(alignment.get('P') or '').strip()
         if pitcher and new_pitcher and new_pitcher != pitcher:
