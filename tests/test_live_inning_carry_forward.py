@@ -10,7 +10,9 @@ Precedence for the next inning's defense is now:
 1. a NEXT the coach set by hand during the live game (Same defense means
    "carry the field forward", so it keeps following the field);
 2. otherwise, if the field changed during this inning, the whole field as it
-   stands -- a pregame plan for the next inning does not undo it;
+   stands -- a pregame plan for the next inning does not undo it. A change
+   of pitcher alone keeps the next inning's plan, with the new pitcher
+   carried on (tests/test_pitching_change_keeps_rotation.py);
 3. otherwise, the pregame plan for the next inning (or the field, if none).
 """
 
@@ -191,7 +193,11 @@ def test_an_undone_change_leaves_the_pregame_plan_in_place(monkeypatch):
     assert {pos: after.get(pos) for pos in INNING_ONE} == _inning_two_plan()
 
 
-def test_a_change_in_a_later_inning_carries_past_that_innings_plan(monkeypatch):
+def test_a_pitching_change_in_a_later_inning_keeps_that_pitcher_and_the_plan(monkeypatch):
+    """A change of pitcher only: the new pitcher carries into the next
+    inning, and everyone else follows that inning's plan (the planned
+    rotation is not dropped). Here the 3rd's plan had Drew pitching and Jack
+    sitting, so Drew takes Jack's planned sit."""
     inning_three = dict(_inning_two_plan(), P='Drew', **{'2B': 'Carter'})
     client = _build_app(monkeypatch, {'1': INNING_ONE, '2': _inning_two_plan(), '3': inning_three})
     _prep(client)
@@ -199,7 +205,6 @@ def test_a_change_in_a_later_inning_carries_past_that_innings_plan(monkeypatch):
 
     assert _prep(client)['confirmed']['alignment']['P'] == 'Drew'
     _change_pitcher_to_jack(client)                         # Carter -> Jack in inning 2
-    live = _state(client)['current_alignment']
 
     prep = _prep(client)
     assert prep['confirmed']['alignment']['P'] == 'Jack'
@@ -210,8 +215,9 @@ def test_a_change_in_a_later_inning_carries_past_that_innings_plan(monkeypatch):
     assert response.status_code == 200, response.get_data(as_text=True)
     state = _state(client)
     assert state['current_inning'] == '3'
-    assert {pos: state['current_alignment'].get(pos) for pos in INNING_ONE} == \
-        {pos: live.get(pos) for pos in INNING_ONE}
+    started = {pos: state['current_alignment'].get(pos) for pos in INNING_ONE}
+    assert started == dict(inning_three, P='Jack')
+    assert 'Drew' not in started.values()
 
 
 def test_next_the_coach_set_is_not_overwritten_by_live_changes(monkeypatch):

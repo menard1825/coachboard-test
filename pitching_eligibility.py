@@ -298,7 +298,7 @@ def pitchers_removed(events, current_pitcher):
     return used - {str(current_pitcher or '').strip(), ''}
 
 
-def carry_planned_pitcher(planned, current_alignment, events, present_names=None):
+def carry_planned_pitcher(planned, current_alignment, events, present_names=None, live_change=False):
     """The next inning's plan with its pitcher carried forward when the plan
     would bring back a pitcher who already came out.
 
@@ -319,6 +319,11 @@ def carry_planned_pitcher(planned, current_alignment, events, present_names=None
     the returning pitcher is no longer here). No one is duplicated and no
     one else is moved.
 
+    `live_change`: the pitcher now on the mound came in by a live pitching
+    change this inning. That is the coach's decision for the next inning
+    too, so he carries on whoever the plan names; innings after that follow
+    their plans (a later planned new pitcher still takes over).
+
     Returns (alignment, carry) -- carry is None when the plan is used as
     written, else {'pitcher', 'planned_pitcher', 'position'}.
     """
@@ -327,7 +332,7 @@ def carry_planned_pitcher(planned, current_alignment, events, present_names=None
     current_p = str((current_alignment or {}).get('P') or '').strip()
     if not planned_p or not current_p or planned_p == current_p:
         return alignment, None
-    if planned_p not in pitchers_removed(events, current_p):
+    if not live_change and planned_p not in pitchers_removed(events, current_p):
         return alignment, None
 
     spot = next(

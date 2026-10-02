@@ -9,8 +9,8 @@ from sqlalchemy.exc import IntegrityError
 from asset_versioning import asset_url
 from db import db
 from extensions import socketio
-from game_availability import game_availability, inning_has_only_setup_edits, present_players
-from live_history import _event_order_key
+from game_availability import ARRIVED, LEFT, game_availability, inning_has_only_setup_edits, present_players
+from live_history import INNING_STARTED, _event_order_key
 from models import Game, Player, Rotation
 from pitching_eligibility import carry_planned_pitcher, project_planned_innings
 from team_game_settings import regulation_innings_for_team
@@ -105,12 +105,22 @@ def _clean_draft_alignment(candidate, game, team):
     return cleaned, None
 
 
+# Recorded with the field unchanged: not a coach's defensive change.
+_BOOKKEEPING_EVENTS = frozenset({'End Inning', INNING_STARTED, ARRIVED, LEFT})
+
+
 def _field_changed_this_inning(events, current_inning, current_alignment, team):
     """Whether the coach changed the live field during the current inning.
 
     The inning starts with the field End Inning put out (or, before the
     first change of a game, the field that change replaced). Reverted events
     do not count, and a change undone by hand leaves the field as it began.
+
+    A change of pitcher alone (Change Pitcher, wherever the relieved pitcher
+    went) is not a field change for the next inning: it keeps its plan, and
+    the new pitcher carries forward (carry_planned_pitcher) -- the coach
+    changed who pitches, not the playing-time rotation. Any other change in
+    the inning still carries the whole field forward.
     """
     allowed = _allowed_positions(team)
 
@@ -122,6 +132,8 @@ def _field_changed_this_inning(events, current_inning, current_alignment, team):
         if not event.reverted and str(event.inning) == str(current_inning)
     ]
     if not inning_events:
+        return False
+    if _pitching_changed_this_inning(events, current_inning):
         return False
     first = inning_events[0]
     start = first.after_alignment if first.event_type == 'End Inning' else first.before_alignment
@@ -334,9 +346,24 @@ def _clear_prep(game_id, team_id):
     return False
 
 
-def _carried_plan(game, team, planned_alignment, current_alignment, events):
+def _carried_plan(game, team, planned_alignment, current_alignment, events, live_change=False):
     present = {player.name for player in _present_players(game, team.id)}
-    return carry_planned_pitcher(planned_alignment, current_alignment, events, present)
+    return carry_planned_pitcher(planned_alignment, current_alignment, events, present, live_change)
+
+
+def _inning_changes(events, current_inning):
+    return [
+        event for event in events
+        if not event.reverted
+        and str(event.inning) == str(current_inning)
+        and event.event_type not in _BOOKKEEPING_EVENTS
+    ]
+
+
+def _pitching_changed_this_inning(events, current_inning):
+    """Whether this inning's live changes were changes of pitcher only."""
+    changes = _inning_changes(events, current_inning)
+    return bool(changes) and all(event.event_type == 'Pitcher Change' for event in changes)
 
 
 def _next_inning_context(game, team):
@@ -361,7 +388,10 @@ def _next_inning_context(game, team):
     # is not brought back just because the old plan still names him -- the
     # pitcher now on the mound carries on (carry_planned_pitcher). The saved
     # plan itself is unchanged.
-    planned_alignment, _ = _carried_plan(game, team, planned_alignment, current_alignment, events)
+    planned_alignment, _ = _carried_plan(
+        game, team, planned_alignment, current_alignment, events,
+        live_change=_pitching_changed_this_inning(events, current_inning),
+    )
 
     prep = _prep_for_game(game.id, team.id)
 
