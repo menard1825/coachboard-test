@@ -296,6 +296,50 @@ def pitchers_removed(events, current_pitcher):
     return used - {str(current_pitcher or '').strip(), ''}
 
 
+def carry_planned_pitcher(planned, current_alignment, events, present_names=None):
+    """The next inning's plan with its pitcher carried forward when the plan
+    would bring back a pitcher who already came out.
+
+    The saved plan is one defense per inning, so it cannot say whether
+    "Reed at P in the 4th" is a leftover from filling every inning with the
+    starting defense or a decision to bring Reed back. A plan that names a
+    new pitcher ("Hansen from the 3rd", "Cole in the 6th") is a planned
+    takeover and is kept. A plan that names a pitcher who already pitched in
+    this game and is off the mound (pitchers_removed -- what the re-entry
+    rule reads) is not applied automatically: the pitcher now on the mound
+    keeps pitching until the next planned change. Bringing a pitcher back
+    stays an explicit coach decision (Change Pitcher, or the Next Inning
+    board), with its eligibility check.
+
+    The two players trade places so every other position keeps its plan: the
+    returning pitcher takes the spot the plan gave the pitcher who carries
+    on (or sits, if that pitcher was planned to sit; the spot is left open if
+    the returning pitcher is no longer here). No one is duplicated and no
+    one else is moved.
+
+    Returns (alignment, carry) -- carry is None when the plan is used as
+    written, else {'pitcher', 'planned_pitcher', 'position'}.
+    """
+    alignment = dict(planned or {})
+    planned_p = str(alignment.get('P') or '').strip()
+    current_p = str((current_alignment or {}).get('P') or '').strip()
+    if not planned_p or not current_p or planned_p == current_p:
+        return alignment, None
+    if planned_p not in pitchers_removed(events, current_p):
+        return alignment, None
+
+    spot = next(
+        (pos for pos, name in alignment.items()
+         if pos != 'P' and str(name or '').strip() == current_p),
+        None,
+    )
+    alignment['P'] = current_p
+    if spot:
+        here = present_names is None or planned_p in present_names
+        alignment[spot] = planned_p if here else ''
+    return alignment, {'pitcher': current_p, 'planned_pitcher': planned_p, 'position': spot}
+
+
 def _flag(summary, name, status, detail, kind, next_available):
     item = summary.setdefault(name, {'name': name})
     item['status'] = status

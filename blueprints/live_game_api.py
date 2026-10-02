@@ -353,6 +353,10 @@ def get_authoritative_live_state(game_id, team_id, game=None):
     except (TypeError, ValueError):
         next_inning = '1'
     planned_next = deepcopy((rotation.innings or {}).get(next_inning, {}) if rotation else {})
+    # As the next inning will use it: a removed pitcher is not brought back
+    # by an old plan (pitching_eligibility.carry_planned_pitcher).
+    planned_next, _ = pitching_eligibility.carry_planned_pitcher(
+        planned_next, current_alignment, events, {p.name for p in present_roster})
 
     all_outings = db.session.query(PitchingOuting).options(joinedload(PitchingOuting.player)).filter_by(team_id=team_id).all()
     targets = db.session.query(PlayerPitchTarget).filter_by(team_id=team_id).all()

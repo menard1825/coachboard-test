@@ -12,6 +12,7 @@ from extensions import socketio
 from game_availability import game_availability, inning_has_only_setup_edits, present_players
 from live_history import _event_order_key
 from models import Game, Player, Rotation
+from pitching_eligibility import carry_planned_pitcher
 from team_game_settings import regulation_innings_for_team
 from blueprints.live_game_api import (
     _actual_rotation,
@@ -288,6 +289,11 @@ def _clear_prep(game_id, team_id):
     return False
 
 
+def _carried_plan(game, team, planned_alignment, current_alignment, events):
+    present = {player.name for player in _present_players(game, team.id)}
+    return carry_planned_pitcher(planned_alignment, current_alignment, events, present)
+
+
 def _next_inning_context(game, team):
     rotation, actual_rotation, events = _actual_rotation(game, team.id)
     current_inning = str(game.live_current_inning or '1')
@@ -306,6 +312,11 @@ def _next_inning_context(game, team):
         if rotation and next_inning
         else {}
     )
+    # The plan as the next inning will use it: a pitcher who already came out
+    # is not brought back just because the old plan still names him -- the
+    # pitcher now on the mound carries on (carry_planned_pitcher). The saved
+    # plan itself is unchanged.
+    planned_alignment, _ = _carried_plan(game, team, planned_alignment, current_alignment, events)
 
     prep = _prep_for_game(game.id, team.id)
 
@@ -570,6 +581,17 @@ def next_inning_prep(game_id):
 
 def _next_prep_response(game, team, current_inning, next_inning, current_alignment,
                         planned_alignment, prep, pregame_rotation, actual_rotation):
+    # planned_alignment is the plan as the next inning uses it; the saved one
+    # differs only when its pitcher was carried forward (_next_inning_context).
+    saved_plan = (pregame_rotation or {}).get(next_inning) or {}
+    pitcher_carry = None
+    if saved_plan.get('P') and saved_plan.get('P') != planned_alignment.get('P'):
+        pitcher = planned_alignment.get('P')
+        pitcher_carry = {
+            'pitcher': pitcher,
+            'planned_pitcher': saved_plan.get('P'),
+            'position': next((pos for pos, name in saved_plan.items() if pos != 'P' and name == pitcher), None),
+        }
     return jsonify({
         'status': 'success',
         'game_id': game.id,
@@ -579,9 +601,13 @@ def _next_prep_response(game, team, current_inning, next_inning, current_alignme
         'current_inning_setup_only': inning_has_only_setup_edits(game, team.id, current_inning),
         'next_inning': next_inning,
         'current_alignment': current_alignment,
-        # planned_alignment stays the plan for the upcoming inning only.
-        # The two below are whole-game reference data for Pregame Plan.
-        'planned_alignment': planned_alignment,
+        # planned_alignment stays the saved plan for the upcoming inning
+        # only. The two below are whole-game reference data for Pregame Plan.
+        'planned_alignment': deepcopy((pregame_rotation or {}).get(next_inning) or {}),
+        # When that plan would bring back a pitcher who already came out:
+        # who carries on instead ({'pitcher', 'planned_pitcher', 'position'}),
+        # else None. planned_seed and the automatic defense already use it.
+        'pitcher_carry': pitcher_carry,
         # The upcoming inning's own plan as "Use 2nd-inning plan" would set it
         # (mode 'planned'), or None when the inning has no separate plan --
         # then the field simply carries forward.

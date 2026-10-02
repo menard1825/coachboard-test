@@ -249,9 +249,14 @@
     }
 
     if (source === 'planned') {
-      return nextLabel
+      const carry = pitcherCarried();
+      const plan = nextLabel
         ? `Pregame plan for the ${nextLabel}`
         : 'Pregame defensive plan';
+      // The plan named a pitcher who already came out: say who pitches.
+      return carry
+        ? `${plan} · ${carry.pitcher} keeps pitching (the plan had ${carry.planned_pitcher}, who already came out)`
+        : plan;
     }
 
     if (source === 'current') {
@@ -263,6 +268,14 @@
     return nextLabel
       ? `Changes saved for the ${nextLabel}`
       : 'Changes saved';
+  }
+
+  // The server carried the current pitcher forward instead of the plan's
+  // (pitching_eligibility.carry_planned_pitcher), and the board still has
+  // that pitcher on the mound.
+  function pitcherCarried() {
+    const carry = latest?.pitcher_carry;
+    return carry?.pitcher && snapshot().P === carry.pitcher ? carry : null;
   }
 
   function boardSource() {
@@ -2138,7 +2151,12 @@
     if (saveMode === 'saving' || dirty || activeSavePromise) return `Saving the ${inningLabel} defense…`;
 
     const source = boardSource();
-    if (source === 'planned') return `Plan for the ${inningLabel}`;
+    if (source === 'planned') {
+      const carry = pitcherCarried();
+      return carry
+        ? `Plan for the ${inningLabel} · ${carry.pitcher} keeps pitching`
+        : `Plan for the ${inningLabel}`;
+    }
     if (source === 'current') {
       return skippedPlanByDefault()
         ? `Same as the ${currentLabel} · plan not used`
