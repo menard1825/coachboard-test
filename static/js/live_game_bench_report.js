@@ -9,7 +9,10 @@
   let cardObserver = null;
   let rootObserver = null;
   let loadBusy = false;
-  let lastState = null;
+  const AVAILABILITY_ID = 'cbPlayerAvailabilityModal';
+  // The Player availability sheet: the live state and next-inning defense it
+  // was drawn from, and the player waiting on "Mark unavailable?".
+  let availability = {state: null, prep: null, confirming: null, busy: false};
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -38,6 +41,25 @@
       #${MODAL_ID} .cb-br-unprojected{margin:0 0 10px;border:1px solid #f1d38a;border-radius:9px;background:#fff8e6;color:#5b4300;padding:7px 9px;font-size:.72rem;line-height:1.35}
       #${MODAL_ID} .cb-br-empty{border:1px dashed #d0d5dd;border-radius:11px;color:#667085;padding:16px;text-align:center;font-size:.78rem}
       #${MODAL_ID} .cb-br-loading{min-height:140px;display:flex;align-items:center;justify-content:center;color:#667085;font-size:.8rem}
+      #${MODAL_ID} .cb-br-away{display:grid;gap:7px;margin-top:12px}
+      #${MODAL_ID} .cb-br-away-title{color:#344054;font-size:.74rem;font-weight:850;text-transform:uppercase;letter-spacing:.04em}
+      #${MODAL_ID} .cb-br-row.away{background:#f8fafc}
+      #${MODAL_ID} .cb-br-away-hint{color:#667085;font-size:.7rem}
+      #${AVAILABILITY_ID} .modal-content{border:0;border-radius:15px;overflow:hidden}
+      #${AVAILABILITY_ID} .cb-pa-intro{color:#526176;font-size:.74rem;line-height:1.4;margin-bottom:10px}
+      #${AVAILABILITY_ID} .cb-pa-message{margin-bottom:10px;border:1px solid #f3b8b5;border-radius:9px;background:#fff4f3;color:#9b1c13;padding:7px 9px;font-size:.74rem}
+      #${AVAILABILITY_ID} .cb-pa-group{display:grid;gap:7px;margin-bottom:14px}
+      #${AVAILABILITY_ID} .cb-pa-title{color:#344054;font-size:.74rem;font-weight:850;text-transform:uppercase;letter-spacing:.04em}
+      #${AVAILABILITY_ID} .cb-pa-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center;border:1px solid #e1e5ea;border-radius:11px;background:#fff;padding:8px 10px}
+      #${AVAILABILITY_ID} .cb-pa-row.away{background:#f8fafc}
+      #${AVAILABILITY_ID} .cb-pa-name{min-width:0;color:#172033;font-size:.82rem;font-weight:820;overflow-wrap:anywhere}
+      #${AVAILABILITY_ID} .cb-pa-where{grid-column:1;color:#667085;font-size:.7rem;line-height:1.3}
+      #${AVAILABILITY_ID} .cb-pa-row .btn{grid-column:2;grid-row:1/span 2;min-height:40px;font-size:.72rem;font-weight:800;white-space:nowrap}
+      #${AVAILABILITY_ID} .cb-pa-row .btn:disabled{border-color:#d0d5dd;background:#f2f4f7;color:#98a2b3;opacity:1}
+      #${AVAILABILITY_ID} .cb-pa-confirm h6{color:#172033;font-size:1rem;font-weight:850;line-height:1.3}
+      #${AVAILABILITY_ID} .cb-pa-confirm p{color:#526176;font-size:.8rem;line-height:1.45}
+      #${AVAILABILITY_ID} .cb-pa-confirm .btn{min-height:44px;font-weight:800}
+      @media(max-width:575.98px){#${AVAILABILITY_ID} .modal-dialog{margin:.5rem}#${AVAILABILITY_ID} .modal-body{padding:12px}}
       @media(max-width:575.98px){#${MODAL_ID} .modal-dialog{margin:.5rem}#${MODAL_ID} .modal-body{padding:12px}#${MODAL_ID} .cb-br-count{font-size:.61rem}}
     `;
     document.head.appendChild(style);
@@ -66,12 +88,6 @@
       </div>`;
     document.body.appendChild(modal);
     modal.querySelector('[data-cb-bench-refresh]')?.addEventListener('click',() => loadReport());
-    modal.addEventListener('click', event => {
-      const left = event.target.closest('[data-cb-br-left]');
-      const arrived = event.target.closest('[data-cb-br-arrived]');
-      if (left) changeAvailability('left', left.dataset.cbBrLeft);
-      if (arrived) changeAvailability('arrived', arrived.dataset.cbBrArrived);
-    });
     return modal;
   }
 
@@ -252,7 +268,6 @@
     const body = modal.querySelector('[data-cb-bench-report-body]');
     if (!body) return;
     const report = buildReport(state, prep);
-    lastState = state;
     const onBench = report.history.filter(row => row.currentBench).length;
     const rows = report.history.length ? report.history.map(row => {
       const completedText = row.sat.length ? row.sat.join(', ') : 'None';
@@ -260,15 +275,11 @@
       const planned = row.plannedSat.length
         ? `<div class="cb-br-plan"><strong>Projected to sit:</strong> ${esc(row.plannedSat.join(', '))}</div>`
         : '';
-      // Leaving is for a player off the field: sitting now.
-      const leave = row.currentBench
-        ? `<button type="button" class="btn btn-sm btn-outline-secondary cb-br-action" data-cb-br-left="${esc(row.player.id)}">Left this inning</button>`
-        : '';
-      return `<div class="cb-br-row ${row.currentBench ? 'current' : ''}" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-count">${esc(countLabel(row))}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(completedText)}${current}</div>${planned}${leave}</div>`;
+      return `<div class="cb-br-row ${row.currentBench ? 'current' : ''}" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-count">${esc(countLabel(row))}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(completedText)}${current}</div>${planned}</div>`;
     }).join('') : '<div class="cb-br-empty">No bench history yet.</div>';
     const away = report.away.length
       ? `<div class="cb-br-away" data-cb-br-not-here><div class="cb-br-away-title">Not here</div>${report.away.map(row => `
-          <div class="cb-br-row away" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(row.sat.length ? row.sat.join(', ') : 'None')}</div><button type="button" class="btn btn-sm btn-outline-primary cb-br-action" data-cb-br-arrived="${esc(row.player.id)}">Here now</button></div>`).join('')}</div>`
+          <div class="cb-br-row away" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(row.sat.length ? row.sat.join(', ') : 'None')}</div></div>`).join('')}<div class="cb-br-away-hint">Change who is here in Menu → Player availability.</div></div>`
       : '';
     const unknown = report.unknown.length
       ? `<div class="cb-br-unprojected" data-cb-br-unknown><strong>No recorded defense:</strong> ${esc(report.unknown.map(ordinal).join(', '))}. Sits for ${report.unknown.length === 1 ? 'that inning aren' : 'those innings aren'}'t counted.</div>`
@@ -285,7 +296,7 @@
           esc(report.unprojected.map(item => `${ordinal(item.inning)} (${item.reason})`).join(', '))
         }. Sits for ${report.unprojected.length === 1 ? 'that inning aren' : 'those innings aren'}'t counted.</div>`
       : '';
-    body.innerHTML = `<div class="cb-br-summary"><span class="cb-br-chip">Inning ${esc(report.currentLabel)}</span><span class="cb-br-chip" data-cb-br-sitting>Sitting now: ${onBench}</span>${report.away.length ? `<span class="cb-br-chip" data-cb-br-away-count>Not here: ${report.away.length}</span>` : ''}${planChip}</div><div class="cb-br-basis" data-cb-br-basis>${esc(basis)}</div>${unknown}${missing}<div class="cb-br-message" data-cb-br-message role="status" hidden></div><div class="cb-br-list">${rows}</div>${away}`;
+    body.innerHTML = `<div class="cb-br-summary"><span class="cb-br-chip">Inning ${esc(report.currentLabel)}</span><span class="cb-br-chip" data-cb-br-sitting>Sitting now: ${onBench}</span>${report.away.length ? `<span class="cb-br-chip" data-cb-br-away-count>Not here: ${report.away.length}</span>` : ''}${planChip}</div><div class="cb-br-basis" data-cb-br-basis>${esc(basis)}</div>${unknown}${missing}<div class="cb-br-list">${rows}</div>${away}`;
   }
 
   // fresh: a state just returned by a write. A /state read here could be
@@ -324,29 +335,181 @@
       .map(event => Number(event.sequence) || 0));
   }
 
-  // "Here now" / "Left this inning": a live availability change from the
-  // inning being played (Player Arrived / Player Left). First-pitch
-  // attendance is not changed; live Undo takes it back.
+  /*
+   * Player availability (live-game Menu): who is here, changed from the
+   * inning being played. "Mark unavailable" / "Mark available" write the
+   * live 'Player Left' / 'Player Arrived' events (POST .../availability,
+   * with the live version), which the Bench Report and Pregame Plan read
+   * back inning by inning. First-pitch attendance is not changed, live Undo
+   * takes a change back, and a player on the field or in the next inning's
+   * defense has to be moved off it first (the server checks this too).
+   */
+  function ensureAvailabilityModal() {
+    let modal = document.getElementById(AVAILABILITY_ID);
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = AVAILABILITY_ID;
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-labelledby', `${AVAILABILITY_ID}Title`);
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title mb-0" id="${AVAILABILITY_ID}Title">Player availability</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" data-cb-pa-body><div class="cb-br-loading">Loading…</div></div>
+          <div class="modal-footer"><button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button></div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', event => {
+      const off = event.target.closest('[data-cb-pa-unavailable]');
+      const on = event.target.closest('[data-cb-pa-available]');
+      if (off && !off.disabled) askUnavailable(Number(off.dataset.cbPaUnavailable));
+      if (on && !on.disabled) changeAvailability('arrived', Number(on.dataset.cbPaAvailable));
+      if (event.target.closest('[data-cb-pa-confirm]')) {
+        const playerId = availability.confirming;
+        availability.confirming = null;
+        changeAvailability('left', playerId);
+      }
+      if (event.target.closest('[data-cb-pa-cancel]')) {
+        availability.confirming = null;
+        renderAvailability();
+      }
+    });
+    modal.addEventListener('hidden.bs.modal', () => {
+      availability.confirming = null;
+    });
+    return modal;
+  }
+
+  async function loadAvailability(fresh = null) {
+    const body = ensureAvailabilityModal().querySelector('[data-cb-pa-body]');
+    try {
+      const [state, prep] = await Promise.all([
+        fresh || fetch(`/api/live-game/${gameId}/state`, {cache: 'no-store'}).then(async r => {
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.message || `Unable to load players (${r.status}).`);
+          return data;
+        }),
+        fetch(`/api/live-game/${gameId}/next-inning-prep`, {cache: 'no-store'})
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null),
+      ]);
+      availability.state = state;
+      availability.prep = prep?.status === 'success' ? prep : null;
+      renderAvailability();
+    } catch (error) {
+      if (body) body.innerHTML = `<div class="alert alert-danger mb-0">${esc(error.message)}</div>`;
+    }
+  }
+
+  function playerName(player) {
+    return String(player?.name || '').trim();
+  }
+
+  // Where a player is now, and why they can't be marked unavailable yet.
+  function whereNow(name) {
+    const field = availability.state?.current_alignment || {};
+    const next = availability.prep?.confirmed?.alignment || {};
+    const nextLabel = ordinal(availability.prep?.next_inning);
+    const onField = Object.keys(field).find(pos => String(field[pos] || '').trim() === name);
+    if (onField) return {text: `On the field at ${onField} · move them off first`, blocked: true};
+    const nextPos = Object.keys(next).find(pos => String(next[pos] || '').trim() === name);
+    if (nextPos) {
+      return {text: `At ${nextPos} in the ${nextLabel || 'next'} inning · take them out of it first`, blocked: true};
+    }
+    return {text: 'Sitting now', blocked: false};
+  }
+
+  function renderAvailability(message = '') {
+    const body = ensureAvailabilityModal().querySelector('[data-cb-pa-body]');
+    const state = availability.state;
+    if (!body || !state) return;
+    const inning = ordinal(state.current_inning || '1');
+    const here = (Array.isArray(state.roster) ? state.roster : []).filter(playerName)
+      .slice().sort((a, b) => playerName(a).localeCompare(playerName(b)));
+    const away = (Array.isArray(state.not_here) ? state.not_here : []).filter(playerName)
+      .slice().sort((a, b) => playerName(a).localeCompare(playerName(b)));
+
+    const confirming = here.find(player => Number(player.id) === availability.confirming);
+    if (confirming) {
+      const name = playerName(confirming);
+      body.innerHTML = `
+        <div class="cb-pa-confirm" data-cb-pa-question>
+          <h6>Mark ${esc(name)} unavailable for the rest of the game?</h6>
+          <p class="mb-3">This takes effect now, in the ${esc(inning)} inning. Innings already played still count ${esc(name)} as here.</p>
+          <div class="d-grid gap-2">
+            <button type="button" class="btn btn-danger" data-cb-pa-confirm>Mark unavailable</button>
+            <button type="button" class="btn btn-outline-secondary" data-cb-pa-cancel>Cancel</button>
+          </div>
+        </div>`;
+      body.querySelector('[data-cb-pa-cancel]')?.focus({preventScroll: true});
+      return;
+    }
+
+    // Players who can be marked unavailable (sitting now) first.
+    const hereRows = here
+      .map(player => ({player, where: whereNow(playerName(player))}))
+      .sort((a, b) => Number(a.where.blocked) - Number(b.where.blocked))
+      .map(({player, where}) => {
+      const name = playerName(player);
+      return `<div class="cb-pa-row" data-cb-pa-player="${esc(name)}"><div class="cb-pa-name">${esc(rosterName(player))}</div><div class="cb-pa-where">${esc(where.text)}</div><button type="button" class="btn btn-outline-danger btn-sm" data-cb-pa-unavailable="${esc(player.id)}" ${where.blocked || availability.busy ? 'disabled' : ''}>Mark unavailable</button></div>`;
+    }).join('') || '<div class="cb-br-empty">No one is marked available.</div>';
+    const awayRows = away.map(player => `<div class="cb-pa-row away" data-cb-pa-player="${esc(playerName(player))}"><div class="cb-pa-name">${esc(rosterName(player))}</div><div class="cb-pa-where">Not here</div><button type="button" class="btn btn-outline-primary btn-sm" data-cb-pa-available="${esc(player.id)}" ${availability.busy ? 'disabled' : ''}>Mark available</button></div>`).join('');
+
+    body.innerHTML = `
+      <div class="cb-pa-intro">Changes take effect this inning (the ${esc(inning)}). Innings already played keep who was here. Undo takes a change back.</div>
+      ${message ? `<div class="cb-pa-message" data-cb-pa-message role="alert">${esc(message)}</div>` : ''}
+      <div class="cb-pa-group" data-cb-pa-here><div class="cb-pa-title">Available · ${here.length}</div>${hereRows}</div>
+      ${away.length ? `<div class="cb-pa-group" data-cb-pa-away><div class="cb-pa-title">Unavailable · ${away.length}</div>${awayRows}</div>` : ''}`;
+  }
+
+  function askUnavailable(playerId) {
+    availability.confirming = playerId;
+    renderAvailability();
+  }
+
   async function changeAvailability(action, playerId) {
-    const body = ensureModal().querySelector('[data-cb-bench-report-body]');
-    const message = body?.querySelector('[data-cb-br-message]');
+    if (availability.busy || !playerId) return;
+    availability.busy = true;
+    renderAvailability();
+    let message = '';
     try {
       const response = await fetch(`/api/live-game/${gameId}/availability`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action, player_id: Number(playerId), base_sequence: liveSequence(lastState)}),
+        body: JSON.stringify({action, player_id: Number(playerId), base_sequence: liveSequence(availability.state)}),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Unable to save that.');
       if (data.state) document.dispatchEvent(new CustomEvent('coachboard:live-state', {detail: {game_id: gameId, state: data.state}}));
-      await loadReport(data.state || null);
+      availability.busy = false;
+      // The state this write returned: a /state read right after it could be
+      // answered by a read shared from before it (live_game_feedback_pass.js).
+      await loadAvailability(data.state || null);
+      return;
     } catch (error) {
-      if (message) {
-        message.hidden = false;
-        message.textContent = error.message;
-      }
+      message = error.message;
     }
+    availability.busy = false;
+    // Refused (stale screen, a player now on the field): show it with the
+    // latest players.
+    await loadAvailability();
+    renderAvailability(message);
   }
+
+  function openAvailability(relatedTarget = null) {
+    availability.confirming = null;
+    availability.busy = false;
+    const modal = ensureAvailabilityModal();
+    modal.querySelector('[data-cb-pa-body]').innerHTML = '<div class="cb-br-loading">Loading…</div>';
+    bootstrap.Modal.getOrCreateInstance(modal).show(relatedTarget || undefined);
+    loadAvailability();
+  }
+  window.CBPlayerAvailability = {open: openAvailability};
 
   function openReport() {
     bootstrap.Modal.getOrCreateInstance(ensureModal()).show();

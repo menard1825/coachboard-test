@@ -165,6 +165,7 @@
       #cbCoachBoardNavModal .cb-nav-safe{border:1px solid #b9dcc4;background:#f4fbf6;color:#22543d;border-radius:10px;padding:9px 10px;font-size:.75rem;line-height:1.4;margin-bottom:12px}
       #cbCoachBoardNavModal .cb-app-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
       #cbCoachBoardNavModal .cb-app-link{min-height:58px;border:1px solid #dfe4ea;border-radius:11px;background:#fff;color:#253047;text-decoration:none;display:flex;align-items:center;gap:9px;padding:10px 11px;font-size:.8rem;font-weight:780}
+      #cbCoachBoardNavModal button.cb-app-link{width:100%;text-align:left;font-family:inherit}
       #cbCoachBoardNavModal .cb-app-link i{font-size:1.05rem;color:var(--cb-primary-text,#102a66)}
       #cbCoachBoardNavModal .cb-return-game{grid-column:1/-1;background:var(--primary-color,#102a66);border-color:var(--primary-color,#102a66);color:var(--cb-on-primary,#fff)}
       #cbCoachBoardNavModal .cb-return-game i{color:var(--cb-on-primary,#fff)}
@@ -404,8 +405,16 @@
     modal.id = 'cbCoachBoardNavModal';
     modal.className = 'modal fade';
     modal.tabIndex = -1;
-    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">CoachBoard Menu</h5><div class="small text-muted">Leave this screen without ending the game.</div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="cb-nav-safe"><strong>The game stays live.</strong> Leaving this screen does not end the game, change the inning, or change the clock. If the clock is paused, it stays paused until you resume it.</div><div class="cb-app-grid"><a class="cb-app-link cb-return-game" href="/game/${gameId}"><i class="bi bi-diamond-fill"></i><span>Back to Live Game</span></a>${gameChanger ? '' : '<a class="cb-app-link" href="/#overview"><i class="bi bi-house-door"></i><span>Home</span></a>'}<a class="cb-app-link" href="/game-day"><i class="bi bi-calendar3"></i><span>Game Day</span></a>${gameChanger ? '' : '<a class="cb-app-link" href="/#roster"><i class="bi bi-people"></i><span>Roster</span></a><a class="cb-app-link" href="/#practice_plan"><i class="bi bi-clipboard-check"></i><span>Practice</span></a><a class="cb-app-link" href="/pitching"><i class="bi bi-bullseye"></i><span>Pitching</span></a><a class="cb-app-link" href="/#more"><i class="bi bi-three-dots"></i><span>More</span></a>'}</div></div></div></div>`;
+    modal.innerHTML = `<div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title mb-0">CoachBoard Menu</h5><div class="small text-muted">Leave this screen without ending the game.</div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="cb-nav-safe"><strong>The game stays live.</strong> Leaving this screen does not end the game, change the inning, or change the clock. If the clock is paused, it stays paused until you resume it.</div><div class="cb-app-grid"><a class="cb-app-link cb-return-game" href="/game/${gameId}"><i class="bi bi-diamond-fill"></i><span>Back to Live Game</span></a><button type="button" class="cb-app-link" data-cb-player-availability><i class="bi bi-person-check"></i><span>Player availability</span></button>${gameChanger ? '' : '<a class="cb-app-link" href="/#overview"><i class="bi bi-house-door"></i><span>Home</span></a>'}<a class="cb-app-link" href="/game-day"><i class="bi bi-calendar3"></i><span>Game Day</span></a>${gameChanger ? '' : '<a class="cb-app-link" href="/#roster"><i class="bi bi-people"></i><span>Roster</span></a><a class="cb-app-link" href="/#practice_plan"><i class="bi bi-clipboard-check"></i><span>Practice</span></a><a class="cb-app-link" href="/pitching"><i class="bi bi-bullseye"></i><span>Pitching</span></a><a class="cb-app-link" href="/#more"><i class="bi bi-three-dots"></i><span>More</span></a>'}</div></div></div></div>`;
     document.body.appendChild(modal);
+    // Who is here during the game: one sheet (live_game_bench_report.js).
+    // It opens once the Menu has closed, and returns focus to Menu.
+    modal.querySelector('[data-cb-player-availability]')?.addEventListener('click', () => {
+      modal.addEventListener('hidden.bs.modal', () => {
+        window.CBPlayerAvailability?.open($('cbDugoutHeader')?.querySelector('[data-cb-menu]') || null);
+      }, {once: true});
+      bootstrap.Modal.getOrCreateInstance(modal).hide();
+    });
     return modal;
   }
 
