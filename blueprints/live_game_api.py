@@ -416,6 +416,12 @@ def get_authoritative_live_state(game_id, team_id, game=None):
         'planned_next_alignment': planned_next,
         'roster': [model_to_dict(p) for p in present_roster],
         'absent_player_ids': sorted(availability.not_here_now()),
+        # Who is not here now (Out at first pitch and not arrived, or left
+        # during the game), for the Bench Report's "Not here" list.
+        'not_here': [
+            {'id': p.id, 'name': p.name, 'number': p.number}
+            for p in roster if not availability.is_present(p.id)
+        ],
         'rotation_events': [model_to_dict(e) for e in events],
         # The same timeline as baseball history (live_history): no setup
         # edits, and each inning taking the field with the defense that

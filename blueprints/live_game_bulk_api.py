@@ -810,3 +810,87 @@ def inject_live_game_feedback_pass(response):
 
     response.set_data(html)
     return response
+
+
+@live_game_bulk_bp.route('/<int:game_id>/availability', methods=['POST'])
+def availability_change(game_id):
+    """A player arrives late ("Here now") or leaves during the game ("Left
+    this inning"): the live 'Player Arrived' / 'Player Left' events that
+    game_availability replays, from the inning being played.
+
+    First-pitch attendance (PlayerGameAbsence) is not touched -- it stays
+    "who was here when the game started". A player on the field, or in the
+    Next Inning defense, has to be moved off it before they can leave.
+    Live Undo reverts this like any other live change.
+    """
+    from game_availability import ARRIVED, LEFT, game_availability
+    from models import Player
+    from blueprints.live_game_ui import _next_inning_context
+
+    user, team, game = _authorized_context(game_id)
+    if not game:
+        return jsonify({'status': 'error', 'message': 'Unauthorized or game not found.'}), 403
+    if not game.is_live:
+        return jsonify({'status': 'error', 'message': 'Game is not live.'}), 409
+
+    data = request.get_json(silent=True) or {}
+    stale = _stale_write_response(data, game, team)
+    if stale:
+        return stale
+
+    action = str(data.get('action') or '')
+    if action not in ('arrived', 'left'):
+        return jsonify({'status': 'error', 'message': 'Choose Here now or Left this inning.'}), 400
+    try:
+        player_id = int(data.get('player_id'))
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': 'Choose a player.'}), 400
+    player = db.session.query(Player).filter_by(id=player_id, team_id=team.id).first()
+    if not player:
+        return jsonify({'status': 'error', 'message': 'That player is not on this team.'}), 404
+
+    inning = str(game.live_current_inning or '1')
+    try:
+        inning_number = int(float(inning))
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': 'Current inning is invalid.'}), 409
+
+    availability = game_availability(game, team.id)
+    here = availability.is_present(player.id)
+    _, actual_rotation, _ = _actual_rotation(game, team.id)
+    field = _current_alignment(game, team.id, actual_rotation)
+
+    if action == 'arrived' and here:
+        return jsonify({'status': 'error', 'message': f'{player.name} is already here.'}), 409
+    if action == 'left':
+        if not here:
+            return jsonify({'status': 'error', 'message': f'{player.name} is already marked as gone.'}), 409
+        position = next((pos for pos, name in field.items() if name == player.name), None)
+        if position:
+            return jsonify({
+                'status': 'error',
+                'message': f'{player.name} is at {position}. Take them off the field first.',
+            }), 409
+        # The defense the next inning would start with (seeded if it has
+        # not been read yet), not only a stored one.
+        prep = _next_inning_context(game, team)[4]
+        planned = next((pos for pos, name in ((prep.alignment if prep else {}) or {}).items()
+                        if name == player.name), None)
+        if planned:
+            return jsonify({
+                'status': 'error',
+                'message': f'{player.name} is at {planned} in the next inning. Take them out of it first.',
+            }), 409
+
+    # The field does not change; the event carries it unchanged so the
+    # replayed defense stays the same.
+    event = _event(game, team.id, ARRIVED if action == 'arrived' else LEFT, inning, field, field)
+    event.subject_player_id = player.id
+    event.effective_inning = inning_number
+    db.session.commit()
+
+    _release_request_write_lock()
+    state = _broadcast_state(game.id, team.id)
+    socketio.emit('next_inning_prep_update', {'game_id': game.id, 'inning': inning},
+                  room=_room_name(team.id, game.id))
+    return jsonify({'status': 'success', 'state': state})

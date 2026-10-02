@@ -9,6 +9,7 @@
   let cardObserver = null;
   let rootObserver = null;
   let loadBusy = false;
+  let lastState = null;
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -64,7 +65,13 @@
         </div>
       </div>`;
     document.body.appendChild(modal);
-    modal.querySelector('[data-cb-bench-refresh]')?.addEventListener('click',loadReport);
+    modal.querySelector('[data-cb-bench-refresh]')?.addEventListener('click',() => loadReport());
+    modal.addEventListener('click', event => {
+      const left = event.target.closest('[data-cb-br-left]');
+      const arrived = event.target.closest('[data-cb-br-arrived]');
+      if (left) changeAvailability('left', left.dataset.cbBrLeft);
+      if (arrived) changeAvailability('arrived', arrived.dataset.cbBrArrived);
+    });
     return modal;
   }
 
@@ -161,15 +168,36 @@
     return {projected, unprojected};
   }
 
+  /*
+   * Innings already played, from what the game recorded -- the same evidence
+   * Pregame Plan uses (next-inning-prep's played_innings): how each inning
+   * ended (End Inning's record, or a later correction) and who was here in
+   * it. A player sat an inning only when they were here for it and not in
+   * its recorded defense. An inning with no record stays unknown; nothing is
+   * read from an untouched plan.
+   */
+  function playedInnings(state, prep) {
+    const currentValue = inningValue(state?.current_inning);
+    const played = prep?.played_innings && typeof prep.played_innings === 'object' ? prep.played_innings : {};
+    const recorded = [];
+    const unknown = [];
+    for (let inning = 1; currentValue !== null && inning < currentValue; inning += 1) {
+      const entry = played[String(inning)];
+      const names = Object.values(entry?.alignment || {}).map(value => String(value ?? '').trim()).filter(Boolean);
+      if (!entry || !names.length || !Array.isArray(entry.available)) {
+        unknown.push(String(inning));
+      } else {
+        recorded.push({inning: String(inning), assigned: new Set(names), available: new Set(entry.available)});
+      }
+    }
+    return {recorded, unknown};
+  }
+
   function buildReport(state, prep = null) {
     const roster = Array.isArray(state?.roster) ? state.roster.filter(player => player?.name) : [];
-    const currentValue = inningValue(state?.current_inning);
+    const notHere = Array.isArray(state?.not_here) ? state.not_here.filter(player => player?.name) : [];
     const currentLabel = inningLabel(state?.current_inning || '1');
-    const actual = state?.actual_rotation && typeof state.actual_rotation === 'object' ? state.actual_rotation : {};
-    const completed = Object.entries(actual)
-      .map(([inning,alignment]) => ({inning,value:inningValue(inning),alignment:alignment || {}}))
-      .filter(item => item.value !== null && (currentValue === null || item.value < currentValue))
-      .sort((a,b)=>a.value-b.value);
+    const {recorded, unknown} = playedInnings(state, prep);
 
     const {projected: futurePlanned, unprojected} = inningsAhead(state, prep);
 
@@ -178,16 +206,13 @@
         .map(value => String(value ?? '').trim())
         .filter(Boolean)
     );
+    const satIn = name => recorded
+      .filter(item => item.available.has(name) && !item.assigned.has(name))
+      .map(item => inningLabel(item.inning));
     const history = roster.map(player => {
       const name = String(player.name).trim();
-      const sat = [];
-      completed.forEach(item => {
-        const assigned = Object.values(item.alignment || {})
-          .map(value => String(value ?? '').trim());
-        if (!assigned.includes(name)) {
-          sat.push(inningLabel(item.inning));
-        }
-      });
+      const sat = satIn(name);
+      // Here now and not on the field: sitting now.
       const currentBench = !currentAssigned.has(name);
       const plannedSat = futurePlanned
         .filter(item => {
@@ -204,7 +229,12 @@
       if (a.plannedSat.length !== b.plannedSat.length) return b.plannedSat.length - a.plannedSat.length;
       return a.name.localeCompare(b.name);
     });
-    return {history,currentLabel,futurePlanned,unprojected,nextLabel: ordinal(prep?.next_inning),
+    // Not here now: no current or projected sits; earlier recorded sits stay.
+    const away = notHere.map(player => {
+      const name = String(player.name).trim();
+      return {player, name, display: rosterName(player), sat: satIn(name)};
+    }).sort((a, b) => a.name.localeCompare(b.name));
+    return {history,away,unknown,currentLabel,futurePlanned,unprojected,nextLabel: ordinal(prep?.next_inning),
       upcomingKnown: Boolean(prep?.confirmed?.alignment)};
   }
 
@@ -222,6 +252,7 @@
     const body = modal.querySelector('[data-cb-bench-report-body]');
     if (!body) return;
     const report = buildReport(state, prep);
+    lastState = state;
     const onBench = report.history.filter(row => row.currentBench).length;
     const rows = report.history.length ? report.history.map(row => {
       const completedText = row.sat.length ? row.sat.join(', ') : 'None';
@@ -229,8 +260,19 @@
       const planned = row.plannedSat.length
         ? `<div class="cb-br-plan"><strong>Projected to sit:</strong> ${esc(row.plannedSat.join(', '))}</div>`
         : '';
-      return `<div class="cb-br-row ${row.currentBench ? 'current' : ''}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-count">${esc(countLabel(row))}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(completedText)}${current}</div>${planned}</div>`;
+      // Leaving is for a player off the field: sitting now.
+      const leave = row.currentBench
+        ? `<button type="button" class="btn btn-sm btn-outline-secondary cb-br-action" data-cb-br-left="${esc(row.player.id)}">Left this inning</button>`
+        : '';
+      return `<div class="cb-br-row ${row.currentBench ? 'current' : ''}" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-count">${esc(countLabel(row))}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(completedText)}${current}</div>${planned}${leave}</div>`;
     }).join('') : '<div class="cb-br-empty">No bench history yet.</div>';
+    const away = report.away.length
+      ? `<div class="cb-br-away" data-cb-br-not-here><div class="cb-br-away-title">Not here</div>${report.away.map(row => `
+          <div class="cb-br-row away" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(row.sat.length ? row.sat.join(', ') : 'None')}</div><button type="button" class="btn btn-sm btn-outline-primary cb-br-action" data-cb-br-arrived="${esc(row.player.id)}">Here now</button></div>`).join('')}</div>`
+      : '';
+    const unknown = report.unknown.length
+      ? `<div class="cb-br-unprojected" data-cb-br-unknown><strong>No recorded defense:</strong> ${esc(report.unknown.map(ordinal).join(', '))}. Sits for ${report.unknown.length === 1 ? 'that inning aren' : 'those innings aren'}'t counted.</div>`
+      : '';
     const planChip = report.futurePlanned.length
       ? `<span class="cb-br-chip">Projected innings ahead: ${report.futurePlanned.length}</span>`
       : '';
@@ -243,10 +285,13 @@
           esc(report.unprojected.map(item => `${ordinal(item.inning)} (${item.reason})`).join(', '))
         }. Sits for ${report.unprojected.length === 1 ? 'that inning aren' : 'those innings aren'}'t counted.</div>`
       : '';
-    body.innerHTML = `<div class="cb-br-summary"><span class="cb-br-chip">Inning ${esc(report.currentLabel)}</span><span class="cb-br-chip">On bench: ${onBench}</span>${planChip}</div><div class="cb-br-basis" data-cb-br-basis>${esc(basis)}</div>${missing}<div class="cb-br-list">${rows}</div>`;
+    body.innerHTML = `<div class="cb-br-summary"><span class="cb-br-chip">Inning ${esc(report.currentLabel)}</span><span class="cb-br-chip" data-cb-br-sitting>Sitting now: ${onBench}</span>${report.away.length ? `<span class="cb-br-chip" data-cb-br-away-count>Not here: ${report.away.length}</span>` : ''}${planChip}</div><div class="cb-br-basis" data-cb-br-basis>${esc(basis)}</div>${unknown}${missing}<div class="cb-br-message" data-cb-br-message role="status" hidden></div><div class="cb-br-list">${rows}</div>${away}`;
   }
 
-  async function loadReport() {
+  // fresh: a state just returned by a write. A /state read here could be
+  // answered by a read shared from before that write
+  // (live_game_feedback_pass.js), so it is used as is.
+  async function loadReport(fresh = null) {
     if (loadBusy) return;
     const modal = ensureModal();
     const body = modal.querySelector('[data-cb-bench-report-body]');
@@ -256,20 +301,50 @@
     if (body) body.innerHTML = '<div class="cb-br-loading">Loading…</div>';
     try {
       const [response, prep] = await Promise.all([
-        fetch(`/api/live-game/${gameId}/state`,{cache:'no-store'}),
+        fresh ? null : fetch(`/api/live-game/${gameId}/state`,{cache:'no-store'}),
         // The defense the next inning will actually start with.
         fetch(`/api/live-game/${gameId}/next-inning-prep`,{cache:'no-store'})
           .then(r => (r.ok ? r.json() : null))
           .catch(() => null),
       ]);
-      const data = await response.json().catch(()=>({}));
-      if (!response.ok) throw new Error(data.message || `Unable to load bench report (${response.status}).`);
+      const data = fresh || await response.json().catch(()=>({}));
+      if (!fresh && !response.ok) throw new Error(data.message || `Unable to load bench report (${response.status}).`);
       renderReport(data, prep?.status === 'success' ? prep : null);
     } catch (err) {
       if (body) body.innerHTML = `<div class="alert alert-danger mb-0">${esc(err.message)}</div>`;
     } finally {
       loadBusy = false;
       if (refresh) refresh.disabled = false;
+    }
+  }
+
+  function liveSequence(state) {
+    return Math.max(0, ...(state?.rotation_events || [])
+      .filter(event => !event.reverted)
+      .map(event => Number(event.sequence) || 0));
+  }
+
+  // "Here now" / "Left this inning": a live availability change from the
+  // inning being played (Player Arrived / Player Left). First-pitch
+  // attendance is not changed; live Undo takes it back.
+  async function changeAvailability(action, playerId) {
+    const body = ensureModal().querySelector('[data-cb-bench-report-body]');
+    const message = body?.querySelector('[data-cb-br-message]');
+    try {
+      const response = await fetch(`/api/live-game/${gameId}/availability`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action, player_id: Number(playerId), base_sequence: liveSequence(lastState)}),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Unable to save that.');
+      if (data.state) document.dispatchEvent(new CustomEvent('coachboard:live-state', {detail: {game_id: gameId, state: data.state}}));
+      await loadReport(data.state || null);
+    } catch (error) {
+      if (message) {
+        message.hidden = false;
+        message.textContent = error.message;
+      }
     }
   }
 
