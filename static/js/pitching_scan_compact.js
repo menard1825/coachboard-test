@@ -132,9 +132,22 @@
     return official.replace(/\s+pitches?$/i, '');
   }
 
+  // Ready to pitch: eligible with nothing to weigh. A pitcher eligible with
+  // a Pitch Smart advisory (already pitched in a game today) is still
+  // eligible -- an advisory is guidance, not a rule -- but is not "ready":
+  // the card stays out in full, with the advisory and the rest date.
+  function isAdvisory(card) {
+    return card.dataset.badgeShort === 'ADVISORY';
+  }
+
   function eligibleCards() {
     return [...document.querySelectorAll('.cb-pitcher-card')]
-      .filter(card => card.dataset.availabilityGroup === 'eligible');
+      .filter(card => card.dataset.availabilityGroup === 'eligible' && !isAdvisory(card));
+  }
+
+  function advisoryCount() {
+    return [...document.querySelectorAll('.cb-pitcher-card')]
+      .filter(card => card.dataset.availabilityGroup === 'eligible' && isAdvisory(card)).length;
   }
 
   function rollupSignature(cards) {
@@ -142,6 +155,7 @@
       expanded: readyExpanded,
       compact: isCompactMode(),
       tablet: isTabletTouch(),
+      advisory: advisoryCount(),
       pitchers: cards.map(card => [
         card.dataset.playerName || card.querySelector('.cb-pitcher-name')?.textContent || '',
         todayUsage(card),
@@ -171,7 +185,7 @@
       lastRollupSignature = signature;
       rollup.innerHTML = `
         <div class="cb-ready-rollup-head">
-          <div><strong>Ready to pitch</strong><small>${cards.length} pitcher${cards.length === 1 ? '' : 's'} available today</small></div>
+          <div><strong>Ready to pitch</strong><small>${cards.length} pitcher${cards.length === 1 ? '' : 's'} available today${advisoryCount() ? ` · ${advisoryCount()} more eligible with an advisory, shown below` : ''}</small></div>
           <button type="button" class="cb-ready-rollup-toggle" aria-expanded="${readyExpanded ? 'true' : 'false'}">${readyExpanded ? 'Hide details' : 'Show details'}</button>
         </div>
         <div class="cb-ready-rollup-names">

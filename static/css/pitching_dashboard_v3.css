@@ -820,3 +820,6 @@ body.cb-pitching #newPitchingOutingForm button[type="submit"] {
     border-left: 0;
   }
 }
+
+/* "N with an advisory" under Eligible Today: eligible, not unconditionally ready. */
+.cb-pitch-summary-item small[data-pitch-advisory-count] { display: block; margin-top: 2px; color: #8a5a13; font-size: .68rem; font-weight: 750; }

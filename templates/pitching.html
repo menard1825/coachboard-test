@@ -92,7 +92,7 @@
             </div>
             {% else %}
             <div class="cb-pitch-summary cb-pitch-counts" aria-label="Pitcher availability summary">
-                <div class="cb-pitch-summary-item"><span>Eligible Today</span><strong>{{ ns.eligible }}</strong></div>
+                <div class="cb-pitch-summary-item"><span>Eligible Today</span><strong>{{ ns.eligible }}</strong>{% if ns.advisory %}<small data-pitch-advisory-count>{{ ns.advisory }} with an advisory</small>{% endif %}</div>
                 <div class="cb-pitch-summary-item"><span>Unavailable</span><strong>{{ ns.unavailable }}</strong></div>
                 <div class="cb-pitch-summary-item"><span>Needs Review</span><strong>{{ ns.review }}</strong></div>
             </div>
