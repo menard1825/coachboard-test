@@ -2,7 +2,8 @@
 never starts an inning on a change that did not save.
 
 * Beside End Inning (every tab): "Plan for the 2nd", "Same as the 1st",
-  "Your changes for the 2nd" -- or the save state while that matters.
+  "Your changes for the 2nd" (this board's own save; "Changes for the 2nd"
+  for another device's) -- or the save state while that matters.
 * A live change this inning carries the field forward and skips the next
   inning's own pregame plan by default. Nobody chose that, so End Inning
   asks once: "Use the 2nd-inning plan" or "Keep this defense". The answer is
@@ -10,7 +11,9 @@ never starts an inning on a change that did not save.
 * A save still in flight holds End Inning until it lands.
 * A change refused because another device changed the defense says "Not
   saved" (never "Saved"), shows that device's defense, and holds End Inning
-  until the coach accepts it ("Use this defense") or changes it.
+  until the coach accepts it ("Use this defense") or changes it. If that
+  defense can't be read, the board says so and offers Try again instead;
+  nothing can be accepted, and End Inning stays held, until it loads.
 """
 
 import os
@@ -165,6 +168,17 @@ def test_no_question_without_a_separate_plan(live, coachboard_url):
     assert page.cb_errors == []
 
 
+def test_this_boards_own_save_is_your_changes(live, coachboard_url):
+    page = live(PHONE, plan={'1': INNING_1, '2': INNING_1})
+    _open(page, coachboard_url)
+    _bench_right_field(page)
+    expect(page.locator(NOTE)).to_have_text('Your changes for the 2nd', timeout=10_000)
+    # Another device saves over it: no longer this board's changes.
+    _set_next(page, coachboard_url, {**INNING_1, **FIELD_SWAP})
+    expect(page.locator(NOTE)).to_have_text('Changes for the 2nd', timeout=10_000)
+    assert page.cb_errors == []
+
+
 # Saves that have not landed ---------------------------------------------------------------
 
 def _hold_saves(page):
@@ -226,6 +240,7 @@ def test_a_competing_edit_is_not_shown_as_saved_and_holds_end_inning(live, coach
     expect(board.locator('[data-next-notice]')).to_contain_text('changed on another device')
     expect(board.locator('[data-next-position="RF"]')).to_have_attribute('data-next-player', other['RF'])
     expect(page.locator(NOTE)).to_have_text('Not saved — check the 2nd')
+    expect(board.locator('[data-next-hint]')).to_have_text('Saved on another device for the 2nd')
 
     # End Inning waits for the coach.
     page.locator('#cb-now-next-switch [data-now-next="now"]').click()
@@ -238,7 +253,78 @@ def test_a_competing_edit_is_not_shown_as_saved_and_holds_end_inning(live, coach
     # Accepting that defense lets the inning start with it.
     board.locator('[data-next-conflict-ack]').click()
     expect(badge).to_have_text('Saved ✓')
-    expect(page.locator(NOTE)).to_have_text('Your changes for the 2nd')
+    expect(page.locator(NOTE)).to_have_text('Changes for the 2nd')     # not "Your changes"
+    page.locator('#liveEndInningBtn').click()
+    _wait_inning(page, coachboard_url, '2')
+    assert _filled(_live(page, coachboard_url)['current_alignment']) == other
+    assert page.cb_errors == []
+
+
+def test_a_conflict_whose_new_defense_cannot_load_waits_for_it(live, coachboard_url):
+    page = live(PHONE, plan={'1': INNING_1, '2': INNING_1})
+    _open(page, coachboard_url)
+    held, reads_fail = [], [False]
+
+    def route(route):
+        if route.request.method == 'POST':
+            held.append(route)
+        elif reads_fail[0]:
+            route.abort()
+        else:
+            route.continue_()
+
+    page.route('**/next-inning-prep', route)
+    board = _bench_right_field(page)
+    rf_before = board.locator('[data-next-position="RF"]')
+
+    # Another device saves a different 2nd; then this phone's save is
+    # refused while it can't read anything.
+    other = {**INNING_1, **FIELD_SWAP}
+    _set_next(page, coachboard_url, other)
+    reads_fail[0] = True
+    for held_route in held:
+        held_route.continue_()
+
+    badge = board.locator('[data-next-save-state]')
+    notice = board.locator('[data-next-notice]')
+    expect(badge).to_have_text('Not saved', timeout=10_000)
+    expect(notice).to_have_text("Couldn't load the latest defense. Try again.")
+    expect(board.locator('[data-next-hint]')).to_have_text(
+        'Last loaded defense for the 2nd · may be out of date')
+    expect(board.locator('[data-next-conflict-ack]')).to_have_count(0)    # nothing to accept yet
+    expect(board.locator('[data-next-conflict-retry]')).to_be_visible()
+    expect(rf_before).not_to_have_attribute('data-next-player', other['RF'])
+    expect(page.locator(NOTE)).to_have_text('Not saved — check the 2nd')
+
+    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+    page.locator('#liveEndInningBtn').click()
+    expect(board).to_be_visible(timeout=10_000)                 # sent back to look
+    page.wait_for_timeout(800)
+    assert _inning(page, coachboard_url) == '1'
+    expect(notice).to_have_text("Couldn't load the latest defense. Try again.")
+
+    # The connection is back: Try again (or the poll) loads the other defense.
+    reads_fail[0] = False
+    page.evaluate("document.querySelector('[data-next-conflict-retry]')?.click()")
+    ack = board.locator('[data-next-conflict-ack]')
+    expect(ack).to_be_visible(timeout=10_000)
+    expect(notice).to_contain_text("Your change wasn't saved")
+    expect(notice).to_contain_text('changed on another device')
+    expect(board.locator('[data-next-hint]')).to_have_text('Saved on another device for the 2nd')
+    expect(board.locator('[data-next-position="RF"]')).to_have_attribute('data-next-player', other['RF'])
+    expect(badge).to_have_text('Not saved')
+
+    # Loaded is not accepted: End Inning still waits for the coach.
+    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+    page.locator('#liveEndInningBtn').click()
+    expect(board).to_be_visible(timeout=10_000)
+    page.wait_for_timeout(800)
+    assert _inning(page, coachboard_url) == '1'
+
+    ack.click()
+    expect(badge).to_have_text('Saved ✓')
+    expect(page.locator(NOTE)).to_have_text('Changes for the 2nd')
+    page.unroute('**/next-inning-prep')
     page.locator('#liveEndInningBtn').click()
     _wait_inning(page, coachboard_url, '2')
     assert _filled(_live(page, coachboard_url)['current_alignment']) == other

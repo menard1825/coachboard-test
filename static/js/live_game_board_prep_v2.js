@@ -50,6 +50,13 @@
   // saved. End Inning waits until the coach has looked at what is there
   // now ("Use this defense") or changed it again.
   let conflictPending = false;
+  // Whether the defense that replaced it has been read since the conflict.
+  // Until it has, the board shows an older defense: no "Use this defense",
+  // and End Inning stays held.
+  let conflictLoaded = false;
+  // The prep revision of this board's own last save: "Your changes" only
+  // while the saved defense is still that one.
+  let ownRevision = null;
   let rejectCount = 0;
   // Bumped by every local move and every confirmed save, so a poll that was
   // already on its way cannot put an older board back afterwards.
@@ -231,6 +238,15 @@
     const currentLabel = inningOrdinal(
       latest?.current_inning || ''
     );
+
+    // What the board shows during a conflict: the other device's defense,
+    // or -- when it could not be read -- the last one this board loaded.
+    if (conflictPending) {
+      const inning = nextLabel ? ` for the ${nextLabel}` : '';
+      return conflictLoaded
+        ? `Saved on another device${inning}`
+        : `Last loaded defense${inning} · may be out of date`;
+    }
 
     if (source === 'planned') {
       return nextLabel
@@ -2128,7 +2144,14 @@
         ? `Same as the ${currentLabel} · plan not used`
         : `Same as the ${currentLabel}`;
     }
-    return `Your changes for the ${inningLabel}`;
+    return ownSave()
+      ? `Your changes for the ${inningLabel}`
+      : `Changes for the ${inningLabel}`;
+  }
+
+  function ownSave() {
+    const revision = latest?.confirmed?.revision;
+    return ownRevision !== null && revision !== undefined && revision === ownRevision;
   }
 
   // A separate plan for the next inning that the automatic defense is not
@@ -3069,8 +3092,11 @@
             data-next-notice
             ${noticeMessage ? '' : 'hidden'}
           >${esc(noticeMessage)}</div>
-          ${conflictPending
+          ${conflictPending && conflictLoaded
             ? '<button type="button" class="btn btn-outline-primary btn-sm cb-next-conflict-ack" data-next-conflict-ack>Use this defense</button>'
+            : ''}
+          ${conflictPending && !conflictLoaded
+            ? '<button type="button" class="btn btn-outline-primary btn-sm cb-next-conflict-ack" data-next-conflict-retry>Try again</button>'
             : ''}
           ${
             undoNote
@@ -3190,6 +3216,13 @@
         acceptConflict
       );
 
+    card
+      .querySelector('[data-next-conflict-retry]')
+      ?.addEventListener(
+        'click',
+        loadConflictDefense
+      );
+
     const benchSelected = () => {
       if (!selected || selected.source === 'BENCH') return;
 
@@ -3297,6 +3330,7 @@
     pendingMode = mode;
     localSource = source;
     conflictPending = false;
+    conflictLoaded = false;
     undoNote = '';
     dirty = true;
     localRevision += 1;
@@ -3369,6 +3403,7 @@
         latest = data;
         lastSignature = JSON.stringify(data);
         localRevision += 1;
+        ownRevision = data?.confirmed?.revision ?? null;
         serverBase = normalize(data?.confirmed?.alignment || sent);
         if (!dirty) localSource = null;
 
@@ -3403,7 +3438,21 @@
     localSource = null;
     conflictCount += 1;
     conflictPending = true;
+    conflictLoaded = false;
+    // A read already in the air predates the other device's save.
+    localRevision += 1;
+    // A tap made while the read below is out is part of the replay being
+    // stopped; the board is the server's.
+    dragSurface?.cancel();
+    setSyncState('conflict');
+    await loadConflictDefense();
+  }
 
+  // Read the defense that replaced this board's change. Until that works
+  // the board says so, rather than claiming the other device's defense is
+  // shown, and keeps the conflict (and End Inning) held.
+  async function loadConflictDefense() {
+    if (!conflictPending) return;
     let data = null;
 
     try {
@@ -3412,23 +3461,20 @@
       data = null;
     }
 
-    // A tap made while that read was out is part of the replay being
-    // stopped; the board below is the server's.
+    if (!conflictPending) return;
     dirty = false;
-    dragSurface?.cancel();
 
-    if (data) {
+    if (data && data.status !== 'inactive' && data.is_live !== false) {
       lastSignature = JSON.stringify(data);
-      hydrate(data, {remote: false});
+      hydrate(data, {remote: false});        // marks the conflict loaded
     } else {
-      // Show the last defense the server confirmed until the poll can
-      // read the new one.
+      // Keep the last defense the server confirmed; the poll (or Try
+      // again) reads the new one.
       lastSignature = '';
       draft = normalize(serverBase || {});
-      renderCard();
+      noticeMessage = "Couldn't load the latest defense. Try again.";
     }
 
-    noticeMessage = conflictNotice();
     setSyncState('conflict');
     renderCard();
   }
@@ -3442,7 +3488,9 @@
 
   // The coach has looked at the other device's defense and keeps it.
   function acceptConflict() {
+    if (!conflictLoaded) return;
     conflictPending = false;
+    conflictLoaded = false;
     noticeMessage = '';
     successMessage = 'Saved ✓';
     setSyncState('saved');
@@ -3515,6 +3563,13 @@
           window.clearTimeout(timer);
         }
       }
+    }
+
+    if (conflictPending && !conflictLoaded) {
+      throw new Error(
+        "Your change to the next inning wasn't saved, and the latest defense " +
+        "couldn't be loaded. Tap Try again, then end the inning."
+      );
     }
 
     if (conflictPending || conflictCount !== conflictsBefore) {
@@ -4380,6 +4435,13 @@
       setSyncState('saved');
     }
 
+    // A conflict's replacement defense is on the board now: the coach can
+    // check it and accept it.
+    if (conflictPending) {
+      conflictLoaded = true;
+      noticeMessage = conflictNotice();
+    }
+
     renderCard();
 
     return true;
@@ -4492,6 +4554,7 @@
     selectedPosition = '';
     undoNote = '';
     conflictPending = false;
+    conflictLoaded = false;
     errorMessage = '';
     noticeMessage = '';
     serverBase = null;
