@@ -329,6 +329,11 @@ class GameRotationEvent(db.Model):
     # (live_history): True = a setup edit before the inning began, False = a
     # change during play, NULL = recorded before the question existed.
     pre_start = Column(Boolean, nullable=True)
+    # 'End Inning' only: the saved Next Inning defense it started the inning
+    # with -- source, who chose it, its revision and what its Undo would
+    # bring back (the alignment is after_alignment). Undoing the inning start
+    # restores it instead of seeding a new one. NULL before this existed.
+    started_prep = Column(JSON, nullable=True)
 
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     game_id = Column(Integer, ForeignKey('games.id'), nullable=False)

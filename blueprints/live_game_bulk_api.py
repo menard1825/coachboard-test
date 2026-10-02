@@ -768,9 +768,12 @@ def advance_inning(game_id):
     )
     game.live_current_inning = next_inning
 
-    from blueprints.live_game_ui import GameNextInningPrep
+    from blueprints.live_game_ui import GameNextInningPrep, prep_snapshot
     prep = db.session.query(GameNextInningPrep).filter_by(game_id=game.id, team_id=team.id).first()
     if prep:
+        # Undoing this start brings this defense back exactly (undo).
+        if str(prep.inning) == str(next_inning):
+            event.started_prep = prep_snapshot(prep)
         db.session.delete(prep)
 
     db.session.commit()

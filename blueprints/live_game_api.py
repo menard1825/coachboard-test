@@ -857,6 +857,9 @@ def undo(game_id):
             event_type=INNING_STARTED,
             reverted=False,
         ).update({'reverted': True}, synchronize_session='fetch')
+        # And the Next Inning defense that started it is back, as saved.
+        from blueprints.live_game_ui import restore_started_prep
+        restore_started_prep(game, team.id, last_event)
 
     current_inning = '1'
     remaining = db.session.query(GameRotationEvent).filter_by(

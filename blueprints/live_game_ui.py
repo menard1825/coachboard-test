@@ -277,6 +277,51 @@ def _played_innings(game, team, current_inning):
     return played
 
 
+def prep_snapshot(prep):
+    """A saved Next Inning defense, kept on the End Inning that started it."""
+    return {
+        'inning': str(prep.inning),
+        'alignment': deepcopy(prep.alignment or {}),
+        'source': prep.source,
+        'updated_by': prep.updated_by,
+        'revision': int(prep.revision or 0),
+        'previous_alignment': deepcopy(prep.previous_alignment),
+        'previous_source': prep.previous_source,
+        'previous_updated_by': prep.previous_updated_by,
+    }
+
+
+def restore_started_prep(game, team_id, event):
+    """Undo of an inning start: the Next Inning defense that started it is
+    the Next Inning defense again -- alignment, source, who chose it and its
+    own Undo -- with a newer revision than any it has had, so a screen that
+    never saw the restore cannot undo against it. Returns the restored row,
+    or None when the event kept nothing (recorded before this existed)."""
+    snapshot = event.started_prep or None
+    if not snapshot or str(snapshot.get('inning')) != str(event.inning):
+        return None
+    existing = _prep_for_game(game.id, team_id)
+    revision = max(int(snapshot.get('revision') or 0), int(getattr(existing, 'revision', 0) or 0)) + 1
+    if existing:
+        db.session.delete(existing)
+        db.session.flush()
+    prep = GameNextInningPrep(
+        game_id=game.id,
+        team_id=team_id,
+        inning=str(event.inning),
+        alignment=deepcopy(snapshot.get('alignment') or event.after_alignment or {}),
+        source=snapshot.get('source'),
+        updated_by=snapshot.get('updated_by'),
+        previous_alignment=deepcopy(snapshot.get('previous_alignment')),
+        previous_source=snapshot.get('previous_source'),
+        previous_updated_by=snapshot.get('previous_updated_by'),
+        revision=revision,
+        updated_at=datetime.utcnow(),
+    )
+    db.session.add(prep)
+    return prep
+
+
 def _prep_for_game(game_id, team_id):
     return db.session.query(GameNextInningPrep).filter_by(game_id=game_id, team_id=team_id).first()
 
