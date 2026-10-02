@@ -47,9 +47,12 @@ class GameNextInningPrep(db.Model):
     previous_updated_by = db.Column(db.String, nullable=True)
     revision = db.Column(db.Integer, nullable=True, default=0)
     # Whether the coach chose this defense's pitcher (a save that changed P
-    # on the board). A saved defense whose pitcher was not chosen follows a
-    # live pitching change (_effective_prep); one whose pitcher was chosen
-    # keeps it. previous_pitcher_chosen goes with the Undo state.
+    # on the board). A saved defense whose pitcher was not chosen (False)
+    # follows a live pitching change (_effective_prep); one whose pitcher was
+    # chosen (True) keeps it. NULL is unknown -- saved before this was
+    # recorded -- and a coach-saved defense with NULL keeps its pitcher like
+    # a chosen one; it is never inferred. previous_pitcher_chosen goes with
+    # the Undo state, NULL kept as NULL.
     pitcher_chosen = db.Column(db.Boolean, nullable=True)
     previous_pitcher_chosen = db.Column(db.Boolean, nullable=True)
 
@@ -203,7 +206,7 @@ def _prep_dict(prep):
         'updated_by': prep.updated_by,
         'updated_at': prep.updated_at.isoformat() if prep.updated_at else None,
         'revision': int(prep.revision or 0),
-        'pitcher_chosen': bool(prep.pitcher_chosen),
+        'pitcher_chosen': prep.pitcher_chosen,
         # What "Undo next-inning edit" would bring back, or None.
         'previous': {
             'alignment': deepcopy(prep.previous_alignment),
@@ -319,8 +322,9 @@ def prep_snapshot(prep):
         'previous_alignment': deepcopy(prep.previous_alignment),
         'previous_source': prep.previous_source,
         'previous_updated_by': prep.previous_updated_by,
-        'pitcher_chosen': bool(prep.pitcher_chosen),
-        'previous_pitcher_chosen': bool(prep.previous_pitcher_chosen),
+        # As recorded: None (unknown) stays None.
+        'pitcher_chosen': prep.pitcher_chosen,
+        'previous_pitcher_chosen': prep.previous_pitcher_chosen,
     }
 
 
@@ -348,8 +352,9 @@ def restore_started_prep(game, team_id, event):
         previous_alignment=deepcopy(snapshot.get('previous_alignment')),
         previous_source=snapshot.get('previous_source'),
         previous_updated_by=snapshot.get('previous_updated_by'),
-        pitcher_chosen=bool(snapshot.get('pitcher_chosen')),
-        previous_pitcher_chosen=bool(snapshot.get('previous_pitcher_chosen')),
+        # A snapshot from before these were recorded: unknown (None).
+        pitcher_chosen=snapshot.get('pitcher_chosen'),
+        previous_pitcher_chosen=snapshot.get('previous_pitcher_chosen'),
         revision=revision,
         updated_at=datetime.utcnow(),
     )
@@ -400,7 +405,9 @@ def _effective_prep(game, team, prep, current_inning, current_alignment, events)
     change this inning; the two pitchers trade places, every saved fielding
     assignment stays. The saved row is not rewritten, so undoing the live
     change brings the defense back as saved. A chosen pitcher, the automatic
-    defense (re-seeded from the field) and "Same defense" are left alone.
+    defense (re-seeded from the field) and "Same defense" are left alone, and
+    so is a defense saved before pitcher_chosen was recorded (None): its
+    intent is unknown, so its pitcher is kept as saved.
     """
     if prep is None:
         return None
@@ -409,7 +416,7 @@ def _effective_prep(game, team, prep, current_inning, current_alignment, events)
     if (
         prep.updated_by == 'Auto'
         or prep.source == 'current'
-        or prep.pitcher_chosen
+        or prep.pitcher_chosen is not False
         or str(prep.inning) != str(_next_inning_key(current_inning))
     ):
         return prep
@@ -629,7 +636,7 @@ def next_inning_prep(game_id):
             prep.alignment = cleaned
             prep.source = prep.previous_source
             prep.updated_by = prep.previous_updated_by
-            prep.pitcher_chosen = bool(prep.previous_pitcher_chosen)
+            prep.pitcher_chosen = prep.previous_pitcher_chosen
             prep.previous_alignment = None
             prep.previous_source = None
             prep.previous_updated_by = None
@@ -689,17 +696,24 @@ def next_inning_prep(game_id):
         )
         # A pitcher the coach chose: this save changed P from what the board
         # showed, or an earlier save chose it. A fielding edit, "Use inning
-        # plan" and "Same defense" do not choose the pitcher.
+        # plan" and "Same defense" do not choose the pitcher. A fielding edit
+        # on a coach-saved defense keeps what that defense recorded -- None
+        # (saved before this was recorded) stays unknown, not guessed from P.
         seen_pitcher = (prep_alignment(prep) if prep else {}).get('P') or ''
-        pitcher_chosen = mode == 'custom' and (
-            (cleaned.get('P') or '') != seen_pitcher or bool(prep and prep.pitcher_chosen)
-        )
+        if mode != 'custom':
+            pitcher_chosen = False
+        elif (cleaned.get('P') or '') != seen_pitcher:
+            pitcher_chosen = True
+        elif prep is not None and prep.updated_by != 'Auto' and prep.source != 'current':
+            pitcher_chosen = prep.pitcher_chosen
+        else:
+            pitcher_chosen = False
         if prep and (prep.alignment != cleaned or prep.source != source or prep.updated_by != updated_by):
             # What Undo brings back: the defense as it was saved before this.
             prep.previous_alignment = deepcopy(prep.alignment)
             prep.previous_source = prep.source
             prep.previous_updated_by = prep.updated_by
-            prep.previous_pitcher_chosen = bool(prep.pitcher_chosen)
+            prep.previous_pitcher_chosen = prep.pitcher_chosen
 
         prep = prep or GameNextInningPrep(
             game_id=game.id,
@@ -739,9 +753,13 @@ def _next_prep_response(game, team, current_inning, next_inning, current_alignme
     saved_plan = (pregame_rotation or {}).get(next_inning) or {}
     # Why the pitcher differs from what was saved: a coach-saved defense's
     # pitcher carried by a live change, else (for a plan-based defense) the
-    # plan's pitcher carried forward. A coach's defense as saved has none.
+    # plan's pitcher carried forward -- only when the defense shows that
+    # pitcher (a plan-based one saved before pitcher_chosen keeps its own).
+    # A coach's defense as saved has none.
     pitcher_carry = getattr(prep, 'pitcher_adjustment', None) if prep else None
-    plan_based = prep is None or prep.source == 'planned'
+    plan_based = prep is None or (
+        prep.source == 'planned' and prep_alignment(prep).get('P') == planned_alignment.get('P')
+    )
     if (not pitcher_carry and plan_based and saved_plan.get('P')
             and saved_plan.get('P') != planned_alignment.get('P')):
         pitcher = planned_alignment.get('P')

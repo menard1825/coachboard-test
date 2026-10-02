@@ -9,7 +9,10 @@ included, even when the coach only moved fielders. pitcher_chosen records
 whether the save changed P on the board; a defense whose pitcher was not
 chosen follows a live pitching change (carry_planned_pitcher), one whose
 pitcher was chosen keeps it. previous_pitcher_chosen goes with the one-step
-Undo state. Existing rows keep NULL: not chosen.
+Undo state. Existing rows keep NULL: unknown, saved before this was
+recorded. A coach-saved defense with NULL keeps its pitcher, like a chosen
+one -- intent is never inferred from the saved assignments. Automatic
+defenses follow the field and the plan as before.
 """
 
 from alembic import op
