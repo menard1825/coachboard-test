@@ -76,7 +76,10 @@ def test_the_new_pitcher_keeps_pitching_after_the_planned_takeover(live, coachbo
     expect(board.locator('[data-next-position="P"]')).to_have_attribute('data-next-player', MATEO)
     expect(board.locator('[data-next-position="1B"]')).to_have_attribute('data-next-player', LUKE)
     expect(board.locator('[data-next-hint]')).to_have_text(
-        f'Pregame plan for the 4th · {MATEO} keeps pitching (the plan had {LUKE}, who already came out)')
+        f'Pregame plan for the 4th · {MATEO} keeps pitching; {LUKE} moves to 1B.')
+    # Readable on a phone: the line wraps rather than cutting off the reason.
+    assert board.locator('[data-next-hint]').evaluate(
+        'el => el.scrollWidth <= el.clientWidth + 1 && getComputedStyle(el).whiteSpace === "normal"')
 
     page.locator('#cb-now-next-switch [data-now-next="now"]').click()
     page.locator('#liveEndInningBtn').click()
@@ -125,6 +128,7 @@ def test_the_bench_report_projects_the_carried_pitcher(live, coachboard_url):
     # The 5th: Mateo keeps pitching, so Luke -- not Mateo -- takes the sit
     # the plan gave Mateo. The 6th: Owen pitches, everyone else as planned.
     expect(report.locator(f'[data-cb-br-player="{LUKE}"] .cb-br-plan')).to_have_text('Projected to sit: 5')
+    expect(report.locator(f'[data-cb-br-player="{LUKE}"] .cb-br-count')).to_have_text('1 projected')
     assert _projected(report, MATEO) == ''
     expect(report.locator(f'[data-cb-br-player="{COLE}"] .cb-br-plan')).to_have_text('Projected to sit: 4, 6')
 

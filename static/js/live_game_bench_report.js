@@ -273,9 +273,9 @@
   function countLabel(row) {
     const actual = row.total;
     const planned = row.plannedSat.length;
-    if (actual && planned) return `${actual} so far · ${planned} planned`;
+    if (actual && planned) return `${actual} so far · ${planned} projected`;
     if (actual) return `${actual} ${actual === 1 ? 'inning' : 'innings'}`;
-    if (planned) return `${planned} planned`;
+    if (planned) return `${planned} projected`;
     return '0 innings';
   }
 

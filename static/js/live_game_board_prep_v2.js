@@ -253,10 +253,9 @@
       const plan = nextLabel
         ? `Pregame plan for the ${nextLabel}`
         : 'Pregame defensive plan';
-      // The plan named a pitcher who already came out: say who pitches.
-      return carry
-        ? `${plan} · ${carry.pitcher} keeps pitching (the plan had ${carry.planned_pitcher}, who already came out)`
-        : plan;
+      // The plan named another pitcher: say who pitches, and where the
+      // plan's pitcher goes instead (the two trade places).
+      return carry ? `${plan} · ${carriedSwap(carry)}` : plan;
     }
 
     if (source === 'current') {
@@ -276,6 +275,19 @@
   function pitcherCarried() {
     const carry = latest?.pitcher_carry;
     return carry?.pitcher && snapshot().P === carry.pitcher ? carry : null;
+  }
+
+  // "Hansen keeps pitching; Reed moves to 1B." -- or sits (Hansen was
+  // planned to sit), or the spot is open (Reed is no longer here).
+  function carriedSwap(carry) {
+    const board = snapshot();
+    const spot = carry.position;
+    let move;
+    if (!spot) move = `${carry.planned_pitcher} sits`;
+    else if (board[spot] === carry.planned_pitcher) move = `${carry.planned_pitcher} moves to ${spot}`;
+    else if (!board[spot]) move = `${spot} is open`;
+    else move = `${board[spot]} plays ${spot}`;
+    return `${carry.pitcher} keeps pitching; ${move}.`;
   }
 
   function boardSource() {
@@ -1339,6 +1351,15 @@
         white-space:nowrap;
         overflow:hidden;
         text-overflow:ellipsis;
+      }
+
+      /* The plan line can explain a carried pitcher: let it wrap on a phone
+         instead of cutting off the part that explains it. */
+      #${CARD_ID} .cb-next-sub[data-next-hint]{
+        white-space:normal;
+        overflow:visible;
+        text-overflow:clip;
+        overflow-wrap:anywhere;
       }
 
       #${CARD_ID} .cb-next-sub.cb-next-hint{
