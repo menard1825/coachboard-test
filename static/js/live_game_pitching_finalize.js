@@ -192,6 +192,17 @@
 
     const order = pitcherOrder(state);
     const logByPlayer = new Map((state.game_pitching_log || []).map(o => [Number(o.player_id), o]));
+    // Everyone who pitched gets a card, whether or not they are here now:
+    // the whole team is the roster here plus the players not here (marked
+    // unavailable during the game, or Out at first pitch), plus anyone with
+    // a saved line for this game.
+    const team = [
+      ...(state.roster || []),
+      ...(state.not_here || []),
+      ...(state.game_pitching_log || [])
+        .filter(o => o.player_name)
+        .map(o => ({id: o.player_id, name: o.player_name})),
+    ];
 
     if (!order.length) {
       container.innerHTML = '<div class="text-muted text-center py-3">No pitchers were found in the live defensive history.</div>';
@@ -205,7 +216,7 @@
         <div class="small mt-2">If a value is already filled in but GameChanger shows something different, replace it with the GameChanger number. GameChanger is the final source on this screen.</div>
       </div>
       ${order.map((name, index) => {
-        const player = (state.roster || []).find(p => p.name === name);
+        const player = team.find(p => p.name === name);
         if (!player) return '';
         const existing = logByPlayer.get(Number(player.id)) || {};
         const [whole, outs] = splitInnings(existing.innings);
@@ -367,8 +378,9 @@
         const fields = cardFields(card);
         return {
           player_id: Number(card.dataset.playerId),
-          pitches: Number(fields.pitches.value),
-          innings_whole: Number(fields.innings.value),
+          // A blank stays blank (no count yet), never 0.
+          pitches: fieldPresent(fields.pitches) ? Number(fields.pitches.value) : null,
+          innings_whole: fieldPresent(fields.innings) ? Number(fields.innings.value) : null,
           innings_outs: Number(fields.outs?.value || 0),
           pitcher_type: index === 0 ? 'Starter' : 'Reliever',
         };

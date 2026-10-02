@@ -118,6 +118,8 @@ def end_with_pitching(game_id):
     submitted = data.get('counts') or []
     submitted_by_player = {}
     for item in submitted:
+        if not isinstance(item, dict):
+            continue
         try:
             submitted_by_player[int(item.get('player_id'))] = item
         except (TypeError, ValueError):
@@ -134,39 +136,54 @@ def end_with_pitching(game_id):
         }
 
         for index, pitcher_name in enumerate(pitcher_order):
+            # Everyone who pitched, found on the whole team -- a pitcher who
+            # has since left the game still pitched.
             player = players_by_name.get(pitcher_name)
             if not player:
                 continue
-            item = submitted_by_player.get(player.id, {})
-
-            raw_pitches = item.get('pitches')
-            pitches = None
-            if raw_pitches not in (None, ''):
-                try:
-                    pitches = int(raw_pitches)
-                    if pitches < 0:
-                        raise ValueError
-                except (TypeError, ValueError):
-                    return jsonify({'status': 'error', 'message': f'Invalid pitch count for {player.name}.'}), 400
-
-            innings = _parse_innings(item)
-            if item.get('innings') not in (None, '') or item.get('innings_whole') not in (None, ''):
-                if innings is None:
-                    return jsonify({'status': 'error', 'message': f'Invalid innings for {player.name}. Use full innings plus 0, 1, or 2 outs.'}), 400
-
-            if pitches is None:
-                missing_pitch_counts.append(player.name)
-            if innings is None:
-                missing_innings.append(player.name)
+            # Only what was sent changes: a pitcher left out of this
+            # submission, or a field left out for a pitcher, keeps its saved
+            # value. An explicit blank means "no count yet"; 0 is a count.
+            item = submitted_by_player.get(player.id)
 
             existing = db.session.query(PitchingOuting).filter_by(
                 game_id=game.id,
                 player_id=player.id,
                 team_id=team.id,
             ).order_by(PitchingOuting.id.asc()).all()
+            outing = existing[0] if existing else None
 
-            if existing:
-                outing = existing[0]
+            pitches = outing.pitches if outing else None
+            innings = outing.innings if outing else None
+            if item is not None:
+                if 'pitches' in item:
+                    raw_pitches = item.get('pitches')
+                    pitches = None
+                    if raw_pitches not in (None, ''):
+                        try:
+                            pitches = int(raw_pitches)
+                            if pitches < 0:
+                                raise ValueError
+                        except (TypeError, ValueError):
+                            return jsonify({'status': 'error', 'message': f'Invalid pitch count for {player.name}.'}), 400
+
+                if 'innings' in item or 'innings_whole' in item:
+                    innings = _parse_innings(item)
+                    if item.get('innings') not in (None, '') or item.get('innings_whole') not in (None, ''):
+                        if innings is None:
+                            return jsonify({'status': 'error', 'message': f'Invalid innings for {player.name}. Use full innings plus 0, 1, or 2 outs.'}), 400
+
+            if pitches is None:
+                missing_pitch_counts.append(player.name)
+            if innings is None:
+                missing_innings.append(player.name)
+
+            if item is None and outing is None:
+                # Nothing sent and nothing saved: no row, so the pitcher
+                # keeps reading "count needed" (unrecorded_pitching).
+                continue
+
+            if outing:
                 for duplicate in existing[1:]:
                     db.session.delete(duplicate)
             else:
