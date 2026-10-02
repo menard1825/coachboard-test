@@ -115,6 +115,21 @@ def show_list(page):
         expect(switch).to_have_attribute('aria-pressed', 'true')
 
 
+def show_bench(page):
+    """The bench is one line until "Show bench" opens the names."""
+    show_list(page)
+    toggle = page.locator(f'{CARD} [data-plan-bench-toggle]')
+    if toggle.get_attribute('aria-expanded') != 'true':
+        toggle.click()
+    expect(page.locator(f'{CARD} .cb-plan-bench')).to_be_visible()
+
+
+def statement(card):
+    """The one line under the inning buttons: (kind, text)."""
+    line = card.locator('.cb-plan-summary')
+    return line.get_attribute('data-kind'), line.inner_text().strip()
+
+
 def _names(page):
     """The planned name at each field position, in full (the marker itself
     shows a short form; its label and data carry the whole name)."""
@@ -207,7 +222,11 @@ def test_changes_from_the_inning_before_are_marked(open_plan, device):
 @DEVICES
 def test_bench_lists_who_sits_that_inning(open_plan, device):
     page = open_plan(device)
-    show_list(page)                                  # the bench is a row of the list
+    # One line first ("Bench · 9 planned · 9 next inning"), the names a tap away.
+    show_list(page)
+    expect(page.locator(f'{CARD} .cb-plan-bench')).to_have_count(0)
+    expect(page.locator(f'{CARD} [data-plan-bench-summary]')).to_contain_text('planned')
+    show_bench(page)
     bench = page.locator(f'{CARD} .cb-plan-bench')
     expect(bench).to_be_visible()
     text = bench.inner_text()

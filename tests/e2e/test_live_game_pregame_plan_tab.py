@@ -233,14 +233,15 @@ def test_pregame_plan_tab_offers_no_way_to_edit(page: Page, coachboard_url: str)
         expect(plan).to_be_visible(timeout=10_000)
 
         # The only buttons choose what to look at -- an inning, List or
-        # Field, Only changes -- or open the Next Inning tab. None of them
-        # sends anything.
+        # Field, the list's "Show changes only", the bench -- or open the
+        # Next Inning tab. None of them sends anything.
         writes = []
         page.on('request', lambda request: writes.append(request.url)
                 if request.method != 'GET' and '/api/live-game/' in request.url else None)
         buttons = plan.locator('button')
         looking = plan.locator(
-            'button[data-plan-inning], button[data-plan-view-btn], button[data-plan-only]')
+            'button[data-plan-inning], button[data-plan-view-btn], button[data-plan-only], '
+            'button[data-plan-bench-toggle]')
         assert plan.locator('button[data-plan-inning]').count() > 0
         assert buttons.count() == looking.count() + plan.locator('button[data-plan-edit-next]').count()
         for index in range(looking.count()):

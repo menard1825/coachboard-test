@@ -32,7 +32,7 @@ from playwright.sync_api import expect  # noqa: E402
 
 import cdn_assets  # noqa: E402
 from live_field_markers import LINEUP, create_named_live_game, login, remove_named_live_game  # noqa: E402
-from test_pregame_plan_field_view import MEASURE, show_field, show_list  # noqa: E402
+from test_pregame_plan_field_view import MEASURE, show_bench, show_field, statement  # noqa: E402
 
 
 PHONE = ('phone', {'width': 390, 'height': 844}, {'is_mobile': True, 'has_touch': True})
@@ -170,7 +170,8 @@ def test_mid_inning_pitcher_change_shows_on_the_inning_being_played(live, coachb
     expect(card.locator('[data-plan-row="P"] .cb-plan-game')).to_contain_text('Changed')
     # One bench row: the plan's bench, and who sits now -- the starter, out
     # of the game, sits; the reliever does not.
-    show_list(page)
+    assert statement(card) == ('changes', '1 change from the pregame plan: P')
+    show_bench(page)
     expect(card.locator('.cb-plan-bench')).to_have_count(1)
     game_bench = card.locator('.cb-plan-bench .cb-plan-game').inner_text()
     assert INNING_1['P'] in game_bench and RELIEVER not in game_bench, game_bench
@@ -222,12 +223,12 @@ def test_no_message_while_the_game_follows_the_plan(live, coachboard_url, device
     card = _open_plan(page, coachboard_url, 1)
     page.wait_for_timeout(1_500)
     expect(_differing_rows(card)).to_have_count(0)
-    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_text('Matches the plan')
+    assert statement(card) == ('match', 'Defense matches the pregame plan')
     assert _differs(card) == []
     card.locator('[data-plan-inning="2"]').click()                 # next inning follows its plan too
     page.wait_for_timeout(500)
     expect(_differing_rows(card)).to_have_count(0)
-    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_text('Matches the plan')
+    assert statement(card) == ('match', 'Defense matches the pregame plan')
     expect(card.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 1: P, 1B')
     assert page.cb_errors == []
 
@@ -269,7 +270,7 @@ def test_a_manual_next_inning_edit_is_compared_with_the_plan(live, coachboard_ur
     # Inning 1 is still being played exactly as planned.
     card.locator('[data-plan-inning="1"]').click()
     expect(_differing_rows(card)).to_have_count(0)
-    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_text('Matches the plan')
+    assert statement(card) == ('match', 'Defense matches the pregame plan')
     assert page.cb_errors == []
 
 
@@ -341,7 +342,8 @@ def test_the_plan_stays_read_only(live, coachboard_url, device):
     page.wait_for_timeout(800)
     # Every button only chooses what to look at, or opens the Next Inning tab.
     assert card.locator('button').count() == card.locator(
-        'button[data-plan-inning], button[data-plan-view-btn], button[data-plan-only], button[data-plan-edit-next]').count()
+        'button[data-plan-inning], button[data-plan-view-btn], button[data-plan-only], '
+        'button[data-plan-bench-toggle], button[data-plan-edit-next]').count()
     assert page.cb_writes == []
     assert _state(page, coachboard_url)['current_alignment']['P'] == RELIEVER
     assert page.cb_errors == []

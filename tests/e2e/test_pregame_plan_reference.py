@@ -30,7 +30,7 @@ from playwright.sync_api import expect  # noqa: E402
 
 import cdn_assets  # noqa: E402
 from live_field_markers import LINEUP, create_named_live_game, login, remove_named_live_game  # noqa: E402
-from test_pregame_plan_field_view import show_field, show_list  # noqa: E402
+from test_pregame_plan_field_view import show_bench, show_field, show_list, statement  # noqa: E402
 
 
 PHONE = ('phone', {'width': 390, 'height': 844}, {'is_mobile': True, 'has_touch': True})
@@ -138,10 +138,6 @@ def _show(page, inning):
     expect(button).to_have_attribute('aria-pressed', 'true')
 
 
-def _chips(card):
-    return card.locator('.cb-plan-chip').evaluate_all('els => els.map(el => [el.dataset.kind, el.innerText.trim()])')
-
-
 def _states(card):
     return card.locator('.cb-plan-list [data-plan-row]:not([data-plan-row="bench"])').evaluate_all(
         'els => Object.fromEntries(els.map(el => [el.dataset.planRow, el.dataset.planState]))')
@@ -153,13 +149,12 @@ def _states(card):
 def test_matching_needs_every_position_including_empty_ones(live, coachboard_url, device):
     page = live(device)
     card = _open_plan(page, coachboard_url, 1)
-    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_text('Matches the plan')
+    assert statement(card) == ('match', 'Defense matches the pregame plan')
 
     # Left field opened up: one position no longer matches, so no match.
     _field_edit(page, coachboard_url, LF='')
     expect(card.locator('[data-plan-row="LF"]')).to_have_attribute('data-plan-state', 'empty', timeout=10_000)
-    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_count(0)
-    assert ['empty', 'Empty: LF'] in _chips(card)
+    assert statement(card) == ('changes', '1 change from the pregame plan: LF · LF empty')
     expect(card.locator('[data-plan-row="LF"] .cb-plan-game')).to_have_text('Empty')
     expect(card.locator('[data-plan-row="LF"]')).to_have_attribute('data-plan-live-differs', 'true')
     # Not "Changed": the plan named someone and nobody is there.
@@ -171,7 +166,7 @@ def test_matching_needs_every_position_including_empty_ones(live, coachboard_url
     _set_next(page, coachboard_url, {**INNING_2, 'RF': ''})
     expect(card.locator('[data-plan-row="RF"]')).to_have_attribute('data-plan-state', 'empty', timeout=10_000)
     expect(card.locator('[data-plan-row="RF"]')).to_have_attribute('data-plan-live-differs', 'true')
-    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_count(0)
+    assert statement(card)[0] == 'changes', statement(card)
     assert page.cb_errors == []
 
 
@@ -182,9 +177,8 @@ def test_a_plan_with_an_open_position_matches_the_same_open_field(live, coachboa
     expect(card.locator('[data-plan-row="RF"]')).to_have_attribute('data-plan-state', 'empty', timeout=10_000)
     expect(card.locator('[data-plan-row="RF"] .cb-plan-planned')).to_have_text('Not in plan')
     expect(card.locator('[data-plan-row="RF"]')).to_have_attribute('data-plan-live-differs', 'false')
-    chips = _chips(card)
-    assert ['match', 'Matches the plan'] in chips and ['empty', 'Empty: RF'] in chips, chips
-    assert ['plan', 'Plan: 8 of 9 positions'] in chips, chips
+    # Partial (8 of 9), yet every position matches -- the open one included.
+    assert statement(card) == ('match', 'Defense matches the pregame plan · RF empty')
     expect(card.locator('[data-plan-inning="2"]')).to_have_attribute('data-plan-live-differs', 'false')
     assert page.cb_errors == []
 
@@ -195,19 +189,19 @@ def test_a_partial_plan_names_what_it_has_and_specifies_no_bench(live, coachboar
     page = live(DESKTOP)
     card = _open_plan(page, coachboard_url, 3)                       # a later inning, planned in part
     expect(card.locator('.cb-plan-inning-title')).to_contain_text('3rd')
-    chips = _chips(card)
-    assert ['plan', 'Plan: 2 of 9 positions'] in chips, chips
-    assert not any(kind in ('match', 'changed', 'empty') for kind, _ in chips), chips
+    assert statement(card) == ('partial', 'Partial pregame plan · 2 of 9 positions')
     for pos in INNING_1:
         planned = card.locator(f'[data-plan-row="{pos}"] .cb-plan-planned')
         if pos in INNING_3:
             expect(planned).to_contain_text(INNING_3[pos])
         else:
             expect(planned).to_have_text('Not in plan')
-    expect(card.locator('.cb-plan-bench .cb-plan-planned')).to_have_text('Bench not specified')
-    # A later inning has no game side: nothing to compare.
+    # Nothing to list: no "Show bench", just the honest line.
+    expect(card.locator('[data-plan-bench-summary]')).to_have_text('Bench not specified')
+    expect(card.locator('[data-plan-bench-toggle]')).to_have_count(0)
+    # A later inning has no game side: nothing to compare, so no filter.
     expect(card.locator('.cb-plan-list.single')).to_have_count(1)
-    expect(card.locator('[data-plan-only]')).to_be_disabled()
+    expect(card.locator('[data-plan-only]')).to_have_count(0)
     expect(card.locator('.cb-plan-emp')).to_have_count(0)
     # The plan against its inning before only speaks for the positions it
     # names: first base differs from the 2nd's plan; third base does not, and
@@ -216,6 +210,7 @@ def test_a_partial_plan_names_what_it_has_and_specifies_no_bench(live, coachboar
 
     # A complete plan lists who it leaves out: here players, not anyone absent.
     _show(page, 2)
+    show_bench(page)
     bench = card.locator('.cb-plan-bench .cb-plan-planned').inner_text()
     assert bench not in ('', 'Bench not specified'), bench
     for name in INNING_2.values():
@@ -243,13 +238,10 @@ def test_a_played_inning_with_no_record_is_never_called_empty(live, coachboard_u
     page.route('**/next-inning-prep', drop_record)
     card = _open_plan(page, coachboard_url, 1)
     expect(card.locator('.cb-plan-colhead .cb-plan-planned')).to_have_text('Pregame plan')
-    expect(card.locator('.cb-plan-note')).to_have_text('No record of how the 1st ended. Showing the pregame plan only.')
+    assert statement(card) == ('norec', 'No recorded defense')
     assert set(_states(card).values()) == {'norec'}, _states(card)
-    chips = _chips(card)
-    assert ['norec', 'No record for this inning'] in chips, chips
-    assert not any(kind in ('empty', 'match', 'changed') for kind, _ in chips), chips
     expect(card.locator('.cb-plan-list .cb-plan-emp')).to_have_count(0)
-    expect(card.locator('[data-plan-only]')).to_be_disabled()
+    expect(card.locator('[data-plan-only]')).to_have_count(0)
     expect(card.locator('[data-plan-inning="1"]')).to_have_attribute('data-plan-live-differs', 'false')
     show_field(page)
     expect(card.locator('.cb-plan-field .cb-plan-norec').first).to_have_text('No record')
@@ -260,32 +252,52 @@ def test_a_played_inning_with_no_record_is_never_called_empty(live, coachboard_u
     card = _open_plan(page, coachboard_url, 1)
     expect(card.locator('.cb-plan-colhead .cb-plan-game')).to_have_text('How the 1st ended')
     assert set(_states(card).values()) == {'name'}, _states(card)
-    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_text('Matches the plan')
+    assert statement(card) == ('match', 'Defense matches the pregame plan')
     assert page.cb_errors == []
 
 
 # Only changes ------------------------------------------------------------------------------
 
-def test_only_changes_lists_the_differences_and_needs_a_comparison(live, coachboard_url):
-    page = live(PHONE)
+@DEVICES
+def test_show_changes_only_filters_the_list_and_never_the_field(live, coachboard_url, device):
+    page = live(device)
     _field_edit(page, coachboard_url, LF=INNING_1['RF'], RF=INNING_1['LF'])
     card = _open_plan(page, coachboard_url, 1)
     only = card.locator('[data-plan-only]')
-    expect(only).to_be_enabled()
-    only.click()
-    expect(only).to_have_attribute('aria-pressed', 'true')
     rows = card.locator('.cb-plan-list [data-plan-row]:not([data-plan-row="bench"])')
-    assert rows.evaluate_all('els => els.map(el => el.dataset.planRow)') == ['LF', 'RF']
+    spots = card.locator('.cb-plan-field [data-plan-position]')
+
+    # List: the filter is a small action, not a view.
+    expect(card.locator('[data-plan-view-btn]')).to_have_count(2)
+    expect(only).to_have_text('Show changes only')
     only.click()
+    expect(only).to_have_text('Show all positions')
+    assert rows.evaluate_all('els => els.map(el => el.dataset.planRow)') == ['LF', 'RF']
+
+    # Field: always all nine, the differences marked; no filter there.
+    show_field(page)
+    expect(spots).to_have_count(9)
+    for index in range(9):
+        expect(spots.nth(index)).to_be_visible()
+    expect(only).to_be_hidden()
+    assert card.locator('.cb-plan-field [data-plan-position][data-plan-changed="true"]').evaluate_all(
+        'els => els.map(el => el.dataset.planPosition)') == ['LF', 'RF']
+
+    # Back to List: the filter is still on, and says so; then off again.
+    show_list(page)
+    expect(only).to_have_text('Show all positions')
+    expect(rows).to_have_count(2)
+    only.click()
+    expect(only).to_have_text('Show changes only')
     expect(rows).to_have_count(9)
 
     # Nothing to compare: a later inning (no game side yet), or one with
-    # neither a plan nor a defense yet.
+    # neither a plan nor a defense yet. No filter is offered.
     _show(page, '3')
-    expect(only).to_be_disabled()
+    expect(only).to_have_count(0)
     expect(rows).to_have_count(9)
     _show(page, '5')
-    expect(only).to_be_disabled()
+    expect(only).to_have_count(0)
     expect(card.locator('.cb-plan-listwrap .cb-plan-note')).to_have_text(
         'No pregame plan and no defense set yet for the 5th.')
     assert page.cb_writes == []
@@ -299,6 +311,15 @@ def test_the_next_inning_preview_follows_the_next_inning_board(live, coachboard_
     page = live(device, plan={'1': INNING_1, '2': INNING_1})
     card = _open_plan(page, coachboard_url)
     preview = card.locator('.cb-plan-next')
+
+    # The next inning is already the inning shown: no second preview of it,
+    # just a way to edit it.
+    expect(card.locator('[data-plan-inning="2"]')).to_have_attribute('aria-pressed', 'true')
+    expect(preview).to_have_count(0)
+    expect(card.locator('.cb-plan-status [data-plan-edit-next]')).to_have_text('Edit next inning')
+
+    # Another inning shown: a compact card for the next one.
+    _show(page, 1)
     expect(preview).to_have_attribute('data-plan-next', 'same')
     expect(preview).to_contain_text('Next inning · 2nd')
     expect(preview.locator('[data-plan-next-summary]')).to_have_text('Same defense as the 1st')
@@ -343,6 +364,9 @@ def test_an_edit_still_saving_shows_in_the_next_inning_column(live, coachboard_u
     expect(card.locator('.cb-plan-colhead .cb-plan-game')).to_have_text('Next inning')
     expect(card.locator('[data-plan-row="RF"]')).to_have_attribute('data-plan-state', 'empty')
     expect(card.locator('[data-plan-row="RF"] .cb-plan-game')).to_have_text('Empty')
+    assert statement(card)[1].endswith('RF empty'), statement(card)
+    # And in the next-inning card, from the inning being played.
+    _show(page, 1)
     expect(card.locator('.cb-plan-next [data-plan-next-pos="RF"]')).to_contain_text('Empty')
     assert held, 'the edit was not sent'
     for route in held:
@@ -382,8 +406,18 @@ LAYOUT = """() => {
   return {
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     card: box(card), list, field,
+    statement: box(card.querySelector('.cb-plan-summary')),
+    viewportHeight: window.innerHeight,
     viewport: window.innerWidth,
     clippedNames: names.filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.innerText),
+    // A name broken inside a word: more lines than words.
+    splitNames: names.filter(el => {
+      const text = el.firstChild;
+      if (!text || text.nodeType !== 3) return false;
+      const range = document.createRange(); range.selectNodeContents(text);
+      const lines = new Set([...range.getClientRects()].filter(r => r.width > 1).map(r => Math.round(r.top))).size;
+      return lines > text.textContent.trim().split(/\s+/).length;
+    }).map(el => el.innerText),
     smallestName: Math.min(...names.map(el => parseFloat(getComputedStyle(el).fontSize))),
     shortButtons: [...card.querySelectorAll('button')].filter(el => el.getClientRects().length && el.getBoundingClientRect().height < 44).map(el => el.innerText.trim()),
   };
@@ -405,22 +439,19 @@ def test_layout_reads_at_every_size(live, coachboard_url, size):
     assert data['overflow'] <= 0, data
     assert data['card']['l'] >= 0 and data['card']['r'] <= width + 1, data
     assert data['clippedNames'] == [] and data['smallestName'] >= 15, data
+    assert data['splitNames'] == [], data
     assert data['shortButtons'] == [], data
-    if phone:
-        # The list first; the field is a tap away, one view at a time.
-        assert data['list'] and data['field'] is None, data
-        show_field(page)
-        data = page.evaluate(LAYOUT)
-        assert data['field'] and data['list'] is None, data
-        show_list(page)
-    else:
-        # Both together; side by side when there is room for both.
-        assert data['list'] and data['field'], data
-        expect(card.locator('[data-plan-view-btn="field"]')).to_be_hidden()
-        side_by_side = data['field']['l'] >= data['list']['r'] - 1
-        stacked = data['field']['t'] >= data['list']['b'] - 1
-        assert side_by_side or stacked, data
-        assert side_by_side, ('iPad and wider show list and field together', data)
+    # The first screenful says what changed, without scrolling.
+    assert data['statement'] and data['statement']['b'] <= data['viewportHeight'], data
+    # Phones and iPads alike: the list first, the field a tap away, one view
+    # at a time -- never both side by side.
+    expect(card.locator('[data-plan-view-btn]')).to_have_count(2)
+    assert data['list'] and data['field'] is None, data
+    show_field(page)
+    data = page.evaluate(LAYOUT)
+    assert data['field'] and data['list'] is None, data
+    assert data['field']['r'] - data['field']['l'] <= 461, data      # not stretched on an iPad
+    show_list(page)
     assert page.cb_errors == []
 
 
@@ -446,10 +477,11 @@ def test_an_untouched_plan_never_becomes_how_an_inning_ended(live, coachboard_ur
     expect(card.locator('[data-plan-row="P"]')).to_have_attribute('data-plan-state', 'norec')
     assert set(_states(card).values()) == {'norec'}, _states(card)
     expect(card).not_to_contain_text('How the 2nd ended')
-    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_count(0)
     expect(card.locator('[data-plan-inning="2"]')).to_have_attribute('data-plan-live-differs', 'false')
+    assert statement(card) == ('norec', 'No recorded defense')
     # No availability recorded for the 2nd either: no bench made up from today.
-    expect(card.locator('.cb-plan-bench .cb-plan-planned')).to_have_text('Bench not recorded')
+    expect(card.locator('[data-plan-bench-summary]')).to_have_text('Bench not recorded')
+    expect(card.locator('[data-plan-bench-toggle]')).to_have_count(0)
     page.unroute('**/next-inning-prep')
     assert page.cb_errors == []
 
@@ -470,6 +502,7 @@ def test_a_played_innings_bench_is_that_innings_not_todays(live, coachboard_url)
     page.route('**/next-inning-prep', without_pat_in_the_first)
     card = _open_plan(page, coachboard_url, 1)
     expect(card.locator('.cb-plan-colhead .cb-plan-game')).to_have_text('How the 1st ended')
+    show_bench(page)
     for column in ('.cb-plan-planned', '.cb-plan-game'):
         bench = card.locator(f'.cb-plan-bench {column}').inner_text()
         assert bench and left_early not in bench, (column, bench)
@@ -503,11 +536,11 @@ def test_a_change_planned_during_an_inning_stays_reachable(live, coachboard_url)
     _show(page, '2.5')
     expect(card.locator('.cb-plan-inning-title')).to_contain_text('during the 2nd')
     expect(card.locator('.cb-plan-inning-title')).to_contain_text('Planned change')
-    expect(card.locator('.cb-plan-listwrap .cb-plan-note')).to_contain_text('the plan only')
+    assert statement(card) == ('midplan', 'Change planned during the 2nd')
     expect(card.locator('.cb-plan-list.single .cb-plan-colhead .cb-plan-planned')).to_have_text('Pregame plan')
     for pos, name in during_second.items():
         expect(card.locator(f'[data-plan-row="{pos}"]')).to_have_attribute('data-plan-planned', name)
-    expect(card.locator('[data-plan-only]')).to_be_disabled()
+    expect(card.locator('[data-plan-only]')).to_have_count(0)
     expect(card.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 2: P, 1B')
     # The next planned inning compares with it, labelled as the mid-inning
     # change: the 3rd's plan names first and third, as planned during the 2nd.
@@ -535,7 +568,9 @@ def test_a_partial_plan_shows_all_nine_positions_against_the_game(live, coachboa
         else:
             expect(row.locator('.cb-plan-planned')).to_have_text('Not in plan')
             expect(row).to_have_attribute('data-plan-live-differs', 'true')
-    assert ['plan', 'Plan: 2 of 9 positions'] in _chips(card)
-    expect(card.locator('.cb-plan-chip[data-kind="match"]')).to_have_count(0)
+    # The two named positions match; the others are not counted as changes.
+    assert statement(card) == ('partial', 'Partial pregame plan · no changes')
+    expect(card.locator('[data-plan-bench-summary]')).to_contain_text('not specified in the plan')
+    show_bench(page)
     expect(card.locator('.cb-plan-bench .cb-plan-planned')).to_have_text('Bench not specified')
     assert page.cb_errors == []
