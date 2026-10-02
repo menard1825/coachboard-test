@@ -128,5 +128,7 @@ def test_a_saved_next_inning_edit_is_kept(monkeypatch):
     assert response.status_code == 200
     _change_pitcher(client)
     confirmed = _prep(client)['confirmed']
-    assert _filled(confirmed['alignment']) == mine                  # the coach's 4th stands
+    # The coach's fielding edit stands; the pitcher was not chosen, so the
+    # live change carries Jack in (tests/test_saved_next_inning_pitcher.py).
+    assert _filled(confirmed['alignment']) == dict(mine, P='Jack', **{'1B': 'Aiden'})
     assert confirmed['source'] == 'custom'

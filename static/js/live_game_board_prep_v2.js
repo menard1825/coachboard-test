@@ -264,9 +264,12 @@
         : 'Same defense as this inning';
     }
 
-    return nextLabel
+    const saved = nextLabel
       ? `Changes saved for the ${nextLabel}`
       : 'Changes saved';
+    // The saved fielding edit, with the pitcher a live change carried in.
+    const carry = pitcherCarried();
+    return carry ? `${saved} · ${carriedSwap(carry)}` : saved;
   }
 
   // The server carried the current pitcher forward instead of the plan's
@@ -2183,9 +2186,11 @@
         ? `Same as the ${currentLabel} · plan not used`
         : `Same as the ${currentLabel}`;
     }
-    return ownSave()
+    const changes = ownSave()
       ? `Your changes for the ${inningLabel}`
       : `Changes for the ${inningLabel}`;
+    const carry = pitcherCarried();
+    return carry ? `${changes} · ${carry.pitcher} keeps pitching` : changes;
   }
 
   function ownSave() {

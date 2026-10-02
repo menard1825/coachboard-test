@@ -46,6 +46,12 @@ class GameNextInningPrep(db.Model):
     previous_source = db.Column(db.String, nullable=True)
     previous_updated_by = db.Column(db.String, nullable=True)
     revision = db.Column(db.Integer, nullable=True, default=0)
+    # Whether the coach chose this defense's pitcher (a save that changed P
+    # on the board). A saved defense whose pitcher was not chosen follows a
+    # live pitching change (_effective_prep); one whose pitcher was chosen
+    # keeps it. previous_pitcher_chosen goes with the Undo state.
+    pitcher_chosen = db.Column(db.Boolean, nullable=True)
+    previous_pitcher_chosen = db.Column(db.Boolean, nullable=True)
 
     __table_args__ = (
         UniqueConstraint('game_id', 'team_id', name='uq_game_next_inning_prep'),
@@ -175,17 +181,29 @@ def _planned_seed(current_alignment, planned_alignment, team):
     return seeded if source == 'planned' else None
 
 
+def prep_alignment(prep):
+    """The defense a Next Inning row stands for now: its saved alignment,
+    with the pitcher a live pitching change carries when the coach saved the
+    fielders but did not choose the pitcher (_effective_prep). The board,
+    the save conflict check and End Inning all use this."""
+    if prep is None:
+        return {}
+    effective = getattr(prep, 'effective_alignment', None)
+    return effective if effective is not None else (prep.alignment or {})
+
+
 def _prep_dict(prep):
     if not prep:
         return None
     return {
         'id': prep.id,
         'inning': prep.inning,
-        'alignment': deepcopy(prep.alignment or {}),
+        'alignment': deepcopy(prep_alignment(prep)),
         'source': prep.source,
         'updated_by': prep.updated_by,
         'updated_at': prep.updated_at.isoformat() if prep.updated_at else None,
         'revision': int(prep.revision or 0),
+        'pitcher_chosen': bool(prep.pitcher_chosen),
         # What "Undo next-inning edit" would bring back, or None.
         'previous': {
             'alignment': deepcopy(prep.previous_alignment),
@@ -213,7 +231,7 @@ def _next_prep_conflict(data, next_inning, prep, team):
             if (alignment or {}).get(pos)
         }
 
-    if filled(base) != filled(prep.alignment if prep else {}):
+    if filled(base) != filled(prep_alignment(prep)):
         return 'The Next Inning defense changed on another device.'
     return None
 
@@ -301,6 +319,8 @@ def prep_snapshot(prep):
         'previous_alignment': deepcopy(prep.previous_alignment),
         'previous_source': prep.previous_source,
         'previous_updated_by': prep.previous_updated_by,
+        'pitcher_chosen': bool(prep.pitcher_chosen),
+        'previous_pitcher_chosen': bool(prep.previous_pitcher_chosen),
     }
 
 
@@ -328,6 +348,8 @@ def restore_started_prep(game, team_id, event):
         previous_alignment=deepcopy(snapshot.get('previous_alignment')),
         previous_source=snapshot.get('previous_source'),
         previous_updated_by=snapshot.get('previous_updated_by'),
+        pitcher_chosen=bool(snapshot.get('pitcher_chosen')),
+        previous_pitcher_chosen=bool(snapshot.get('previous_pitcher_chosen')),
         revision=revision,
         updated_at=datetime.utcnow(),
     )
@@ -365,6 +387,40 @@ def _pitching_changed_this_inning(events, current_inning):
     """Whether this inning's live changes were changes of pitcher only."""
     changes = _inning_changes(events, current_inning)
     return bool(changes) and all(event.event_type == 'Pitcher Change' for event in changes)
+
+
+def _effective_prep(game, team, prep, current_inning, current_alignment, events):
+    """Set prep.effective_alignment / prep.pitcher_adjustment.
+
+    A Next Inning defense the coach saved records whether its pitcher was
+    chosen (pitcher_chosen: the save changed P). If not -- a fielding edit,
+    or "Use inning plan" -- its P is just whoever was there, and a live
+    pitching change carries the new pitcher in, the way it does for the
+    automatic defense: carry_planned_pitcher, live_change for a pitching
+    change this inning; the two pitchers trade places, every saved fielding
+    assignment stays. The saved row is not rewritten, so undoing the live
+    change brings the defense back as saved. A chosen pitcher, the automatic
+    defense (re-seeded from the field) and "Same defense" are left alone.
+    """
+    if prep is None:
+        return None
+    prep.effective_alignment = None
+    prep.pitcher_adjustment = None
+    if (
+        prep.updated_by == 'Auto'
+        or prep.source == 'current'
+        or prep.pitcher_chosen
+        or str(prep.inning) != str(_next_inning_key(current_inning))
+    ):
+        return prep
+    effective, carry = _carried_plan(
+        game, team, prep.alignment or {}, current_alignment, events,
+        live_change=_pitching_changed_this_inning(events, current_inning),
+    )
+    if carry:
+        prep.effective_alignment = effective
+        prep.pitcher_adjustment = carry
+    return prep
 
 
 def _next_inning_context(game, team):
@@ -461,6 +517,10 @@ def _next_inning_context(game, team):
             prep = _prep_for_game(game.id, team.id)
             if prep is None or prep.inning != next_inning:
                 raise
+
+    # A coach-saved defense whose pitcher the coach did not choose follows a
+    # live pitching change; the saved row itself is unchanged.
+    _effective_prep(game, team, prep, current_inning, current_alignment, events)
 
     # pregame_rotation is the plan as it was written before first pitch.
     # _planned_rotation already hands _actual_rotation its own deep copy to
@@ -569,9 +629,11 @@ def next_inning_prep(game_id):
             prep.alignment = cleaned
             prep.source = prep.previous_source
             prep.updated_by = prep.previous_updated_by
+            prep.pitcher_chosen = bool(prep.previous_pitcher_chosen)
             prep.previous_alignment = None
             prep.previous_source = None
             prep.previous_updated_by = None
+            prep.previous_pitcher_chosen = None
             prep.revision = int(prep.revision or 0) + 1
             prep.updated_at = datetime.utcnow()
             db.session.commit()
@@ -580,6 +642,10 @@ def next_inning_prep(game_id):
                 {'game_id': game.id, 'inning': next_inning},
                 room=f'team_{team.id}_game_{game.id}',
             )
+            # Read back as the board will: an automatic defense follows the
+            # field again, a saved one gets its effective pitcher.
+            (current_inning, next_inning, current_alignment, planned_alignment,
+             prep, pregame_rotation, actual_rotation) = _next_inning_context(game, team)
             return _next_prep_response(game, team, current_inning, next_inning, current_alignment,
                                        planned_alignment, prep, pregame_rotation, actual_rotation)
 
@@ -621,11 +687,19 @@ def next_inning_prep(game_id):
             or user.full_name
             or user.username
         )
+        # A pitcher the coach chose: this save changed P from what the board
+        # showed, or an earlier save chose it. A fielding edit, "Use inning
+        # plan" and "Same defense" do not choose the pitcher.
+        seen_pitcher = (prep_alignment(prep) if prep else {}).get('P') or ''
+        pitcher_chosen = mode == 'custom' and (
+            (cleaned.get('P') or '') != seen_pitcher or bool(prep and prep.pitcher_chosen)
+        )
         if prep and (prep.alignment != cleaned or prep.source != source or prep.updated_by != updated_by):
             # What Undo brings back: the defense as it was saved before this.
             prep.previous_alignment = deepcopy(prep.alignment)
             prep.previous_source = prep.source
             prep.previous_updated_by = prep.updated_by
+            prep.previous_pitcher_chosen = bool(prep.pitcher_chosen)
 
         prep = prep or GameNextInningPrep(
             game_id=game.id,
@@ -636,6 +710,7 @@ def next_inning_prep(game_id):
         prep.alignment = cleaned
         prep.source = source
         prep.updated_by = updated_by
+        prep.pitcher_chosen = pitcher_chosen
         prep.revision = int(prep.revision or 0) + 1
         prep.updated_at = datetime.utcnow()
 
@@ -659,9 +734,16 @@ def _next_prep_response(game, team, current_inning, next_inning, current_alignme
                         planned_alignment, prep, pregame_rotation, actual_rotation):
     # planned_alignment is the plan as the next inning uses it; the saved one
     # differs only when its pitcher was carried forward (_next_inning_context).
+    events = _events(game.id, team.id)
+    _effective_prep(game, team, prep, current_inning, current_alignment, events)
     saved_plan = (pregame_rotation or {}).get(next_inning) or {}
-    pitcher_carry = None
-    if saved_plan.get('P') and saved_plan.get('P') != planned_alignment.get('P'):
+    # Why the pitcher differs from what was saved: a coach-saved defense's
+    # pitcher carried by a live change, else (for a plan-based defense) the
+    # plan's pitcher carried forward. A coach's defense as saved has none.
+    pitcher_carry = getattr(prep, 'pitcher_adjustment', None) if prep else None
+    plan_based = prep is None or prep.source == 'planned'
+    if (not pitcher_carry and plan_based and saved_plan.get('P')
+            and saved_plan.get('P') != planned_alignment.get('P')):
         pitcher = planned_alignment.get('P')
         pitcher_carry = {
             'pitcher': pitcher,
@@ -676,8 +758,8 @@ def _next_prep_response(game, team, current_inning, next_inning, current_alignme
         projected_innings = project_planned_innings(
             pregame_rotation,
             next_inning,
-            prep.alignment or {},
-            _events(game.id, team.id),
+            prep_alignment(prep),
+            events,
             {player.name for player in _present_players(game, team.id)},
         )
     return jsonify({

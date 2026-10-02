@@ -138,3 +138,42 @@ def test_the_bench_report_projects_the_carried_pitcher(live, coachboard_url):
     field = _filled(_state(page, coachboard_url)['current_alignment'])
     assert field['P'] == MATEO and field['1B'] == COLE and LUKE not in field.values()
     assert page.cb_errors == []
+
+
+# A saved fielding edit, then a live pitching change -------------------------------------
+
+def test_a_saved_fielding_edit_follows_a_live_pitching_change(live, coachboard_url):
+    from test_pregame_plan_reference import _sequence, _set_next
+
+    page = live(PHONE, plan={str(i): INNING_1 for i in range(1, 7)})
+    _advance(page, coachboard_url)
+    _advance(page, coachboard_url)                                 # in the 3rd
+    # The coach's 4th: left and right field swap (Luke still at P -- not chosen).
+    edit = dict(INNING_1, LF=INNING_1['RF'], RF=INNING_1['LF'])
+    _set_next(page, coachboard_url, edit)
+    # Change Pitcher: Mateo comes in from 1B, Luke takes 1B.
+    api = page.cb_api.request
+    state = _state(page, coachboard_url)
+    mateo_id = next(p['id'] for p in state['roster'] if p['name'] == MATEO)
+    response = api.post(_api(page, coachboard_url, 'change-pitcher'), data={
+        'base_sequence': _sequence(state), 'new_pitcher_id': mateo_id, 'outgoing_destination': '1B'})
+    assert response.ok, response.text()[:200]
+    expected = dict(edit, P=MATEO, **{'1B': LUKE})
+
+    for _ in range(2):                                             # and after a reload
+        _open(page, coachboard_url)
+        expect(page.locator(NOTE)).to_have_text(f'Changes for the 4th · {MATEO} keeps pitching')
+        page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+        board = page.locator('#live-board-prep-v3')
+        expect(board.locator('[data-next-position="P"]')).to_have_attribute('data-next-player', MATEO)
+        expect(board.locator('[data-next-position="1B"]')).to_have_attribute('data-next-player', LUKE)
+        expect(board.locator('[data-next-position="LF"]')).to_have_attribute('data-next-player', edit['LF'])
+        expect(board.locator('[data-next-hint]')).to_have_text(
+            f'Changes saved for the 4th · {MATEO} keeps pitching; {LUKE} moves to 1B.')
+
+    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+    page.locator('#liveEndInningBtn').click()
+    _wait_inning(page, coachboard_url, '4')
+    expect(page.locator('.modal.show')).to_have_count(0)           # no question about Luke
+    assert _filled(_state(page, coachboard_url)['current_alignment']) == expected
+    assert page.cb_errors == []

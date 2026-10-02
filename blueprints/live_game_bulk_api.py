@@ -691,12 +691,11 @@ def advance_inning(game_id):
     # remain compatible because the guard is only enforced when a token is
     # supplied.
     if expected_prep_id is not None:
-        from blueprints.live_game_ui import GameNextInningPrep
+        from blueprints.live_game_ui import _next_inning_context, prep_alignment
 
-        guarded_prep = db.session.query(GameNextInningPrep).filter_by(
-            game_id=game.id,
-            team_id=team.id,
-        ).first()
+        # The defense as the board shows it (a saved fielding edit carries
+        # the live pitcher -- live_game_ui._effective_prep).
+        guarded_prep = _next_inning_context(game, team)[4]
 
         def canonical_alignment(alignment):
             canonical = {}
@@ -718,7 +717,7 @@ def advance_inning(game_id):
                 and str(guarded_prep.id) != str(expected_prep_id)
             )
             or canonical_alignment(
-                guarded_prep.alignment
+                prep_alignment(guarded_prep)
             ) != canonical_alignment(after)
         )
 
@@ -828,7 +827,7 @@ def availability_change(game_id):
     """
     from game_availability import ARRIVED, LEFT, game_availability
     from models import Player
-    from blueprints.live_game_ui import _next_inning_context
+    from blueprints.live_game_ui import _next_inning_context, prep_alignment
 
     user, team, game = _authorized_context(game_id)
     if not game:
@@ -877,7 +876,7 @@ def availability_change(game_id):
         # The defense the next inning would start with (seeded if it has
         # not been read yet), not only a stored one.
         prep = _next_inning_context(game, team)[4]
-        planned = next((pos for pos, name in ((prep.alignment if prep else {}) or {}).items()
+        planned = next((pos for pos, name in prep_alignment(prep).items()
                         if name == player.name), None)
         if planned:
             return jsonify({
