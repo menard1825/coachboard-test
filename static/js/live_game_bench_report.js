@@ -167,13 +167,17 @@
     // Every regulation inning ahead, planned or not.
     const regulation = Number(state?.regulation_innings) || 0;
     for (let inning = 1; inning <= regulation; inning += 1) keys.add(String(inning));
+    // Nothing past the scheduled length: the Next Inning defense exists in
+    // the last inning too (End Inning can start an extra one), but an extra
+    // inning counts only once it is played. In extras, nothing lies ahead.
+    const last = regulation ? Math.max(regulation, currentValue || 0) : Infinity;
 
     const projected = [];
     const unprojected = [];
     [...keys]
       .map(inning => ({inning, value: inningValue(inning)}))
       .filter(item => item.value !== null && Number.isInteger(item.value) &&
-        (currentValue === null || item.value > currentValue))
+        (currentValue === null || item.value > currentValue) && item.value <= last)
       .sort((a, b) => a.value - b.value)
       .forEach(({inning}) => {
         const isNext = inning === nextKey && upcoming;
@@ -188,7 +192,12 @@
           projected.push({inning, value: inningValue(inning), alignment, upcoming: Boolean(isNext)});
         }
       });
-    return {projected, unprojected};
+    return {
+      projected,
+      unprojected,
+      noneAhead: Number.isFinite(last) && currentValue !== null && currentValue >= last,
+      extra: Boolean(regulation) && currentValue !== null && currentValue > regulation,
+    };
   }
 
   /*
@@ -222,7 +231,7 @@
     const currentLabel = inningLabel(state?.current_inning || '1');
     const {recorded, unknown} = playedInnings(state, prep);
 
-    const {projected: futurePlanned, unprojected} = inningsAhead(state, prep);
+    const {projected: futurePlanned, unprojected, noneAhead, extra} = inningsAhead(state, prep);
 
     const currentAssigned = new Set(
       Object.values(state?.current_alignment || {})
@@ -257,7 +266,7 @@
       const name = String(player.name).trim();
       return {player, name, display: rosterName(player), sat: satIn(name)};
     }).sort((a, b) => a.name.localeCompare(b.name));
-    return {history,away,unknown,currentLabel,futurePlanned,unprojected,nextLabel: ordinal(prep?.next_inning),
+    return {history,away,unknown,currentLabel,futurePlanned,unprojected,noneAhead,extra,nextLabel: ordinal(prep?.next_inning),
       upcomingKnown: Boolean(prep?.confirmed?.alignment)};
   }
 
@@ -295,7 +304,9 @@
       ? `<span class="cb-br-chip">Projected innings ahead: ${report.futurePlanned.length}</span>`
       : '';
     // Where the projections come from, and what they leave out.
-    const basis = report.upcomingKnown
+    const basis = report.noneAhead
+      ? `The ${ordinal(report.currentLabel)} is ${report.extra ? 'an extra' : 'the last scheduled'} inning: no innings ahead to project.`
+      : report.upcomingKnown
       ? `Projections use the ${report.nextLabel}-inning defense as it will start, then the pregame plan.`
       : "Projections use the pregame plan; the next inning's defense couldn't be read.";
     const missing = report.unprojected.length
