@@ -36,6 +36,15 @@ class GameNextInningPrep(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
     game_id = db.Column(db.Integer, db.ForeignKey('games.id'), nullable=False)
     team_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=False)
+    # "Undo next-inning edit": the defense as saved before the last coach
+    # save, with its source and updated_by ('Auto' = nobody chose it). One
+    # step, kept on the row so it survives a reload. revision counts coach
+    # saves and Undos (not the automatic follow-the-field updates); an Undo
+    # must name the revision it saw.
+    previous_alignment = db.Column(JSON, nullable=True)
+    previous_source = db.Column(db.String, nullable=True)
+    previous_updated_by = db.Column(db.String, nullable=True)
+    revision = db.Column(db.Integer, nullable=True, default=0)
 
     __table_args__ = (
         UniqueConstraint('game_id', 'team_id', name='uq_game_next_inning_prep'),
@@ -162,6 +171,13 @@ def _prep_dict(prep):
         'source': prep.source,
         'updated_by': prep.updated_by,
         'updated_at': prep.updated_at.isoformat() if prep.updated_at else None,
+        'revision': int(prep.revision or 0),
+        # What "Undo next-inning edit" would bring back, or None.
+        'previous': {
+            'alignment': deepcopy(prep.previous_alignment),
+            'source': prep.previous_source,
+            'updated_by': prep.previous_updated_by,
+        } if prep.previous_alignment is not None else None,
     }
 
 
@@ -184,6 +200,18 @@ def _next_prep_conflict(data, next_inning, prep, team):
         }
 
     if filled(base) != filled(prep.alignment if prep else {}):
+        return 'The Next Inning defense changed on another device.'
+    return None
+
+
+def _next_prep_undo_conflict(data, prep):
+    """Why an Undo no longer applies: it must name the revision it saw, and
+    a newer save (another device's) means the screen is out of date."""
+    try:
+        seen = int(data.get('base_revision'))
+    except (TypeError, ValueError):
+        return 'Reload the Next Inning defense before undoing.'
+    if not prep or seen != int(prep.revision or 0):
         return 'The Next Inning defense changed on another device.'
     return None
 
@@ -427,12 +455,46 @@ def next_inning_prep(game_id):
         # the single-process eventlet deployment. Moving to multiple workers
         # or processes needs a database/Redis/distributed lock first.
         conflict = _next_prep_conflict(data, next_inning, prep, team)
+        if not conflict and mode == 'undo':
+            conflict = _next_prep_undo_conflict(data, prep)
         if conflict:
             return jsonify({
                 'status': 'error',
                 'code': 'next_prep_conflict',
                 'message': conflict,
             }), 409
+
+        if mode == 'undo':
+            # Back to the defense as saved before the last coach save: its
+            # alignment, source, and who chose it ('Auto' = nobody, so it
+            # follows the field and the plan again). One step only.
+            if not prep or prep.previous_alignment is None:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'There is no next-inning edit to undo.',
+                }), 409
+            cleaned, message = _clean_draft_alignment(prep.previous_alignment, game, team)
+            if cleaned is None:
+                return jsonify({
+                    'status': 'error',
+                    'message': f"Can't undo: {message}",
+                }), 409
+            prep.alignment = cleaned
+            prep.source = prep.previous_source
+            prep.updated_by = prep.previous_updated_by
+            prep.previous_alignment = None
+            prep.previous_source = None
+            prep.previous_updated_by = None
+            prep.revision = int(prep.revision or 0) + 1
+            prep.updated_at = datetime.utcnow()
+            db.session.commit()
+            socketio.emit(
+                'next_inning_prep_update',
+                {'game_id': game.id, 'inning': next_inning},
+                room=f'team_{team.id}_game_{game.id}',
+            )
+            return _next_prep_response(game, team, current_inning, next_inning, current_alignment,
+                                       planned_alignment, prep, pregame_rotation, actual_rotation)
 
         if mode == 'current':
             candidate = deepcopy(current_alignment)
@@ -467,6 +529,17 @@ def next_inning_prep(game_id):
                 'message': message,
             }), 409
 
+        updated_by = (
+            session.get('full_name')
+            or user.full_name
+            or user.username
+        )
+        if prep and (prep.alignment != cleaned or prep.source != source or prep.updated_by != updated_by):
+            # What Undo brings back: the defense as it was saved before this.
+            prep.previous_alignment = deepcopy(prep.alignment)
+            prep.previous_source = prep.source
+            prep.previous_updated_by = prep.updated_by
+
         prep = prep or GameNextInningPrep(
             game_id=game.id,
             team_id=team.id,
@@ -475,11 +548,8 @@ def next_inning_prep(game_id):
         prep.inning = next_inning
         prep.alignment = cleaned
         prep.source = source
-        prep.updated_by = (
-            session.get('full_name')
-            or user.full_name
-            or user.username
-        )
+        prep.updated_by = updated_by
+        prep.revision = int(prep.revision or 0) + 1
         prep.updated_at = datetime.utcnow()
 
         db.session.add(prep)
@@ -494,6 +564,12 @@ def next_inning_prep(game_id):
             room=f'team_{team.id}_game_{game.id}',
         )
 
+    return _next_prep_response(game, team, current_inning, next_inning, current_alignment,
+                               planned_alignment, prep, pregame_rotation, actual_rotation)
+
+
+def _next_prep_response(game, team, current_inning, next_inning, current_alignment,
+                        planned_alignment, prep, pregame_rotation, actual_rotation):
     return jsonify({
         'status': 'success',
         'game_id': game.id,

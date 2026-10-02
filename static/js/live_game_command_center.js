@@ -132,10 +132,14 @@
       // as well meant .coach-live-head had to be un-hidden for it, which cost a
       // standalone control row above the tabs. Leave placement to the header.
       if (undo && !document.body.classList.contains('cb-dugout')) {
-        const undoMarkup = '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="cb-undo-text">Undo last change</span>';
+        // Named for what it undoes, as in the Dugout header.
+        const next = undo.dataset.cbUndoScope === 'next';
+        const label = next ? 'Undo next-inning edit' : 'Undo live change';
+        const title = next ? "Undo your last change to the next inning's defense" : 'Undo the last live-game change';
+        const undoMarkup = `<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span class="cb-undo-text">${label}</span>`;
         if (undo.className !== 'btn cb-command-undo') undo.className = 'btn cb-command-undo';
-        if (undo.title !== 'Undo the last live-game change') undo.title = 'Undo the last live-game change';
-        if (undo.getAttribute('aria-label') !== 'Undo last change') undo.setAttribute('aria-label', 'Undo last change');
+        if (undo.title !== title) undo.title = title;
+        if (undo.getAttribute('aria-label') !== label) undo.setAttribute('aria-label', label);
         if (undo.innerHTML !== undoMarkup) undo.innerHTML = undoMarkup;
         if (undo.parentElement !== tools) tools.appendChild(undo);
       }

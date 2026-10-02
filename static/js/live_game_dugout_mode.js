@@ -140,6 +140,8 @@
          those modules still load. */
       body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;min-width:44px!important;min-height:44px!important;height:44px!important;width:auto!important;margin:0!important;padding:0 10px!important;border:1px solid #ffffff5c!important;border-radius:9px!important;background:transparent!important;color:#fff!important;box-shadow:none!important;font-size:.7rem!important;font-weight:800!important;line-height:1!important;letter-spacing:.02em;flex:none!important;touch-action:manipulation}
       body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo i{display:inline-block!important;margin:0!important;font-size:1rem!important}
+      body.cb-dugout #cbDugoutHeader #liveUndoBtn .cb-dh-undo-text{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left}
+      body.cb-dugout #cbDugoutHeader #liveUndoBtn .cb-dh-undo-scope{font-size:.58rem;font-weight:700;letter-spacing:0;opacity:.88;white-space:nowrap}
       body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo:disabled{opacity:.42!important;cursor:not-allowed!important}
       body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo[hidden]{display:none!important}
       /* The button is adopted from #coach-action-slot, where live_game_coach_ui
@@ -293,6 +295,8 @@
         .cb-dh-name{font-size:.78rem}
         .cb-dh-btn{font-size:.7rem!important;padding:4px 7px!important}
         body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo{padding:0 7px!important;font-size:.7rem!important}
+        /* The two-line name ("Undo / next inning") needs the icon's room. */
+        body.cb-dugout #cbDugoutHeader #liveUndoBtn.cb-dh-undo i{display:none!important}
         /* Below 375px the field is too narrow for larger names: long ones
            would run into the next marker. Markers keep their earlier size. */
         .cb-qd-spot{width:61px}
@@ -423,9 +427,18 @@
   // The button itself is never cloned or rebuilt -- it is the same element, so
   // the delegated /undo handler in live_game_v2 keeps working and
   // live_game_board_prep_v2's disabled toggling still lands on it.
-  const UNDO_MARKUP =
+  //
+  // One button, two Undos: on the 2nd Inning tab live_game_board_prep_v2
+  // takes the tap for the next inning's defense (data-cb-undo-scope="next");
+  // everywhere else it is the live game's /undo. The label says which.
+  const UNDO_LABELS = {
+    live: {scope: 'live change', label: 'Undo live change', title: 'Undo the last live-game change'},
+    // "next inning" fits beside LIVE · SYNCED at 320px; the name is in full.
+    next: {scope: 'next inning', label: 'Undo next-inning edit', title: "Undo your last change to the next inning's defense"},
+  };
+  const undoMarkup = scope =>
     '<i class="bi bi-arrow-90deg-left" aria-hidden="true"></i>'
-    + '<span class="cb-dh-undo-text">Undo</span>';
+    + `<span class="cb-dh-undo-text">Undo<small class="cb-dh-undo-scope">${scope}</small></span>`;
   let undoOrigin = null;
 
   function adoptUndo(header) {
@@ -442,13 +455,13 @@
       };
     }
 
+    const labels = UNDO_LABELS[undo.dataset.cbUndoScope === 'next' ? 'next' : 'live'];
+    const markup = undoMarkup(labels.scope);
     if (undo.className !== 'btn cb-dh-undo') undo.className = 'btn cb-dh-undo';
-    if (undo.innerHTML !== UNDO_MARKUP) undo.innerHTML = UNDO_MARKUP;
-    if (undo.title !== 'Undo the last live-game change') {
-      undo.title = 'Undo the last live-game change';
-    }
-    if (undo.getAttribute('aria-label') !== 'Undo last change') {
-      undo.setAttribute('aria-label', 'Undo last change');
+    if (undo.innerHTML !== markup) undo.innerHTML = markup;
+    if (undo.title !== labels.title) undo.title = labels.title;
+    if (undo.getAttribute('aria-label') !== labels.label) {
+      undo.setAttribute('aria-label', labels.label);
     }
     if (undo.parentElement !== slot) slot.appendChild(undo);
   }
@@ -1653,6 +1666,12 @@
       'coachboard:live-delta',
       applySharedLiveDelta
     );
+
+    // The tab changed which Undo the header button is.
+    document.addEventListener('coachboard:undo-scope', () => {
+      const header = $('cbDugoutHeader');
+      if (header) adoptUndo(header);
+    });
 
     const liveOverlay = $('live-game-overlay');
     if (liveOverlay) {

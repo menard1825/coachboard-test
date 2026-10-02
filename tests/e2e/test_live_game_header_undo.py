@@ -175,7 +175,8 @@ def test_header_undo_keeps_its_label_and_a_tappable_target(page: Page, coachboar
         open_live_game(page, coachboard_url, game_id)
 
         undo = page.locator(UNDO)
-        expect(undo).to_have_attribute('aria-label', 'Undo last change')
+        # Named for what it undoes (the 2nd Inning tab's is the next-inning edit).
+        expect(undo).to_have_attribute('aria-label', 'Undo live change')
         expect(undo).to_have_attribute(
             'title', 'Undo the last live-game change'
         )

@@ -141,7 +141,8 @@ def test_undo_is_labelled_and_says_what_it_took_back(page: Page, coachboard_url,
     board, game_id = next_board
     page.locator('#cb-now-next-switch [data-now-next="now"]').click()
     undo = page.locator('#liveUndoBtn')
-    expect(undo).to_have_text('Undo')
+    expect(undo).to_have_attribute('aria-label', 'Undo live change')
+    expect(undo).to_contain_text('live change')
     box = undo.bounding_box()
     assert box['height'] >= 44 and box['width'] >= 44, box
 

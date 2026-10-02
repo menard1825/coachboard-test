@@ -60,7 +60,11 @@
   let successMessage = 'Saved ✓';
   let noticeMessage = '';
   let errorMessage = '';
-  let undoStack = [];
+  // "Undo next-inning edit" restores the server's one previous saved
+  // defense (confirmed.previous) -- it survives a reload, and brings back
+  // its source and whether a coach chose it.
+  // The saved defense that Undo is taking back (its revision).
+  let undoBaseRevision = null;
   // Pitching readiness from the shared live state (see pitchingReadiness).
   let pitchSummary = null;
   let socketBound = false;
@@ -2265,8 +2269,14 @@
       } else {
         undo.disabled =
           activeView === 'next'
-            ? !undoStack.length
+            ? !canUndoNext()
             : false;
+      }
+      // Which Undo this is: the header names it (live_game_dugout_mode).
+      const scope = activeView === 'next' ? 'next' : 'live';
+      if (undo.dataset.cbUndoScope !== scope) {
+        undo.dataset.cbUndoScope = scope;
+        document.dispatchEvent(new CustomEvent('coachboard:undo-scope', {detail: {scope}}));
       }
     }
 
@@ -3268,7 +3278,7 @@
     next,
     {
       mode = 'custom',
-      pushUndo = true,
+      source = mode,
       message = 'Saved ✓',
     } = {}
   ) {
@@ -3283,17 +3293,9 @@
       return activeSavePromise || Promise.resolve();
     }
 
-    if (pushUndo) {
-      undoStack.push(before);
-
-      if (undoStack.length > 12) {
-        undoStack.shift();
-      }
-    }
-
     draft = after;
     pendingMode = mode;
-    localSource = mode;
+    localSource = source;
     conflictPending = false;
     undoNote = '';
     dirty = true;
@@ -3344,6 +3346,9 @@
               // closed as a conflict (reload) rather than overwriting.
               base_alignment: serverBase || {},
               inning: String(latest?.next_inning || ''),
+              // Undo names the save it takes back; a newer one from
+              // another device makes it a conflict.
+              ...(mode === 'undo' ? {base_revision: undoBaseRevision} : {}),
             }
           );
         } catch (error) {
@@ -3396,7 +3401,6 @@
   async function resolveConflict() {
     dirty = false;
     localSource = null;
-    undoStack = [];
     conflictCount += 1;
     conflictPending = true;
 
@@ -3450,7 +3454,6 @@
   function rejectLocalChange(error) {
     dirty = false;
     localSource = null;
-    undoStack = [];
     rejectCount += 1;
     draft = normalize(serverBase || {});
     noticeMessage = '';
@@ -4253,11 +4256,30 @@
     );
   }
 
-  function undoNext() {
-    if (!undoStack.length) return Promise.resolve();
+  function canUndoNext() {
+    return !conflictPending && Boolean(latest?.confirmed?.previous || dirty || activeSavePromise);
+  }
 
+  // Back to the defense as it was saved before the last save. A change
+  // still saving goes out first, so Undo takes back that one.
+  async function undoNext() {
+    if (!canUndoNext()) return;
+    if (dirty || activeSavePromise) {
+      try {
+        await flushPendingSave();
+      } catch (error) {
+        return;
+      }
+    }
+    const previous = latest?.confirmed?.previous;
+    if (!previous?.alignment || conflictPending) {
+      renderCard();
+      return;
+    }
+
+    undoBaseRevision = latest?.confirmed?.revision ?? null;
     const before = snapshot();
-    const restored = normalize(undoStack.pop());
+    const restored = normalize(previous.alignment);
     const back = positions()
       .filter(pos => (before[pos] || '') !== (restored[pos] || ''))
       .map(pos => (restored[pos] ? `${restored[pos]} back at ${pos}` : `${pos} open again`));
@@ -4265,7 +4287,8 @@
     const saving = commitLocalChange(
       restored,
       {
-        pushUndo: false,
+        mode: 'undo',
+        source: previous.source || 'custom',
         message: 'Restored ✓',
       }
     );
@@ -4348,7 +4371,6 @@
       }
 
       draft = incoming;
-      undoStack = [];
       selected = null;
       selectedPosition = '';
     }
@@ -4468,7 +4490,6 @@
     activeView = 'now';
     selected = null;
     selectedPosition = '';
-    undoStack = [];
     undoNote = '';
     conflictPending = false;
     errorMessage = '';
@@ -4699,9 +4720,7 @@
         event.stopPropagation();
         event.stopImmediatePropagation();
 
-        if (undoStack.length) {
-          undoNext();
-        }
+        undoNext();
       },
       true
     );
