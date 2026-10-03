@@ -316,7 +316,7 @@
   }
 
 
-  function showInningRecoveryNotice(inning) {
+  function showInningRecoveryNotice(inning, message = '') {
     let notice = $('cb-test2-inning-recovery');
 
     if (!notice) {
@@ -332,6 +332,7 @@
 
     setText(
       notice,
+      message ||
       `Another coach already started Inning ${inning}. ` +
       'Live Game is updated.'
     );
@@ -801,6 +802,10 @@
 
     inningAdvanceBusy = true;
 
+    // The inning the coach is ending, as the button showed it.
+    const shownInning =
+      button.dataset.cbInning || '';
+
     const wasDisabled =
       button.disabled;
 
@@ -834,12 +839,27 @@
         ''
       );
 
+      // The page shows what was just read (if it is newer).
+      window.CBLiveState?.adopt?.(liveState, 'end-inning');
+
       if (
         currentInning !==
         String(prep?.current_inning || '')
       ) {
         recoverAdvancedInning(
           liveState
+        );
+        return;
+      }
+
+      // The game is in another inning than the one the coach tapped to end
+      // (changed on another device, not yet shown here): show it instead of
+      // ending an inning the coach did not see.
+      if (shownInning && currentInning !== shownInning) {
+        showInningRecoveryNotice(
+          currentInning,
+          `The game is in Inning ${currentInning} now — it changed on another device. ` +
+          'Check the field, then end the inning.'
         );
         return;
       }

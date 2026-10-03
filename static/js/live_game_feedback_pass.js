@@ -30,11 +30,30 @@
 
   let stateInflight = null;
   let stateInflightUntil = 0;
+
+  // Every /state the page reads -- the polls, Undo, End Inning, a
+  // reconnect -- is the game as the server has it. A read newer than the
+  // state this page shows becomes it, and is published (coachboard:live-
+  // state) so the header, tabs and action labels move together; an older
+  // one (sent before a change that has since landed) is ignored.
+  // init.cbCarrier: loadState below, which publishes its own read.
+  function shareRead(promise, init) {
+    if (init?.cbCarrier) return;
+    promise.then(response => {
+      if (!response.ok) return;
+      response.clone().json().then(data => {
+        // After the caller's own handling, which may publish it first.
+        window.setTimeout(() => adoptRead(data, 'read'), 0);
+      }, () => {});
+    }, () => {});
+  }
+
   window.fetch = function(input, init = {}) {
     const url = typeof input === 'string' ? input : input?.url;
     const method = String(init?.method || (typeof input !== 'string' ? input?.method : '') || 'GET').toUpperCase();
+    const isState = method === 'GET' && url && new URL(url, window.location.href).pathname === stateUrl;
     // init.cbFresh: the caller needs a read that starts now (End Inning).
-    if (method === 'GET' && !init?.cbFresh && url && new URL(url, window.location.href).pathname === stateUrl) {
+    if (isState && !init?.cbFresh) {
       const now = Date.now();
       if (stateInflight && now < stateInflightUntil) return stateInflight.then(response => response.clone());
       const promise = nativeFetch(input, init);
@@ -46,10 +65,63 @@
           stateInflightUntil = 0;
         }
       }, 550);
+      shareRead(promise, init);
       return promise.then(response => response.clone());
     }
-    return nativeFetch(input, init);
+    const result = nativeFetch(input, init);
+    if (isState) shareRead(result, init);
+    return result;
   };
+
+  // How far along the game's history a state is. Every live write adds an
+  // event (a higher sequence) or reverts one (Undo), so this only grows --
+  // unlike the highest unreverted sequence, which an Undo lowers.
+  function liveVersion(value) {
+    const events = Array.isArray(value?.rotation_events) ? value.rotation_events : [];
+    let high = 0;
+    let reverted = 0;
+    events.forEach(event => {
+      high = Math.max(high, Number(event?.sequence) || 0);
+      if (event?.reverted) reverted += 1;
+    });
+    return [high, reverted];
+  }
+
+  function compareVersions(a, b) {
+    return (a[0] - b[0]) || (a[1] - b[1]);
+  }
+
+  function isOlder(next) {
+    return Boolean(state?.rotation_events) && compareVersions(liveVersion(next), liveVersion(state)) < 0;
+  }
+
+  function publishState(data, source) {
+    document.dispatchEvent(
+      new CustomEvent('coachboard:live-state', {
+        detail: {
+          game_id: gameId,
+          state: data,
+          source,
+        },
+      })
+    );
+  }
+
+  // A read made elsewhere on the page: adopt and publish it if it is newer
+  // than what this page shows (or shows another inning).
+  function adoptRead(data, source) {
+    if (!data || Number(data?.game?.id) !== gameId) return false;
+    const newer = !state?.rotation_events ||
+      compareVersions(liveVersion(data), liveVersion(state)) > 0 ||
+      (!isOlder(data) && String(data.current_inning || '') !== String(state.current_inning || ''));
+    if (!newer) return false;
+    state = data;
+    stateLoadedAt = Date.now();
+    lastSequence = sequenceFromState(data);
+    queuePatch();
+    publishState(data, source);
+    return true;
+  }
 
   function sequenceFromState(value = state) {
     const events = Array.isArray(value?.rotation_events) ? value.rotation_events : [];
@@ -75,31 +147,35 @@
 
   async function loadState(
     force = false,
-    source = 'state-load'
+    source = 'state-load',
+    {fresh = false} = {}
   ) {
     if (!force && state && (socketHealthy || Date.now() - stateLoadedAt < 15000)) return state;
-    const response = await window.fetch(stateUrl, {cache:'no-store'});
+    const response = await window.fetch(stateUrl, {cache:'no-store', cbCarrier: true, ...(fresh ? {cbFresh: true} : {})});
     if (!response.ok) return state;
     const data = await response.json().catch(() => null);
     if (!data) return state;
+    // A read sent before a change that has since landed is older than what
+    // the page shows: keep the newer state.
+    if (isOlder(data)) return state;
     state = data;
     stateLoadedAt = Date.now();
     lastSequence = sequenceFromState(data);
 
     queuePatch();
-
-    document.dispatchEvent(
-      new CustomEvent('coachboard:live-state', {
-        detail: {
-          game_id: gameId,
-          state: data,
-          source,
-        },
-      })
-    );
+    publishState(data, source);
 
     return state;
   }
+
+  // The live state this page shows, for scripts that label or act on it.
+  window.CBLiveState = Object.freeze({
+    current: () => state,
+    // A new read (never one already in the air), published if newer.
+    refresh: source => loadState(true, source || 'refresh', {fresh: true}),
+    // A read the caller made itself: adopted and published if newer.
+    adopt: (data, source) => adoptRead(data, source || 'read'),
+  });
 
   // Each live change is handled once, whichever copy arrives first: the
   // Socket.IO broadcast, or the same delta from this page's own write
@@ -351,6 +427,9 @@
     ) {
       return;
     }
+
+    // Published by another script from an older read: keep the newer state.
+    if (isOlder(next)) return;
 
     state = next;
     stateLoadedAt = Date.now();

@@ -2138,6 +2138,28 @@
     ).trim();
   }
 
+  // The inning the page shows everywhere -- header, tabs, End Inning -- is
+  // the shared live state's (live_game_feedback_pass.js), which takes every
+  // newer read the page makes. This board's own read can be a moment behind
+  // or ahead of it; until they agree the labels follow the shared state.
+  function sharedInning() {
+    return String(window.CBLiveState?.current?.()?.current_inning || '').trim();
+  }
+
+  function readDisagrees(data = latest) {
+    const shared = sharedInning();
+    return Boolean(shared && data && String(data.current_inning || '') !== shared);
+  }
+
+  // This board read a different inning than the page shows: read the game
+  // again (published if newer), at most every 2 s.
+  let lastSharedAsk = 0;
+  function askForSharedState() {
+    if (Date.now() - lastSharedAsk < 2000) return;
+    lastSharedAsk = Date.now();
+    window.CBLiveState?.refresh?.('next-inning-read')?.catch?.(() => {});
+  }
+
   function inningOrdinal(value) {
     const number = Number.parseInt(
       String(value || ''),
@@ -2211,11 +2233,13 @@
   }
 
   function syncUpcomingInningLabels() {
-    const inning = upcomingInning();
+    const behind = readDisagrees();
+    const current = sharedInning() || String(latest?.current_inning || '');
+    const inning = behind
+      ? String(Number.parseInt(current, 10) + 1)
+      : upcomingInning();
     const inningLabel = inningOrdinal(inning);
-    const currentLabel = inningOrdinal(
-      latest?.current_inning || ''
-    );
+    const currentLabel = inningOrdinal(current);
 
     const nextTab = $(SWITCH_ID)
       ?.querySelector(
@@ -2267,7 +2291,16 @@
       ? `End ${currentLabel} → Start ${inningLabel}`
       : `Start ${inningLabel}`;
 
-    const noteText = endInningSource(inningLabel, currentLabel);
+    // While this board's read catches up, nothing from it is shown here.
+    const noteText = behind
+      ? `Checking the ${inningLabel} defense…`
+      : endInningSource(inningLabel, currentLabel);
+
+    // The inning this button ends, as the coach sees it: End Inning
+    // refuses if the server's game has moved to another (contract.js).
+    if (endInning.dataset.cbInning !== current) {
+      endInning.dataset.cbInning = current;
+    }
 
     if (title.textContent !== buttonTitle) {
       title.textContent = buttonTitle;
@@ -4562,6 +4595,9 @@
         return data;
       }
 
+      // Read another inning than the page shows: one of them is behind.
+      if (readDisagrees(data)) askForSharedState();
+
       if (
         force ||
         signature !== lastSignature ||
@@ -4800,6 +4836,17 @@
         latest.current_alignment = detail.state.current_alignment;
         syncLiveActions();
         renderPlanCard();
+      }
+      // Another inning than this board read (an Undo, a remote End Inning
+      // found by a poll or on reconnect): relabel now, read the next inning.
+      if (
+        Number(detail.game_id) === gameId &&
+        latest &&
+        detail.state?.current_inning &&
+        String(detail.state.current_inning) !== String(latest.current_inning || '')
+      ) {
+        syncUpcomingInningLabels();
+        onLiveChange();
       }
     });
 
