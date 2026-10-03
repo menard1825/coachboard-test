@@ -34,6 +34,17 @@
     return host?.closest('.container-fluid.mt-3') || host?.parentElement || null;
   }
 
+  // Write only what changes: an unchanged write still notifies every
+  // MutationObserver on the page, and this pass runs on each notification
+  // (it rewrote these every animation frame during a live game).
+  function setAttr(element, name, value) {
+    if (element && element.getAttribute(name) !== value) element.setAttribute(name, value);
+  }
+
+  function setHidden(element, value) {
+    if (element && element.hidden !== value) element.hidden = value;
+  }
+
   function setText(element, value) {
     if (element && element.textContent.trim() !== value) element.textContent = value;
   }
@@ -665,14 +676,16 @@
       battingOrderOpen
     );
 
-    toggle.setAttribute(
+    setAttr(
+      toggle,
       'aria-expanded',
       battingOrderOpen
         ? 'true'
         : 'false'
     );
 
-    toggle.textContent = (
+    setText(
+      toggle,
       battingOrderOpen
         ? 'Hide'
         : 'View'
@@ -730,8 +743,8 @@
     card.classList.toggle('gm-details-open', detailsOpen);
     const more = card.querySelector('.gm-pitch-card-more');
     if (more) {
-      more.setAttribute('aria-expanded', detailsOpen ? 'true' : 'false');
-      more.textContent = detailsOpen ? 'Hide pitch details' : 'Pitch details';
+      setAttr(more, 'aria-expanded', detailsOpen ? 'true' : 'false');
+      setText(more, detailsOpen ? 'Hide pitch details' : 'Pitch details');
     }
   }
 
@@ -775,20 +788,20 @@
     }
 
     if (isCompact()) {
-      safeRows.forEach((row) => { row.hidden = !showAvailablePitchers; });
-      attentionRows.forEach((row) => { row.hidden = false; });
+      safeRows.forEach((row) => setHidden(row, !showAvailablePitchers));
+      attentionRows.forEach((row) => setHidden(row, false));
       if (toggle) {
-        toggle.hidden = false;
-        toggle.setAttribute('aria-expanded', showAvailablePitchers ? 'true' : 'false');
-        toggle.textContent = showAvailablePitchers
+        setHidden(toggle, false);
+        setAttr(toggle, 'aria-expanded', showAvailablePitchers ? 'true' : 'false');
+        setText(toggle, showAvailablePitchers
           ? `Hide ${safeRows.length} available pitcher${safeRows.length === 1 ? '' : 's'}`
-          : `Show ${safeRows.length} available pitcher${safeRows.length === 1 ? '' : 's'}`;
+          : `Show ${safeRows.length} available pitcher${safeRows.length === 1 ? '' : 's'}`);
       }
-      if (grid) grid.hidden = rows.every((row) => row.hidden);
+      setHidden(grid, rows.every((row) => row.hidden));
     } else {
-      rows.forEach((row) => { row.hidden = false; row.classList.add('gm-details-open'); });
-      if (toggle) toggle.hidden = true;
-      if (grid) grid.hidden = false;
+      rows.forEach((row) => { setHidden(row, false); row.classList.toggle('gm-details-open', true); });
+      setHidden(toggle, true);
+      setHidden(grid, false);
     }
   }
 
@@ -832,8 +845,9 @@
       );
     }
 
-    wrap.classList.remove(
-      'gm-mobile-start-wrap'
+    wrap.classList.toggle(
+      'gm-mobile-start-wrap',
+      false
     );
 
     const existingProxy = document.getElementById(
@@ -881,9 +895,9 @@
 
     if (!headerActions) return;
 
-    headerActions.id = (
-      'gm-game-header-actions'
-    );
+    if (headerActions.id !== 'gm-game-header-actions') {
+      headerActions.id = 'gm-game-header-actions';
+    }
 
     let proxy = document.getElementById(
       'gm-mobile-start-game'
@@ -931,8 +945,9 @@
       );
     }
 
-    wrap.classList.add(
-      'gm-canonical-start-mobile-hidden'
+    wrap.classList.toggle(
+      'gm-canonical-start-mobile-hidden',
+      true
     );
 
     const syncProxy = () => {
@@ -943,22 +958,21 @@
         )
       );
 
-      proxy.disabled = disabled;
+      if (proxy.disabled !== disabled) proxy.disabled = disabled;
 
       proxy.classList.toggle(
         'disabled',
         disabled
       );
 
-      proxy.setAttribute(
+      setAttr(
+        proxy,
         'aria-disabled',
         disabled ? 'true' : 'false'
       );
 
-      proxy.title = (
-        button.title ||
-        'Start Game'
-      );
+      const title = button.title || 'Start Game';
+      if (proxy.title !== title) proxy.title = title;
     };
 
     syncProxy();

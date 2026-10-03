@@ -75,6 +75,10 @@
       if (!stats?.isConnected) return;
       const raw = String(stats.textContent || '').trim();
       if (!raw) return;
+      // Already formatted (live_game_command_center.js writes the same
+      // status with its next-available note): rewriting it made the two
+      // scripts undo each other every animation frame.
+      if (stats.querySelector(':scope > .ok, :scope > .stop')) return;
 
       const status = raw.split('•')[0].trim();
       const normalized = status === 'Available' || status === 'Eligible to pitch'

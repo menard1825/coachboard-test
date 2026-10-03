@@ -1567,16 +1567,18 @@
 
     saveRotationDesktop
       ?.closest('li')
-      ?.classList.add(
-        'd-none'
+      ?.classList.toggle(
+        'd-none',
+        true
       );
 
     document
       .getElementById(
         'saveRotationBtnMobile'
       )
-      ?.classList.add(
-        'd-none'
+      ?.classList.toggle(
+        'd-none',
+        true
       );
 
     const cardHeader =
@@ -1749,14 +1751,16 @@
     group.querySelectorAll('input[name="inning-radio"]').forEach(input => {
       const label = group.querySelector(`label[for="${CSS.escape(input.id)}"]`);
       if (!label) return;
+      // Change-only writes: an unchanged one still wakes this script's own
+      // observer, which re-ran this every animation frame.
       if (isSubInning(input.value)) {
         setText(label, shortInningLabel(input.value));
-        if (!label.classList.contains('gm-sub-inning-label')) label.classList.add('gm-sub-inning-label');
-        label.title = fullInningLabel(input.value);
+        label.classList.toggle('gm-sub-inning-label', true);
+        if (label.title !== fullInningLabel(input.value)) label.title = fullInningLabel(input.value);
       } else {
         setText(label, input.value);
-        label.classList.remove('gm-sub-inning-label');
-        label.removeAttribute('title');
+        label.classList.toggle('gm-sub-inning-label', false);
+        if (label.hasAttribute('title')) label.removeAttribute('title');
       }
     });
   }
@@ -2244,8 +2248,9 @@
 
     if (!menu) return;
 
-    menu.classList.add(
-      'gm-plan-options-menu'
+    menu.classList.toggle(
+      'gm-plan-options-menu',
+      true
     );
 
     let header =
@@ -2326,8 +2331,9 @@
           if (
             definition.hidden
           ) {
-            li.classList.add(
-              'd-none'
+            li.classList.toggle(
+              'd-none',
+              true
             );
           }
 
@@ -2434,8 +2440,9 @@
               ':scope > hr.dropdown-divider'
             )
           ) {
-            li.classList.add(
-              'd-none'
+            li.classList.toggle(
+              'd-none',
+              true
             );
           }
         }
@@ -2536,8 +2543,9 @@
   ) {
     if (!pickerRow) return;
     legacyActions
-      ?.classList.add(
-        'gm-legacy-inning-actions'
+      ?.classList.toggle(
+        'gm-legacy-inning-actions',
+        true
       );
     let controls =
       document.querySelector(
@@ -2627,14 +2635,24 @@
           controls
         );
       }
-    } else if (
-      pickerRow.nextElementSibling !==
-      controls
-    ) {
-      pickerRow.insertAdjacentElement(
-        'afterend',
-        controls
-      );
+    } else {
+      // No editor (Live Game): after the picker row -- after its paste
+      // controls, which also go right after the picker row (each moved in
+      // front of the other on every pass, every animation frame).
+      const paste =
+        document.getElementById(
+          'inning-paste-controls'
+        );
+      const anchor =
+        paste && pickerRow.nextElementSibling === paste
+          ? paste
+          : pickerRow;
+      if (anchor.nextElementSibling !== controls) {
+        anchor.insertAdjacentElement(
+          'afterend',
+          controls
+        );
+      }
     }
     const hidden =
       isSubInning() ||
@@ -2669,8 +2687,9 @@
       );
 
     if (pickerRow) {
-      pickerRow.classList.add(
-        'gm-coach-inning-picker'
+      pickerRow.classList.toggle(
+        'gm-coach-inning-picker',
+        true
       );
 
       if (
@@ -2707,8 +2726,9 @@
       );
 
     oldAdvancedGroup
-      ?.classList.add(
-        'd-none'
+      ?.classList.toggle(
+        'd-none',
+        true
       );
 
     const copyPrevious =
@@ -2747,8 +2767,9 @@
       pickerRow.nextElementSibling !==
         paste
     ) {
-      paste.classList.add(
-        'gm-apply-picker'
+      paste.classList.toggle(
+        'gm-apply-picker',
+        true
       );
 
       pickerRow
@@ -2894,8 +2915,9 @@
      * Portrait tablet, wide desktop, or Live Game:
      * put the picker back in its original planner-controls home.
      */
-    picker.classList.remove(
-      'gm-ipad-sticky-inning-picker'
+    picker.classList.toggle(
+      'gm-ipad-sticky-inning-picker',
+      false
     );
 
     if (picker.parentElement !== controls) {

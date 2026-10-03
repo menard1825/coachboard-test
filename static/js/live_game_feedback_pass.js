@@ -392,8 +392,12 @@
       positions().forEach(pos => {
         const zone = document.getElementById(`pos-${mode}-${pos}`);
         if (!zone) return;
-        zone.querySelectorAll('.player-tag').forEach(tag => tag.remove());
         const name = alignment[pos];
+        // Already showing this player: rewriting it anyway re-ran this patch
+        // (the page's MutationObserver) every animation frame.
+        const tags = zone.querySelectorAll('.player-tag');
+        if (name ? tags.length === 1 && tags[0].dataset.playerName === name : !tags.length) return;
+        tags.forEach(tag => tag.remove());
         if (name) zone.insertAdjacentHTML('beforeend', `<div class="player-tag" data-player-name="${esc(name)}">${esc(name)}</div>`);
       });
     });
