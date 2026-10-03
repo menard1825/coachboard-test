@@ -160,6 +160,12 @@ def test_a_saved_fielding_edit_follows_a_live_pitching_change(live, coachboard_u
     assert response.ok, response.text()[:200]
     expected = dict(edit, P=MATEO, **{'1B': LUKE})
 
+    # A live refresh on this same page must not invent another coach.
+    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    board = page.locator('#live-board-prep-v3')
+    expect(board.locator('[data-next-position="P"]')).to_have_attribute('data-next-player', MATEO)
+    expect(board.locator('[data-next-notice]')).to_have_text('Next inning defense updated.')
+
     for _ in range(2):                                             # and after a reload
         _open(page, coachboard_url)
         expect(page.locator(NOTE)).to_have_text(f'Changes for the 4th · {MATEO} keeps pitching')
@@ -176,4 +182,12 @@ def test_a_saved_fielding_edit_follows_a_live_pitching_change(live, coachboard_u
     _wait_inning(page, coachboard_url, '4')
     expect(page.locator('.modal.show')).to_have_count(0)           # no question about Luke
     assert _filled(_state(page, coachboard_url)['current_alignment']) == expected
+
+    # Live Undo restores the saved next defense without attributing it to someone else.
+    page.locator('#liveUndoBtn').click()
+    _wait_inning(page, coachboard_url, '3')
+    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    board = page.locator('#live-board-prep-v3')
+    expect(board.locator('[data-next-position="P"]')).to_have_attribute('data-next-player', MATEO)
+    expect(board.locator('[data-next-notice]')).to_have_text('Next inning defense updated.')
     assert page.cb_errors == []

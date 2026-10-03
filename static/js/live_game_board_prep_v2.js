@@ -3768,7 +3768,7 @@
       instance.hide();
       // The plan moved on underneath the question: never apply it there.
       if (!sameAlignment(snapshot(), board)) {
-        noticeMessage = 'Defense updated by another coach.';
+        noticeMessage = 'Next inning defense updated.';
         renderSyncState();
         return;
       }
@@ -4461,12 +4461,12 @@
         previousBase &&
         data?.confirmed?.source === 'custom'
       ) {
-        noticeMessage = 'Defense updated by another coach.';
+        noticeMessage = 'Next inning defense updated.';
       }
 
       // An unfinished displacement question was about the old plan.
       if (discardOpenChain()) {
-        noticeMessage = 'Defense updated by another coach.';
+        noticeMessage = 'Next inning defense updated.';
       }
 
       draft = incoming;

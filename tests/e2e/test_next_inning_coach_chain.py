@@ -266,7 +266,7 @@ def test_another_coachs_update_discards_the_unfinished_question(
 
     expect(sheet).to_be_hidden(timeout=10_000)
     expect(board.locator('[data-next-notice]')).to_have_text(
-        'Defense updated by another coach.', timeout=10_000
+        'Next inning defense updated.', timeout=10_000
     )
     assert board_alignment(page) == other
     page.wait_for_timeout(500)
