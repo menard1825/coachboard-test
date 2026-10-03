@@ -16,10 +16,36 @@
     if (el && el.innerHTML !== value) el.innerHTML = value;
   };
 
+  // One Socket.IO connection for this page. Each live script calls io() --
+  // the board, the game page, the clock -- and each call used to open a
+  // connection of its own, all joined to the same game room: every
+  // broadcast arrived, and was handled, once per connection (three /state
+  // downloads after each pitching change). They now share one. A script
+  // that gets it already connected still has its connect handler run once,
+  // as a connection of its own would have, so it joins the room and syncs
+  // the same way; reconnects run every handler, as before.
+  let sharedSocket = null;
+
+  function shareConnect(socket) {
+    const on = socket.on;
+    socket.on = function(event, handler, ...rest) {
+      const result = on.call(this, event, handler, ...rest);
+      if (event === 'connect' && typeof handler === 'function' && this.connected) {
+        window.setTimeout(() => { if (this.connected) handler.call(this); }, 0);
+      }
+      return result;
+    };
+    return socket;
+  }
+
   if (typeof window.io === 'function' && !window.io.__cbSocketExposed) {
     const originalIo = window.io;
     const exposedIo = function(...args) {
-      const socket = originalIo.apply(this, args);
+      // Only the page's default connection is shared; anything asking for
+      // another URL or options gets its own, as before.
+      const socket = args.length
+        ? originalIo.apply(this, args)
+        : (sharedSocket = sharedSocket || shareConnect(originalIo.apply(this, args)));
       window.__cbLiveGameSocket = socket;
       return socket;
     };

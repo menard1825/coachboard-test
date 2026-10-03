@@ -100,7 +100,21 @@
     return state;
   }
 
-  function applyDelta(delta) {
+  // Each live change is handled once, whichever copy arrives first: the
+  // Socket.IO broadcast, or the same delta from this page's own write
+  // response (End Inning, Change Pitcher, a drag), published as
+  // coachboard:live-delta. The page's own changes then show even while the
+  // live connection is down.
+  const handledDeltas = new Set();
+  let publishing = false;
+
+  function deltaKey(delta) {
+    const sequence = Number(delta.sequence) || 0;
+    if (!sequence) return '';
+    return `${sequence}:${Number(delta.event?.id) || 0}:${delta.current_inning || ''}`;
+  }
+
+  function applyDelta(delta, {fromPage = false} = {}) {
     if (!delta || Number(delta.game_id) !== gameId) return;
 
     const incomingEventId =
@@ -147,6 +161,13 @@
     const sequence = Number(delta.sequence) || 0;
     if (sequence && sequence < lastSequence) return;
 
+    const key = deltaKey(delta);
+    if (key) {
+      if (handledDeltas.has(key)) return;
+      handledDeltas.add(key);
+      if (handledDeltas.size > 100) handledDeltas.delete(handledDeltas.values().next().value);
+    }
+
     /*
      * A live delta proves that any /state GET which began before this
      * delta may describe an older live-game version.
@@ -186,7 +207,15 @@
     }
     stateLoadedAt = Date.now();
     queuePatch();
-    document.dispatchEvent(new CustomEvent('coachboard:live-delta', {detail:delta}));
+    // A delta from this page was already published to every listener.
+    if (!fromPage) {
+      publishing = true;
+      try {
+        document.dispatchEvent(new CustomEvent('coachboard:live-delta', {detail:delta}));
+      } finally {
+        publishing = false;
+      }
+    }
 
     // A delta carries the field, not pitching eligibility. After a pitcher
     // leaves the mound (a pitching change, or a new pitcher at End Inning)
@@ -196,6 +225,10 @@
       loadState(true, 'pitching-change').catch(() => {});
     }
   }
+
+  document.addEventListener('coachboard:live-delta', event => {
+    if (!publishing) applyDelta(event.detail, {fromPage: true});
+  });
 
   function wireSocket(socket) {
     if (!socket || socket.__cbStateSyncWired) return socket;
