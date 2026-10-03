@@ -33,7 +33,8 @@
   window.fetch = function(input, init = {}) {
     const url = typeof input === 'string' ? input : input?.url;
     const method = String(init?.method || (typeof input !== 'string' ? input?.method : '') || 'GET').toUpperCase();
-    if (method === 'GET' && url && new URL(url, window.location.href).pathname === stateUrl) {
+    // init.cbFresh: the caller needs a read that starts now (End Inning).
+    if (method === 'GET' && !init?.cbFresh && url && new URL(url, window.location.href).pathname === stateUrl) {
       const now = Date.now();
       if (stateInflight && now < stateInflightUntil) return stateInflight.then(response => response.clone());
       const promise = nativeFetch(input, init);

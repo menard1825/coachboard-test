@@ -23,6 +23,31 @@
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[char]));
   const sleep = ms => new Promise(resolve => window.setTimeout(resolve, ms));
+
+  // Live-game writes this page has sent and not yet had an answer to.
+  // End Inning reads the game only once they have all landed. Next Inning
+  // saves are settled by CBNextDefense.flush(), and End Inning's own
+  // advance is not counted.
+  let liveWritesInFlight = 0;
+  const untrackedFetch = window.fetch;
+  window.fetch = function(input, init) {
+    const url = typeof input === 'string' ? input : input?.url;
+    const method = String(init?.method || (typeof input !== 'string' ? input?.method : '') || 'GET').toUpperCase();
+    let pathname = '';
+    try { pathname = new URL(url, window.location.href).pathname; } catch (_) {}
+    if (
+      method === 'GET' ||
+      !pathname.startsWith(`/api/live-game/${gameId}/`) ||
+      /\/(next-inning-prep|advance-inning)$/.test(pathname)
+    ) {
+      return untrackedFetch.apply(this, arguments);
+    }
+    liveWritesInFlight += 1;
+    const landed = () => { liveWritesInFlight -= 1; };
+    const result = untrackedFetch.apply(this, arguments);
+    result.then(landed, landed);
+    return result;
+  };
   const setText = (element, value) => {
     if (element && element.textContent !== value) element.textContent = value;
   };
@@ -216,8 +241,10 @@
     window.requestAnimationFrame(applyContract);
   }
 
-  async function getJson(path) {
-    const response = await fetch(path, {cache:'no-store'});
+  // fresh: a new request, never one already in the air (the shared /state
+  // read in live_game_feedback_pass.js may predate a write that just landed).
+  async function getJson(path, {fresh = false} = {}) {
+    const response = await fetch(path, {cache:'no-store', ...(fresh ? {cbFresh: true} : {})});
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.status === 'error') throw new Error(data.message || `Request failed (${response.status}).`);
     return data;
@@ -269,36 +296,25 @@
     );
   }
 
+  // This page's live writes (a Quick Field save, an Undo, a fill...) have
+  // all been answered, so one read now includes them. Another device's
+  // later change is caught by the server (base_sequence, the Next Inning
+  // revision), as before.
   async function waitForLiveWritesToSettle() {
     await waitForQuickFieldSave();
 
-    let previous = null;
-
-    for (
-      let attempt = 0;
-      attempt < 12;
-      attempt += 1
-    ) {
-      const state = await getJson(
-        `/api/live-game/${gameId}/state`
-      );
-
-      const signature =
-        `${state.current_inning || ''}:` +
-        `${sequenceFromState(state)}`;
-
-      if (signature === previous) {
-        return state;
+    for (let attempt = 0; liveWritesInFlight > 0; attempt += 1) {
+      if (attempt >= 100) {
+        throw new Error(
+          'A change is still saving. ' +
+          'Try End Inning again in a moment.'
+        );
       }
 
-      previous = signature;
-      await sleep(120);
+      await sleep(100);
     }
-
-    return getJson(
-      `/api/live-game/${gameId}/state`
-    );
   }
+
 
   function showInningRecoveryNotice(inning) {
     let notice = $('cb-test2-inning-recovery');
@@ -799,13 +815,17 @@
 
       await waitForLiveWritesToSettle();
 
+      // Everything this page sent has landed: read the game and the next
+      // inning once, together.
       const [prep, liveState] =
         await Promise.all([
           getJson(
-            `/api/live-game/${gameId}/next-inning-prep`
+            `/api/live-game/${gameId}/next-inning-prep`,
+            {fresh: true}
           ),
           getJson(
-            `/api/live-game/${gameId}/state`
+            `/api/live-game/${gameId}/state`,
+            {fresh: true}
           ),
         ]);
 
@@ -1001,7 +1021,8 @@
 
       try {
         const fresh = await getJson(
-          `/api/live-game/${gameId}/state`
+          `/api/live-game/${gameId}/state`,
+          {fresh: true}
         );
 
         const nextInning = Number(
