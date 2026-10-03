@@ -3505,6 +3505,9 @@
       renderSyncState();
     } finally {
       activeSavePromise = null;
+      // End Inning's line counts a save in the air as "Saving…": redraw it
+      // now that none is, instead of at the next read (~0.8 s later).
+      syncLiveActions();
     }
   }
 
