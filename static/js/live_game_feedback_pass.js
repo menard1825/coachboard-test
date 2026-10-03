@@ -111,6 +111,10 @@
   // than what this page shows (or shows another inning).
   function adoptRead(data, source) {
     if (!data || Number(data?.game?.id) !== gameId) return false;
+    // Going live or ending is live_game_v2.js's to show (its lifecycle,
+    // with the slow check in live_game_postgame_cleanup.js when there is no
+    // socket); a read that crosses it is left to them.
+    if (Boolean(data?.game?.is_live) !== Boolean(state?.game?.is_live)) return false;
     const newer = !state?.rotation_events ||
       compareVersions(liveVersion(data), liveVersion(state)) > 0 ||
       (!isOlder(data) && String(data.current_inning || '') !== String(state.current_inning || ''));
