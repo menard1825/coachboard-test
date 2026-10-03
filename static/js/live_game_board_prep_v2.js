@@ -4642,9 +4642,44 @@
   // send and what the Pregame Plan note compares against. Re-read the
   // next-inning data once, shortly after, however many scripts announce the
   // same change -- instead of waiting for the 3.5 s poll.
+  let liveChangePending = false;
+
   function onLiveChange() {
+    liveChangePending = true;
     window.clearTimeout(liveChangeTimer);
-    liveChangeTimer = window.setTimeout(() => refresh({changed: true}), 150);
+    liveChangeTimer = window.setTimeout(() => {
+      liveChangePending = false;
+      refresh({changed: true});
+    }, 150);
+  }
+
+  // Until the read a live change asked for has landed. End Inning waits for
+  // it, so the defense it starts is the one this board then shows (after an
+  // Undo the board briefly still showed the undone pitcher carried on).
+  async function whenCurrent(timeoutMs = 3000) {
+    const deadline = Date.now() + timeoutMs;
+    while ((liveChangePending || readInFlight) && Date.now() < deadline) {
+      if (readInFlight) {
+        try { await readInFlight; } catch (_) {}
+      } else {
+        await new Promise(resolve => window.setTimeout(resolve, 30));
+      }
+    }
+  }
+
+  // How far along the game's history a live state is: the highest event
+  // sequence, then how many are reverted (an Undo reverts one).
+  let seenLiveVersion = '';
+  function liveVersionOf(value) {
+    const events = Array.isArray(value?.rotation_events) ? value.rotation_events : [];
+    if (!events.length) return '';
+    let high = 0;
+    let reverted = 0;
+    events.forEach(event => {
+      high = Math.max(high, Number(event?.sequence) || 0);
+      if (event?.reverted) reverted += 1;
+    });
+    return `${high}:${reverted}`;
   }
 
   function afterAdvance() {
@@ -4708,6 +4743,7 @@
     showError,
     clearError,
     requirePitcher,
+    whenCurrent,
     afterAdvance,
     showNext: () => {
       activeView = 'next';
@@ -4859,6 +4895,11 @@
       }
       // Another inning than this board read (an Undo, a remote End Inning
       // found by a poll or on reconnect): relabel now, read the next inning.
+      // Any other change to the game (an Undo of a pitching change arrives
+      // as a full state, not a delta) also moves the next inning: read it.
+      const version = Number(detail.game_id) === gameId ? liveVersionOf(detail.state) : '';
+      const moved = Boolean(version && seenLiveVersion && version !== seenLiveVersion);
+      if (version) seenLiveVersion = version;
       if (
         Number(detail.game_id) === gameId &&
         latest &&
@@ -4866,6 +4907,8 @@
         String(detail.state.current_inning) !== String(latest.current_inning || '')
       ) {
         syncUpcomingInningLabels();
+        onLiveChange();
+      } else if (moved && latest) {
         onLiveChange();
       }
     });

@@ -818,6 +818,11 @@
       await window.CBNextDefense
         ?.flush?.();
 
+      // A Next Inning read a live change (an Undo) asked for lands first:
+      // the defense started is the one the board then shows.
+      await window.CBNextDefense
+        ?.whenCurrent?.();
+
       await waitForLiveWritesToSettle();
 
       // Everything this page sent has landed: read the game and the next
