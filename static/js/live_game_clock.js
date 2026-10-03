@@ -308,17 +308,32 @@
       remainingValue = remaining !== null && remaining < 0 ? formatDuration(remaining, true) : formatDuration(remaining);
     }
 
-    card.innerHTML = `
-      <div class="cb-game-clock-main">
-        <div class="cb-game-clock-values">
-          <div class="cb-game-clock-value"><div class="cb-game-clock-label">Game Clock · Elapsed</div><div class="cb-game-clock-time">${formatDuration(elapsed)}</div></div>
-          <div class="cb-game-clock-value ${statusClass}"><div class="cb-game-clock-label">${esc(remainingLabel)}</div><div class="cb-game-clock-time">${esc(remainingValue)}</div></div>
+    // Built once; each second only its text changes, so its buttons (and
+    // their focus) are not replaced every second.
+    if (!card.querySelector('.cb-game-clock-main')) {
+      card.innerHTML = `
+        <div class="cb-game-clock-main">
+          <div class="cb-game-clock-values">
+            <div class="cb-game-clock-value" data-cb-clock-elapsed><div class="cb-game-clock-label">Game Clock · Elapsed</div><div class="cb-game-clock-time"></div></div>
+            <div class="cb-game-clock-value" data-cb-clock-remaining><div class="cb-game-clock-label"></div><div class="cb-game-clock-time"></div></div>
+          </div>
+          <div class="cb-game-clock-actions"><button type="button" class="btn btn-sm btn-outline-secondary cb-clock-config"><i class="bi bi-clock-history me-1"></i>Set Clock</button><button type="button" class="btn btn-sm btn-outline-danger cb-clock-end-time"><i class="bi bi-stop-circle me-1"></i>End — Time Limit</button></div>
         </div>
-        <div class="cb-game-clock-actions"><button type="button" class="btn btn-sm btn-outline-secondary cb-clock-config"><i class="bi bi-clock-history me-1"></i>Set Clock</button><button type="button" class="btn btn-sm btn-outline-danger cb-clock-end-time"><i class="bi bi-stop-circle me-1"></i>End — Time Limit</button></div>
-      </div>
-      <div class="cb-game-clock-note">${limit ? `${formatTimeLimit(limit)} time limit. ` : ''}The clock starts with Live Game and stays synced to the server. CoachBoard never ends the game automatically.</div>`;
-    card.querySelector('.cb-clock-config')?.addEventListener('click', openConfig);
-    card.querySelector('.cb-clock-end-time')?.addEventListener('click', openTimeLimitEnd);
+        <div class="cb-game-clock-note"></div>`;
+      card.querySelector('.cb-clock-config')?.addEventListener('click', openConfig);
+      card.querySelector('.cb-clock-end-time')?.addEventListener('click', openTimeLimitEnd);
+    }
+    const setText = (el, text) => { if (el && el.textContent !== text) el.textContent = text; };
+    setText(card.querySelector('[data-cb-clock-elapsed] .cb-game-clock-time'), formatDuration(elapsed));
+    const remainingBox = card.querySelector('[data-cb-clock-remaining]');
+    const remainingClass = `cb-game-clock-value ${statusClass}`.trim();
+    if (remainingBox && remainingBox.className !== remainingClass) remainingBox.className = remainingClass;
+    setText(remainingBox?.querySelector('.cb-game-clock-label'), remainingLabel);
+    setText(remainingBox?.querySelector('.cb-game-clock-time'), remainingValue);
+    setText(
+      card.querySelector('.cb-game-clock-note'),
+      `${limit ? `${formatTimeLimit(limit)} time limit. ` : ''}The clock starts with Live Game and stays synced to the server. CoachBoard never ends the game automatically.`
+    );
   }
 
   function renderPregame() {
@@ -328,7 +343,11 @@
       return;
     }
     const limit = Number(clock?.time_limit_minutes || 0);
-    card.innerHTML = `<div><strong><i class="bi bi-clock me-1"></i>Game Clock</strong><span class="d-block">${limit ? `Time limit: ${formatTimeLimit(limit)}` : 'No time limit set yet'} · starts when you tap Start Live Game</span></div><button type="button" class="btn btn-sm btn-outline-primary cb-clock-config">${limit ? 'Change' : 'Set Time Limit'}</button>`;
+    const markup = `<div><strong><i class="bi bi-clock me-1"></i>Game Clock</strong><span class="d-block">${limit ? `Time limit: ${formatTimeLimit(limit)}` : 'No time limit set yet'} · starts when you tap Start Live Game</span></div><button type="button" class="btn btn-sm btn-outline-primary cb-clock-config">${limit ? 'Change' : 'Set Time Limit'}</button>`;
+    // Rebuilt only when it changes, not every second (its button keeps focus).
+    if (card.dataset.cbMarkup === markup) return;
+    card.dataset.cbMarkup = markup;
+    card.innerHTML = markup;
     card.querySelector('.cb-clock-config')?.addEventListener('click', openConfig);
   }
 

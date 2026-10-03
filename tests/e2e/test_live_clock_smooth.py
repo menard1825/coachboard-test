@@ -89,3 +89,17 @@ def test_pause_holds_the_time_and_resume_continues_it(live, coachboard_url):
     resumed = _seconds(page.locator(TIME).text_content().strip())
     assert 0 <= resumed - _seconds(held) <= 2                # continues; the pause is not counted
     assert page.cb_errors == []
+
+
+def test_the_clock_card_keeps_its_buttons(live, coachboard_url):
+    # The card's text changes every second; its buttons are not replaced
+    # (they used to be rebuilt every second, losing focus).
+    page = live(PHONE)
+    _open(page, coachboard_url)
+    page.wait_for_function("() => document.querySelector('#cbLiveGameClock .cb-clock-config')", timeout=10_000)
+    page.evaluate("() => { window.__cbClockButton = document.querySelector('#cbLiveGameClock .cb-clock-config'); }")
+    before = page.locator('#cbLiveGameClock [data-cb-clock-elapsed] .cb-game-clock-time').text_content()
+    page.wait_for_timeout(3_000)
+    assert page.locator('#cbLiveGameClock [data-cb-clock-elapsed] .cb-game-clock-time').text_content() != before
+    assert page.evaluate("() => window.__cbClockButton === document.querySelector('#cbLiveGameClock .cb-clock-config')"
+                         " && window.__cbClockButton.isConnected")
