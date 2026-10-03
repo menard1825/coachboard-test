@@ -181,6 +181,11 @@
   const STALE_MESSAGE =
     'Defense changed on another device. Check the field and try the pitching change again.';
   const QUESTION_ID = 'live-pitcher-destination-v7';
+  // A step of the question that replaces the one just answered ignores taps
+  // for this long, and any tap whose press began before it appeared: the
+  // second tap of a double tap must not answer a question the coach has
+  // not seen (e.g. "Make this change" drawn where "Bench …" was).
+  const STEP_GUARD_MS = 500;
 
   function filled(alignment) {
     return Object.fromEntries(
@@ -348,8 +353,27 @@
         instance.hide();
       };
 
+      // When the coach last pressed inside the question (pointer taps).
+      let pressedAt = -Infinity;
+      modal.addEventListener('pointerdown', () => { pressedAt = performance.now(); }, true);
+      let steps = 0;
+
       // One step of the conversation: a title, a question, buttons.
       const render = (title, question, buttons, summary = []) => {
+        const shownAt = performance.now();
+        const replacesAStep = steps > 0;
+        steps += 1;
+        // data-pc-ready says when this step takes answers (assistive tech, tests).
+        const step = steps;
+        list.dataset.pcReady = String(!replacesAStep);
+        if (replacesAStep) {
+          window.setTimeout(() => { if (steps === step) list.dataset.pcReady = 'true'; }, STEP_GUARD_MS);
+        }
+        const deliberate = event => !replacesAStep || (
+          performance.now() - shownAt >= STEP_GUARD_MS &&
+          // A keyboard activation has no press (detail 0).
+          (event.detail === 0 || pressedAt >= shownAt)
+        );
         titleEl.textContent = title;
         questionEl.textContent = question;
         summaryEl.replaceChildren(...summary.map(text => {
@@ -363,7 +387,8 @@
           button.type = 'button';
           button.className = `btn ${className}`;
           button.textContent = label;
-          button.addEventListener('click', () => {
+          button.addEventListener('click', event => {
+            if (!deliberate(event)) return;
             // An answer given after the field changed is not applied.
             if (stale) {
               instance.hide();

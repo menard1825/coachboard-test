@@ -147,7 +147,14 @@ def choose_new_pitcher(page: Page, name: str):
     return question
 
 
+def ready(question):
+    """A step that replaces the one just answered takes answers after a
+    moment (a double tap must not answer it): wait, as a coach reads it."""
+    expect(question.locator('[data-pc-choices]')).to_have_attribute('data-pc-ready', 'true')
+
+
 def answer(question, label):
+    ready(question)
     question.get_by_role('button', name=label, exact=True).click()
     expect(question).not_to_be_visible(timeout=10_000)
 
@@ -348,6 +355,7 @@ def test_field_changed_by_another_coach_cancels_the_open_question(
 
 def step(question, label):
     """A choice that continues the conversation (the question stays open)."""
+    ready(question)
     question.get_by_role('button', name=label, exact=True).click()
 
 
