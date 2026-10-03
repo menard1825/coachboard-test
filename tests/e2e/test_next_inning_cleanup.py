@@ -379,9 +379,11 @@ def test_an_open_p_is_never_accepted_even_short_handed(setup, coachboard_url):
     expect(spot(page.locator(CARD), 'P')).to_have_attribute('data-next-player', '', timeout=10_000)
 
     page.locator('#liveEndInningBtn').click()
-    expect(page.locator(f'{CARD} .cb-next-error')).to_contain_text(
-        'Set a pitcher for the next inning.', timeout=15_000
-    )
+    # One message -- the board's own line -- and focus on the P spot
+    # (test_end_inning_needs_pitcher.py); no question is asked.
+    expect(spot(page.locator(CARD), 'P')).to_be_focused(timeout=15_000)
+    expect(page.locator(f'{CARD} #cb-next-needs-pitcher')).to_have_text('Set a pitcher for the next inning.')
+    expect(page.locator(f'{CARD} .cb-next-error')).to_have_count(0)
     page.wait_for_timeout(500)
     assert _asked(page) == []
     assert _inning(page, coachboard_url, game_id) == '1'
