@@ -37,16 +37,30 @@
         }
       }
 
-      /* Medium-width phones, foldables and small tablets need a compact header. */
+      /* Medium-width phones, foldables and small tablets (iPad portrait)
+         need a compact header. The connection status stays: a narrow
+         column where "Live · Synced" / "Reconnecting…" wraps onto two short
+         lines, so a dropped connection is never hidden at these widths. */
       @media (min-width: 576px) and (max-width: 899.98px) {
         html body.cb-dugout #cbDugoutHeader .cb-dh-live {
-          display: none !important;
+          display: flex !important;
+          align-items: flex-start !important;
+          gap: 4px !important;
+          max-width: 66px !important;
+          white-space: normal !important;
+          line-height: 1.15 !important;
+          font-size: .56rem !important;
+          letter-spacing: .03em !important;
         }
-        /* .cb-dh-live is hidden just above, leaving inning, clock, pitcher,
-           the Undo slot and the two buttons -- six columns. Undercounting
-           wraps the header onto a second row and costs 46px. */
+        html body.cb-dugout #cbDugoutHeader .cb-dh-live .cb-dh-dot {
+          flex: 0 0 auto !important;
+          margin-top: 2px !important;
+        }
+        /* Status, inning, clock, pitcher, the Undo slot and the two buttons
+           -- seven columns. Undercounting wraps the header onto a second
+           row and costs 46px. */
         html body.cb-dugout #cbDugoutHeader .cb-dh-main {
-          grid-template-columns: auto minmax(74px,.8fr) minmax(92px,1.15fr) auto auto auto !important;
+          grid-template-columns: auto auto minmax(74px,.8fr) minmax(92px,1.15fr) auto auto auto !important;
           gap: 6px !important;
         }
         html body.cb-dugout #cbDugoutHeader .cb-dh-pitcher {
