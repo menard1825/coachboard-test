@@ -347,13 +347,49 @@
     return negative ? `+${valueText}` : valueText;
   }
 
+  /*
+   * The running clock between /clock reads. A read gives whole seconds
+   * (elapsed_seconds); counting on from each one moved the display by up to
+   * a second at every read -- a 2-second step, then a 2-second pause, every
+   * 15 s. Instead the clock runs from started_at on this device's clock,
+   * shifted by clockOffsetMs (server time minus device time). Each read says
+   * the server's time was in [started + E, started + E + 1 s) while this
+   * device's clock read between sending and receiving; the offset only moves
+   * when it falls outside that window -- a real correction (a wrong device
+   * clock), not a rounding one. Paused or ended: the server's value.
+   */
+  let clockOffsetMs = null;
+
+  function parseUtc(value) {
+    // Microseconds (Python's isoformat) are not parsed by every browser.
+    return Date.parse(String(value || '').replace(/(\.\d{3})\d+/, '$1'));
+  }
+
+  function correctClockOffset(payload, sentAt, receivedAt) {
+    const started = parseUtc(payload?.started_at_utc);
+    if (!payload?.is_live || payload.ended_at_utc || payload.elapsed_seconds == null || !Number.isFinite(started)) return;
+    const reported = started + Number(payload.elapsed_seconds) * 1000;
+    const lowest = reported - receivedAt;
+    const highest = reported + 1000 - sentAt;
+    const current = clockOffsetMs ?? Math.min(Math.max(0, lowest), highest);
+    clockOffsetMs = Math.min(Math.max(current, lowest), highest);
+  }
+
+  function clockRunning() {
+    return Boolean(
+      clock?.is_live && !clock.ended_at_utc && !clock.is_paused &&
+      clockOffsetMs !== null && Number.isFinite(parseUtc(clock.started_at_utc))
+    );
+  }
+
+  function elapsedMs() {
+    return Date.now() + clockOffsetMs - parseUtc(clock.started_at_utc);
+  }
+
   function elapsed() {
     if (clock?.elapsed_seconds == null) return null;
-    let value = Number(clock.elapsed_seconds) || 0;
-    if (clock.is_live && clock.started_at_utc && !clock.ended_at_utc && !clock.is_paused && clockAt) {
-      value += Math.max(0, Math.floor((Date.now() - clockAt) / 1000));
-    }
-    return value;
+    if (clockRunning()) return Math.max(0, Math.floor(elapsedMs() / 1000));
+    return Number(clock.elapsed_seconds) || 0;
   }
 
   const SYNC_LABELS = {
@@ -1650,10 +1686,12 @@
     if (clockBusy) return;
     clockBusy = true;
     try {
+      const sentAt = Date.now();
       const response = await fetch(`/api/live-game/${gameId}/clock`, { cache: 'no-store' });
       if (!response.ok) return;
       clock = (await response.json())?.clock || null;
       clockAt = Date.now();
+      correctClockOffset(clock, sentAt, clockAt);
       queue();
     } catch (_) {
     } finally {
@@ -1698,9 +1736,14 @@
     // remain only as recovery in case a browser misses an update.
     setInterval(getState, 12000);
     setInterval(getClock, 15000);
-    setInterval(() => {
+    // Once a second -- just after the clock's own second turns while it
+    // runs, so the display never shows a second twice or skips one.
+    const tick = () => {
       if (document.body.classList.contains('cb-dugout')) queue();
-    }, 1000);
+      const delay = clockRunning() ? 1000 - (((elapsedMs() % 1000) + 1000) % 1000) + 20 : 1000;
+      window.setTimeout(tick, delay);
+    };
+    window.setTimeout(tick, 1000);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
         getState();
