@@ -900,6 +900,9 @@
       };
 
       if (!alignment.P) {
+        // One message -- the Next Inning board's "Set a pitcher" line --
+        // with focus on its P spot.
+        if (window.CBNextDefense?.requirePitcher?.()) return;
         throw new Error(
           'Set a pitcher for the next inning.'
         );

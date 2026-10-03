@@ -203,7 +203,7 @@
 
     if (!draft?.P) {
       items.push(
-        '<div class="cb-next-warning danger">' +
+        '<div class="cb-next-warning danger" id="cb-next-needs-pitcher">' +
         'Set a pitcher for the next inning.' +
         '</div>'
       );
@@ -353,6 +353,7 @@
         style="left:${left}%;top:${top}%"
         data-next-position="${esc(pos)}"
         data-next-player="${esc(name)}"
+        ${pos === 'P' && isOpen ? 'aria-describedby="cb-next-needs-pitcher"' : ''}
         aria-label="${esc(
           isOpen
             ? `${pos} open`
@@ -4449,6 +4450,21 @@
     renderCard();
   }
 
+  // End Inning stopped because the next inning has no pitcher: the Next
+  // Inning board's own "Set a pitcher" line is the one message, and focus
+  // goes to its P spot, where the pitcher is chosen.
+  function requirePitcher() {
+    activeView = 'next';
+    errorMessage = '';
+    renderCard();
+    applyView();
+    const spot = document.querySelector(`#${CARD_ID} [data-next-position="P"]`);
+    if (!spot) return false;
+    spot.scrollIntoView({block: 'center'});
+    spot.focus({preventScroll: true});
+    return true;
+  }
+
   function hydrate(data, {remote = true} = {}) {
     const previousBase = serverBase;
 
@@ -4688,6 +4704,7 @@
     isSaveInFlightOrQueued,
     showError,
     clearError,
+    requirePitcher,
     afterAdvance,
     showNext: () => {
       activeView = 'next';
