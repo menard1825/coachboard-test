@@ -2384,6 +2384,13 @@
     syncOpenDefenseWarning(endInning);
   }
 
+  // The phone layout, where End Inning is a dock fixed at the bottom
+  // (live_game_inning_clarity.js).
+  function actionsDocked() {
+    return window.matchMedia('(max-width:575.98px)').matches;
+  }
+  window.matchMedia('(max-width:575.98px)').addEventListener?.('change', () => syncLiveActions());
+
   // End Inning starts the next inning with the Next Inning defense, so an
   // open spot there is worth seeing before tapping it -- including on a
   // phone, where the card's own warning sits below the fixed action dock.
@@ -2444,10 +2451,15 @@
         window.CBQuickField?.fillOpen?.(now[0]);
       }
     );
+    // On the next inning's own tab, wider than a phone, End Inning sits right
+    // under the card, whose warnings ("Set a pitcher for the next inning.",
+    // "⚠ CF is open.") are just above this line: said once, there. On a
+    // phone the dock covers the card's warnings, so this line stays.
+    const cardSaysIt = activeView === 'next' && !actionsDocked();
     const showsNext = warningLine(
       'cbNextOpenWarning',
       endInning,
-      open.length
+      open.length && !cardSaysIt
         ? `⚠ Next inning: ${open.join(', ')} ${open.length === 1 ? 'is' : 'are'} open`
         : '',
       () => {

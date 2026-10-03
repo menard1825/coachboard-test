@@ -282,9 +282,12 @@ def test_short_handed_with_nobody_on_the_bench_starts_without_asking(setup, coac
     page, game_id = _start(setup, coachboard_url, {'1': NO_CF, '2': NO_CF, '3': NO_CF}, out=SHORT)
     _watch_questions(page)
 
-    # The board still says CF is open.
-    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    # The board still says CF is open: End Inning's line on the field tab,
+    # the next inning's own warning on its tab (said once there).
     expect(page.locator('#cbNextOpenWarning')).to_have_text('⚠ Next inning: CF is open', timeout=10_000)
+    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    expect(page.locator('#live-board-prep-v3 .cb-next-warnings')).to_contain_text('⚠ CF is open', timeout=10_000)
+    expect(page.locator('#cbNextOpenWarning')).to_have_count(0)
 
     _end_inning_to(page, '2')
     _end_inning_to(page, '3')                 # nor the 2nd's record afterwards

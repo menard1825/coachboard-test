@@ -386,6 +386,22 @@
     return Date.now() + clockOffsetMs - parseUtc(clock.started_at_utc);
   }
 
+  // Once a second -- just after the clock's own second turns while it
+  // runs, so the display never shows a second twice or skips one. A /clock
+  // read re-aims it (the first read after load, a resume).
+  let clockTickTimer = null;
+
+  function clockTick() {
+    if (document.body.classList.contains('cb-dugout')) queue();
+    scheduleClockTick();
+  }
+
+  function scheduleClockTick(delay) {
+    window.clearTimeout(clockTickTimer);
+    const wait = delay ?? (clockRunning() ? 1000 - (((elapsedMs() % 1000) + 1000) % 1000) + 20 : 1000);
+    clockTickTimer = window.setTimeout(clockTick, wait);
+  }
+
   function elapsed() {
     if (clock?.elapsed_seconds == null) return null;
     if (clockRunning()) return Math.max(0, Math.floor(elapsedMs() / 1000));
@@ -425,7 +441,8 @@
         tone: remaining <= 0 ? 'danger' : remaining <= 600 ? 'warn' : '',
       };
     }
-    return { label: `${paused ? 'Paused · ' : ''}Elapsed`, value: fmtSeconds(current), tone: '' };
+    // Before the first /clock read there is no time to show: "—", not 0:00.
+    return { label: `${paused ? 'Paused · ' : ''}Elapsed`, value: current == null ? '—' : fmtSeconds(current), tone: '' };
   }
 
   function title() {
@@ -668,6 +685,8 @@
       alignment: currentAlignment(),
       bench: benchPlayers().map(player => [player.id, player.name, player.number, player.benchStreak]),
       outfielderCount: state?.outfielder_count || 3,
+      // Field players are shown with their numbers.
+      roster: (state?.roster || []).map(player => [player.id, player.name, player.number]),
       saveMode,
       saveMessage,
       retry: lastFailedMove ? [lastFailedMove.playerId, lastFailedMove.destination] : Boolean(lastFailedDraft),
@@ -1674,7 +1693,8 @@
         saveMessage = 'Saved ✓';
       }
 
-      quickDefenseSignature = '';
+      // Redrawn only if the card's own data changed (its signature): the
+      // 12 s recovery read rebuilt it every time, Bench Report icon and all.
       queue();
     } catch (_) {
     } finally {
@@ -1692,6 +1712,7 @@
       clock = (await response.json())?.clock || null;
       clockAt = Date.now();
       correctClockOffset(clock, sentAt, clockAt);
+      scheduleClockTick();
       queue();
     } catch (_) {
     } finally {
@@ -1736,14 +1757,7 @@
     // remain only as recovery in case a browser misses an update.
     setInterval(getState, 12000);
     setInterval(getClock, 15000);
-    // Once a second -- just after the clock's own second turns while it
-    // runs, so the display never shows a second twice or skips one.
-    const tick = () => {
-      if (document.body.classList.contains('cb-dugout')) queue();
-      const delay = clockRunning() ? 1000 - (((elapsedMs() % 1000) + 1000) % 1000) + 20 : 1000;
-      window.setTimeout(tick, delay);
-    };
-    window.setTimeout(tick, 1000);
+    scheduleClockTick(1000);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
         getState();
