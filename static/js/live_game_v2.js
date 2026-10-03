@@ -416,22 +416,29 @@
                 pickerModal
             );
 
-        if (pickerModal.classList.contains('show')) {
-            await new Promise(resolve => {
-                pickerModal.addEventListener(
-                    'hidden.bs.modal',
-                    resolve,
-                    { once: true },
-                );
-                instance.hide();
-            });
-        }
+        // The list closes while the controller reads the state it needs,
+        // rather than before; its question opens once the list has gone
+        // (one dialog at a time, so focus passes from one to the next).
+        const listClosed =
+            pickerModal.classList.contains('show')
+                ? new Promise(resolve => {
+                    pickerModal.addEventListener(
+                        'hidden.bs.modal',
+                        resolve,
+                        { once: true },
+                    );
+                    instance.hide();
+                })
+                : Promise.resolve();
 
         // A Ready pitcher goes straight on; a flagged one reaches here only
         // with the coach's explicit decision (options.pitchingDecision).
         await controller.open(
             playerId,
-            options,
+            {
+                ...options,
+                afterClose: listClosed,
+            },
         );
     }
 

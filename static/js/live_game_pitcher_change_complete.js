@@ -294,10 +294,13 @@
     return new Promise(resolve => {
       let answer = null;
       let stale = false;
+      let decided = false;
+      let closed;
+      const whenClosed = new Promise(done => { closed = done; });
 
       // Bootstrap ignores hide() while the modal is still fading in.
       modal.addEventListener('shown.bs.modal', () => {
-        if (stale) instance.hide();
+        if (stale || decided) instance.hide();
       }, {once: true});
 
       // The official field moved on (another coach, an Undo) while the
@@ -325,11 +328,23 @@
       modal.addEventListener('hidden.bs.modal', () => {
         document.removeEventListener('coachboard:live-delta', onLiveChange);
         document.removeEventListener('coachboard:live-state', onLiveChange);
+        closed();
         resolve(answer);
       }, {once: true});
 
+      // The coach's decision is saved at once, not after the question has
+      // faded out: its buttons stop answering (no second tap) and the
+      // caller stays busy until the question has gone (decision.closed).
+      // The server still refuses it if the field moved on meanwhile
+      // (base_sequence). Cancel resolves when the question has gone.
       const finish = value => {
+        if (decided) return;
         answer = value;
+        if (value) {
+          decided = true;
+          list.querySelectorAll('button').forEach(button => { button.disabled = true; });
+          resolve({...value, closed: whenClosed});
+        }
         instance.hide();
       };
 
@@ -467,8 +482,15 @@
     const pitchingDecision =
       options?.pitchingDecision || null;
 
+    let decision;
+
     try {
-      state = await loadState();
+      // Read while the pitcher list is still closing (options.afterClose),
+      // then ask once it has gone.
+      const reading = loadState();
+      reading.catch(() => {});
+      await options?.afterClose;
+      state = await reading;
 
       if (!state?.game?.is_live) {
         throw new Error('Game is not live.');
@@ -506,8 +528,6 @@
        * save the whole decision as one pitching change (one Undo).
        * With nobody on the mound there is nothing more to ask.
        */
-      let decision;
-
       if (oldPitcher) {
         decision = await askOutgoingDestination({
           incoming,
@@ -546,6 +566,9 @@
         'danger',
       );
     } finally {
+      // Not done until the question has gone: Change Pitcher cannot open
+      // again over a closing dialog.
+      await decision?.closed;
       busy = false;
     }
   }
