@@ -30,6 +30,7 @@
   let quickDefenseSignature = '';
   let lastFailureKind = null;
   let reconnectMessageUntil = 0;
+  let openMoveContext = null;
 
   function failureKind(error) {
     const message = String(
@@ -97,6 +98,54 @@
       Number(value?.sequence) || 0,
       Number(value?.event?.sequence) || 0,
     );
+  }
+
+  function alignmentKey(alignment) {
+    return JSON.stringify(
+      Object.entries(alignment || {})
+        .filter(([, name]) => name)
+        .sort(([a], [b]) => a.localeCompare(b))
+    );
+  }
+
+  function captureMoveContext(alignment = currentAlignment()) {
+    return {
+      alignment: {...(alignment || {})},
+      baseSequence: sequenceFromState(),
+    };
+  }
+
+  function moveContextIsCurrent(context) {
+    if (!context) return true;
+
+    return (
+      Number(context.baseSequence || 0) === Number(sequenceFromState() || 0) &&
+      alignmentKey(context.alignment) === alignmentKey(currentAlignment())
+    );
+  }
+
+  function showStaleMove() {
+    lastFailedMove = null;
+    lastFailureKind = 'server';
+    saveMode = 'error';
+    saveMessage = `Not saved — ${STALE_MOVE_MESSAGE}`;
+    quickDefenseSignature = '';
+
+    const shell = document.querySelector('#live-game-overlay .coach-live-shell');
+    if (shell) renderQuickDefense(shell);
+  }
+
+  function invalidateOpenMoveIfStale() {
+    if (!openMoveContext || moveContextIsCurrent(openMoveContext)) return;
+
+    const modal = $('cbQuickMoveModal');
+    openMoveContext = null;
+
+    if (modal?.classList.contains('show')) {
+      bootstrap.Modal.getOrCreateInstance(modal).hide();
+    }
+
+    showStaleMove();
   }
 
   function styles() {
@@ -699,8 +748,7 @@
         const pos = player.dataset.cbPosition;
 
         if (name === 'Open') {
-          // Open positions are state, not a separate workflow. Pick a player
-          // first, then choose this position (or drag a player here).
+          openOpenPositionModal(pos);
           return;
         }
 
@@ -763,12 +811,19 @@
     const modal = ensureMoveModal();
     const title = modal.querySelector('.modal-title');
     const body = modal.querySelector('.modal-body');
+    const context = captureMoveContext();
+    const alignment = context.alignment;
+    openMoveContext = context;
+
+    modal.addEventListener('hidden.bs.modal', () => {
+      if (openMoveContext === context) openMoveContext = null;
+    }, {once: true});
 
     if (title) {
       title.textContent = `Fill ${pos}`;
     }
     // Another spot open too: name it, so it's clear which one this fills.
-    const others = positions().filter(other => other !== pos && !currentAlignment()?.[other]);
+    const others = positions().filter(other => other !== pos && !alignment?.[other]);
     setMoveModalHint(
       'Only the player you choose moves.' +
       (others.length ? ` Also open: ${others.join(', ')}.` : '')
@@ -783,7 +838,6 @@
      * special: choosing them goes to Change Pitcher, which settles who
      * pitches (with its eligibility checks) before anyone leaves P.
      */
-    const alignment = currentAlignment();
     const labelFor = player => {
       const number = String(player?.number ?? '').trim();
       return number ? `#${number} ${player.name}` : player.name;
@@ -867,7 +921,8 @@
           closeMoveSheetThen(() => saveMove(
             choice.player.id,
             pos,
-            choice.player.name
+            choice.player.name,
+            context
           ));
         }
       );
@@ -881,7 +936,8 @@
   function openMoveModal(name) {
     const player = playerForName(name);
     if (!player) return;
-    const alignment = currentAlignment();
+    const context = captureMoveContext();
+    const alignment = context.alignment;
     const source = Object.entries(alignment).find(([, playerName]) => playerName === name)?.[0] || 'BENCH';
     if (source === 'P') {
       $('liveChangePitcherBtn')?.click();
@@ -890,6 +946,11 @@
     const modal = ensureMoveModal();
     const title = modal.querySelector('.modal-title');
     const body = modal.querySelector('.modal-body');
+    openMoveContext = context;
+
+    modal.addEventListener('hidden.bs.modal', () => {
+      if (openMoveContext === context) openMoveContext = null;
+    }, {once: true});
 
     if (title) {
       title.textContent = 'Move Player';
@@ -907,12 +968,24 @@
     }).join('')}</div>`;
 
     body.querySelectorAll('[data-cb-destination]').forEach(button => {
-      button.addEventListener('click', () => moveOrAsk(player.name, button.dataset.cbDestination));
+      button.addEventListener(
+        'click',
+        () => moveOrAsk(
+          player.name,
+          button.dataset.cbDestination,
+          context
+        )
+      );
     });
 
     // Bench is an obvious one-step move: the old position stays open.
     body.querySelector('[data-cb-bench-current]')?.addEventListener('click', () => {
-      closeMoveSheetThen(() => saveMove(player.id, 'BENCH', player.name));
+      closeMoveSheetThen(() => saveMove(
+        player.id,
+        'BENCH',
+        player.name,
+        context
+      ));
     });
     bootstrap.Modal.getOrCreateInstance(modal).show();
   }
@@ -920,16 +993,19 @@
   const STALE_MOVE_MESSAGE =
     'Defense changed on another device. Check the field and try the move again.';
 
-  // Tap and drag both land here with "<name> is moving to <destination>".
-  // An open destination is the approved one-step move (saveMove). An
-  // occupied one is a coach decision about its player (askOccupiedMove).
-  // Anything touching P belongs to Change Pitcher.
-  function moveOrAsk(name, destination) {
+  // Tap and drag both land here. The context captures the field/version
+  // the coach actually acted on, so a later live update cannot silently
+  // change who gets swapped or benched before the save starts.
+  function moveOrAsk(
+    name,
+    destination,
+    context = captureMoveContext()
+  ) {
     const player = playerForName(name);
     const target = String(destination || '').toUpperCase();
     if (!player || !target) return;
 
-    const alignment = currentAlignment();
+    const alignment = context.alignment || {};
     const source = Object.entries(alignment)
       .find(([, assigned]) => assigned === name)?.[0] || 'BENCH';
 
@@ -941,7 +1017,12 @@
 
     // Resolve the obvious move immediately:
     // open spot = move, occupied spot = swap, Bench = leave the old spot open.
-    closeMoveSheetThen(() => saveMove(player.id, target, name));
+    closeMoveSheetThen(() => saveMove(
+      player.id,
+      target,
+      name,
+      context
+    ));
   }
 
   /*
@@ -983,7 +1064,20 @@
 
   function retryLastFailedSave() {
     if (lastFailedMove) {
-      saveMove(lastFailedMove.playerId, lastFailedMove.destination, lastFailedMove.name);
+      const failed = lastFailedMove;
+
+      if (!moveContextIsCurrent(failed.context)) {
+        lastFailedMove = null;
+        showStaleMove();
+        return true;
+      }
+
+      saveMove(
+        failed.playerId,
+        failed.destination,
+        failed.name,
+        failed.context
+      );
       return true;
     }
     if (lastFailedDraft) {
@@ -1318,8 +1412,18 @@
 
   // One-step moves only: an open destination (the old spot is left open).
   // An occupied destination is the coach's decision -- askOccupiedMove.
-  async function saveMove(playerId, destination, name) {
+  async function saveMove(
+    playerId,
+    destination,
+    name,
+    context = captureMoveContext()
+  ) {
     if (moveBusy) return;
+
+    if (!moveContextIsCurrent(context)) {
+      showStaleMove();
+      return;
+    }
 
     moveBusy = true;
     saveMode = 'saving';
@@ -1341,7 +1445,8 @@
         );
       }
 
-      const alignment = {...currentAlignment()};
+      // Build the result from the exact alignment the coach acted on.
+      const alignment = {...(context.alignment || {})};
       const source = Object.entries(alignment)
         .find(([, assigned]) => assigned === player.name)?.[0] || 'BENCH';
       const target = String(destination || '').toUpperCase();
@@ -1388,7 +1493,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           alignment,
-          base_sequence: sequenceFromState(),
+          base_sequence: context.baseSequence,
         }),
       });
 
@@ -1403,8 +1508,10 @@
         }
 
         throw new Error(
-          data.message ||
-          `Unable to save defense (${response.status}).`
+          data.code === 'stale_live_state'
+            ? STALE_MOVE_MESSAGE
+            : data.message ||
+              `Unable to save defense (${response.status}).`
         );
       }
 
@@ -1418,7 +1525,12 @@
       queue();
     } catch (error) {
       reportSaveFailure(error, () => {
-        lastFailedMove = {playerId, destination, name};
+        lastFailedMove = {
+          playerId,
+          destination,
+          name,
+          context,
+        };
       });
     } finally {
       moveBusy = false;
@@ -1445,6 +1557,7 @@
     // explicit authoritative refresh.
     state = next;
     quickDefenseSignature = '';
+    invalidateOpenMoveIfStale();
 
     const source = String(
       detail.source || ''
@@ -1614,8 +1727,10 @@
       }
     }
 
-    // Force Quick Field to redraw from the newest alignment. This also means
-    // the next tap uses the newest base_sequence instead of an old one.
+    // Force Quick Field to redraw from the newest alignment. Any open move
+    // sheet was decided against the prior field/version, so close it rather
+    // than silently changing who a visible destination would move.
+    invalidateOpenMoveIfStale();
     quickDefenseSignature = '';
     queue();
   }
