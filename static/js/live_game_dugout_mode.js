@@ -627,7 +627,7 @@
     const pitcher = pos === 'P';
     const open = name === 'Open';
     const number = numberMap().get(name);
-    const label = open && !pitcher ? 'Open · tap to fill' : name;
+    const label = open && !pitcher ? 'Open' : name;
     const fullLabel = open ? `${pos} open` : `${number ? `#${number} ` : ''}${name} at ${pos}`;
 
     return `<button type="button"
@@ -659,7 +659,7 @@
         }).join('')
       : '<span class="small text-muted">No players are on the bench.</span>';
 
-    return `<div class="cb-qd-head"><div><div class="cb-qd-kicker">Live Defense</div><div class="cb-qd-title">Quick Field</div><div class="cb-qd-help">Drag or tap players right on the field and bench. Pitcher changes stay in Change Pitcher.</div></div>${saveStateMarkup()}</div><div class="cb-qd-body"><div class="cb-qd-field"><svg class="cb-qd-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true"><path d="M7 57 Q9 13 50 6 Q91 13 93 57" fill="none" stroke="rgba(245,245,220,.38)" stroke-width="1.2"/><path d="M50 84 L8 38 M50 84 L92 38" fill="none" stroke="rgba(255,255,255,.88)" stroke-width=".7"/><polygon points="50,75 27,54 50,32 73,54" fill="#cfa56c" opacity=".95"/><polygon points="50,68 34,54 50,40 66,54" fill="#438f58"/><circle cx="50" cy="61" r="4.8" fill="#cfa56c"/><circle cx="50" cy="81" r="6.2" fill="#cfa56c"/><rect x="49" y="31" width="2" height="2" fill="#fff" transform="rotate(45 50 32)"/><rect x="72" y="53" width="2" height="2" fill="#fff" transform="rotate(45 73 54)"/><rect x="26" y="53" width="2" height="2" fill="#fff" transform="rotate(45 27 54)"/><path d="M48.8 81.5 L50 80.4 L51.2 81.5 L50.8 83 L49.2 83 Z" fill="#fff"/></svg>${positionSpots().map(([pos, left, top]) => fieldSpot(pos, left, top)).join('')}</div><div class="cb-qd-bench-wrap"><div class="cb-qd-bench-head"><strong>Bench now · ${bench.length}</strong><span>${bench.length ? 'Players sitting longest are shown first' : 'Everyone is in the field'}</span></div><div class="cb-qd-bench">${benchMarkup}</div></div><div class="cb-qd-actions"><div class="cb-qd-tip">Tap a player for a quick move, or drag directly between the field and bench. CoachBoard saves a complete defense automatically.</div></div></div>`;
+    return `<div class="cb-qd-head"><div><div class="cb-qd-kicker">Live Defense</div><div class="cb-qd-title">Inning ${esc(state?.current_inning || '')} · live</div><div class="cb-qd-help">Tap a player to move him. Occupied spots swap automatically. Bench leaves the old spot open.</div></div>${saveStateMarkup()}</div><div class="cb-qd-body"><div class="cb-qd-field"><svg class="cb-qd-field-art" viewBox="0 0 100 88" preserveAspectRatio="none" aria-hidden="true"><path d="M7 57 Q9 13 50 6 Q91 13 93 57" fill="none" stroke="rgba(245,245,220,.38)" stroke-width="1.2"/><path d="M50 84 L8 38 M50 84 L92 38" fill="none" stroke="rgba(255,255,255,.88)" stroke-width=".7"/><polygon points="50,75 27,54 50,32 73,54" fill="#cfa56c" opacity=".95"/><polygon points="50,68 34,54 50,40 66,54" fill="#438f58"/><circle cx="50" cy="61" r="4.8" fill="#cfa56c"/><circle cx="50" cy="81" r="6.2" fill="#cfa56c"/><rect x="49" y="31" width="2" height="2" fill="#fff" transform="rotate(45 50 32)"/><rect x="72" y="53" width="2" height="2" fill="#fff" transform="rotate(45 73 54)"/><rect x="26" y="53" width="2" height="2" fill="#fff" transform="rotate(45 27 54)"/><path d="M48.8 81.5 L50 80.4 L51.2 81.5 L50.8 83 L49.2 83 Z" fill="#fff"/></svg>${positionSpots().map(([pos, left, top]) => fieldSpot(pos, left, top)).join('')}</div><div class="cb-qd-bench-wrap"><div class="cb-qd-bench-head"><strong>Bench now · ${bench.length}</strong><span>${bench.length ? 'Players sitting longest are shown first' : 'Everyone is in the field'}</span></div><div class="cb-qd-bench">${benchMarkup}</div></div><div class="cb-qd-actions"><div class="cb-qd-tip">Pitcher changes stay in Change Pitcher. Use Undo if the move was not what you wanted.</div></div></div>`;
   }
 
   function quickDefenseStateSignature() {
@@ -699,7 +699,8 @@
         const pos = player.dataset.cbPosition;
 
         if (name === 'Open') {
-          openOpenPositionModal(pos);
+          // Open positions are state, not a separate workflow. Pick a player
+          // first, then choose this position (or drag a player here).
           return;
         }
 
@@ -893,14 +894,14 @@
     if (title) {
       title.textContent = 'Move Player';
     }
-    setMoveModalHint("Tap the new position. If someone is there, you choose where they go.");
+    setMoveModalHint("Tap the new position. Occupied positions swap automatically.");
 
     const destinations = positions().filter(pos => pos !== 'P' && pos !== source);
     const sourceText = source === 'BENCH' ? `${name} is currently on the bench.` : `${name} is currently playing ${source}.`;
     const benchDestination = source === 'BENCH'
       ? ''
-      : `<button type="button" class="btn btn-outline-secondary cb-destination" data-cb-bench-current><span>Bench</span><small>Leave ${esc(source)} open or choose who plays it</small></button>`;
-    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. If someone is there, you choose where they go.' : 'Choose another position, or Bench.'}</div><div class="cb-destination-grid">${benchDestination}${destinations.map(pos => {
+      : `<button type="button" class="btn btn-outline-secondary cb-destination" data-cb-bench-current><span>Bench</span><small>Leave ${esc(source)} open</small></button>`;
+    body.innerHTML = `<div class="cb-move-current"><strong>${esc(sourceText)}</strong><br>${source === 'BENCH' ? 'Choose a field position. If someone is there, that player goes to the bench.' : 'Choose another position, or Bench.'}</div><div class="cb-destination-grid">${benchDestination}${destinations.map(pos => {
       const occupant = alignment[pos] || '';
       return `<button type="button" class="btn btn-outline-primary cb-destination" data-cb-destination="${esc(pos)}"><span>${esc(pos)}</span><small>${occupant ? `Currently ${esc(occupant)}` : 'Open position'}</small></button>`;
     }).join('')}</div>`;
@@ -909,10 +910,9 @@
       button.addEventListener('click', () => moveOrAsk(player.name, button.dataset.cbDestination));
     });
 
-    // Bench: the coach says what happens at the vacated spot (leave it
-    // open, or who plays it) -- the same decision as dragging to Bench.
+    // Bench is an obvious one-step move: the old position stays open.
     body.querySelector('[data-cb-bench-current]')?.addEventListener('click', () => {
-      askOccupiedMove(player, source, 'BENCH');
+      closeMoveSheetThen(() => saveMove(player.id, 'BENCH', player.name));
     });
     bootstrap.Modal.getOrCreateInstance(modal).show();
   }
@@ -928,19 +928,19 @@
     const player = playerForName(name);
     const target = String(destination || '').toUpperCase();
     if (!player || !target) return;
+
     const alignment = currentAlignment();
     const source = Object.entries(alignment)
       .find(([, assigned]) => assigned === name)?.[0] || 'BENCH';
+
     if (source === 'P' || target === 'P') {
       bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
       $('liveChangePitcherBtn')?.click();
       return;
     }
-    const occupant = alignment[target];
-    if (occupant && occupant !== name) {
-      askOccupiedMove(player, source, target);
-      return;
-    }
+
+    // Resolve the obvious move immediately:
+    // open spot = move, occupied spot = swap, Bench = leave the old spot open.
     closeMoveSheetThen(() => saveMove(player.id, target, name));
   }
 
@@ -1320,18 +1320,16 @@
   // An occupied destination is the coach's decision -- askOccupiedMove.
   async function saveMove(playerId, destination, name) {
     if (moveBusy) return;
-    const occupying = currentAlignment()[String(destination || '').toUpperCase()];
-    if (occupying && occupying !== name) {
-      moveOrAsk(name, destination);
-      return;
-    }
+
     moveBusy = true;
     saveMode = 'saving';
     saveMessage = 'Saving…';
     lastFailedMove = null;
     quickDefenseSignature = '';
+
     const shell = document.querySelector('#live-game-overlay .coach-live-shell');
     if (shell) renderQuickDefense(shell);
+
     try {
       const player = (state?.roster || []).find(
         candidate => Number(candidate.id) === Number(playerId)
@@ -1348,33 +1346,42 @@
         .find(([, assigned]) => assigned === player.name)?.[0] || 'BENCH';
       const target = String(destination || '').toUpperCase();
 
-      if (!target || target === 'P') {
+      if (!target || source === 'P' || target === 'P') {
         throw new Error(
           'Use Change Pitcher for changes involving P.'
         );
       }
 
-      if (target === 'BENCH') {
-        throw new Error(
-          'Choose Bench from the move sheet so CoachBoard can fill the open position.'
-        );
-      }
-
       if (source === target) {
         throw new Error(
-          `${player.name} is already playing ${target}.`
+          source === 'BENCH'
+            ? `${player.name} is already on the bench.`
+            : `${player.name} is already playing ${target}.`
         );
       }
 
-      if (alignment[target] && alignment[target] !== player.name) {
-        throw new Error(STALE_MOVE_MESSAGE);
-      }
+      const occupant =
+        target === 'BENCH'
+          ? ''
+          : (alignment[target] || '');
 
       if (source !== 'BENCH') {
         delete alignment[source];
       }
 
-      alignment[target] = player.name;
+      if (target !== 'BENCH') {
+        alignment[target] = player.name;
+
+        // Field-to-field occupied move = swap. Bench-to-field occupied move
+        // = the fielder being replaced goes to the bench.
+        if (
+          occupant &&
+          occupant !== player.name &&
+          source !== 'BENCH'
+        ) {
+          alignment[source] = occupant;
+        }
+      }
 
       const response = await fetch(`/api/live-game/${gameId}/defense-edit`, {
         method: 'POST',
@@ -1384,7 +1391,9 @@
           base_sequence: sequenceFromState(),
         }),
       });
+
       const data = await response.json().catch(() => ({}));
+
       if (!response.ok || data.status === 'error') {
         if (
           data.code === 'stale_live_state' ||
@@ -1398,6 +1407,7 @@
           `Unable to save defense (${response.status}).`
         );
       }
+
       await applyQuickDefenseSaveResponse(data);
 
       lastFailureKind = null;
