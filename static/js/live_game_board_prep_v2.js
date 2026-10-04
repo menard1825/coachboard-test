@@ -12,6 +12,7 @@
   const STYLE_ID = 'live-next-defense-styles';
   const PITCH_MODAL_ID = 'cbNextPitchingChange';
   const OPEN_PICKER_ID = 'cbNextOpenPositionPicker';
+  const BACKDROP_ID = 'cbNextSheetBackdrop';
 
   let latest = null;
   let draft = {};
@@ -76,6 +77,7 @@
   let pitchSummary = null;
   let socketBound = false;
   let dragSurface = null;
+  let undoBusy = false;
 
   const $ = id => document.getElementById(id);
 
@@ -1263,12 +1265,15 @@
 
       }
 
-      body.cb-next-sheet-open::after{
-        content:"";
+      #${BACKDROP_ID}{
         position:fixed;
         inset:0;
         z-index:1085;
         background:rgba(16,24,40,.38);
+      }
+
+      #${BACKDROP_ID}[hidden]{
+        display:none!important;
       }
 
       #${CARD_ID}{
@@ -2094,6 +2099,14 @@
       );
     }
 
+    let backdrop = $(BACKDROP_ID);
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.id = BACKDROP_ID;
+      backdrop.hidden = true;
+      $('live-game-overlay')?.appendChild(backdrop);
+    }
+
     if (!$(PLAN_CARD_ID)) {
       const planCard = document.createElement('div');
       planCard.id = PLAN_CARD_ID;
@@ -2426,6 +2439,7 @@
     const now = $('cbQuickDefense');
     const next = $(CARD_ID);
     const plan = $(PLAN_CARD_ID);
+    const backdrop = $(BACKDROP_ID);
     const planning = activeView === 'next';
 
     switcher
@@ -2450,10 +2464,9 @@
       plan.hidden = true;
     }
 
-    document.body.classList.toggle(
-      'cb-next-sheet-open',
-      planning
-    );
+    if (backdrop) {
+      backdrop.hidden = !planning;
+    }
 
     syncLiveActions();
   }
@@ -3901,12 +3914,30 @@
       return;
     }
 
-    // Moving onto an occupied position: the coach decides where that
-    // player goes. Nothing is swapped or benched automatically.
+    // Keep the planning board consistent with the live field:
+    // field -> occupied swaps; bench -> occupied benches the displaced player.
     const occupant = board[target] || '';
     if (target !== 'P' && occupant && occupant !== name) {
-      renderCard();
-      askDisplaced(board, name, source, target);
+      const next = {...board};
+
+      if (source && source !== 'BENCH') {
+        next[source] = occupant;
+      }
+
+      next[target] = name;
+
+      const displacedTo =
+        source && source !== 'BENCH'
+          ? source
+          : 'BENCH';
+
+      commitLocalChange(
+        next,
+        {
+          message:
+            `${playerLabel(name)} → ${target} · ${playerLabel(occupant)} → ${displacedTo} ✓`,
+        }
+      );
       return;
     }
 
@@ -4373,47 +4404,60 @@
   }
 
   function canUndoNext() {
-    return !conflictPending && Boolean(latest?.confirmed?.previous || dirty || activeSavePromise);
+    return !undoBusy &&
+      !conflictPending &&
+      Boolean(latest?.confirmed?.previous || dirty || activeSavePromise);
   }
 
   // Back to the defense as it was saved before the last save. A change
   // still saving goes out first, so Undo takes back that one.
   async function undoNext() {
     if (!canUndoNext()) return;
-    if (dirty || activeSavePromise) {
-      try {
-        await flushPendingSave();
-      } catch (error) {
+
+    undoBusy = true;
+    renderCard();
+
+    try {
+      if (dirty || activeSavePromise) {
+        try {
+          await flushPendingSave();
+        } catch (error) {
+          return;
+        }
+      }
+
+      const previous = latest?.confirmed?.previous;
+
+      if (!previous?.alignment || conflictPending) {
         return;
       }
-    }
-    const previous = latest?.confirmed?.previous;
-    if (!previous?.alignment || conflictPending) {
-      renderCard();
-      return;
-    }
 
-    undoBaseRevision = latest?.confirmed?.revision ?? null;
-    const before = snapshot();
-    const restored = normalize(previous.alignment);
-    const back = positions()
-      .filter(pos => (before[pos] || '') !== (restored[pos] || ''))
-      .map(pos => (restored[pos] ? `${restored[pos]} back at ${pos}` : `${pos} open again`));
-    const inning = inningOrdinal(latest?.next_inning || '');
-    const saving = commitLocalChange(
-      restored,
-      {
-        mode: 'undo',
-        source: previous.source || 'custom',
-        message: 'Restored ✓',
-      }
-    );
-    // Say what came back, after commitLocalChange cleared the last note.
-    undoNote =
-      `Undid your last change to the ${inning}` +
-      (back.length ? `: ${back.slice(0, 3).join('; ')}${back.length > 3 ? '; …' : ''}.` : '.');
-    renderCard();
-    return saving;
+      undoBaseRevision = latest?.confirmed?.revision ?? null;
+      const before = snapshot();
+      const restored = normalize(previous.alignment);
+      const back = positions()
+        .filter(pos => (before[pos] || '') !== (restored[pos] || ''))
+        .map(pos => (restored[pos] ? `${restored[pos]} back at ${pos}` : `${pos} open again`));
+      const inning = inningOrdinal(latest?.next_inning || '');
+
+      await commitLocalChange(
+        restored,
+        {
+          mode: 'undo',
+          source: previous.source || 'custom',
+          message: 'Restored ✓',
+        }
+      );
+
+      // Say what came back after the server has confirmed the undo. Its
+      // response clears confirmed.previous, so the button disables at once.
+      undoNote =
+        `Undid your last change to the ${inning}` +
+        (back.length ? `: ${back.slice(0, 3).join('; ')}${back.length > 3 ? '; …' : ''}.` : '.');
+    } finally {
+      undoBusy = false;
+      renderCard();
+    }
   }
 
   function showError(message) {
@@ -4464,7 +4508,9 @@
       $(SWITCH_ID)?.remove();
       $(CARD_ID)?.remove();
       $(PLAN_CARD_ID)?.remove();
+      $(BACKDROP_ID)?.remove();
       $('cbNextOpenWarning')?.remove();
+      undoBusy = false;
 
       const now = $('cbQuickDefense');
 
@@ -4632,6 +4678,7 @@
     selected = null;
     selectedPosition = '';
     undoNote = '';
+    undoBusy = false;
     conflictPending = false;
     conflictLoaded = false;
     errorMessage = '';
@@ -4853,6 +4900,19 @@
     // Back online: read the server now instead of at the next poll, which
     // also sends any Next Inning changes still waiting to sync.
     window.addEventListener('online', () => refresh({changed: true}));
+
+    window.addEventListener('keydown', event => {
+      if (
+        event.key !== 'Escape' ||
+        activeView !== 'next' ||
+        document.querySelector('.modal.show')
+      ) {
+        return;
+      }
+
+      activeView = 'now';
+      applyView();
+    });
 
     registerDragSurface();
 
