@@ -609,49 +609,25 @@
     style.id = STYLE_ID;
     style.textContent = `
       #${SWITCH_ID}{
-        display:grid;
-        grid-template-columns:1fr 1fr 1fr;
-        gap:4px;
-        padding:4px;
+        display:flex;
+        justify-content:flex-end;
+        padding:0;
         margin:0 0 8px;
-        border:1px solid #d7dde5;
-        border-radius:12px;
-        background:#e9edf2;
+        border:0;
+        background:transparent;
       }
 
-      /* Three labelled tabs are much tighter than the old two, so the
-         buttons give back some horizontal padding and a little type size
-         to keep "On the Field" on one line at phone width. */
       #${SWITCH_ID} .btn{
-        min-height:42px;
-        padding:6px 6px;
-        border:0!important;
-        border-radius:9px!important;
-        background:transparent;
-        color:#475467;
-        font-size:.85rem;
-        font-weight:900;
+        min-height:44px;
+        padding:8px 12px;
+        border:1px solid #c7ced8!important;
+        border-radius:10px!important;
+        background:#fff;
+        color:#344054;
+        font-size:.82rem;
+        font-weight:850;
         line-height:1.2;
         box-shadow:none!important;
-      }
-
-      #${SWITCH_ID} .btn.active{
-        background:#172033!important;
-        color:#fff!important;
-      }
-
-      #${SWITCH_ID} [data-now-next="next"]{
-        font-size:.8rem;
-        white-space:nowrap;
-        letter-spacing:-.01em;
-      }
-
-      @media(max-width:390px){
-        #${SWITCH_ID} [data-now-next="next"]{
-          font-size:.73rem;
-          padding-left:3px;
-          padding-right:3px;
-        }
       }
 
       /* Pregame Plan: the coach's plan as a reference next to what the game
@@ -1287,17 +1263,41 @@
 
       }
 
+      body.cb-next-sheet-open::after{
+        content:"";
+        position:fixed;
+        inset:0;
+        z-index:1085;
+        background:rgba(16,24,40,.38);
+      }
+
       #${CARD_ID}{
+        position:fixed;
+        left:50%;
+        right:auto;
+        bottom:0;
+        z-index:1090;
+        width:min(100%,960px);
+        max-height:90dvh;
+        overflow:auto;
+        transform:translateX(-50%);
         border:1.5px solid #cfd6df;
-        border-radius:14px;
+        border-radius:18px 18px 0 0;
         background:#fff;
-        overflow:hidden;
-        margin:0 0 10px;
-        box-shadow:0 2px 7px rgba(16,24,40,.08);
+        margin:0;
+        box-shadow:0 -10px 32px rgba(16,24,40,.22);
       }
 
       #${CARD_ID}[hidden]{
         display:none!important;
+      }
+
+      @media(min-width:760px){
+        #${CARD_ID}{
+          bottom:18px;
+          max-height:88dvh;
+          border-radius:18px;
+        }
       }
 
       #${CARD_ID} .cb-next-head{
@@ -2037,25 +2037,15 @@
       );
       switcher.setAttribute(
         'aria-label',
-        'Defense on the field, next inning, and the pregame plan'
+        'Plan the next inning'
       );
 
       switcher.innerHTML = `
         <button
           type="button"
-          class="btn"
-          data-now-next="now"
-        >On the Field</button>
-        <button
-          type="button"
-          class="btn"
+          class="btn btn-outline-secondary"
           data-now-next="next"
-        >Next Inning</button>
-        <button
-          type="button"
-          class="btn"
-          data-now-next="plan"
-        >Pregame Plan</button>`;
+        ><i class="bi bi-calendar2-plus me-1"></i> Plan next inning</button>`;
 
       now.insertAdjacentElement(
         'beforebegin',
@@ -2073,20 +2063,8 @@
 
           const requested = button.dataset.nowNext;
 
-          activeView =
-            requested === 'next' || requested === 'plan'
-              ? requested
-              : 'now';
-
-          // Only toggles visibility. Pregame Plan is reference data that is
-          // already in `latest`, so opening it must never fetch or save --
-          // but it is drawn now rather than on the next background refresh.
+          activeView = requested === 'next' ? 'next' : 'now';
           applyView();
-
-          if (activeView === 'plan' && latest) {
-            ensureSurface();
-            renderPlanCard();
-          }
         }
       );
     }
@@ -2248,8 +2226,8 @@
       );
 
     const tabText = inningLabel
-      ? `${inningLabel} Inning`
-      : 'Next Inning';
+      ? `Plan ${inningLabel} inning`
+      : 'Plan next inning';
 
     if (nextTab && nextTab.textContent !== tabText) {
       nextTab.textContent = tabText;
@@ -2325,59 +2303,47 @@
     const endInning = $('liveEndInningBtn');
     const undo = $('liveUndoBtn');
     const actionSlot = $('coach-action-slot');
+    const planning = activeView !== 'now';
 
     syncUpcomingInningLabels();
 
     if (actionSlot) {
       actionSlot.removeAttribute('hidden');
+      if (planning) {
+        actionSlot.style.setProperty('display', 'none', 'important');
+      } else {
+        actionSlot.style.removeProperty('display');
+      }
+      actionSlot.classList.remove('cb-single-live-action');
     }
 
     if (endInning) {
       endInning.removeAttribute('hidden');
-      if (endInning.classList.contains('d-none')) {
-        endInning.classList.remove('d-none');
-      }
+      endInning.classList.remove('d-none');
     }
 
-    // On the Field owns two live actions. NEXT and Pregame Plan hide
-    // Change Pitcher, so their phone dock should become one full-width
-    // End Inning action instead of leaving an empty grid column.
-    actionSlot?.classList.toggle(
-      'cb-single-live-action',
-      activeView === 'next' || activeView === 'plan'
-    );
-
-    // NEXT edits pitcher directly on the defensive board, and Pregame Plan
-    // is a reference view that must offer no way to change anything.
     if (changePitcher) {
-      if (activeView === 'next' || activeView === 'plan') {
-        changePitcher.style.setProperty(
-          'display',
-          'none',
-          'important'
-        );
+      if (planning) {
+        changePitcher.style.setProperty('display', 'none', 'important');
       } else {
         changePitcher.style.removeProperty('display');
       }
     }
 
-    // Keep the canonical Undo button in its original DOM location.
-    // NEXT only controls whether that button can currently be used;
-    // Pregame Plan has nothing of its own to undo.
+    // The canonical Undo always means the last committed LIVE action.
+    // Next-inning planning gets its own Undo inside the sheet.
     if (undo) {
-      if (activeView === 'plan') {
-        undo.disabled = true;
-      } else {
-        undo.disabled =
-          activeView === 'next'
-            ? !canUndoNext()
-            : false;
+      if (undo.dataset.cbUndoScope !== 'live') {
+        undo.dataset.cbUndoScope = 'live';
+        document.dispatchEvent(
+          new CustomEvent('coachboard:undo-scope', {detail: {scope: 'live'}})
+        );
       }
-      // Which Undo this is: the header names it (live_game_dugout_mode).
-      const scope = activeView === 'next' ? 'next' : 'live';
-      if (undo.dataset.cbUndoScope !== scope) {
-        undo.dataset.cbUndoScope = scope;
-        document.dispatchEvent(new CustomEvent('coachboard:undo-scope', {detail: {scope}}));
+      undo.disabled = false;
+      if (planning) {
+        undo.style.setProperty('display', 'none', 'important');
+      } else {
+        undo.style.removeProperty('display');
       }
     }
 
@@ -2423,27 +2389,19 @@
 
   function syncOpenDefenseWarning(endInning) {
     const open = latest ? openPositions() : [];
-    const now = latest ? currentOpenPositions() : [];
-    const current = inningOrdinal(latest?.current_inning || '');
+
+    // An empty spot on the live field is visible state, not another workflow.
+    $('cbNowOpenWarning')?.remove();
 
     if (!endInning) {
-      $('cbNowOpenWarning')?.remove();
       $('cbNextOpenWarning')?.remove();
-      document.body.classList.remove('cb-next-open-warning', 'cb-now-open-warning');
+      document.body.classList.remove(
+        'cb-next-open-warning',
+        'cb-now-open-warning'
+      );
       return;
     }
 
-    const showsNow = warningLine(
-      'cbNowOpenWarning',
-      endInning,
-      now.length
-        ? `⚠ Empty now (${current} inning): ${now.join(', ')} · Tap to fix`
-        : '',
-      () => {
-        window.CBNextDefense?.showNow?.();
-        window.CBQuickField?.fillOpen?.(now[0]);
-      }
-    );
     const showsNext = warningLine(
       'cbNextOpenWarning',
       endInning,
@@ -2453,18 +2411,14 @@
       () => {
         activeView = 'next';
         applyView();
-        askOpenPosition(open[0]);
       }
     );
-    // Keep the order: the field now above the next inning.
-    const nowLine = $('cbNowOpenWarning');
-    const nextLine = $('cbNextOpenWarning');
-    if (nowLine && nextLine && nowLine.nextElementSibling !== nextLine) {
-      nextLine.parentNode.insertBefore(nowLine, nextLine);
-    }
 
-    document.body.classList.toggle('cb-next-open-warning', showsNow || showsNext);
-    document.body.classList.toggle('cb-now-open-warning', showsNow && showsNext);
+    document.body.classList.toggle(
+      'cb-next-open-warning',
+      showsNext
+    );
+    document.body.classList.remove('cb-now-open-warning');
   }
 
   function applyView() {
@@ -2472,35 +2426,34 @@
     const now = $('cbQuickDefense');
     const next = $(CARD_ID);
     const plan = $(PLAN_CARD_ID);
+    const planning = activeView === 'next';
 
     switcher
       ?.querySelectorAll('[data-now-next]')
       .forEach(button => {
-        const isActive =
-          button.dataset.nowNext === activeView;
-
-        button.classList.toggle(
-          'active',
-          isActive
-        );
-
         button.setAttribute(
           'aria-pressed',
-          isActive ? 'true' : 'false'
+          planning ? 'true' : 'false'
         );
       });
 
+    // The live field remains the context. Planning opens over it.
     if (now) {
-      now.hidden = activeView !== 'now';
+      now.hidden = false;
     }
 
     if (next) {
-      next.hidden = activeView !== 'next';
+      next.hidden = !planning;
     }
 
     if (plan) {
-      plan.hidden = activeView !== 'plan';
+      plan.hidden = true;
     }
+
+    document.body.classList.toggle(
+      'cb-next-sheet-open',
+      planning
+    );
 
     syncLiveActions();
   }
@@ -3131,6 +3084,20 @@
       </div>
 
       <div class="cb-next-body">
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            data-next-close
+          ><i class="bi bi-chevron-down me-1"></i> Back to live field</button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            data-next-undo-local
+            ${canUndoNext() ? '' : 'disabled'}
+          ><i class="bi bi-arrow-counterclockwise me-1"></i> Undo plan edit</button>
+        </div>
+
         ${fieldMarkup()}
 
         ${benchMarkup()}
@@ -3194,6 +3161,19 @@
             : ''
         }
       </div>`;
+
+    card
+      .querySelector('[data-next-close]')
+      ?.addEventListener('click', () => {
+        activeView = 'now';
+        applyView();
+      });
+
+    card
+      .querySelector('[data-next-undo-local]')
+      ?.addEventListener('click', () => {
+        undoNext();
+      });
 
     card
       .querySelectorAll('[data-next-position]')
@@ -4876,28 +4856,6 @@
 
     registerDragSurface();
 
-    window.addEventListener(
-      'click',
-      event => {
-        const undo = event.target.closest?.(
-          '#liveUndoBtn'
-        );
-
-        if (
-          !undo ||
-          activeView !== 'next'
-        ) {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-
-        undoNext();
-      },
-      true
-    );
   };
 
   document.readyState === 'loading'
