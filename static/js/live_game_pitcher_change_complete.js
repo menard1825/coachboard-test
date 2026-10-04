@@ -229,28 +229,18 @@
   }
 
   /*
-   * "Graham is going in to pitch. Where should Pat go?"
+   * One question after choosing the incoming pitcher:
+   * "Where should the old pitcher go?"
    *
-   * Then, only if the coach sends Pat to an occupied position:
-   * "Pat is moving to 1B. Riggins is at 1B. Where should Riggins go?" --
-   * and so on until every displaced player has a place the coach chose.
-   *
-   * The pending change is built locally; nothing is saved while the
-   * question is open. CoachBoard offers open positions, "another
-   * position…" and the bench, but never decides for the coach: an
-   * occupied position is only taken when the coach picks it, and its
-   * player is always asked about next -- never benched or swapped
-   * automatically.
-   *
-   * No loops: a player the chain has already placed (the new pitcher, or
-   * anyone moved in this change) is never offered as a target again, so
-   * every step either ends the chain or brings in a player not yet moved.
-   * A chain of more than one move is shown as its resulting field before
-   * it is made.
+   * Every button names the complete defensive consequence. An occupied
+   * destination is a three-player rotation when the incoming pitcher left
+   * a field spot, or benches the displaced fielder when the incoming pitcher
+   * came from the bench. Nothing is hidden behind a generic "Swap" label.
    *
    * Resolves with the chosen alignment and message, or null for Cancel,
    * or {stale: true} when the field changed underneath the question.
    */
+
   function askOutgoingDestination({
     incoming,
     oldPitcher,
@@ -361,18 +351,23 @@
       // Bench is always valid. If the incoming pitcher left a field position,
       // that spot simply remains open.
       buttons.push(
-        choose(`Bench ${oldPitcher}`, () => {
-          const alignment = {...base};
-          const opened = incomingPosition
-            ? ` · ${incomingPosition} open`
-            : '';
+        choose(
+          incomingPosition
+            ? `Bench ${oldPitcher} · ${incomingPosition} open`
+            : `Bench ${oldPitcher}`,
+          () => {
+            const alignment = {...base};
+            const opened = incomingPosition
+              ? ` · ${incomingPosition} open`
+              : '';
 
-          return {
-            alignment,
-            message:
-              `${incoming.name} is pitching · ${oldPitcher} to Bench${opened}`,
-          };
-        }),
+            return {
+              alignment,
+              message:
+                `${incoming.name} is pitching · ${oldPitcher} to Bench${opened}`,
+            };
+          },
+        ),
       );
 
       // Open spots are one-tap destinations.
@@ -386,30 +381,32 @@
         );
       });
 
-      // Occupied destinations are also one decision. The outgoing pitcher
-      // takes the spot; the displaced fielder fills the incoming pitcher's
-      // vacated spot when there is one, otherwise goes to the bench.
+      // Occupied destinations stay one decision, but the button names
+      // the complete result so a coach never has to infer who moves or sits.
       occupiedSpots.forEach(pos => {
         const displaced = base[pos];
+        const displacedTo =
+          incomingPosition &&
+          incomingPosition !== pos &&
+          !base[incomingPosition]
+            ? incomingPosition
+            : 'Bench';
+
+        const label =
+          `${oldPitcher} → ${pos} · ${displaced} → ${displacedTo}`;
 
         buttons.push(
-          choose(`Swap with ${displaced} at ${pos}`, () => {
+          choose(label, () => {
             const alignment = {...base, [pos]: oldPitcher};
-            let tail = `${displaced} to Bench`;
 
-            if (
-              incomingPosition &&
-              incomingPosition !== pos &&
-              !alignment[incomingPosition]
-            ) {
-              alignment[incomingPosition] = displaced;
-              tail = `${displaced} to ${incomingPosition}`;
+            if (displacedTo !== 'Bench') {
+              alignment[displacedTo] = displaced;
             }
 
             return {
               alignment,
               message:
-                `${incoming.name} is pitching · ${oldPitcher} to ${pos} · ${tail}`,
+                `${incoming.name} is pitching · ${oldPitcher} to ${pos} · ${displaced} to ${displacedTo}`,
             };
           }),
         );
