@@ -251,7 +251,14 @@
    * Resolves with the chosen alignment and message, or null for Cancel,
    * or {stale: true} when the field changed underneath the question.
    */
-  function askOutgoingDestination({incoming, oldPitcher, incomingPosition, before, sequence, positions}) {
+  function askOutgoingDestination({
+    incoming,
+    oldPitcher,
+    incomingPosition,
+    before,
+    sequence,
+    positions,
+  }) {
     const modal = questionModal();
     const instance = bootstrap.Modal.getOrCreateInstance(modal);
     const list = modal.querySelector('[data-pc-choices]');
@@ -260,41 +267,14 @@
     const summaryEl = modal.querySelector('[data-pc-summary]');
 
     const spots = positions.filter(pos => pos !== 'P');
-    const draft = {...before, P: incoming.name};
-    if (incomingPosition) delete draft[incomingPosition];
+    const base = {...before, P: incoming.name};
 
-    // Moves the coach has decided, in order: {name, to} (to = a position
-    // or 'Bench'). Players placed by this change are never moved again.
-    const moves = [];
-    const placed = new Set([incoming.name]);
+    if (incomingPosition) {
+      delete base[incomingPosition];
+    }
 
-    const openSpots = () => spots.filter(pos => !draft[pos]);
-    const openNote = () => {
-      const open = openSpots();
-      if (!open.length) return '';
-      return ` · ${open.join(', ')} ${open.length === 1 ? 'is' : 'are'} open`;
-    };
-    // Occupied positions whose player this change has not moved yet.
-    const takenSpots = () => spots.filter(
-      pos => draft[pos] && !placed.has(draft[pos])
-    );
-
-    const message = () =>
-      `${incoming.name} is pitching · ` +
-      moves.map(move => `${move.name} to ${move.to}`).join(' · ') +
-      openNote();
-
-    const lines = () => [
-      `${incoming.name} → P` +
-        (incomingPosition ? ` (from ${incomingPosition})` : ' (from Bench)'),
-      ...moves.map(move => {
-        const from = Object.entries(before).find(
-          ([pos, name]) => name === move.name
-        )?.[0] || 'Bench';
-        return `${move.name}: ${from} → ${move.to}`;
-      }),
-      ...openSpots().map(pos => `${pos}: open`),
-    ];
+    const openSpots = spots.filter(pos => !base[pos]);
+    const occupiedSpots = spots.filter(pos => base[pos]);
 
     return new Promise(resolve => {
       let answer = null;
@@ -303,20 +283,23 @@
       let closed;
       const whenClosed = new Promise(done => { closed = done; });
 
-      // Bootstrap ignores hide() while the modal is still fading in.
-      modal.addEventListener('shown.bs.modal', () => {
-        if (stale || decided) instance.hide();
-      }, {once: true});
+      modal.addEventListener(
+        'shown.bs.modal',
+        () => {
+          if (stale || decided) instance.hide();
+        },
+        {once: true},
+      );
 
-      // The official field moved on (another coach, an Undo) while the
-      // coach was deciding: this answer no longer applies to it.
       const onLiveChange = event => {
         const detail = event.detail || {};
         if (Number(detail.game_id) !== gameId) return;
+
         const next = detail.state || detail;
         const nextSequence = detail.state
           ? sequenceFromState(detail.state)
           : Number(detail.sequence);
+
         if (
           !sameField(next.current_alignment, before) ||
           (Number.isFinite(nextSequence) && nextSequence !== sequence)
@@ -330,165 +313,116 @@
       document.addEventListener('coachboard:live-delta', onLiveChange);
       document.addEventListener('coachboard:live-state', onLiveChange);
 
-      modal.addEventListener('hidden.bs.modal', () => {
-        document.removeEventListener('coachboard:live-delta', onLiveChange);
-        document.removeEventListener('coachboard:live-state', onLiveChange);
-        closed();
-        resolve(answer);
-      }, {once: true});
+      modal.addEventListener(
+        'hidden.bs.modal',
+        () => {
+          document.removeEventListener('coachboard:live-delta', onLiveChange);
+          document.removeEventListener('coachboard:live-state', onLiveChange);
+          closed();
+          resolve(answer);
+        },
+        {once: true},
+      );
 
-      // The coach's decision is saved at once, not after the question has
-      // faded out: its buttons stop answering (no second tap) and the
-      // caller stays busy until the question has gone (decision.closed).
-      // The server still refuses it if the field moved on meanwhile
-      // (base_sequence). Cancel resolves when the question has gone.
       const finish = value => {
         if (decided) return;
         answer = value;
+
         if (value) {
           decided = true;
-          list.querySelectorAll('button').forEach(button => { button.disabled = true; });
+          list.querySelectorAll('button').forEach(button => {
+            button.disabled = true;
+          });
           resolve({...value, closed: whenClosed});
         }
+
         instance.hide();
       };
 
-      // When the coach last pressed inside the question (pointer taps).
-      let pressedAt = -Infinity;
-      modal.addEventListener('pointerdown', () => { pressedAt = performance.now(); }, true);
-      let steps = 0;
-
-      // One step of the conversation: a title, a question, buttons.
-      const render = (title, question, buttons, summary = []) => {
-        const shownAt = performance.now();
-        const replacesAStep = steps > 0;
-        steps += 1;
-        // data-pc-ready says when this step takes answers (assistive tech, tests).
-        const step = steps;
-        list.dataset.pcReady = String(!replacesAStep);
-        if (replacesAStep) {
-          window.setTimeout(() => { if (steps === step) list.dataset.pcReady = 'true'; }, STEP_GUARD_MS);
-        }
-        const deliberate = event => !replacesAStep || (
-          performance.now() - shownAt >= STEP_GUARD_MS &&
-          // A keyboard activation has no press (detail 0).
-          (event.detail === 0 || pressedAt >= shownAt)
-        );
-        titleEl.textContent = title;
-        questionEl.textContent = question;
-        summaryEl.replaceChildren(...summary.map(text => {
-          const item = document.createElement('li');
-          item.textContent = text;
-          return item;
-        }));
-        summaryEl.hidden = !summary.length;
-        list.replaceChildren(...buttons.map(([label, className, onChoose]) => {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = `btn ${className}`;
-          button.textContent = label;
-          button.addEventListener('click', event => {
-            if (!deliberate(event)) return;
-            // An answer given after the field changed is not applied.
-            if (stale) {
-              instance.hide();
-              return;
-            }
-            onChoose();
-          });
-          return button;
-        }));
+      const choose = (label, build) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-outline-primary';
+        button.textContent = label;
+        button.addEventListener('click', () => {
+          if (stale || decided) return;
+          finish(build());
+        });
+        return button;
       };
 
-      const cancel = ['Cancel', 'btn-outline-secondary', () => finish(null)];
+      titleEl.textContent = `${incoming.name} is going in to pitch`;
+      questionEl.textContent = `Where should ${oldPitcher} go?`;
+      summaryEl.hidden = true;
+      summaryEl.replaceChildren();
 
-      const resolved = () => {
-        const result = {alignment: {...draft}, message: message()};
-        // One move is the tap the coach just made; a chain is shown as
-        // the field it produces before anything is changed.
-        if (moves.length === 1) {
-          finish(result);
-          return;
-        }
-        render(
-          'Check the pitching change',
-          'This is the field after the change:',
-          [
-            ['Make this change', 'btn-primary', () => finish(result)],
-            cancel,
-          ],
-          lines(),
-        );
-      };
+      const buttons = [];
 
-      const place = (name, to) => {
-        if (to !== 'Bench') draft[to] = name;
-        placed.add(name);
-        moves.push({name, to});
-      };
+      // Bench is always valid. If the incoming pitcher left a field position,
+      // that spot simply remains open.
+      buttons.push(
+        choose(`Bench ${oldPitcher}`, () => {
+          const alignment = {...base};
+          const opened = incomingPosition
+            ? ` · ${incomingPosition} open`
+            : '';
 
-      // "Where should <name> go?"
-      const ask = (name, title, question) => {
-        const buttons = openSpots().map(pos => [
-          `Put ${name} at ${pos}`,
-          'btn-outline-primary',
-          () => {
-            place(name, pos);
-            resolved();
-          },
-        ]);
-        if (takenSpots().length) {
-          buttons.push([
-            `Move ${name} to another position…`,
-            'btn-outline-primary',
-            () => choosePosition(name, title, question),
-          ]);
-        }
-        // Name only the spots this change opens (e.g. the new pitcher's).
-        const opened = openSpots().filter(pos => before[pos]);
-        buttons.push([
-          `Bench ${name}` + (opened.length ? ` · ${opened.join(', ')} open` : ''),
-          'btn-outline-primary',
-          () => {
-            place(name, 'Bench');
-            resolved();
-          },
-        ]);
-        buttons.push(cancel);
-        render(title, question, buttons);
-      };
-
-      // Every position with a player this change hasn't moved, by name.
-      const choosePosition = (name, title, question) => {
-        render(
-          title,
-          `Where should ${name} go?`,
-          [
-            ...takenSpots().map(pos => [
-              `${pos} · ${draft[pos]}`,
-              'btn-outline-primary',
-              () => {
-                const occupant = draft[pos];
-                place(name, pos);
-                ask(
-                  occupant,
-                  `${name} is moving to ${pos}`,
-                  `${occupant} is at ${pos}. Where should ${occupant} go?`,
-                );
-              },
-            ]),
-            ['Back', 'btn-outline-secondary', () => ask(name, title, question)],
-            cancel,
-          ],
-        );
-      };
-
-      ask(
-        oldPitcher,
-        `${incoming.name} is going in to pitch`,
-        `Where should ${oldPitcher} go?`,
+          return {
+            alignment,
+            message:
+              `${incoming.name} is pitching · ${oldPitcher} to Bench${opened}`,
+          };
+        }),
       );
 
+      // Open spots are one-tap destinations.
+      openSpots.forEach(pos => {
+        buttons.push(
+          choose(`${oldPitcher} → ${pos}`, () => ({
+            alignment: {...base, [pos]: oldPitcher},
+            message:
+              `${incoming.name} is pitching · ${oldPitcher} to ${pos}`,
+          })),
+        );
+      });
+
+      // Occupied destinations are also one decision. The outgoing pitcher
+      // takes the spot; the displaced fielder fills the incoming pitcher's
+      // vacated spot when there is one, otherwise goes to the bench.
+      occupiedSpots.forEach(pos => {
+        const displaced = base[pos];
+
+        buttons.push(
+          choose(`Swap with ${displaced} at ${pos}`, () => {
+            const alignment = {...base, [pos]: oldPitcher};
+            let tail = `${displaced} to Bench`;
+
+            if (
+              incomingPosition &&
+              incomingPosition !== pos &&
+              !alignment[incomingPosition]
+            ) {
+              alignment[incomingPosition] = displaced;
+              tail = `${displaced} to ${incomingPosition}`;
+            }
+
+            return {
+              alignment,
+              message:
+                `${incoming.name} is pitching · ${oldPitcher} to ${pos} · ${tail}`,
+            };
+          }),
+        );
+      });
+
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'btn btn-outline-secondary';
+      cancel.textContent = 'Cancel';
+      cancel.addEventListener('click', () => finish(null));
+      buttons.push(cancel);
+
+      list.replaceChildren(...buttons);
       instance.show();
     });
   }
