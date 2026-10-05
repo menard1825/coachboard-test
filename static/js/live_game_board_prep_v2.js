@@ -59,6 +59,8 @@
   // while the saved defense is still that one.
   let ownRevision = null;
   let rejectCount = 0;
+  // Undos the server refused (not this coach's save, or none left).
+  let undoRefusals = 0;
   // Bumped by every local move and every confirmed save, so a poll that was
   // already on its way cannot put an older board back afterwards.
   let localRevision = 0;
@@ -3747,7 +3749,12 @@
             }
           );
         } catch (error) {
-          if (error.code === 'next_prep_conflict') {
+          if (
+            mode === 'undo' &&
+            (error.code === 'next_prep_not_yours' || error.code === 'next_prep_nothing_to_undo')
+          ) {
+            await refuseUndo(error);
+          } else if (error.code === 'next_prep_conflict') {
             await resolveConflict();
           } else if (error.retry) {
             // Keep the coach's board. The poll (and the browser's online
@@ -3863,6 +3870,36 @@
 
   // The server refused the change itself (for example, a player who is no
   // longer available). Put the board back to what the server has.
+  // The server refused an Undo: the save it would take back is another
+  // coach's (or there is none any more). Nothing was undone -- the board goes
+  // back to the server's defense, read fresh, and says so in coach words.
+  async function refuseUndo(error) {
+    dirty = false;
+    localSource = null;
+    undoRefusals += 1;
+    draft = normalize(serverBase || {});
+
+    let data = null;
+    try {
+      data = await api('GET');
+    } catch (_) {
+      data = null;
+    }
+    if (data && data.status !== 'inactive' && data.is_live !== false) {
+      lastSignature = JSON.stringify(data);
+      hydrate(data, {remote: false});
+    }
+
+    errorMessage = '';
+    noticeMessage = error.code === 'next_prep_not_yours'
+      ? NOT_YOURS_TO_UNDO
+      : 'There is no plan change of yours to undo.';
+    // Not "Restored ✓": nothing was.
+    successMessage = 'Saved ✓';
+    setSyncState('saved');
+    renderCard();
+  }
+
   function rejectLocalChange(error) {
     dirty = false;
     localSource = null;
@@ -4693,11 +4730,17 @@
     );
   }
 
+  // Undo takes back this coach's own last plan change: one still saving
+  // (Undo waits for it, then takes it back), or the last saved change when
+  // the server says it is theirs (confirmed.can_undo). Another coach's newer
+  // save is theirs to undo, so the button stays off for it.
   function canUndoNext() {
-    return !undoBusy &&
-      !conflictPending &&
-      Boolean(latest?.confirmed?.previous || dirty || activeSavePromise);
+    if (undoBusy || conflictPending) return false;
+    if (dirty || activeSavePromise) return true;
+    return Boolean(latest?.confirmed?.previous && latest?.confirmed?.can_undo);
   }
+
+  const NOT_YOURS_TO_UNDO = 'That plan was changed by another coach. Nothing was undone.';
 
   // Back to the defense as it was saved before the last save. A change
   // still saving goes out first, so Undo takes back that one.
@@ -4722,6 +4765,13 @@
         return;
       }
 
+      // Another coach saved since this was drawn (or since this coach's own
+      // save settled): their change is not this coach's to undo.
+      if (!latest?.confirmed?.can_undo) {
+        noticeMessage = NOT_YOURS_TO_UNDO;
+        return;
+      }
+
       undoBaseRevision = latest?.confirmed?.revision ?? null;
       const before = snapshot();
       const restored = normalize(previous.alignment);
@@ -4729,6 +4779,8 @@
         .filter(pos => (before[pos] || '') !== (restored[pos] || ''))
         .map(pos => (restored[pos] ? `${restored[pos]} back at ${pos}` : `${pos} open again`));
       const inning = inningOrdinal(latest?.next_inning || '');
+
+      const outcomes = [conflictCount, rejectCount, undoRefusals].join();
 
       await commitLocalChange(
         restored,
@@ -4738,6 +4790,12 @@
           message: 'Restored ✓',
         }
       );
+
+      // Refused or in conflict: nothing was undone, and the board already
+      // says why.
+      if ([conflictCount, rejectCount, undoRefusals].join() !== outcomes) {
+        return;
+      }
 
       // Say what came back after the server has confirmed the undo. Its
       // response clears confirmed.previous, so the button disables at once.

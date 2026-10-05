@@ -46,6 +46,11 @@ class GameNextInningPrep(db.Model):
     previous_source = db.Column(db.String, nullable=True)
     previous_updated_by = db.Column(db.String, nullable=True)
     revision = db.Column(db.Integer, nullable=True, default=0)
+    # Who made the coach save that Undo would take back: the user's id, as
+    # updated_by is only a display name. Undo is "undo my last plan edit",
+    # so only that coach may undo it (_undo_belongs_to). NULL: automatic, an
+    # Undo's result, or saved before this was recorded.
+    updated_by_user_id = db.Column(db.Integer, nullable=True)
     # Whether the coach chose this defense's pitcher (a save that changed P
     # on the board). A saved defense whose pitcher was not chosen (False)
     # follows a live pitching change (_effective_prep); one whose pitcher was
@@ -195,7 +200,30 @@ def prep_alignment(prep):
     return effective if effective is not None else (prep.alignment or {})
 
 
-def _prep_dict(prep):
+def _coach_name(user):
+    """The name a coach's saves are recorded under (updated_by)."""
+    return session.get('full_name') or user.full_name or user.username
+
+
+def _undo_belongs_to(prep, user):
+    """Whether the save Undo would take back is this coach's own.
+
+    Undo next-inning edit means "undo my last plan edit", never "undo
+    whoever saved last": another coach's newer save is theirs to undo.
+    Ownership is the saving coach's user id; a save recorded before ids were
+    kept falls back to the name it was saved under.
+    """
+    if not prep or prep.previous_alignment is None or user is None:
+        return False
+    if prep.updated_by_user_id is not None:
+        return prep.updated_by_user_id == user.id
+    return prep.updated_by not in (None, '', 'Auto') and prep.updated_by == _coach_name(user)
+
+
+NOT_YOURS = 'That plan was changed by another coach. Nothing was undone.'
+
+
+def _prep_dict(prep, viewer=None):
     if not prep:
         return None
     return {
@@ -207,6 +235,9 @@ def _prep_dict(prep):
         'updated_at': prep.updated_at.isoformat() if prep.updated_at else None,
         'revision': int(prep.revision or 0),
         'pitcher_chosen': prep.pitcher_chosen,
+        # Whether this coach may undo the last save: there is one, and it is
+        # theirs (_undo_belongs_to). The server refuses any other Undo.
+        'can_undo': _undo_belongs_to(prep, viewer),
         # What "Undo next-inning edit" would bring back, or None.
         'previous': {
             'alignment': deepcopy(prep.previous_alignment),
@@ -318,6 +349,7 @@ def prep_snapshot(prep):
         'alignment': deepcopy(prep.alignment or {}),
         'source': prep.source,
         'updated_by': prep.updated_by,
+        'updated_by_user_id': prep.updated_by_user_id,
         'revision': int(prep.revision or 0),
         'previous_alignment': deepcopy(prep.previous_alignment),
         'previous_source': prep.previous_source,
@@ -349,6 +381,7 @@ def restore_started_prep(game, team_id, event):
         alignment=deepcopy(snapshot.get('alignment') or event.after_alignment or {}),
         source=snapshot.get('source'),
         updated_by=snapshot.get('updated_by'),
+        updated_by_user_id=snapshot.get('updated_by_user_id'),
         previous_alignment=deepcopy(snapshot.get('previous_alignment')),
         previous_source=snapshot.get('previous_source'),
         previous_updated_by=snapshot.get('previous_updated_by'),
@@ -608,6 +641,17 @@ def next_inning_prep(game_id):
         # the per-game lock in live_game_write_lock.py, which is valid for
         # the single-process eventlet deployment. Moving to multiple workers
         # or processes needs a database/Redis/distributed lock first.
+        # Undo takes back only this coach's own last save. Checked first: a
+        # screen that missed another coach's newer save gets this answer too,
+        # not a generic conflict, and nothing of theirs is undone.
+        if mode == 'undo' and prep is not None and prep.previous_alignment is not None \
+                and not _undo_belongs_to(prep, user):
+            return jsonify({
+                'status': 'error',
+                'code': 'next_prep_not_yours',
+                'message': NOT_YOURS,
+            }), 409
+
         conflict = _next_prep_conflict(data, next_inning, prep, team)
         if not conflict and mode == 'undo':
             conflict = _next_prep_undo_conflict(data, prep)
@@ -625,6 +669,7 @@ def next_inning_prep(game_id):
             if not prep or prep.previous_alignment is None:
                 return jsonify({
                     'status': 'error',
+                    'code': 'next_prep_nothing_to_undo',
                     'message': 'There is no next-inning edit to undo.',
                 }), 409
             cleaned, message = _clean_draft_alignment(prep.previous_alignment, game, team)
@@ -636,6 +681,9 @@ def next_inning_prep(game_id):
             prep.alignment = cleaned
             prep.source = prep.previous_source
             prep.updated_by = prep.previous_updated_by
+            # Nothing is left to undo, and whose the restored defense was is
+            # only known by name.
+            prep.updated_by_user_id = None
             prep.pitcher_chosen = prep.previous_pitcher_chosen
             prep.previous_alignment = None
             prep.previous_source = None
@@ -654,7 +702,8 @@ def next_inning_prep(game_id):
             (current_inning, next_inning, current_alignment, planned_alignment,
              prep, pregame_rotation, actual_rotation) = _next_inning_context(game, team)
             return _next_prep_response(game, team, current_inning, next_inning, current_alignment,
-                                       planned_alignment, prep, pregame_rotation, actual_rotation)
+                                       planned_alignment, prep, pregame_rotation, actual_rotation,
+                                       viewer=user)
 
         if mode == 'current':
             candidate = deepcopy(current_alignment)
@@ -689,11 +738,7 @@ def next_inning_prep(game_id):
                 'message': message,
             }), 409
 
-        updated_by = (
-            session.get('full_name')
-            or user.full_name
-            or user.username
-        )
+        updated_by = _coach_name(user)
         # A pitcher the coach chose: this save changed P from what the board
         # showed, or an earlier save chose it. A fielding edit, "Use inning
         # plan" and "Same defense" do not choose the pitcher. A fielding edit
@@ -724,6 +769,7 @@ def next_inning_prep(game_id):
         prep.alignment = cleaned
         prep.source = source
         prep.updated_by = updated_by
+        prep.updated_by_user_id = user.id
         prep.pitcher_chosen = pitcher_chosen
         prep.revision = int(prep.revision or 0) + 1
         prep.updated_at = datetime.utcnow()
@@ -741,11 +787,12 @@ def next_inning_prep(game_id):
         )
 
     return _next_prep_response(game, team, current_inning, next_inning, current_alignment,
-                               planned_alignment, prep, pregame_rotation, actual_rotation)
+                               planned_alignment, prep, pregame_rotation, actual_rotation,
+                               viewer=user)
 
 
 def _next_prep_response(game, team, current_inning, next_inning, current_alignment,
-                        planned_alignment, prep, pregame_rotation, actual_rotation):
+                        planned_alignment, prep, pregame_rotation, actual_rotation, viewer=None):
     # planned_alignment is the plan as the next inning uses it; the saved one
     # differs only when its pitcher was carried forward (_next_inning_context).
     events = _events(game.id, team.id)
@@ -809,7 +856,7 @@ def _next_prep_response(game, team, current_inning, next_inning, current_alignme
         # Innings already played: how each ended, only where the game
         # recorded it, and who was here that inning (see _played_innings).
         'played_innings': _played_innings(game, team, current_inning),
-        'confirmed': _prep_dict(prep),
+        'confirmed': _prep_dict(prep, viewer),
         'roster': [
             {
                 'id': player.id,
