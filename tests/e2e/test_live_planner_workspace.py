@@ -10,8 +10,10 @@ the live field's Move Player. Now:
   way back (Live Field), the inning, the save state and Undo;
 * the live screen behind it is inert -- no tap, click or Tab reaches it --
   and does not scroll; only the planner scrolls;
-* wider than tall from 700px, or from 1000px, it is two columns: the field
-  sized by the height, the bench and tools beside it; otherwise one column;
+* wider than tall (from 700px) it is two columns: the field sized by the
+  height, the bench and tools beside it; taller than wide -- phones and
+  portrait tablets, however wide -- one column, a large field first;
+* on a big screen the field keeps growing with the height (to ~1030px);
 * focus goes into the planner when it opens and back to the Plan button
   when it closes; Escape closes it unless a dialog is open;
 * dialogs opened from the planner are above it and usable.
@@ -38,7 +40,10 @@ TABLET_PORTRAIT = ('tablet-portrait', {'width': 820, 'height': 1180}, TOUCH)
 TABLET_LANDSCAPE = ('tablet-landscape', {'width': 1180, 'height': 820}, TOUCH)
 ANDROID_LANDSCAPE = ('android-landscape', {'width': 1280, 'height': 800}, TOUCH)
 REPORTED_TABLET = ('reported-tablet', {'width': 1344, 'height': 865}, TOUCH)
+PRO_PORTRAIT = ('pro-portrait', {'width': 1032, 'height': 1376}, TOUCH)
+PRO_LANDSCAPE = ('pro-landscape', {'width': 1376, 'height': 1032}, TOUCH)
 DESKTOP = ('desktop', {'width': 1440, 'height': 900}, {})
+LARGE_DESKTOP = ('large-desktop', {'width': 1920, 'height': 1080}, {})
 
 PLANNER = '#live-board-prep-v3'
 PLAN_BUTTON = '#cb-now-next-switch [data-now-next="next"]'
@@ -162,7 +167,7 @@ def test_only_the_planner_scrolls(live, coachboard_url):
     assert page.cb_errors == []
 
 
-@pytest.mark.parametrize('device', [TABLET_LANDSCAPE, ANDROID_LANDSCAPE, REPORTED_TABLET], ids=ids)
+@pytest.mark.parametrize('device', [TABLET_LANDSCAPE, ANDROID_LANDSCAPE, REPORTED_TABLET, PRO_LANDSCAPE], ids=ids)
 def test_tablet_landscape_is_two_columns(live, coachboard_url, device):
     page = live(device)
     _open_planner(page, coachboard_url)
@@ -181,14 +186,28 @@ def test_tablet_landscape_is_two_columns(live, coachboard_url, device):
     assert page.cb_errors == []
 
 
-def test_tablet_portrait_is_one_column(live, coachboard_url):
-    page = live(TABLET_PORTRAIT)
+# Portrait stays one column however wide: 1032px used to get two columns
+# and a 594px field above 800px of empty screen.
+@pytest.mark.parametrize('device', [TABLET_PORTRAIT, PRO_PORTRAIT], ids=ids)
+def test_tablet_portrait_is_one_column(live, coachboard_url, device):
+    page = live(device)
     _open_planner(page, coachboard_url)
     field = _box(page, f'{PLANNER} .cb-next-field')
     bench = _box(page, f'{PLANNER} .cb-next-bench')
+    tools = _box(page, f'{PLANNER} .cb-next-tools')
     assert bench['y'] >= field['y'] + field['height']
     assert field['width'] >= 0.9 * page.viewport_size['width']
-    assert bench['y'] + bench['height'] <= page.viewport_size['height']
+    assert tools['y'] + tools['height'] <= page.viewport_size['height']
+
+
+def test_a_big_screen_gets_a_bigger_field_that_still_fits(live, coachboard_url):
+    page = live(LARGE_DESKTOP)
+    _open_planner(page, coachboard_url)
+    field = _box(page, f'{PLANNER} .cb-next-field')
+    bench = _box(page, f'{PLANNER} .cb-next-bench')
+    assert field['width'] > 900                          # was 791, capped by the content width
+    assert field['y'] + field['height'] <= page.viewport_size['height']
+    assert bench['x'] >= field['x'] + field['width']
 
 
 @pytest.mark.parametrize('device', [PHONE, REPORTED_TABLET], ids=ids)

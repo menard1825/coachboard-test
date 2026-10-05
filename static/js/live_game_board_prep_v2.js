@@ -1976,11 +1976,13 @@
    *
    * Layout follows the room the planner has, not a device:
    *  - Always full-screen, over the live screen (which is inert meanwhile).
-   *  - One column (field, then bench and tools) while the screen is taller
-   *    than wide and under 1000px.
-   *  - Two columns -- field ~60%, bench/tools ~40% -- from 1000px, or in
-   *    landscape from 700px, where a field sized by the height leaves room
-   *    for a side panel.
+   *  - One column (a large field first, then bench and tools) whenever the
+   *    screen is taller than wide: phones and portrait tablets, however wide.
+   *  - Two columns -- field ~60%, bench/tools ~40% -- when it is wider than
+   *    tall and at least 700px: there the field is sized by the height, which
+   *    leaves room beside it for the side panel.
+   *  - Content up to 1760px wide: on a big screen the field grows with the
+   *    screen's height (about 1030px wide at most) instead of stopping early.
    * The bar wraps onto two rows under 600px; its buttons stay 44px.
    */
   function installWorkspaceStyles() {
@@ -2097,7 +2099,7 @@
           "error";
         gap:10px;
         width:100%;
-        max-width:1360px;
+        max-width:1760px;
         margin:0 auto;
         padding:10px 12px calc(16px + env(safe-area-inset-bottom));
         align-items:start;
@@ -2110,7 +2112,7 @@
 
       #${CARD_ID} .cb-next-field{
         grid-area:field;
-        width:min(100%, 900px, max(300px, calc((100dvh - 330px) * 1.28)));
+        width:min(100%, 1100px, max(300px, calc((100dvh - 330px) * 1.28)));
         margin:0 auto;
       }
 
@@ -2135,7 +2137,7 @@
       }
 
       /* Two columns: the field by the screen's height, the rest beside it. */
-      @media(min-width:1000px), (orientation:landscape) and (min-width:700px){
+      @media(orientation:landscape) and (min-width:700px){
         #${CARD_ID} .cb-next-body{
           grid-template-columns:minmax(0,60fr) minmax(280px,40fr);
           grid-template-areas:
