@@ -12,7 +12,7 @@
   const STYLE_ID = 'live-next-defense-styles';
   const PITCH_MODAL_ID = 'cbNextPitchingChange';
   const OPEN_PICKER_ID = 'cbNextOpenPositionPicker';
-  const BACKDROP_ID = 'cbNextSheetBackdrop';
+  const WORKSPACE_STYLE_ID = 'live-next-workspace-styles';
 
   let latest = null;
   let draft = {};
@@ -78,6 +78,9 @@
   let socketBound = false;
   let dragSurface = null;
   let undoBusy = false;
+  // Plan Next Inning is open (focus moved in) and what it made inert.
+  let plannerOpen = false;
+  const inertByPlanner = new Set();
 
   const $ = id => document.getElementById(id);
 
@@ -605,7 +608,10 @@
   }
 
   function installStyles() {
-    if ($(STYLE_ID)) return;
+    if ($(STYLE_ID)) {
+      installWorkspaceStyles();
+      return;
+    }
 
     const style = document.createElement('style');
     style.id = STYLE_ID;
@@ -1275,71 +1281,16 @@
         overflow:hidden!important;
       }
 
-      #${BACKDROP_ID}{
-        position:fixed;
-        inset:0;
-        z-index:1085;
-        background:rgba(16,24,40,.38);
-        touch-action:none;
-        overscroll-behavior:none;
-      }
-
-      #${BACKDROP_ID}[hidden]{
-        display:none!important;
-      }
-
-      #${CARD_ID}{
-        position:fixed;
-        left:50%;
-        right:auto;
-        bottom:0;
-        z-index:1090;
-        width:min(100%,960px);
-        max-height:90dvh;
-        overflow:auto;
-        overscroll-behavior:contain;
-        -webkit-overflow-scrolling:touch;
-        transform:translateX(-50%);
-        border:1.5px solid #cfd6df;
-        border-radius:18px 18px 0 0;
-        background:#fff;
-        margin:0;
-        box-shadow:0 -10px 32px rgba(16,24,40,.22);
-      }
-
+      /*
+       * Plan Next Inning is a workspace of its own at every size, not a
+       * sheet over the live game: it covers the live screen, which is inert
+       * while it is open (setLiveInert), so nothing needs a backdrop and
+       * nothing of the live game competes with it. Its sticky bar is the way
+       * back. Its layout rules are in WORKSPACE_STYLE_ID, installed after
+       * this sheet so they outrank the older field-size rules below.
+       */
       #${CARD_ID}[hidden]{
         display:none!important;
-      }
-
-      @media(max-width:759.98px){
-        #${CARD_ID}{
-          inset:0;
-          left:0;
-          right:0;
-          bottom:0;
-          width:100%;
-          height:100dvh;
-          max-height:none;
-          transform:none;
-          border:0;
-          border-radius:0;
-          box-shadow:none;
-        }
-
-        #${CARD_ID} .cb-next-head{
-          position:sticky;
-          top:0;
-          z-index:3;
-          background:#fff;
-        }
-      }
-
-      @media(min-width:760px){
-        #${CARD_ID}{
-          bottom:18px;
-          max-height:88dvh;
-          border-radius:18px;
-        }
       }
 
       #${CARD_ID} .cb-next-head{
@@ -2015,6 +1966,216 @@
     `;
 
     document.head.appendChild(style);
+    installWorkspaceStyles();
+  }
+
+  /*
+   * The Plan Next Inning workspace. Installed after the main sheet so its
+   * layout outranks the older field-size rules there (portrait tablet,
+   * landscape owner), which were written for a card inside the live page.
+   *
+   * Layout follows the room the planner has, not a device:
+   *  - Always full-screen, over the live screen (which is inert meanwhile).
+   *  - One column (field, then bench and tools) while the screen is taller
+   *    than wide and under 1000px.
+   *  - Two columns -- field ~60%, bench/tools ~40% -- from 1000px, or in
+   *    landscape from 700px, where a field sized by the height leaves room
+   *    for a side panel.
+   * The bar wraps onto two rows under 600px; its buttons stay 44px.
+   */
+  function installWorkspaceStyles() {
+    if ($(WORKSPACE_STYLE_ID)) return;
+
+    const style = document.createElement('style');
+    style.id = WORKSPACE_STYLE_ID;
+    style.textContent = `
+      /* dugout_mode gives the board a card border with !important. */
+      #${CARD_ID},
+      html body.cb-dugout #${CARD_ID}{
+        position:fixed;
+        inset:0;
+        z-index:1090;
+        width:100%;
+        height:100dvh;
+        max-height:none;
+        margin:0;
+        overflow:auto;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
+        transform:none;
+        border:0!important;
+        border-radius:0!important;
+        box-shadow:none!important;
+        background:#f4f6f9;
+      }
+
+      #${CARD_ID} .cb-next-bar{
+        position:sticky;
+        top:0;
+        z-index:5;
+        display:grid;
+        grid-template-columns:auto minmax(0,1fr) auto auto;
+        grid-template-areas:"back title save undo";
+        align-items:center;
+        gap:8px 10px;
+        padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
+        background:#fff;
+        border-bottom:1px solid #dfe4ea;
+        box-shadow:0 2px 8px rgba(16,24,40,.06);
+      }
+
+      #${CARD_ID} .cb-next-bar .cb-next-back{
+        grid-area:back;
+      }
+
+      #${CARD_ID} .cb-next-bar .cb-next-title{
+        grid-area:title;
+        min-width:0;
+        margin:0;
+        overflow:hidden;
+        white-space:nowrap;
+        text-overflow:ellipsis;
+        font-size:1.1rem;
+      }
+
+      #${CARD_ID} .cb-next-bar .cb-next-save{
+        grid-area:save;
+        justify-self:end;
+      }
+
+      #${CARD_ID} .cb-next-bar .cb-next-undo{
+        grid-area:undo;
+      }
+
+      #${CARD_ID} .cb-next-bar .btn{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
+        min-width:44px;
+        min-height:44px;
+        padding:6px 12px;
+        border-radius:10px;
+        color:#344054;
+        border-color:#8a94a6;
+        background:#fff;
+        font-size:.86rem;
+        font-weight:850;
+        white-space:nowrap;
+      }
+
+      #${CARD_ID} .cb-next-bar .btn:disabled{
+        color:#98a2b3;
+        border-color:#d0d5dd;
+      }
+
+      @media(max-width:599.98px){
+        #${CARD_ID} .cb-next-bar{
+          grid-template-columns:auto minmax(0,1fr) auto;
+          grid-template-areas:
+            "back save undo"
+            "title title title";
+          padding-left:8px;
+          padding-right:8px;
+        }
+
+        #${CARD_ID} .cb-next-bar .btn{
+          padding:6px 10px;
+        }
+      }
+
+      /* One column: field, then the bench and tools under it. */
+      #${CARD_ID} .cb-next-body{
+        display:grid;
+        grid-template-columns:minmax(0,1fr);
+        grid-template-areas:
+          "info"
+          "field"
+          "bench"
+          "tools"
+          "warnings"
+          "error";
+        gap:10px;
+        width:100%;
+        max-width:1360px;
+        margin:0 auto;
+        padding:10px 12px calc(16px + env(safe-area-inset-bottom));
+        align-items:start;
+      }
+
+      #${CARD_ID} .cb-next-info{
+        grid-area:info;
+        min-width:0;
+      }
+
+      #${CARD_ID} .cb-next-field{
+        grid-area:field;
+        width:min(100%, 900px, max(300px, calc((100dvh - 330px) * 1.28)));
+        margin:0 auto;
+      }
+
+      #${CARD_ID} .cb-next-bench{
+        grid-area:bench;
+        margin-top:0;
+      }
+
+      #${CARD_ID} .cb-next-tools{
+        grid-area:tools;
+        margin-top:0;
+      }
+
+      #${CARD_ID} .cb-next-warnings{
+        grid-area:warnings;
+        margin-top:0;
+      }
+
+      #${CARD_ID} .cb-next-error{
+        grid-area:error;
+        margin-top:0;
+      }
+
+      /* Two columns: the field by the screen's height, the rest beside it. */
+      @media(min-width:1000px), (orientation:landscape) and (min-width:700px){
+        #${CARD_ID} .cb-next-body{
+          grid-template-columns:minmax(0,60fr) minmax(280px,40fr);
+          grid-template-areas:
+            "field info"
+            "field bench"
+            "field tools"
+            "field warnings"
+            "field error";
+          grid-template-rows:repeat(4,auto) 1fr;
+          column-gap:18px;
+          padding-top:12px;
+        }
+
+        #${CARD_ID} .cb-next-field{
+          width:min(100%, calc((100dvh - 96px) * 1.28));
+          aspect-ratio:1.28/1;
+          margin:0 auto;
+        }
+
+        #${CARD_ID} .cb-next-field .cb-qd-spot{
+          width:clamp(56px,17%,112px);
+          min-height:44px;
+        }
+
+        #${CARD_ID} .cb-next-tools .btn{
+          flex:1 1 100%;
+        }
+      }
+
+      /* With room to spare, bench players are full-size touch targets. */
+      @media(min-width:700px) and (min-height:600px){
+        #${CARD_ID} .cb-next-bench-player{
+          min-height:44px;
+          padding:8px 12px;
+          font-size:.8rem;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
   }
 
   async function api(method = 'GET', body = null) {
@@ -2131,7 +2292,7 @@
       card.id = CARD_ID;
       card.setAttribute('role', 'dialog');
       card.setAttribute('aria-modal', 'true');
-      card.setAttribute('aria-label', 'Plan next inning');
+      card.setAttribute('aria-labelledby', `${CARD_ID}-title`);
 
       now.insertAdjacentElement(
         'afterend',
@@ -2139,34 +2300,6 @@
       );
     }
 
-    let backdrop = $(BACKDROP_ID);
-    if (!backdrop) {
-      backdrop = document.createElement('div');
-      backdrop.id = BACKDROP_ID;
-      backdrop.hidden = true;
-      backdrop.setAttribute('aria-hidden', 'true');
-
-      backdrop.addEventListener('click', () => {
-        if (activeView !== 'next') return;
-        activeView = 'now';
-        applyView();
-      });
-
-      // Never let wheel/touch gestures on the dimmed live field scroll the
-      // page underneath the planner.
-      backdrop.addEventListener(
-        'wheel',
-        event => event.preventDefault(),
-        {passive: false}
-      );
-      backdrop.addEventListener(
-        'touchmove',
-        event => event.preventDefault(),
-        {passive: false}
-      );
-
-      $('live-game-overlay')?.appendChild(backdrop);
-    }
 
     if (!$(PLAN_CARD_ID)) {
       const planCard = document.createElement('div');
@@ -2500,7 +2633,6 @@
     const now = $('cbQuickDefense');
     const next = $(CARD_ID);
     const plan = $(PLAN_CARD_ID);
-    const backdrop = $(BACKDROP_ID);
     const planning = activeView === 'next';
 
     switcher
@@ -2525,10 +2657,6 @@
       plan.hidden = true;
     }
 
-    if (backdrop) {
-      backdrop.hidden = !planning;
-    }
-
     document.documentElement.classList.toggle(
       'cb-next-sheet-open',
       planning
@@ -2538,7 +2666,86 @@
       planning
     );
 
+    // The planner is the only thing the coach can reach while it is open.
+    setLiveInert(planning && Boolean(next));
+
+    if (planning && next && !plannerOpen) {
+      plannerOpen = true;
+      next.scrollTop = 0;
+      if (!next.contains(document.activeElement)) {
+        next.querySelector('[data-next-close]')?.focus({preventScroll: true});
+      }
+    } else if (!planning && plannerOpen) {
+      plannerOpen = false;
+      const active = document.activeElement;
+      if (!active || active === document.body || next?.contains(active)) {
+        switcher
+          ?.querySelector('[data-now-next="next"]')
+          ?.focus({preventScroll: true});
+      }
+    }
+
     syncLiveActions();
+  }
+
+  // The live screen behind the planner: every sibling on the way from the
+  // planner up to the live overlay. Only what this module made inert is
+  // released again; dialogs (.modal) are never touched.
+
+  function setLiveInert(on) {
+    if (!on) {
+      inertByPlanner.forEach(element => {
+        element.inert = false;
+      });
+      inertByPlanner.clear();
+      return;
+    }
+
+    const overlay = $('live-game-overlay');
+    let node = $(CARD_ID);
+
+    while (node && overlay && node !== overlay && node.parentElement) {
+      [...node.parentElement.children].forEach(sibling => {
+        if (
+          sibling === node ||
+          sibling.classList.contains('modal') ||
+          inertByPlanner.has(sibling) ||
+          sibling.inert
+        ) {
+          return;
+        }
+        sibling.inert = true;
+        inertByPlanner.add(sibling);
+      });
+      if (node.parentElement === overlay) break;
+      node = node.parentElement;
+    }
+  }
+
+  const PLAN_FOCUS_KEYS = [
+    'data-next-close',
+    'data-next-undo-local',
+    'data-next-use-current',
+    'data-next-use-plan',
+    'data-next-position',
+    'data-next-bench-player',
+  ];
+
+  function planFocusKey(element) {
+    for (const attr of PLAN_FOCUS_KEYS) {
+      const owner = element?.closest?.(`[${attr}]`);
+      if (owner) return [attr, owner.getAttribute(attr) || ''];
+    }
+    return ['data-next-close', ''];
+  }
+
+  function restorePlanFocus(card, [attr, value]) {
+    const target = [...card.querySelectorAll(`[${attr}]`)]
+      .find(element => (element.getAttribute(attr) || '') === value);
+    const focusable = target && !target.disabled
+      ? target
+      : card.querySelector('[data-next-close]');
+    focusable?.focus({preventScroll: true});
   }
 
   /*
@@ -3145,40 +3352,49 @@
       latest.current_inning || ''
     );
 
+    // A redraw replaces every control. Keep keyboard and assistive-tech
+    // focus on the same control (or the bar) rather than losing it.
+    const focusedKey = card.contains(document.activeElement)
+      ? planFocusKey(document.activeElement)
+      : null;
+
     card.innerHTML = `
-      <div class="cb-next-head">
-        <div class="cb-next-head-main">
-          <div class="cb-next-title">
-            ${esc(inningLabel)} Inning Defense
-          </div>
-          <div
-            class="cb-next-sub ${selected ? 'cb-next-hint' : ''}"
-            data-next-hint
-            role="status"
-          >${esc(selected ? moveHint() : planStateText())}</div>
-          ${pitcherStatusMarkup()}
-        </div>
+      <div class="cb-next-bar cb-next-head">
+        <button
+          type="button"
+          class="btn btn-outline-secondary cb-next-back"
+          data-next-close
+          aria-label="Back to live field"
+        ><i class="bi bi-arrow-left" aria-hidden="true"></i><span>Live Field</span></button>
+
+        <h2 class="cb-next-title" id="${CARD_ID}-title">
+          ${esc(inningLabel)} Inning Defense
+        </h2>
 
         <div
           class="cb-next-save ${esc(saveMode)}"
           data-next-save-state
           role="status"
         >${esc(saveMessage)}</div>
+
+        <button
+          type="button"
+          class="btn btn-outline-secondary cb-next-undo"
+          data-next-undo-local
+          aria-label="Undo plan edit"
+          title="Undo plan edit"
+          ${canUndoNext() ? '' : 'disabled'}
+        ><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>Undo</span></button>
       </div>
 
       <div class="cb-next-body">
-        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm"
-            data-next-close
-          ><i class="bi bi-chevron-down me-1"></i> Back to live field</button>
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm"
-            data-next-undo-local
-            ${canUndoNext() ? '' : 'disabled'}
-          ><i class="bi bi-arrow-counterclockwise me-1"></i> Undo plan edit</button>
+        <div class="cb-next-info">
+          <div
+            class="cb-next-sub ${selected ? 'cb-next-hint' : ''}"
+            data-next-hint
+            role="status"
+          >${esc(selected ? moveHint() : planStateText())}</div>
+          ${pitcherStatusMarkup()}
         </div>
 
         ${fieldMarkup()}
@@ -3388,6 +3604,8 @@
         if (event.target.closest('button')) return;
         benchSelected();
       });
+
+    if (focusedKey) restorePlanFocus(card, focusedKey);
 
     applyView();
   }
@@ -4578,10 +4796,11 @@
       $(SWITCH_ID)?.remove();
       $(CARD_ID)?.remove();
       $(PLAN_CARD_ID)?.remove();
-      $(BACKDROP_ID)?.remove();
       $('cbNextOpenWarning')?.remove();
       document.documentElement.classList.remove('cb-next-sheet-open');
       document.body.classList.remove('cb-next-sheet-open');
+      setLiveInert(false);
+      plannerOpen = false;
       undoBusy = false;
 
       const now = $('cbQuickDefense');
@@ -4973,18 +5192,22 @@
     // also sends any Next Inning changes still waiting to sync.
     window.addEventListener('online', () => refresh({changed: true}));
 
+    // Escape goes back to the live field -- unless a dialog is open, which
+    // owns Escape. Capture phase: Bootstrap hides its dialog during this same
+    // key press, so by the bubbling phase the dialog no longer looks open.
     window.addEventListener('keydown', event => {
       if (
         event.key !== 'Escape' ||
         activeView !== 'next' ||
-        document.querySelector('.modal.show')
+        document.querySelector('.modal.show') ||
+        document.body.classList.contains('modal-open')
       ) {
         return;
       }
 
       activeView = 'now';
       applyView();
-    });
+    }, true);
 
     registerDragSurface();
 
