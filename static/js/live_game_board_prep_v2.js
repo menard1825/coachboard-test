@@ -1265,11 +1265,23 @@
 
       }
 
+      html.cb-next-sheet-open,
+      body.cb-next-sheet-open{
+        overflow:hidden!important;
+        overscroll-behavior:none;
+      }
+
+      body.cb-next-sheet-open #live-game-overlay{
+        overflow:hidden!important;
+      }
+
       #${BACKDROP_ID}{
         position:fixed;
         inset:0;
         z-index:1085;
         background:rgba(16,24,40,.38);
+        touch-action:none;
+        overscroll-behavior:none;
       }
 
       #${BACKDROP_ID}[hidden]{
@@ -1285,6 +1297,8 @@
         width:min(100%,960px);
         max-height:90dvh;
         overflow:auto;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
         transform:translateX(-50%);
         border:1.5px solid #cfd6df;
         border-radius:18px 18px 0 0;
@@ -1295,6 +1309,29 @@
 
       #${CARD_ID}[hidden]{
         display:none!important;
+      }
+
+      @media(max-width:759.98px){
+        #${CARD_ID}{
+          inset:0;
+          left:0;
+          right:0;
+          bottom:0;
+          width:100%;
+          height:100dvh;
+          max-height:none;
+          transform:none;
+          border:0;
+          border-radius:0;
+          box-shadow:none;
+        }
+
+        #${CARD_ID} .cb-next-head{
+          position:sticky;
+          top:0;
+          z-index:3;
+          background:#fff;
+        }
       }
 
       @media(min-width:760px){
@@ -2092,6 +2129,9 @@
     if (!card) {
       card = document.createElement('div');
       card.id = CARD_ID;
+      card.setAttribute('role', 'dialog');
+      card.setAttribute('aria-modal', 'true');
+      card.setAttribute('aria-label', 'Plan next inning');
 
       now.insertAdjacentElement(
         'afterend',
@@ -2104,6 +2144,27 @@
       backdrop = document.createElement('div');
       backdrop.id = BACKDROP_ID;
       backdrop.hidden = true;
+      backdrop.setAttribute('aria-hidden', 'true');
+
+      backdrop.addEventListener('click', () => {
+        if (activeView !== 'next') return;
+        activeView = 'now';
+        applyView();
+      });
+
+      // Never let wheel/touch gestures on the dimmed live field scroll the
+      // page underneath the planner.
+      backdrop.addEventListener(
+        'wheel',
+        event => event.preventDefault(),
+        {passive: false}
+      );
+      backdrop.addEventListener(
+        'touchmove',
+        event => event.preventDefault(),
+        {passive: false}
+      );
+
       $('live-game-overlay')?.appendChild(backdrop);
     }
 
@@ -2467,6 +2528,15 @@
     if (backdrop) {
       backdrop.hidden = !planning;
     }
+
+    document.documentElement.classList.toggle(
+      'cb-next-sheet-open',
+      planning
+    );
+    document.body.classList.toggle(
+      'cb-next-sheet-open',
+      planning
+    );
 
     syncLiveActions();
   }
@@ -4510,6 +4580,8 @@
       $(PLAN_CARD_ID)?.remove();
       $(BACKDROP_ID)?.remove();
       $('cbNextOpenWarning')?.remove();
+      document.documentElement.classList.remove('cb-next-sheet-open');
+      document.body.classList.remove('cb-next-sheet-open');
       undoBusy = false;
 
       const now = $('cbQuickDefense');
