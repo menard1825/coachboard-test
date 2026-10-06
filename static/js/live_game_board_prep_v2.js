@@ -25,6 +25,11 @@
   let planOnlyChanges = false;
   let planBenchOpen = false;
   let liveChangeTimer = null;
+  // The read a live change scheduled (onLiveChange), until it has landed:
+  // {promise, resolve}. CBNextDefense.whenCurrent() waits on it.
+  let liveRead = null;
+  // How far along the game's history the last live state was (liveVersionOf).
+  let seenLiveVersion = '';
   // One next-inning read at a time (see refresh()).
   let readInFlight = null;
   let readStale = false;
@@ -80,6 +85,11 @@
   let socketBound = false;
   let dragSurface = null;
   let undoBusy = false;
+  // The whole Plan Undo while it runs -- the save it waits for, the Undo
+  // request, and the answer or re-read the board adopts (undoNext).
+  // flush() waits on it, so End Inning never reads a plan an Undo the coach
+  // started is about to replace.
+  let undoRun = null;
   // Plan Next Inning is open (focus moved in) and what it made inert.
   let plannerOpen = false;
   const inertByPlanner = new Set();
@@ -3913,12 +3923,65 @@
     renderCard();
   }
 
+  const FLUSH_TIMEOUT_MESSAGE =
+    'Next Inning defense is still saving. Check your connection, wait for Saved ✓, then try ending the inning again.';
+
+  // End Inning's flush (CBNextDefense.flush). A Plan Undo the coach started
+  // settles completely first -- succeeded, its restored plan adopted, or
+  // not -- so nothing reads the plan it is about to replace; then any save
+  // still waiting goes out (settlePendingSave). The outcomes are counted
+  // from before the Undo, so an Undo that was refused, rejected or ran into
+  // another device's change stops End Inning with the reason.
+  //
+  // The Undo itself never calls this: runUndo settles the save it takes
+  // back with settlePendingSave, which does not wait on undoRun -- waiting
+  // here would be waiting on itself.
   async function flushPendingSave() {
     const deadline = Date.now() + 10000;
-    const timeoutMessage =
-      'Next Inning defense is still saving. Check your connection, wait for Saved ✓, then try ending the inning again.';
-    const conflictsBefore = conflictCount;
-    const rejectsBefore = rejectCount;
+    const outcomes = {
+      deadline,
+      conflictsBefore: conflictCount,
+      rejectsBefore: rejectCount,
+    };
+    const refusalsBefore = undoRefusals;
+
+    while (undoRun) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new Error(FLUSH_TIMEOUT_MESSAGE);
+      let timer = null;
+      try {
+        await Promise.race([
+          undoRun.then(() => null, () => null),
+          new Promise((_, reject) => {
+            timer = window.setTimeout(() => reject(new Error(FLUSH_TIMEOUT_MESSAGE)), remaining);
+          }),
+        ]);
+      } finally {
+        if (timer !== null) window.clearTimeout(timer);
+      }
+    }
+
+    // The Undo did not happen (another coach's plan, or nothing left to
+    // undo). The board shows the server's plan and says why; the coach
+    // checks it before the inning starts.
+    if (undoRefusals !== refusalsBefore) {
+      throw new Error(
+        `${noticeMessage || 'Nothing was undone.'} Check the ` +
+        `${inningOrdinal(latest?.next_inning || '') || 'next'} inning, then end the inning again.`
+      );
+    }
+
+    return settlePendingSave(outcomes);
+  }
+
+  // Every Next Inning save waiting or in the air has been answered; throws
+  // if one was not saved (a conflict with another device, or refused).
+  async function settlePendingSave({
+    deadline = Date.now() + 10000,
+    conflictsBefore = conflictCount,
+    rejectsBefore = rejectCount,
+  } = {}) {
+    const timeoutMessage = FLUSH_TIMEOUT_MESSAGE;
     let retried = false;
 
     while (activeSavePromise || dirty) {
@@ -4744,16 +4807,28 @@
 
   // Back to the defense as it was saved before the last save. A change
   // still saving goes out first, so Undo takes back that one.
-  async function undoNext() {
-    if (!canUndoNext()) return;
+  //
+  // The whole Undo is one promise (undoRun), from waiting on that save to
+  // adopting the server's answer: End Inning's flush() waits for all of it.
+  function undoNext() {
+    if (undoRun) return undoRun;
+    if (!canUndoNext()) return Promise.resolve();
+    undoRun = runUndo().finally(() => {
+      undoRun = null;
+    });
+    return undoRun;
+  }
 
+  async function runUndo() {
     undoBusy = true;
     renderCard();
 
     try {
       if (dirty || activeSavePromise) {
         try {
-          await flushPendingSave();
+          // Only the save this Undo takes back -- never flushPendingSave,
+          // which waits for this Undo.
+          await settlePendingSave();
         } catch (error) {
           return;
         }
@@ -4768,6 +4843,7 @@
       // Another coach saved since this was drawn (or since this coach's own
       // save settled): their change is not this coach's to undo.
       if (!latest?.confirmed?.can_undo) {
+        undoRefusals += 1;
         noticeMessage = NOT_YOURS_TO_UNDO;
         return;
       }
@@ -5019,9 +5095,59 @@
   // send and what the Pregame Plan note compares against. Re-read the
   // next-inning data once, shortly after, however many scripts announce the
   // same change -- instead of waiting for the 3.5 s poll.
+  //
+  // liveRead settles when that read has landed (or was not needed: a save in
+  // the air owns the board and its answer is newer).
   function onLiveChange() {
+    if (!liveRead) {
+      let resolve = null;
+      const promise = new Promise(done => { resolve = done; });
+      liveRead = {promise, resolve};
+    }
     window.clearTimeout(liveChangeTimer);
-    liveChangeTimer = window.setTimeout(() => refresh({changed: true}), 150);
+    liveChangeTimer = window.setTimeout(() => {
+      const scheduled = liveRead;
+      liveRead = null;
+      Promise.resolve(refresh({changed: true}))
+        .catch(() => null)
+        .finally(() => scheduled?.resolve());
+    }, 150);
+  }
+
+  // The board is current: the read a live change scheduled, and any read
+  // already in the air, have landed. End Inning waits for this after
+  // flush(), so the defense it starts is the one this board shows (after a
+  // live Undo the board used to show the undone defense until the next
+  // poll). Bounded: a read that never answers holds End Inning for at most
+  // `timeoutMs`; End Inning then reads the server itself, as before.
+  async function whenCurrent(timeoutMs = 3000) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const waits = [liveRead?.promise, readInFlight].filter(Boolean);
+      const remaining = deadline - Date.now();
+      if (!waits.length || remaining <= 0) return;
+      let timer = null;
+      await Promise.race([
+        Promise.all(waits.map(wait => Promise.resolve(wait).catch(() => null))),
+        new Promise(done => { timer = window.setTimeout(done, remaining); }),
+      ]);
+      window.clearTimeout(timer);
+    }
+  }
+
+  // How far along the game's history a live state is: its highest event
+  // sequence, then how many events are reverted (an Undo reverts one). ''
+  // when the state carries no history.
+  function liveVersionOf(value) {
+    const events = Array.isArray(value?.rotation_events) ? value.rotation_events : [];
+    if (!events.length) return '';
+    let high = 0;
+    let reverted = 0;
+    events.forEach(event => {
+      high = Math.max(high, Number(event?.sequence) || 0);
+      if (event?.reverted) reverted += 1;
+    });
+    return `${high}:${reverted}`;
   }
 
   function afterAdvance() {
@@ -5082,6 +5208,7 @@
     undo: undoNext,
     getAlignment: () => snapshot(),
     flush: flushPendingSave,
+    whenCurrent: () => whenCurrent(),
     isSaveInFlightOrQueued,
     showError,
     clearError,
@@ -5235,6 +5362,12 @@
         syncLiveActions();
         renderPlanCard();
       }
+      // Any other change to the game's history in the same inning moves
+      // the next inning too -- an Undo of a pitching change arrives as a
+      // full live state, not a delta -- so it is read as well.
+      const version = Number(detail.game_id) === gameId ? liveVersionOf(detail.state) : '';
+      const moved = Boolean(version && seenLiveVersion && version !== seenLiveVersion);
+      if (version) seenLiveVersion = version;
       // Another inning than this board read (an Undo, a remote End Inning
       // found by a poll or on reconnect): relabel now, read the next inning.
       if (
@@ -5244,6 +5377,8 @@
         String(detail.state.current_inning) !== String(latest.current_inning || '')
       ) {
         syncUpcomingInningLabels();
+        onLiveChange();
+      } else if (moved && latest) {
         onLiveChange();
       }
     });

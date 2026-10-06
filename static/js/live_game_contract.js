@@ -816,11 +816,22 @@
 
       // NEXT prep is a separate persistence channel from live rotation
       // events. Flush it explicitly before asking the server which defense
-      // should become the next inning.
+      // should become the next inning. This includes a Plan Undo the coach
+      // started: flush() resolves only once it has fully succeeded (its
+      // restored plan adopted), and throws -- stopping here -- if it was
+      // refused or failed.
       await window.CBNextDefense
         ?.flush?.();
 
       await waitForLiveWritesToSettle();
+
+      // The Next Inning board has caught up with every live change those
+      // writes made (a live Undo of a pitching change re-reads it): the
+      // defense started below is the one the board and this button show.
+      // Bounded inside whenCurrent(); the reads below are the server's
+      // either way.
+      await window.CBNextDefense
+        ?.whenCurrent?.();
 
       // Everything this page sent has landed: read the game and the next
       // inning once, together.
