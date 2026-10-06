@@ -476,7 +476,9 @@
         tone: remaining <= 0 ? 'danger' : remaining <= 600 ? 'warn' : '',
       };
     }
-    return { label: `${paused ? 'Paused · ' : ''}Elapsed`, value: fmtSeconds(current), tone: '' };
+    // Before the first /clock answer there is no time to show: "—", never a
+    // made-up 0:00.
+    return { label: `${paused ? 'Paused · ' : ''}Elapsed`, value: current == null ? '—' : fmtSeconds(current), tone: '' };
   }
 
   function title() {
@@ -719,6 +721,8 @@
       alignment: currentAlignment(),
       bench: benchPlayers().map(player => [player.id, player.name, player.number, player.benchStreak]),
       outfielderCount: state?.outfielder_count || 3,
+      // Field markers show each player's name and number.
+      roster: (state?.roster || []).map(player => [player.id, player.name, player.number]),
       saveMode,
       saveMessage,
       retry: lastFailedMove ? [lastFailedMove.playerId, lastFailedMove.destination] : false,
@@ -1526,7 +1530,10 @@
         saveMessage = 'Saved ✓';
       }
 
-      quickDefenseSignature = '';
+      // The card is redrawn only if what it shows changed (its signature).
+      // Clearing the signature here rebuilt the whole card on every 12 s
+      // recovery read -- markers, bench and Bench Report button -- and a
+      // long press on a player in that moment never armed.
       queue();
     } catch (_) {
     } finally {
