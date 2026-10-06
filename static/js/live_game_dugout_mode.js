@@ -24,7 +24,6 @@
   let queued = false;
   let moveBusy = false;
   let lastFailedMove = null;
-  let lastFailedDraft = null;
   let saveMode = 'saved';
   let saveMessage = 'Saved';
   let quickDefenseSignature = '';
@@ -692,7 +691,7 @@
 
   function saveStateMarkup() {
     const icon = saveMode === 'saving' ? 'bi-arrow-repeat' : saveMode === 'error' ? 'bi-exclamation-triangle' : 'bi-check-circle-fill';
-    const retry = saveMode === 'error' && (lastFailedMove || lastFailedDraft) ? ' data-cb-retry-move role="button" tabindex="0"' : '';
+    const retry = saveMode === 'error' && lastFailedMove ? ' data-cb-retry-move role="button" tabindex="0"' : '';
     return `<div class="cb-save-state ${saveMode}"${retry}><i class="bi ${icon}"></i><span>${esc(saveMessage)}</span></div>`;
   }
 
@@ -719,7 +718,7 @@
       outfielderCount: state?.outfielder_count || 3,
       saveMode,
       saveMessage,
-      retry: lastFailedMove ? [lastFailedMove.playerId, lastFailedMove.destination] : Boolean(lastFailedDraft),
+      retry: lastFailedMove ? [lastFailedMove.playerId, lastFailedMove.destination] : false,
     });
   }
 
@@ -737,18 +736,16 @@
         const player = event.target.closest('[data-cb-move-player]');
         if (!player) return;
 
-        // While unified drag-and-drop owns a local draft, an Open marker is
-        // not authoritative yet. Do not launch the separate tap-to-fill
-        // writer against older server state. Once the draft save completes,
-        // clearDraft() removes cb-main-open and the authoritative Open spot
-        // becomes tappable normally.
-        if (player.classList.contains('cb-main-open')) return;
-
         const name = player.dataset.cbMovePlayer;
         const pos = player.dataset.cbPosition;
 
+        // One move at a time, tapped or dragged: a Move or Fill sheet
+        // opened while a move is saving would be decided against the field
+        // that save is about to replace. (P still goes to Change Pitcher.)
+        const busy = moveBusy && pos !== 'P';
+
         if (name === 'Open') {
-          openOpenPositionModal(pos);
+          if (!busy) openOpenPositionModal(pos);
           return;
         }
 
@@ -759,7 +756,7 @@
           return;
         }
 
-        openMoveModal(name);
+        if (!busy) openMoveModal(name);
       });
       card.addEventListener('keydown', event => {
         if ((event.key === 'Enter' || event.key === ' ') && event.target.closest('[data-cb-retry-move]')) {
@@ -774,7 +771,6 @@
   function renderQuickDefense(shell) {
     const card = ensureQuickDefense(shell);
     if (!card || !state?.game?.is_live) return;
-    if (card.querySelector('.cb-main-draft-banner, .cb-main-open')) return;
     const signature = quickDefenseStateSignature();
     if (signature === quickDefenseSignature && card.childElementCount) return;
     quickDefenseSignature = signature;
@@ -831,8 +827,8 @@
 
     /*
      * Anyone can fill an open position: a bench player, or a player at
-     * another position -- the same move drag-and-drop makes (saveMove,
-     * like applyMove in live_game_unified_field_entry.js): the player
+     * another position -- the same move drag-and-drop makes (both commit
+     * through commitMove): the player
      * moves here and their old position is left open. Nothing else moves;
      * the coach fills that spot next if they want to. The pitcher is
      * special: choosing them goes to Change Pitcher, which settles who
@@ -909,21 +905,10 @@
 
           if (!choice) return;
 
-          if (choice.from === 'P') {
-            // Never moves the pitcher off P here: Change Pitcher asks who
-            // pitches, then where the pitcher goes (this open spot is
-            // offered there as a one-tap choice).
-            bootstrap.Modal.getOrCreateInstance(modal).hide();
-            $('liveChangePitcherBtn')?.click();
-            return;
-          }
-
-          closeMoveSheetThen(() => saveMove(
-            choice.player.id,
-            pos,
-            choice.player.name,
-            context
-          ));
+          // Choosing the pitcher never moves P here: commitMove sends it to
+          // Change Pitcher, which asks who pitches, then where the pitcher
+          // goes (this open spot is offered there as a one-tap choice).
+          commitMove(choice.player.name, pos, context);
         }
       );
     });
@@ -970,7 +955,7 @@
     body.querySelectorAll('[data-cb-destination]').forEach(button => {
       button.addEventListener(
         'click',
-        () => moveOrAsk(
+        () => commitMove(
           player.name,
           button.dataset.cbDestination,
           context
@@ -980,12 +965,7 @@
 
     // Bench is an obvious one-step move: the old position stays open.
     body.querySelector('[data-cb-bench-current]')?.addEventListener('click', () => {
-      closeMoveSheetThen(() => saveMove(
-        player.id,
-        'BENCH',
-        player.name,
-        context
-      ));
+      commitMove(player.name, 'BENCH', context);
     });
     bootstrap.Modal.getOrCreateInstance(modal).show();
   }
@@ -993,14 +973,27 @@
   const STALE_MOVE_MESSAGE =
     'Defense changed on another device. Check the field and try the move again.';
 
-  // Tap and drag both land here. The context captures the field/version
-  // the coach actually acted on, so a later live update cannot silently
-  // change who gets swapped or benched before the save starts.
-  function moveOrAsk(
+  /*
+   * The one writer of a normal live defensive move.
+   *
+   * Tap (the Move and Fill sheets), drag-and-drop
+   * (live_game_unified_field_entry.js, through CBQuickFieldMoves.commit)
+   * and Retry all commit here. The gesture only says who goes where; this
+   * decides the resulting field, checks it against the field the coach
+   * acted on (`context`, captured when the sheet opened or the drag
+   * began), saves it, and reports a refusal or a failure once, on the
+   * Quick Field status. A later live update never changes who gets
+   * swapped or benched: a move decided on an older field is refused.
+   *
+   * One move at a time: moveBusy is held from this decision to the
+   * server's answer, and a move made meanwhile is dropped.
+   */
+  function commitMove(
     name,
     destination,
     context = captureMoveContext()
   ) {
+    if (moveBusy) return;
     const player = playerForName(name);
     const target = String(destination || '').toUpperCase();
     if (!player || !target) return;
@@ -1009,14 +1002,19 @@
     const source = Object.entries(alignment)
       .find(([, assigned]) => assigned === name)?.[0] || 'BENCH';
 
+    // P is never a generic move: Change Pitcher settles who pitches.
     if (source === 'P' || target === 'P') {
       bootstrap.Modal.getOrCreateInstance(ensureMoveModal()).hide();
       $('liveChangePitcherBtn')?.click();
       return;
     }
 
+    // Dropped where the player already is: nothing to do.
+    if (source === target) return;
+
     // Resolve the obvious move immediately:
     // open spot = move, occupied spot = swap, Bench = leave the old spot open.
+    moveBusy = true;
     closeMoveSheetThen(() => saveMove(
       player.id,
       target,
@@ -1062,30 +1060,20 @@
     }, 600);
   }
 
+  // Retry is the same decision on the same field, through the same writer:
+  // if the field has changed since, it is refused rather than reapplied.
   function retryLastFailedSave() {
-    if (lastFailedMove) {
-      const failed = lastFailedMove;
+    if (!lastFailedMove) return false;
+    const failed = lastFailedMove;
 
-      if (!moveContextIsCurrent(failed.context)) {
-        lastFailedMove = null;
-        showStaleMove();
-        return true;
-      }
-
-      saveMove(
-        failed.playerId,
-        failed.destination,
-        failed.name,
-        failed.context
-      );
+    if (!moveContextIsCurrent(failed.context)) {
+      lastFailedMove = null;
+      showStaleMove();
       return true;
     }
-    if (lastFailedDraft) {
-      const {alignment, successMessage, baseSequence} = lastFailedDraft;
-      saveDefenseDraft(alignment, successMessage, baseSequence);
-      return true;
-    }
-    return false;
+
+    commitMove(failed.name, failed.destination, failed.context);
+    return true;
   }
 
   // One place a save's failure is shown. A lost connection can be retried
@@ -1105,226 +1093,14 @@
     if (shell) renderQuickDefense(shell);
   }
 
-  /*
-   * "Graham is moving to SS. Where should Rylan go?"
-   *
-   * The coach said where one player goes -- not what happens to the
-   * player already there. CoachBoard offers the mover's vacated position,
-   * any open position, "another position…" and the bench, and never
-   * picks for the coach: no automatic swap, bench or move. Choosing
-   * another occupied position asks about that player next.
-   *
-   * The whole chain is built locally and saved as one defensive change
-   * (one Undo). Once the coach has placed every displaced player it is
-   * saved -- a change involving two players needs no second confirmation;
-   * one involving three or more is shown once for review ("Make this
-   * change"). Cancel, or the sheet closing, changes nothing. If the
-   * official field changes while the chain is open, it is discarded --
-   * never applied to newer state.
-   *
-   * No loops: players already placed by this chain are never offered
-   * again, and P is never an ordinary destination.
-   */
-  //
-  // Also: "Graham is going to the bench. What should happen at 2B?"
-  // (target 'BENCH'): leave 2B open -- one tap, saved at once, exactly
-  // what dragging Graham to the bench does -- or choose who plays 2B: a
-  // bench player, or a field player whose own spot is then left open.
-  // Nothing is filled automatically.
-  function askOccupiedMove(player, source, target) {
-    const before = {...currentAlignment()};
-    const baseSequence = sequenceFromState();
-    const modal = ensureMoveModal();
-    const instance = bootstrap.Modal.getOrCreateInstance(modal);
-    const title = modal.querySelector('.modal-title');
-    const body = modal.querySelector('.modal-body');
-    const spots = positions().filter(pos => pos !== 'P');
-    const toBench = target === 'BENCH';
-
-    const draft = {...before};
-    if (source !== 'BENCH') delete draft[source];
-    const firstDisplaced = toBench ? null : draft[target];
-    if (!toBench) draft[target] = player.name;
-    const moves = [{name: player.name, from: source, to: toBench ? 'Bench' : target}];
-    const placed = new Set([player.name]);
-    let active = true;
-
-    // Spots this chain emptied first (e.g. the mover's old position).
-    const openSpots = () => [
-      ...spots.filter(pos => !draft[pos] && before[pos]),
-      ...spots.filter(pos => !draft[pos] && !before[pos]),
-    ];
-    const takenSpots = () => spots.filter(pos => draft[pos] && !placed.has(draft[pos]));
-    const fromLabel = pos => (pos === 'BENCH' ? 'Bench' : pos);
-
-    const stop = () => {
-      active = false;
-      document.removeEventListener('coachboard:live-delta', onLiveChange);
-      document.removeEventListener('coachboard:live-state', onLiveChange);
-    };
-
-    // Another coach (or an Undo) changed the official field: this chain
-    // was decided against a field that no longer exists.
-    function onLiveChange(event) {
-      const detail = event.detail || {};
-      if (!active || Number(detail.game_id) !== gameId) return;
-      const next = detail.state || detail;
-      const nextSequence = detail.state
-        ? sequenceFromState(detail.state)
-        : Number(detail.sequence);
-      const sameField = JSON.stringify(Object.entries(next.current_alignment || {})
-        .filter(([, n]) => n).sort()) === JSON.stringify(Object.entries(before)
-        .filter(([, n]) => n).sort());
-      if (sameField && (!Number.isFinite(nextSequence) || nextSequence === baseSequence)) return;
-      stop();
-      title.textContent = 'Move not made';
-      body.innerHTML = `<div class="alert alert-warning mb-3" data-cb-chain-stale>${esc(STALE_MOVE_MESSAGE)}</div>
-        <div class="d-grid"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button></div>`;
-      getState().catch(() => {});
-    }
-
-    document.addEventListener('coachboard:live-delta', onLiveChange);
-    document.addEventListener('coachboard:live-state', onLiveChange);
-    modal.addEventListener('hidden.bs.modal', stop, {once: true});
-
-    const render = (heading, question, buttons, lines = []) => {
-      title.textContent = heading;
-      setMoveModalHint('Nothing changes until you finish.');
-      body.innerHTML = `<div class="cb-move-current"><strong data-cb-chain-question>${esc(question)}</strong></div>
-        ${lines.length ? `<ul class="list-unstyled mb-3" data-cb-chain-summary>${lines.map(line => `<li>${esc(line)}</li>`).join('')}</ul>` : ''}
-        <div class="d-grid gap-2" data-cb-chain-choices></div>`;
-      const list = body.querySelector('[data-cb-chain-choices]');
-      buttons.forEach(([label, className, onChoose]) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `btn ${className}`;
-        button.textContent = label;
-        button.addEventListener('click', () => {
-          if (active) onChoose();
-        });
-        list.appendChild(button);
-      });
-    };
-
-    const cancel = ['Cancel', 'btn-outline-secondary', () => {
-      stop();
-      instance.hide();
-    }];
-
-    const place = (name, from, to) => {
-      if (to !== 'Bench') draft[to] = name;
-      placed.add(name);
-      moves.push({name, from, to});
-    };
-
-    // The decision is complete: close the sheet, then save it as one change.
-    const commit = message => {
-      stop();
-      const alignment = {...draft};
-      closeMoveSheetThen(() => saveDefenseDraft(alignment, message, baseSequence));
-    };
-    const summary = () => moves.map(move => `${move.name} to ${move.to}`).join(' · ');
-
-    const review = () => {
-      const lines = [
-        ...moves.map(move => `${move.name}: ${fromLabel(move.from)} → ${move.to}`),
-        ...openSpots().map(pos => `${pos}: open`),
-      ];
-      render('Check the defensive change', 'This is the field after the change:', [
-        ['Make this change', 'btn-primary', () => commit(summary())],
-        cancel,
-      ], lines);
-    };
-
-    // Every displaced player has a place the coach chose. Two players: the
-    // coach's own choices are the confirmation. Three or more: one review.
-    const finish = () => {
-      if (moves.length >= 3) review();
-      else commit(summary());
-    };
-
-    // "Where should <name> go?" -- name was at `from` until just now.
-    const ask = (name, from, mover) => {
-      const buttons = openSpots().map(pos => [
-        `Put ${name} at ${pos}`,
-        'btn-outline-primary',
-        () => {
-          place(name, from, pos);
-          finish();
-        },
-      ]);
-      if (takenSpots().length) {
-        buttons.push([
-          `Move ${name} to another position…`,
-          'btn-outline-primary',
-          () => choosePosition(name, from, mover),
-        ]);
-      }
-      buttons.push([`Bench ${name}`, 'btn-outline-primary', () => {
-        place(name, from, 'Bench');
-        finish();
-      }]);
-      buttons.push(cancel);
-      render(`${mover} is moving to ${from}`, `Where should ${name} go?`, buttons);
-    };
-
-    const choosePosition = (name, from, mover) => {
-      render(`${mover} is moving to ${from}`, `Where should ${name} go?`, [
-        ...takenSpots().map(pos => [
-          `${pos} · ${draft[pos]}`,
-          'btn-outline-primary',
-          () => {
-            const next = draft[pos];
-            place(name, from, pos);
-            ask(next, pos, name);
-          },
-        ]),
-        ['Back', 'btn-outline-secondary', () => ask(name, from, mover)],
-        cancel,
-      ]);
-    };
-
-    const numbered = name => {
-      const number = String(playerForName(name)?.number ?? '').trim();
-      return number ? `#${number} ${name}` : name;
-    };
-
-    // "What should happen at <pos>?" after <player> goes to the bench.
-    const fill = pos => {
-      const bench = benchPlayers().filter(candidate => !placed.has(candidate.name));
-      const fielders = spots.filter(spot => draft[spot] && !placed.has(draft[spot]));
-      render(`${player.name} is going to the bench`, `What should happen at ${pos}?`, [
-        [`Leave ${pos} open`, 'btn-primary', () => commit(`${player.name} to Bench · ${pos} open`)],
-        ...bench.map(candidate => [
-          `${numbered(candidate.name)} — Bench → ${pos}`,
-          'btn-outline-primary',
-          () => {
-            place(candidate.name, 'BENCH', pos);
-            finish();
-          },
-        ]),
-        ...fielders.map(spot => [
-          `${numbered(draft[spot])} — ${spot} → ${pos} · ${spot} left open`,
-          'btn-outline-secondary',
-          () => {
-            const name = draft[spot];
-            delete draft[spot];
-            place(name, spot, pos);
-            finish();
-          },
-        ]),
-        cancel,
-      ]);
-    };
-
-    if (toBench) fill(source);
-    else ask(firstDisplaced, target, player.name);
-    instance.show();
-  }
-
-  // Drag-and-drop's occupied drops come here, so tap and drag ask the same
-  // question and save through the same writer.
-  window.CBQuickFieldMoves = Object.freeze({moveOrAsk});
+  // Drag-and-drop commits through the same writer. `context` is what a
+  // drag captures when it starts -- the field the coach picked a player up
+  // from -- and `busy` holds a drag back while a move is saving.
+  window.CBQuickFieldMoves = Object.freeze({
+    context: () => captureMoveContext(),
+    commit: commitMove,
+    busy: () => moveBusy,
+  });
 
   async function applyQuickDefenseSaveResponse(data) {
     if (data?.delta) {
@@ -1351,90 +1127,28 @@
     await getState();
   }
 
-  async function saveDefenseDraft(alignment, successMessage, baseSequence = null) {
-    if (moveBusy) return;
-    moveBusy = true;
-    saveMode = 'saving';
-    saveMessage = 'Saving…';
-    lastFailedMove = null;
-    lastFailedDraft = null;
-    quickDefenseSignature = '';
-
-    const shell = document.querySelector('#live-game-overlay .coach-live-shell');
-    if (shell) renderQuickDefense(shell);
-
-    try {
-      const response = await fetch(`/api/live-game/${gameId}/defense-edit`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          alignment,
-          // A chain is saved against the field it was decided on.
-          base_sequence: baseSequence ?? sequenceFromState(),
-        }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok || data.status === 'error') {
-        if (
-          data.code === 'stale_live_state' ||
-          data.code === 'missing_live_state_version'
-        ) {
-          await getState();
-        }
-
-        throw new Error(
-          data.code === 'stale_live_state'
-            ? STALE_MOVE_MESSAGE
-            : data.message ||
-              `Unable to save defense (${response.status}).`
-        );
-      }
-
-      await applyQuickDefenseSaveResponse(data);
-
-      lastFailureKind = null;
-      reconnectMessageUntil = 0;
-      saveMode = 'saved';
-      saveMessage = 'Saved ✓';
-      quickDefenseSignature = '';
-
-      queue();
-    } catch (error) {
-      reportSaveFailure(error, () => {
-        lastFailedDraft = {alignment, successMessage, baseSequence};
-      });
-    } finally {
-      moveBusy = false;
-    }
-  }
-
-  // One-step moves only: an open destination (the old spot is left open).
-  // An occupied destination is the coach's decision -- askOccupiedMove.
+  // commitMove's save. It holds moveBusy (set by commitMove) and always
+  // releases it, whether the move is saved, refused or fails.
   async function saveMove(
     playerId,
     destination,
     name,
-    context = captureMoveContext()
+    context
   ) {
-    if (moveBusy) return;
-
-    if (!moveContextIsCurrent(context)) {
-      showStaleMove();
-      return;
-    }
-
-    moveBusy = true;
-    saveMode = 'saving';
-    saveMessage = 'Saving…';
-    lastFailedMove = null;
-    quickDefenseSignature = '';
-
-    const shell = document.querySelector('#live-game-overlay .coach-live-shell');
-    if (shell) renderQuickDefense(shell);
-
     try {
+      if (!moveContextIsCurrent(context)) {
+        showStaleMove();
+        return;
+      }
+
+      saveMode = 'saving';
+      saveMessage = 'Saving…';
+      lastFailedMove = null;
+      quickDefenseSignature = '';
+
+      const shell = document.querySelector('#live-game-overlay .coach-live-shell');
+      if (shell) renderQuickDefense(shell);
+
       const player = (state?.roster || []).find(
         candidate => Number(candidate.id) === Number(playerId)
       );
@@ -1577,10 +1291,6 @@
      * The server has already reverted the event and returned the
      * complete replacement state. Paint Quick Field immediately
      * from that state instead of waiting for requestAnimationFrame.
-     *
-     * This intentionally bypasses the normal cb-main-* draft guard:
-     * a stale local editor must never be allowed to cover up a
-     * successful server-side Undo.
      */
     if (source === 'undo') {
       const shell = document.querySelector(
@@ -1828,7 +1538,7 @@
     styles();
 
     // live_game_feedback_pass.js publishes Socket.IO live deltas here, and
-    // drag-and-drop publishes its successful response here as well.
+    // a saved move publishes its own response here as well.
     document.addEventListener(
       'coachboard:live-state',
       applySharedLiveState

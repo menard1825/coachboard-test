@@ -579,14 +579,15 @@ def test_test2_drag_survives_remote_live_redraw(
     A coach begins dragging SS while another coach saves a real live
     defensive change.
 
-    Either concurrency outcome is valid:
+    The drag was decided on the field the coach picked SS up from, so the
+    drop is refused -- never rebased onto the newer field and saved (Quick
+    Field's one move writer, CBQuickFieldMoves.commit, checks the context
+    the drag captured at its start). The coach is told on the save status,
+    without a blocking alert, and the remote change stands.
 
-    * the drag rebases on current state and saves, preserving both changes; or
-    * optimistic concurrency rejects the drag with stale_live_state.
-
-    What must never happen is for the phone to visually roll the field back
-    to the older alignment after it has already rendered the newer remote
-    defense.
+    What must also never happen is for the phone to visually roll the field
+    back to the older alignment after it has already rendered the newer
+    remote defense.
     """
     phone_context = routed_context(
         browser,
@@ -790,9 +791,7 @@ def test_test2_drag_survives_remote_live_redraw(
             is None
         )
 
-        # SS to the bench: a one-step drag that saves through the drag
-        # draft (an occupied drop now asks the coach first, see
-        # test_live_defense_coach_chain.py).
+        # SS to the bench, dropped on the newer field.
         destination = phone_quick.locator(
             '.cb-qd-bench-wrap'
         )
@@ -862,24 +861,29 @@ def test_test2_drag_survives_remote_live_redraw(
             destination_y,
         )
 
-        endpoint = (
-            f'/api/live-game/{game_id}/defense-edit'
+        posts = []
+        phone.on(
+            'request',
+            lambda request: posts.append(request.url)
+            if request.method == 'POST' and 'defense-edit' in request.url
+            else None,
         )
 
-        with phone.expect_response(
-            lambda response: (
-                endpoint in response.url
-                and response.request.method == 'POST'
-            ),
+        phone.mouse.up()
+        mouse_down = False
+
+        # Refused on this device: nothing is sent, the coach is told.
+        expect(
+            phone_quick.locator('.cb-save-state')
+        ).to_contain_text(
+            'Defense changed on another device',
             timeout=10_000,
-        ) as save_response_info:
-            phone.mouse.up()
-            mouse_down = False
+        )
+        expect(
+            phone_quick.locator('[data-cb-retry-move]')
+        ).to_have_count(0)
 
-        save_response = save_response_info.value
-        save_payload = save_response.json()
-
-        # Allow the sampler to span the full stale-error recovery window.
+        # Allow the sampler to span the full recovery window.
         phone.wait_for_timeout(1700)
 
         samples = phone.evaluate(
@@ -906,78 +910,31 @@ def test_test2_drag_survives_remote_live_redraw(
             f'{stale_visual_samples[:10]}'
         )
 
+        assert posts == []
+        assert dialogs == []
+
         final_state_response = phone.request.get(
             f'{coachboard_url}/api/live-game/{game_id}/state'
         )
 
         assert final_state_response.status == 200
 
-        final_state = final_state_response.json()
+        # The remote change stands; SS was not benched on it.
+        assert (
+            final_state_response.json()['current_alignment']
+            == remote_alignment
+        )
 
-        if save_response.status == 200:
-            assert save_payload.get('status') == 'success'
-
-            # Remote 1B/3B edit and local SS-to-bench drag both survived.
+        # The visible field is the authoritative one.
+        for position in ('1B', '2B', '3B', 'SS'):
             assert (
-                final_state['current_alignment']['1B']
-                == remote_alignment['1B']
-            )
-            assert (
-                final_state['current_alignment']['3B']
-                == remote_alignment['3B']
-            )
-            assert (
-                final_state['current_alignment']['2B']
-                == 'Second Sam'
-            )
-            assert not final_state['current_alignment'].get('SS')
-
-            expect(
-                phone_quick.locator('.cb-save-state')
-            ).to_contain_text(
-                'Saved',
-                timeout=10_000,
-            )
-
-        else:
-            # First accepted coach wins. The rejected drag must not be
-            # automatically merged/retried over newer authoritative state.
-            assert save_response.status == 409
-            assert (
-                save_payload.get('code')
-                == 'stale_live_state'
-            )
-
-            authoritative = dict(
-                save_payload['current_alignment']
-            )
-
-            assert (
-                authoritative
-                == remote_alignment
-            )
-
-            assert (
-                final_state['current_alignment']
-                == remote_alignment
-            )
-
-            assert dialogs
-            assert any(
-                'not saved' in message.lower()
-                for message in dialogs
-            )
-
-            # The visible field must already be the authoritative winner.
-            for position in ('1B', '2B', '3B', 'SS'):
-                assert (
-                    phone_quick.locator(
-                        f'[data-cb-position="{position}"]'
-                    ).get_attribute(
-                        'data-cb-move-player'
-                    )
-                    == remote_alignment[position]
+                phone_quick.locator(
+                    f'[data-cb-position="{position}"]'
+                ).get_attribute(
+                    'data-cb-move-player'
                 )
+                == remote_alignment[position]
+            )
 
     finally:
         if mouse_down:
@@ -1222,18 +1179,16 @@ def test_test2_stale_recovery_authoritative_open_does_not_freeze_quick_field(
     coachboard_url: str,
 ):
     """
-    Regression for the `.cb-main-open` / authoritative-open interaction.
+    A drag that loses the optimistic-concurrency race must not freeze
+    Quick Field.
 
-    When a drag loses the optimistic-concurrency race and the authoritative
-    alignment the server returns has a genuinely open position, Quick Field
-    may keep showing that position as open. It must NOT reuse `.cb-main-open`
-    to do it: live_game_dugout_mode.js and live_game_feedback_pass.js both
-    treat the presence of `.cb-main-open` anywhere in #cbQuickDefense as "a
-    local draft owns this DOM, do not repaint" and will otherwise stay
-    frozen indefinitely, since draft is null and nothing else clears it.
-
-    This proves the open marker survives as a visual-only class and that a
-    later real remote defensive change still repaints the phone normally.
+    This used to guard the drag's own draft (`.cb-main-open`), which other
+    modules took as "a local draft owns this DOM, do not repaint". A drag
+    now saves through Quick Field's one move writer
+    (CBQuickFieldMoves.commit), the same as a tap: there is no draft, the
+    refusal is reported on the save status without a blocking alert, the
+    field is re-read from the server, and a later real remote defensive
+    change still repaints the phone normally.
     """
     phone_context = routed_context(
         browser,
@@ -1305,12 +1260,6 @@ def test_test2_stale_recovery_authoritative_open_does_not_freeze_quick_field(
         assert before_response.status == 200
         before = before_response.json()
 
-        # Simulate a rejected save whose authoritative alignment leaves
-        # 1B genuinely open (e.g. an ejected/absent fielder not yet
-        # replaced), which is exactly the case the preserveOpen fix targets.
-        authoritative_open = dict(before['current_alignment'])
-        authoritative_open['1B'] = ''
-
         stale_route = f'**/api/live-game/{game_id}/defense-edit'
 
         def stale_drag_response(route):
@@ -1329,14 +1278,12 @@ def test_test2_stale_recovery_authoritative_open_does_not_freeze_quick_field(
                     ),
                     'current_sequence': current_sequence(before) + 1,
                     'current_inning': before.get('current_inning') or '1',
-                    'current_alignment': authoritative_open,
                 }),
             )
 
         phone.route(stale_route, stale_drag_response)
 
-        # SS to the bench saves through the drag draft (an occupied drop
-        # now asks the coach first instead of saving).
+        # SS to the bench, by drag.
         source = phone_quick.locator('[data-cb-position="SS"]')
         destination = phone_quick.locator('.cb-qd-bench-wrap')
 
@@ -1385,36 +1332,18 @@ def test_test2_stale_recovery_authoritative_open_does_not_freeze_quick_field(
         phone.unroute(stale_route)
         stale_route = None
 
-        open_spot = phone_quick.locator('[data-cb-position="1B"]')
-
-        expect(open_spot).to_contain_text(
-            'Open — choose player', timeout=10_000,
+        # Refused, said once on the save status -- no alert, no Retry --
+        # and nothing applied: the field is the server's.
+        expect(phone_quick.locator('.cb-save-state')).to_contain_text(
+            'Defense changed on another device', timeout=10_000,
         )
-
-        # An authoritative Open position is now intentionally actionable:
-        # the coach can tap it and choose a bench player. It must remain
-        # visually authoritative without becoming a frozen local draft.
-        expect(open_spot).to_be_enabled()
-
-        assert open_spot.evaluate(
-            "el => el.classList.contains('cb-authoritative-open')"
-        )
-        assert not open_spot.evaluate(
-            "el => el.classList.contains('cb-main-open')"
-        )
-
-        expect(
-            phone_quick.locator('.cb-main-draft-banner')
-        ).to_have_count(0)
-
-        assert dialogs
-        assert any('not saved' in message.lower() for message in dialogs)
+        expect(phone_quick.locator('[data-cb-retry-move]')).to_have_count(0)
+        expect(source).to_contain_text(before['current_alignment']['SS'])
+        assert dialogs == []
 
         # This is the regression assertion: a real remote defensive change
-        # must still repaint the phone's Quick Field normally. Before the
-        # fix, the lingering `.cb-main-open` from the stale-recovery path
-        # made live_game_dugout_mode.js's and live_game_feedback_pass.js's
-        # "a draft owns this DOM" guards refuse to repaint forever.
+        # must still repaint the phone's Quick Field normally after a
+        # refused drag.
         remote_state_response = ipad.request.get(
             f'{coachboard_url}/api/live-game/{game_id}/state'
         )

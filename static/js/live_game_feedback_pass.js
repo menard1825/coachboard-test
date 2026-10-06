@@ -369,7 +369,6 @@
 
   function patchVisibleState() {
     if (!state?.game?.is_live) return;
-    if (document.querySelector('#cbQuickDefense .cb-main-draft-banner, #cbQuickDefense .cb-main-open')) return;
 
     const alignment = state.current_alignment || {};
     const inning = String(state.current_inning || state.game?.live_current_inning || '1');
