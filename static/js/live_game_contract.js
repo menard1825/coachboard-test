@@ -274,35 +274,24 @@
     }, 0);
   }
 
-  async function waitForQuickFieldSave() {
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      const badge = document.querySelector(
-        '#cbQuickDefense .cb-save-state'
-      );
-
-      if (
-        !badge ||
-        !badge.classList.contains('saving')
-      ) {
-        return;
-      }
-
-      await sleep(100);
+  // A defensive move still saving settles first, through Quick Field's one
+  // move writer (CBQuickFieldMoves, live_game_dugout_mode.js): true once it
+  // is saved (or none was saving), false if it was refused or failed. The
+  // writer's status already says why, and offers Retry where it can.
+  async function defenseMoveSaved() {
+    const moves = window.CBQuickFieldMoves;
+    if (!moves?.whenIdle) return true;
+    // A move started while the last one settled is waited for too.
+    while (moves.busy()) {
+      if (!(await moves.whenIdle())) return false;
     }
-
-    throw new Error(
-      'Current defense is still saving. ' +
-      'Try End Inning again after Saved ✓ appears.'
-    );
+    return true;
   }
 
-  // This page's live writes (a Quick Field save, an Undo, a fill...) have
-  // all been answered, so one read now includes them. Another device's
-  // later change is caught by the server (base_sequence, the Next Inning
-  // revision), as before.
+  // This page's live writes (an Undo, a fill...) have all been answered,
+  // so one read now includes them. Another device's later change is caught
+  // by the server (base_sequence, the Next Inning revision), as before.
   async function waitForLiveWritesToSettle() {
-    await waitForQuickFieldSave();
-
     for (let attempt = 0; liveWritesInFlight > 0; attempt += 1) {
       if (attempt >= 100) {
         throw new Error(
@@ -812,6 +801,19 @@
     button.disabled = true;
 
     try {
+      // A defensive move the coach just made may still be saving. End
+      // Inning checks and advances only the field it leaves behind: wait
+      // for it, and stop -- nothing checked, nothing opened, nothing sent
+      // -- if it was not saved. The coach stays on the live field with the
+      // move's own status (Not saved — Retry, or why it was refused) and
+      // ends the inning again when ready.
+      if (window.CBQuickFieldMoves?.busy?.()) {
+        button.setAttribute('aria-busy', 'true');
+        const saved = await defenseMoveSaved();
+        button.removeAttribute('aria-busy');
+        if (!saved) return;
+      }
+
       // NEXT prep is a separate persistence channel from live rotation
       // events. Flush it explicitly before asking the server which defense
       // should become the next inning.

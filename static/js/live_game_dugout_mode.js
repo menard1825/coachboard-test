@@ -23,6 +23,9 @@
   let clockBusy = false;
   let queued = false;
   let moveBusy = false;
+  // The move moveBusy is held for: resolves once it has settled -- true if
+  // it was saved, false if it was refused or failed (whenIdle).
+  let moveSettled = Promise.resolve(true);
   let lastFailedMove = null;
   let saveMode = 'saved';
   let saveMessage = 'Saved';
@@ -1015,12 +1018,12 @@
     // Resolve the obvious move immediately:
     // open spot = move, occupied spot = swap, Bench = leave the old spot open.
     moveBusy = true;
-    closeMoveSheetThen(() => saveMove(
+    moveSettled = new Promise(settle => closeMoveSheetThen(() => saveMove(
       player.id,
       target,
       name,
       context
-    ));
+    ).then(settle)));
   }
 
   /*
@@ -1096,10 +1099,17 @@
   // Drag-and-drop commits through the same writer. `context` is what a
   // drag captures when it starts -- the field the coach picked a player up
   // from -- and `busy` holds a drag back while a move is saving.
+  //
+  // whenIdle: the move now saving, settled -- true once it is saved, false
+  // if it was refused or failed (its status already says why); true at
+  // once when no move is saving. End Inning waits on it
+  // (live_game_contract.js), so it never checks or advances a field a
+  // move is still changing.
   window.CBQuickFieldMoves = Object.freeze({
     context: () => captureMoveContext(),
     commit: commitMove,
     busy: () => moveBusy,
+    whenIdle: () => (moveBusy ? moveSettled : Promise.resolve(true)),
   });
 
   async function applyQuickDefenseSaveResponse(data) {
@@ -1128,7 +1138,8 @@
   }
 
   // commitMove's save. It holds moveBusy (set by commitMove) and always
-  // releases it, whether the move is saved, refused or fails.
+  // releases it, whether the move is saved, refused or fails. Resolves
+  // true only when the move was saved.
   async function saveMove(
     playerId,
     destination,
@@ -1138,7 +1149,7 @@
     try {
       if (!moveContextIsCurrent(context)) {
         showStaleMove();
-        return;
+        return false;
       }
 
       saveMode = 'saving';
@@ -1237,6 +1248,7 @@
       saveMessage = 'Saved ✓';
       quickDefenseSignature = '';
       queue();
+      return true;
     } catch (error) {
       reportSaveFailure(error, () => {
         lastFailedMove = {
@@ -1246,6 +1258,7 @@
           context,
         };
       });
+      return false;
     } finally {
       moveBusy = false;
     }
@@ -1496,7 +1509,11 @@
       const next = await response.json();
       state = next;
 
-      if (
+      // A move still saving owns the status: a read that lands meanwhile
+      // must not call it Saved (or Reconnected) before its answer.
+      if (moveBusy) {
+        // the move's own answer sets the status
+      } else if (
         lastFailureKind === 'network' &&
         navigator.onLine
       ) {
