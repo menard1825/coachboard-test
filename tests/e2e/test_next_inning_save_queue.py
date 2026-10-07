@@ -10,8 +10,6 @@ what the coach sees and what the server ends up holding.
 
 import os
 import re
-import time
-from datetime import date, timedelta
 
 import pytest
 
@@ -25,81 +23,29 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     )
 
 from playwright.sync_api import Page, expect
-from start_helpers import start_body  # noqa: E402
 
 import pitching_eligibility
 from e2e_cleanup import wait_until_modal_shown, watch_modal_openings
 
-from test_next_inning_save_race import (
-    cleanup_game,
-    login,
-    post_json,
+from live_fixtures import (  # noqa: F401 (next_board is a fixture)
+    IMMEDIATE_MS,
+    NEXT_BOARD_VIEWPORT as PHONE,
+    PLANNER as CARD,
+    PREP_URL,
+    bench,
+    board_alignment,
+    filled,
+    leave_live_positions_open as open_on_the_field,
+    live_state,
+    next_board,
+    other_coach_sets,
+    record_prep_posts,
+    server_next,
+    slow_network,
+    spot,
     starting_alignment,
+    wait_for_server,
 )
-
-
-PHONE = {'width': 390, 'height': 844}
-CARD = '#live-board-prep-v3'
-PREP_URL = re.compile(r'/api/live-game/\d+/next-inning-prep$')
-
-# Every tap must show on the board well inside one slow round trip.
-IMMEDIATE_MS = 400
-
-
-def create_live_game(page: Page, url: str):
-    response = page.request.post(
-        f'{url}/game-day/add',
-        form={
-            'game_date': (date.today() + timedelta(days=9)).isoformat(),
-            'game_start_time': '10:00',
-            'game_opponent': 'Next Inning Queue Opponent',
-            'game_location': 'Queue Field',
-            'pitching_rule_set': 'USSSA',
-        },
-        max_redirects=0,
-    )
-    assert response.status in {302, 303}
-    game_id = int(
-        re.search(r'/game/(\d+)', response.headers['location']).group(1)
-    )
-    post_json(page, url, '/save_rotation', {
-        'title': 'Next Inning Queue Rotation',
-        'innings': {'1': starting_alignment(), '2': starting_alignment()},
-        'associated_game_id': game_id,
-    })
-    post_json(page, url, f'/api/live-game/{game_id}/start', start_body(page.request, url, game_id))
-    return game_id
-
-
-@pytest.fixture
-def next_board(page: Page, coachboard_url: str, browser_name: str):
-    if browser_name != 'chromium':
-        pytest.skip('CDP network emulation is Chromium-only.')
-
-    page.set_viewport_size(PHONE)
-    login(page, coachboard_url)
-    game_id = create_live_game(page, coachboard_url)
-    try:
-        page.goto(
-            f'{coachboard_url}/game/{game_id}',
-            wait_until='domcontentloaded',
-        )
-        expect(page.locator('#cb-now-next-switch')).to_be_visible(
-            timeout=15_000
-        )
-        page.locator('#cb-now-next-switch [data-now-next="next"]').click()
-        board = page.locator(CARD)
-        expect(spot(board, 'SS')).to_contain_text(
-            'Shortstop Shawn', timeout=10_000
-        )
-        yield board, game_id
-    finally:
-        page.context.set_offline(False)
-        cleanup_game(page, coachboard_url, game_id)
-
-
-def spot(board, position):
-    return board.locator(f'[data-next-position="{position}"]')
 
 
 def swap(board, source, target):
@@ -120,85 +66,6 @@ def answer_displaced(page: Page, displaced, vacated):
     # The answer applies at once; no wait for the sheet's fade, so callers
     # can still check the board "immediately" after the move.
     sheet.get_by_role('button', name=f'Put {displaced} at {vacated}', exact=True).click()
-
-
-def slow_network(page: Page, latency_ms=1000):
-    cdp = page.context.new_cdp_session(page)
-    cdp.send('Network.enable')
-    cdp.send('Network.emulateNetworkConditions', {
-        'offline': False,
-        'latency': latency_ms,
-        'downloadThroughput': -1,
-        'uploadThroughput': -1,
-    })
-    return cdp
-
-
-def normal_network(cdp):
-    cdp.send('Network.emulateNetworkConditions', {
-        'offline': False,
-        'latency': 0,
-        'downloadThroughput': -1,
-        'uploadThroughput': -1,
-    })
-
-
-def server_next(page: Page, url: str, game_id: int):
-    response = page.request.get(
-        f'{url}/api/live-game/{game_id}/next-inning-prep'
-    )
-    assert response.ok, response.text()[:300]
-    return filled(response.json()['confirmed']['alignment'])
-
-
-def live_state(page: Page, url: str, game_id: int):
-    response = page.request.get(f'{url}/api/live-game/{game_id}/state')
-    assert response.ok, response.text()[:300]
-    return response.json()
-
-
-def filled(alignment):
-    return {pos: name for pos, name in (alignment or {}).items() if name}
-
-
-def board_alignment(page: Page):
-    return filled(page.evaluate('() => window.CBNextDefense.getAlignment()'))
-
-
-def wait_for_server(page, url, game_id, expected, timeout_s=15):
-    deadline = timeout_s * 1000
-    waited = 0
-    while waited < deadline:
-        if server_next(page, url, game_id) == expected:
-            return
-        page.wait_for_timeout(200)
-        waited += 200
-    assert server_next(page, url, game_id) == expected
-
-
-def record_prep_posts(page: Page):
-    """Every Next Inning save: the alignment it sent, and when it was
-    in flight, so overlapping or out-of-order writes are visible."""
-    posts = []
-
-    def on_request(request):
-        if request.method == 'POST' and PREP_URL.search(request.url):
-            posts.append({
-                'request': request,
-                'body': request.post_data_json,
-                'start': time.monotonic(),
-                'end': None,
-            })
-
-    def on_done(request):
-        for post in posts:
-            if post['request'] is request:
-                post['end'] = time.monotonic()
-
-    page.on('request', on_request)
-    page.on('requestfinished', on_done)
-    page.on('requestfailed', on_done)
-    return posts
 
 
 def expected_after(*swaps):
@@ -401,15 +268,6 @@ def test_end_inning_while_unsynced_explains_and_does_not_advance(
 
 
 # ------------------------------------------------------ stale conflicts
-
-
-def other_coach_sets(page: Page, url: str, game_id: int, alignment):
-    """Another coach's device: a plain save that does not know this board."""
-    post_json(
-        page, url,
-        f'/api/live-game/{game_id}/next-inning-prep',
-        {'mode': 'custom', 'alignment': alignment},
-    )
 
 
 def test_server_rejects_a_save_based_on_an_older_defense(
@@ -928,14 +786,6 @@ def close_open_position_picker(page: Page, position):
     expect(picker).to_be_hidden(timeout=10_000)
 
 
-def bench(board, position):
-    spot(board, position).click()
-    board.locator('[data-next-bench-selected]').click()
-    expect(spot(board, position)).to_have_attribute(
-        'data-next-player', '', timeout=IMMEDIATE_MS
-    )
-
-
 def test_incomplete_defense_warns_and_confirms_before_starting(
     page: Page, coachboard_url, next_board
 ):
@@ -992,28 +842,6 @@ def test_incomplete_defense_warns_and_confirms_before_starting(
     state = live_state(page, coachboard_url, game_id)
     assert not state['current_alignment'].get('SS')
     assert not state['current_alignment'].get('LF')
-
-
-def open_on_the_field(page: Page, url: str, game_id: int, *positions):
-    state = live_state(page, url, game_id)
-    sequence = max(
-        [
-            int(event.get('sequence') or 0)
-            for event in state.get('rotation_events', [])
-            if not event.get('reverted')
-        ]
-        or [0]
-    )
-    alignment = {
-        pos: name
-        for pos, name in filled(state['current_alignment']).items()
-        if pos not in positions
-    }
-    response = page.request.post(
-        f'{url}/api/live-game/{game_id}/defense-edit',
-        data={'alignment': alignment, 'base_sequence': sequence},
-    )
-    assert response.ok, response.text()[:300]
 
 
 def test_recorded_inning_gaps_and_next_inning_gaps_are_separate_questions(

@@ -17,53 +17,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
-
-TEST_USERNAME = 'playwright-coach'
-TEST_PASSWORD = 'playwright-password'
-
-
-def login(page: Page, coachboard_url: str):
-    page.goto(f'{coachboard_url}/login')
-    page.get_by_label('Username or email').fill(TEST_USERNAME)
-    page.locator('#password').fill(TEST_PASSWORD)
-    page.get_by_role('button', name='Sign In').click()
-
-    expect(page).to_have_url(
-        re.compile(
-            rf'^{re.escape(coachboard_url)}/?'
-            rf'(?:#(?:overview|games))?$'
-        )
-    )
-
-
-def post_json(page: Page, coachboard_url: str, path: str, data):
-    response = page.request.post(
-        f'{coachboard_url}{path}',
-        data=data,
-    )
-
-    assert response.status == 200, (
-        f'POST {path} returned '
-        f'{response.status}: {response.text()}'
-    )
-
-    payload = response.json()
-    assert payload.get('status') == 'success', payload
-    return payload
-
-
-def starting_alignment():
-    return {
-        'P': 'Pitcher Pat',
-        'C': 'Catcher Cole',
-        '1B': 'First Frank',
-        '2B': 'Second Sam',
-        '3B': 'Third Theo',
-        'SS': 'Shortstop Shawn',
-        'LF': 'Left Lee',
-        'CF': 'Center Casey',
-        'RF': 'Right Riley',
-    }
+from live_fixtures import cleanup_game, login, post_json, starting_alignment
 
 
 def planned_alignment():
@@ -157,41 +111,6 @@ def start_live_game(
     ).to_be_visible(timeout=10_000)
 
     return next_board
-
-
-def cleanup_game(
-    page: Page,
-    coachboard_url: str,
-    game_id: int,
-):
-    state_response = page.request.get(
-        f'{coachboard_url}/api/live-game/'
-        f'{game_id}/state'
-    )
-
-    if (
-        state_response.ok
-        and state_response.json()
-        .get('game', {})
-        .get('is_live')
-    ):
-        page.request.post(
-            f'{coachboard_url}/api/live-game/'
-            f'{game_id}/end-with-pitching',
-            data={
-                'defer_pitching': True,
-                'end_reason': 'manual',
-                'current_inning_played': True,
-            },
-        )
-
-    page.request.post(
-        f'{coachboard_url}/game-day/'
-        f'{game_id}/delete',
-        headers={
-            'Accept': 'application/json',
-        },
-    )
 
 
 def test_end_inning_waits_for_inflight_next_save(

@@ -28,97 +28,24 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import expect  # noqa: E402
 
-import cdn_assets  # noqa: E402
-from live_field_markers import LINEUP, create_named_live_game, login, remove_named_live_game  # noqa: E402
+from live_fixtures import (  # noqa: E402,F401 (live is a fixture)
+    INNING_1,
+    INNING_2,
+    INNING_3,
+    PHONE,
+    advance_inning as _advance,
+    api_url as _api,
+    edit_live_defense as _field_edit,
+    live,
+    set_next_inning as _set_next,
+)
 from test_pregame_plan_field_view import show_bench, show_field, show_list, statement  # noqa: E402
 
 
-PHONE = ('phone', {'width': 390, 'height': 844}, {'is_mobile': True, 'has_touch': True})
 DESKTOP = ('desktop', {'width': 1440, 'height': 900}, {})
 DEVICES = pytest.mark.parametrize('device', [PHONE, DESKTOP], ids=lambda d: d[0])
 CARD = '#live-board-pregame-plan'
 NEXT_CARD = '#live-board-prep-v3'
-
-INNING_1 = {pos: name for pos, (name, _) in LINEUP.items()}
-INNING_2 = {**INNING_1, 'P': INNING_1['1B'], '1B': INNING_1['P']}
-# The 3rd is planned only in part: who plays first and third.
-INNING_3 = {'1B': INNING_1['1B'], '3B': INNING_1['3B']}
-PLAN = {'1': INNING_1, '2': INNING_2, '3': INNING_3}
-
-
-@pytest.fixture
-def live(browser, coachboard_url):
-    made = []
-
-    def _open(device, plan=None):
-        setup = browser.new_context()
-        cdn_assets.install(setup)
-        api = setup.new_page()
-        login(api, coachboard_url)
-        game_id, player_ids = create_named_live_game(api, coachboard_url, innings=plan or PLAN)
-        made.append((setup, api, game_id, player_ids))
-
-        cdn_assets.require_vendored_assets()
-        _, viewport, extra = device
-        context = browser.new_context(viewport=viewport, **extra)
-        cdn_assets.install(context)
-        made[-1] += (context,)
-        page = context.new_page()
-        errors, writes = [], []
-        page.on('pageerror', lambda error: errors.append(str(error)))
-        page.on('request', lambda request: writes.append(request.url)
-                if request.method != 'GET' and '/api/live-game/' in request.url else None)
-        page.cb_errors, page.cb_writes = errors, writes
-        login(page, coachboard_url)
-        page.cb_api, page.cb_game = api, game_id
-        return page
-
-    yield _open
-    for setup, api, game_id, player_ids, *contexts in made:
-        for context in contexts:
-            context.close()
-        remove_named_live_game(api, coachboard_url, game_id, player_ids)
-        setup.close()
-
-
-def _api(page, base_url, path):
-    return f'{base_url}/api/live-game/{page.cb_game}/{path}'
-
-
-def _state(page, base_url):
-    return page.cb_api.request.get(_api(page, base_url, 'state')).json()
-
-
-def _sequence(state):
-    return max([int(e.get('sequence') or 0) for e in state.get('rotation_events') or [] if not e.get('reverted')] or [0])
-
-
-def _field_edit(page, base_url, **changes):
-    """A live defensive change: position -> player ('' leaves it open)."""
-    state = _state(page, base_url)
-    alignment = {pos: name for pos, name in state['current_alignment'].items() if name}
-    for pos, name in changes.items():
-        if name:
-            alignment[pos] = name
-        else:
-            alignment.pop(pos, None)
-    response = page.cb_api.request.post(_api(page, base_url, 'defense-edit'), data={
-        'base_sequence': _sequence(state), 'alignment': alignment})
-    assert response.ok, response.text()[:300]
-
-
-def _set_next(page, base_url, alignment):
-    response = page.cb_api.request.post(_api(page, base_url, 'next-inning-prep'),
-                                        data={'mode': 'custom', 'alignment': alignment})
-    assert response.ok, response.text()[:300]
-
-
-def _advance(page, base_url):
-    prep = page.cb_api.request.get(_api(page, base_url, 'next-inning-prep')).json()
-    response = page.cb_api.request.post(_api(page, base_url, 'advance-inning'), data={
-        'alignment': prep['confirmed']['alignment'], 'next_prep_id': prep['confirmed']['id'],
-        'base_sequence': _sequence(_state(page, base_url))})
-    assert response.ok, response.text()[:300]
 
 
 def _open_plan(page, base_url, inning=None):

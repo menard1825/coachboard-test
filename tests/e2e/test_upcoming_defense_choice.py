@@ -25,7 +25,7 @@ from playwright.sync_api import Page, expect
 from start_helpers import start_body
 
 from e2e_cleanup import delete_players_named
-from test_next_inning_save_race import cleanup_game, login, post_json, starting_alignment
+from live_fixtures import cleanup_game, login, post_json, starting_alignment
 from test_pregame_player_time_summary import add_player
 
 

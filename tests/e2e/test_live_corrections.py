@@ -18,17 +18,17 @@ import pytest
 
 from playwright.sync_api import Page, expect
 
-from test_next_inning_save_queue import (  # noqa: F401 (next_board is a fixture)
-    CARD,
+from live_fixtures import (  # noqa: F401 (next_board is a fixture)
+    PLANNER as CARD,
     live_state,
     next_board,
-    open_on_the_field,
+    leave_live_positions_open as open_on_the_field,
     other_coach_sets,
     server_next,
     spot,
     wait_for_server,
+    starting_alignment,
 )
-from test_next_inning_save_race import starting_alignment
 from e2e_cleanup import wait_until_modal_shown, watch_modal_openings
 
 

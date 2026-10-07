@@ -22,10 +22,10 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
-from test_live_change_pitcher_decision import (  # noqa: F401 (fixture)
+from live_fixtures import (  # noqa: F401 (fixture)
     BASE,
     RELIEVER,
-    edit_field,
+    set_live_defense as edit_field,
     filled,
     live_field,
     live_state,

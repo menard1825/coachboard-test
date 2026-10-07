@@ -38,7 +38,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
 
-from test_next_inning_save_race import cleanup_game, login, post_json
+from live_fixtures import cleanup_game, login, post_json
 
 
 PHONE = {'width': 430, 'height': 932}

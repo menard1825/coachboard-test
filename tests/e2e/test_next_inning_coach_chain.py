@@ -24,7 +24,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
-from test_next_inning_save_queue import (  # noqa: F401 (fixture)
+from live_fixtures import (  # noqa: F401 (fixture)
     IMMEDIATE_MS,
     bench,
     board_alignment,
@@ -34,8 +34,8 @@ from test_next_inning_save_queue import (  # noqa: F401 (fixture)
     record_prep_posts,
     spot,
     wait_for_server,
+    starting_alignment,
 )
-from test_next_inning_save_race import starting_alignment
 
 
 SHEET = '#cbNextPitchingChange'

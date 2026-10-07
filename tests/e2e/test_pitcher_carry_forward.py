@@ -20,8 +20,13 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import expect  # noqa: E402
 
-from test_pregame_plan_reference import (  # noqa: E402,F401 (live is a fixture)
-    INNING_1, PHONE, _advance, _api, _state, live,
+from live_fixtures import (  # noqa: E402,F401 (live is a fixture)
+    INNING_1,
+    PHONE,
+    advance_inning as _advance,
+    api_url as _api,
+    game_state as _state,
+    live,
 )
 
 
@@ -143,7 +148,7 @@ def test_the_bench_report_projects_the_carried_pitcher(live, coachboard_url):
 # A saved fielding edit, then a live pitching change -------------------------------------
 
 def test_a_saved_fielding_edit_follows_a_live_pitching_change(live, coachboard_url):
-    from test_pregame_plan_reference import _sequence, _set_next
+    from live_fixtures import last_sequence as _sequence, set_next_inning as _set_next
 
     page = live(PHONE, plan={str(i): INNING_1 for i in range(1, 7)})
     _advance(page, coachboard_url)

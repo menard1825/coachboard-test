@@ -19,7 +19,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import expect  # noqa: E402
 
 from test_live_game_status_ownership import set_sync  # noqa: E402
-from test_pregame_plan_reference import live  # noqa: E402,F401 (live is a fixture)
+from live_fixtures import live  # noqa: E402,F401 (live is a fixture)
 
 
 LABEL = '#cbDugoutHeader [data-cb-live-label]'

@@ -26,7 +26,14 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import expect  # noqa: E402
 
 from cdp_touch import GHOST_SELECTOR, TouchDriver, centres, ghost_creations, watch_ghosts  # noqa: E402
-from test_pregame_plan_reference import INNING_1, PHONE, _api, _sequence, _state, live  # noqa: E402,F401
+from live_fixtures import (  # noqa: E402,F401
+    INNING_1,
+    PHONE,
+    api_url as _api,
+    last_sequence as _sequence,
+    game_state as _state,
+    live,
+)
 
 
 CARD = '#cbQuickDefense'

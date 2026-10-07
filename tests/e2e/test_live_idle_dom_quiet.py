@@ -19,7 +19,7 @@ pytestmark = pytest.mark.e2e
 if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
-from test_pregame_plan_reference import PHONE, live  # noqa: E402,F401 (live is a fixture)
+from live_fixtures import PHONE, live  # noqa: E402,F401 (live is a fixture)
 
 
 COUNT = """() => new Promise(resolve => {

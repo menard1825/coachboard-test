@@ -23,50 +23,25 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
-from test_live_change_pitcher_decision import (  # noqa: F401 (fixture)
+from live_fixtures import (  # noqa: F401 (fixture)
     BASE,
+    MOVE_SHEET as SHEET,
     RELIEVER,
-    edit_field,
+    bench_player,
+    defense_writes,
+    drag,
+    field_player,
     filled,
+    live_events as events,
     live_field,
     live_state,
+    set_live_defense as edit_field,
+    tap_move,
     wait_for_field,
 )
 
 
-SHEET = '#cbQuickMoveModal'
 STALE = 'Defense changed on another device. Check the field and try the move again.'
-
-
-def defense_writes(page: Page):
-    posts = []
-    page.on(
-        'request',
-        lambda request: posts.append(request.post_data_json)
-        if request.method == 'POST' and 'defense-edit' in request.url
-        else None,
-    )
-    return posts
-
-
-def events(state):
-    return [e for e in state.get('rotation_events', []) if not e.get('reverted')]
-
-
-def tap_move(page: Page, player_selector: str, destination: str):
-    page.locator(f'#cbQuickDefense {player_selector}').click()
-    sheet = page.locator(SHEET)
-    expect(sheet).to_be_visible(timeout=10_000)
-    sheet.locator(f'[data-cb-destination="{destination}"]').click()
-    return sheet
-
-
-def field_player(position):
-    return f'[data-cb-position="{position}"]'
-
-
-def bench_player(name):
-    return f'.cb-qd-bench-player[data-cb-move-player="{name}"]'
 
 
 def choices(sheet):
@@ -85,14 +60,6 @@ def expect_question(sheet, title, question):
 def expect_review(sheet, lines):
     expect(sheet.locator('.modal-title')).to_have_text('Check the defensive change')
     expect(sheet.locator('[data-cb-chain-summary] li')).to_have_text(lines)
-
-
-def drag(page: Page, source, target):
-    s, t = source.bounding_box(), target.bounding_box()
-    page.mouse.move(s['x'] + s['width'] / 2, s['y'] + s['height'] / 2)
-    page.mouse.down()
-    page.mouse.move(t['x'] + t['width'] / 2, t['y'] + t['height'] / 2, steps=12)
-    page.mouse.up()
 
 
 SWAPPED = dict(BASE, SS='Second Sam', **{'2B': 'Shortstop Shawn'})

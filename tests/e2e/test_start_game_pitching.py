@@ -15,7 +15,7 @@ from test_set_defense_simplified import (  # noqa: F401 (make_page is a fixture)
     make_page,
 )
 from test_saved_defense_pitcher import setup  # noqa: F401 (fixture)
-from test_next_inning_save_queue import live_state
+from live_fixtures import live_state
 
 from playwright.sync_api import expect  # noqa: E402
 

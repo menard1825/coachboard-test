@@ -18,8 +18,14 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import expect  # noqa: E402
 
-from test_pregame_plan_reference import (  # noqa: E402,F401 (live is a fixture)
-    INNING_1, PHONE, _api, _field_edit, _sequence, _state, live,
+from live_fixtures import (  # noqa: E402,F401 (live is a fixture)
+    INNING_1,
+    PHONE,
+    api_url as _api,
+    edit_live_defense as _field_edit,
+    last_sequence as _sequence,
+    game_state as _state,
+    live,
 )
 
 

@@ -7,8 +7,6 @@ saved as one pitching change: one event, one Undo.
 """
 
 import os
-import re
-from datetime import date, timedelta
 
 import pytest
 
@@ -22,106 +20,24 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     )
 
 from playwright.sync_api import Page, expect
-from start_helpers import start_body  # noqa: E402
 
-from e2e_cleanup import delete_players_named
-from test_next_inning_save_race import cleanup_game, login, post_json
+from live_fixtures import (  # noqa: F401 (live_field is a fixture)
+    BASE,
+    RELIEVER,
+    filled,
+    live_field,
+    live_state,
+    pitcher_changes,
+    set_live_defense as edit_field,
+    wait_for_field,
+)
 
 
-PHONE = {'width': 430, 'height': 932}
 QUESTION = '#live-pitcher-destination-v7'
-RELIEVER = 'Bench Blake'
 STALE = (
     'Defense changed on another device. '
     'Check the field and try the pitching change again.'
 )
-
-BASE = {
-    'P': 'Pitcher Pat', 'C': 'Catcher Cole', '1B': 'First Frank',
-    '2B': 'Second Sam', '3B': 'Third Theo', 'SS': 'Shortstop Shawn',
-    'LF': 'Left Lee', 'CF': 'Center Casey', 'RF': 'Right Riley',
-}
-
-
-def filled(alignment):
-    return {pos: name for pos, name in (alignment or {}).items() if name}
-
-
-def live_state(page: Page, url: str, game_id: int):
-    response = page.request.get(f'{url}/api/live-game/{game_id}/state')
-    assert response.ok, response.text()[:300]
-    return response.json()
-
-
-def sequence(state):
-    return max(
-        [int(e.get('sequence') or 0) for e in state.get('rotation_events', []) if not e.get('reverted')]
-        or [0]
-    )
-
-
-def edit_field(page: Page, url: str, game_id: int, alignment):
-    """Another coach's On the Field change."""
-    state = live_state(page, url, game_id)
-    response = page.request.post(
-        f'{url}/api/live-game/{game_id}/defense-edit',
-        data={'alignment': alignment, 'base_sequence': sequence(state)},
-    )
-    assert response.ok, response.text()[:300]
-
-
-@pytest.fixture
-def live_field(page: Page, coachboard_url: str):
-    page.set_viewport_size(PHONE)
-    login(page, coachboard_url)
-    game_id = None
-    try:
-        response = page.request.post(
-            f'{coachboard_url}/add_player',
-            form={
-                'name': RELIEVER, 'number': '10', 'position1': '', 'position2': '',
-                'position3': '', 'throws': 'Right', 'bats': 'Right', 'notes': '',
-                'pitcher_role': 'Starter', 'roster_status': 'regular',
-            },
-            headers={'X-Requested-With': 'XMLHttpRequest'},
-            max_redirects=0,
-        )
-        assert response.status == 200 and response.json()['status'] == 'success'
-
-        response = page.request.post(
-            f'{coachboard_url}/game-day/add',
-            form={
-                'game_date': (date.today() + timedelta(days=14)).isoformat(),
-                'game_start_time': '11:00',
-                'game_opponent': 'Pitching Change Opponent',
-                'game_location': 'Pitching Change Field',
-                'pitching_rule_set': 'USSSA',
-            },
-            max_redirects=0,
-        )
-        game_id = int(re.search(r'/game/(\d+)', response.headers['location']).group(1))
-        post_json(page, coachboard_url, '/save_rotation', {
-            'title': 'Pitching Change Plan',
-            'innings': {'1': BASE},
-            'associated_game_id': game_id,
-        })
-        post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
-
-        def open_field(before_load=None):
-            if before_load:
-                before_load(game_id)
-            page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
-            expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
-            expect(
-                page.locator('#cbQuickDefense [data-cb-position="SS"]')
-            ).to_contain_text('Shortstop Shawn', timeout=10_000)
-            return game_id
-
-        yield open_field
-    finally:
-        if game_id is not None:
-            cleanup_game(page, coachboard_url, game_id)
-        assert delete_players_named(page.request, coachboard_url, [RELIEVER]) == []
 
 
 def record_pitching_changes(page: Page):
@@ -163,25 +79,8 @@ def choices(question):
     return [text.strip() for text in question.locator('[data-pc-choices] button').all_inner_texts()]
 
 
-def pitcher_changes(state):
-    return [
-        event for event in state.get('rotation_events', [])
-        if event.get('event_type') == 'Pitcher Change' and not event.get('reverted')
-    ]
-
-
 def player_id(state, name):
     return next(int(p['id']) for p in state['roster'] if p['name'] == name)
-
-
-def wait_for_field(page, url, game_id, expected, timeout_ms=10_000):
-    waited = 0
-    while waited < timeout_ms:
-        if filled(live_state(page, url, game_id)['current_alignment']) == expected:
-            return
-        page.wait_for_timeout(200)
-        waited += 200
-    assert filled(live_state(page, url, game_id)['current_alignment']) == expected
 
 
 # ------------------------------------------------------ fielder → pitcher

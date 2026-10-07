@@ -21,9 +21,13 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect  # noqa: E402
 
-from test_live_change_pitcher_decision import (  # noqa: E402,F401 (live_field is a fixture)
-    BASE, QUESTION, live_field, live_state, wait_for_field,
+from live_fixtures import (  # noqa: E402,F401 (live_field is a fixture)
+    BASE,
+    live_field,
+    live_state,
+    wait_for_field,
 )
+from test_live_change_pitcher_decision import QUESTION  # noqa: E402
 
 
 PICKER = '#live-pitcher-picker-v2'

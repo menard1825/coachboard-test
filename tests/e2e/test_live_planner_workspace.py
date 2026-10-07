@@ -31,7 +31,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import expect  # noqa: E402
 
-from test_pregame_plan_reference import PHONE, _api, live  # noqa: E402,F401 (live is a fixture)
+from live_fixtures import PHONE, api_url as _api, live  # noqa: E402,F401 (live is a fixture)
 
 
 TOUCH = {'is_mobile': True, 'has_touch': True}

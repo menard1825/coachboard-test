@@ -35,8 +35,8 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
-from test_next_inning_save_queue import (  # noqa: F401 (next_board is a fixture)
-    CARD,
+from live_fixtures import (  # noqa: F401 (next_board is a fixture)
+    PLANNER as CARD,
     IMMEDIATE_MS,
     board_alignment,
     filled,

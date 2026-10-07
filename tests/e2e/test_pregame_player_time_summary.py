@@ -24,7 +24,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import Page, expect
 
 from e2e_cleanup import delete_players_named
-from test_next_inning_save_race import cleanup_game, login, post_json
+from live_fixtures import cleanup_game, login, post_json
 
 
 DESKTOP = {'width': 1280, 'height': 900}
