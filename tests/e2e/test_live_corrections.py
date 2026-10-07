@@ -5,7 +5,8 @@
   picker for the open spot in the next inning. With more than one spot
   open, the picker names the one it fills and lists the others, which stay
   marked Open.
-* Undo is labelled and 44px tall, and says what it took back.
+* Live Undo is labelled and 44px tall, and says what it took back; the
+  planner's Plan Undo says what came back to the next inning.
 * The live header keeps the inning, clock and pitcher apart at 320px, with
   44px controls and no sideways scrolling.
 """
@@ -18,10 +19,13 @@ from playwright.sync_api import Page, expect
 
 from live_fixtures import (  # noqa: F401 (next_board is a fixture)
     PLANNER as CARD,
+    end_inning_from_live,
     live_state,
     next_board,
     leave_live_positions_open as open_on_the_field,
     other_coach_sets,
+    plan_undo,
+    return_to_live_field,
     server_next,
     spot,
     wait_for_server,
@@ -84,8 +88,7 @@ def test_finish_is_prominent_and_opens_the_next_inning_picker(page: Page, coachb
     other_coach_sets(page, coachboard_url, game_id, planned)
     expect(spot(board, 'RF')).to_have_attribute('data-next-player', '', timeout=10_000)
 
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     incomplete = page.locator('#cbIncompleteNextModal')
     expect(incomplete.locator('.modal-title')).to_have_text('2nd inning defense has open positions', timeout=10_000)
     finish = incomplete.get_by_role('button', name='Finish 2nd Inning Defense')
@@ -111,7 +114,7 @@ def _toast(page):
 
 def test_undo_is_labelled_and_says_what_it_took_back(page: Page, coachboard_url, next_board):
     board, game_id = next_board
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+    return_to_live_field(page)
     undo = page.locator('#liveUndoBtn')
     expect(undo).to_have_attribute('aria-label', 'Undo live change')
     expect(undo).to_contain_text('live change')
@@ -126,7 +129,7 @@ def test_undo_is_labelled_and_says_what_it_took_back(page: Page, coachboard_url,
     expect(page.locator('#cbNowOpenWarning')).to_have_count(0, timeout=5_000)
 
     # Undoing an inning change names it.
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(page.locator('#live-inning-display')).to_have_text('2', timeout=20_000)
     page.wait_for_timeout(800)
     undo.click()
@@ -140,10 +143,12 @@ def test_next_inning_undo_says_what_came_back(page: Page, coachboard_url, next_b
     board.get_by_role('button', name=re.compile(r'^Bench #\d+ Right Riley$')).click()
     expect(spot(board, 'RF')).to_have_attribute('data-next-player', '', timeout=2_000)
     page.wait_for_timeout(800)
-    page.locator('#liveUndoBtn').click()
+    # The planner's own Undo (Plan Undo); the live field is not touched.
+    plan_undo(page)
     expect(board.locator('[data-next-undo-note]')).to_have_text(
         'Undid your last change to the 2nd: Right Riley back at RF.', timeout=5_000)
     wait_for_server(page, coachboard_url, game_id, starting_alignment())
+    assert _filled(live_state(page, coachboard_url, game_id)['current_alignment']) == starting_alignment()
 
 
 @pytest.mark.parametrize('size', [(320, 640), (360, 740), (375, 667), (390, 844), (440, 956),
@@ -151,7 +156,7 @@ def test_next_inning_undo_says_what_came_back(page: Page, coachboard_url, next_b
                          ids=lambda s: f'{s[0]}x{s[1]}')
 def test_the_live_header_is_readable_and_reachable(page: Page, coachboard_url, next_board, size):
     page.set_viewport_size({'width': size[0], 'height': size[1]})
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+    return_to_live_field(page)
     page.wait_for_timeout(500)
     data = page.evaluate("""() => {
       const header = document.getElementById('cbDugoutHeader');

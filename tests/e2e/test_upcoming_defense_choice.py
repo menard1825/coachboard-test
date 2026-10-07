@@ -2,17 +2,17 @@
 
 * An upcoming inning with no plan of its own carries the field forward.
 * A live change during the 1st still carries the field forward when the 2nd
-  has its own plan, but the Next Inning board now says so -- "Using the
+  has its own plan, but the Next Inning planner now says so -- "Using the
   1st-inning field. Your 2nd-inning plan won't be used." -- and offers
-  "Use 2nd-inning plan". That choice is saved as the coach's: a reload, a
-  tab switch, or another live change does not undo it, and End Inning
-  starts exactly that defense. A different pitcher in it goes through End
-  Inning's usual pitching check.
+  "Use 2nd-inning plan". That choice is saved as the coach's: a reload,
+  leaving and reopening the planner, or another live change does not undo
+  it, and End Inning (on the live field) starts exactly that defense. A
+  different pitcher in it goes through End Inning's usual pitching check.
 * After an edit the header says "Changes saved for the 2nd" at once.
+* Live Undo takes back the live change; Plan Undo takes back the planner's
+  own choice and leaves the live field alone.
 * Bench Report projects the upcoming inning from the defense that will
   actually start, then the plan, and names innings it can't project.
-* Pregame Plan keeps the original plan as a reference and labels its two
-  comparisons: plan against plan, and the game against this plan.
 """
 
 import re
@@ -25,7 +25,16 @@ from playwright.sync_api import Page, expect
 from start_helpers import start_body
 
 from e2e_cleanup import delete_players_named
-from live_fixtures import cleanup_game, login, post_json, starting_alignment
+from live_fixtures import (
+    cleanup_game,
+    end_inning_from_live,
+    login,
+    open_next_inning_planner,
+    plan_undo,
+    post_json,
+    return_to_live_field,
+    starting_alignment,
+)
 from test_pregame_player_time_summary import add_player
 
 
@@ -93,10 +102,6 @@ def _board_alignment(page):
     return _filled(page.evaluate('() => window.CBNextDefense.getAlignment()'))
 
 
-def _show(page, view):
-    page.locator(f'#cb-now-next-switch [data-now-next="{view}"]').click()
-
-
 def _expect_board(page, alignment, label):
     board = _board(page)
     expect(board.locator('[data-next-hint]')).to_have_text(label, timeout=15_000)
@@ -118,7 +123,7 @@ def game(page: Page, coachboard_url):
                   start_body(page.request, coachboard_url, game_id))
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         expect(page.locator('#cb-now-next-switch')).to_be_visible(timeout=15_000)
-        _show(page, 'next')
+        open_next_inning_planner(page)
         yield game_id
     finally:
         cleanup_game(page, coachboard_url, game_id)
@@ -141,13 +146,6 @@ def test_a_live_change_says_the_plan_wont_be_used(page: Page, coachboard_url, ga
     _expect_board(page, SWAP, 'Same defense as the 1st')
     expect(_board(page).locator('[data-next-plan-note]')).to_have_text(NOTE)
     expect(_board(page).get_by_role('button', name='Use 2nd-inning plan')).to_be_visible()
-    # The original plan is still there, labelled as the reference.
-    _show(page, 'plan')
-    expect(page.get_by_text('Reference only').first).to_be_visible(timeout=10_000)
-    # Plan against plan, and the game against this plan, each labelled.
-    expect(page.locator('.cb-plan-changes')).to_have_text('Plan change from Inning 1: 1B, 2B, LF, RF')
-    expect(page.locator('.cb-plan-colhead .cb-plan-planned')).to_have_text('Pregame plan')
-    expect(page.locator('.cb-plan-colhead .cb-plan-game')).to_have_text('Next inning')
 
 
 # 3. Choosing the saved plan, keeping it, and starting with exactly it -----------------------
@@ -162,19 +160,20 @@ def test_using_the_plan_is_kept_and_starts_the_inning(page: Page, coachboard_url
     prep = _prep(page, coachboard_url, game)
     assert prep['source'] == 'planned' and _filled(prep['alignment']) == D2
 
-    # A tab switch, a reload, and another live change keep the choice.
-    _show(page, 'now')
-    _show(page, 'next')
+    # Leaving and reopening the planner, a reload, and another live change
+    # keep the choice.
+    return_to_live_field(page)
+    open_next_inning_planner(page)
     _expect_board(page, D2, 'Pregame plan for the 2nd')
     page.reload(wait_until='domcontentloaded')
     expect(page.locator('#cb-now-next-switch')).to_be_visible(timeout=15_000)
-    _show(page, 'next')
+    open_next_inning_planner(page)
     _expect_board(page, D2, 'Pregame plan for the 2nd')
     _live_change(page, coachboard_url, game, dict(SWAP, LF='Center Casey', CF='Left Lee'))
     page.wait_for_timeout(4_500)                  # past the board's poll
     _expect_board(page, D2, 'Pregame plan for the 2nd')
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(page.locator('#live-inning-display')).to_have_text('2', timeout=20_000)
     assert _filled(_state(page, coachboard_url, game)['current_alignment']) == D2
 
@@ -190,13 +189,13 @@ def test_an_unplanned_inning_follows_the_field(page: Page, coachboard_url):
                   start_body(page.request, coachboard_url, game_id))
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         expect(page.locator('#cb-now-next-switch')).to_be_visible(timeout=15_000)
-        _show(page, 'next')
+        open_next_inning_planner(page)
         _expect_board(page, D1, 'Same defense as the 1st')
         _live_change(page, coachboard_url, game_id, SWAP)
         _expect_board(page, SWAP, 'Same defense as the 1st')
         expect(_board(page).locator('[data-next-plan-note]')).to_have_count(0)
         expect(_board(page).get_by_role('button', name='Use 2nd-inning plan')).to_have_count(0)
-        page.locator('#liveEndInningBtn').click()
+        end_inning_from_live(page)
         expect(page.locator('#live-inning-display')).to_have_text('2', timeout=20_000)
         assert _filled(_state(page, coachboard_url, game_id)['current_alignment']) == SWAP
     finally:
@@ -224,13 +223,13 @@ def test_an_edit_is_named_at_once_and_the_plan_can_come_back(page: Page, coachbo
 def test_undo_of_the_live_change_brings_the_plan_back(page: Page, coachboard_url, game):
     _live_change(page, coachboard_url, game, SWAP)
     _expect_board(page, SWAP, 'Same defense as the 1st')
-    _show(page, 'now')
+    return_to_live_field(page)
     page.locator('#liveUndoBtn').click()
     page.wait_for_function(
         f"async () => (await (await fetch('/api/live-game/{game}/state')).json()).current_alignment.SS === 'Shortstop Shawn'",
         timeout=10_000,
     )
-    _show(page, 'next')
+    open_next_inning_planner(page)
     _expect_board(page, D2, 'Pregame plan for the 2nd')
     expect(_board(page).locator('[data-next-plan-note]')).to_have_count(0)
 
@@ -241,16 +240,28 @@ def test_undo_on_the_next_inning_board_takes_back_using_the_plan(page: Page, coa
     _board(page).get_by_role('button', name='Use 2nd-inning plan').click()
     _expect_board(page, D2, 'Pregame plan for the 2nd')
     page.wait_for_timeout(800)
-    page.locator('#liveUndoBtn').click()
+    # Plan Undo, the planner's own: it takes back the choice, not the live change.
+    plan_undo(page)
     expect(_spot(page, 'SS')).to_have_attribute('data-next-player', 'Third Theo', timeout=10_000)
     expect(_board(page).locator('[data-next-plan-note]')).to_be_visible()
     expect(_board(page).get_by_role('button', name='Use 2nd-inning plan')).to_be_visible()
+    page.wait_for_timeout(800)
+    assert _prep(page, coachboard_url, game)['source'] != 'planned'
+    assert _filled(_state(page, coachboard_url, game)['current_alignment']) == SWAP
+
+    # Live Undo still has the live change to take back.
+    return_to_live_field(page)
+    page.locator('#liveUndoBtn').click()
+    page.wait_for_function(
+        f"async () => (await (await fetch('/api/live-game/{game}/state')).json()).current_alignment.SS === 'Shortstop Shawn'",
+        timeout=10_000,
+    )
 
 
 # 7. Bench Report ---------------------------------------------------------------------------
 
 def _bench_report(page):
-    _show(page, 'now')
+    return_to_live_field(page)
     page.locator('[data-cb-bench-report]').click()
     modal = page.locator('#cbBenchReportModal')
     expect(modal.locator('[data-cb-br-basis]')).to_be_visible(timeout=10_000)
@@ -278,7 +289,7 @@ def test_bench_report_follows_the_defense_that_will_start(page: Page, coachboard
     expect(modal).to_be_hidden()
 
     # Using the plan (Riley to LF, Bench Bo in RF): now Left Lee sits the 2nd.
-    _show(page, 'next')
+    open_next_inning_planner(page)
     _board(page).get_by_role('button', name='Use 2nd-inning plan').click()
     _expect_board(page, D2, 'Pregame plan for the 2nd')
     page.wait_for_timeout(800)
@@ -314,14 +325,14 @@ def test_a_resting_pitcher_in_the_plan_is_asked_about_at_end_inning(page: Page, 
                   start_body(page.request, coachboard_url, game_id))
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         expect(page.locator('#cb-now-next-switch')).to_be_visible(timeout=15_000)
-        _show(page, 'next')
+        open_next_inning_planner(page)
         _live_change(page, coachboard_url, game_id, SWAP)
         _expect_board(page, SWAP, 'Same defense as the 1st')
         _board(page).get_by_role('button', name='Use 2nd-inning plan').click()
         _expect_board(page, casey_pitches, 'Pregame plan for the 2nd')
         page.wait_for_timeout(800)
 
-        page.locator('#liveEndInningBtn').click()
+        end_inning_from_live(page)
         decision = page.locator('#cbPitchingDecisionModal')
         expect(decision).to_be_visible(timeout=15_000)
         expect(decision).to_contain_text('70 game pitches')

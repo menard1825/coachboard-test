@@ -27,6 +27,7 @@ from live_fixtures import (  # noqa: E402,F401 (live is a fixture)
     api_url as _api,
     game_state as _state,
     live,
+    end_inning_from_live,
 )
 
 
@@ -54,7 +55,7 @@ def test_open_p_shows_one_message_and_focuses_the_pitcher_spot(live, coachboard_
     page.locator('#cbQuickDefense').wait_for(state='visible', timeout=20_000)
     page.wait_for_timeout(1_500)
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     spot = page.locator(f'{BOARD} [data-next-position="P"]')
     expect(spot).to_be_focused(timeout=5_000)
     assert _visible_messages(page) == 1
@@ -71,7 +72,7 @@ def test_open_p_shows_one_message_and_focuses_the_pitcher_spot(live, coachboard_
     spot.click()
     expect(spot).to_have_attribute('data-next-player', reliever, timeout=3_000)
     expect(board.locator('.cb-next-save')).to_have_class(re.compile(r'\bsaved\b'), timeout=5_000)
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(page.locator('#live-inning-display')).to_have_text('2', timeout=10_000)
     assert _visible_messages(page) == 0
     assert page.cb_errors == []

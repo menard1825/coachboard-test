@@ -8,9 +8,10 @@ height that implies, so Change Pitcher and End Inning ended up below the fold.
 live_game_board_prep_v2.js now owns landscape sizing for both fields and
 derives it from the viewport height.
 
-On the Field and Next Inning do not share a vertical budget -- Next Inning
-carries a heading and a save chip above its field -- so they are measured
-separately here rather than through one shared helper.
+The live field and the full-screen Next Inning planner do not share a
+vertical budget -- the planner has its own bar (Live Field, Plan Undo) and a
+heading above its field -- so they are measured separately here. End Inning
+belongs to the live field; the planner is measured without it.
 """
 
 import os
@@ -30,6 +31,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
+from live_fixtures import PLANNER, open_next_inning_planner, return_to_live_field  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -142,14 +144,18 @@ def open_live_game(page: Page, coachboard_url: str, game_id: int):
     expect(page.locator(SWITCHER)).to_be_visible(timeout=15_000)
 
 
-def show(page: Page, view: str):
-    page.locator(f'{SWITCHER} [data-now-next="{view}"]').click()
-    target = {
-        'now': '#cbQuickDefense',
-        'next': '#live-board-prep-v3',
-        'plan': '#live-board-pregame-plan',
-    }[view]
-    expect(page.locator(target)).to_be_visible(timeout=15_000)
+def show(page: Page, surface: str):
+    """'live': the live field. 'planner': the full-screen Next Inning planner,
+    opened and closed with the coach's own controls."""
+    planner = page.locator(PLANNER)
+    if surface == 'planner':
+        if not planner.is_visible():
+            open_next_inning_planner(page)
+        expect(planner).to_be_visible(timeout=15_000)
+    else:
+        if planner.is_visible():
+            return_to_live_field(page)
+        expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
 
 
 MEASURE = """
@@ -171,6 +177,7 @@ MEASURE = """
     };
   };
 
+  // The live field's "Plan next inning" button.
   const tabs = [...document.querySelectorAll('#cb-now-next-switch [data-now-next]')];
   const tabWraps = tabs.map(tab => {
     // A label that fits on one line paints as a single client rect.
@@ -205,14 +212,21 @@ MEASURE = """
 """
 
 
+LIVE_CONTROLS = {
+    'header': '#cbDugoutHeader',
+    'switcher': SWITCHER,
+    'changePitcher': '#liveChangePitcherBtn',
+    'endInning': '#liveEndInningBtn',
+}
+PLANNER_CONTROLS = {
+    'planBar': f'{PLANNER} .cb-next-bar',
+    'liveField': f'{PLANNER} [data-next-close]',
+    'planUndo': f'{PLANNER} [data-next-undo-local]',
+}
+
+
 def measure(page: Page, field: str, extra=None):
-    selectors = {
-        'header': '#cbDugoutHeader',
-        'switcher': SWITCHER,
-        'field': field,
-        'changePitcher': '#liveChangePitcherBtn',
-        'endInning': '#liveEndInningBtn',
-    }
+    selectors = {'field': field, **(LIVE_CONTROLS if field == NOW_FIELD else PLANNER_CONTROLS)}
     selectors.update(extra or {})
     return page.evaluate(MEASURE, selectors)
 
@@ -223,10 +237,11 @@ def assert_no_horizontal_overflow(data, label):
     )
 
 
-def assert_tabs_on_one_line(data, label):
+def assert_plan_button_on_one_line(data, label):
+    assert data['tabs'], f'{label}: no Plan next inning button'
     for tab in data['tabs']:
         assert tab['lines'] == 1, (
-            f'{label}: tab {tab["label"]!r} wrapped onto {tab["lines"]} lines'
+            f'{label}: {tab["label"]!r} wrapped onto {tab["lines"]} lines'
         )
 
 
@@ -271,7 +286,7 @@ def test_on_the_field_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
 
     try:
         open_live_game(page, coachboard_url, game_id)
-        show(page, 'now')
+        show(page, 'live')
 
         data = measure(page, NOW_FIELD, {'bench': '#cbQuickDefense .cb-qd-bench-wrap'})
         height = data['viewport']['height']
@@ -286,7 +301,7 @@ def test_on_the_field_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
             )
 
         assert_no_horizontal_overflow(data, 'On the Field at 1024x768')
-        assert_tabs_on_one_line(data, 'On the Field at 1024x768')
+        assert_plan_button_on_one_line(data, 'On the Field at 1024x768')
         assert_markers_are_tappable(data, 'On the Field at 1024x768')
         assert_field_inside_card(
             page, NOW_FIELD, '#cbQuickDefense', 'On the Field at 1024x768'
@@ -302,7 +317,7 @@ def test_next_inning_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
 
     try:
         open_live_game(page, coachboard_url, game_id)
-        show(page, 'next')
+        show(page, 'planner')
         # At rest there is no move instruction; the header shows the plan.
         expect(page.locator(HINT)).not_to_contain_text('Moving')
 
@@ -312,8 +327,8 @@ def test_next_inning_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
         })
         height = data['viewport']['height']
 
-        for name in ('header', 'switcher', 'heading',
-                     'field', 'bench', 'endInning'):
+        for name in ('planBar', 'liveField', 'planUndo', 'heading',
+                     'field', 'bench'):
             box = data['boxes'][name]
             assert box, f'Next Inning at 1024x768: {name} is missing'
             assert box['bottom'] <= height, (
@@ -323,7 +338,6 @@ def test_next_inning_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
             )
 
         assert_no_horizontal_overflow(data, 'Next Inning at 1024x768')
-        assert_tabs_on_one_line(data, 'Next Inning at 1024x768')
         assert_markers_are_tappable(data, 'Next Inning at 1024x768')
         assert_field_inside_card(
             page, NEXT_FIELD, '#live-board-prep-v3', 'Next Inning at 1024x768'
@@ -342,15 +356,16 @@ def test_landscape_tablets_keep_both_fields_inside_their_cards(page: Page, coach
             open_live_game(page, coachboard_url, game_id)
 
             for view, field, card in (
-                ('now', NOW_FIELD, '#cbQuickDefense'),
-                ('next', NEXT_FIELD, '#live-board-prep-v3'),
+                ('live', NOW_FIELD, '#cbQuickDefense'),
+                ('planner', NEXT_FIELD, '#live-board-prep-v3'),
             ):
                 label = f'{view} at {width}x{height}'
                 show(page, view)
                 data = measure(page, field)
 
                 assert_no_horizontal_overflow(data, label)
-                assert_tabs_on_one_line(data, label)
+                if view == 'live':
+                    assert_plan_button_on_one_line(data, label)
                 assert_markers_are_tappable(data, label)
                 assert_field_inside_card(page, field, card, label)
 
@@ -360,19 +375,22 @@ def test_landscape_tablets_keep_both_fields_inside_their_cards(page: Page, coach
                     f'{label}: field aspect ratio drifted to {ratio:.3f}'
                 )
 
-                assert data['boxes']['endInning']['bottom'] <= height, (
-                    f'{label}: End Inning is below the fold'
-                )
+                if view == 'live':
+                    assert data['boxes']['endInning']['bottom'] <= height, (
+                        f'{label}: End Inning is below the fold'
+                    )
     finally:
         cleanup_game(page, coachboard_url, game_id)
 
 
 def test_landscape_fields_are_sized_by_height_not_only_width(page: Page, coachboard_url: str):
-    """The same width at two heights must not produce the same field.
+    """The same width at two heights must not produce the same live field.
 
     This is the regression that started B2: picking a fixed width per
     breakpoint made 1024x768 and 1024x1366 render an identical diamond, and
-    only one of those screens had room for it.
+    only one of those screens had room for it. The full-screen planner has
+    the whole screen to itself, in two columns: its field must fit the
+    screen at both heights.
     """
     login(page, coachboard_url)
     game_id = create_live_game(page, coachboard_url, 'Landscape Height Aware')
@@ -383,27 +401,24 @@ def test_landscape_fields_are_sized_by_height_not_only_width(page: Page, coachbo
             page.set_viewport_size({'width': 1280, 'height': viewport_height})
             open_live_game(page, coachboard_url, game_id)
 
-            for view, field in (('now', NOW_FIELD), ('next', NEXT_FIELD)):
-                show(page, view)
-                box = measure(page, field)['boxes']['field']
-                heights[(view, viewport_height)] = box['height']
+            show(page, 'live')
+            heights[viewport_height] = measure(page, NOW_FIELD)['boxes']['field']['height']
 
-        for view in ('now', 'next'):
-            short = heights[(view, 720)]
-            tall = heights[(view, 900)]
-            assert tall > short + 20, (
-                f'{view}: field measured {short}px at 1280x720 and {tall}px at '
-                f'1280x900 -- it is not responding to the vertical budget'
+            show(page, 'planner')
+            label = f'planner at 1280x{viewport_height}'
+            data = measure(page, NEXT_FIELD)
+            box = data['boxes']['field']
+            assert box['top'] >= data['boxes']['planBar']['bottom'] - 1, f'{label}: field under the bar {data}'
+            assert box['bottom'] <= viewport_height, (
+                f'{label}: field ends {box["bottom"] - viewport_height}px below the fold'
             )
+            assert_field_inside_card(page, NEXT_FIELD, PLANNER, label)
 
-        # Next Inning has more chrome of its own above the field, so at the
-        # same viewport it must not claim as much height as On the Field.
-        for viewport_height in (720, 900):
-            assert heights[('next', viewport_height)] < heights[('now', viewport_height)], (
-                f'at 1280x{viewport_height} Next Inning claimed '
-                f'{heights[("next", viewport_height)]}px against On the '
-                f'Field\'s {heights[("now", viewport_height)]}px'
-            )
+        short, tall = heights[720], heights[900]
+        assert tall > short + 20, (
+            f'live field measured {short}px at 1280x720 and {tall}px at '
+            f'1280x900 -- it is not responding to the vertical budget'
+        )
     finally:
         cleanup_game(page, coachboard_url, game_id)
 
@@ -417,7 +432,8 @@ def test_pregame_plan_stays_compact_and_usable_in_landscape(page: Page, coachboa
         for width, height in TABLET_LANDSCAPE:
             page.set_viewport_size({'width': width, 'height': height})
             open_live_game(page, coachboard_url, game_id)
-            show(page, 'plan')
+            page.locator(f'{SWITCHER} [data-now-next="plan"]').click()
+            expect(page.locator('#live-board-pregame-plan')).to_be_visible(timeout=15_000)
 
             label = f'plan at {width}x{height}'
             plan = page.locator('#live-board-pregame-plan')
@@ -431,7 +447,6 @@ def test_pregame_plan_stays_compact_and_usable_in_landscape(page: Page, coachboa
                 'field': '#live-board-pregame-plan',
             })
             assert_no_horizontal_overflow(data, label)
-            assert_tabs_on_one_line(data, label)
 
             box = data['boxes']['plan']
             assert box['top'] <= height, f'{label}: plan starts below the fold'
@@ -454,15 +469,16 @@ def test_portrait_and_phone_are_untouched_by_landscape_sizing(page: Page, coachb
             open_live_game(page, coachboard_url, game_id)
 
             for view, field, card in (
-                ('now', NOW_FIELD, '#cbQuickDefense'),
-                ('next', NEXT_FIELD, '#live-board-prep-v3'),
+                ('live', NOW_FIELD, '#cbQuickDefense'),
+                ('planner', NEXT_FIELD, '#live-board-prep-v3'),
             ):
                 label = f'{view} at {width}x{height}'
                 show(page, view)
                 data = measure(page, field)
 
                 assert_no_horizontal_overflow(data, label)
-                assert_tabs_on_one_line(data, label)
+                if view == 'live':
+                    assert_plan_button_on_one_line(data, label)
                 assert_field_inside_card(page, field, card, label)
 
                 box = data['boxes']['field']
@@ -497,15 +513,15 @@ def field_top(page: Page):
 
 
 def test_next_inning_mid_move_fits_a_1024x768_tablet(page: Page, coachboard_url: str):
-    """The old STEP 2 panel pushed the field down and End Inning below the
-    fold. Mid-move now changes one header line and nothing moves."""
+    """The old STEP 2 panel pushed the field down and off the screen.
+    Mid-move now changes one header line and nothing moves."""
     page.set_viewport_size({'width': 1024, 'height': 768})
     login(page, coachboard_url)
     game_id = create_live_game(page, coachboard_url, 'Landscape Mid Move')
 
     try:
         open_live_game(page, coachboard_url, game_id)
-        show(page, 'next')
+        show(page, 'planner')
         expect(page.locator(f'{NEXT_FIELD} [data-next-position="SS"]')).to_contain_text('Shortstop Shawn')
         at_rest = measure(page, NEXT_FIELD, {'bench': '#live-board-prep-v3 .cb-next-bench'})
         start_move(page)
@@ -514,10 +530,10 @@ def test_next_inning_mid_move_fits_a_1024x768_tablet(page: Page, coachboard_url:
             'hint': HINT, 'bench': '#live-board-prep-v3 .cb-next-bench',
         })
         height = data['viewport']['height']
-        for name in ('hint', 'field', 'bench', 'endInning'):
+        for name in ('planBar', 'hint', 'field', 'bench'):
             box = data['boxes'][name]
             assert box and box['bottom'] <= height, f'mid-move at 1024x768: {name} {box} below {height}'
-        for name in ('field', 'bench', 'endInning'):
+        for name in ('planBar', 'field', 'bench'):
             assert abs(data['boxes'][name]['top'] - at_rest['boxes'][name]['top']) <= 1, (
                 f'{name} moved when a player was tapped'
             )
@@ -528,15 +544,14 @@ def test_next_inning_mid_move_fits_a_1024x768_tablet(page: Page, coachboard_url:
         hint = page.evaluate(HINT_LINE, HINT)
         assert not hint['clipped'] and hint['font'] >= 10, hint
 
-        # Finishing the move still works: SS onto 2B asks where Second Sam goes.
+        # Finishing the move still works: SS onto 2B swaps the two at once.
         page.locator(f'{NEXT_FIELD} [data-next-position="2B"]').click()
-        sheet = page.locator('#cbNextPitchingChange')
-        expect(sheet).to_contain_text('Where should Second Sam go?', timeout=5_000)
-        sheet.get_by_role('button', name='Put Second Sam at SS', exact=True).click()
         expect(page.locator(HINT)).not_to_contain_text('Moving', timeout=10_000)
         expect(page.locator(f'{NEXT_FIELD} [data-next-position="2B"]')).to_contain_text('Shortstop Shawn', timeout=10_000)
         expect(page.locator(f'{NEXT_FIELD} [data-next-position="SS"]')).to_contain_text('Second Sam')
-        assert measure(page, NEXT_FIELD)['boxes']['endInning']['bottom'] <= height
+        after = measure(page, NEXT_FIELD, {'bench': '#live-board-prep-v3 .cb-next-bench'})
+        for name in ('field', 'bench'):
+            assert after['boxes'][name]['bottom'] <= height, f'after the move: {name} below {height}'
 
         # Tapping the moving player again cancels; the field is as it was.
         start_move(page, 'CF')
@@ -558,7 +573,7 @@ def test_a_move_keeps_the_field_in_place_elsewhere(page: Page, coachboard_url: s
 
     try:
         open_live_game(page, coachboard_url, game_id)
-        show(page, 'next')
+        show(page, 'planner')
         expect(page.locator(f'{NEXT_FIELD} [data-next-position="SS"]')).to_contain_text('Shortstop Shawn')
         before = field_top(page)
         resting = page.evaluate(HINT_LINE, HINT)

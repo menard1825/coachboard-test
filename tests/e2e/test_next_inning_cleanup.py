@@ -46,6 +46,8 @@ from live_fixtures import (  # noqa: F401 (next_board is a fixture)
     server_next,
     spot,
     wait_for_server,
+    end_inning_from_live,
+    return_to_live_field,
 )
 from test_saved_defense_pitcher import setup  # noqa: F401 (fixture)
 from test_set_defense_simplified import _open_game, make_page  # noqa: F401 (fixture)
@@ -123,7 +125,7 @@ def _inning(page: Page, url, game_id):
 
 
 def _end_inning_to(page: Page, inning: str):
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(page.locator('#live-inning-display')).to_have_text(inning, timeout=20_000)
     page.wait_for_timeout(800)            # the next inning's board settles
 
@@ -170,7 +172,7 @@ def _start_the_2nd_anyway(setup, url):
     on the bench, so End Inning asks); the 3rd planned full."""
     page, game_id = _start(setup, url, {'1': FULL, '2': NO_CF, '3': FULL})
     _watch_questions(page)
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     incomplete = page.locator(INCOMPLETE)
     expect(incomplete.locator('.modal-title')).to_have_text('2nd inning defense has CF open', timeout=15_000)
     expect(incomplete).to_contain_text('CF is open, and players are available on the bench.')
@@ -204,7 +206,7 @@ def test_a_changed_defense_with_the_same_open_spot_asks_again(setup, coachboard_
     page, game_id = _start_the_2nd_anyway(setup, coachboard_url)
     _set_field(page, coachboard_url, game_id, dict(NO_CF, SS='Second Sam', **{'2B': 'Shortstop Shawn'}))
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     recorded = page.locator(RECORDED)
     expect(recorded.locator('.modal-title')).to_have_text(
         'Center field is empty at the end of the 2nd', timeout=15_000
@@ -229,7 +231,7 @@ def test_a_different_open_set_asks_again(setup, coachboard_url):
     page, game_id = _start_the_2nd_anyway(setup, coachboard_url)
     _set_field(page, coachboard_url, game_id, {p: n for p, n in NO_CF.items() if p != 'LF'})
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     recorded = page.locator(RECORDED)
     expect(recorded).to_contain_text(
         'Nobody was in LF or CF when the 2nd ended.', timeout=15_000
@@ -246,7 +248,7 @@ def test_three_empty_spots_read_naturally_and_continue_goes_on(setup, coachboard
     third = {p: n for p, n in NO_CF.items() if p not in ('LF', 'RF')}
     _set_field(page, coachboard_url, game_id, third)
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     recorded = page.locator(RECORDED)
     expect(recorded.locator('.modal-title')).to_have_text(
         'Left field, center field, and right field are empty at the end of the 2nd', timeout=15_000
@@ -296,7 +298,7 @@ def test_a_player_on_the_bench_still_asks(setup, coachboard_url):
     # Center Casey is here but planned on the bench: CF could be filled.
     page, game_id = _start(setup, coachboard_url, {'1': NO_CF, '2': NO_CF},
                            out=('Relief Rex', 'Relief Rae'))
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     incomplete = page.locator(INCOMPLETE)
     expect(incomplete).to_contain_text('CF is open, and players are available on the bench.', timeout=15_000)
     incomplete.get_by_role('button', name='Finish 2nd Inning Defense').click()
@@ -319,7 +321,7 @@ def test_several_open_spots_are_named_and_the_start_is_remembered(
     wait_for_server(page, coachboard_url, game_id, plan)
     _watch_questions(page)
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     incomplete = page.locator(INCOMPLETE)
     expect(incomplete.locator('.modal-title')).to_have_text(
         '2nd inning defense has open positions', timeout=15_000
@@ -333,7 +335,7 @@ def test_several_open_spots_are_named_and_the_start_is_remembered(
 
     # The 3rd's plan is the same open defense: asked about; the 2nd's
     # record (the defense just started on purpose) is not.
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(incomplete.locator('.modal-title')).to_have_text(
         '3rd inning defense has open positions', timeout=15_000
     )
@@ -349,10 +351,10 @@ def test_finish_defense_returns_to_next_inning_planning(page: Page, coachboard_u
     board.get_by_role('button', name='Bench #9 Right Riley', exact=True).click()
     wait_for_server(page, coachboard_url, game_id, {p: n for p, n in FULL.items() if p != 'RF'})
 
-    # Ending from On the Field: Finish brings the coach to the 2nd's plan.
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+    # Ending from the live field: Finish brings the coach to the 2nd's plan.
+    return_to_live_field(page)
     expect(board).to_be_hidden()
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     incomplete = page.locator(INCOMPLETE)
     expect(incomplete.locator('.modal-title')).to_have_text('2nd inning defense has RF open', timeout=15_000)
     _expect_two_real_choices(incomplete, 'Finish 2nd Inning Defense', 'Start 2nd with RF Open')
@@ -378,7 +380,7 @@ def test_an_open_p_is_never_accepted_even_short_handed(setup, coachboard_url):
     page.locator('#cb-now-next-switch [data-now-next="next"]').click()
     expect(spot(page.locator(CARD), 'P')).to_have_attribute('data-next-player', '', timeout=10_000)
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     # One message -- the board's own line -- and focus on the P spot
     # (test_end_inning_needs_pitcher.py); no question is asked.
     expect(spot(page.locator(CARD), 'P')).to_be_focused(timeout=15_000)

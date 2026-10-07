@@ -36,6 +36,7 @@ from live_fixtures import (  # noqa: E402,F401 (live is a fixture)
     edit_live_defense as _field_edit,
     set_next_inning as _set_next,
     live,
+    end_inning_from_live,
 )
 
 
@@ -209,7 +210,7 @@ def test_a_save_still_in_flight_holds_end_inning(live, coachboard_url):
     _bench_right_field(page)
     expect(page.locator(NOTE)).to_have_text('Saving the 2nd defense…')
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     page.wait_for_timeout(1_500)
     assert _inning(page, coachboard_url) == '1'                 # waits for the save
     assert held
@@ -248,8 +249,7 @@ def test_a_competing_edit_is_not_shown_as_saved_and_holds_end_inning(live, coach
     expect(board.locator('[data-next-hint]')).to_have_text('Saved on another device for the 2nd')
 
     # End Inning waits for the coach.
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(board).to_be_visible(timeout=10_000)                 # sent back to look
     page.wait_for_timeout(800)
     assert _inning(page, coachboard_url) == '1'
@@ -259,7 +259,7 @@ def test_a_competing_edit_is_not_shown_as_saved_and_holds_end_inning(live, coach
     board.locator('[data-next-conflict-ack]').click()
     expect(badge).to_have_text('Saved ✓')
     expect(page.locator(NOTE)).to_have_text('Changes for the 2nd')     # not "Your changes"
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     _wait_inning(page, coachboard_url, '2')
     assert _filled(_live(page, coachboard_url)['current_alignment']) == other
     assert page.cb_errors == []
@@ -301,8 +301,7 @@ def test_a_conflict_whose_new_defense_cannot_load_waits_for_it(live, coachboard_
     expect(rf_before).not_to_have_attribute('data-next-player', other['RF'])
     expect(page.locator(NOTE)).to_have_text('Not saved — check the 2nd')
 
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(board).to_be_visible(timeout=10_000)                 # sent back to look
     page.wait_for_timeout(800)
     assert _inning(page, coachboard_url) == '1'
@@ -320,8 +319,7 @@ def test_a_conflict_whose_new_defense_cannot_load_waits_for_it(live, coachboard_
     expect(badge).to_have_text('Not saved')
 
     # Loaded is not accepted: End Inning still waits for the coach.
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(board).to_be_visible(timeout=10_000)
     page.wait_for_timeout(800)
     assert _inning(page, coachboard_url) == '1'
@@ -330,7 +328,7 @@ def test_a_conflict_whose_new_defense_cannot_load_waits_for_it(live, coachboard_
     expect(badge).to_have_text('Saved ✓')
     expect(page.locator(NOTE)).to_have_text('Changes for the 2nd')
     page.unroute('**/next-inning-prep')
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     _wait_inning(page, coachboard_url, '2')
     assert _filled(_live(page, coachboard_url)['current_alignment']) == other
     assert page.cb_errors == []

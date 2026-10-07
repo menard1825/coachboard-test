@@ -22,8 +22,10 @@ from live_fixtures import (  # noqa: E402,F401 (live is a fixture)
     INNING_1,
     PHONE,
     advance_inning as _advance,
+    end_inning_from_live,
     game_state as _state,
     live,
+    open_next_inning_planner,
 )
 
 
@@ -39,7 +41,7 @@ def _open(page, coachboard_url):
 
 
 def _next_board(page):
-    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    open_next_inning_planner(page)
     board = page.locator('#live-board-prep-v3')
     expect(board).to_be_visible()
     return board
@@ -63,8 +65,7 @@ def test_the_pitcher_carries_on_and_his_planned_spot_shows_open(live, coachboard
     expect(board.locator('[data-next-position="1B"]')).to_have_attribute('data-next-player', '')
 
     # End Inning asks about the open spot, as for any open position.
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     incomplete = page.locator('#cbIncompleteNextModal')
     expect(incomplete).to_be_visible(timeout=10_000)
     incomplete.get_by_role('button', name=re.compile(r'^Start 3rd with 1B Open$')).click()

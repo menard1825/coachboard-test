@@ -25,6 +25,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import Page, expect
 
 from live_fixtures import (  # noqa: F401 (fixture)
+    end_inning_from_live,
     bench,
     board_alignment,
     filled,
@@ -56,7 +57,9 @@ def advance_posts(page: Page):
 
 
 def end_inning(page: Page):
-    page.locator('#liveEndInningBtn').click()
+    # From the live field: the planner, if open, is left first (saves in
+    # flight keep going -- End Inning waits for them itself).
+    end_inning_from_live(page)
 
 
 def expect_started_with(page: Page, url: str, game_id: int, alignment):

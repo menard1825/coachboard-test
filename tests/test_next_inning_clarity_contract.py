@@ -10,7 +10,7 @@ def test_next_inning_ux_uses_authoritative_next_inning():
 
     assert "latest?.next_inning" in source
     assert "function inningOrdinal(value)" in source
-    assert "`${inningLabel} Inning`" in source
+    assert "`Plan ${inningLabel} inning`" in source
     assert "${esc(inningLabel)} Inning Defense" in source
     assert "`End ${currentLabel} → Start ${inningLabel}`" in source
     assert "`Use ${esc(currentLabel)} Inning Defense`" in source

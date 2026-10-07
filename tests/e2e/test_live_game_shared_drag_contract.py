@@ -28,6 +28,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
+from live_fixtures import open_next_inning_planner, plan_undo  # noqa: E402
 
 from e2e_cleanup import delete_players_named, release_game
 from cdp_touch import (
@@ -566,11 +567,12 @@ def test_board_click_handlers_survive_the_migration(page: Page, coachboard_url, 
     """Draft-cancel and Next Inning Undo must not be deleted with the drag listeners.
 
     Both boards' click listeners do double duty -- suppression plus a
-    board feature (unified_field_entry.js:514-530 handles
-    [data-cb-cancel-main-draft]; board_prep_v2.js:2354-2389 intercepts
-    #liveUndoBtn while Next Inning is showing). Only the suppression
-    half moves to the manager. Deleting either wholesale breaks a
-    feature no drag test would notice.
+    board feature (unified_field_entry.js handles
+    [data-cb-cancel-main-draft]; the planner handles its own Plan Undo,
+    [data-next-undo-local]). Only the suppression half moves to the
+    manager. Deleting either wholesale breaks a feature no drag test
+    would notice. A drag in the planner is undone by Plan Undo; the
+    header Undo is the live game's only.
     """
     if browser_name != 'chromium':
         pytest.skip('Chromium-only.')
@@ -582,7 +584,7 @@ def test_board_click_handlers_survive_the_migration(page: Page, coachboard_url, 
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=15_000)
 
-        page.locator('[data-now-next="next"]').click()
+        open_next_inning_planner(page)
         expect(page.locator('#live-board-prep-v3')).to_be_visible(timeout=10_000)
 
         source = page.locator('#live-board-prep-v3 [data-next-position="SS"]')
@@ -594,9 +596,9 @@ def test_board_click_handlers_survive_the_migration(page: Page, coachboard_url, 
         page.mouse.up()
         expect(source).to_contain_text('OPEN', timeout=10_000)
 
-        undo = page.locator('#liveUndoBtn')
+        undo = page.locator('#live-board-prep-v3 [data-next-undo-local]')
         expect(undo).to_be_enabled(timeout=10_000)
-        undo.click()
+        plan_undo(page)
         expect(source).to_contain_text('Shortstop Shawn', timeout=10_000)
     finally:
         cleanup(page, coachboard_url, game_id, player_name)

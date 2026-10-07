@@ -39,7 +39,7 @@ from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
 
 from change_pitcher_flow import DESTINATION_QUESTION, choose_outgoing_destination
-from live_fixtures import cleanup_game, login, post_json
+from live_fixtures import cleanup_game, login, post_json, end_inning_from_live
 
 
 PHONE = {'width': 430, 'height': 932}
@@ -367,14 +367,14 @@ def test_next_inning_plans_a_flagged_pitcher_and_end_inning_decides(
     # End Inning re-evaluates on the server and asks. Go Back / Cancel
     # change nothing.
     modal = page.locator('#cbPitchingDecisionModal')
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(modal).to_be_visible(timeout=15_000)
     expect(modal.locator('.modal-title')).to_have_text('Shortstop Shawn appears ineligible to pitch')
     expect(modal).to_contain_text('MLB Pitch Smart: Resting. 70 game pitches')
     modal.get_by_role('button', name='Go Back').click()
     expect(modal).to_be_hidden()
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(modal).to_be_visible(timeout=15_000)
     modal.get_by_role('button', name='Use Shortstop Anyway').click()
     expect(modal.locator('.modal-title')).to_have_text('Override pitching rule?')
@@ -385,7 +385,7 @@ def test_next_inning_plans_a_flagged_pitcher_and_end_inning_decides(
     assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
 
     # The override: honored for this End Inning without asking again.
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(modal).to_be_visible(timeout=15_000)
     modal.get_by_role('button', name='Use Shortstop Anyway').click()
     modal.get_by_role('button', name='Use Shortstop Anyway').click()
@@ -414,7 +414,7 @@ def test_end_inning_unknown_asks_for_verification(
     expect(board.locator('[data-next-pitcher-status]')).to_contain_text("Can't confirm")
 
     modal = page.locator('#cbPitchingDecisionModal')
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(modal).to_be_visible(timeout=15_000)
     expect(modal.locator('.modal-title')).to_have_text(
         "CoachBoard can't confirm Third Theo's eligibility"
@@ -423,7 +423,7 @@ def test_end_inning_unknown_asks_for_verification(
     expect(modal).to_be_hidden()
     assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(modal).to_be_visible(timeout=15_000)
     modal.get_by_role('button', name='I verified Third is eligible').click()
     expect(page.locator('#live-inning-display')).to_have_text('2', timeout=20_000)
@@ -435,7 +435,7 @@ def test_continuing_pitcher_is_not_rechecked(
 ):
     """Pat carrying into the next inning is not a new pitcher (current rule)."""
     game_id = game_with_history
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(page.locator('#live-inning-display')).to_have_text('2', timeout=20_000)
     expect(page.locator('#cbPitchingDecisionModal')).not_to_be_visible()
     assert live_state(page, coachboard_url, game_id)['current_alignment']['P'] == 'Pitcher Pat'
@@ -549,7 +549,7 @@ def test_removed_pitcher_is_flagged_everywhere_and_overridable_explicitly(
 
     # End Inning: the re-entry warning, then the explicit override.
     modal = page.locator('#cbPitchingDecisionModal')
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(modal).to_be_visible(timeout=15_000)
     expect(modal).to_contain_text(REENTRY)
     modal.get_by_role('button', name='Use Pitcher Anyway').click()

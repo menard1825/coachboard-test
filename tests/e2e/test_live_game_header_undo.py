@@ -4,9 +4,13 @@ live_game_command_center.js used to park #liveUndoBtn inside .coach-live-head,
 which live_game_dugout_mode.js hides in Dugout Mode. The only way the button
 stayed reachable was gameday_pitching_steppers.js re-showing that head with a
 higher-specificity rule -- so a 46px row plus margin sat between the dark
-header and the On the Field / Next Inning / Pregame Plan tabs carrying nothing
-but one circular control. On a 1024x768 tablet that row is the difference
-between End Inning being on screen and being below the fold.
+header and the live field's controls carrying nothing but one circular
+control. On a 1024x768 tablet that row is the difference between End Inning
+being on screen and being below the fold.
+
+The header Undo is the live game's Undo only. The full-screen Next Inning
+planner has its own Plan Undo, and while it is open the header Undo cannot
+be reached.
 """
 
 import os
@@ -26,6 +30,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
+from live_fixtures import open_next_inning_planner, return_to_live_field  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -147,7 +152,7 @@ def test_undo_sits_in_the_dark_header_and_costs_no_row(page: Page, coachboard_ur
         if head.count():
             expect(head.first).to_be_hidden()
 
-        # ...and nothing sits between the dark header and the tabs.
+        # ...and nothing sits between the dark header and Plan next inning.
         gap = page.evaluate(
             """() => {
               const header = document.querySelector('#cbDugoutHeader');
@@ -175,7 +180,7 @@ def test_header_undo_keeps_its_label_and_a_tappable_target(page: Page, coachboar
         open_live_game(page, coachboard_url, game_id)
 
         undo = page.locator(UNDO)
-        # Named for what it undoes (the 2nd Inning tab's is the next-inning edit).
+        # Named for what it undoes (next-inning edits have the planner's Plan Undo).
         expect(undo).to_have_attribute('aria-label', 'Undo live change')
         expect(undo).to_have_attribute(
             'title', 'Undo the last live-game change'
@@ -295,9 +300,10 @@ def test_phone_header_still_shows_undo_without_a_row(page: Page, coachboard_url:
 def test_header_undo_still_undoes_and_still_disables(page: Page, coachboard_url: str):
     """Moving the element must not change what it does.
 
-    The /undo handler in live_game_v2 is delegated from document, and
-    live_game_board_prep_v2 toggles `disabled` by id, so both should survive
-    the reparent -- this proves it rather than assuming it.
+    The /undo handler in live_game_v2 is delegated from document, so it
+    should survive the reparent -- this proves it rather than assuming it.
+    And while the coach plans the next inning, the live Undo is out of reach:
+    the planner has its own Plan Undo.
     """
     page.set_viewport_size({'width': 1024, 'height': 768})
     login(page, coachboard_url)
@@ -338,17 +344,20 @@ def test_header_undo_still_undoes_and_still_disables(page: Page, coachboard_url:
             f'undo did not restore the alignment: {before} -> {after}'
         )
 
-        # Pregame Plan is reference only, so the header Undo has to go dead
-        # there exactly as it did in its old home.
-        page.locator('#cb-now-next-switch [data-now-next="plan"]').click()
-        expect(page.locator('#live-board-pregame-plan')).to_be_visible(
-            timeout=10_000
-        )
-        expect(undo).to_be_disabled()
+        # The planner: the header Undo is behind it and inert; the
+        # planner's own Plan Undo is the one on screen.
+        in_inert = "el => !!el.closest('[inert]')"
+        open_next_inning_planner(page)
+        expect(page.locator('#live-board-prep-v3 [data-next-undo-local]')).to_be_visible(timeout=10_000)
+        expect(undo).to_be_hidden()
+        assert undo.evaluate(in_inert)
 
-        page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+        # Back on the live field it is reachable and works again.
+        return_to_live_field(page)
         expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=10_000)
+        expect(undo).to_be_visible()
         expect(undo).to_be_enabled()
+        assert not undo.evaluate(in_inert)
     finally:
         cleanup_game(page, coachboard_url, game_id)
 

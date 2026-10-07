@@ -15,6 +15,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Browser, Page, expect
 from start_helpers import start_body  # noqa: E402
+from live_fixtures import end_inning_from_live, open_next_inning_planner  # noqa: E402
 
 import cdn_assets
 
@@ -1008,9 +1009,7 @@ def test_test2_end_inning_uses_latest_remote_next_prep(
             timeout=15_000,
         )
 
-        phone.locator(
-            '[data-now-next="next"]'
-        ).click()
+        open_next_inning_planner(phone)
 
         next_board = phone.locator(
             '#live-board-prep-v3'
@@ -1110,9 +1109,8 @@ def test_test2_end_inning_uses_latest_remote_next_prep(
         phone.unroute(stale_route)
         stale_route = None
 
-        phone.locator(
-            '#liveEndInningBtn'
-        ).click()
+        # Back on the live field, End Inning; nothing waits first.
+        end_inning_from_live(phone)
 
         expect(
             phone.locator(

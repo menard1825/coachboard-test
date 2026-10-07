@@ -17,7 +17,14 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
-from live_fixtures import cleanup_game, login, post_json, starting_alignment
+from live_fixtures import (
+    cleanup_game,
+    end_inning_from_live,
+    login,
+    open_next_inning_planner,
+    post_json,
+    starting_alignment,
+)
 
 
 def planned_alignment():
@@ -96,13 +103,7 @@ def start_live_game(
         page.locator('#live-game-overlay')
     ).to_be_visible(timeout=15_000)
 
-    expect(
-        page.locator('#cb-now-next-switch')
-    ).to_be_visible(timeout=15_000)
-
-    page.locator(
-        '#cb-now-next-switch [data-now-next="next"]'
-    ).click()
+    open_next_inning_planner(page)
 
     next_board = page.locator('#live-board-prep-v3')
 
@@ -233,9 +234,7 @@ def test_end_inning_waits_for_inflight_next_save(
         )
 
         # This is the tap that lost Travis's final edits in game 78.
-        page.locator(
-            '#liveEndInningBtn'
-        ).click()
+        end_inning_from_live(page)
 
         # Give the old buggy implementation enough time to run its state
         # stabilization check and incorrectly advance using stale NEXT.
@@ -418,9 +417,7 @@ def test_advance_rejects_next_changed_after_client_read(
             },
         )
 
-        page.locator(
-            '#liveEndInningBtn'
-        ).click()
+        end_inning_from_live(page)
 
         page.wait_for_function(
             '() => window.__cbAdvanceStatus !== null'
@@ -507,13 +504,14 @@ def test_next_inning_labels_follow_authoritative_inning(
             game_id,
         )
 
+        # The live field's "Plan next inning" button names the inning.
         next_tab = page.locator(
             '#cb-now-next-switch '
             '[data-now-next="next"]'
         )
 
         expect(next_tab).to_have_text(
-            '2nd Inning',
+            'Plan 2nd inning',
             timeout=10_000,
         )
 
@@ -548,14 +546,12 @@ def test_next_inning_labels_follow_authoritative_inning(
             )
         ).to_have_count(0)
 
-        # At phone width the longer tab label must still fit its tab.
+        # At phone width the longer label must still fit its button.
         assert next_tab.evaluate(
             '(el) => el.scrollWidth <= el.clientWidth + 1'
         )
 
-        page.locator(
-            '#liveEndInningBtn'
-        ).click()
+        end_inning_from_live(page)
 
         expect(
             page.locator(
@@ -567,11 +563,11 @@ def test_next_inning_labels_follow_authoritative_inning(
         )
 
         expect(next_tab).to_have_text(
-            '3rd Inning',
+            'Plan 3rd inning',
             timeout=10_000,
         )
 
-        next_tab.click()
+        open_next_inning_planner(page)
 
         expect(
             next_board.locator(

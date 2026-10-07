@@ -17,6 +17,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
+from live_fixtures import end_inning_from_live, open_next_inning_planner  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -1294,9 +1295,7 @@ def test_now_next_first_slice(
             )
         ).to_have_count(0)
 
-        switcher.locator(
-            '[data-now-next="next"]'
-        ).click()
+        open_next_inning_planner(page)
 
         next_board = page.locator(
             '#live-board-prep-v3'
@@ -1374,8 +1373,10 @@ def test_now_next_first_slice(
             )
         ).to_have_count(0)
 
-        undo = page.locator(
-            '#liveUndoBtn'
+        # Plan Undo, the planner's own: next-inning edits are not the
+        # live game's Undo.
+        undo = next_board.locator(
+            '[data-next-undo-local]'
         )
 
         expect(
@@ -1412,6 +1413,14 @@ def test_now_next_first_slice(
             prep['confirmed']['alignment']['2B']
             == 'Pitcher Pat'
         )
+
+        # The live field was not touched by Plan Undo.
+        live_now = page.request.get(
+            f'{coachboard_url}/api/live-game/'
+            f'{game_id}/state'
+        ).json()
+        assert live_now['current_alignment']['P'] == 'Pitcher Pat'
+        assert live_now['current_inning'] == '1'
 
         # Two ordinary non-pitcher swaps on NEXT.
         next_board.locator(
@@ -1538,9 +1547,7 @@ def test_now_next_first_slice(
             'Set a pitcher for the next inning'
         )
 
-        page.locator(
-            '#liveEndInningBtn'
-        ).click()
+        end_inning_from_live(page)
 
         expect(
             page.locator(
@@ -1550,18 +1557,29 @@ def test_now_next_first_slice(
             '1'
         )
 
+        # End Inning brings the coach back to the planner, focused on the
+        # open P spot; the one message there says why.
         expect(
             next_board.locator(
-                '.cb-next-error'
+                '[data-next-position="P"]'
             )
-        ).to_contain_text(
-            'Set a pitcher for the next inning',
+        ).to_be_focused(
             timeout=10_000,
         )
 
+        expect(
+            next_board.locator(
+                '.cb-next-warnings'
+            )
+        ).to_contain_text(
+            'Set a pitcher for the next inning'
+        )
+
         # Restore the pitcher, leaving RF intentionally OPEN.
-        undo = page.locator(
-            '#liveUndoBtn'
+        # Plan Undo, the planner's own: next-inning edits are not the
+        # live game's Undo.
+        undo = next_board.locator(
+            '[data-next-undo-local]'
         )
 
         expect(
@@ -1598,9 +1616,7 @@ def test_now_next_first_slice(
 
         # No huddle. An open spot is confirmed once, by name, and then
         # NEXT becomes NOW.
-        page.locator(
-            '#liveEndInningBtn'
-        ).click()
+        end_inning_from_live(page)
 
         expect(
             page.locator(
@@ -1648,11 +1664,14 @@ def test_now_next_first_slice(
             == 'planned'
         )
 
+        # The plan, with the pitcher carried forward: Second Sam took over
+        # in the 2nd and keeps pitching, so Pitcher Pat stays at 2B (see
+        # test_pitcher_carry_forward).
         assert (
             nonblank(
                 prep_three['confirmed']['alignment']
             )
-            == alignment()
+            == dict(alignment(), P='Second Sam', **{'2B': 'Pitcher Pat'})
         )
 
         # End Game is not a pitch-entry workflow.

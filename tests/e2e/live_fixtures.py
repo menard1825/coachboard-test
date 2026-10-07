@@ -390,12 +390,35 @@ PREP_URL = re.compile(r'/api/live-game/\d+/next-inning-prep$')
 IMMEDIATE_MS = 400
 
 
+PLAN_NEXT_INNING = '#cb-now-next-switch [data-now-next="next"]'
+END_INNING = '#liveEndInningBtn'
+
+
 def open_next_inning_planner(page: Page):
     """Tap "Plan next inning" on the live screen."""
     expect(page.locator('#cb-now-next-switch')).to_be_visible(
         timeout=15_000
     )
-    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    page.locator(PLAN_NEXT_INNING).click()
+
+
+def return_to_live_field(page: Page):
+    """Leave the full-screen planner the way a coach does ("Live Field").
+    Nothing waits for a save: what is saving keeps saving."""
+    page.locator(f'{PLANNER} [data-next-close]').click()
+    expect(page.locator(PLANNER)).to_be_hidden(timeout=10_000)
+
+
+def end_inning_from_live(page: Page):
+    """End Inning is on the live field: go back there first if planning."""
+    if page.locator(PLANNER).is_visible():
+        return_to_live_field(page)
+    page.locator(END_INNING).click()
+
+
+def plan_undo(page: Page):
+    """The planner's own Undo (Plan Undo), not the live game's."""
+    page.locator(f'{PLANNER} [data-next-undo-local]').click()
 
 
 def _create_next_board_game(page: Page, url: str):

@@ -25,8 +25,10 @@ from live_fixtures import (  # noqa: E402,F401 (live is a fixture)
     PHONE,
     advance_inning as _advance,
     api_url as _api,
+    end_inning_from_live,
     game_state as _state,
     live,
+    open_next_inning_planner,
 )
 
 
@@ -76,7 +78,7 @@ def test_the_new_pitcher_keeps_pitching_after_the_planned_takeover(live, coachbo
 
     _open(page, coachboard_url)
     expect(page.locator(NOTE)).to_have_text(f'Plan for the 4th · {MATEO} keeps pitching')
-    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    open_next_inning_planner(page)
     board = page.locator('#live-board-prep-v3')
     expect(board.locator('[data-next-position="P"]')).to_have_attribute('data-next-player', MATEO)
     expect(board.locator('[data-next-position="1B"]')).to_have_attribute('data-next-player', LUKE)
@@ -86,8 +88,7 @@ def test_the_new_pitcher_keeps_pitching_after_the_planned_takeover(live, coachbo
     assert board.locator('[data-next-hint]').evaluate(
         'el => el.scrollWidth <= el.clientWidth + 1 && getComputedStyle(el).whiteSpace === "normal"')
 
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     _wait_inning(page, coachboard_url, '4')
     assert _filled(_state(page, coachboard_url)['current_alignment']) == _carried('4')
     # No pitcher question or warning on the way (Luke's own status on the
@@ -98,7 +99,7 @@ def test_the_new_pitcher_keeps_pitching_after_the_planned_takeover(live, coachbo
     # A reload: the 5th is prepared the same way.
     _open(page, coachboard_url)
     expect(page.locator(NOTE)).to_have_text(f'Plan for the 5th · {MATEO} keeps pitching')
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     _wait_inning(page, coachboard_url, '5')
     assert _filled(_state(page, coachboard_url)['current_alignment']) == _carried('5')
     # The saved plan is the reference, unchanged.
@@ -156,6 +157,7 @@ def test_a_saved_fielding_edit_follows_a_live_pitching_change(live, coachboard_u
     # The coach's 4th: left and right field swap (Luke still at P -- not chosen).
     edit = dict(INNING_1, LF=INNING_1['RF'], RF=INNING_1['LF'])
     _set_next(page, coachboard_url, edit)
+    _open(page, coachboard_url)                                    # the coach's page is open
     # Change Pitcher: Mateo comes in from 1B, Luke takes 1B.
     api = page.cb_api.request
     state = _state(page, coachboard_url)
@@ -166,7 +168,7 @@ def test_a_saved_fielding_edit_follows_a_live_pitching_change(live, coachboard_u
     expected = dict(edit, P=MATEO, **{'1B': LUKE})
 
     # A live refresh on this same page must not invent another coach.
-    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    open_next_inning_planner(page)
     board = page.locator('#live-board-prep-v3')
     expect(board.locator('[data-next-position="P"]')).to_have_attribute('data-next-player', MATEO)
     expect(board.locator('[data-next-notice]')).to_have_text('Next inning defense updated.')
@@ -174,7 +176,7 @@ def test_a_saved_fielding_edit_follows_a_live_pitching_change(live, coachboard_u
     for _ in range(2):                                             # and after a reload
         _open(page, coachboard_url)
         expect(page.locator(NOTE)).to_have_text(f'Changes for the 4th · {MATEO} keeps pitching')
-        page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+        open_next_inning_planner(page)
         board = page.locator('#live-board-prep-v3')
         expect(board.locator('[data-next-position="P"]')).to_have_attribute('data-next-player', MATEO)
         expect(board.locator('[data-next-position="1B"]')).to_have_attribute('data-next-player', LUKE)
@@ -182,8 +184,7 @@ def test_a_saved_fielding_edit_follows_a_live_pitching_change(live, coachboard_u
         expect(board.locator('[data-next-hint]')).to_have_text(
             f'Changes saved for the 4th · {MATEO} keeps pitching; {LUKE} moves to 1B.')
 
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     _wait_inning(page, coachboard_url, '4')
     expect(page.locator('.modal.show')).to_have_count(0)           # no question about Luke
     assert _filled(_state(page, coachboard_url)['current_alignment']) == expected
@@ -191,7 +192,7 @@ def test_a_saved_fielding_edit_follows_a_live_pitching_change(live, coachboard_u
     # Live Undo restores the saved next defense without attributing it to someone else.
     page.locator('#liveUndoBtn').click()
     _wait_inning(page, coachboard_url, '3')
-    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+    open_next_inning_planner(page)
     board = page.locator('#live-board-prep-v3')
     expect(board.locator('[data-next-position="P"]')).to_have_attribute('data-next-player', MATEO)
     expect(board.locator('[data-next-notice]')).to_have_text('Next inning defense updated.')

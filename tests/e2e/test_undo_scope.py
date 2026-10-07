@@ -22,7 +22,10 @@ from live_fixtures import (  # noqa: E402,F401 (live is a fixture)
     INNING_1,
     PHONE,
     api_url as _api,
+    end_inning_from_live,
     live,
+    open_next_inning_planner,
+    return_to_live_field,
 )
 
 
@@ -37,8 +40,8 @@ def _open(page, coachboard_url):
     page.wait_for_timeout(800)
 
 
-def _next_tab(page):
-    page.locator('#cb-now-next-switch [data-now-next="next"]').click()
+def _planner(page):
+    open_next_inning_planner(page)
     board = page.locator(BOARD)
     expect(board).to_be_visible()
     return board
@@ -66,12 +69,12 @@ def _bench_right_field(page, coachboard_url, board):
 def test_undo_on_the_field_is_still_the_live_undo(live, coachboard_url):
     page = live(PHONE, plan=PLAN)
     _open(page, coachboard_url)
-    board = _next_tab(page)
+    board = _planner(page)
     _bench_right_field(page, coachboard_url, board)
-    page.locator('#cb-now-next-switch [data-now-next="now"]').click()
+    return_to_live_field(page)
 
-    # End the 1st, then undo it from On the Field: the live Undo.
-    page.locator('#liveEndInningBtn').click()
+    # End the 1st, then undo it from the live field: the live Undo.
+    end_inning_from_live(page)
     incomplete = page.locator('#cbIncompleteNextModal')
     expect(incomplete).to_be_visible(timeout=10_000)
     incomplete.get_by_role('button', name=re.compile(r'^Start 2nd with RF Open$')).click()

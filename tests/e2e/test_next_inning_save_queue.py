@@ -28,6 +28,9 @@ import pitching_eligibility
 from e2e_cleanup import wait_until_modal_shown, watch_modal_openings
 
 from live_fixtures import (  # noqa: F401 (next_board is a fixture)
+    end_inning_from_live,
+    plan_undo,
+    return_to_live_field,
     IMMEDIATE_MS,
     NEXT_BOARD_VIEWPORT as PHONE,
     PLANNER as CARD,
@@ -136,7 +139,7 @@ def test_end_inning_waits_for_the_queue_and_starts_with_the_final_defense(
         final['RF'], timeout=IMMEDIATE_MS
     )
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
 
     expect(page.locator('#live-inning-display')).to_have_text(
         '2', timeout=25_000
@@ -244,7 +247,7 @@ def test_end_inning_while_unsynced_explains_and_does_not_advance(
         'Not synced — retrying', timeout=5_000
     )
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
 
     expect(board.locator('.cb-next-error')).to_contain_text(
         'has not synced yet', timeout=15_000
@@ -435,7 +438,7 @@ def test_fielder_to_pitcher_bench_choice_leaves_the_spot_open(
     expect(page.locator('#cbNextOpenWarning')).to_have_text(
         '⚠ Next inning: SS is open'
     )
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     modal = page.locator('#cbIncompleteNextModal')
     expect(modal).to_be_visible(timeout=10_000)
     expect(modal).to_contain_text('SS is open, and players are available on the bench.')
@@ -472,8 +475,8 @@ def test_pitcher_to_field_asks_who_pitches(
     expected['SS'] = 'Pitcher Pat'
     wait_for_server(page, coachboard_url, game_id, expected)
 
-    # Undo takes the whole answer back in one step.
-    page.locator('#liveUndoBtn').click()
+    # Plan Undo takes the whole answer back in one step.
+    plan_undo(page)
     wait_for_server(page, coachboard_url, game_id, original)
 
     # Choosing the shortstop to pitch is the swap, because the coach said so.
@@ -525,7 +528,7 @@ def test_pitching_change_through_a_slow_save_starts_the_next_inning(
     )
 
     # End Inning waits for the queued saves, then records the change.
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(page.locator('#live-inning-display')).to_have_text(
         '2', timeout=25_000
     )
@@ -781,9 +784,10 @@ def test_incomplete_defense_warns_and_confirms_before_starting(
     modal = page.locator('#cbIncompleteNextModal')
 
     bench(board, 'SS')
+    return_to_live_field(page)
 
-    # The warning sits right above End Inning, in view on a phone and not
-    # covered by the fixed action bar.
+    # Back on the live field, the warning sits right above End Inning, in
+    # view on a phone and not covered by the fixed action bar.
     warning = page.locator('#cbNextOpenWarning')
     expect(warning).to_have_text('⚠ Next inning: SS is open')
     box = warning.bounding_box()
@@ -815,6 +819,7 @@ def test_incomplete_defense_warns_and_confirms_before_starting(
 
     # Several open spots: every one is named; Start inning anyway advances.
     bench(board, 'LF')
+    return_to_live_field(page)
     expect(warning).to_have_text('⚠ Next inning: SS, LF are open')
     wait_for_server(page, coachboard_url, game_id, board_alignment(page))
     end_inning.click()
@@ -851,7 +856,7 @@ def test_recorded_inning_gaps_and_next_inning_gaps_are_separate_questions(
         'data-next-player', '', timeout=10_000
     )
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(recorded).to_be_visible(timeout=10_000)
     expect(recorded.locator('.modal-title')).to_have_text(
         'Shortstop and left field are empty at the end of the 1st'
@@ -881,7 +886,7 @@ def test_recorded_inning_gaps_and_next_inning_gaps_are_separate_questions(
     wait_for_server(page, coachboard_url, game_id, board_alignment(page))
     planned = board_alignment(page)
 
-    page.locator('#liveEndInningBtn').click()
+    end_inning_from_live(page)
     expect(incomplete).to_contain_text(
         'SS and LF are open, and players are available on the bench.', timeout=10_000
     )

@@ -1,4 +1,5 @@
-"""The Live Game tabs must not wait for the 3.5s refresh interval.
+"""The live field's "Plan next inning" control must not wait for the 3.5s
+refresh interval.
 
 live_game_board_prep_v2 builds its switcher in ensureSurface(), which needs
 both .coach-live-shell and #cbQuickDefense. Those are mounted by other
@@ -6,7 +7,10 @@ modules -- live_game_dugout_mode is fetched dynamically, so Quick Field
 routinely appears after this module's first next-inning request at 140ms.
 ensureSurface() just returns null when they are missing, and the only thing
 that retried was the 3500ms interval, so the coach could sit for seconds with
-no way to reach Next Inning or the pregame plan.
+no way to reach Next Inning.
+
+The control lives in #cb-now-next-switch (its historical id): today it holds
+one button, "Plan next inning", which opens the full-screen planner.
 
 The race is reproduced deterministically by delaying the dugout module's
 script, which pushes #cbQuickDefense well past the first API response.
@@ -36,12 +40,13 @@ TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
 
 SWITCHER = '#cb-now-next-switch'
+PLAN_NEXT_INNING = f'{SWITCHER} [data-now-next="next"]'
 QUICK_FIELD = '#cbQuickDefense'
 
 # live_game_board_prep_v2 refreshes at 140ms and then every 3500ms. Before
 # the boot fix, a Quick Field that mounted after the first refresh left the
 # switcher waiting for the next interval tick. Anything comfortably under
-# that interval proves the tabs came from the event-driven boot path.
+# that interval proves the control came from the event-driven boot path.
 REFRESH_INTERVAL_MS = 3500
 PROMPT_MS = 1500
 
@@ -193,8 +198,8 @@ def test_switcher_appears_without_waiting_for_the_refresh_interval(page: Page, c
             expect(page.locator(QUICK_FIELD)).to_be_visible(timeout=20_000)
             quick_field_at = time.monotonic()
 
-            # The tabs must follow it essentially immediately rather than
-            # waiting for the next 3500ms refresh.
+            # Plan next inning must follow it essentially immediately rather
+            # than waiting for the next 3500ms refresh.
             expect(page.locator(SWITCHER)).to_be_visible(timeout=PROMPT_MS + 1_000)
             switcher_at = time.monotonic()
 
@@ -205,19 +210,18 @@ def test_switcher_appears_without_waiting_for_the_refresh_interval(page: Page, c
                 f'waiting for the refresh interval again'
             )
 
-            # And it is the real, complete switcher.
-            expect(
-                page.locator(SWITCHER).locator('[data-now-next]')
-            ).to_have_count(3)
+            # And it is the real control: one Plan next inning button.
+            expect(page.locator(SWITCHER).locator('[data-now-next]')).to_have_count(1)
+            expect(page.locator(PLAN_NEXT_INNING)).to_contain_text('Plan')
         finally:
             page.unroute('**/live_game_dugout_mode.js*')
     finally:
         cleanup_game(page, coachboard_url, game_id)
 
 
-def test_boot_leaves_on_the_field_active(page: Page, coachboard_url: str):
-    """Building the tabs before the API responds must not change which view
-    a coach lands on."""
+def test_boot_lands_on_the_live_field(page: Page, coachboard_url: str):
+    """Building Plan next inning before the API responds must not change
+    where a coach lands: the live field, with the planner closed."""
     page.set_viewport_size({'width': 1024, 'height': 768})
     login(page, coachboard_url)
     game_id = create_game(page, coachboard_url)
@@ -229,12 +233,13 @@ def test_boot_leaves_on_the_field_active(page: Page, coachboard_url: str):
         switcher = page.locator(SWITCHER)
         expect(switcher).to_be_visible(timeout=15_000)
 
-        expect(
-            switcher.locator('[data-now-next="now"]')
-        ).to_have_attribute('aria-pressed', 'true', timeout=10_000)
+        expect(page.locator(PLAN_NEXT_INNING)).to_be_visible(timeout=10_000)
+        expect(page.locator(QUICK_FIELD)).to_be_visible()
+        expect(page.locator('#liveEndInningBtn')).to_be_visible()
+        expect(page.locator('#live-board-prep-v3')).to_be_hidden()
+        page.wait_for_timeout(REFRESH_INTERVAL_MS + 500)   # a refresh does not move the coach
         expect(page.locator(QUICK_FIELD)).to_be_visible()
         expect(page.locator('#live-board-prep-v3')).to_be_hidden()
-        expect(page.locator('#live-board-pregame-plan')).to_be_hidden()
     finally:
         cleanup_game(page, coachboard_url, game_id)
 
@@ -244,7 +249,7 @@ def test_observer_stays_armed_and_catches_a_same_page_game_start(page: Page, coa
 
     A game the coach has not started yet keeps the observer armed
     indefinitely, so starting the game on the same page -- no reload -- still
-    produces the tabs immediately. The long idle wait below is the point: a
+    produces Plan next inning immediately. The long idle wait below is the point: a
     hypothetical short-lived boot timeout would have expired by then, and the
     switcher would be left to the 3500ms refresh interval.
     """
@@ -285,12 +290,11 @@ def test_observer_stays_armed_and_catches_a_same_page_game_start(page: Page, coa
             f'observer had been torn down and the interval did the work'
         )
 
-        # Exactly one switcher, with the expected default view.
+        # Exactly one control, on the live field, with the planner closed.
         expect(page.locator(SWITCHER)).to_have_count(1)
-        expect(page.locator(SWITCHER).locator('[data-now-next]')).to_have_count(3)
-        expect(
-            page.locator(SWITCHER).locator('[data-now-next="now"]')
-        ).to_have_attribute('aria-pressed', 'true', timeout=10_000)
+        expect(page.locator(SWITCHER).locator('[data-now-next]')).to_have_count(1)
+        expect(page.locator(PLAN_NEXT_INNING)).to_be_visible()
+        expect(page.locator('#live-board-prep-v3')).to_be_hidden()
     finally:
         cleanup_game(page, coachboard_url, game_id)
 
