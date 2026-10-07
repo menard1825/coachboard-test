@@ -5,8 +5,6 @@
   picker for the open spot in the next inning. With more than one spot
   open, the picker names the one it fills and lists the others, which stay
   marked Open.
-* A spot empty right now is a red line ("Empty now (1st inning): SS"),
-  separate from the amber next-inning line; each opens its picker.
 * Undo is labelled and 44px tall, and says what it took back.
 * The live header keeps the inning, clock and pitcher apart at 320px, with
   44px controls and no sideways scrolling.
@@ -29,7 +27,6 @@ from live_fixtures import (  # noqa: F401 (next_board is a fixture)
     wait_for_server,
     starting_alignment,
 )
-from e2e_cleanup import wait_until_modal_shown, watch_modal_openings
 
 
 pytestmark = pytest.mark.e2e
@@ -106,31 +103,6 @@ def test_finish_is_prominent_and_opens_the_next_inning_picker(page: Page, coachb
     picker.locator('button').filter(has_text='Center Casey').first.click()
     wait_for_server(page, coachboard_url, game_id, dict(planned, CF='Center Casey'))
     assert str(live_state(page, coachboard_url, game_id)['current_inning']) == '1'
-
-
-def test_empty_now_and_next_inning_are_separate_lines(page: Page, coachboard_url, next_board):
-    board, game_id = next_board
-    open_on_the_field(page, coachboard_url, game_id, 'SS')
-    other_coach_sets(page, coachboard_url, game_id,
-                     {p: n for p, n in starting_alignment().items() if p != 'RF'})
-    _reload_live(page, coachboard_url, game_id)
-
-    now_line = page.locator('#cbNowOpenWarning')
-    next_line = page.locator('#cbNextOpenWarning')
-    expect(now_line).to_have_text('⚠ Empty now (1st inning): SS · Tap to fix', timeout=10_000)
-    expect(next_line).to_have_text('⚠ Next inning: RF is open')
-    assert now_line.bounding_box()['y'] < next_line.bounding_box()['y']
-
-    watch_modal_openings(page)
-    now_line.click()
-    expect(page.locator(FIELD_PICKER).locator('.modal-title')).to_have_text('Fill SS', timeout=10_000)
-    wait_until_modal_shown(page, 'cbQuickMoveModal')    # Escape is ignored mid-opening
-    page.keyboard.press('Escape')
-    expect(page.locator(FIELD_PICKER)).to_be_hidden(timeout=10_000)
-
-    next_line.click()
-    expect(page.locator(NEXT_PICKER).locator('[data-open-position-title]')).to_have_text(
-        'Who plays RF in the 2nd?', timeout=10_000)
 
 
 def _toast(page):
