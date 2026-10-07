@@ -22,6 +22,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
+from change_pitcher_flow import DESTINATION_QUESTION, choose_outgoing_destination
 from live_fixtures import (  # noqa: F401 (fixture)
     BASE,
     RELIEVER,
@@ -164,9 +165,9 @@ def test_choosing_the_pitcher_goes_to_change_pitcher(
 
     # Then the open SS is Pat's one-tap destination in Change Pitcher.
     picker.locator('.pitcher-choice-v2', has=page.get_by_text(RELIEVER, exact=True)).click()
-    question = page.locator('#live-pitcher-destination-v7')
+    question = page.locator(DESTINATION_QUESTION)
     expect(question).to_be_visible(timeout=10_000)
-    question.get_by_role('button', name='Put Pitcher Pat at SS', exact=True).click()
+    choose_outgoing_destination(question, 'Pitcher Pat → SS')
     wait_for_field(page, coachboard_url, game_id, dict(OPEN_SS, P=RELIEVER, SS='Pitcher Pat'))
     assert len(pitcher_changes(live_state(page, coachboard_url, game_id))) == 1
 

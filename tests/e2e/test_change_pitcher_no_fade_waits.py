@@ -27,10 +27,7 @@ from live_fixtures import (  # noqa: E402,F401 (live_field is a fixture)
     live_state,
     wait_for_field,
 )
-from test_live_change_pitcher_decision import QUESTION  # noqa: E402
-
-
-PICKER = '#live-pitcher-picker-v2'
+from change_pitcher_flow import DESTINATION_QUESTION as QUESTION, PICKER  # noqa: E402
 
 # What happened when: state reads, the pitching-change save, dialogs opening
 # and closing -- in the page's own clock.
@@ -81,7 +78,7 @@ def test_change_pitcher_reads_and_saves_without_waiting_on_fades(page: Page, coa
     # The answer, tapped twice in a row.
     page.evaluate(f"""() => {{
         const button = [...document.querySelectorAll('{QUESTION} [data-pc-choices] button')]
-            .find(b => b.textContent.trim() === 'Put Pitcher Pat at SS');
+            .find(b => b.textContent.trim() === 'Pitcher Pat → SS');
         button.click();
         button.click();
     }}""")

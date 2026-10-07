@@ -37,7 +37,7 @@ from live_fixtures import (  # noqa: F401 (fixture)
     tap_move,
     wait_for_field,
 )
-from test_live_change_pitcher_decision import answer, choose_new_pitcher
+from change_pitcher_flow import choose_incoming_pitcher, choose_outgoing_destination
 
 
 NO_LF = {pos: name for pos, name in BASE.items() if pos != 'LF'}
@@ -81,8 +81,8 @@ def test_a_single_move_saves_without_an_inning_question(page: Page, coachboard_u
 
 def test_change_pitcher_saves_without_an_inning_question(page: Page, coachboard_url, live_field):
     game_id = live_field()
-    question = choose_new_pitcher(page, 'Shortstop Shawn')
-    answer(question, 'Put Pitcher Pat at SS')
+    question = choose_incoming_pitcher(page, 'Shortstop Shawn')
+    choose_outgoing_destination(question, 'Pitcher Pat → SS')
     wait_for_field(page, coachboard_url, game_id, dict(BASE, P='Shortstop Shawn', SS='Pitcher Pat'))
     assert _changes(page, coachboard_url, game_id) == ['Pitcher Change']
     _all_sheets_closed(page)

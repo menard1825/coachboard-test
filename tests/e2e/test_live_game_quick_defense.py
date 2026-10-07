@@ -612,7 +612,7 @@ def test_pitcher_change_asks_where_the_pitcher_goes_and_can_leave_defense_open(
         expect(
             toast
         ).to_contain_text(
-            '2B is open',
+            '2B open',
         )
 
         state = get_json(

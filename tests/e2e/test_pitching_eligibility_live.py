@@ -38,6 +38,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
 
+from change_pitcher_flow import DESTINATION_QUESTION, choose_outgoing_destination
 from live_fixtures import cleanup_game, login, post_json
 
 
@@ -241,9 +242,9 @@ def test_change_pitcher_rest_is_a_rule_conflict_the_coach_can_override(
     picker.locator('.pitcher-choice-v2', has_text='Shortstop Shawn').click()
     picker.get_by_role('button', name='Use Shortstop Anyway').click()
     picker.get_by_role('button', name='Use Shortstop Anyway').click()
-    question = page.locator('#live-pitcher-destination-v7')
+    question = page.locator(DESTINATION_QUESTION)
     expect(question).to_be_visible(timeout=10_000)
-    question.get_by_role('button', name='Put Pitcher Pat at SS', exact=True).click()
+    choose_outgoing_destination(question, 'Pitcher Pat → SS')
 
     expect(page.locator('#cbDugoutHeader [data-cb-pitcher]')).to_contain_text(
         'Shortstop Shawn', timeout=10_000
@@ -277,9 +278,9 @@ def test_change_pitcher_unknown_needs_verification_not_an_override(
 
     theo.click()
     picker.get_by_role('button', name='I verified Third is eligible').click()
-    question = page.locator('#live-pitcher-destination-v7')
+    question = page.locator(DESTINATION_QUESTION)
     expect(question).to_be_visible(timeout=10_000)
-    question.get_by_role('button', name='Put Pitcher Pat at 3B', exact=True).click()
+    choose_outgoing_destination(question, 'Pitcher Pat → 3B')
 
     expect(page.locator('#cbDugoutHeader [data-cb-pitcher]')).to_contain_text(
         'Third Theo', timeout=10_000
@@ -464,14 +465,16 @@ def test_pitch_smart_second_game_today_is_an_advisory(
     # One confirmation is enough.
     picker.get_by_role('button', name='Continue with Center').click()
 
-    question = page.locator('#live-pitcher-destination-v7')
+    question = page.locator(DESTINATION_QUESTION)
     expect(question).to_be_visible(timeout=10_000)
-    question.get_by_role('button', name='Put Pitcher Pat at CF', exact=True).click()
+    choose_outgoing_destination(question, 'Pitcher Pat → CF')
     expect(page.locator('#cbDugoutHeader [data-cb-pitcher]')).to_contain_text(
         'Center Casey', timeout=10_000
     )
     assert posts[-1]['pitching_decision'] == 'advisory_acknowledged'
-    assert live_state(page, coachboard_url, game_id)['current_alignment']['P'] == 'Center Casey'
+    state = live_state(page, coachboard_url, game_id)
+    assert filled(state['current_alignment']) == dict(BASE, P='Center Casey', CF='Pitcher Pat')
+    assert len(pitcher_changes(state)) == 1
 
 
 # ------------------------------------------------------------------ re-entry
@@ -572,13 +575,16 @@ def test_change_pitcher_shows_reentry_as_a_rule_conflict(
     picker.get_by_role('button', name='Use Pitcher Anyway').click()
     expect(picker.locator('[data-eligibility-reason]')).to_have_text(REENTRY)
     picker.get_by_role('button', name='Use Pitcher Anyway').click()
-    question = page.locator('#live-pitcher-destination-v7')
+    question = page.locator(DESTINATION_QUESTION)
     expect(question).to_be_visible(timeout=10_000)
-    question.get_by_role('button', name='Put First Frank at 1B', exact=True).click()
+    choose_outgoing_destination(question, 'First Frank → 1B')
     expect(page.locator('#cbDugoutHeader [data-cb-pitcher]')).to_contain_text(
         'Pitcher Pat', timeout=10_000
     )
-    assert live_state(page, coachboard_url, game_id)['current_alignment']['P'] == 'Pitcher Pat'
+    # Back to where the day began: Pat pitching, Frank at first.
+    state = live_state(page, coachboard_url, game_id)
+    assert filled(state['current_alignment']) == BASE
+    assert len(pitcher_changes(state)) == 2
 
 
 # ------------------------------------------------------------------- USSSA
@@ -628,12 +634,14 @@ def test_usssa_uses_innings_limits_not_a_same_day_rule(
         expect(casey).to_contain_text('Ready')
         expect(casey).not_to_contain_text('Advisory')
         casey.click()
-        question = page.locator('#live-pitcher-destination-v7')
+        question = page.locator(DESTINATION_QUESTION)
         expect(question).to_be_visible(timeout=10_000)
-        question.get_by_role('button', name='Put Pitcher Pat at CF', exact=True).click()
+        choose_outgoing_destination(question, 'Pitcher Pat → CF')
         expect(page.locator('#cbDugoutHeader [data-cb-pitcher]')).to_contain_text(
             'Center Casey', timeout=10_000
         )
+        state = live_state(page, coachboard_url, today)
+        assert filled(state['current_alignment']) == dict(BASE, P='Center Casey', CF='Pitcher Pat')
     finally:
         for game_id in reversed(games):
             cleanup_game(page, coachboard_url, game_id)
