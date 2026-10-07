@@ -7,7 +7,8 @@
     python tests/e2e/shard.py verify TOTAL JUNIT_DIR
         Collect tests/e2e again and check the shards' JUnit files: every
         collected test ran exactly once, and nothing else ran. Prints each
-        shard's counts. Exits 1 on any difference.
+        shard's counts and every failing test's ID. Exits 1 on any
+        difference.
 
 Files are never split: each runs whole, in its usual order, on one shard
 with its own server and database. Assignment is deterministic -- the
@@ -102,6 +103,10 @@ def verify(total, directory):
         counts = collections.Counter(outcome for _, outcome in cases)
         print(f'{name}: {len(cases)} tests -- {counts["passed"]} passed, '
               f'{counts["failed"]} failed, {counts["skipped"]} skipped')
+    # Every failing test by ID, so one run can be compared with another.
+    failed = sorted(test_id for cases in runs.values() for test_id, outcome in cases if outcome == 'failed')
+    for test_id in failed:
+        print(f'FAILED {test_id}')
 
     missing = sorted(set(expected) - set(ran))
     unexpected = sorted(set(ran) - set(expected))
