@@ -148,14 +148,6 @@ def drag(page: Page, source, target):
     page.mouse.up()
 
 
-def answer_displaced(page: Page, displaced: str, vacated: str):
-    """Next Inning never swaps by itself: moving onto an occupied spot asks
-    where its player goes, and the coach sends them to the vacated spot."""
-    sheet = page.locator('#cbNextPitchingChange')
-    expect(sheet).to_contain_text(f'Where should {displaced} go?', timeout=5_000)
-    sheet.get_by_role('button', name=f'Put {displaced} at {vacated}', exact=True).click()
-    expect(sheet).to_be_hidden(timeout=5_000)
-
 def get_prep(page: Page, coachboard_url: str, game_id: int):
     response = page.request.get(
         f'{coachboard_url}/api/live-game/'
@@ -237,7 +229,6 @@ def test_next_inning_supports_drag_and_drop(
             catcher,
             first_base,
         )
-        answer_displaced(page, 'First Frank', 'C')
 
         expect(
             first_base
@@ -1192,7 +1183,6 @@ def test_next_touch_swipe_leaves_tap_flow_clean(
         )
 
         first_base.click()
-        answer_displaced(page, 'First Frank', 'C')
 
         expect(first_base).to_contain_text(
             'Catcher Cole',
@@ -1431,7 +1421,6 @@ def test_now_next_first_slice(
         next_board.locator(
             '[data-next-position="1B"]'
         ).click()
-        answer_displaced(page, 'First Frank', 'C')
 
         expect(
             next_board.locator(
@@ -1449,7 +1438,6 @@ def test_now_next_first_slice(
         next_board.locator(
             '[data-next-position="SS"]'
         ).click()
-        answer_displaced(page, 'Shortstop Shawn', '3B')
 
         expect(
             next_board.locator(

@@ -44,11 +44,9 @@ def test_end_inning_line_follows_the_save(live, coachboard_url):
     page.locator('#cb-now-next-switch [data-now-next="next"]').click()
     board = page.locator('#live-board-prep-v3')
     spot = lambda pos: board.locator(f'[data-next-position="{pos}"]')
-    rf = spot('RF').get_attribute('data-next-player')
     spot('LF').click()
-    spot('RF').click()
     page.evaluate(SAMPLE)
-    page.locator('#cbNextPitchingChange').get_by_role('button', name=f'Put {rf} at LF', exact=True).click()
+    spot('RF').click()                                  # LF and RF swap at once
     page.wait_for_timeout(2_500)
 
     samples = page.evaluate('() => window.__lbl')

@@ -319,6 +319,26 @@ def test_a_save_the_server_refuses_reads_the_same(page: Page, coachboard_url, fi
     assert filled(live_state(page, coachboard_url, game_id)['current_alignment']) == BASE
 
 
+@pytest.mark.parametrize('gesture', GESTURES)
+def test_a_save_refused_for_another_reason_says_why(page: Page, coachboard_url, field, gesture):
+    """Any other refusal is shown in the server's own words, not offered
+    for Retry, and leaves the field as it was."""
+    game_id, _ = field()
+    reason = 'First Frank is not available for this game.'
+    page.route(re.compile(r'.*/defense-edit$'), lambda route: route.fulfill(
+        status=409, content_type='application/json',
+        json={'status': 'error', 'message': reason},
+    ))
+
+    move(page, gesture, 'Shortstop Shawn', 'BENCH')
+
+    expect(page.locator(BADGE)).to_have_text(f'Not saved — {reason}', timeout=10_000)
+    expect(page.locator(RETRY)).to_have_count(0)
+    expect(page.locator(SHEET)).not_to_be_visible()
+    assert filled(live_state(page, coachboard_url, game_id)['current_alignment']) == BASE
+    expect(spot(page, 'SS')).to_contain_text('Shortstop Shawn')
+
+
 # ------------------------------------------------------ failure, Retry
 #
 # Shortstop to the Bench: before the one writer, a drag made this move

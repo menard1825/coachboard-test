@@ -161,12 +161,12 @@ def test_move_leaving_old_spot_open_names_the_actual_open_spot(
 def test_resolved_chain_is_what_is_validated_and_sent(page: Page, coachboard_url, next_board):
     board, game_id = next_board
     posts = advance_posts(page)
-    # SS -> 2B; the coach benches Sam: SS is open in the plan.
+    # SS -> 2B swaps at once; then Sam, now at SS, goes to the bench: SS is
+    # open in the plan.
     spot(board, 'SS').click()
     spot(board, '2B').click()
-    page.locator('#cbNextPitchingChange').get_by_role(
-        'button', name='Bench Second Sam', exact=True
-    ).click()
+    expect(spot(board, '2B')).to_have_attribute('data-next-player', 'Shortstop Shawn', timeout=5_000)
+    bench(board, 'SS')
     plan = {pos: n for pos, n in START.items() if pos != 'SS'}
     plan['2B'] = 'Shortstop Shawn'
     wait_for_server(page, coachboard_url, game_id, plan)
@@ -184,11 +184,13 @@ def test_bench_to_occupied_chain_is_what_is_validated_and_sent(
 ):
     board, game_id = next_board
     bench(board, 'CF')
+    # Bench -> occupied SS: Casey plays SS and Shawn goes to the bench.
     board.locator('[data-next-bench-player="Center Casey"]').click()
     spot(board, 'SS').click()
-    page.locator('#cbNextPitchingChange').get_by_role(
-        'button', name='Put Shortstop Shawn at CF', exact=True
-    ).click()
+    expect(spot(board, 'SS')).to_have_attribute('data-next-player', 'Center Casey', timeout=5_000)
+    # Then Shawn, from the bench, fills the open CF.
+    board.locator('[data-next-bench-player="Shortstop Shawn"]').click()
+    spot(board, 'CF').click()
     plan = dict(START, SS='Center Casey', CF='Shortstop Shawn')
     wait_for_server(page, coachboard_url, game_id, plan)
 

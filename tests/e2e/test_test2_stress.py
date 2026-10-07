@@ -200,11 +200,8 @@ def test_test2_iphone_ipad_multi_client_stress(browser: Browser, coachboard_url:
         quick.locator('[data-cb-position="SS"]').click()
         move = phone.locator('#cbQuickMoveModal')
         expect(move).to_be_visible(timeout=10_000)
+        # 2B is occupied: SS and 2B swap at once.
         move.locator('[data-cb-destination="2B"]').click()
-        # 2B is occupied: the coach explicitly sends its player to the
-        # vacated SS (inning 2's names come from the prepared defense).
-        at_second = next_alignment['2B']
-        move.get_by_role('button', name=f'Put {at_second} at SS', exact=True).click()
         expect(move).not_to_be_visible(timeout=10_000)
         expect(quick.locator('.cb-save-state')).to_contain_text('Saved', timeout=10_000)
         phone.locator('#liveUndoBtn').click()
@@ -355,14 +352,8 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
             )
         ).to_be_visible(timeout=10_000)
 
-        # 2B is occupied, so the coach says where Sam goes. Asking is local
-        # (no request); the coach's answer completes the swap and writes.
-        move_b.locator('[data-cb-destination="2B"]').click()
-        expect(
-            move_b.get_by_role(
-                'button', name='Put Second Sam at SS', exact=True
-            )
-        ).to_be_visible(timeout=10_000)
+        # 2B is occupied, so tapping it swaps SS and 2B at once -- the tap is
+        # the write. It is made below, once Coach B is offline.
 
         # Coach B now loses all network.
         #
@@ -409,9 +400,9 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
         # locator after Chromium networking has been disabled.
         coach_b.evaluate(
             """() => {
-                const button = [...document.querySelectorAll(
-                    '#cbQuickMoveModal button'
-                )].find(node => node.textContent.trim() === 'Put Second Sam at SS');
+                const button = document.querySelector(
+                    '#cbQuickMoveModal [data-cb-destination="2B"]'
+                );
 
                 if (!button) {
                     throw new Error(
@@ -453,11 +444,9 @@ def test_test2_offline_quick_field_recovers_authoritative_state(
 
         expect(move_a).to_be_visible(timeout=10_000)
 
+        # 3B is occupied: 1B and 3B swap at once.
         move_a.locator(
             '[data-cb-destination="3B"]'
-        ).click()
-        move_a.get_by_role(
-            'button', name='Put Third Theo at 1B', exact=True
         ).click()
 
         expect(move_a).not_to_be_visible(timeout=10_000)
