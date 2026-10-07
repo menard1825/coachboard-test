@@ -13,6 +13,8 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Browser, expect
 
+import cdn_assets  # noqa: E402
+
 
 TEST_USERNAME = 'playwright-coach'
 TEST_PASSWORD = 'playwright-password'
@@ -38,6 +40,7 @@ def test_pitching_ipad_uses_compact_decision_board(browser: Browser, coachboard_
         has_touch=True,
         is_mobile=False,
     )
+    cdn_assets.install(context)
     page = context.new_page()
     try:
         login(page, coachboard_url)

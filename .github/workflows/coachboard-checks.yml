@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+# A newer commit on a branch cancels that branch's older run. Each main run
+# gets its own group, so a main run is never cancelled or held back.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -68,11 +74,21 @@ jobs:
           DATABASE_URL: 'sqlite:///:memory:'
         run: python -m pytest -q
 
-  browser-tests:
-    name: Playwright browser tests
-    needs: test
+  # The browser suite, split by whole test file across four runners
+  # (tests/e2e/shard.py). Each shard has its own checkout, Python, Chromium,
+  # app server and SQLite database; nothing is shared. Shards start at once,
+  # independently of the job above, so a failing Python test never hides
+  # browser results.
+  browser-shard:
+    name: Playwright shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Temporary: many obsolete tests still fail slowly on 10-30 s waits.
+    # Lower to about 30 minutes once the current test cleanup is finished.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
 
@@ -87,23 +103,90 @@ jobs:
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium
 
-      - name: Run Playwright tests
+      # The exact pinned files require_vendored_assets() expects, each checked
+      # against its SHA-256 (any mismatch fails the job). The CDN hosts are
+      # then blocked, so a page can never quietly load them from the network.
+      - name: Vendor CDN assets
+        run: |
+          python tests/e2e/fetch_cdn_assets.py "$RUNNER_TEMP/cdn"
+          echo "COACHBOARD_CDN_DIR=$RUNNER_TEMP/cdn" >> "$GITHUB_ENV"
+          echo '0.0.0.0 cdn.jsdelivr.net cdn.socket.io' | sudo tee -a /etc/hosts
+          if curl -sS --max-time 10 -o /dev/null https://cdn.jsdelivr.net/; then
+            echo 'The CDN is still reachable; refusing to run.' >&2
+            exit 1
+          fi
+
+      - name: Choose this shard's test files
         env:
           COACHBOARD_E2E: '1'
+        run: python tests/e2e/shard.py files ${{ matrix.shard }} 4 > "$RUNNER_TEMP/shard-files.txt"
+
+      - name: Run Playwright shard ${{ matrix.shard }}/4
+        env:
+          COACHBOARD_E2E: '1'
+          COACHBOARD_E2E_REQUIRE_CDN: '1'
           PYTHONUNBUFFERED: '1'
         run: >-
-          python -u -m pytest -vv tests/e2e
+          xargs -r -a "$RUNNER_TEMP/shard-files.txt"
+          python -u -m pytest -vv
           --browser chromium
           --tracing retain-on-failure
           --screenshot only-on-failure
           --video retain-on-failure
           --output test-results/e2e
+          --junitxml test-results/junit-shard-${{ matrix.shard }}.xml
 
-      - name: Upload browser failure details
+      - name: Upload browser failure details (shard ${{ matrix.shard }})
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: coachboard-playwright-results
+          name: coachboard-playwright-results-shard-${{ matrix.shard }}
           path: test-results/e2e
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Upload JUnit results (shard ${{ matrix.shard }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coachboard-playwright-junit-shard-${{ matrix.shard }}
+          path: test-results/junit-shard-${{ matrix.shard }}.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The one result to require: every shard passed, and every collected E2E
+  # test ran exactly once across them.
+  browser-tests:
+    name: Playwright browser tests
+    needs: browser-shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coachboard-playwright-junit-shard-*
+          path: junit
+
+      - name: Every collected E2E test ran exactly once; every shard passed
+        env:
+          COACHBOARD_E2E: '1'
+          SHARDS_RESULT: ${{ needs.browser-shard.result }}
+        run: |
+          status=0
+          python tests/e2e/shard.py verify 4 junit || status=1
+          if [ "$SHARDS_RESULT" != 'success' ]; then
+            echo "Browser shards: $SHARDS_RESULT" >&2
+            status=1
+          fi
+          exit $status

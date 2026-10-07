@@ -13,7 +13,9 @@ cannot depend on those being reachable:
 Point ``COACHBOARD_CDN_DIR`` at a directory holding the five files below (the
 versions base.html pins), or drop them in ``tests/e2e/vendor/``. Tests that
 need them skip, with this explanation, when neither is present: a silent pass
-would be worse than a skip.
+would be worse than a skip. CI downloads them (fetch_cdn_assets.py, checked
+against ``CDN_SHA256``) and sets ``COACHBOARD_E2E_REQUIRE_CDN=1``, which makes
+missing files a failure instead of a skip.
 """
 
 import os
@@ -36,6 +38,22 @@ CDN_ASSETS = {
         ('socket.io.min.js', 'application/javascript'),
 }
 
+#: SHA-256 of each file at the pinned URL (identical to the files in the npm
+#: packages bootstrap@5.3.3, bootstrap-icons@1.11.3, sortablejs@1.15.0 and
+#: socket.io-client@4.7.5).
+CDN_SHA256 = {
+    'bootstrap.min.css': '3c8f27e6009ccfd710a905e6dcf12d0ee3c6f2ac7da05b0572d3e0d12e736fc8',
+    'bootstrap-icons.min.css': 'f643d6fe7e679f9de3e16311600c5ef5cd6b098f7a3a8828fcc29255d2b33e62',
+    'bootstrap.bundle.min.js': '0833b2e9c3a26c258476c46266e6877fc75218625162e0460be9a3a098a61c6c',
+    'Sortable.min.js': '8a9889aecc2f011e15031fed87eeb35ac75e62655a7b4889ba247ee8ea872474',
+    'socket.io.min.js': '73eba16bc895fdfa454e27ecb80def31ede8d861f99e175ff93b110eabec044f',
+}
+
+
+def required():
+    """CI: the vendored files must be present; never skip, never use the network."""
+    return os.environ.get('COACHBOARD_E2E_REQUIRE_CDN') == '1'
+
 
 def vendor_dir():
     configured = os.environ.get('COACHBOARD_CDN_DIR')
@@ -53,11 +71,14 @@ def missing_assets():
 def require_vendored_assets():
     missing = missing_assets()
     if missing:
-        pytest.skip(
+        message = (
             'Vendored CDN assets are required for this test and were not '
             f'found in {vendor_dir()}: {", ".join(sorted(missing))}. '
             'Set COACHBOARD_CDN_DIR to a directory holding them.'
         )
+        if required():
+            pytest.fail(message)
+        pytest.skip(message)
 
 
 def install(context, *, api_delay_ms=0, blocked=()):

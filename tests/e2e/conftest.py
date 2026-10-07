@@ -78,3 +78,26 @@ def coachboard_url(tmp_path_factory):
     except subprocess.TimeoutExpired:
         process.kill()
         process.communicate(timeout=5)
+
+
+
+@pytest.fixture(autouse=True)
+def _vendored_cdn(request):
+    """Serve CoachBoard's CDN files from the vendored copies, when they are
+    present, in every pytest-playwright context -- always in CI, where they
+    are required (cdn_assets.required()) and the CDN hosts are blocked.
+
+    Autouse and looked up at run time rather than overriding `context`, so
+    the test IDs (and pytest-playwright's [chromium] parametrization) stay
+    exactly as they were.
+    """
+    if 'context' not in request.fixturenames:
+        yield
+        return
+    import cdn_assets
+
+    if cdn_assets.required():
+        cdn_assets.require_vendored_assets()
+    if not cdn_assets.missing_assets():
+        cdn_assets.install(request.getfixturevalue('context'))
+    yield
