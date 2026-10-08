@@ -82,9 +82,9 @@ jobs:
   browser-shard:
     name: Playwright shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
-    # Temporary: many obsolete tests still fail slowly on 10-30 s waits.
-    # Lower to about 30 minutes once the current test cleanup is finished.
-    timeout-minutes: 60
+    # A green shard takes about 15-17 minutes, setup included; 30 leaves
+    # room for a slow runner and still stops a hung shard in half an hour.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
