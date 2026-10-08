@@ -175,6 +175,13 @@
         body.coach-game-page #start-live-blockers{
           display:none!important;
         }
+        body.coach-game-page #gm-mobile-start-reason{
+          grid-column:1 / -1;
+          font-size:.8rem;line-height:1.3;
+          color:#7a2e0e;background:#fff4e5;border:1px solid #f5c38a;border-radius:8px;
+          padding:6px 9px;
+        }
+        body.coach-game-page #gm-mobile-start-reason[hidden]{display:none!important}
 
         body.coach-game-page #pregame-checklist-container > .d-flex:first-child{
           align-items:start!important;
@@ -264,6 +271,13 @@
         body.coach-game-page #pregame-checklist-container > h5.text-uppercase{display:none!important}
         body.coach-game-page #pregame-checklist-container > .row.g-3.mb-4{display:none!important}
         body.coach-game-page #start-live-blockers{display:none!important}
+        body.coach-game-page #gm-mobile-start-reason{
+          grid-column:1 / -1;
+          font-size:.8rem;line-height:1.3;
+          color:#7a2e0e;background:#fff4e5;border:1px solid #f5c38a;border-radius:8px;
+          padding:6px 9px;
+        }
+        body.coach-game-page #gm-mobile-start-reason[hidden]{display:none!important}
 
         body.coach-game-page #pregame-checklist-container > .d-flex:first-child{
           display:grid!important;grid-template-columns:1fr;gap:8px;margin-bottom:9px!important;padding:0 1px!important;
@@ -860,6 +874,7 @@
       );
 
       existingProxy?.remove();
+      document.getElementById('gm-mobile-start-reason')?.remove();
 
       mobileStartObserver?.disconnect();
       mobileStartObserver = null;
@@ -950,6 +965,19 @@
       true
     );
 
+    // The canonical Start's reason box is hidden at this size, so a
+    // disabled Start Game says why right under itself.
+    let reason = document.getElementById('gm-mobile-start-reason');
+    if (!reason) {
+      reason = document.createElement('div');
+      reason.id = 'gm-mobile-start-reason';
+      reason.setAttribute('role', 'status');
+      reason.hidden = true;
+    }
+    if (reason.parentElement !== headerActions || headerActions.lastElementChild !== reason) {
+      headerActions.appendChild(reason);
+    }
+
     const syncProxy = () => {
       const disabled = (
         button.disabled ||
@@ -973,6 +1001,19 @@
 
       const title = button.title || 'Start Game';
       if (proxy.title !== title) proxy.title = title;
+
+      const text = disabled ? String(button.dataset.cbStartBlockedReason || '').trim() : '';
+      if (reason.dataset.text !== text) {
+        reason.dataset.text = text;
+        reason.replaceChildren(...text.split('\n').filter(Boolean).map((line) => {
+          const row = document.createElement('div');
+          row.textContent = line;
+          return row;
+        }));
+      }
+      setHidden(reason, !text);
+      if (text) setAttr(proxy, 'aria-describedby', reason.id);
+      else proxy.removeAttribute('aria-describedby');
     };
 
     syncProxy();
@@ -992,6 +1033,7 @@
           'class',
           'title',
           'aria-disabled',
+          'data-cb-start-blocked-reason',
         ],
       }
     );

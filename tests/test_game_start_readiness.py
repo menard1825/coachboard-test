@@ -182,3 +182,83 @@ def test_missing_pitching_rules_ask_about_the_starter_instead_of_blocking(monkey
     payload = asked.get_json()
     assert payload['code'] == 'start_no_pitching_rules'
     assert payload['required_decision'] == 'no_rules_acknowledged'
+
+
+def _six_innings_with_a_padded_roster_name(app, *, raw_innings=(1, 2), trimmed_innings=(3, 4, 5, 6)):
+    """Drew's roster name was saved as typed on a phone: 'Drew ' (autocomplete
+    adds the space). Some innings hold that exact name, others the trimmed one."""
+    from db import db
+    from models import Player, Rotation
+
+    with app.app_context():
+        db.session.get(Player, 4).name = 'Drew '
+        rotation = db.session.get(Rotation, 1)
+        base = dict(rotation.innings['1'])
+        innings = {}
+        for number in raw_innings:
+            innings[str(number)] = dict(base, **{'2B': 'Drew '})
+        for number in trimmed_innings:
+            innings[str(number)] = dict(base, **{'2B': 'Drew'})
+        rotation.innings = innings
+        db.session.commit()
+
+
+def test_a_roster_name_with_a_trailing_space_does_not_block_first_pitch(monkeypatch):
+    # Start Game was greyed out with "Drew is at 2B in the 1st inning but is
+    # not on the roster" while Home said READY: the start check trimmed the
+    # plan's names but compared them with untrimmed roster names.
+    app = _build_app(monkeypatch)
+    _six_innings_with_a_padded_roster_name(app)
+    client = app.test_client()
+    _login(client)
+
+    payload = client.get('/api/game-day/91/readiness').get_json()
+    assert payload['hard_stops'] == []
+    assert payload['ready'] is True
+    # Home and Manage Game read the same answer: every inning counts.
+    assert payload['readiness']['defense_completed_innings'] == 6
+    assert payload['readiness']['defense_ready'] is True
+
+    started = client.post('/api/live-game/91/start', json={'inning_one': _stored_inning_one(client, 91)})
+    assert started.status_code == 200, started.get_json()
+    assert started.get_json()['status'] == 'success'
+
+
+def test_a_player_really_off_the_roster_still_blocks_first_pitch(monkeypatch):
+    from db import db
+    from models import Rotation
+
+    app = _build_app(monkeypatch)
+    with app.app_context():
+        rotation = db.session.get(Rotation, 1)
+        rotation.innings = {'1': dict(rotation.innings['1'], **{'2B': 'Somebody Else'})}
+        db.session.commit()
+    client = app.test_client()
+    _login(client)
+
+    payload = client.get('/api/game-day/91/readiness').get_json()
+    assert payload['ready'] is False
+    assert payload['hard_stops'] == ['Somebody Else is at 2B in the 1st inning but is not on the roster.']
+    started = client.post('/api/live-game/91/start', json={'inning_one': _stored_inning_one(client, 91)})
+    assert started.status_code == 409
+    assert started.get_json()['code'] == 'start_hard_stops'
+
+
+def test_a_padded_starting_pitcher_is_still_checked_for_eligibility(monkeypatch):
+    # The starter's roster name carries the space; the eligibility check must
+    # still find their pitching record, not treat them as unknown.
+    from db import db
+    from models import Player
+
+    app = _build_app(monkeypatch)
+    with app.app_context():
+        db.session.get(Player, 1).name = 'Aiden '
+        db.session.commit()
+    client = app.test_client()
+    _login(client)
+
+    payload = client.get('/api/game-day/91/readiness').get_json()
+    assert payload['ready'] is True and payload['hard_stops'] == []
+    started = client.post('/api/live-game/91/start', json={'inning_one': _stored_inning_one(client, 91)})
+    body = started.get_json()
+    assert started.status_code == 200, body

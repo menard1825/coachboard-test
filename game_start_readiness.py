@@ -1,6 +1,6 @@
 
 from db import db
-from game_day_helpers import duplicate_assignment_message, field_order, required_positions
+from game_day_helpers import duplicate_assignment_message, field_order, required_positions, roster_name
 from game_pitching_rules import rule_settings_payload
 from models import Player, PlayerGameAbsence, Rotation
 
@@ -41,8 +41,11 @@ def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSE
         ).all()
     absent_ids = {row.player_id for row in absences}
     present = [player for player in roster if player.id not in absent_ids]
-    present_names = {player.name for player in present}
-    roster_names = {player.name for player in roster}
+    # Compared trimmed, like the plan's names below: a roster name saved as
+    # typed on a phone ('Rhett Wanninger ', autocomplete's space) is still
+    # that player.
+    present_names = {roster_name(player) for player in present}
+    roster_names = {roster_name(player) for player in roster}
 
     hard_stops = []
     if not present:
@@ -80,7 +83,7 @@ def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSE
     # An open fielding position is a baseball choice, not an error: Start asks.
     open_positions = [position for position in required if position != 'P' and position not in inning_one]
     placed = set(inning_one.values())
-    bench = sorted(player.name for player in present if player.name not in placed)
+    bench = sorted(roster_name(player) for player in present if roster_name(player) not in placed)
 
     return {
         # `ready`/`missing` keep their meaning for existing consumers: can

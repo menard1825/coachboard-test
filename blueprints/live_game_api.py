@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload
 from db import db
 from extensions import socketio
 from game_availability import INNING_STARTED, game_availability, inning_has_started
-from game_day_helpers import required_positions
+from game_day_helpers import required_positions, roster_name
 from live_history import gameplay_events
 from game_start_readiness import can_start_game, normalized_inning_one
 from models import (
@@ -568,6 +568,13 @@ def start(game_id):
         starting_pitcher_check,
     )
     starter = start_readiness['inning_one']['P']
+    # Pitching records are keyed by the roster name exactly as saved, which
+    # may carry a phone's trailing space; the plan's name is trimmed.
+    starter = next(
+        (player.name for player in db.session.query(Player).filter_by(team_id=team.id)
+         if roster_name(player) == starter),
+        starter,
+    )
     pitching_question, pitching_decision = starting_pitcher_check(game, team, starter, data)
     if pitching_question is not None:
         response, status_code = pitching_question

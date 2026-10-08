@@ -8,6 +8,7 @@ from game_day_helpers import (
     actual_game_rotation,
     build_game_readiness,
     required_positions,
+    roster_name,
 )
 from lineup_service import lineup_to_dict, sync_lineup
 from models import (
@@ -322,7 +323,7 @@ def correct_defense(game_id):
 
     positions = required_positions(team)
     present = _present_players(game, team.id)
-    present_names = {player.name for player in present}
+    present_names = {roster_name(player) for player in present}
     cleaned = {
         pos: str(proposed.get(pos) or '').strip()
         for pos in positions

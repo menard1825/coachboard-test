@@ -78,7 +78,15 @@
     const { btn, box } = nodes;
     const legacy = payload?.readiness || {};
 
+    // Why Start is unusable, on the button itself: phones hide this box and
+    // show their own Start Game (game_management_visual_polish.js), which
+    // repeats this reason right under it.
+    const blockedReason = (text) => {
+      if (btn.dataset.cbStartBlockedReason !== text) btn.dataset.cbStartBlockedReason = text;
+    };
+
     if (legacy.is_live) {
+      blockedReason('');
       box.classList.add('d-none');
       btn.disabled = false;
       btn.classList.remove('disabled');
@@ -86,6 +94,7 @@
     }
 
     if (!payload || typeof payload.ready !== 'boolean') {
+      blockedReason('Checking first-pitch setup…');
       btn.disabled = true;
       btn.classList.add('disabled');
       box.className = 'alert alert-light border shadow-sm mb-3';
@@ -94,6 +103,7 @@
     }
 
     const missing = Array.isArray(payload.missing) ? payload.missing.filter(Boolean) : [];
+    blockedReason(payload.ready ? '' : (missing.join('\n') || 'Finish setup before first pitch.'));
     btn.disabled = !payload.ready;
     btn.classList.toggle('disabled', !payload.ready);
 
