@@ -270,7 +270,7 @@ _MAKE_SCROLLABLE = """
 """
 
 
-def make_overlay_scrollable(page):
+def make_overlay_scrollable(page, selector=OVERLAY_SELECTOR):
     """Give the live overlay a deterministic scroll opportunity.
 
     At 390x844 the real app leaves nothing on the page able to scroll:
@@ -282,12 +282,15 @@ def make_overlay_scrollable(page):
 
     So the test manufactures the surface and verifies it exists before
     swiping, instead of depending on what the environment renders.
+
+    `selector` names another scroller -- the full-screen Next Inning
+    planner scrolls itself, with the overlay inert behind it.
     """
-    return page.evaluate(_MAKE_SCROLLABLE, OVERLAY_SELECTOR)
+    return page.evaluate(_MAKE_SCROLLABLE, selector)
 
 
-def overlay_scroll_top(page):
+def overlay_scroll_top(page, selector=OVERLAY_SELECTOR):
     return page.evaluate(
         '(selector) => document.querySelector(selector)?.scrollTop ?? -1',
-        OVERLAY_SELECTOR,
+        selector,
     )

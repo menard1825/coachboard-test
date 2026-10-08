@@ -72,6 +72,8 @@ class Board:
     state_field: str
     tap_affordance: str
     open_text: str
+    # What a swipe scrolls: the live overlay, or the full-screen planner itself.
+    scroller: str = '#live-game-overlay'
 
     def marker(self, position):
         if self.key == 'on-field':
@@ -107,6 +109,7 @@ NEXT_INNING = Board(
     state_field='confirmed.alignment',
     tap_affordance='#live-board-prep-v3 .cb-next-destination',
     open_text='OPEN',
+    scroller='#live-board-prep-v3',
 )
 
 BOARDS = [
@@ -334,21 +337,21 @@ def test_swipe_on_player_scrolls_and_does_not_drag(page: Page, coachboard_url, l
     board, game_id = live_board
     before = board_state(page, coachboard_url, game_id, board)
 
-    scroller = make_overlay_scrollable(page)
+    scroller = make_overlay_scrollable(page, board.scroller)
     assert scroller['ok'], (
         f'{board.label}: no scrollable surface to test against ({scroller})'
     )
 
     watch_ghosts(page)
     (x, y), = centres(page.locator(board.marker('SS')))
-    assert overlay_scroll_top(page) == 0, f'{board.label}: overlay did not start at the top'
+    assert overlay_scroll_top(page, board.scroller) == 0, f'{board.label}: {board.scroller} did not start at the top'
 
     touch = TouchDriver(page)
     touch.down(x, y).move_to(x, y - 140, steps=14, pause_ms=6).up()
     page.wait_for_timeout(300)
 
-    assert overlay_scroll_top(page) > 0, (
-        f'{board.label}: a swipe starting on a player did not scroll the overlay '
+    assert overlay_scroll_top(page, board.scroller) > 0, (
+        f'{board.label}: a swipe starting on a player did not scroll {board.scroller} '
         f'(maxScroll was {scroller["maxScroll"]})'
     )
     assert ghost_creations(page) == 0, f'{board.label}: a swipe created a drag ghost'
