@@ -74,10 +74,19 @@ def required_positions(team):
     return base + outfield
 
 
+def roster_name(player):
+    """A roster player's name as plans are compared: trimmed. Names are saved
+    as typed, and a phone's autocomplete leaves a trailing space."""
+    return str(player.name or '').strip()
+
+
 def _complete_alignment(alignment, required, present_names, optional_positions=None):
     if not isinstance(alignment, dict):
         return False, list(required)
 
+    # Trimmed, as Start compares them (game_start_readiness), so Home, Manage
+    # Game and Start Game give one answer for the same plan.
+    alignment = {pos: str(name or '').strip() for pos, name in alignment.items()}
     optional_positions = list(optional_positions or [])
     missing = [pos for pos in required if not alignment.get(pos)]
     positions_to_validate = list(dict.fromkeys([*required, *optional_positions]))
@@ -301,7 +310,7 @@ def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation
         absences = db.session.query(PlayerGameAbsence).filter_by(game_id=game.id, team_id=team_id).all()
     absent_ids = {row.player_id for row in absences}
     present = [player for player in roster if player.id not in absent_ids]
-    present_names = {player.name for player in present}
+    present_names = {roster_name(player) for player in present}
 
     lineup = db.session.query(Lineup).filter_by(associated_game_id=game.id, team_id=team_id).first()
     if rotation is _UNSET:
@@ -550,7 +559,7 @@ def build_actual_game_report(game, team):
 
     _, actual, events, reached = actual_game_rotation(game, team.id)
     required = required_positions(team)
-    present_names = {player.name for player in present_roster}
+    present_names = {roster_name(player) for player in present_roster}
     position_order = {pos: index for index, pos in enumerate(required)}
 
     def inning_sort(value):
