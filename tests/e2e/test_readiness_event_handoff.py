@@ -42,11 +42,12 @@ OWNER = 'game_prep_readiness.js'
 SUBSCRIBER = 'game_setup_ux.js'
 QUICK_START = 'pregame_quick_start.js'
 
-# Two application modules override window.fetch (live_game_feedback_pass.js:33
-# and live_game_inning_clarity.js:105). Their frames sit between the real
-# caller and this probe, so an unfiltered stack blames 100% of readiness
-# traffic on whichever wrapper loaded last.
-WRAPPERS = ('live_game_feedback_pass.js', 'live_game_inning_clarity.js')
+# Three application modules override window.fetch (live_game_feedback_pass.js,
+# live_game_inning_clarity.js, and live_game_contract.js, which counts live
+# writes in flight for End Inning and itself never requests readiness). Their
+# frames sit between the real caller and this probe, so an unfiltered stack
+# blames 100% of readiness traffic on whichever wrapper loaded last.
+WRAPPERS = ('live_game_feedback_pass.js', 'live_game_inning_clarity.js', 'live_game_contract.js')
 
 READINESS_PATH = re.compile(r'^/api/game-day/\d+/readiness$')
 
