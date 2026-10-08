@@ -126,7 +126,10 @@ def test_first_pitch_launches_quick_field_command_center(page: Page, coachboard_
 
         quick = page.locator('#cbQuickDefense')
         expect(quick).to_be_visible(timeout=15_000)
-        expect(quick.locator('.cb-qd-title')).to_have_text('Quick Field', timeout=15_000)
+        # The live field's heading (live_game_dugout_mode.js): what it is and
+        # which inning is being played.
+        expect(quick.locator('.cb-qd-kicker')).to_have_text('Live Defense', timeout=15_000)
+        expect(quick.locator('.cb-qd-title')).to_have_text('Inning 1 · live')
         expect(page.locator('#liveDefensiveChangeBtn')).to_have_count(0)
         expect(page.locator('#cb-live-field-editor')).to_have_count(0)
         expect(page.locator('#liveChangePitcherBtn')).to_be_visible()

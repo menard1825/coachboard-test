@@ -121,7 +121,10 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
         quick = page.locator('#cbQuickDefense')
         expect(quick).to_be_visible(timeout=15_000)
-        expect(quick.locator('.cb-qd-title')).to_have_text('Quick Field')
+        # The live field's heading (live_game_dugout_mode.js): what it is and
+        # which inning is being played.
+        expect(quick.locator('.cb-qd-kicker')).to_have_text('Live Defense', timeout=15_000)
+        expect(quick.locator('.cb-qd-title')).to_have_text('Inning 1 · live')
 
         # Test 2 contract: no second current-defense surface can coexist with Quick Field.
         for selector in (
@@ -144,10 +147,8 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         modal = page.locator('#cbQuickMoveModal')
         expect(modal).to_be_visible()
         expect(modal).to_contain_text(f'{BENCH_NAME} is currently on the bench')
+        # CF is occupied: the bench player takes it and Casey goes to the bench.
         modal.locator('[data-cb-destination="CF"]').click()
-        # CF is occupied: the coach says where Casey goes (nothing automatic).
-        expect(modal.locator('[data-cb-chain-question]')).to_have_text('Where should Center Casey go?')
-        modal.get_by_role('button', name='Bench Center Casey', exact=True).click()
         expect(modal).not_to_be_visible(timeout=10_000)
         expect(quick.locator('[data-cb-position="CF"]')).to_contain_text(BENCH_NAME, timeout=10_000)
         expect(quick.locator('[data-cb-move-player="Center Casey"]')).to_be_visible(timeout=10_000)
@@ -157,38 +158,23 @@ def test_phone_live_game_keeps_quick_field_as_only_defense_surface(page: Page, c
         assert state['current_alignment']['CF'] == BENCH_NAME
         assert 'Center Casey' not in state['current_alignment'].values()
 
-        # Regression: swapping catchers through the fielder -> Bench ->
-        # replacement chain must repaint this exact Quick Field immediately.
+        # Regression: replacing the catcher from the bench must repaint
+        # this exact Quick Field immediately, on the same page.
         #
-        # Center Casey is on the bench after the CF substitution above.
+        # Center Casey is on the bench after the CF substitution above. The
+        # bench player taps C: one move, Catcher Cole goes to the bench.
         page.evaluate(
             "window.__catcherSwapStayedOnPage = 'yes'"
         )
 
-        quick.locator('[data-cb-position="C"]').click()
+        quick.locator('[data-cb-move-player="Center Casey"]').click()
 
         expect(modal).to_be_visible()
         expect(modal).to_contain_text(
-            'Catcher Cole is currently playing C'
+            'Center Casey is currently on the bench'
         )
 
-        modal.locator('[data-cb-bench-current]').click()
-
-        expect(modal.locator('[data-cb-chain-question]')).to_have_text(
-            'What should happen at C?'
-        )
-
-        catcher_replacement = modal.locator(
-            '[data-cb-chain-choices] button',
-            has_text='Center Casey',
-        )
-
-        expect(catcher_replacement).to_be_visible()
-        expect(catcher_replacement).to_contain_text(
-            'Bench → C'
-        )
-
-        catcher_replacement.click()
+        modal.locator('[data-cb-destination="C"]').click()
 
         expect(modal).not_to_be_visible(timeout=10_000)
 

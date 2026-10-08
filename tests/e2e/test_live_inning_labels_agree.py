@@ -1,7 +1,7 @@
-"""The header, the tabs and End Inning show the same inning.
+"""The header, "Plan next inning" and End Inning show the same inning.
 
 They used to come from different reads: the header from the live state, the
-Next tab and End Inning ("End 1st → Start 2nd") from the Next Inning board's
+"Plan 2nd inning" button and End Inning ("End 1st → Start 2nd") from the Next Inning board's
 own poll. After Undo End Inning the tab and button stayed on the old inning
 for about 3 s; with the live connection down a remote End Inning put
 "INNING 1" beside "End 2nd → Start 3rd" for up to 10 s.
@@ -46,7 +46,7 @@ ORDINAL = {'1': '1st', '2': '2nd', '3': '3rd', '4': '4th'}
 def _consistent(labels):
     inning = labels['header']
     nxt = str(int(inning) + 1)
-    return (labels['display'] == inning and labels['tab'] == f'{ORDINAL[nxt]} Inning'
+    return (labels['display'] == inning and labels['tab'] == f'Plan {ORDINAL[nxt]} inning'
             and labels['end'] == f'End {ORDINAL[inning]} → Start {ORDINAL[nxt]}')
 
 

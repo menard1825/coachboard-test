@@ -92,7 +92,10 @@ def test_phone_current_fielder_uses_quick_field_move_sheet(page: Page, coachboar
 
         quick = page.locator('#cbQuickDefense')
         expect(quick).to_be_visible(timeout=15_000)
-        expect(quick.locator('.cb-qd-title')).to_have_text('Quick Field')
+        # The live field's heading (live_game_dugout_mode.js): what it is and
+        # which inning is being played.
+        expect(quick.locator('.cb-qd-kicker')).to_have_text('Live Defense', timeout=15_000)
+        expect(quick.locator('.cb-qd-title')).to_have_text('Inning 1 · live')
         shortstop = quick.locator('[data-cb-position="SS"]')
         expect(shortstop).to_contain_text('Shortstop Shawn')
         shortstop.click()
@@ -103,10 +106,9 @@ def test_phone_current_fielder_uses_quick_field_move_sheet(page: Page, coachboar
         expect(page.locator('#cb-live-field-editor')).to_have_count(0)
         expect(page.locator('#liveDefensiveChangeBtn')).to_have_count(0)
 
-        # Swap SS and 2B from the one live defense surface: the coach
-        # explicitly sends Sam to the vacated SS.
+        # Swap SS and 2B from the one live defense surface: tapping an
+        # occupied spot is the move -- the two trade places at once.
         move_sheet.locator('[data-cb-destination="2B"]').click()
-        move_sheet.get_by_role('button', name='Put Second Sam at SS', exact=True).click()
         expect(move_sheet).not_to_be_visible(timeout=10_000)
         expect(quick.locator('[data-cb-position="2B"]')).to_contain_text('Shortstop Shawn', timeout=10_000)
         expect(quick.locator('[data-cb-position="SS"]')).to_contain_text('Second Sam', timeout=10_000)

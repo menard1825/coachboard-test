@@ -95,8 +95,9 @@ def test_live_action_area_text_holds_still(browser, coachboard_url, device):
         seen = page.evaluate('window.__cbAreaText')
         flashing = {area: texts for area, texts in seen.items() if len(texts) > 1}
         assert flashing == {}, flashing
-        assert seen['Quick Field heading'][0].startswith('LIVE DEFENSE Quick Field') or \
-            seen['Quick Field heading'][0].startswith('Live Defense Quick Field'), seen['Quick Field heading']
+        # One steady heading: the kicker and the inning being played.
+        assert seen['Quick Field heading'][0].lower().startswith('live defense inning 1 · live'), \
+            seen['Quick Field heading']
         # No script loop rewriting the page's classes every frame.
         assert page.evaluate('window.__cbBodyWrites') < 20
 
