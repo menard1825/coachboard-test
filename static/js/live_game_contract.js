@@ -776,11 +776,23 @@
     });
   }
 
+  // The filled positions of a defense, names trimmed: what a coach sees.
+  function shownDefense(alignment) {
+    return JSON.stringify(
+      Object.entries(alignment || {})
+        .map(([position, name]) => [position, String(name || '').trim()])
+        .filter(([, name]) => name)
+        .sort(([a], [b]) => (a < b ? -1 : 1))
+    );
+  }
+
   async function endInningFromNext(
     allowOpenNext = false,
-    pitchingDecision = null
+    pitchingDecision = null,
+    caughtUp = false
   ) {
     if (inningAdvanceBusy) return;
+    let again = false;
 
     const button =
       $('liveEndInningBtn');
@@ -906,6 +918,25 @@
           () => endInningFromNext(allowOpenNext, pitchingDecision)
         );
         return;
+      }
+
+      // Another coach's plan reached the server before this board showed it:
+      // the board shows it first, so the defense started is the one on
+      // screen. If a newer plan landed meanwhile, start over once from it;
+      // a second time, go on with the server's plan as before.
+      const board = window.CBNextDefense;
+      if (
+        board?.getAlignment &&
+        shownDefense(board.getAlignment()) !== shownDefense(prep?.confirmed?.alignment)
+      ) {
+        await board.refresh?.();
+        if (
+          !caughtUp &&
+          shownDefense(board.getAlignment()) !== shownDefense(prep?.confirmed?.alignment)
+        ) {
+          again = true;
+          return;
+        }
       }
 
       const alignment = {
@@ -1101,6 +1132,10 @@
         button.disabled =
           wasDisabled;
       }
+    }
+
+    if (again) {
+      return endInningFromNext(allowOpenNext, pitchingDecision, true);
     }
   }
 

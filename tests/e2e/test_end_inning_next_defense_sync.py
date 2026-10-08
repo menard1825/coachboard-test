@@ -349,6 +349,27 @@ def test_another_coachs_plan_change_is_the_one_started(live, assistant, coachboa
     assert page.cb_errors == []
 
 
+def test_another_coachs_plan_not_yet_on_this_board_is_shown_before_it_starts(
+    live, assistant, coachboard_url
+):
+    """The race CI hit by chance, made certain: this page's live connection is
+    down, so its board cannot have heard of the other coach's plan when End
+    Inning is tapped. End Inning reads the server's plan; the board shows it
+    before the advance is sent, so what starts is what is on screen."""
+    page = live(PHONE)
+    _open(page, coachboard_url)
+    page.evaluate('() => window.__cbLiveGameSocket.disconnect()')
+    other = assistant(page)
+    confirmed = _prep(other.request, coachboard_url, page)
+    theirs = _save(other.request, coachboard_url, page, **_swap(confirmed, '2B', 'SS'))
+    assert _filled(page.evaluate('() => window.CBNextDefense.getAlignment()')) != _filled(theirs['alignment'])
+
+    page.locator(END).click()                                    # at once
+
+    _one_clean_advance(page, coachboard_url, theirs['alignment'])
+    assert page.cb_errors == []
+
+
 def test_end_inning_with_nothing_pending_is_unchanged(live, coachboard_url):
     page = live(PHONE)
     _open(page, coachboard_url)
