@@ -263,7 +263,12 @@ def test_rapid_edits_then_one_undo_keeps_one_step(live, coachboard_url):
     previous = _filled(confirmed['previous']['alignment'])               # before the last save
 
     page.locator(UNDO).click()
+    # Off at once (an Undo is under way) -- done only when the server has
+    # confirmed it and the board says what came back.
     expect(page.locator(UNDO)).to_be_disabled(timeout=5_000)
+    expect(page.locator(f'{PLANNER} [data-next-undo-note]')).to_contain_text(
+        'Undid your last change', timeout=10_000)
+    expect(page.locator(UNDO)).to_be_disabled()
     assert _filled(_prep(page.cb_api.request, coachboard_url, page)['alignment']) == previous
     assert posts.count('undo') == 1
     assert page.cb_errors == []
