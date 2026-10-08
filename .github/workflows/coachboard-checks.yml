@@ -82,9 +82,10 @@ jobs:
   browser-shard:
     name: Playwright shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
-    # A green shard takes about 15-17 minutes, setup included; 30 leaves
-    # room for a slow runner and still stops a hung shard in half an hour.
-    timeout-minutes: 30
+    # A green shard usually takes 13-19 minutes, setup included, and one
+    # took 25 on a slow runner (CI #1463); 40 leaves room for that and
+    # still stops a hung shard well before the old 60.
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
