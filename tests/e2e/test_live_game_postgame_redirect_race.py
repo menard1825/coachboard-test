@@ -517,7 +517,21 @@ def track_report_visits(page: Page, coachboard_url: str, game_id: int):
 
 def start_game(page: Page, coachboard_url: str, opponent: str):
     game_id = create_game(page, coachboard_url, opponent)
-    started = page.request.post(f"{coachboard_url}/api/live-game/{game_id}/start", data=start_body(page.request, coachboard_url, game_id))
+    url = f"{coachboard_url}/api/live-game/{game_id}/start"
+    body = start_body(page.request, coachboard_url, game_id)
+    started = page.request.post(url, data=body)
+    answer = started.json() if started.status == 409 else {}
+    if answer.get("required_decision"):
+        # The same starter is pitching in the other live game, so Start asks
+        # about his eligibility; the coach confirms what they were shown, as
+        # the Start button's question does.
+        started = page.request.post(url, data={
+            **body,
+            "pitching_decision": answer["required_decision"],
+            "pitching_decision_status": answer["pitching_status"],
+            "pitching_decision_rule_set": answer["decision_rule_set"],
+            "pitching_decision_reason": answer["decision_reason"],
+        })
     assert started.ok and started.json().get("status") == "success", started.text()
     return game_id
 
