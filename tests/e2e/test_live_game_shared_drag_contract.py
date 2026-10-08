@@ -959,17 +959,28 @@ def test_click_suppression_follows_a_replaced_root(page: Page, coachboard_url, b
     stops matching, and the click a drop was supposed to swallow gets
     through to the board underneath. Resolving root() at click time is
     what makes this hold.
+
+    Only the drop's own click is swallowed -- the one the release makes,
+    which can arrive after the rerender. A new tap is a new gesture and
+    always gets through (a coach tapping Undo right after a drop).
+    The drag is dispatched as pointer events, which make no native click
+    of their own, so the release's click can be delivered after the
+    rerender, exactly once.
     """
     if browser_name != 'chromium':
         pytest.skip('Chromium-only.')
     game_id, player_name = _open_live_page(page, coachboard_url)
     try:
         page.evaluate(SYNTH_SETUP)
-
-        page.mouse.move(160, 210)
-        page.mouse.down()
-        page.mouse.move(160, 300, steps=8)
-        page.mouse.up()
+        page.evaluate("""() => {
+          const at = (type, x, y, target) => target.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true, pointerId: 7, pointerType: 'mouse',
+            isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y}));
+          const src = document.getElementById('cbSynthSrc');
+          at('pointerdown', 160, 210, src);
+          for (let y = 220; y <= 300; y += 10) at('pointermove', 160, y, src);
+          at('pointerup', 160, 300, document.getElementById('cbSynthTgt'));
+        }""")
         assert page.evaluate('() => window.__dropped') is True, 'synthetic drop did not fire'
 
         # The board rerenders: same id, brand new node.
@@ -980,11 +991,16 @@ def test_click_suppression_follows_a_replaced_root(page: Page, coachboard_url, b
           window.__clicked = false;
         }""")
 
-        # Well inside the 700ms suppression window.
-        page.mouse.click(160, 300)
+        # The release's own click lands on the new node: swallowed.
+        page.evaluate("""() => document.getElementById('cbSynthTgt')
+          .dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, clientX: 160, clientY: 300}))""")
         assert page.evaluate('() => window.__clicked') is False, (
             'a post-drop click reached the page after the surface replaced its root'
         )
+
+        # A new tap, still well inside the old 700 ms window, is not.
+        page.mouse.click(160, 300)
+        assert page.evaluate('() => window.__clicked') is True, 'a new tap right after a drop was swallowed'
     finally:
         page.evaluate('() => window.__synth?.unregister()')
         cleanup(page, coachboard_url, game_id, player_name)

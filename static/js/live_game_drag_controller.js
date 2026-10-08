@@ -151,6 +151,13 @@
     }
   }
 
+  /**
+   * Swallow the click the browser makes from this gesture's own release
+   * -- and only that one. It is consumed by the first click it catches,
+   * and a new press clears it (see onPointerDown): a coach who drops a
+   * player and taps Undo at once is making a new tap, which must work.
+   * The time limit only bounds platforms that never send that click.
+   */
   function suppressClicks(surface) {
     suppressClickUntil = Date.now() + CLICK_SUPPRESSION_MS;
     // Keep the surface, not its root element. Holding the element would
@@ -227,6 +234,10 @@
       return;
     }
     if (active) teardown();
+    // A new press is a new gesture: the last drop's own click, if it was
+    // ever coming, has already been dispatched.
+    suppressClickUntil = 0;
+    suppressSurface = null;
     if (event.isPrimary === false) return;
     if (event.button !== undefined && event.button !== 0) return;
 
@@ -381,6 +392,9 @@
     if (!suppressSurface || !event.target.closest) return;
     const root = suppressSurface.root();
     if (!root || !root.contains(event.target)) return;
+    // A release makes at most one click.
+    suppressClickUntil = 0;
+    suppressSurface = null;
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
