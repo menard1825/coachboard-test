@@ -106,6 +106,30 @@ def test_labels_move_together_with_the_connection_down(live, coachboard_url):
     assert page.cb_errors == []
 
 
+def test_a_newer_inning_never_reaches_the_buttons_before_the_header(live, coachboard_url):
+    """The same race the 50 ms watch above can only catch by luck: the page
+    takes a newer live state (here the remote End Inning, read while the
+    connection is down) and its labels are read in that very turn, and again
+    once the next frame has drawn. Every reading agrees."""
+    page = live(PHONE)
+    _open(page, coachboard_url)
+    page.evaluate('() => window.__cbLiveGameSocket.disconnect()')
+    _remote_end_inning(page, coachboard_url)
+    readings = page.evaluate("""async (labels) => {
+      const read = eval(labels);
+      const state = await (await fetch(location.pathname.replace(/^\\/game\\//, '/api/live-game/') + '/state')).json();
+      const before = read();
+      window.CBLiveState.adopt(state, 'test');
+      const sameTurn = read();
+      await new Promise(done => requestAnimationFrame(() => setTimeout(done, 0)));
+      return {before, sameTurn, drawn: read()};
+    }""", LABELS)
+    assert _consistent(readings['before']) and readings['before']['header'] == '1', readings
+    assert _consistent(readings['sameTurn']), readings
+    assert _consistent(readings['drawn']) and readings['drawn']['header'] == '2', readings
+    assert page.cb_errors == []
+
+
 def test_end_inning_will_not_end_an_inning_the_coach_did_not_see(live, coachboard_url):
     page = live(PHONE)
     _open(page, coachboard_url)

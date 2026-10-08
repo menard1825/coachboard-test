@@ -5369,14 +5369,18 @@
       const moved = Boolean(version && seenLiveVersion && version !== seenLiveVersion);
       if (version) seenLiveVersion = version;
       // Another inning than this board read (an Undo, a remote End Inning
-      // found by a poll or on reconnect): relabel now, read the next inning.
+      // found by a poll or on reconnect): relabel, read the next inning.
+      // Relabelled in the same frame as the header and inning display
+      // (live_game_dugout_mode / live_game_feedback_pass draw on the next
+      // animation frame), so the page never holds "INNING 1" beside
+      // "End 2nd" -- not even between frames.
       if (
         Number(detail.game_id) === gameId &&
         latest &&
         detail.state?.current_inning &&
         String(detail.state.current_inning) !== String(latest.current_inning || '')
       ) {
-        syncUpcomingInningLabels();
+        window.requestAnimationFrame(syncUpcomingInningLabels);
         onLiveChange();
       } else if (moved && latest) {
         onLiveChange();
