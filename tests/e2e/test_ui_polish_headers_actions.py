@@ -271,9 +271,10 @@ def test_phone_template_buttons_center_their_label(make_page, coachboard_url, na
     # Still a comfortable tap target.
     assert gaps['height'] >= 40 and gaps['width'] >= 120, gaps
 
-    button.scroll_into_view_if_needed()
-    box = button.bounding_box()
-    page.touchscreen.tap(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+    # A real tap on the button's centre. Playwright checks nothing covers it
+    # first: scrolled only "into view", a button low on the page ends up under
+    # the fixed bottom nav, and a raw coordinate tap opens Roster instead.
+    button.tap()
     page.wait_for_url(f'**{TEMPLATE_BUTTONS[name]}', timeout=15_000)
     assert page.cb_errors == []
 
