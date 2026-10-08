@@ -387,11 +387,23 @@ def test_save_game_plan_creates_a_reusable_named_plan(make_page, coachboard_url,
     name = f'Plan {uuid.uuid4().hex[:4]}'
     _plan_options(page).get_by_role('link', name='Save game plan').click()
     page.locator('#rotationTemplateName').fill(name)
-    page.once('dialog', lambda dialog: dialog.accept())
+    shown = []
+
+    def answer(dialog):
+        shown.append(dialog.message)
+        dialog.accept()
+
+    page.once('dialog', answer)
+    save = page.locator('#confirmSaveTemplateBtn')
     with page.expect_request(lambda r: r.url.endswith('/save_rotation_as_template')) as plan_save:
-        page.locator('#confirmSaveTemplateBtn').click()
+        save.click()
     assert plan_save.value.post_data_json['title'] == name
     assert 'associated_game_id' not in plan_save.value.post_data_json
+    # Saved and confirmed before the page is left: the confirmation comes
+    # with the server's answer, and an alert still open when the next page
+    # is asked for holds that navigation up.
+    expect(save).to_have_text('Save game plan', timeout=10_000)
+    assert shown == ['Game plan saved.'], shown
 
     # It is a reusable Game Plan: another visit offers it under Load.
     _open_game(page, coachboard_url, game)
