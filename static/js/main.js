@@ -1789,7 +1789,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabToActivate) {
             // We need to make sure the content is visible on first load, so we'll activate it directly.
             // Using a small timeout allows the rest of the page to render first.
-            setTimeout(() => activateTab(tabToActivate), 0);
+            // If the coach opened another workspace in that turn (or a link or
+            // Back did), the URL no longer names this tab: leave theirs open.
+            const requested = window.location.hash;
+            setTimeout(() => {
+                if (window.location.hash !== requested) return;
+                activateTab(tabToActivate);
+            }, 0);
         }
     }
     
