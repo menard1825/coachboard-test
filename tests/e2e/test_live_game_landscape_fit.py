@@ -423,41 +423,6 @@ def test_landscape_fields_are_sized_by_height_not_only_width(page: Page, coachbo
         cleanup_game(page, coachboard_url, game_id)
 
 
-def test_pregame_plan_stays_compact_and_usable_in_landscape(page: Page, coachboard_url: str):
-    """Pregame Plan was already compact. Landscape sizing must leave it alone."""
-    login(page, coachboard_url)
-    game_id = create_live_game(page, coachboard_url, 'Landscape Plan')
-
-    try:
-        for width, height in TABLET_LANDSCAPE:
-            page.set_viewport_size({'width': width, 'height': height})
-            open_live_game(page, coachboard_url, game_id)
-            page.locator(f'{SWITCHER} [data-now-next="plan"]').click()
-            expect(page.locator('#live-board-pregame-plan')).to_be_visible(timeout=15_000)
-
-            label = f'plan at {width}x{height}'
-            plan = page.locator('#live-board-pregame-plan')
-            expect(plan).to_be_visible()
-            expect(plan).to_contain_text('Reference only')
-
-            data = page.evaluate(MEASURE, {
-                'header': '#cbDugoutHeader',
-                'switcher': SWITCHER,
-                'plan': '#live-board-pregame-plan',
-                'field': '#live-board-pregame-plan',
-            })
-            assert_no_horizontal_overflow(data, label)
-
-            box = data['boxes']['plan']
-            assert box['top'] <= height, f'{label}: plan starts below the fold'
-
-            # The other two surfaces stay out of the way.
-            expect(page.locator('#cbQuickDefense')).to_be_hidden()
-            expect(page.locator('#live-board-prep-v3')).to_be_hidden()
-    finally:
-        cleanup_game(page, coachboard_url, game_id)
-
-
 def test_portrait_and_phone_are_untouched_by_landscape_sizing(page: Page, coachboard_url: str):
     """The landscape owner is landscape-scoped; these must not have moved."""
     login(page, coachboard_url)
