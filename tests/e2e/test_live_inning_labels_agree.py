@@ -130,6 +130,37 @@ def test_a_newer_inning_never_reaches_the_buttons_before_the_header(live, coachb
     assert page.cb_errors == []
 
 
+def test_the_header_catching_up_to_this_boards_read_moves_the_labels_with_it(live, coachboard_url):
+    """The other order: this board's own read finds the 2nd first (its
+    buttons wait on the header, "Checking the 2nd defense..."), then the
+    live state catches up. The buttons used to be relabelled in that same
+    turn, before the header drew -- "INNING 1" beside "End 2nd" for a
+    frame, caught in CI by the 50 ms watch above."""
+    page = live(PHONE)
+    _open(page, coachboard_url)
+    page.evaluate('() => window.__cbLiveGameSocket.disconnect()')
+    held = '**/api/live-game/*/state'
+    page.route(held, lambda route: route.abort())
+    _remote_end_inning(page, coachboard_url)
+    expect(page.locator('#liveEndInningBtn .coach-action-note')).to_contain_text(
+        'Checking the 2nd defense', timeout=10_000)
+    assert _consistent(page.evaluate(LABELS)) and page.evaluate(LABELS)['header'] == '1'
+    page.unroute(held)
+    readings = page.evaluate("""async (labels) => {
+      const read = eval(labels);
+      const state = await (await fetch(location.pathname.replace(/^\\/game\\//, '/api/live-game/') + '/state')).json();
+      const before = read();
+      window.CBLiveState.adopt(state, 'test');
+      const sameTurn = read();
+      await new Promise(done => requestAnimationFrame(() => setTimeout(done, 0)));
+      return {before, sameTurn, drawn: read()};
+    }""", LABELS)
+    assert _consistent(readings['before']) and readings['before']['header'] == '1', readings
+    assert _consistent(readings['sameTurn']), readings
+    assert _consistent(readings['drawn']) and readings['drawn']['header'] == '2', readings
+    assert page.cb_errors == []
+
+
 def test_end_inning_will_not_end_an_inning_the_coach_did_not_see(live, coachboard_url):
     page = live(PHONE)
     _open(page, coachboard_url)

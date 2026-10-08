@@ -5351,7 +5351,9 @@
       }
       // The field right now, for the "Empty now" line and Pregame Plan's
       // "On the field now" -- updated with the live state (an Undo, a fill)
-      // rather than at the next poll.
+      // rather than at the next poll. Drawn on the next frame, with the
+      // header: this board's own read can reach a new inning first, and
+      // the live state catching up to it then lands here, not below.
       if (
         Number(detail.game_id) === gameId &&
         latest &&
@@ -5359,8 +5361,10 @@
         String(detail.state.current_inning || '') === String(latest.current_inning || '')
       ) {
         latest.current_alignment = detail.state.current_alignment;
-        syncLiveActions();
-        renderPlanCard();
+        window.requestAnimationFrame(() => {
+          syncLiveActions();
+          renderPlanCard();
+        });
       }
       // Any other change to the game's history in the same inning moves
       // the next inning too -- an Undo of a pitching change arrives as a
