@@ -109,7 +109,10 @@ def test_a_double_tap_on_the_incoming_pitcher_asks_once_and_saves_nothing(
     no_dialog_left_open(page)
 
 
-@pytest.mark.parametrize('gesture', ['touch-80', 'touch-250', 'dblclick'])
+# touch-400: the question and its backdrop are gone by the second tap,
+# which used to land on the field behind and open Move Player for whoever
+# stood under the button (CI #1462, touch-250 on a slower runner).
+@pytest.mark.parametrize('gesture', ['touch-80', 'touch-250', 'touch-400', 'dblclick'])
 def test_a_double_tap_on_a_destination_saves_it_once(
     page: Page, coachboard_url, live_field, gesture
 ):
@@ -136,3 +139,27 @@ def test_a_double_tap_on_a_destination_saves_it_once(
     question = choose_incoming_pitcher(page, 'First Frank')
     expect_destination_question(question, 'First Frank', 'Shortstop Shawn')
     choose_outgoing_destination(question, 'Cancel')
+
+
+def test_a_later_tap_where_the_choice_was_reaches_the_field(
+    page: Page, coachboard_url, live_field
+):
+    """Only the double tap's second tap is held back: a tap on the field
+    there once the double-tap window has passed opens Move Player."""
+    game_id = live_field()
+    question = choose_incoming_pitcher(page, 'Shortstop Shawn')
+    page.wait_for_function(
+        f"() => document.querySelector('{DESTINATION_QUESTION}').contains(document.activeElement)")
+    label = f'{OUTGOING} → 1B · First Frank → SS'
+    button = question.get_by_role('button', name=label, exact=True)
+    x, y = centre(button)
+    page.touchscreen.tap(x, y)
+    wait_for_pitcher_change(page, coachboard_url, game_id, outcome_of(label, BASE, 'Shortstop Shawn', OUTGOING))
+    no_dialog_left_open(page)
+
+    under = page.evaluate('([x, y]) => document.elementFromPoint(x, y)?.closest(".cb-qd-field") !== null', [x, y])
+    assert under, 'expected a field card under the choice'
+    page.wait_for_timeout(600)          # past the double-tap window (500 ms)
+    page.touchscreen.tap(x, y)
+    expect(page.locator('#cbQuickMoveModal')).to_be_visible(timeout=5_000)
+

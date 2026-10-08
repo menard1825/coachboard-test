@@ -187,6 +187,28 @@
   // not seen (e.g. "Make this change" drawn where "Bench …" was).
   const STEP_GUARD_MS = 500;
 
+  // The second tap of a double tap on a choice lands where the first did,
+  // after the question has closed: it must not reach the field behind
+  // (it opened Move Player for whoever stood under the button). One click
+  // at that spot within STEP_GUARD_MS is swallowed; a tap anywhere else,
+  // or a choice made from the keyboard, is untouched.
+  function swallowSecondTap(answering) {
+    if (!answering || answering.detail === 0) return;
+    const {clientX: x, clientY: y} = answering;
+    const until = performance.now() + STEP_GUARD_MS;
+    const stop = () => document.removeEventListener('click', onClick, true);
+    const onClick = event => {
+      if (event === answering) return;
+      stop();
+      if (performance.now() > until) return;
+      if (Math.hypot(event.clientX - x, event.clientY - y) > 24) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    document.addEventListener('click', onClick, true);
+    window.setTimeout(stop, STEP_GUARD_MS);
+  }
+
   function filled(alignment) {
     return Object.fromEntries(
       Object.entries(alignment || {}).filter(([, name]) => name)
@@ -334,8 +356,9 @@
         button.type = 'button';
         button.className = 'btn btn-outline-primary';
         button.textContent = label;
-        button.addEventListener('click', () => {
+        button.addEventListener('click', event => {
           if (stale || decided) return;
+          swallowSecondTap(event);
           finish(build());
         });
         return button;
