@@ -53,6 +53,24 @@ def _sheet_button(page, label):
     return page.locator(SHEET).get_by_role('button', name=label, exact=True)
 
 
+def _started_with_cf_open(page, game_id):
+    """Start with CF Open has finished on this page, not just on the server.
+
+    The server says live as soon as /start commits; the page saves the
+    coach's "Start with CF Open" answer for this tab once that response
+    returns. A reload in between loses the answer and End Inning asks
+    again -- so wait for both before reloading.
+    """
+    page.wait_for_function(
+        f"async () => (await (await fetch('/api/live-game/{game_id}/state')).json()).game.is_live",
+        timeout=15_000,
+    )
+    page.wait_for_function(
+        f"() => (sessionStorage.getItem('coachboard:record-acks:v1:{game_id}') || '[]') !== '[]'",
+        timeout=15_000,
+    )
+
+
 def test_a_complete_first_inning_starts(setup, coachboard_url):
     page, game_id = _open(setup, coachboard_url, FULL)
     page.locator(START).click()
@@ -104,10 +122,7 @@ def test_ending_the_first_with_the_same_open_field_does_not_ask_again(setup, coa
     page, game_id = _open(setup, coachboard_url, NO_CF)
     page.locator(START).click()
     _sheet_button(page, 'Start with CF Open').click()
-    page.wait_for_function(
-        f"async () => (await (await fetch('/api/live-game/{game_id}/state')).json()).game.is_live",
-        timeout=15_000,
-    )
+    _started_with_cf_open(page, game_id)
     page.reload(wait_until='domcontentloaded')
     page.locator('#liveEndInningBtn').click()
     # The 2nd inning's plan still has CF open, which End Inning asks about;
@@ -122,10 +137,7 @@ def test_a_field_changed_after_start_gets_the_normal_record_warning(setup, coach
     page, game_id = _open(setup, coachboard_url, NO_CF)
     page.locator(START).click()
     _sheet_button(page, 'Start with CF Open').click()
-    page.wait_for_function(
-        f"async () => (await (await fetch('/api/live-game/{game_id}/state')).json()).game.is_live",
-        timeout=15_000,
-    )
+    _started_with_cf_open(page, game_id)
     open_on_the_field(page, coachboard_url, game_id, 'LF')
     page.reload(wait_until='domcontentloaded')
     page.locator('#liveEndInningBtn').click()
