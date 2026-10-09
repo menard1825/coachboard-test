@@ -28,6 +28,16 @@
             </div>
         </div>
 
+        {% if previous_setup %}
+        <div id="previousSetupLaunch" class="cb-previous-setup-launch" data-game-id="{{ game['id'] }}">
+            <div class="cb-psl-copy">
+                <div class="cb-psl-title"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Use Previous Game Setup</div>
+                <div class="cb-psl-help">Copy the batting order and starting defense from <strong>vs {{ previous_setup.opponent }}</strong> · {{ previous_setup.date_label }}. You'll see everything before it's copied.</div>
+            </div>
+            <button type="button" class="btn btn-outline-primary cb-psl-button" id="previousSetupOpenBtn">Review &amp; Copy</button>
+        </div>
+        {% endif %}
+
         <h5 class="mb-3 text-uppercase text-muted fw-bold small">Pregame Setup Checklist</h5>
 
         <div class="row g-3 mb-4">
@@ -201,6 +211,7 @@
 </div>
 
 {% include '_lineup_editor.html' %}
+{% if previous_setup %}{% include '_previous_game_setup.html' %}{% endif %}
 
 <div class="modal fade" id="assignPlayerModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -250,6 +261,7 @@
 <script src="{{ url_for('static', filename='js/game_setup_ux.js', v=asset_version) }}"></script>
 <script src="{{ url_for('static', filename='js/live_game_unified_field_entry.js', v=asset_version) }}"></script>
 <script src="{{ url_for('static', filename='js/live_game_contract.js', v=asset_version) }}"></script>
+{% if previous_setup %}<script src="{{ url_for('static', filename='js/previous_game_setup.js', v=asset_version) }}"></script>{% endif %}
 <script>
     // Keep the game shell visible without observing/mutating the same attributes.
     const keepGameShellVisible = () => {

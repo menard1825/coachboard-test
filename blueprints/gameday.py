@@ -12,6 +12,7 @@ from game_day_helpers import duplicate_assignment_message
 from models import GameRotationEvent, PlayerPitchTarget
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
 from unrecorded_pitching import with_unrecorded
+from previous_game_setup import build_previous_setup_preview, source_summary
 from lineup_service import (
     LineupValidationError,
     lineup_to_dict,
@@ -90,6 +91,7 @@ def game_management(game_id):
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team.id, associated_game_id=None).all()
 
     game_date_for_input = game.date.strftime('%Y-%m-%d')
+    previous_setup = None if game.is_live else source_summary(game)
 
     return render_template('game_management.html',
                            current_team=team,
@@ -106,8 +108,20 @@ def game_management(game_id):
                            previous_lineup=lineup_to_dict(previous_lineup),
                            batting_order_mode=team.batting_order_mode,
                            fixed_lineup_size=team.fixed_lineup_size,
+                           previous_setup=previous_setup,
                            # NEW: Pass rotation templates to the render_template call
                            rotation_templates=[model_to_dict(rt) for rt in rotation_templates])
+
+@gameday_bp.route('/api/game/<int:game_id>/previous-setup')
+def previous_setup_preview(game_id):
+    """Read-only preview for Use Previous Game Setup. Nothing is written:
+    the page applies the result through /add_lineup or /edit_lineup and the
+    shared /save_rotation queue."""
+    team = db.session.get(Team, session['team_id'])
+    game = db.session.query(Game).filter_by(id=game_id, team_id=session['team_id']).first()
+    if not team or not game:
+        return jsonify({'status': 'error', 'message': 'Game not found.'}), 404
+    return jsonify({'status': 'success', **build_previous_setup_preview(game, team)})
 
 @gameday_bp.route('/add_game', methods=['POST'])
 def add_game():
