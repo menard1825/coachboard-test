@@ -504,8 +504,7 @@
         planTitle.insertAdjacentElement('afterend', badge);
       }
     }
-    const planSubtitle = plan?.querySelector(':scope > .card .card-header .small.text-muted');
-    if (planSubtitle && /No pitching plan set\.?/i.test(planSubtitle.textContent.trim())) setText(planSubtitle, 'No pitchers planned yet.');
+    // The subtitle (starting pitcher + plan) is owned by game_setup_ux.js.
 
     const clock = document.getElementById('cbPregameClock');
     clock?.querySelectorAll('span').forEach((span) => {
@@ -630,10 +629,14 @@
       : rowCount;
 
     if (subtitle) {
+      // prepare_game_notices.js records what the order still needs (an Out
+      // player, missing batters) so "hitters set" never sits beside a
+      // lineup that isn't ready.
+      const issue = card.dataset.cbLineupIssue || '';
       setText(
         subtitle,
         count > 0
-          ? `${count} hitters set`
+          ? (issue ? `${count} hitters · ${issue}` : `${count} hitters set`)
           : 'Order not set'
       );
     }

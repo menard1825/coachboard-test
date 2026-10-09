@@ -3,9 +3,9 @@
 Choosing the starting pitcher used to accept a resting pitcher with no word
 (the rest rule was only enforced once the game went live). The P picker now
 shows each player's status for the scheduled game date, from the same check
-the live game uses, and a pitcher who isn't ready is asked about with the
-live game's choices -- Use anyway (rule conflict), I verified (can't
-confirm), Continue (advisory) -- or Cancel, which changes nothing.
+the live game uses. Planning never stops to ask: a pitcher who isn't ready is
+set, and the status stays under the field. Start Game asks for the coach's
+decision (Use anyway, I verified, Continue) before first pitch.
 """
 
 import re
@@ -87,32 +87,36 @@ def test_the_p_picker_shows_each_players_status_for_the_game_date(resting_rex):
     expect(_choice(page, 'Relief Rae').locator('.pde-eligibility')).to_have_text('Ready')
 
 
-def test_a_resting_pitcher_is_asked_about_and_cancel_changes_nothing(resting_rex, coachboard_url):
+def test_a_resting_pitcher_is_flagged_inline_and_start_game_still_asks(resting_rex, coachboard_url):
+    """Planning never stops to ask: the status is on the row and stays under
+    the field. Start Game is where the decision is required."""
     page, game_id = resting_rex
     _open_p(page)
     expect(_choice(page, 'Relief Rex').locator('.pde-eligibility')).to_have_text(NOT_READY, timeout=10_000)
     _choice(page, 'Relief Rex').click()
 
-    title = page.locator('#pde-player-modal .modal-title')
-    expect(title).to_have_text(re.compile(r"^Relief Rex — (Rule conflict|Can't confirm)$"), timeout=10_000)
-    expect(page.locator('#pde-help')).to_contain_text('70 game pitches on')
-    go = page.locator('#pde-list .pde-question-choice').filter(
-        has_text=re.compile(r'Use Relief Rex anyway|I verified Relief Rex can pitch'))
-    expect(go).to_be_visible()
-
-    page.locator('#pde-list .pde-question-choice[data-answer="cancel"]').click()
+    # No question sheet: Rex is set and saved.
     expect(page.locator('#pde-player-modal')).to_be_hidden(timeout=10_000)
-    page.wait_for_timeout(600)
-    assert 'P' not in _filled(_innings(page, coachboard_url, game_id)['1'])
-
-    # Asked again, the coach decides to use him: P is set and saved.
-    _open_p(page)
-    _choice(page, 'Relief Rex').click()
-    expect(go).to_be_visible(timeout=10_000)
-    go.click()
-    expect(page.locator('#pde-player-modal')).to_be_hidden(timeout=10_000)
+    expect(page.locator('.pde-question-choice')).to_have_count(0)
     _saved(page)
     assert _filled(_innings(page, coachboard_url, game_id)['1']) == dict(FIELDERS, P='Relief Rex')
+
+    # The status stays visible under the field, once.
+    note = page.locator(f'{PANEL} .pde-pitcher-note')
+    expect(note).to_have_count(1, timeout=10_000)
+    expect(note).to_have_text(re.compile(
+        r"^Relief Rex: (Rule conflict|Can't confirm) · .*70 game pitches on.*Start Game will ask before first pitch\.$"))
+
+    # Start Game still requires the coach's decision about Rex.
+    page.locator('#startLiveGameBtnAction').click()
+    sheet = page.locator('#cbStartGameModal')
+    expect(sheet).to_be_visible(timeout=15_000)
+    expect(sheet.locator('.modal-title')).to_have_text('Relief Rex appears ineligible to pitch')
+    expect(sheet.get_by_role('button', name='Use Relief Anyway')).to_be_visible()
+    sheet.get_by_role('button', name='Close').click()
+    expect(sheet).to_be_hidden(timeout=10_000)
+    state = page.request.get(f'{coachboard_url}/api/live-game/{game_id}/state').json()
+    assert state['game']['is_live'] is False
 
 
 def test_a_ready_pitcher_is_set_without_a_question(resting_rex, coachboard_url):

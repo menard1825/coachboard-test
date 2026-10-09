@@ -109,6 +109,32 @@ def _detail(item):
     return str(item.get('status_detail') or item.get('next_available') or '').strip()
 
 
+def arm_care_note(summary_item):
+    """The team arm-care concern for a pitcher when no game rules are
+    selected, as one sentence -- or ''.
+
+    Without game rules every pitcher is "can't confirm", and that question
+    alone never said a pitcher's arm needs rest. The arm-care check still ran
+    (game_pitching_rules keeps it as arm_care_*), so it is said wherever the
+    coach decides: the Start Game question and its logged reason.
+    """
+    item = summary_item or {}
+    if item.get('rule_type') != 'none':
+        return ''
+    status = str(item.get('arm_care_status') or '').strip()
+    if not status or status.lower().startswith(('available', 'unknown')):
+        return ''
+    detail = str(item.get('arm_care_status_detail') or '').strip()
+    next_available = str(item.get('arm_care_next_available') or '').strip()
+    rule = str(item.get('arm_care_rule_set') or '').strip()
+    note = f"Arm care{f' ({rule})' if rule else ''}: {status}."
+    if detail:
+        note += f" {detail if detail.endswith('.') else detail + '.'}"
+    if next_available and next_available.lower() != 'today':
+        note += f' Next available: {next_available}.'
+    return note
+
+
 def describe(pitcher_name, summary_item, rules=None):
     """What the coach is shown before deciding: heading, the rule reason,
     and (for a rule conflict) the override confirmation. Empty for ready."""
@@ -131,6 +157,9 @@ def describe(pitcher_name, summary_item, rules=None):
             + (f' ({status}).' if status != 'Eligibility Unknown' else '.')
             + (f' {detail}' if detail else '')
         )
+        arm_care = arm_care_note(item)
+        if arm_care:
+            message += f' {arm_care}'
     else:
         heading = f'{pitcher_name} appears ineligible to pitch'
         if status == REENTRY_STATUS and detail:

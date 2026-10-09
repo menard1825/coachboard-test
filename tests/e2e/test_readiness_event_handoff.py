@@ -361,7 +361,7 @@ def test_start_button_converges_and_tracks_state_changes_from_the_owner_poll(pag
 
         # Initial load converges via the subscriber's own direct fetch.
         expect(start_button).to_be_enabled(timeout=20_000)
-        expect(blockers).to_contain_text('Ready for first pitch', timeout=20_000)
+        expect(blockers).to_contain_text('Ready for First Pitch', timeout=20_000)
 
         # A readiness-relevant mutation the page never learns about by socket.
         page.evaluate('window.__cbProbe.requests = [];')
@@ -382,7 +382,7 @@ def test_start_button_converges_and_tracks_state_changes_from_the_owner_poll(pag
         # And back.
         set_absences(page, coachboard_url, game_id, [])
         expect(start_button).to_be_enabled(timeout=12_000)
-        expect(blockers).to_contain_text('Ready for first pitch', timeout=12_000)
+        expect(blockers).to_contain_text('Ready for First Pitch', timeout=12_000)
     finally:
         delete_game(page, coachboard_url, game_id)
 

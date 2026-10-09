@@ -72,6 +72,26 @@
     return { btn, box };
   }
 
+  // A player marked Out who is still in the 1st inning
+  // has one full, actionable notice on the page (prepare_game_notices.js,
+  // Mark Playing / Remove from plan). Under Start Game a short reason points
+  // to it instead of repeating the whole sentence for every player. Start is
+  // still blocked exactly as before; only the words change.
+  const OUT_IN_FIRST = /^(.+) is marked Out but is at \S+ in the 1st inning\.$/;
+
+  function condenseOutPlayers(missing) {
+    const names = new Set();
+    const rest = [];
+    missing.forEach((line) => {
+      const found = String(line).match(OUT_IN_FIRST);
+      if (found) names.add(found[1]);
+      else rest.push(line);
+    });
+    if (!names.size) return missing;
+    const count = names.size;
+    return [...rest, `${count} player${count === 1 ? '' : 's'} marked Out ${count === 1 ? 'is' : 'are'} in the 1st inning. Fix it below.`];
+  }
+
   function applyStartReadiness(payload) {
     const nodes = ensureStartFeedback();
     if (!nodes) return;
@@ -102,7 +122,7 @@
       return;
     }
 
-    const missing = Array.isArray(payload.missing) ? payload.missing.filter(Boolean) : [];
+    const missing = condenseOutPlayers(Array.isArray(payload.missing) ? payload.missing.filter(Boolean) : []);
     blockedReason(payload.ready ? '' : (missing.join('\n') || 'Finish setup before first pitch.'));
     btn.disabled = !payload.ready;
     btn.classList.toggle('disabled', !payload.ready);
@@ -125,7 +145,7 @@
 
     if (payload.ready) {
       box.className = 'alert alert-success border-0 shadow-sm mb-3';
-      box.innerHTML = '<strong>Ready for first pitch.</strong><div class="small mt-1">Batting order and later innings can be added later.</div>';
+      box.innerHTML = '<strong>Ready for First Pitch.</strong><div class="small mt-1">Batting order and later innings can be added later.</div>';
       return;
     }
 
@@ -359,6 +379,33 @@
     details.classList.add('d-none');
   }
 
+  // The starting pitcher is the 1st-inning P in the defense plan; the
+  // Pitching Plan is the optional list of planned pitchers. The subtitle says
+  // both, so "no pitchers planned" never appears beside a chosen starter.
+  function startingPitcher() {
+    try {
+      const first = window.CBPregameRotation?.getRotation()?.innings?.['1'];
+      return String(first?.P || '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function syncPitchingPlanSubtitle() {
+    const card = document.querySelector('#pitching-board-v2 > .card');
+    const subtitle = card?.querySelector('.card-header .small.text-muted');
+    if (!subtitle) return;
+    const planCount = card.querySelectorAll('.edit-plan-v2').length;
+    const starter = startingPitcher();
+    const planned = `${planCount} pitcher${planCount === 1 ? '' : 's'} in the plan`;
+    let text = 'Starting pitcher not chosen yet.';
+    if (starter) text = `Starting pitcher: ${starter} · ${planCount ? planned : 'relief plan optional'}`;
+    else if (planCount) text = `${planned} · starting pitcher not chosen yet`;
+    if (subtitle.textContent !== text) subtitle.textContent = text;
+  }
+
+  window.CBPregameRotation?.onChange(() => syncPitchingPlanSubtitle());
+
   function polishPitchingPlan() {
     const board = document.getElementById('pitching-board-v2');
     const card = board?.querySelector(':scope > .card');
@@ -372,8 +419,9 @@
     const planCount = card.querySelectorAll('.edit-plan-v2').length;
     const title = header?.querySelector('h5');
     const subtitle = header?.querySelector('.small.text-muted');
-    if (title) title.textContent = 'Pitching Plan (Optional)';
-    if (subtitle) subtitle.textContent = planCount ? `${planCount} pitcher${planCount === 1 ? '' : 's'} planned.` : 'No pitching plan set.';
+    // One name for this card everywhere ("Optional" is its badge).
+    if (title) title.textContent = 'Pitching Plan';
+    syncPitchingPlanSubtitle();
 
     body?.querySelectorAll('.small.text-muted').forEach((node) => {
       node.textContent = node.textContent.replace(/\s*•\s*Target\s+[^•]+/gi, '').trim();

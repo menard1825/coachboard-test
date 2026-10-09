@@ -290,6 +290,7 @@ def gameplay_pitch_summary(
         item['arm_care_status'] = item.get('status') or 'Unknown'
         item['arm_care_status_detail'] = item.get('status_detail') or ''
         item['arm_care_next_available'] = item.get('next_available')
+        item['arm_care_rule_set'] = proxy_rules.get('rule_set_name')
 
         item['rule_type'] = 'none'
         item['rule_set_name'] = 'Rules Not Selected'

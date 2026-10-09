@@ -53,6 +53,17 @@
       #previousSetupLaunch .cb-psl-title{font-size:.84rem;font-weight:900;color:#172033}
       #previousSetupLaunch .cb-psl-help{font-size:.7rem;line-height:1.35;color:#667085;margin-top:2px}
       #previousSetupLaunch .cb-psl-button{flex:0 0 auto;min-height:44px;border-radius:9px;font-size:.78rem;font-weight:850;white-space:nowrap}
+      #previousSetupLaunch.is-used{border-left-color:#1f8a4c;background:#f6fbf8}
+      #previousSetupLaunch.is-used .cb-psl-title{color:#176b38}
+      #previousSetupLaunch[data-state="partial"]{border-left-color:#c58a17;background:#fffaf1}
+      #previousSetupLaunch[data-state="partial"] .cb-psl-title{color:#8a5a13}
+      #previousSetupLaunch .cb-psl-parts{list-style:none;margin:3px 0 0;padding:0;font-size:.74rem;line-height:1.4;color:#344054}
+      #previousSetupLaunch .cb-psl-parts .is-not-copied{color:#8a5a13;font-weight:750}
+      #previousSetupLaunch .cb-psl-result{
+        margin:0 0 6px;padding:7px 9px;border-radius:8px;background:#e5f5ea;color:#145c30;
+        font-size:.8rem;font-weight:850;line-height:1.3
+      }
+      #previousSetupLaunch .cb-psl-result[hidden]{display:none!important}
       #previousSetupModal .modal-content{border:0;border-radius:16px;overflow:hidden}
       #previousSetupModal .cb-ps-kicker{font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:#667085;font-weight:900}
       #previousSetupModal .modal-title{font-size:1.08rem;font-weight:900;color:#172033}
@@ -449,6 +460,9 @@
       if (host) host.innerHTML = resultHtml(results);
       body.scrollTop = 0;
       if (results.every((item) => item.ok)) {
+        const sentence = copiedSentence(pick);
+        feedback('success', `${sentence} Updating Prepare Game…`);
+        rememberCopied(sentence);
         setTimeout(() => window.location.reload(), 700);
         return;
       }
@@ -460,7 +474,34 @@
     applyBtn.disabled = false;
   }
 
+  // A full copy reloads the page; the card then says what was copied, once.
+  const FLASH_KEY = `cb-previous-setup-copied:${gameId}`;
+
+  function copiedSentence(pick) {
+    const parts = [];
+    if (pick.lineup) parts.push(plural(preview.lineup.player_ids.length, 'batter'));
+    if (pick.defense) parts.push(plural(preview.defense.copied_count, 'fielder'));
+    return `Copied ${parts.join(' and ')} from ${preview.source.short_date}.`;
+  }
+
+  function rememberCopied(text) {
+    try { window.sessionStorage.setItem(FLASH_KEY, text); } catch (_) { /* best effort */ }
+  }
+
+  function showCopiedFlash() {
+    let text = null;
+    try {
+      text = window.sessionStorage.getItem(FLASH_KEY);
+      window.sessionStorage.removeItem(FLASH_KEY);
+    } catch (_) { return; }
+    const host = document.getElementById('previousSetupResult');
+    if (!text || !host) return;
+    host.textContent = text;
+    host.hidden = false;
+  }
+
   installStyles();
+  showCopiedFlash();
   applyBtn.addEventListener('click', () => {
     if (finished) window.location.reload();
     else void apply();

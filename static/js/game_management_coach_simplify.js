@@ -263,9 +263,9 @@
           align-items:center;
           gap:5px;
           width:auto;
-          min-height:30px;
+          min-height:44px;
           margin:0 0 6px;
-          padding:4px 7px;
+          padding:4px 12px;
           border:1px solid #d7dde5;
           border-radius:8px;
           background:#fff;

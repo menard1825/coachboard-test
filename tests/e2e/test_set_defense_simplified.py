@@ -227,11 +227,10 @@ def saved_defense(make_page, coachboard_url):
 
 
 def _use(page, scope, answer='Use Saved Defense'):
-    """Use -> This inning / Whole game, then answer the confirmation sheet."""
-    page.locator('#pde-use').click()
-    item = page.locator('#pde-use-inning' if scope == 'This inning' else '#pde-use-game')
+    """Use (this inning) or Whole game, then answer the confirmation sheet."""
+    item = page.locator('#pde-use' if scope == 'This inning' else '#pde-use-game')
     expect(item).to_be_visible()
-    expect(item).to_have_text(scope)
+    expect(item).to_have_text(re.compile(r'^Use for Inning \d+$') if scope == 'This inning' else scope)
     item.click()
     sheet = page.locator('#pde-use-confirm')
     expect(sheet).to_be_visible(timeout=10_000)
@@ -258,13 +257,17 @@ def test_saved_defense_for_this_inning(make_page, coachboard_url, game, saved_de
     _choose_inning(page, 2)
     tools = _saved_defense_tools(page)
     expect(tools).to_contain_text('Use a saved defense')
-    # One obvious action: the scope choices wait behind Use.
-    expect(page.locator('#pde-use')).to_be_disabled()
-    for scope in ('This inning', 'Whole game'):
-        expect(tools.get_by_role('button', name=scope, exact=True)).to_be_hidden()
+    # One obvious action: Use (this inning) or Whole game, two plain
+    # buttons -- waiting, disabled, until a saved defense is chosen.
+    use, whole = page.locator('#pde-use'), page.locator('#pde-use-game')
+    expect(use).to_have_text('Use for Inning 2')
+    expect(use).to_be_disabled()
+    expect(whole).to_be_disabled()
+    expect(tools.get_by_role('button', name='This inning', exact=True)).to_be_hidden()
     expect(tools.get_by_role('button', name='Save this defense', exact=True)).to_be_visible()
     tools.locator('#pde-preset').select_option(label=name)
-    expect(page.locator('#pde-use')).to_be_enabled()
+    expect(use).to_be_enabled()
+    expect(whole).to_be_enabled()
     _use(page, 'This inning')
     _saved(page)
     innings = _innings(page, coachboard_url, game)

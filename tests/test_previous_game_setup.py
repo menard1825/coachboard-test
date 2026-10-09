@@ -166,7 +166,8 @@ def test_the_most_recent_earlier_game_with_a_setup_is_the_source(app):
     # The rained-out game is newer but has nothing reusable; the later game
     # and the other team's game are never sources. Last season's games show
     # their year.
-    assert data['source'] == {'game_id': LAST, 'opponent': 'Tigers', 'date_label': 'Sat, Oct 3, 2026'}
+    assert data['source'] == {'game_id': LAST, 'opponent': 'Tigers', 'date_label': 'Sat, Oct 3, 2026',
+                              'short_date': 'Oct 3, 2026'}
 
 
 def test_a_game_with_no_earlier_setup_has_nothing_to_copy(app):
@@ -389,3 +390,101 @@ def test_the_page_offers_the_action_only_when_there_is_a_source(app):
     first = client.get(f'/game/{OLDER}').get_data(as_text=True)
     assert 'id="previousSetupLaunch"' not in first
     assert 'js/previous_game_setup.js' not in first
+
+
+# --- The card says what was copied, from today's data -------------------------------
+
+def _page_state(app):
+    import re
+    page = _client(app).get(f'/game/{TODAY}').get_data(as_text=True)
+    return re.search(r'id="previousSetupLaunch"[^>]*data-state="(\w+)"', page).group(1), page
+
+
+def _copy(app, *, lineup=True, defense=True):
+    data = _preview(app)
+    client = _client(app)
+    if defense:
+        from db import db
+        from models import Rotation
+        with app.app_context():
+            rotation = db.session.query(Rotation).filter_by(associated_game_id=TODAY).first()
+            rotation_id = rotation.id if rotation else None
+            innings = copy.deepcopy(rotation.innings) if rotation else {}
+        innings['1'] = data['defense']['proposed']
+        assert client.post('/save_rotation', json={
+            'id': rotation_id, 'title': 'Rotation for vs Visitors', 'innings': innings,
+            'associated_game_id': TODAY}).status_code == 200
+    if lineup:
+        assert client.post('/add_lineup', json={
+            'title': 'Lineup for vs Visitors', 'lineup_player_ids': data['lineup']['player_ids'],
+            'associated_game_id': TODAY}).status_code == 200
+    return data
+
+
+def test_the_card_offers_the_copy_before_anything_is_copied(app):
+    state, page = _page_state(app)
+    assert state == 'ready'
+    assert 'Use Previous Game Setup' in page
+    assert 'Review &amp; Copy' in page
+
+
+def test_the_card_says_copied_when_both_parts_match(app):
+    data = _copy(app)
+    state, page = _page_state(app)
+
+    assert state == 'copied'
+    assert 'Copied from vs Tigers · Oct 3, 2026' in page
+    assert f"Batting order: copied ({len(data['lineup']['player_ids'])} batters)" in page
+    assert 'Starting defense: copied (8 fielders)' in page
+
+
+def test_the_card_never_claims_a_part_that_was_not_copied(app):
+    _copy(app, lineup=False)
+    state, page = _page_state(app)
+
+    assert state == 'partial'
+    assert 'Partly copied from vs Tigers' in page
+    assert 'Starting defense: copied (8 fielders)' in page
+    assert 'Batting order: not copied' in page
+
+
+def test_the_card_stops_saying_copied_once_the_coach_changes_it(app):
+    _copy(app)
+    from db import db
+    from models import Rotation
+    with app.app_context():
+        rotation = db.session.query(Rotation).filter_by(associated_game_id=TODAY).one()
+        innings = copy.deepcopy(rotation.innings)
+        innings['1']['C'], innings['1']['1B'] = innings['1']['1B'], innings['1']['C']
+        rotation_id = rotation.id
+    assert _client(app).post('/save_rotation', json={
+        'id': rotation_id, 'title': 'Rotation for vs Visitors', 'innings': innings,
+        'associated_game_id': TODAY}).status_code == 200
+
+    state, page = _page_state(app)
+    assert state == 'partial'
+    assert 'Starting defense: not copied' in page
+
+
+# --- Readiness names what the plan needs ---------------------------------------------
+
+def test_readiness_names_an_out_player_in_an_inning_and_the_starting_pitcher(app):
+    _set_today(app, innings={'1': {**LAST_GAME_DEFENSE, 'P': 'Jules'}, '2': {'C': 'Drew'}}, absent=['Drew'])
+
+    readiness = _client(app).get(f'/api/game-day/{TODAY}/readiness').get_json()['readiness']
+    by_inning = {item['inning']: item for item in readiness['incomplete_innings']}
+
+    assert readiness['starting_pitcher'] == 'Jules'
+    assert by_inning['1']['unavailable'] == ['Drew']   # at 2B, marked Out
+    assert by_inning['1']['missing'] == []
+    assert by_inning['2']['unavailable'] == ['Drew']
+
+
+def test_readiness_has_no_starting_pitcher_until_one_is_chosen(app):
+    _set_today(app, innings={'1': {pos: name for pos, name in LAST_GAME_DEFENSE.items() if pos != 'P'}})
+
+    readiness = _client(app).get(f'/api/game-day/{TODAY}/readiness').get_json()['readiness']
+    first = next(item for item in readiness['incomplete_innings'] if item['inning'] == '1')
+
+    assert readiness['starting_pitcher'] is None
+    assert first == {'inning': '1', 'missing': ['P'], 'unavailable': []}

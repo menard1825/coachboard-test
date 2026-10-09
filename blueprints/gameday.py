@@ -91,7 +91,7 @@ def game_management(game_id):
     rotation_templates = db.session.query(Rotation).filter_by(team_id=team.id, associated_game_id=None).all()
 
     game_date_for_input = game.date.strftime('%Y-%m-%d')
-    previous_setup = None if game.is_live else source_summary(game)
+    previous_setup = None if game.is_live else source_summary(game, team)
 
     return render_template('game_management.html',
                            current_team=team,

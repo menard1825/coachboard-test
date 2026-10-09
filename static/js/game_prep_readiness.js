@@ -178,7 +178,79 @@
     return 'Optional';
   }
 
-  function render(r) {
+  const isAre = (names) => (names.length === 1 ? 'is' : 'are');
+
+  // What the batting order needs, in the coach's words. A lineup holding a
+  // player marked Out is not the same as a missing lineup.
+  function lineupStatus(r) {
+    const count = Number(r.lineup_count) || 0;
+    const expected = Number(r.lineup_expected_count) || 0;
+    const out = Array.isArray(r.lineup_unavailable_names) ? r.lineup_unavailable_names : [];
+    const missing = Array.isArray(r.lineup_missing_names) ? r.lineup_missing_names : [];
+    if (r.lineup_ready) return {tone: 'good', compact: `${count} hitters`, detail: `${count} hitters set`};
+    // Start Game doesn't require a batting order, so its absence is stated,
+    // not called "needed" beside Ready for First Pitch.
+    if (!count) return {tone: 'need', compact: 'No batting order yet', detail: 'Not set yet'};
+    if (out.length) {
+      return {
+        tone: 'need',
+        compact: out.length === 1 ? `Lineup: ${out[0]} is Out` : `Lineup: ${out.length} Out players`,
+        detail: `${out.join(', ')} ${isAre(out)} marked Out but still batting`,
+      };
+    }
+    if (r.lineup_mode === 'bat_all' && missing.length) {
+      return {
+        tone: 'need',
+        compact: `Lineup: add ${missing.length}`,
+        detail: `Bat Everyone: add ${missing.join(', ')}`,
+      };
+    }
+    return {tone: 'need', compact: `Lineup: ${count} of ${expected}`, detail: `Fixed Lineup: ${count} of ${expected} batters`};
+  }
+
+  // What the defense needs. Start Game needs a complete 1st inning; later
+  // innings are planning, so they are counted, not treated as a problem.
+  function defenseStatus(r) {
+    const total = Number(r.regulation_innings || r.defense_innings) || 0;
+    const done = Number(r.defense_completed_innings) || 0;
+    const incomplete = Array.isArray(r.incomplete_innings) ? r.incomplete_innings : [];
+    const first = incomplete.find((item) => String(item?.inning) === '1');
+    if (first) {
+      const out = Array.isArray(first.unavailable) ? first.unavailable : [];
+      const missing = Array.isArray(first.missing) ? first.missing : [];
+      if (out.length) {
+        return {
+          tone: 'need',
+          compact: out.length === 1 ? `1st inning: ${out[0]} is Out` : `1st inning: ${out.length} Out players`,
+          detail: `${out.join(', ')} ${isAre(out)} marked Out but in the 1st inning`,
+        };
+      }
+      if (missing.length === 1 && missing[0] === 'P') {
+        return {tone: 'need', compact: 'Starting pitcher needed', detail: '1st inning fielders set · choose the starting pitcher'};
+      }
+      if (!missing.length) {
+        return {tone: 'need', compact: 'Check the 1st inning', detail: 'A player is placed twice in the 1st inning'};
+      }
+      const fielders = missing.filter((pos) => pos !== 'P');
+      return {
+        tone: 'need',
+        compact: `1st inning: ${missing.length} open`,
+        detail: `1st inning open: ${missing.join(', ')}${missing.includes('P') && fielders.length ? ' (including the pitcher)' : ''}`,
+      };
+    }
+    if (r.defense_ready) return {tone: 'good', compact: `${total} innings set`, detail: `All ${total} innings set`};
+    return {
+      tone: 'optional',
+      compact: '1st inning ready',
+      detail: `1st inning ready · full-game plan ${done} of ${total} innings (optional)`,
+    };
+  }
+
+  // `start` is the Start Game check from the same response (can_start_game):
+  // the 1st inning, a starting pitcher and available players. It decides
+  // "Ready for First Pitch" -- the batting order and a full six-inning plan
+  // are optional and listed as such, never required to start.
+  function render(r, start = {}) {
     const host = document.getElementById('pregame-checklist-container');
     if (!host || r.is_live) {
       document.getElementById(ID)?.remove();
@@ -193,15 +265,20 @@
       else host.prepend(panel);
     }
 
-    const coreReady = Boolean(r.present_count > 0 && r.lineup_ready && r.defense_ready);
-    const heading = coreReady ? 'Pregame overview' : 'Pregame setup';
+    const coreReady = start.ready === true;
+    const optional = [];
+    if (!r.lineup_ready) optional.push('batting order');
+    if (!r.defense_ready) optional.push('full-game defense');
+    const heading = coreReady ? 'Ready for First Pitch' : 'Pregame setup';
     const subtitle = coreReady
-      ? 'Availability, batting order, and defense are ready.'
+      ? (optional.length
+        ? `Optional before first pitch: ${optional.join(' and ')}.`
+        : 'Batting order and full-game defense are set too.')
       : 'Tap a box to review or make changes.';
-    const defenseValue = r.defense_ready
-      ? `${r.regulation_innings || r.defense_innings} innings ready`
-      : `${r.defense_completed_innings || 0} of ${r.regulation_innings || r.defense_innings || 0} innings`;
-    const lineupValue = r.lineup_ready ? `${r.lineup_count} hitters` : 'Needs attention';
+    const lineup = lineupStatus(r);
+    const defense = defenseStatus(r);
+    const defenseValue = defense.detail;
+    const lineupValue = lineup.detail;
     const availabilityValue = r.present_count > 0
       ? (r.absent_count ? `${r.absent_count} out` : 'Everyone available')
       : 'Confirm availability';
@@ -217,24 +294,8 @@
         : 'Availability needed'
     );
 
-    const compactLineup = (
-      r.lineup_ready
-        ? `${r.lineup_count} hitters`
-        : 'Lineup needed'
-    );
-
-    const compactDefense = (
-      r.defense_ready
-        ? (
-            `${r.regulation_innings || r.defense_innings}`
-            + ' innings'
-          )
-        : (
-            `${r.defense_completed_innings || 0}/`
-            + `${r.regulation_innings || r.defense_innings || 0}`
-            + ' defense'
-          )
-    );
+    const compactLineup = lineup.compact;
+    const compactDefense = defense.compact;
 
     const compactClock = (
       clockValue === 'Optional'
@@ -276,8 +337,8 @@
       </div>
       <div class="cgr-grid">
         ${item('Player Availability', r.present_count > 0 ? 'good' : 'need', availabilityValue, 'availability')}
-        ${item('Batting Order', r.lineup_ready ? 'good' : 'need', lineupValue, 'lineup')}
-        ${item('Defense', r.defense_ready ? 'good' : 'need', defenseValue, 'defense')}
+        ${item('Batting Order', lineup.tone, lineupValue, 'lineup')}
+        ${item('Defense', defense.tone, defenseValue, 'defense')}
         ${item('Game Clock', 'optional', clockValue, 'clock')}
       </div>`;
   }
@@ -395,7 +456,7 @@
       // for the Start Game UI, so a throw inside the owner panel's renderer
       // must not withhold an otherwise valid server response from it.
       publishReadiness(data);
-      if (data.readiness) render(data.readiness);
+      if (data.readiness) render(data.readiness, data);
     } catch (_) {}
   }
 

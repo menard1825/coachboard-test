@@ -100,8 +100,7 @@ def setup(make_page, coachboard_url):
 def _open_use(page, name, scope):
     tools = _saved_defense_tools(page)
     tools.locator('#pde-preset').select_option(label=name)
-    page.locator('#pde-use').click()
-    page.locator('#pde-use-inning' if scope == 'This inning' else '#pde-use-game').click()
+    page.locator('#pde-use' if scope == 'This inning' else '#pde-use-game').click()
     sheet = page.locator(SHEET)
     expect(sheet).to_be_visible(timeout=10_000)
     return sheet
@@ -284,7 +283,7 @@ def test_a_planned_pitcher_marked_out_is_kept_and_flagged(setup, coachboard_url)
     assert _filled(innings['1']) == {**SAVED, 'P': 'Relief Rex'}
     # The existing absent-in-plan warning, not the saved defense, handles it.
     expect(page.locator('[data-absent-warning]')).to_have_text(
-        '⚠ Relief Rex is marked absent but is still in the plan: pitching in the 1st.'
+        '⚠ Relief Rex is marked Out but is still in the plan: pitching in the 1st.'
     )
 
 
@@ -371,7 +370,6 @@ def test_a_tap_while_the_sheet_is_still_opening_counts(setup, coachboard_url, an
     tools = _saved_defense_tools(page)
     tools.locator('#pde-preset').select_option(label=name)
     page.locator('#pde-use').click()
-    page.locator('#pde-use-inning').click()
 
     expect(page.locator(SHEET)).to_be_hidden(timeout=10_000)
     if answer == 'Cancel':

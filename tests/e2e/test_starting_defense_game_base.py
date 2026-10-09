@@ -128,10 +128,9 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
 
         use = page.locator('#pde-use')
         expect(use).to_be_enabled()
-        use.click()
+        expect(use).to_have_text('Use for Inning 1')
         apply_to_game = page.locator('#pde-use-game')
         expect(apply_to_game).to_have_text('Whole game')
-        expect(page.locator('#pde-use-inning')).to_have_text('This inning')
         expect(page.locator('.cb-starting-defense-help')).to_contain_text('Pitchers stay as planned')
 
         # Applying to the entire game mutates the canonical CBPregameRotation

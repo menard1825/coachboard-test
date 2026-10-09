@@ -115,16 +115,38 @@ def find_previous_setup_game(game):
     return None, None, None
 
 
-def source_summary(game):
-    """Small label for the Prepare Game button, or None when there is no
-    earlier game to copy from."""
-    source, _lineup, _rotation = find_previous_setup_game(game)
-    if source is None:
+def _short_date(value, today=None):
+    label = f'{value:%b} {value.day}'
+    if today is not None and value.year != today.year:
+        label += f', {value.year}'
+    return label
+
+
+def source_summary(game, team):
+    """What the Prepare Game card shows: the source game, and whether today's
+    batting order and starting defense already match what it would copy (so
+    the card can say the setup was used). None when there is nothing to copy.
+
+    "Copied" is worked out from today's data, never stored: it holds on every
+    device, and once the coach changes the lineup or 1st inning it no longer
+    claims they match."""
+    preview = build_previous_setup_preview(game, team)
+    if not preview.get('available'):
         return None
+    lineup = preview['lineup']
+    defense = preview['defense']
+    current_ids = []
+    if lineup['current_id']:
+        current = db.session.get(Lineup, lineup['current_id'])
+        current_ids = (lineup_to_dict(current) or {}).get('lineup_player_ids') or []
+    current_fielders = {pos: name for pos, name in defense['current_alignment'].items() if pos != 'P'}
+    proposed_fielders = {pos: name for pos, name in defense['proposed'].items() if pos != 'P'}
     return {
-        'game_id': source.id,
-        'opponent': source.opponent,
-        'date_label': _date_label(source.date, game.date),
+        **preview['source'],
+        'lineup_copied': bool(lineup['player_ids']) and current_ids == lineup['player_ids'],
+        'defense_copied': bool(proposed_fielders) and current_fielders == proposed_fielders,
+        'batter_count': len(lineup['player_ids']),
+        'fielder_count': defense['copied_count'],
     }
 
 
@@ -289,6 +311,7 @@ def build_previous_setup_preview(game, team):
             'game_id': source.id,
             'opponent': source.opponent,
             'date_label': _date_label(source.date, game.date),
+            'short_date': _short_date(source.date, game.date),
         },
         'present_count': len(present),
         'lineup': lineup,

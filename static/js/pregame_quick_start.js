@@ -297,7 +297,7 @@
 
     if (latest.startReady === true) {
       blockers.className = 'cb-qs-blockers ready';
-      blockers.textContent = 'Ready for first pitch. Batting order and later innings remain optional.';
+      blockers.textContent = 'Ready for First Pitch. Batting order and later innings remain optional.';
     } else if (latest.startReady === false) {
       blockers.className = 'cb-qs-blockers';
       blockers.textContent = latest.startMissing.length ? `Still needed: ${latest.startMissing.join(' · ')}` : 'Finish the first-pitch setup.';

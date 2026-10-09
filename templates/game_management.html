@@ -29,12 +29,28 @@
         </div>
 
         {% if previous_setup %}
-        <div id="previousSetupLaunch" class="cb-previous-setup-launch" data-game-id="{{ game['id'] }}">
+        {% set ps = previous_setup %}
+        {% set ps_parts = [] %}
+        {% if ps.batter_count %}{% set _ = ps_parts.append(('Batting order', ps.lineup_copied, ps.batter_count ~ ' batters')) %}{% endif %}
+        {% if ps.fielder_count %}{% set _ = ps_parts.append(('Starting defense', ps.defense_copied, ps.fielder_count ~ ' fielders')) %}{% endif %}
+        {% set ps_used = ps.lineup_copied or ps.defense_copied %}
+        {% set ps_all = ps_used and (ps.lineup_copied or not ps.batter_count) and (ps.defense_copied or not ps.fielder_count) %}
+        <div id="previousSetupLaunch" class="cb-previous-setup-launch{% if ps_used %} is-used{% endif %}" data-game-id="{{ game['id'] }}" data-state="{{ 'copied' if ps_all else ('partial' if ps_used else 'ready') }}">
             <div class="cb-psl-copy">
+                <div id="previousSetupResult" class="cb-psl-result" role="status" hidden></div>
+                {% if ps_used %}
+                <div class="cb-psl-title"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>{{ 'Copied' if ps_all else 'Partly copied' }} from vs {{ ps.opponent }} · {{ ps.short_date }}</div>
+                <ul class="cb-psl-parts">
+                    {% for label, copied, detail in ps_parts %}
+                    <li class="{{ 'is-copied' if copied else 'is-not-copied' }}">{{ label }}: {{ ('copied (' ~ detail ~ ')') if copied else 'not copied' }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
                 <div class="cb-psl-title"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Use Previous Game Setup</div>
-                <div class="cb-psl-help">Copy the batting order and starting defense from <strong>vs {{ previous_setup.opponent }}</strong> · {{ previous_setup.date_label }}. You'll see everything before it's copied.</div>
+                <div class="cb-psl-help">Copy the batting order and starting defense from <strong>vs {{ ps.opponent }}</strong> · {{ ps.date_label }}. You'll see everything before it's copied.</div>
+                {% endif %}
             </div>
-            <button type="button" class="btn btn-outline-primary cb-psl-button" id="previousSetupOpenBtn">Review &amp; Copy</button>
+            <button type="button" class="btn {{ 'btn-outline-secondary' if ps_all else 'btn-outline-primary' }} cb-psl-button" id="previousSetupOpenBtn">{% if ps_all %}Review{% else %}Review &amp; Copy{% endif %}</button>
         </div>
         {% endif %}
 
@@ -160,7 +176,7 @@
         <div class="col-lg-12 mb-4" id="pitching-log-container">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitcher Availability & Plan</h5>
+                    <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitcher Availability</h5>
                 </div>
                 <div class="card-body">
                   {% include '_pitching_log.html' %}
@@ -262,6 +278,7 @@
 <script src="{{ url_for('static', filename='js/live_game_unified_field_entry.js', v=asset_version) }}"></script>
 <script src="{{ url_for('static', filename='js/live_game_contract.js', v=asset_version) }}"></script>
 {% if previous_setup %}<script src="{{ url_for('static', filename='js/previous_game_setup.js', v=asset_version) }}"></script>{% endif %}
+<script src="{{ url_for('static', filename='js/prepare_game_notices.js', v=asset_version) }}"></script>
 <script>
     // Keep the game shell visible without observing/mutating the same attributes.
     const keepGameShellVisible = () => {

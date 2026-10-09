@@ -417,11 +417,11 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
             preset_tools
         ).to_be_visible()
 
-        # One obvious action: choose a saved defense, then Use. The scope
-        # (This inning / Whole game) is picked from Use's menu, and Save
-        # this defense is a secondary action beneath the row.
+        # One obvious action: choose a saved defense, then tap Use (this
+        # inning) or Whole game -- two plain buttons beneath the menu, no
+        # menu to open. Save this defense is a secondary action below them.
         use_button = defense.locator('#pde-use')
-        expect(use_button).to_have_text('Use')
+        expect(use_button).to_have_text('Use for Inning 1')
         expect(defense.locator('#pde-apply')).to_be_hidden()
         expect(defense.locator('#pde-apply-game')).to_be_hidden()
         expect(defense.locator('#pde-save')).to_have_text('Save this defense')
@@ -441,16 +441,20 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
                     display:getComputedStyle(tools).display,
                     select:box(tools.querySelector('#pde-preset')),
                     use:box(tools.querySelector('#pde-use')),
+                    game:box(tools.querySelector('#pde-use-game')),
                     save:box(tools.querySelector('#pde-save')),
                     tools:box(tools),
                 };
             }"""
         )
         assert preset_layout['display'] == 'grid'
-        assert abs(preset_layout['use']['top'] - preset_layout['select']['top']) <= 4, preset_layout
-        assert preset_layout['use']['left'] >= preset_layout['select']['right'] - 1, preset_layout
-        assert preset_layout['use']['right'] <= preset_layout['tools']['right'] + 1, preset_layout
-        assert preset_layout['save']['top'] >= preset_layout['select']['bottom'] - 1, preset_layout
+        assert preset_layout['use']['top'] >= preset_layout['select']['bottom'] - 1, preset_layout
+        assert abs(preset_layout['use']['top'] - preset_layout['game']['top']) <= 2, preset_layout
+        assert preset_layout['game']['left'] >= preset_layout['use']['right'] - 1, preset_layout
+        assert preset_layout['game']['right'] <= preset_layout['tools']['right'] + 1, preset_layout
+        for key in ('select', 'use', 'game'):
+            assert preset_layout[key]['bottom'] - preset_layout[key]['top'] >= 44, preset_layout
+        assert preset_layout['save']['top'] >= preset_layout['use']['bottom'] - 1, preset_layout
 
         defense_options = page.get_by_role('button', name=re.compile('Plan Options'))
         defense_options.click()
@@ -601,7 +605,6 @@ def test_mobile_game_planning_is_compact_and_baseball_friendly(page: Page, coach
         assert preset_id
         preset.select_option(value=preset_id)
         defense.locator('#pde-use').click()
-        defense.locator('#pde-use-inning').click()
         page.locator('#pde-use-confirm').get_by_role('button', name='Use Saved Defense', exact=True).click()
         expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
         expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')

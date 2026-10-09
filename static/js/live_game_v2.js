@@ -1023,7 +1023,7 @@
             else pregame.appendChild(board);
         }
         const plans = [...(liveState?.pitching_plans || [])].sort((a,b) => roleRank(a.role)-roleRank(b.role));
-        board.innerHTML = `<div class="card shadow-sm border-0 mb-4"><div class="card-header bg-white d-flex justify-content-between align-items-center"><div><h5 class="mb-0">Today's Pitching Board</h5><div class="small text-muted">Plan the staff before first pitch.</div></div><button type="button" class="btn btn-primary" id="add-pitcher-plan-v2"><i class="bi bi-plus-lg me-1"></i>Add Pitcher</button></div><div class="card-body">${plans.length ? plans.map(plan => {
+        board.innerHTML = `<div class="card shadow-sm border-0 mb-4"><div class="card-header bg-white d-flex justify-content-between align-items-center"><div><h5 class="mb-0">Pitching Plan</h5><div class="small text-muted">Plan relief options before first pitch.</div></div><button type="button" class="btn btn-primary" id="add-pitcher-plan-v2"><i class="bi bi-plus-lg me-1"></i>Add Pitcher</button></div><div class="card-body">${plans.length ? plans.map(plan => {
             const player = liveState.roster.find(p => Number(p.id) === Number(plan.player_id));
             if (!player) return '';
             const s = summaryFor(player); const profile = profileFor(player.id);

@@ -27,6 +27,9 @@
   .gd-ready-label{font-size:var(--cb-text-2xs);text-transform:uppercase;letter-spacing:.07em;font-weight:850;color:#667085}
   .gd-ready-value{font-size:.8rem;font-weight:800;color:#1d2939;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .gd-alerts{margin-top:10px;border-radius:10px;background:#fff8eb;border:1px solid #f1d7a5;padding:9px 10px}
+  .gd-optional{margin-top:10px;border-radius:10px;background:#f7f9fb;border:1px solid #e1e6ec;padding:8px 10px;font-size:var(--cb-text-xs);color:#526176}
+  .gd-status{max-width:52%;text-align:center;line-height:1.2}
+  .gd-status.success{white-space:normal}
   .gd-alerts strong{font-size:.72rem;color:#7a4d00}.gd-alerts div{font-size:var(--cb-text-xs);color:#7b6241;margin-top:3px}
   .gd-actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
   .gd-actions .btn{min-height:44px;border-radius:10px;font-weight:780;padding-left:16px;padding-right:16px}
@@ -50,7 +53,7 @@
   'GC STATS PENDING': 'Need Pitch Counts',
   'COMPLETE': 'Complete',
   'NEEDS POSTGAME': 'Finish Game',
-  'READY': 'Ready',
+  'READY': 'Ready for First Pitch',
   'PREP': 'Pregame',
   'PAST': 'Past'
 } %}
@@ -85,11 +88,11 @@
         <div class="gd-body">
           <div class="gd-readiness">
             <div class="gd-ready-item {% if r.present_count > 0 %}good{% else %}need{% endif %}"><span class="gd-ready-label">Availability</span><div class="gd-ready-value">{{ r.present_count }} present{% if r.absent_count %} · {{ r.absent_count }} out{% endif %}</div></div>
-            <div class="gd-ready-item {% if r.lineup_ready %}good{% else %}need{% endif %}"><span class="gd-ready-label">Lineup</span><div class="gd-ready-value">{% if r.lineup_ready %}{{ r.lineup_count }} hitters set{% else %}Needs attention{% endif %}</div></div>
+            <div class="gd-ready-item {% if r.lineup_ready %}good{% else %}need{% endif %}"><span class="gd-ready-label">Lineup</span><div class="gd-ready-value">{% if r.lineup_ready %}{{ r.lineup_count }} hitters set{% elif not r.lineup_count %}Not set yet{% else %}Needs attention{% endif %}</div></div>
             {% if r.has_end_game %}
             <div class="gd-ready-item good"><span class="gd-ready-label">Game</span><div class="gd-ready-value">Finished</div></div>
             {% else %}
-            <div class="gd-ready-item {% if r.defense_ready %}good{% else %}need{% endif %}"><span class="gd-ready-label">Defense</span><div class="gd-ready-value">{% if r.defense_ready %}{{ r.defense_innings }} innings ready{% else %}Needs attention{% endif %}</div></div>
+            <div class="gd-ready-item {% if r.defense_ready or r.first_pitch_ready %}good{% else %}need{% endif %}"><span class="gd-ready-label">Defense</span><div class="gd-ready-value">{% if r.defense_ready %}{{ r.defense_innings }} innings ready{% elif r.first_pitch_ready %}1st inning ready{% else %}Needs attention{% endif %}</div></div>
             {% endif %}
             {% if r.has_end_game %}
             <div class="gd-ready-item {% if r.pitching_stats_complete %}good{% else %}need{% endif %}"><span class="gd-ready-label">GameChanger</span><div class="gd-ready-value">{% if r.pitching_stats_complete %}Pitch counts entered{% else %}Need pitch counts{% endif %}</div></div>
@@ -101,6 +104,15 @@
           {% if not is_game_changer %}
             {% if r.status == 'GC STATS PENDING' %}
             <div class="gd-alerts"><strong>Game's over · Need pitch counts</strong><div>Still need GameChanger numbers for {{ r.pitching_missing|join(', ') }}.</div></div>
+            {% elif r.status == 'PREP' %}
+            {# Start Game's own check: only what first pitch needs. #}
+            <div class="gd-alerts"><strong>{{ r.first_pitch_blockers|length }} item{% if r.first_pitch_blockers|length != 1 %}s{% endif %} before first pitch</strong>{% for blocker in r.first_pitch_blockers %}<div>{{ blocker }}</div>{% endfor %}</div>
+            {% elif r.status == 'READY' %}
+              {% set optional = [] %}
+              {% if not r.lineup_ready %}{% set _ = optional.append('batting order') %}{% endif %}
+              {% if not r.defense_ready %}{% set _ = optional.append('full-game defense') %}{% endif %}
+              {% if optional %}<div class="gd-optional">Optional before first pitch: {{ optional|join(' and ') }}.</div>{% endif %}
+              {% if r.pitching_alerts %}<div class="gd-alerts"><strong>Pitching attention</strong>{% for alert in r.pitching_alerts[:3] %}<div>{{ alert.name }} — {{ alert.status }}{% if alert.detail %}: {{ alert.detail }}{% endif %}</div>{% endfor %}</div>{% endif %}
             {% elif r.status not in ['COMPLETE'] and r.blockers %}
             <div class="gd-alerts"><strong>{{ r.blockers|length }} setup item{% if r.blockers|length != 1 %}s{% endif %} to finish</strong>{% for blocker in r.blockers %}<div>{{ blocker }}</div>{% endfor %}</div>
             {% elif r.status not in ['COMPLETE'] and r.pitching_alerts %}

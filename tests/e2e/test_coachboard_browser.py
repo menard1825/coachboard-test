@@ -61,7 +61,6 @@ def test_starting_defense_applies_and_survives_reload(page: Page, coachboard_url
 
     preset_select.select_option(value=preset_id)
     defense.locator('#pde-use').click()
-    defense.locator('#pde-use-inning').click()
     page.locator('#pde-use-confirm').get_by_role('button', name='Use Saved Defense', exact=True).click()
 
     expected_positions = {

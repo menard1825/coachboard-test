@@ -372,7 +372,14 @@ def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation
         if valid:
             complete_inning_count += 1
         else:
-            incomplete_innings.append({'inning': inning, 'missing': missing})
+            # Who in this inning is marked Out (or no longer on the roster):
+            # the coach needs the name, not just "incomplete".
+            unavailable = sorted({
+                str(name or '').strip()
+                for name in (alignment or {}).values()
+                if str(name or '').strip() and str(name or '').strip() not in present_names
+            }) if isinstance(alignment, dict) else []
+            incomplete_innings.append({'inning': inning, 'missing': missing, 'unavailable': unavailable})
     defense_ready = complete_inning_count == regulation_innings
 
     blockers = []
@@ -442,6 +449,13 @@ def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation
     has_end_game = any(event.event_type == 'End Game' for event in live_events)
     has_pitching = bool(game_outings)
     ready = not blockers
+    # Ready for First Pitch: Start Game's own check (game_start_readiness),
+    # on the rows already loaded above. A full six-inning plan and the
+    # batting order stay in `ready`/`blockers` as planning items; they never
+    # decide whether the game can start.
+    from game_start_readiness import first_pitch_hard_stops
+    first_pitch_blockers, _inning_one = first_pitch_hard_stops(team, roster, absent_ids, rotation)
+    first_pitch_ready = not first_pitch_blockers
 
     # The rotation and events are already in hand, so reconstruct from them
     # rather than calling actual_game_rotation(), which would re-query both.
@@ -473,7 +487,7 @@ def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation
         status = 'NEEDS POSTGAME'
         status_tone = 'warning'
         primary_label = 'Finish Game'
-    elif ready:
+    elif first_pitch_ready:
         status = 'READY'
         status_tone = 'success'
         primary_label = 'Open Game'
@@ -494,6 +508,8 @@ def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation
         'primary_label': primary_label,
         'ready': ready,
         'blockers': blockers,
+        'first_pitch_ready': first_pitch_ready,
+        'first_pitch_blockers': first_pitch_blockers,
         'present_count': len(present),
         'absent_count': len(absent_ids),
         'roster_count': len(roster),
@@ -508,6 +524,10 @@ def build_game_readiness(game, team, *, roster=_UNSET, absences=_UNSET, rotation
         'defense_completed_innings': complete_inning_count,
         'regulation_innings': regulation_innings,
         'incomplete_innings': incomplete_innings,
+        # The 1st-inning P from the plan: the starting pitcher. Distinct from
+        # the optional Pitching Plan (GamePitchingPlan rows).
+        'starting_pitcher': (str((innings.get('1') or {}).get('P') or '').strip() or None)
+        if isinstance(innings.get('1'), dict) else None,
         'pitcher_tbd_innings': pitcher_tbd_innings,
         'pitching_plan_ready': bool(plans),
         'pitching_plan_count': len(plans),

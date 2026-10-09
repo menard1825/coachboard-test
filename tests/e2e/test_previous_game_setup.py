@@ -114,6 +114,19 @@ def test_copy_last_games_setup_without_its_pitcher(setup, make_page, coachboard_
     with coach.expect_navigation(timeout=20_000):
         apply.click()
 
+    # The coach sees what was copied, once, and the card shows it was used.
+    launch = coach.locator('#previousSetupLaunch')
+    expect(coach.locator('#previousSetupResult')).to_have_text(
+        re.compile(r'^Copied \d+ batters and 6 fielders from [A-Z][a-z]{2} \d+(, \d{4})?\.$'), timeout=20_000)
+    expect(launch).to_have_attribute('data-state', 'copied')
+    expect(launch.locator('.cb-psl-title')).to_contain_text('Copied from vs ')
+    expect(launch).to_contain_text('Batting order: copied')
+    expect(launch).to_contain_text('Starting defense: copied (6 fielders)')
+    expect(launch.get_by_role('button', name='Review', exact=True)).to_be_visible()
+    coach.reload()
+    expect(launch).to_have_attribute('data-state', 'copied', timeout=20_000)
+    expect(coach.locator('#previousSetupResult')).to_be_hidden()
+
     first = _filled(_innings(page, coachboard_url, today_id)['1'])
     expected = {pos: name for pos, name in DEFENSE_A.items() if pos not in {'P', '3B', 'LF'}}
     assert first == {**expected, 'P': 'Third Theo'}
@@ -220,6 +233,16 @@ def test_defense_saves_but_the_batting_order_fails(setup, coachboard_url):
     assert _filled(_innings(page, coachboard_url, today_id)['1']) == {
         pos: name for pos, name in DEFENSE_A.items() if pos != 'P'}
     assert page.request.get(f'{coachboard_url}/api/game_data/{today_id}').json()['lineup'] is None
+
+    # Refresh: the card shows only what was copied, never "Copied" for both.
+    with page.expect_navigation(timeout=20_000):
+        sheet.locator('#previousSetupApplyBtn').click()
+    launch = page.locator('#previousSetupLaunch')
+    expect(launch).to_have_attribute('data-state', 'partial', timeout=20_000)
+    expect(launch.locator('.cb-psl-title')).to_contain_text('Partly copied from vs ')
+    expect(launch).to_contain_text('Starting defense: copied (8 fielders)')
+    expect(launch).to_contain_text('Batting order: not copied')
+    expect(page.locator('#previousSetupResult')).to_be_hidden()
 
 
 def test_batting_order_saves_but_the_defense_fails(setup, coachboard_url):

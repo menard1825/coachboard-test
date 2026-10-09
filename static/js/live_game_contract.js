@@ -1304,11 +1304,13 @@
     const another = {label: 'Choose Another Pitcher', value: 'another'};
 
     if (info.code === 'start_no_pitching_rules') {
+      // An arm-care concern (in the message) also offers another pitcher.
       return startQuestion({
         title: info.eligibility_heading,
         message,
         actions: [
           {label: 'Choose Rules', value: 'rules', primary: true},
+          ...(info.arm_care_concern ? [another] : []),
           {label: 'Start Without Rules', value: 'decide'},
         ],
       });

@@ -177,7 +177,6 @@ def test_ipad_game_planning_keeps_tablet_layout(
         assert preset_id
         preset.select_option(value=preset_id)
         defense.locator('#pde-use').click()
-        defense.locator('#pde-use-inning').click()
         page.locator('#pde-use-confirm').get_by_role('button', name='Use Saved Defense', exact=True).click()
         expect(defense.locator('[data-pde-pos="SS"] .pde-name')).to_have_text('Shortstop Shawn')
         expect(defense.locator('[data-pde-pos="P"] .pde-name')).to_have_text('OPEN')

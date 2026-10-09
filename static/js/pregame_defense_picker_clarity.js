@@ -100,12 +100,17 @@
         list.appendChild(empty);
       }
 
+      // The current fielder is marked Out: whoever replaces them moves here
+      // and the Out player comes off the field -- it is never a swap, and the
+      // base picker's help already says so.
+      const occupantOut = Boolean(list.querySelector('.pde-choice-out'));
+
       if (fieldChoices.length) {
         list.appendChild(
           sectionLabel(
             pitcherPicker
               ? 'Already On Field'
-              : hasOccupant
+              : hasOccupant && !occupantOut
                 ? 'Already On Field — Tap to Swap'
                 : 'Already On Field — Move to This Spot'
           )
@@ -117,7 +122,7 @@
       }
 
       const help = document.getElementById('pde-help');
-      if (help) {
+      if (help && !occupantOut) {
         help.textContent = pitcherPicker
           ? (hasOccupant
               ? "Choose who pitches. You'll decide where the current pitcher goes."

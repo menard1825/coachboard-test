@@ -198,6 +198,13 @@ def starting_pitcher_check(game, team, pitcher_name, data=None):
             f"CoachBoard can't confirm {pitcher_name}'s pitching eligibility "
             'without the game rules.'
         )
+        # An arm-care concern is shown with the rules question, and the
+        # coach's answer counts only for this wording (decision_reason above
+        # carries the same note through describe()).
+        arm_care = pitching_eligibility.arm_care_note(summary)
+        if arm_care:
+            body['eligibility_message'] += f' {arm_care}'
+            body['arm_care_concern'] = arm_care
         body['message'] = body['eligibility_message']
     return (jsonify(body), 409), None
 

@@ -350,9 +350,9 @@ def test_absent_players_still_in_the_plan_are_flagged(
     expect(warnings).to_have_count(2)
     # Roster order. 9. An absent planned pitcher is named as pitching.
     expect(warnings).to_have_text([
-        '⚠ Bench Blake is marked absent but is still in the plan: '
+        '⚠ Bench Blake is marked Out but is still in the plan: '
         'pitching in the 2nd.',
-        '⚠ Right Riley is marked absent but is still in the plan: '
+        '⚠ Right Riley is marked Out but is still in the plan: '
         'RF in the 1st, LF in the 2nd, 2B in the 3rd.',
     ])
     # Absent and unused: no noise, and absent players get no time row.

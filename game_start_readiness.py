@@ -41,38 +41,14 @@ def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSE
         ).all()
     absent_ids = {row.player_id for row in absences}
     present = [player for player in roster if player.id not in absent_ids]
-    # Compared trimmed, like the plan's names below: a roster name saved as
-    # typed on a phone ('Rhett Wanninger ', autocomplete's space) is still
-    # that player.
-    present_names = {roster_name(player) for player in present}
-    roster_names = {roster_name(player) for player in roster}
-
-    hard_stops = []
-    if not present:
-        hard_stops.append('Mark at least one player available for this game.')
 
     if rotation is _UNSET:
         rotation = db.session.query(Rotation).filter_by(
             associated_game_id=game.id,
             team_id=team_id,
         ).first()
-    stored = (rotation.innings or {}).get('1', {}) if rotation else {}
+    hard_stops, inning_one = first_pitch_hard_stops(team, roster, absent_ids, rotation)
     required = required_positions(team)
-    inning_one = normalized_inning_one(stored, required)
-
-    # Hard stops: the 1st-inning record would be invalid, so the coach must
-    # fix it. Each says exactly what is wrong.
-    if not inning_one.get('P'):
-        hard_stops.append('Choose the starting pitcher for the 1st inning.')
-    duplicate = duplicate_assignment_message(inning_one, '1')
-    if duplicate:
-        hard_stops.append(duplicate)
-    for position in sorted(inning_one, key=field_order):
-        name = inning_one[position]
-        if name not in roster_names:
-            hard_stops.append(f'{name} is at {position} in the 1st inning but is not on the roster.')
-        elif name not in present_names:
-            hard_stops.append(f'{name} is marked Out but is at {position} in the 1st inning.')
 
     # No pitching rules is not a data problem: CoachBoard just can't confirm
     # the starter's eligibility, and Start asks about it with the pitcher.
@@ -97,6 +73,44 @@ def can_start_game(game, team, *, roster=_UNSET, absences=_UNSET, rotation=_UNSE
         'open_question': open_position_question(open_positions, len(present), len(required), bench),
         'pitching_rules_selected': pitching_rules_selected,
     }
+
+
+def first_pitch_hard_stops(team, roster, absent_ids, rotation):
+    """What must be fixed before first pitch, and the trimmed 1st inning.
+
+    The one first-pitch check: can_start_game() (Start Game, Prepare Game) and
+    build_game_readiness() (Game Day cards, the home Next Game card) both call
+    it, with rows they have already loaded, so they can never disagree about
+    whether a game is ready for first pitch. Queries nothing.
+    """
+    present = [player for player in roster if player.id not in absent_ids]
+    # Compared trimmed, like the plan's names below: a roster name saved as
+    # typed on a phone ('Rhett Wanninger ', autocomplete's space) is still
+    # that player.
+    present_names = {roster_name(player) for player in present}
+    roster_names = {roster_name(player) for player in roster}
+
+    hard_stops = []
+    if not present:
+        hard_stops.append('Mark at least one player available for this game.')
+
+    stored = (rotation.innings or {}).get('1', {}) if rotation else {}
+    inning_one = normalized_inning_one(stored, required_positions(team))
+
+    # Hard stops: the 1st-inning record would be invalid, so the coach must
+    # fix it. Each says exactly what is wrong.
+    if not inning_one.get('P'):
+        hard_stops.append('Choose the starting pitcher for the 1st inning.')
+    duplicate = duplicate_assignment_message(inning_one, '1')
+    if duplicate:
+        hard_stops.append(duplicate)
+    for position in sorted(inning_one, key=field_order):
+        name = inning_one[position]
+        if name not in roster_names:
+            hard_stops.append(f'{name} is at {position} in the 1st inning but is not on the roster.')
+        elif name not in present_names:
+            hard_stops.append(f'{name} is marked Out but is at {position} in the 1st inning.')
+    return hard_stops, inning_one
 
 
 def normalized_inning_one(alignment, required):

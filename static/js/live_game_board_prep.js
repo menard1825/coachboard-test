@@ -14,6 +14,11 @@
   let inning = '1';
   let busy = false;
   let refreshTimer = null;
+  // The saved defense the coach has chosen. render() rebuilds the panel on
+  // every plan change (a tap, an autosave, another device's save), which used
+  // to reset the menu to "Choose a saved defense…" and disable Use -- the
+  // coach's choice silently vanished. Kept here so it survives a rebuild.
+  let chosenPreset = '';
 
   // The rotation itself (id/title/innings/associated_game_id) and its save
   // queue live in the shared CBPregameRotation store, not here — game_logic.js
@@ -33,6 +38,14 @@
     return Number(state?.outfielder_count) === 4
       ? ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'RCF', 'RF']
       : ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
+  }
+
+  // Names of players marked Out for this game.
+  function outNames() {
+    const absent = new Set((state?.absent_player_ids || []).map(Number));
+    return new Set((state?.roster || [])
+      .filter((player) => absent.has(Number(player.id)))
+      .map((player) => String(player.name || '').trim()));
   }
 
   function presentPlayers() {
@@ -170,7 +183,7 @@
         ));
 
         return spots.length
-          ? `${player.name} is marked absent but is still in the plan: ${spots.join(', ')}.`
+          ? `${player.name} is marked Out but is still in the plan: ${spots.join(', ')}.`
           : '';
       })
       .filter(Boolean);
@@ -371,6 +384,15 @@
       #${PANEL_ID} .pde-time-row.no-time .pde-time-total{color:#a12d26}
       #${PANEL_ID} .pde-playing-time-pitching{padding:6px 10px;border-bottom:1px solid #e7ebef;color:#264f8f;font-size:.64rem;font-weight:750}
       #${PANEL_ID} .pde-playing-time-absent{padding:7px 10px;border-bottom:1px solid #efb5ae;background:#fff1ef;color:#912d28;font-size:.66rem;font-weight:800}
+      #pde-player-modal .pde-rules-notice{padding:10px 14px;background:#fff8e6;border-bottom:1px solid #ecd9b4;color:#7a4f0c;font-size:.8rem;font-weight:750;line-height:1.35}
+      #pde-player-modal .pde-eligibility{font-weight:750;margin-top:2px}
+      #pde-player-modal #pde-list .pde-eligibility-ready{color:#176b38!important}
+      #pde-player-modal #pde-list .pde-eligibility-advisory,#pde-player-modal #pde-list .pde-eligibility-unknown{color:#8a5a13!important}
+      #pde-player-modal #pde-list .pde-eligibility-rule_conflict{color:#a32929!important}
+      #pde-player-modal .pde-choice-out{color:#a32929;font-weight:800}
+      #${PANEL_ID} .pde-pitcher-note{margin-top:10px;padding:8px 10px;border:1px solid #ecd9b4;border-left:4px solid #c58a17;border-radius:10px;background:#fffaf1;color:#5c3d07;font-size:.74rem;font-weight:700;line-height:1.35}
+      #${PANEL_ID} .pde-spot.is-out{border-color:#d9534f!important;background:#fff1ef!important}
+      #${PANEL_ID} .pde-spot.is-out .pde-name{color:#a32929!important;text-decoration:line-through}
       #${PANEL_ID} .pde-playing-time-open{padding:6px 10px;border-bottom:1px solid #e7ebef;background:#fff8e6;color:#775a10;font-size:.62rem;font-weight:750}
       #${PANEL_ID} .pde-status{display:flex;align-items:center;gap:10px;text-align:left;font-size:.72rem;margin-top:10px;border:2px solid #a66500;border-radius:11px;background:#fff4d8;color:#3f2b00;padding:9px 10px;box-shadow:0 2px 5px rgba(75,48,0,.08)}
       #${PANEL_ID} .pde-status.complete{border-color:#176b38;background:#edf8f1;color:#123d23}
@@ -473,7 +495,9 @@
 
   function fieldSpot(pos, source, left, top) {
     const name = source?.[pos] || '';
-    return `<button type="button" class="pde-spot ${name ? '' : 'open'}" data-pde-pos="${esc(pos)}" style="left:${left}%;top:${top}%"><span class="pde-pos">${esc(pos)}</span><span class="pde-name">${esc(name || 'OPEN')}</span></button>`;
+    const out = name && outNames().has(String(name).trim());
+    const label = out ? `${name} (Out)` : (name || 'OPEN');
+    return `<button type="button" class="pde-spot ${name ? '' : 'open'}${out ? ' is-out' : ''}" data-pde-pos="${esc(pos)}" style="left:${left}%;top:${top}%"${out ? ` aria-label="${esc(pos)}: ${esc(name)} is marked Out"` : ''}><span class="pde-pos">${esc(pos)}</span><span class="pde-name">${esc(label)}</span></button>`;
   }
 
   function baseballField(source) {
@@ -536,6 +560,9 @@
 
     const source = alignment();
     const open = positions().filter((pos) => !source[pos]);
+    const out = outNames();
+    const outPlaced = positions().filter((pos) => source[pos] && out.has(String(source[pos]).trim()));
+    const needs = open.length + outPlaced.length;
     const savedPresets = presets();
 
     panel.innerHTML = `
@@ -552,31 +579,41 @@
         <div class="pde-tools">
           <select class="form-select" id="pde-preset">
             <option value="">Choose a saved defense…</option>
-            ${savedPresets.map((preset) => `<option value="${preset.id}">${esc(presetName(preset))}</option>`).join('')}
+            ${savedPresets.map((preset) => `<option value="${preset.id}"${String(preset.id) === chosenPreset ? ' selected' : ''}>${esc(presetName(preset))}</option>`).join('')}
           </select>
-          <button class="btn btn-outline-primary" id="pde-apply" disabled>This inning</button>
+          <button class="btn btn-outline-primary" id="pde-apply"${chosenPreset ? '' : ' disabled'}>This inning</button>
           <button class="btn btn-outline-secondary" id="pde-save">Save this defense</button>
         </div>
         ${baseballField(source)}
         ${playingTimeSummary()}
-        <div class="pde-status ${open.length ? 'needs' : 'complete'}">
-          <i class="bi ${open.length ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill'} pde-status-icon" aria-hidden="true"></i>
+        <div class="pde-status ${needs ? 'needs' : 'complete'}">
+          <i class="bi ${needs ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill'} pde-status-icon" aria-hidden="true"></i>
           <div class="pde-status-copy">
-            <strong>${open.length ? `${open.length} open position${open.length === 1 ? '' : 's'}` : 'Defense complete'}</strong>
-            <span class="pde-status-detail">${open.length ? esc(open.join(', ')) : 'Every field position has a player.'}</span>
+            <strong>${outPlaced.length
+              ? esc(`${outPlaced.map((pos) => source[pos]).join(', ')} ${outPlaced.length === 1 ? 'is' : 'are'} marked Out`)
+              : open.length ? `${open.length} open position${open.length === 1 ? '' : 's'}` : 'Defense complete'}</strong>
+            <span class="pde-status-detail">${outPlaced.length
+              ? esc(`Tap ${outPlaced.join(', ')} to choose a player who is playing.${open.length ? ` Also open: ${open.join(', ')}.` : ''}`)
+              : open.length ? esc(open.join(', ')) : 'Every field position has a player.'}</span>
             <span class="pde-status-note">Changes save to this inning only.</span>
           </div>
-          <span class="pde-status-badge">${open.length ? 'ACTION NEEDED' : 'READY'}</span>
+          <span class="pde-status-badge">${needs ? 'ACTION NEEDED' : 'READY'}</span>
         </div>
       </div>`;
 
     panel.querySelectorAll('[data-pde-pos]').forEach((button) => {
       button.addEventListener('click', () => choosePlayer(button.dataset.pdePos));
     });
+    showPitcherNote(panel, source.P);
 
     const presetSelect = $('pde-preset');
     const applyButton = $('pde-apply');
-    presetSelect.addEventListener('change', () => { applyButton.disabled = !presetSelect.value; });
+    // A saved defense that was deleted is no longer offered.
+    if (chosenPreset && presetSelect.value !== chosenPreset) chosenPreset = '';
+    presetSelect.addEventListener('change', () => {
+      chosenPreset = presetSelect.value;
+      applyButton.disabled = !presetSelect.value;
+    });
     applyButton.addEventListener('click', applyPreset);
     $('pde-save').addEventListener('click', openPresetModal);
 
@@ -625,12 +662,18 @@
     const source = alignment() || {};
     const occupant = source[pos] || '';
     const pitcher = source.P || '';
+    // An occupant marked Out can't be swapped into another spot: whoever
+    // replaces them leaves their old spot open and the Out player comes off
+    // the field. The picker says so before anything changes.
+    const occupantOut = Boolean(occupant) && outNames().has(String(occupant).trim());
     modal.querySelector('.modal-title').textContent = `${pos} — Choose Player`;
     $('pde-help').textContent = pos === 'P'
-      ? (pitcher ? `Current pitcher: ${pitcher}.` : 'Choose the pitcher.')
-      : occupant
-        ? `Current: ${occupant}. Choosing a bench player moves ${occupant} to the bench.`
-        : 'Choose a player for this position.';
+      ? (pitcher ? `Current pitcher: ${pitcher}${occupantOut ? ' (marked Out)' : ''}.` : 'Choose the pitcher.')
+      : occupantOut
+        ? `${occupant} is marked Out. Choose who plays ${pos}; ${occupant} comes off the field.`
+        : occupant
+          ? `Current: ${occupant}. Choosing a bench player moves ${occupant} to the bench.`
+          : 'Choose a player for this position.';
 
     const choices = presentPlayers()
       .map((player) => ({player, position: playerPosition(player.name, source)}))
@@ -648,7 +691,7 @@
       // Moves involving P ask the coach; they are never a one-tap swap.
       if (pos === 'P' && pitcher) return `Currently at ${esc(position)} — you'll choose where ${esc(pitcher)} goes`;
       if (position === 'P') return "Currently at P — you'll choose who pitches";
-      return occupant
+      return occupant && !occupantOut
         ? `Currently at ${esc(position)} — swaps with ${esc(occupant)}`
         : `Currently at ${esc(position)} — ${esc(position)} will become open`;
     };
@@ -658,7 +701,9 @@
     list.innerHTML = `
       ${occupant ? (pos === 'P'
         ? `<button class="list-group-item list-group-item-action pde-choice text-danger" data-clear="1"><strong>Take ${esc(occupant)} off P</strong><small>Choose who pitches instead.</small></button>`
-        : `<button class="list-group-item list-group-item-action pde-choice text-danger" data-clear="1"><strong>Move ${esc(occupant)} to Bench</strong><small>Leave ${esc(pos)} open.</small></button>`) : ''}
+        : occupantOut
+          ? `<button class="list-group-item list-group-item-action pde-choice text-danger" data-clear="1"><strong>Take ${esc(occupant)} off the field</strong><small class="pde-choice-out d-block">Marked Out for this game. Leaves ${esc(pos)} open.</small></button>`
+          : `<button class="list-group-item list-group-item-action pde-choice text-danger" data-clear="1"><strong>Move ${esc(occupant)} to Bench</strong><small>Leave ${esc(pos)} open.</small></button>`) : ''}
       ${choices.map(({player, position}) => `
         <button class="list-group-item list-group-item-action pde-choice" data-player="${esc(player.name)}">
           <strong>${esc(player.name)}</strong>
@@ -668,15 +713,19 @@
     // Who can pitch on this game's date, from the server's own check
     // (pitching_eligibility.py), shown on each choice. Nothing is decided
     // here: a pitcher who isn't ready is asked about, as in the live game.
-    const verdicts = pos === 'P' ? fetchPitchingSummary() : null;
+    const verdicts = pos === 'P' ? pitchingVerdicts(true) : null;
     if (verdicts) {
       verdicts.then((summary) => {
         if (list.dataset.pdePosition !== 'P') return;
+        if (Object.values(summary).some(rulesNotSelected) && !list.querySelector('.pde-rules-notice')) {
+          list.insertAdjacentHTML('afterbegin', `<div class="pde-rules-notice" role="note">${esc(RULES_NOTICE)}</div>`);
+        }
         list.querySelectorAll('.pde-choice[data-player]').forEach((button) => {
           const text = eligibilityText(summary[button.dataset.player]);
           if (!text || button.querySelector('.pde-eligibility')) return;
           const line = document.createElement('small');
-          line.className = `pde-eligibility d-block pde-eligibility-${summary[button.dataset.player].eligibility}`;
+          const kind = rulesNotSelected(summary[button.dataset.player]) ? 'advisory' : summary[button.dataset.player].eligibility;
+          line.className = `pde-eligibility d-block pde-eligibility-${kind}`;
           line.textContent = text;
           button.appendChild(line);
         });
@@ -692,8 +741,10 @@
 
       if (verdicts && playerName && playerName !== pitcher) {
         list.onclick = null;
-        const verdict = (await verdicts)[playerName];
-        if (!(await confirmPitcher(modal, playerName, verdict))) return;
+        // Planning never stops to ask about eligibility: the status is on
+        // the row the coach tapped, stays under the field, and Start Game
+        // (and every live pitching change) asks before it counts.
+        const note = pitcherNote(playerName, (await verdicts)[playerName]);
         if (pitcher) {
           void chooseNewPitcher(modal, start, playerName);
           return;
@@ -704,9 +755,9 @@
         state.rotation.innings[inning] = next;
         closePlayerModal(modal);
         render();
-        toast(sourcePos
+        toast(`${sourcePos
           ? `${playerName}: ${sourcePos} → P. ${sourcePos} is now open.`
-          : `${playerName} set at P.`);
+          : `${playerName} set at P.`}${note ? ` ${note}` : ''}`, note ? 'warning' : 'success');
         saveRotation();
         return;
       }
@@ -738,7 +789,7 @@
         const displaced = next[pos];
 
         if (sourcePos && sourcePos !== pos) {
-          if (displaced && displaced !== playerName) {
+          if (displaced && displaced !== playerName && !occupantOut) {
             next[sourcePos] = displaced;
           } else {
             delete next[sourcePos];
@@ -747,7 +798,11 @@
 
         next[pos] = playerName;
 
-        if (
+        if (occupantOut && displaced && displaced !== playerName) {
+          message = sourcePos && sourcePos !== pos
+            ? `${playerName}: ${sourcePos} → ${pos}. ${displaced} (Out) is off the field. ${sourcePos} is now open.`
+            : `${playerName} → ${pos}. ${displaced} (Out) is off the field.`;
+        } else if (
           sourcePos &&
           sourcePos !== pos &&
           displaced &&
@@ -848,24 +903,43 @@
     }
   }
 
-  // A pitcher who isn't ready for this game: the same choices the live
-  // game gives -- Continue (advisory), I verified (can't confirm), or Use
-  // Anyway (a rule conflict) -- or Cancel. Resolves true to go ahead.
-  async function confirmPitcher(modal, name, verdict) {
-    const kind = verdict?.eligibility;
-    if (!kind || kind === 'ready') return true;
-    const label = {
-      advisory: `Continue with ${name}`,
-      unknown: `I verified ${name} can pitch`,
-      rule_conflict: `Use ${name} anyway`,
-    }[kind] || `Use ${name} anyway`;
-    const answer = await ask(modal, {
-      title: `${name} — ${ELIGIBILITY_WORD[kind] || 'Check eligibility'}`,
-      help: String(verdict.eligibility_message || verdict.status_detail || verdict.status || '').trim(),
-      options: [{label, detail: verdict.next_available && !/^today$/i.test(verdict.next_available)
-        ? `Next available: ${verdict.next_available}` : '', value: true, danger: kind === 'rule_conflict'}],
+  // This game's pitching check, fetched once and refreshed whenever the P
+  // picker opens, so the note under the field matches what the picker shows.
+  let verdictCache = null;
+  function pitchingVerdicts(fresh = false) {
+    if (!verdictCache || fresh) verdictCache = fetchPitchingSummary();
+    return verdictCache;
+  }
+
+  // A pitcher who isn't ready for this game, said inline -- never a sheet
+  // while planning. Empty when there is nothing to say (ready, or only the
+  // game rules missing, which the rules notice already says once).
+  function pitcherNote(name, verdict) {
+    const text = eligibilityText(verdict);
+    if (!text || verdict?.eligibility === 'ready') return '';
+    return `${name}: ${text}. Start Game will ask before first pitch.`;
+  }
+
+  // The planned pitcher's status for the inning shown, under the field.
+  function showPitcherNote(panel, pitcherName) {
+    if (!pitcherName) return;
+    pitchingVerdicts().then((summary) => {
+      const current = $(PANEL_ID);
+      if (current !== panel || !panel.isConnected || alignment()?.P !== pitcherName) return;
+      const note = pitcherNote(pitcherName, summary[pitcherName]);
+      let line = panel.querySelector('.pde-pitcher-note');
+      if (!note) {
+        line?.remove();
+        return;
+      }
+      if (!line) {
+        line = document.createElement('div');
+        line.className = 'pde-pitcher-note';
+        line.setAttribute('role', 'note');
+        panel.querySelector('.pde-status')?.insertAdjacentElement('beforebegin', line);
+      }
+      if (line.textContent !== note) line.textContent = note;
     });
-    return answer === true;
   }
 
   async function pitchingSummary(modal) {
@@ -889,7 +963,25 @@
     unknown: "Can't confirm",
   };
 
+  // Game rules not chosen for this game: every player is "can't confirm" for
+  // the same reason, so it is said once, not under every name.
+  const RULES_NOTICE = "Game rules haven't been selected. You can keep planning, but confirm the rules before starting.";
+
+  function rulesNotSelected(summary) {
+    return summary?.rule_type === 'none' && summary?.eligibility === 'unknown';
+  }
+
+  // Arm care still applies without game rules (a resting arm is resting).
+  function armCareConcern(summary) {
+    const status = String(summary?.arm_care_status || '').trim();
+    return status && !/^(available|unknown)\b/i.test(status) ? status : '';
+  }
+
   function eligibilityText(summary) {
+    if (rulesNotSelected(summary)) {
+      const concern = armCareConcern(summary);
+      return concern ? `Arm care · ${concern}` : '';
+    }
     const word = ELIGIBILITY_WORD[summary?.eligibility];
     if (!word) return '';
     if (summary.eligibility === 'ready') return word;
@@ -1334,10 +1426,22 @@
       const {proposed, openings} = plan(innings);
 
       const where = scopePhrase(scope, targetKeys);
+      const lines = savedDefenseSummary(scope, label, source, innings, targetKeys, openings);
+      if (scope === 'game') {
+        // Whole game replaces fielders the coach may already have planned in
+        // other innings: name those innings so the coach knows what they lose.
+        const planned = targetKeys.filter((key) => (
+          key !== String(inning) &&
+          Object.entries(innings[key] || {}).some(([pos, name]) => pos !== 'P' && String(name || '').trim())
+        ));
+        lines.unshift(planned.length
+          ? `Fielders you already planned in ${inningsPhrase(planned)} ${planned.length === 1 ? 'inning' : 'innings'} will be replaced.`
+          : 'No other inning has fielders planned yet.');
+      }
       const confirmed = await confirmSavedDefense(
         `Use “${label}” for ${where}?`,
         `Fielders in ${where} will be replaced.`,
-        savedDefenseSummary(scope, label, source, innings, targetKeys, openings)
+        lines
       );
       if (!confirmed) return;
 
@@ -1512,8 +1616,27 @@
     refreshTimer = setTimeout(refresh, ms);
   }
 
+  // Open this editor's own picker for a position in an inning -- the
+  // "Choose the starting pitcher" notice uses it. The inning is chosen
+  // through its tab, so every module agrees on the inning shown.
+  function choosePosition(inningKey, pos) {
+    if (!state || isLiveNow()) return false;
+    const key = String(inningKey);
+    const radio = document.querySelector(`#inning-btn-group input[name="inning-radio"][value="${CSS.escape(key)}"]`);
+    if (radio && !radio.checked) {
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    inning = key;
+    ensureRotation();
+    render();
+    $(PANEL_ID)?.scrollIntoView({behavior: 'smooth', block: 'start'});
+    choosePlayer(pos);
+    return true;
+  }
+
   // Start Game refreshes the plan when the stored 1st inning has changed.
-  window.CBPregameDefense = {refresh: () => scheduleRefresh(0)};
+  window.CBPregameDefense = {refresh: () => scheduleRefresh(0), choosePosition};
 
   function wire() {
     // The shared rotation store notifies on every local edit from EITHER

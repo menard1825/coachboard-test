@@ -169,8 +169,7 @@ def test_canceling_apply_to_game_leaves_canonical_rotation_and_db_untouched(page
             expect(select).to_be_visible(timeout=10_000)
             select.select_option(label=f'Cancel Safety Preset {game_id}')
 
-            # Use -> Whole game runs the same Whole game apply.
-            page.locator('#pde-use').click()
+            # Whole game (beside Use) runs the same Whole game apply.
             apply_to_game = page.locator('#pde-use-game')
             expect(apply_to_game).to_be_visible(timeout=10_000)
 
