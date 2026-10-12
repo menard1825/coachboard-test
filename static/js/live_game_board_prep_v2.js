@@ -2187,6 +2187,46 @@
           font-size:.8rem;
         }
       }
+
+      /* Bench time: after the planner's own controls (which keep their place
+         on screen), under the field in one column, beside it in two. */
+      #${CARD_ID} .cb-next-body{
+        grid-template-areas:"info" "field" "bench" "tools" "warnings" "quick" "error";
+      }
+      @media(orientation:landscape) and (min-width:700px){
+        #${CARD_ID} .cb-next-body{
+          grid-template-areas:"field info" "field bench" "field tools" "field warnings" "field quick" "field error";
+          grid-template-rows:repeat(5,auto) 1fr;
+        }
+        #${CARD_ID} .cb-nq-list{max-height:min(46dvh,420px);overflow-y:auto}
+      }
+      #${CARD_ID} .cb-next-quick{grid-area:quick;min-width:0}
+      #${CARD_ID} .cb-nq{border:1px solid #dfe4ea;border-radius:12px;background:#fff}
+      #${CARD_ID} .cb-nq>summary{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-height:44px;padding:8px 10px;cursor:pointer;list-style:none;touch-action:manipulation}
+      #${CARD_ID} .cb-nq>summary::-webkit-details-marker{display:none}
+      #${CARD_ID} .cb-nq>summary::after{content:"\\25BE";margin-left:auto;color:#667085;transition:transform .15s}
+      #${CARD_ID} .cb-nq[open]>summary::after{transform:rotate(180deg)}
+      #${CARD_ID} .cb-nq-title{color:#172033;font-size:.8rem;font-weight:850}
+      #${CARD_ID} .cb-nq-glance{color:#7a3b00;font-size:.72rem;font-weight:750;min-width:0}
+      #${CARD_ID} .cb-nq-glance.calm{color:#526176;font-weight:650}
+      #${CARD_ID} .cb-nq-body{padding:0 8px 8px}
+      #${CARD_ID} .cb-nq-key{color:#667085;font-size:.66rem;line-height:1.3;margin:0 2px 6px}
+      #${CARD_ID} .cb-nq-list{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+      #${CARD_ID} .cb-nq-row{display:grid;grid-template-columns:minmax(0,1fr) 4.4em 4.6em 3.2em;align-items:center;gap:6px;min-height:34px;padding:4px 7px;border-radius:8px;background:#f8fafc;font-size:.74rem}
+      #${CARD_ID} .cb-nq-row.head{min-height:0;background:none;color:#667085;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding-block:0}
+      #${CARD_ID} .cb-nq-name{min-width:0;color:#172033;font-weight:780;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      #${CARD_ID} .cb-nq-sat,#${CARD_ID} .cb-nq-proj{text-align:center;font-weight:850;color:#344054}
+      #${CARD_ID} .cb-nq-now{display:inline-block;margin-left:3px;border-radius:999px;background:#fff0c7;color:#7a5200;padding:0 5px;font-size:.6rem;font-weight:850}
+      #${CARD_ID} .cb-nq-next{text-align:center;font-weight:800;color:#294a84}
+      #${CARD_ID} .cb-nq-next.bench{color:#8a5a13}
+      #${CARD_ID} .cb-nq-next.open{color:#98a2b3;font-weight:700}
+      #${CARD_ID} .cb-nq-proj{color:#526176;font-weight:750}
+      #${CARD_ID} .cb-nq-row.most{background:#fff7e6;box-shadow:inset 3px 0 0 #e2a400}
+      #${CARD_ID} .cb-nq-row.again{background:#fff1ef;box-shadow:inset 3px 0 0 #c4320a}
+      #${CARD_ID} .cb-nq-row.again .cb-nq-next{color:#b42318}
+      #${CARD_ID} .cb-nq-note{margin:6px 2px 0;color:#5b4300;font-size:.68rem;line-height:1.35}
+      #${CARD_ID} .cb-nq-away{margin:6px 2px 0;color:#667085;font-size:.68rem}
+      #${CARD_ID} .cb-nq-full{margin-top:8px;width:100%;min-height:40px;font-size:.74rem;font-weight:800}
     `;
 
     document.head.appendChild(style);
@@ -3350,6 +3390,113 @@
     renderCard();
   }
 
+  /*
+   * Bench time: who has sat, and who sits next, beside the field. Its
+   * numbers are the Bench Report's own (CBBenchReport.build), read with this
+   * inning's defense as it is planned on this board right now -- so a move
+   * here changes them at once -- and the game's recorded innings for
+   * everything already played. Nothing here is calculated a second way.
+   */
+  let benchQuickOpen = null;   // null: open by default on wider screens
+
+  function benchQuickRows(report, planned, complete) {
+    const positionOf = {};
+    Object.entries(planned || {}).forEach(([pos, name]) => {
+      const key = String(name || '').trim();
+      if (key) positionOf[key] = pos;
+    });
+    const rows = report.history.map(row => ({
+      ...row,
+      next: positionOf[row.name] || '',
+      proj: row.plannedSat.length,
+    }));
+    const most = Math.max(0, ...rows.map(row => row.total));
+    rows.forEach(row => {
+      row.most = most > 0 && row.total === most;
+      // "Sits again" only once the inning is fully planned: before that, a
+      // player not yet placed has not been benched.
+      row.again = complete && row.most && !row.next;
+    });
+    rows.sort((a, b) => (b.total - a.total) || (b.proj - a.proj) || a.name.localeCompare(b.name));
+    return {rows, most};
+  }
+
+  function benchQuickGlance(rows, most, nextLabel, complete) {
+    if (!most) return {text: complete ? 'No one has sat yet' : `No one has sat yet · the ${nextLabel} isn't fully planned`, calm: true};
+    const top = rows.filter(row => row.most);
+    const again = top.filter(row => row.again);
+    const names = top.slice(0, 3).map(row => row.name).join(', ') + (top.length > 3 ? ` +${top.length - 3}` : '');
+    const tail = !complete
+      ? ` · the ${nextLabel} isn't fully planned`
+      : again.length
+      ? ` · ${again.length === top.length && top.length === 1 ? 'sits' : `${again.length} sit${again.length === 1 ? 's' : ''}`} again in the ${nextLabel}`
+      : '';
+    return {text: `Sat most (${most}): ${names}${tail}`, calm: false};
+  }
+
+  function renderBenchQuick() {
+    const host = $(CARD_ID)?.querySelector('[data-next-bench-quick]');
+    if (!host) return;
+    const build = window.CBBenchReport?.build;
+    const state = window.CBLiveState?.current?.();
+    if (!build || !state?.roster || !latest || readDisagrees()) {
+      host.hidden = true;
+      return;
+    }
+    const planned = snapshot();
+    let report;
+    try {
+      report = build(state, {...latest, confirmed: {...(latest.confirmed || {}), alignment: planned}});
+    } catch (error) {
+      host.hidden = true;
+      return;
+    }
+    const nextLabel = inningOrdinal(latest.next_inning || '') || 'next';
+    // The upcoming inning counts toward projected sits only when its defense
+    // is complete (the Bench Report's own rule).
+    const complete = report.futurePlanned.some(item => item.upcoming);
+    const {rows, most} = benchQuickRows(report, planned, complete);
+    const glance = benchQuickGlance(rows, most, nextLabel, complete);
+    const open = benchQuickOpen ?? window.matchMedia('(min-width: 700px)').matches;
+    const row = item => `
+      <li class="cb-nq-row${item.again ? ' again most' : item.most ? ' most' : ''}" data-next-bench-quick-player="${esc(item.name)}">
+        <span class="cb-nq-name" title="${esc(item.display)}">${esc(item.display)}</span>
+        <span class="cb-nq-sat" data-nq-sat="${item.sat.length}" data-nq-now="${item.currentBench ? 1 : 0}">${item.sat.length}${item.currentBench ? '<span class="cb-nq-now">now</span>' : ''}</span>
+        ${item.next || complete
+          ? `<span class="cb-nq-next${item.next ? '' : ' bench'}" data-nq-next="${esc(item.next || 'Bench')}">${esc(item.next || 'Bench')}</span>`
+          : `<span class="cb-nq-next open" data-nq-next="" title="Not placed yet: the ${esc(nextLabel)} isn't fully planned">—</span>`}
+        <span class="cb-nq-proj" data-nq-proj="${item.proj}">${item.proj ? `+${item.proj}` : '—'}</span>
+      </li>`;
+    const notes = [];
+    if (report.unknown.length) {
+      notes.push(`No recorded defense for the ${report.unknown.map(inningOrdinal).join(', ')}: sits there aren't counted.`);
+    }
+    if (report.unprojected.length) {
+      notes.push(`Not projected: ${report.unprojected.map(item => `${inningOrdinal(item.inning)} (${item.reason})`).join(', ')}.`);
+    }
+    host.hidden = false;
+    host.innerHTML = `
+      <details class="cb-nq" data-next-bench-quick-box ${open ? 'open' : ''}>
+        <summary>
+          <span class="cb-nq-title">Bench time</span>
+          <span class="cb-nq-glance${glance.calm ? ' calm' : ''}" data-next-bench-quick-glance>${esc(glance.text)}</span>
+        </summary>
+        <div class="cb-nq-body">
+          <div class="cb-nq-key">Sat: innings recorded on the bench (+ now). Next: the ${esc(nextLabel)} as planned here. Proj: planned sits still ahead.</div>
+          <ol class="cb-nq-list">
+            <li class="cb-nq-row head" aria-hidden="true"><span>Player</span><span class="cb-nq-sat">Sat</span><span class="cb-nq-next">Next</span><span class="cb-nq-proj">Proj</span></li>
+            ${rows.map(row).join('') || '<li class="cb-nq-row"><span class="cb-nq-name">No players here</span></li>'}
+          </ol>
+          ${notes.map(note => `<div class="cb-nq-note" data-next-bench-quick-note>${esc(note)}</div>`).join('')}
+          ${report.away.length ? `<div class="cb-nq-away" data-next-bench-quick-away>Not here: ${esc(report.away.map(item => item.display).join(', '))}</div>` : ''}
+          <button type="button" class="btn btn-outline-secondary cb-nq-full" data-next-bench-full>Full Bench Report</button>
+        </div>
+      </details>`;
+    const box = host.querySelector('details');
+    box.addEventListener('toggle', () => { benchQuickOpen = box.open; });
+    host.querySelector('[data-next-bench-full]')?.addEventListener('click', () => window.CBBenchReport?.open?.());
+  }
+
   function renderCard() {
     const card = ensureSurface();
 
@@ -3463,6 +3610,8 @@
           }
           ${nextWarningsMarkup()}
         </div>
+
+        <section class="cb-next-quick" data-next-bench-quick aria-label="Bench time" hidden></section>
 
         ${
           errorMessage
@@ -3618,6 +3767,8 @@
         if (event.target.closest('button')) return;
         benchSelected();
       });
+
+    renderBenchQuick();
 
     if (focusedKey) restorePlanFocus(card, focusedKey);
 
@@ -5342,6 +5493,9 @@
 
     document.addEventListener('coachboard:live-state', event => {
       const detail = event.detail || {};
+      // Bench time follows the live game too (a substitution, availability):
+      // drawn with the header, on the next frame.
+      if (Number(detail.game_id) === gameId) window.requestAnimationFrame(renderBenchQuick);
       if (
         Number(detail.game_id) === gameId &&
         detail.state?.pitch_count_summary

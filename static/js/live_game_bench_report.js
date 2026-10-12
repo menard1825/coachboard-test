@@ -534,6 +534,11 @@
     loadReport();
   }
 
+  // The one bench calculation: the Next Inning planner's Bench time panel
+  // calls it with the defense as planned on its board, so the two can never
+  // disagree.
+  window.CBBenchReport = Object.freeze({build: buildReport, open: openReport});
+
   function ensureButton() {
     const benchWrap = document.querySelector('#cbQuickDefense .cb-qd-bench-wrap');
     if (!benchWrap || benchWrap.querySelector('[data-cb-bench-report]')) return;
