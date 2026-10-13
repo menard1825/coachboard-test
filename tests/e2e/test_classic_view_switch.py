@@ -262,3 +262,82 @@ def test_a_live_game_shows_the_updated_live_screens(device, classic_view_url, re
         assert coach.cb_errors == []
     finally:
         remove_named_live_game(coach, classic_view_url, game_id, player_ids)
+
+
+def _until(page, condition, timeout_ms=10_000):
+    """Let the page run until `condition()` holds (a routed request arrived)."""
+    for _ in range(timeout_ms // 50):
+        if condition():
+            return
+        page.wait_for_timeout(50)
+    raise AssertionError('timed out waiting for the request')
+
+
+@pytest.mark.parametrize('spec', [DESKTOP, PHONE], ids=lambda s: s[0])
+def test_work_started_while_the_choice_saves_keeps_page_and_choice_together(device, classic_view_url, reset_views, spec):
+    """The view is chosen, and while the choice is on its way to the server
+    the coach changes Availability. The page must not reload over that change,
+    and the stored choice must match what the page shows."""
+    coach = device(spec)
+    game_id = _game(coach, classic_view_url, f'Race {spec[0]}')
+    try:
+        coach.goto(f'{classic_view_url}/game/{game_id}')
+        coach.evaluate("() => bootstrap.Collapse.getOrCreateInstance(document.getElementById('availabilityCollapse')).show()")
+        switch = coach.locator('#gameAvailabilityForm input[name="absent_players"]').first
+        expect(switch).to_be_visible()
+        coach.evaluate('() => { window.__sameDocument = true; }')
+
+        posted, held = [], []
+
+        def hold_first(route):
+            posted.append(route.request.post_data_json['view'])
+            if len(posted) == 1:
+                held.append(route)
+            else:
+                route.continue_()
+        coach.route('**/api/account/view', hold_first)
+
+        _choose(coach, 'classic')
+        _until(coach, lambda: held)
+        switch.click()                       # a change made while it saves
+        expect(switch).to_be_checked()
+        held[0].continue_()
+
+        status = coach.locator('#cbViewSwitchStatus')
+        expect(status).to_contain_text("The view didn’t change", timeout=10_000)
+        expect(status).to_contain_text('Save Game Availability')
+        assert posted == ['classic', 'updated']           # put back
+        assert coach.evaluate('() => window.__sameDocument === true')
+        expect(switch).to_be_checked()
+        assert _view(coach) == ('updated', 'updated')
+        assert _view(device(DESKTOP)) == ('updated', 'updated')  # stored: Updated
+
+        # If putting it back fails too, the page says what is stored, and the
+        # menu shows it -- still no reload over the change.
+        coach.unroute('**/api/account/view')
+        posted.clear(); held.clear()
+
+        def hold_then_fail(route):
+            posted.append(route.request.post_data_json['view'])
+            if len(posted) == 1:
+                held.append(route)
+            else:
+                route.fulfill(status=503, json={'status': 'error', 'message': 'Simulated outage'})
+        coach.route('**/api/account/view', hold_then_fail)
+        status.click()
+        switch.click()                       # undo, so the switch may start
+        expect(switch).not_to_be_checked()
+        _choose(coach, 'classic')
+        _until(coach, lambda: held)
+        switch.click()
+        held[0].continue_()
+        expect(status).to_contain_text('saved as Classic', timeout=10_000)
+        assert coach.evaluate('() => window.__sameDocument === true')
+        expect(switch).to_be_checked()
+        assert coach.locator('body').get_attribute('data-cb-view-choice') == 'classic'
+        assert coach.locator('[data-cb-view-set="classic"]').first.get_attribute('aria-pressed') == 'true'
+        assert _view(device(DESKTOP)) == ('classic', 'classic')  # stored: Classic, as the menu says
+        coach.unroute('**/api/account/view')
+        assert coach.cb_errors == []
+    finally:
+        _delete(coach, classic_view_url, game_id)
