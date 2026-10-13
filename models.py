@@ -70,6 +70,9 @@ class TeamMembership(db.Model):
     team_id = Column(Integer, ForeignKey('teams.id'), nullable=False)
     role = Column(String, default='Coach', nullable=False)
     player_order = Column(JSON, default=list)
+    # This coach's screen view for this team: 'classic', or NULL for the
+    # default Updated view. See ui_view.py; it never changes what is saved.
+    ui_view = Column(String(16), nullable=True)
 
     user = relationship("User", back_populates="memberships")
     team = relationship("Team", back_populates="memberships")
