@@ -135,12 +135,41 @@
 
   let switching = false;
 
+  async function store(view) {
+    const response = await fetch('/api/account/view', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', Accept: 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({view}),
+    });
+    const data = await response.json().catch(() => ({}));
+    return {ok: response.ok && data.status === 'success', message: data.message};
+  }
+
+  // The menu shows the stored choice.
+  function markChoice(view) {
+    body.dataset.cbViewChoice = view;
+    document.querySelectorAll('[data-cb-view-set]').forEach((button) => {
+      const on = button.dataset.cbViewSet === view;
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+      button.querySelector('.bi')?.classList.toggle('bi-check2', on);
+      button.querySelector('.bi')?.classList.toggle('bi-dot', !on);
+    });
+  }
+
+  const LABELS = {updated: 'Updated', classic: 'Classic'};
+
+  // The stored choice and the page always agree: the page reloads into the
+  // new view only once nothing is left unsaved; if work appeared while the
+  // choice was being saved, the choice is put back and nothing reloads.
   async function choose(view) {
     if (switching) return;
-    if (view === body.dataset.cbViewChoice) return;
+    const previous = body.dataset.cbViewChoice;
+    if (view === previous) return;
     switching = true;
     const buttons = Array.from(document.querySelectorAll('[data-cb-view-set]'));
     buttons.forEach((button) => { button.disabled = true; });
+    let stored = false;
     try {
       show('');
       const reason = await readyToLeave();
@@ -148,27 +177,37 @@
         show(reason);
         return;
       }
-      const response = await fetch('/api/account/view', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', Accept: 'application/json'},
-        credentials: 'same-origin',
-        body: JSON.stringify({view}),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.status !== 'success') {
-        show(data.message || 'Couldn’t change the view. Nothing changed; try again.');
+      const saved = await store(view);
+      if (!saved.ok) {
+        show(saved.message || 'Couldn\u2019t change the view. Nothing changed; try again.');
         return;
       }
-      // A save could have started while the preference was saving.
+      stored = true;
+      // Work started while the choice was saving: a save is waited for, but
+      // a change not yet saved (or a save that failed) must stay on screen.
       const late = await readyToLeave();
-      if (late) {
-        body.dataset.cbViewChoice = view;
-        show(`Your view is saved. ${late} Then reload to see it.`);
+      if (!late) {
+        window.location.reload();
         return;
       }
-      window.location.reload();
+      const undone = await store(previous).catch(() => ({ok: false}));
+      if (undone.ok) {
+        show(`The view didn\u2019t change. ${late}`);
+        return;
+      }
+      markChoice(view);
+      show(`Your choice is saved as ${LABELS[view]} and shows when this page reloads. ${late}`);
     } catch (error) {
-      show('Couldn’t reach CoachBoard. Nothing changed; try again.');
+      if (!stored) {
+        // The answer was lost: the choice may or may not have been saved.
+        // Put the previous one back so the page and the stored choice agree.
+        const undone = await store(previous).catch(() => ({ok: false}));
+        show(undone.ok
+          ? 'Couldn\u2019t reach CoachBoard. Nothing changed; try again.'
+          : 'Couldn\u2019t reach CoachBoard. Your view may have changed; reload this page once your work is saved.');
+      } else {
+        show('Couldn\u2019t reach CoachBoard. Your view may have changed; reload this page once your work is saved.');
+      }
     } finally {
       switching = false;
       buttons.forEach((button) => { button.disabled = false; });
