@@ -115,7 +115,7 @@
           {% else %}
               <i class="bi bi-shield-shaded me-2" style="font-size: 1.5rem;"></i>
           {% endif %}
-          <span class="navbar-brand-text">
+          <span class="navbar-brand-text" title="{{ current_team.team_name if current_team else 'Coach Planner' }}">
             {% if current_team %}{{ current_team.team_name }}{% else %}Coach Planner{% endif %}
           </span>
           {% if config.get('COACHBOARD_INSTANCE_LABEL') %}

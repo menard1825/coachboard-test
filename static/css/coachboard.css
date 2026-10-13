@@ -284,6 +284,54 @@ body.cb-ui .coach-primary-nav .dropdown-item:focus {
   }
 }
 
+/* Every desktop-header width (992px and up, e.g. iPad Pro 13 landscape at
+   1366/1376px): the navigation links and the account menu always stay whole;
+   a long team name or instance label gives way first, with an ellipsis, so
+   the header never widens the page whatever the team is called. */
+@media (min-width: 992px) {
+  body.cb-ui .navbar > .container-fluid {
+    flex-wrap: nowrap;
+  }
+
+  body.cb-ui .navbar-brand {
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  body.cb-ui .navbar-brand-text {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.cb-ui .navbar-brand [data-coachboard-instance-label] {
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.cb-ui .coach-primary-nav {
+    flex: 0 0 auto;
+  }
+
+  body.cb-ui .navbar-nav:has(#userMenuDesktop),
+  body.cb-ui .navbar-nav .nav-item:has(#userMenuDesktop) {
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  body.cb-ui #userMenuDesktop {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 /* Shared cards */
 body.cb-ui main .card,
 body.cb-ui main .accordion-item,

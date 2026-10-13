@@ -55,6 +55,10 @@
 .cb-home-quick-icon{width:32px;height:32px;border-radius:9px;background:#f1f4f8;color:var(--cb-primary-text,#344054);display:flex;align-items:center;justify-content:center}.cb-home-quick strong,.cb-home-quick small{display:block}.cb-home-quick strong{font-size:var(--cb-text-xs);font-weight:850}.cb-home-quick small{font-size:var(--cb-text-xs);color:var(--cb-muted);line-height:1.2;margin-top:1px}.cb-home-quick>.bi{font-size:.7rem;color:#98a2b3}
 .cb-home-loading{min-height:220px;display:flex;align-items:center;justify-content:center;gap:9px;color:#667085;font-size:.75rem}
 @media(max-width:991.98px){.cb-home-grid-top,.cb-home-grid-three{grid-template-columns:1fr}.cb-home-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cb-home-welcome{align-items:flex-start}.cb-home-context{display:none}}
+/* Tablets, portrait or landscape (768-1199px, e.g. iPad Pro 13 portrait at
+   1032px): Next Game full width with Team Alerts beneath it, then two columns.
+   Below 768px the one-column phone layout above applies. */
+@media(min-width:768px) and (max-width:1199.98px){.cb-home-grid-top{grid-template-columns:minmax(0,1fr)}.cb-home-grid-three{grid-template-columns:repeat(2,minmax(0,1fr))}.cb-home-grid-three>:last-child:nth-child(odd){grid-column:1/-1}.cb-home-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:575.98px){.cb-home-dashboard{padding-top:0}.cb-home-welcome{margin-top:0}.cb-home-welcome h1{font-size:1.5rem}.cb-home-welcome p{font-size:.74rem}.cb-home-card{padding:13px;border-radius:14px}.cb-home-card-head h2{font-size:1.18rem}.cb-home-readiness{grid-template-columns:1fr}.cb-home-game-meta{display:grid;gap:4px}.cb-home-quick-grid{grid-template-columns:1fr 1fr}.cb-home-quick{grid-template-columns:31px minmax(0,1fr);padding:9px}.cb-home-quick>.bi{display:none}.cb-home-quick small{display:none}.cb-home-live{grid-template-columns:auto minmax(0,1fr)}.cb-home-live-action{display:none}.cb-home-metrics{gap:4px}.cb-home-metrics span{padding:7px 4px}}
 
 /* Practice workspace v2: keep planning focused on the next practice and make
