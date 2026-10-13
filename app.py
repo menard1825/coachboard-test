@@ -52,6 +52,7 @@ from blueprints.live_game_write_lock import live_game_write_lock_bp
 from blueprints.live_game_clock import live_game_clock_bp
 from blueprints.postgame_navigation import postgame_navigation_bp
 from blueprints.fair_play import fair_play_bp
+from ui_view import CONFIG_KEY as CLASSIC_VIEW_CONFIG_KEY, ui_view_bp, template_context as ui_view_context
 
 # --- ROLE CONSTANTS ---
 SUPER_ADMIN = 'Super Admin'
@@ -103,6 +104,8 @@ def create_app():
     # Optional visible label for disposable/test instances. Empty by default,
     # so normal deployments render exactly as before.
     app.config['COACHBOARD_INSTANCE_LABEL'] = (os.environ.get('COACHBOARD_INSTANCE_LABEL') or '').strip()
+    # Who may choose the Classic view (ui_view.py): off, super-admin or all.
+    app.config[CLASSIC_VIEW_CONFIG_KEY] = (os.environ.get('COACHBOARD_CLASSIC_VIEW') or 'off').strip().lower()
     app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads', 'logos')
     app.config['ALLOWED_EXTENSIONS'] = ALLOWED_LOGO_EXTENSIONS
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or (
@@ -150,6 +153,7 @@ def create_app():
     app.register_blueprint(api_bp)
     app.register_blueprint(stats_dashboard_bp)
     app.register_blueprint(fair_play_bp)
+    app.register_blueprint(ui_view_bp)
 
     from flask_socketio import join_room, leave_room
     from models import TeamMembership
@@ -276,6 +280,7 @@ def create_app():
         because the page chrome rendered. Rendering must not write.
         """
         info = {}
+        stored = None
         if 'team_id' in session:
             with db.session.no_autoflush:
                 team = db.session.get(
@@ -287,8 +292,11 @@ def create_app():
 
                 if 'username' in session:
                     from models import TeamMembership
-                    user_teams = (
-                        db.session.query(Team)
+                    # The same query also brings this coach's own view
+                    # choice for each team (TeamMembership.ui_view), so the
+                    # Classic/Updated view costs no extra statement.
+                    rows = (
+                        db.session.query(Team, TeamMembership.ui_view)
                         .join(TeamMembership)
                         .join(User)
                         .filter(
@@ -298,7 +306,10 @@ def create_app():
                         .populate_existing()
                         .all()
                     )
-                    info['available_teams'] = user_teams
+                    info['available_teams'] = [row[0] for row in rows]
+                    stored = next((view for row_team, view in rows if row_team.id == session['team_id']), None)
+        with db.session.no_autoflush:
+            info.update(ui_view_context(stored))
 
         return info
 
