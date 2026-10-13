@@ -22,10 +22,22 @@ def _available_port():
 @pytest.fixture(scope='session')
 def coachboard_url(tmp_path_factory):
     """Run CoachBoard against a disposable SQLite database for browser tests."""
+    yield from _serve(tmp_path_factory, 'coachboard-e2e', {'COACHBOARD_CLASSIC_VIEW': 'off'})
+
+
+@pytest.fixture(scope='session')
+def classic_view_url(tmp_path_factory):
+    """A second disposable CoachBoard that offers every coach the Classic view
+    (COACHBOARD_CLASSIC_VIEW=all), started only by the tests that ask for it,
+    so the shared server keeps the default (off) every other test expects."""
+    yield from _serve(tmp_path_factory, 'coachboard-e2e-classic', {'COACHBOARD_CLASSIC_VIEW': 'all'})
+
+
+def _serve(tmp_path_factory, name, extra_env=None):
     if os.environ.get('COACHBOARD_E2E') != '1':
         pytest.skip('Set COACHBOARD_E2E=1 to run the Playwright suite.')
 
-    runtime_dir = tmp_path_factory.mktemp('coachboard-e2e')
+    runtime_dir = tmp_path_factory.mktemp(name)
     database_path = runtime_dir / 'coachboard-e2e.db'
     port = _available_port()
     base_url = f'http://127.0.0.1:{port}'
@@ -39,6 +51,7 @@ def coachboard_url(tmp_path_factory):
         'SECRET_KEY': 'coachboard-e2e-only-secret',
         'SESSION_COOKIE_SECURE': '0',
     })
+    env.update(extra_env or {})
 
     process = subprocess.Popen(
         [sys.executable, str(Path(__file__).with_name('serve_test_app.py'))],
