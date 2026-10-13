@@ -103,6 +103,8 @@
 </head>
 {% set cb_primary_nav_route = request.path in ['/', '/game-day', '/game-day/', '/pitching'] %}
 <body class="cb-ui{% if cb_primary_nav_route %} cb-primary-nav-route{% endif %}"
+      data-cb-view="{{ cb_view or 'updated' }}"
+      data-cb-view-choice="{{ cb_view_choice or 'updated' }}"
       data-coach-role="{{ session.get('role','') }}"
       data-coachboard-authenticated="{{ '1' if session.get('logged_in') else '0' }}"
       data-session-timezone="{{ session.get('client_timezone','') }}"
@@ -184,6 +186,13 @@
                     <li><hr class="dropdown-divider"></li>
                     {% endif %}
 
+                    {% if cb_view_offered %}
+                    <li class="dropdown-header">Screens for {{ current_team.team_name if current_team else 'this team' }}</li>
+                    {% for value, label in [('updated', 'Updated'), ('classic', 'Classic')] %}
+                    <li><button type="button" class="dropdown-item" data-cb-view-set="{{ value }}" aria-pressed="{{ 'true' if cb_view_choice == value else 'false' }}"><i class="bi {{ 'bi-check2' if cb_view_choice == value else 'bi-dot' }} me-1"></i>{{ label }}</button></li>
+                    {% endfor %}
+                    <li><hr class="dropdown-divider"></li>
+                    {% endif %}
                     <li><span class="dropdown-item-text small text-muted"><i class="bi bi-person-badge me-1"></i>{{ session.get('role','Coach') }}</span></li>
                     <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i> Change Password</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
@@ -209,6 +218,16 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
+
+        {% if cb_view_offered %}
+        <div id="cbViewSwitchStatus" class="alert alert-warning py-2 small shadow position-fixed start-50 translate-middle-x" style="top: 4.5rem; z-index: 1090; width: min(32rem, calc(100vw - 2rem));" role="alert" aria-live="assertive" hidden></div>
+        {% endif %}
+        {% if cb_view == 'classic' %}
+        <div class="alert alert-secondary py-2 small d-flex align-items-center gap-2" role="note" data-cb-view-notice>
+            <i class="bi bi-layout-text-window-reverse"></i>
+            <span>Classic view is on for you. The familiar Classic screens are still being built, so pages look the same for now. Live games always use the Updated screens.</span>
+        </div>
+        {% endif %}
 
         {% block content %}{% endblock %}
     </main>
@@ -262,6 +281,14 @@
             <hr class="my-2">
             {% endif %}
 
+            {% if cb_view_offered %}
+            <h6 class="text-muted ps-3 mt-2 mb-1">Screens for {{ current_team.team_name if current_team else 'this team' }}</h6>
+            {% for value, label in [('updated', 'Updated'), ('classic', 'Classic')] %}
+            <button type="button" class="list-group-item list-group-item-action" data-cb-view-set="{{ value }}" aria-pressed="{{ 'true' if cb_view_choice == value else 'false' }}"><i class="bi {{ 'bi-check2' if cb_view_choice == value else 'bi-dot' }}"></i> {{ label }}</button>
+            {% endfor %}
+            <hr class="my-2">
+            {% endif %}
+
             <h6 class="text-muted ps-3 mt-2 mb-1">Account</h6>
             <div class="list-group-item small text-muted"><i class="bi bi-person-badge"></i> {{ session.get('role','Coach') }}</div>
             <a class="list-group-item list-group-item-action" href="{{ url_for('auth.change_password') }}"><i class="bi bi-key-fill"></i> Change Password</a>
@@ -297,6 +324,9 @@
     <script src="{{ url_for('static', filename='js/client_timezone.js', v=asset_version) }}"></script>
     <script src="{{ url_for('static', filename='js/coachboard_ui.js', v=asset_version) }}"></script>
     <script src="{{ url_for('static', filename='js/navigation_v2.js', v=asset_version) }}"></script>
+    {% if cb_view_offered %}
+    <script src="{{ url_for('static', filename='js/ui_view_switch.js', v=asset_version) }}"></script>
+    {% endif %}
     <script>
     (() => {
       'use strict';
