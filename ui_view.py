@@ -58,13 +58,21 @@ def chosen_view(stored, role):
     return CLASSIC if stored == CLASSIC and classic_offered(role) else UPDATED
 
 
+#: Game page tools for a completed game; they run on the live-game screens.
+POSTGAME_TOOLS = ('pitching', 'edit')
+
+
 def page_view(choice):
     """The view this page is shown in: the coach's choice, except that a live
-    game is always Updated. Reads the game the view already loaded (identity
+    game is always Updated, and so are the completed game's own tools
+    (``?pitching=1`` final pitch counts, ``?edit=1`` review), which run on
+    the live-game screens. Reads the game the view already loaded (identity
     map), so a coach on the default view costs no query at all."""
     if choice != CLASSIC:
         return UPDATED
     if request.endpoint == 'gameday.game_management':
+        if any(request.args.get(tool) == '1' for tool in POSTGAME_TOOLS):
+            return UPDATED
         game_id = (request.view_args or {}).get('game_id')
         game = db.session.get(Game, game_id) if game_id else None
         if game is not None and game.is_live:

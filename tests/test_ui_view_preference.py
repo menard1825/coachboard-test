@@ -133,6 +133,17 @@ def test_a_live_game_is_always_updated(monkeypatch):
     assert _body(ann, '/game/10')['view'] == 'classic'
 
 
+@pytest.mark.parametrize('tool', ['pitching', 'edit'])
+def test_a_completed_games_own_tools_are_always_updated(monkeypatch, tool):
+    # Final pitch counts and the completed-game review run on the live
+    # screens, so they stay Updated whatever the coach chose.
+    app = _build_app(monkeypatch, 'all')
+    ann = _client(app, 'ann')
+    _set(ann, 'classic')
+    assert _body(ann, f'/game/10?{tool}=1')['view'] == 'updated'
+    assert _body(ann, f'/game/10?{tool}=0')['view'] == 'classic'
+
+
 def test_super_admin_preview_offers_it_to_super_admins_only(monkeypatch):
     app = _build_app(monkeypatch, 'super-admin')
     admin, ann = _client(app, 'admin'), _client(app, 'ann')
