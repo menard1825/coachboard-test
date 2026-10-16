@@ -1,11 +1,16 @@
 """Bench time: who has sat, and who sits next, while planning the next inning.
 
 The Next Inning planner shows, beside the field, every player who is here:
-innings recorded on the bench (and "now" if sitting this inning), where the
-planned defense puts them next inning, and planned sits still ahead. Its
-numbers are the Bench Report's own (CBBenchReport.build) with the defense as
-planned on the board, so they move with each tap -- before the save lands --
-and always agree with the full report, which stays one tap away.
+completed innings on the bench (and "now" if sitting this inning), where the
+planned defense puts them next inning, and bench innings still in the plan.
+Its numbers are the Bench Report's own (CBBenchReport.build) with the defense
+as planned on the board, so they move with each tap -- before the save lands
+-- and always agree with the full report, which stays one tap away.
+
+Bench time is coaching information, not a fairness score: no player is
+highlighted for having sat more than another, and nothing suggests a change.
+A player sitting now who is also on the bench next inning gets a neutral
+"again" ("Scheduled to sit again next inning").
 """
 
 import os
@@ -69,7 +74,10 @@ def _row(quick, name):
 
 def _cells(quick, name):
     row = _row(quick, name)
+    next_cell = row.locator('[data-nq-next]')
     return {
+        'next_text': next_cell.inner_text().replace('\n', ' '),
+        'next_title': next_cell.get_attribute('title'),
         'sat': int(row.locator('[data-nq-sat]').get_attribute('data-nq-sat')),
         'now': row.locator('[data-nq-sat]').get_attribute('data-nq-now') == '1',
         'next': row.locator('[data-nq-next]').get_attribute('data-nq-next'),
@@ -83,9 +91,9 @@ def _report_counts(report, name):
     text = report.locator(f'[data-cb-br-player="{name}"]').inner_text()
     sat = re.search(r'Sat:\s*([^\n·]*)', text).group(1).strip()
     sat_count = 0 if sat == 'None' else len([x for x in sat.split(',') if x.strip()])
-    proj = re.search(r'Projected to sit:\s*([^\n]*)', text)
+    proj = re.search(r'Planned to sit:\s*([^\n]*)', text)
     proj_count = len([x for x in proj.group(1).split(',') if x.strip()]) if proj else 0
-    return sat_count, ' now' in text, proj_count
+    return sat_count, 'Sitting now' in text, proj_count
 
 
 def test_bench_time_agrees_with_the_bench_report_and_moves_with_each_tap(live, coachboard_url):
@@ -100,13 +108,28 @@ def test_bench_time_agrees_with_the_bench_report_and_moves_with_each_tap(live, c
     assert (cole['sat'], cole['now'], cole['next']) == (1, True, 'LF'), cole
     assert (casey['sat'], casey['now'], casey['next']) == (1, True, 'Bench'), casey
     assert casey['proj'] == 1 and cole['proj'] == 0, (casey, cole)
-    # Sat the most and benched again: flagged. Cole plays next: not flagged.
-    assert 'again' in casey['class'] and 'most' in casey['class'], casey
-    assert 'again' not in cole['class'] and 'most' in cole['class'], cole
-    expect(quick.locator('[data-next-bench-quick-glance]')).to_contain_text('Sat most (2)')
-    expect(quick.locator('[data-next-bench-quick-glance]')).to_contain_text('again in the 3rd')
+    # Sitting now and on the bench again in the 3rd: a neutral "again".
+    # Cole plays the 3rd; the player he replaces was not sitting now.
+    assert 'again' in casey['class'] and casey['next_text'] == 'Bench again', casey
+    assert casey['next_title'] == 'Scheduled to sit again next inning', casey
+    assert 'again' not in cole['class'] and cole['next_text'] == 'LF', cole
     benched = _cells(quick, BENCHED_FOR_COLE)
     assert (benched['sat'], benched['now'], benched['next'], benched['proj']) == (0, False, 'Bench', 1), benched
+    assert 'again' not in benched['class'] and benched['next_text'] == 'Bench', benched
+    # The closed-panel line says who sits the 3rd -- no ranking, no warning.
+    # (This test roster is large: the first few names, then "+N".)
+    glance = quick.locator('[data-next-bench-quick-glance]')
+    benched_next = quick.locator('[data-nq-next="Bench"]').count()
+    expect(glance).to_contain_text(re.compile(r'^Sitting the 3rd: Center Casey, .*Left Lee'))
+    if benched_next > 4:
+        expect(glance).to_contain_text(f'+{benched_next - 4}')
+    expect(glance).not_to_contain_text('Catcher Cole')
+    # No player is highlighted for having sat more: every row looks alike.
+    looks = quick.locator('.cb-nq-row:not(.head)').evaluate_all(
+        "rows => [...new Set(rows.map(r => getComputedStyle(r).backgroundColor + '|' + getComputedStyle(r).boxShadow))]")
+    assert len(looks) == 1, looks
+    header = quick.locator('.cb-nq-row.head > span').evaluate_all('cells => cells.map(c => c.textContent.trim())')
+    assert header == ['Player', 'Sat', '3rd', 'Planned'], header
 
     # The same numbers as the full Bench Report, which opens from here.
     quick.locator('[data-next-bench-full]').click()
@@ -171,7 +194,7 @@ def test_unplanned_inning_unknown_history_and_players_not_here(live, coachboard_
     glance = quick.locator('[data-next-bench-quick-glance]')
     expect(glance).to_be_visible()
     # The default 3rd is only partly planned: nobody is said to sit "again".
-    expect(glance).to_contain_text("the 3rd isn't fully planned")
+    expect(glance).to_contain_text("The 3rd isn't fully planned yet")
     _expand(quick)
     expect(quick.locator('.cb-nq-row.again')).to_have_count(0)
     casey = _cells(quick, 'Center Casey')
@@ -179,7 +202,7 @@ def test_unplanned_inning_unknown_history_and_players_not_here(live, coachboard_
 
     # Unknown history: the 1st isn't counted, and says so.
     assert (casey['sat'], casey['now']) == (0, True), casey
-    expect(quick.locator('[data-next-bench-quick-note]').first).to_contain_text('No recorded defense for the 1st')
+    expect(quick.locator('[data-next-bench-quick-note]').first).to_contain_text('No defense recorded for the 1st')
     # Not here: listed apart, with no row of its own.
     expect(quick.locator('[data-next-bench-quick-away]')).to_contain_text('Left Lee')
     expect(_row(quick, 'Left Lee')).to_have_count(0)
@@ -210,6 +233,10 @@ def test_bench_time_fits_beside_or_under_the_field(live, coachboard_url, device)
     assert rows.count() >= len(SITTERS)
     first = rows.first.bounding_box()
     assert first['height'] <= 48, first
+    # Every column heading fits its column.
+    clipped = quick.locator('.cb-nq-row.head > span').evaluate_all(
+        'cells => cells.filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent)')
+    assert clipped == [], clipped
     page.evaluate('() => document.activeElement?.blur()')
     assert page.evaluate('() => document.documentElement.scrollWidth <= window.innerWidth + 1')
     assert page.cb_errors == []

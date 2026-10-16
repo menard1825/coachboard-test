@@ -29,16 +29,16 @@
       #${MODAL_ID} .cb-br-chip{border:1px solid #dfe4ea;border-radius:999px;background:#f8fafc;color:#344054;padding:5px 8px;font-size:.7rem;font-weight:750}
       #${MODAL_ID} .cb-br-list{display:grid;gap:7px}
       #${MODAL_ID} .cb-br-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;border:1px solid #e1e5ea;border-radius:11px;background:#fff;padding:9px 10px}
-      #${MODAL_ID} .cb-br-row.current{border-color:#dfc477;background:#fffaf0}
+      #${MODAL_ID} .cb-br-row.current{border-color:#c7d3e3;background:#f7f9fc}
       #${MODAL_ID} .cb-br-player{min-width:0;color:#172033;font-size:.82rem;font-weight:820;overflow-wrap:anywhere}
       #${MODAL_ID} .cb-br-count{border-radius:999px;background:#eef2f6;color:#344054;padding:4px 7px;font-size:.65rem;font-weight:800;white-space:nowrap}
-      #${MODAL_ID} .cb-br-row.current .cb-br-count{background:#fff0c7;color:#7a5200}
+      #${MODAL_ID} .cb-br-row.current .cb-br-count{background:#e7edf5;color:#294a84}
       #${MODAL_ID} .cb-br-history{grid-column:1/-1;color:#667085;font-size:.72rem;line-height:1.35}
-      #${MODAL_ID} .cb-br-now{color:#8b5c00;font-weight:800}
+      #${MODAL_ID} .cb-br-now{color:#294a84;font-weight:800}
       #${MODAL_ID} .cb-br-plan{grid-column:1/-1;color:#526176;font-size:.7rem;line-height:1.35}
       #${MODAL_ID} .cb-br-plan strong{color:#294a84}
       #${MODAL_ID} .cb-br-basis{margin:-2px 0 8px;color:#526176;font-size:.7rem;line-height:1.35}
-      #${MODAL_ID} .cb-br-unprojected{margin:0 0 10px;border:1px solid #f1d38a;border-radius:9px;background:#fff8e6;color:#5b4300;padding:7px 9px;font-size:.72rem;line-height:1.35}
+      #${MODAL_ID} .cb-br-unprojected{margin:0 0 10px;border:1px solid #dfe4ea;border-radius:9px;background:#f8fafc;color:#475467;padding:7px 9px;font-size:.72rem;line-height:1.35}
       #${MODAL_ID} .cb-br-empty{border:1px dashed #d0d5dd;border-radius:11px;color:#667085;padding:16px;text-align:center;font-size:.78rem}
       #${MODAL_ID} .cb-br-loading{min-height:140px;display:flex;align-items:center;justify-content:center;color:#667085;font-size:.8rem}
       #${MODAL_ID} .cb-br-away{display:grid;gap:7px;margin-top:12px}
@@ -76,7 +76,7 @@
       <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
-            <div><h5 class="modal-title mb-0">Bench Report</h5><div class="small text-muted">Actual + projected bench innings</div></div>
+            <div><h5 class="modal-title mb-0">Bench Report</h5><div class="small text-muted">Bench innings so far, now, and in the plan</div></div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body" data-cb-bench-report-body><div class="cb-br-loading">Loading…</div></div>
@@ -184,7 +184,7 @@
         const alignment = isNext ? upcoming : (carried[inning] || plannedInnings[inning] || {});
         const named = Object.values(alignment).some(name => String(name || '').trim());
         if (!named) {
-          unprojected.push({inning, reason: 'not planned'});
+          unprojected.push({inning, reason: 'no defense planned'});
         } else if (!hasCompletePlannedDefense(alignment, state)) {
           const open = openFieldPositions(alignment, state);
           unprojected.push({inning, reason: `${open.join(', ')} open`});
@@ -270,13 +270,13 @@
       upcomingKnown: Boolean(prep?.confirmed?.alignment)};
   }
 
+  // Completed, now and planned, side by side: information for the coach,
+  // not a score.
   function countLabel(row) {
-    const actual = row.total;
-    const planned = row.plannedSat.length;
-    if (actual && planned) return `${actual} so far · ${planned} projected`;
-    if (actual) return `${actual} ${actual === 1 ? 'inning' : 'innings'}`;
-    if (planned) return `${planned} projected`;
-    return '0 innings';
+    const parts = [`${row.sat.length} sat`];
+    if (row.currentBench) parts.push('sitting now');
+    if (row.plannedSat.length) parts.push(`${row.plannedSat.length} planned`);
+    return parts.join(' · ');
   }
 
   function renderReport(state, prep = null) {
@@ -287,9 +287,9 @@
     const onBench = report.history.filter(row => row.currentBench).length;
     const rows = report.history.length ? report.history.map(row => {
       const completedText = row.sat.length ? row.sat.join(', ') : 'None';
-      const current = row.currentBench ? `<span class="cb-br-now"> · Inning ${esc(report.currentLabel)} now</span>` : '';
+      const current = row.currentBench ? `<span class="cb-br-now"> · Sitting now (inning ${esc(report.currentLabel)})</span>` : '';
       const planned = row.plannedSat.length
-        ? `<div class="cb-br-plan"><strong>Projected to sit:</strong> ${esc(row.plannedSat.join(', '))}</div>`
+        ? `<div class="cb-br-plan"><strong>Planned to sit:</strong> ${esc(row.plannedSat.join(', '))}</div>`
         : '';
       return `<div class="cb-br-row ${row.currentBench ? 'current' : ''}" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-count">${esc(countLabel(row))}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(completedText)}${current}</div>${planned}</div>`;
     }).join('') : '<div class="cb-br-empty">No bench history yet.</div>';
@@ -298,21 +298,21 @@
           <div class="cb-br-row away" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(row.sat.length ? row.sat.join(', ') : 'None')}</div></div>`).join('')}<div class="cb-br-away-hint">Change who is here in Menu → Player availability.</div></div>`
       : '';
     const unknown = report.unknown.length
-      ? `<div class="cb-br-unprojected" data-cb-br-unknown><strong>No recorded defense:</strong> ${esc(report.unknown.map(ordinal).join(', '))}. Sits for ${report.unknown.length === 1 ? 'that inning aren' : 'those innings aren'}'t counted.</div>`
+      ? `<div class="cb-br-unprojected" data-cb-br-unknown><strong>No defense recorded:</strong> ${esc(report.unknown.map(ordinal).join(', '))}. Bench innings there aren't counted.</div>`
       : '';
     const planChip = report.futurePlanned.length
-      ? `<span class="cb-br-chip">Projected innings ahead: ${report.futurePlanned.length}</span>`
+      ? `<span class="cb-br-chip">Planned innings ahead: ${report.futurePlanned.length}</span>`
       : '';
     // Where the projections come from, and what they leave out.
     const basis = report.noneAhead
-      ? `The ${ordinal(report.currentLabel)} is ${report.extra ? 'an extra' : 'the last scheduled'} inning: no innings ahead to project.`
+      ? `The ${ordinal(report.currentLabel)} is ${report.extra ? 'an extra' : 'the last scheduled'} inning: no innings left in the plan.`
       : report.upcomingKnown
-      ? `Projections use the ${report.nextLabel}-inning defense as it will start, then the pregame plan.`
-      : "Projections use the pregame plan; the next inning's defense couldn't be read.";
+      ? `Planned innings use the ${report.nextLabel}-inning defense as set now, then the pregame plan.`
+      : "Planned innings use the pregame plan; the next inning's defense couldn't be read.";
     const missing = report.unprojected.length
-      ? `<div class="cb-br-unprojected" data-cb-br-unprojected><strong>Not projected:</strong> ${
+      ? `<div class="cb-br-unprojected" data-cb-br-unprojected><strong>Not in the plan yet:</strong> ${
           esc(report.unprojected.map(item => `${ordinal(item.inning)} (${item.reason})`).join(', '))
-        }. Sits for ${report.unprojected.length === 1 ? 'that inning aren' : 'those innings aren'}'t counted.</div>`
+        }. Planned counts leave ${report.unprojected.length === 1 ? 'it' : 'them'} out.</div>`
       : '';
     body.innerHTML = `<div class="cb-br-summary"><span class="cb-br-chip">Inning ${esc(report.currentLabel)}</span><span class="cb-br-chip" data-cb-br-sitting>Sitting now: ${onBench}</span>${report.away.length ? `<span class="cb-br-chip" data-cb-br-away-count>Not here: ${report.away.length}</span>` : ''}${planChip}</div><div class="cb-br-basis" data-cb-br-basis>${esc(basis)}</div>${unknown}${missing}<div class="cb-br-list">${rows}</div>${away}`;
   }

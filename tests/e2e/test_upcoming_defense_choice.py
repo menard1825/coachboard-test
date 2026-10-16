@@ -278,13 +278,13 @@ def test_bench_report_follows_the_defense_that_will_start(page: Page, coachboard
     _expect_board(page, SWAP, 'Same defense as the 1st')
     modal = _bench_report(page)
     expect(modal.locator('[data-cb-br-basis]')).to_have_text(
-        'Projections use the 2nd-inning defense as it will start, then the pregame plan.')
-    expect(_row(modal, BENCH)).to_contain_text('Projected to sit: 2')
-    expect(_row(modal, 'Left Lee')).not_to_contain_text('Projected to sit')
+        'Planned innings use the 2nd-inning defense as set now, then the pregame plan.')
+    expect(_row(modal, BENCH)).to_contain_text('Planned to sit: 2')
+    expect(_row(modal, 'Left Lee')).not_to_contain_text('Planned to sit')
     # The 3rd has CF open and the 4th-6th have no plan: named, not counted.
     expect(modal.locator('[data-cb-br-unprojected]')).to_have_text(
-        "Not projected: 3rd (CF open), 4th (not planned), 5th (not planned), 6th (not planned). "
-        "Sits for those innings aren't counted.")
+        "Not in the plan yet: 3rd (CF open), 4th (no defense planned), 5th (no defense planned), "
+        "6th (no defense planned). Planned counts leave them out.")
     modal.get_by_role('button', name='Back to Game').click()
     expect(modal).to_be_hidden()
 
@@ -294,8 +294,8 @@ def test_bench_report_follows_the_defense_that_will_start(page: Page, coachboard
     _expect_board(page, D2, 'Pregame plan for the 2nd')
     page.wait_for_timeout(800)
     modal = _bench_report(page)
-    expect(_row(modal, 'Left Lee')).to_contain_text('Projected to sit: 2', timeout=10_000)
-    expect(_row(modal, BENCH)).not_to_contain_text('Projected to sit')
+    expect(_row(modal, 'Left Lee')).to_contain_text('Planned to sit: 2', timeout=10_000)
+    expect(_row(modal, BENCH)).not_to_contain_text('Planned to sit')
 
 
 # 8. A different pitcher in the plan meets End Inning's pitching check ----------------------

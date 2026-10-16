@@ -133,10 +133,10 @@ def test_the_bench_report_projects_the_carried_pitcher(live, coachboard_url):
 
     # The 5th: Mateo keeps pitching, so Luke -- not Mateo -- takes the sit
     # the plan gave Mateo. The 6th: Owen pitches, everyone else as planned.
-    expect(report.locator(f'[data-cb-br-player="{LUKE}"] .cb-br-plan')).to_have_text('Projected to sit: 5')
-    expect(report.locator(f'[data-cb-br-player="{LUKE}"] .cb-br-count')).to_have_text('1 projected')
+    expect(report.locator(f'[data-cb-br-player="{LUKE}"] .cb-br-plan')).to_have_text('Planned to sit: 5')
+    expect(report.locator(f'[data-cb-br-player="{LUKE}"] .cb-br-count')).to_have_text('0 sat · 1 planned')
     assert _projected(report, MATEO) == ''
-    expect(report.locator(f'[data-cb-br-player="{COLE}"] .cb-br-plan')).to_have_text('Projected to sit: 4, 6')
+    expect(report.locator(f'[data-cb-br-player="{COLE}"] .cb-br-plan')).to_have_text('Planned to sit: 4, 6')
 
     # The games the app prepares agree.
     _advance(page, coachboard_url)                                 # the 4th

@@ -48,12 +48,12 @@ def test_no_projection_past_the_scheduled_innings(live, coachboard_url):
     extra = scheduled + 1
 
     report = _open_report(page, coachboard_url)
-    expect(report.locator('.cb-br-plan')).to_have_count(0)                  # no "Projected to sit"
-    expect(report.get_by_text('Projected innings ahead')).to_have_count(0)
+    expect(report.locator('.cb-br-plan')).to_have_count(0)                  # no "Planned to sit"
+    expect(report.get_by_text('Planned innings ahead')).to_have_count(0)
     expect(report.locator('[data-cb-br-unprojected]')).to_have_count(0)
     expect(report.locator('[data-cb-br-basis]')).to_have_text(
-        f'The {scheduled}th is the last scheduled inning: no innings ahead to project.')
-    expect(report.locator('.cb-br-count').first).not_to_contain_text('projected')
+        f'The {scheduled}th is the last scheduled inning: no innings left in the plan.')
+    expect(report.locator('.cb-br-count').first).not_to_contain_text('planned')
     report.locator('[data-bs-dismiss="modal"]').first.click()
 
     # Extra innings still happen, and count once played.
@@ -63,5 +63,5 @@ def test_no_projection_past_the_scheduled_innings(live, coachboard_url):
     expect(report.locator('.cb-br-chip').first).to_have_text(f'Inning {extra}')
     expect(report.locator('.cb-br-plan')).to_have_count(0)
     expect(report.locator('[data-cb-br-basis]')).to_have_text(
-        f'The {extra}th is an extra inning: no innings ahead to project.')
+        f'The {extra}th is an extra inning: no innings left in the plan.')
     assert page.cb_errors == []
