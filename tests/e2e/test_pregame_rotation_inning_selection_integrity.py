@@ -277,6 +277,17 @@ def test_server_refresh_removing_current_inning_does_not_resurrect_it(page: Page
             'the removed inning must not have been recreated in CBPregameRotation by the refresh'
         )
 
+        # The other coach's removal really landed on the server (the mock
+        # above only delivered it early). /save_rotation now merges against
+        # the plan the page started from, so a page can never delete an
+        # inning the server still has on the strength of a snapshot the
+        # server never held -- the removal has to be real.
+        removed = page.request.post(f'{coachboard_url}/save_rotation', data=json.dumps({
+            'id': baseline['rotation']['id'], 'title': baseline['rotation']['title'],
+            'innings': modified_snapshot['rotation']['innings'], 'associated_game_id': game_id,
+        }), headers={'Content-Type': 'application/json'})
+        assert removed.ok, removed.text()
+
         # A later, real edit/save (against the real, unmocked endpoint from
         # here on) must not resurrect and persist the removed inning.
         choose_player(page, 'SS', 'Shortstop Shawn')
