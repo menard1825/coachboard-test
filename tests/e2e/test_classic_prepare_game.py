@@ -26,6 +26,7 @@ from playwright.sync_api import expect  # noqa: E402
 
 import cdn_assets  # noqa: E402
 from start_helpers import start_body  # noqa: E402
+from e2e_cleanup import release_game  # noqa: E402
 
 
 COACH = ('playwright-coach', 'playwright-password')
@@ -131,7 +132,9 @@ def _innings(page, url, game_id):
 
 
 def _delete(page, url, game_id):
-    page.request.post(f'{url}/game-day/{game_id}/delete', headers={'Accept': 'application/json'})
+    # Ends the game first if a test started it: a live game locks the
+    # team's roster for every later test on the shared server.
+    release_game(page.request, url, game_id)
 
 
 def _open(page, url, game_id):
