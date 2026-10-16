@@ -229,7 +229,8 @@ def test_a_defense_save_in_the_air_is_waited_for_and_a_failed_one_stops_it(devic
         expect(coach.locator('body')).to_have_attribute('data-cb-view', 'classic', timeout=20_000)
         saved = coach.request.get(f'{classic_view_url}/api/game_data/{game_id}').json()
         assert saved['rotation']['innings']['1']['SS'] == 'Second Sam'
-        expect(coach.locator('#pregame-defense-editor-v3 [data-pde-pos="SS"] .pde-name')).to_have_text('Second Sam')
+        # Now on Classic Prepare Game: the same saved edit, on its diamond.
+        expect(coach.locator('#pos-desktop-SS .player-tag')).to_have_text('Second Sam', timeout=15_000)
     finally:
         _delete(coach, classic_view_url, game_id)
 

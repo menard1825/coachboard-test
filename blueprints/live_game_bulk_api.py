@@ -8,6 +8,7 @@ from db import db
 from extensions import socketio
 from game_availability import present_players
 import pitching_eligibility
+from ui_view import is_classic_page
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
@@ -808,7 +809,7 @@ def inject_live_game_feedback_pass(response):
         return response
 
     html = response.get_data(as_text=True)
-    if 'live_game_feedback_pass.js' in html:
+    if 'live_game_feedback_pass.js' in html or is_classic_page(html):
         return response
 
     tag = f'<script src="{_feedback_asset_url()}"></script>\n'

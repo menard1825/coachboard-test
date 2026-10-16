@@ -133,6 +133,49 @@ def test_a_live_game_is_always_updated(monkeypatch):
     assert _body(ann, '/game/10')['view'] == 'classic'
 
 
+
+#: Shared behavior a Classic Prepare Game must load (docs/classic_view_scripts.md).
+CLASSIC_GAME_SCRIPTS = (
+    'js/lineup_editor.js', 'js/game_logic.js', 'js/game_prep_readiness.js',
+    'js/start_game_flow.js', 'js/prepare_game_notices.js', 'js/classic_prepare_game.js',
+    'js/pregame_rotation_sync.js', 'js/navigation_v2.js',
+)
+#: Updated presentation and live-game modules it must not load.
+UPDATED_ONLY_GAME_SCRIPTS = (
+    'js/live_game_v2.js', 'js/live_game_contract.js', 'js/game_setup_ux.js',
+    'js/live_game_board_prep_v2.js', 'js/live_game_feedback_pass.js',
+    'js/live_game_postgame_cleanup.js', 'js/live_game_drag_controller.js',
+    'js/live_game_pitching_finalize.js', 'js/live_game_inning_clarity.js',
+)
+
+
+def test_classic_prepare_game_loads_the_shared_behavior_only(monkeypatch):
+    app = _build_app(monkeypatch, 'all')
+    ann = _client(app, 'ann')
+    _set(ann, 'classic')
+    classic = ann.get('/game/10').get_data(as_text=True)
+    assert 'id="classicPrepareGame"' in classic and 'id="pregame-checklist-container"' not in classic
+    for script in CLASSIC_GAME_SCRIPTS:
+        assert script in classic, script
+    for script in UPDATED_ONLY_GAME_SCRIPTS:
+        assert script not in classic, script
+    # The original editor, Start Live Game and the eligibility table are all there.
+    for marker in ('id="rotation-board"', 'id="rotationMatrixCollapse"', 'id="assignPlayerModal"',
+                   'id="startLiveGameBtnAction"', 'id="pitcher-availability-card"', 'id="gameAvailabilityForm"'):
+        assert marker in classic, marker
+
+    # Updated is unchanged: its own page and every one of its modules.
+    _set(ann, 'updated')
+    updated = ann.get('/game/10').get_data(as_text=True)
+    assert 'id="pregame-checklist-container"' in updated and 'id="classicPrepareGame"' not in updated
+    for script in UPDATED_ONLY_GAME_SCRIPTS:
+        assert script in updated, script
+    assert 'js/classic_prepare_game.js' not in updated
+    # A live game is Updated, with its live modules, whatever the choice.
+    _set(ann, 'classic')
+    live = ann.get('/game/11').get_data(as_text=True)
+    assert 'js/live_game_v2.js' in live and 'id="classicPrepareGame"' not in live
+
 @pytest.mark.parametrize('tool', ['pitching', 'edit'])
 def test_a_completed_games_own_tools_are_always_updated(monkeypatch, tool):
     # Final pitch counts and the completed-game review run on the live

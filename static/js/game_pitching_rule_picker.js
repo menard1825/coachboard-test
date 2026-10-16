@@ -187,6 +187,10 @@
   }
 
   function buildAvailabilityCards(data, armData) {
+    // Classic keeps the original Pitcher Availability table (the server's own
+    // eligibility, refreshed after a rule change by the reload in save());
+    // Classic's strip says when the game's rules are not selected yet.
+    if (document.body?.dataset.cbView === 'classic') return false;
     const card = document.getElementById('pitcher-availability-card');
     const wrap = card?.querySelector('.table-responsive');
     const table = wrap?.querySelector('table');

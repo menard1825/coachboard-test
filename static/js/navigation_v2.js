@@ -402,7 +402,15 @@
     loadScript('/static/js/user_management_cleanup.js', 'user-management-cleanup');
   }
 
-  if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
+  // Classic Prepare Game (ui_view.py) shows the original screens: of these
+  // it needs only the game's pitching rules. Everything else here is the
+  // Updated presentation or the live game, which is always Updated.
+  // docs/classic_view_scripts.md lists every game-page script and why.
+  const classicGamePage = /^\/game\/\d+\/?$/.test(window.location.pathname)
+    && document.body?.dataset.cbView === 'classic';
+  if (classicGamePage) {
+    loadScript('/static/js/game_pitching_rule_picker.js', 'game-pitching-rules');
+  } else if (/^\/game\/\d+\/?$/.test(window.location.pathname)) {
     loadScript('/static/js/postgame_game_management_cleanup.js', 'postgame-game-management-cleanup');
     loadScript('/static/js/live_game_board_prep.js', 'pregame-defense-editor');
     loadScript('/static/js/game_management_visual_polish.js', 'game-management-visual-polish');

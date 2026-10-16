@@ -208,7 +208,8 @@ body.cb-ui main .cb-empty-state {
    defense editor is built. Hide that brief legacy frame so Prepare Game feels
    like one UI instead of flashing old -> new. :has() is supported by the
    current Chrome/Safari targets used by CoachBoard. A timed fallback reveals
-   the page if the modern helper ever fails to initialize. */
+   the page if the modern helper ever fails to initialize. Classic Prepare
+   Game shows the original rotation markup itself, so it never waits. */
 @keyframes cb-game-boot-fallback {
   to { opacity: 1; visibility: visible; }
 }
@@ -216,13 +217,13 @@ body.cb-ui main .cb-empty-state {
   to { opacity: 0; visibility: hidden; }
 }
 
-body.cb-ui:has(#rotation-card-container):not(:has(#pregame-defense-editor-v3)) main > .container-fluid {
+body.cb-ui:not([data-cb-view="classic"]):has(#rotation-card-container):not(:has(#pregame-defense-editor-v3)) main > .container-fluid {
   opacity: 0;
   visibility: hidden;
   animation: cb-game-boot-fallback 0s 2.5s forwards;
 }
 
-body.cb-ui:has(#rotation-card-container):not(:has(#pregame-defense-editor-v3)) main::before {
+body.cb-ui:not([data-cb-view="classic"]):has(#rotation-card-container):not(:has(#pregame-defense-editor-v3)) main::before {
   content: 'Preparing game…';
   display: block;
   width: min(1180px, calc(100% - 24px));

@@ -1,0 +1,85 @@
+/* Classic Prepare Game (templates/_game_management_classic.html).
+
+   The original screens already take their look from Bootstrap and main.css
+   (the diamond, player tags, legend, matrix). This file only undoes today's
+   theme where it would change the original page, and styles the few things
+   Classic adds: the Game Day strip, the save status and a planned player
+   who is now Out. */
+
+/* The original light "Back to All Games" bar, not today's team-colored navbar. */
+body.cb-ui[data-cb-view="classic"] #classicGameBar {
+  --bs-navbar-color: #212529;
+  --bs-navbar-brand-color: #212529;
+  --bs-navbar-brand-hover-color: #000;
+  background: #f8f9fa !important;
+  color: #212529;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+body.cb-ui[data-cb-view="classic"] #classicGameBar .navbar-brand,
+body.cb-ui[data-cb-view="classic"] #classicGameBar .navbar-text {
+  color: #212529;
+}
+
+body.cb-ui[data-cb-view="classic"] #classicGameBar > .container-fluid {
+  flex-wrap: wrap;
+  gap: .25rem .75rem;
+}
+
+body.cb-ui[data-cb-view="classic"] .cb-classic-gametitle {
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+/* Game Day strip: Start Live Game, the save status, notices. */
+body.cb-ui[data-cb-view="classic"] .cb-classic-save {
+  font-size: .8rem;
+  font-weight: 600;
+  padding: .45em .8em;
+}
+
+body.cb-ui[data-cb-view="classic"] .cb-classic-save[data-state="failed"] {
+  cursor: pointer;
+}
+
+body.cb-ui[data-cb-view="classic"] #startLiveGameBtnAction {
+  min-height: 44px;
+}
+
+/* A planned player who is now Out (or off the roster): shown, never hidden,
+   until the coach moves them. */
+.position-dropzone .player-tag.is-unavailable {
+  background-color: #fff5f5;
+  border: 2px solid #dc3545;
+  color: #842029;
+}
+
+.player-tag .player-tag-out {
+  font-weight: 700;
+}
+
+/* "Choose Another Pitcher" points the P spot out on Classic's diamond. */
+.position-dropzone.cb-start-attention {
+  outline: 3px solid #ffc107;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+@media (max-width: 575.98px) {
+  body.cb-ui[data-cb-view="classic"] .cb-classic-gametitle {
+    order: 3;
+    flex-basis: 100%;
+    text-align: left;
+    white-space: normal;
+  }
+
+  body.cb-ui[data-cb-view="classic"] #classic-start-card .d-flex > .me-auto {
+    flex-basis: 100%;
+  }
+
+  body.cb-ui[data-cb-view="classic"] #startLiveGameBtnAction {
+    flex: 1 1 auto;
+  }
+}

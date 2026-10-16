@@ -183,7 +183,8 @@
 
   async function renderOutConflicts(readiness) {
     const token = ++renderToken;
-    const host = $('pregame-checklist-container');
+    // Updated's checklist, or Classic's Game Day strip.
+    const host = $('pregame-checklist-container') || $('classic-game-notices');
     let box = $(OUT_ID);
     if (!host || readiness?.is_live || !needsGameData(readiness)) {
       if (!busy) box?.remove();

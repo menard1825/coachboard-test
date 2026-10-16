@@ -14,6 +14,7 @@ from live_history import INNING_STARTED, _event_order_key
 from models import Game, Player, Rotation
 from pitching_eligibility import carry_planned_pitcher, fill_open_pitcher, project_planned_innings
 from team_game_settings import regulation_innings_for_team
+from ui_view import is_classic_page
 from blueprints.live_game_api import (
     _actual_rotation,
     _authorized_context,
@@ -956,6 +957,10 @@ def inject_live_game_assets(response):
         return response
 
     html = response.get_data(as_text=True)
+
+    # Classic Prepare Game is never live and shows the original screens.
+    if is_classic_page(html):
+        return response
 
     if 'coach-live-first-paint' not in html:
         first_paint = '''

@@ -5,7 +5,14 @@
 
 {% block bottom_nav %}{% endblock %} {# Disable the main bottom nav on this specific page #}
 
+{% block head %}{% if cb_view == 'classic' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/classic_view.css', v=asset_version) }}">
+{% endif %}{% endblock %}
+
 {% block content %}
+{% if cb_view == 'classic' %}
+{% include '_game_management_classic.html' %}
+{% else %}
 <div class="container-fluid mt-3">
     <!-- PRE-GAME CHECKLIST -->
     <div id="pregame-checklist-container" class="planner-controls">
@@ -185,6 +192,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 {# Edit Game Modal #}
 <div class="modal fade" id="editGameModal" tabindex="-1" aria-labelledby="editGameModalLabel" aria-hidden="true">
@@ -227,7 +235,7 @@
 </div>
 
 {% include '_lineup_editor.html' %}
-{% if previous_setup %}{% include '_previous_game_setup.html' %}{% endif %}
+{% if previous_setup and cb_view != 'classic' %}{% include '_previous_game_setup.html' %}{% endif %}
 
 <div class="modal fade" id="assignPlayerModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -268,6 +276,16 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/lineup_editor.js', v=asset_version) }}"></script>
 <script src="{{ url_for('static', filename='js/game_logic.js', v=asset_version) }}"></script>
+{% if cb_view == 'classic' %}
+{#- Classic loads the shared behavior only: the old editor (game_logic.js),
+    the readiness feed (game_prep_readiness.js; its Updated panel has no host
+    here), Start Game, the Out-player notices, and Classic's own strip.
+    docs/classic_view_scripts.md lists every game-page script and why. -#}
+<script src="{{ url_for('static', filename='js/game_prep_readiness.js', v=asset_version) }}"></script>
+<script src="{{ url_for('static', filename='js/start_game_flow.js', v=asset_version) }}"></script>
+<script src="{{ url_for('static', filename='js/prepare_game_notices.js', v=asset_version) }}"></script>
+<script src="{{ url_for('static', filename='js/classic_prepare_game.js', v=asset_version) }}"></script>
+{% else %}
 <script src="{{ url_for('static', filename='js/live_game_inning_clarity.js', v=asset_version) }}" data-live-inning-clarity="true"></script>
 <script src="{{ url_for('static', filename='js/live_game_v2.js', v=asset_version) }}"></script>
 <script src="{{ url_for('static', filename='js/live_game_coach_ui.js', v=asset_version) }}"></script>
@@ -280,6 +298,7 @@
 <script src="{{ url_for('static', filename='js/live_game_contract.js', v=asset_version) }}"></script>
 {% if previous_setup %}<script src="{{ url_for('static', filename='js/previous_game_setup.js', v=asset_version) }}"></script>{% endif %}
 <script src="{{ url_for('static', filename='js/prepare_game_notices.js', v=asset_version) }}"></script>
+{% endif %}
 <script>
     // Keep the game shell visible without observing/mutating the same attributes.
     const keepGameShellVisible = () => {

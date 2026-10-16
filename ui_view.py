@@ -18,6 +18,8 @@ never changes what another coach sees.
   ``all``                every coach.
 """
 
+import re
+
 from flask import Blueprint, current_app, g, jsonify, request, session
 from sqlalchemy import func
 
@@ -78,6 +80,18 @@ def page_view(choice):
         if game is not None and game.is_live:
             return UPDATED
     return choice
+
+
+_BODY_TAG = re.compile(r'<body\b[^>]*>')
+
+
+def is_classic_page(html):
+    """Was this page rendered in the Classic view? For the response hooks that
+    add the live-game helpers to every game page (blueprints/live_game_ui.py,
+    live_game_bulk_api.py): a Classic page is never live and shows the
+    original screens, so it gets none of them."""
+    body = _BODY_TAG.search(html)
+    return bool(body) and 'data-cb-view="classic"' in body.group(0)
 
 
 def template_context(stored):

@@ -1,0 +1,124 @@
+{#- Classic Prepare Game: the original CoachBoard game page (production
+    ee4e9dd templates/game_management.html) on today's data and saves.
+
+    Same ids as Updated wherever both have the control, so the shared
+    behavior (game_logic.js, lineup_editor.js, start_game_flow.js,
+    prepare_game_notices.js, game_pitching_rule_picker.js) works unchanged.
+    Today's safety additions are kept, in Classic styling: Start Live Game
+    with its checks, the save status, Out-player notices and the game's
+    pitching rules. -#}
+{% from "_coachboard_formatters.html" import game_time %}
+{% set absent_count = absent_player_ids | length %}
+{% set present_count = roster | length - absent_count %}
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom mb-3 cb-classic-gamebar" id="classicGameBar">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('home', _anchor='games') }}" id="classicBackToGames">
+            <i class="bi bi-arrow-left"></i> Back to All Games
+        </a>
+        <span class="navbar-text fw-bold text-truncate cb-classic-gametitle">
+            vs {{ game['opponent'] }} on {{ game.date | format_calendar_date }}{% if game.start_time %}, {{ game_time(game.start_time) }}{% endif %}
+        </span>
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editGameModal">
+            <i class="bi bi-pencil-square"></i> Edit Game
+        </button>
+    </div>
+</nav>
+
+<div class="container-fluid cb-classic-game" id="classicPrepareGame">
+    {# Start Live Game: today's Start checks, the save status and the
+       Out-player notices (prepare_game_notices.js) in one plain strip. #}
+    <div class="card mb-4 cb-classic-start" id="classic-start-card">
+        <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <div class="me-auto">
+                    <div class="fw-bold">Game Day</div>
+                    <div class="small text-muted" id="classic-start-summary" role="status">Checking first-pitch setup…</div>
+                </div>
+                <span class="badge rounded-pill text-bg-light border cb-classic-save" id="classic-save-status" role="status" aria-live="polite" data-state="idle">All changes saved</span>
+                <button type="button" class="btn btn-danger fw-bold" id="startLiveGameBtnAction">
+                    <i class="bi bi-play-circle-fill me-1"></i> Start Live Game
+                </button>
+            </div>
+            <div id="start-live-blockers" class="alert alert-warning mb-0 mt-3 d-none" role="status"></div>
+            <div id="classic-game-notices" class="mt-3"></div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100" id="classicAvailabilityCard">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-check2-circle me-2"></i>Player Availability</h5>
+                    <button type="button" class="btn btn-sm btn-primary" id="availabilityToggleBtn" data-bs-toggle="collapse" data-bs-target="#availabilityCollapse" aria-expanded="false" aria-controls="availabilityCollapse">
+                        Edit
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong id="availabilityPresentCount">{{ present_count }}</strong> players present, <strong id="classicAbsentCount">{{ absent_count }}</strong> absent.</p>
+                    {% if absent_count %}
+                    <p class="small text-muted mb-2" id="classicAbsentNames">Out: {% for player in roster if player['id'] in absent_player_ids %}{{ player['name'] }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+                    {% endif %}
+                    <div class="collapse" id="availabilityCollapse">
+                        <form id="gameAvailabilityForm" action="{{ url_for('gameday.update_absences', game_id=game['id']) }}" method="POST">
+                            <p class="small text-muted mb-2">Check the players who are out for this game.</p>
+                            <ul class="list-group mb-3">
+                                {% for player in roster %}
+                                <li class="list-group-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="absent_players" value="{{ player['id'] }}" id="absent_{{ player['id'] }}" {% if player['id'] in absent_player_ids %}checked{% endif %}>
+                                        <label class="form-check-label" for="absent_{{ player['id'] }}">{{ player['name'] }}</label>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            <button type="submit" class="btn btn-primary w-100" id="saveGameAvailabilityBtn">Save Availability</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100" id="classicLineupCard">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Batting Lineup</h5>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#lineupEditorModal">
+                        <i class="bi bi-pencil-square"></i> Edit Lineup
+                    </button>
+                </div>
+                <div class="card-body" id="lineup-card-body">
+                    {% if lineup and lineup.lineup_positions %}
+                        <ol class="list-group list-group-numbered">
+                            {% set out_names = roster | selectattr('id', 'in', absent_player_ids) | map(attribute='name') | list %}
+                            {% for player_name in lineup.lineup_positions %}
+                                <li class="list-group-item{% if player_name in out_names %} list-group-item-danger{% endif %}">{{ player_name }}{% if player_name in out_names %} <span class="badge text-bg-danger">Out</span>{% endif %}</li>
+                            {% endfor %}
+                        </ol>
+                    {% else %}
+                        <div class="text-center p-3 text-muted">
+                            <p class="mb-1">No lineup has been set.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-12 mb-4" id="rotation-card-container">
+            {% include '_rotation_editor.html' %}
+        </div>
+
+        <div class="col-lg-12 mb-4" id="pitching-log-container">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Pitching Log</h5>
+                </div>
+                <div class="card-body">
+                    {# The game's pitching rules (game_pitching_rule_picker.js
+                       fills this): Start Game's "Choose Rules" opens it. #}
+                    <div id="game-pitching-rules-v2"></div>
+                    {% include '_pitching_log.html' %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
