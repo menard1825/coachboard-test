@@ -9,6 +9,7 @@ from datetime import datetime
 
 from blueprints.live_game_write_lock import game_write_lock
 from game_day_helpers import duplicate_assignment_message
+from rotation_merge import merge, normalize
 from models import GameRotationEvent, PlayerPitchTarget
 from utils import get_pitching_rules_for_team, calculate_pitch_count_summary, model_to_dict
 from unrecorded_pitching import with_unrecorded
@@ -395,13 +396,41 @@ def save_rotation():
 
         if rotation_id:
             rotation_to_update = db.session.query(Rotation).filter_by(id=rotation_id, team_id=team_id).first()
+        elif 'base_innings' in rotation_data:
+            # A first save from a page that had no plan yet: another coach's
+            # first save may have created it since. Update that plan (under
+            # the checks below) rather than adding a second one for the game.
+            rotation_to_update = db.session.query(Rotation).filter_by(
+                associated_game_id=game_id, team_id=team_id).order_by(Rotation.id).first()
         stored = (rotation_to_update.innings if rotation_to_update else None) or {}
         if isinstance(stored, str):
             try:
                 stored = json.loads(stored)
             except ValueError:
                 stored = {}
-        duplicate = _duplicate_assignment(innings_data, stored if isinstance(stored, dict) else {})
+        if not isinstance(stored, dict):
+            stored = {}
+
+        # Another coach saved since this page's plan was loaded: merge
+        # position by position, or refuse (rotation_merge.py). Without
+        # base_innings (a direct API call) the plan is replaced as before.
+        if 'base_innings' in rotation_data:
+            base = normalize(rotation_data.get('base_innings'))
+            current = normalize(stored)
+            if base != current:
+                merged, conflicts = merge(base, normalize(innings_data), current)
+                if conflicts:
+                    return jsonify({
+                        'status': 'error',
+                        'code': 'rotation_conflict',
+                        'message': 'Another coach changed the same part of this defense. '
+                                   "Your changes weren't saved yet.",
+                        'conflicts': conflicts,
+                        'innings': current,
+                    }), 409
+                innings_data = merged
+
+        duplicate = _duplicate_assignment(innings_data, stored)
         if duplicate:
             return jsonify({'status': 'error', 'code': 'duplicate_player', 'message': duplicate}), 400
 
@@ -427,7 +456,10 @@ def _write_rotation(rotation_to_update, title, innings_data, associated_game_id,
     db.session.commit()
 
     socketio.emit('rotation_save', {'rotation': model_to_dict(saved_rotation)})
-    return jsonify({'status': 'success', 'message': message, 'new_id': saved_rotation.id})
+    # The plan as now stored (with another coach's merged changes, if any),
+    # so the page's next save starts from it.
+    return jsonify({'status': 'success', 'message': message, 'new_id': saved_rotation.id,
+                    'innings': normalize(saved_rotation.innings)})
 
 @gameday_bp.route('/delete_rotation/<int:rotation_id>')
 def delete_rotation(rotation_id):

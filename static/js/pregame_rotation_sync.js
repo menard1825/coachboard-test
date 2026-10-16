@@ -50,13 +50,113 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
   let lastError = null;
   let statusResetTimer = null;
 
+  // Two coaches, one plan. serverBase is the plan as stored on the server
+  // that this page's rotation was built from; every save sends it as
+  // base_innings, so the server can tell when another coach saved in
+  // between. It then merges position by position, or refuses with
+  // code 'rotation_conflict' (rotation_merge.py) -- never overwrites.
+  // A refused save keeps this coach's changes on screen (unsynced) until
+  // they choose: resolveConflict('theirs' | 'mine').
+  let serverBase = null;
+  let conflict = null;
+
   const changeListeners = [];
   const statusListeners = [];
+  const conflictListeners = [];
 
-  function notifyChange() {
+  // info.source === 'server' when another coach's saved changes were just
+  // brought into this page's plan (after a save that merged them).
+  function notifyChange(info) {
     changeListeners.forEach((fn) => {
-      try { fn(); } catch (error) { console.error(error); }
+      try { fn(info || {}); } catch (error) { console.error(error); }
     });
+  }
+
+  function notifyConflict() {
+    conflictListeners.forEach((fn) => {
+      try { fn(conflict); } catch (error) { console.error(error); }
+    });
+  }
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value || {}));
+  }
+
+  // The server's form of a plan (rotation_merge.normalize): open positions
+  // left out, an inning with none kept.
+  function normalize(innings) {
+    const clean = {};
+    Object.entries(innings || {}).forEach(([inning, alignment]) => {
+      const positions = {};
+      Object.entries(alignment && typeof alignment === 'object' ? alignment : {}).forEach(([pos, name]) => {
+        const player = String(name ?? '').trim();
+        if (player) positions[String(pos)] = player;
+      });
+      clean[String(inning)] = positions;
+    });
+    return clean;
+  }
+
+  function sameDeep(a, b) {
+    const ka = Object.keys(a).sort();
+    const kb = Object.keys(b).sort();
+    if (ka.join('\u0000') !== kb.join('\u0000')) return false;
+    return ka.every((key) => {
+      const pa = a[key] || {};
+      const pb = b[key] || {};
+      const pka = Object.keys(pa).sort();
+      return pka.join('\u0000') === Object.keys(pb).sort().join('\u0000') && pka.every((pos) => pa[pos] === pb[pos]);
+    });
+  }
+
+  // Bring the other coach's saved changes into this page's plan, by the
+  // server's rule (rotation_merge.py): a position only this coach changed
+  // since `base` keeps this coach's player, a position only the other coach
+  // changed takes theirs. Where both changed a position differently it is a
+  // conflict: `prefer` ('mine' | 'theirs') decides it, or, without one, it
+  // is reported and the other coach's player is used.
+  // Returns {innings, conflicts}.
+  function rebase(base, mine, theirs, prefer) {
+    const b = normalize(base);
+    const m = normalize(mine);
+    const t = normalize(theirs);
+    const innings = {};
+    const conflicts = [];
+    const pick = (mv, tv, inning, position) => {
+      if (prefer === 'mine') return mv;
+      if (prefer === 'theirs') return tv;
+      conflicts.push({inning, position, yours: mv ?? null, theirs: tv ?? null});
+      return tv;
+    };
+    new Set([...Object.keys(b), ...Object.keys(m), ...Object.keys(t)]).forEach((inning) => {
+      const inBase = inning in b;
+      const inMine = inning in m;
+      const inTheirs = inning in t;
+      const bi = b[inning] || {};
+      const mi = m[inning] || {};
+      const ti = t[inning] || {};
+      const alignment = {};
+      new Set([...Object.keys(bi), ...Object.keys(mi), ...Object.keys(ti)]).forEach((pos) => {
+        const bv = bi[pos];
+        const mv = mi[pos];
+        const tv = ti[pos];
+        let value;
+        if (mv === bv) value = tv;
+        else if (tv === bv || mv === tv) value = mv;
+        else value = pick(mv, tv, inning, pos);
+        if (value) alignment[pos] = value;
+      });
+      // An inning added or removed is a change of its own. Removing an
+      // inning the other coach changed is a conflict.
+      const mineChanged = inMine !== inBase || !sameDeep({x: mi}, {x: bi});
+      const theirsChanged = inTheirs !== inBase || !sameDeep({x: ti}, {x: bi});
+      let present = inMine !== inBase ? inMine : inTheirs;
+      if (inMine !== inTheirs && mineChanged && theirsChanged) {
+        present = Boolean(pick(inMine ? 'kept' : null, inTheirs ? 'kept' : null, inning, null));
+      }
+      if (present) innings[inning] = alignment;
+    });
+    return {innings, conflicts};
   }
 
   function notifyStatus(isManual) {
@@ -112,6 +212,7 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
     }
     rotation = serverRotation ? {...serverRotation} : null;
     ensure(defaultTitle);
+    serverBase = normalize(serverRotation ? shapeInnings(clone(serverRotation.innings)) : {});
     if (refreshToken !== undefined && refreshToken > lastAppliedRefreshToken) {
       lastAppliedRefreshToken = refreshToken;
     }
@@ -149,6 +250,8 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
       // Snapshot now so a later edit can't mutate an in-flight request.
       innings: JSON.parse(JSON.stringify(current.innings)),
       associated_game_id: gameId,
+      // The stored plan this one was built from (see serverBase).
+      base_innings: clone(serverBase || {}),
     };
   }
 
@@ -163,6 +266,7 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
     pendingIsManual = false;
     rotationSaveInProgress = true;
     let succeeded = false;
+    let mergedFromServer = false;
 
     setStatus('saving', payloadIsManual);
 
@@ -183,6 +287,21 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
         throw new Error(`Save returned an invalid response (${response.status}).`);
       }
 
+      if (response.status === 409 && result.code === 'rotation_conflict') {
+        // Another coach changed the same positions. Nothing was saved; this
+        // coach's changes stay on screen until they choose.
+        conflict = {
+          base: clone(payload.base_innings),
+          theirs: normalize(result.innings),
+          conflicts: Array.isArray(result.conflicts) ? result.conflicts : [],
+          message: result.message,
+        };
+        const error = new Error(result.message || 'Another coach changed the same part of this defense.');
+        error.code = 'rotation_conflict';
+        error.conflicts = conflict.conflicts;
+        throw error;
+      }
+
       // A malformed/empty HTTP 200 must fail closed, not be treated as a
       // silent success — only an explicit 'success' status counts.
       if (!response.ok || result.status !== 'success') {
@@ -197,6 +316,38 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
         if (pendingPayload) pendingPayload.id = result.new_id;
       }
 
+      if (result.innings && typeof result.innings === 'object') {
+        // The plan as stored, which may include another coach's merged
+        // changes: bring them in, keeping every edit made since this save
+        // was sent, and start the next save from it.
+        const stored = normalize(result.innings);
+        if (!sameDeep(stored, normalize(payload.innings))) {
+          const sent = normalize(payload.innings);
+          const rebased = rebase(sent, rotation.innings, stored, null);
+          if (rebased.conflicts.length) {
+            // An edit made while this save was on its way touched a
+            // position the other coach changed: ask, don't overwrite.
+            conflict = {
+              base: sent,
+              theirs: stored,
+              conflicts: rebased.conflicts,
+              message: 'Another coach changed the same part of this defense. Your latest change wasn\u2019t saved yet.',
+            };
+          } else {
+            rotation.innings = shapeInnings(rebased.innings);
+            if (pendingPayload) {
+              pendingPayload.innings = JSON.parse(JSON.stringify(rotation.innings));
+            }
+            mergedFromServer = true;
+          }
+        }
+        serverBase = stored;
+        if (pendingPayload) pendingPayload.base_innings = clone(stored);
+      } else {
+        serverBase = normalize(payload.innings);
+        if (pendingPayload) pendingPayload.base_innings = clone(serverBase);
+      }
+
       succeeded = true;
       lastError = null;
     } catch (error) {
@@ -207,8 +358,21 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
       if (succeeded && payloadRevision > lastSyncedRevision) {
         lastSyncedRevision = payloadRevision;
       }
+      if (mergedFromServer) notifyChange({source: 'server'});
 
-      if (pendingPayload) {
+      if (conflict) {
+        // Hold the queue until the coach chooses; their edits stay local.
+        if (!lastError) {
+          lastError = new Error(conflict.message);
+          lastError.code = 'rotation_conflict';
+          lastError.conflicts = conflict.conflicts;
+        }
+        pendingPayload = null;
+        pendingRevision = null;
+        pendingIsManual = false;
+        setStatus('failed', payloadIsManual);
+        notifyConflict();
+      } else if (pendingPayload) {
         // Another defensive/structural change happened during the
         // request (from either module); save the newest combined
         // snapshot next.
@@ -224,6 +388,12 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
   function commitLocalChange(defaultTitle, isManual) {
     localRevision += 1;
     notifyChange();
+    if (conflict) {
+      // Still waiting for the coach's choice: keep the edit, don't send it.
+      notifyStatus(isManual);
+      notifyConflict();
+      return;
+    }
     pendingPayload = buildPayload(defaultTitle);
     pendingRevision = localRevision;
     pendingIsManual = pendingIsManual || Boolean(isManual);
@@ -232,8 +402,34 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
   }
 
   function retry(defaultTitle, isManual) {
+    if (conflict) {
+      // A retry would meet the same conflict: ask the coach instead.
+      notifyConflict();
+      return;
+    }
     if (rotationSaveInProgress || pendingPayload) return;
     commitLocalChange(defaultTitle, isManual);
+  }
+
+  // The coach's answer to a conflict: 'theirs' takes the other coach's
+  // player where both changed a position, 'mine' keeps this coach's. Every
+  // other change from either coach is kept, and the result is saved.
+  function resolveConflict(choice, defaultTitle) {
+    if (!conflict || (choice !== 'theirs' && choice !== 'mine')) return;
+    const current = ensure(defaultTitle);
+    const {base, theirs} = conflict;
+    current.innings = shapeInnings(rebase(base, current.innings, theirs, choice).innings);
+    serverBase = clone(theirs);
+    conflict = null;
+    lastError = null;
+    notifyChange({source: 'server'});
+    if (sameDeep(normalize(current.innings), theirs)) {
+      // Nothing of this coach's left to save.
+      lastSyncedRevision = localRevision;
+      setStatus('saved', true);
+      return;
+    }
+    commitLocalChange(defaultTitle, true);
   }
 
   // refreshToken is optional for callers that only care about local-edit
@@ -281,7 +477,10 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
     getLocalRevision: () => localRevision,
     getStatus: () => saveStatus,
     getLastError: () => lastError,
+    getConflict: () => conflict,
+    resolveConflict,
     onChange: (fn) => changeListeners.push(fn),
     onStatusChange: (fn) => statusListeners.push(fn),
+    onConflict: (fn) => conflictListeners.push(fn),
   };
 })();

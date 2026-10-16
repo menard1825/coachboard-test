@@ -630,8 +630,10 @@ function applyOutOfPositionIndicators() {
     // (live_game_board_prep.js) could leave those handlers mutating an
     // abandoned, detached snapshot that the shared save queue never reads
     // again — silently losing the structural change.
-    window.CBPregameRotation.onChange(() => {
+    window.CBPregameRotation.onChange((info) => {
         state.rotation = window.CBPregameRotation.getRotation(defaultRotationTitle());
+        // Another coach's saved changes were just brought into the plan.
+        if (info?.source === 'server' && !state.liveMode) renderRotationEditor();
     });
 
     function triggerAutosave() {
