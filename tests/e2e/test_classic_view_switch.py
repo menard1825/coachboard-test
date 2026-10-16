@@ -341,3 +341,37 @@ def test_work_started_while_the_choice_saves_keeps_page_and_choice_together(devi
         assert coach.cb_errors == []
     finally:
         _delete(coach, classic_view_url, game_id)
+
+
+IPAD_PRO_PORTRAIT = ('ipad-pro-portrait', {'width': 1032, 'height': 1376}, {'is_mobile': True, 'has_touch': True})
+IPAD_PRO_LANDSCAPE = ('ipad-pro-landscape', {'width': 1376, 'height': 1032}, {'is_mobile': True, 'has_touch': True})
+
+
+@pytest.mark.parametrize('spec', [IPAD_PRO_PORTRAIT, IPAD_PRO_LANDSCAPE, PHONE], ids=lambda s: s[0])
+def test_classic_on_keeps_the_home_layout_and_header_fitting(device, classic_view_url, reset_views, spec):
+    """With Classic chosen, Home still fits the iPad Pro (portrait and
+    landscape) and a phone: the notice and the Screens menu add no width."""
+    coach = device(spec)
+    coach.request.post(f'{classic_view_url}/api/account/view', data={'view': 'classic'})
+    coach.goto(f'{classic_view_url}/')
+    coach.locator('.cb-home-dashboard .cb-home-quick').first.wait_for(timeout=20_000)
+    expect(coach.locator('[data-cb-view-notice]')).to_be_visible()
+    assert _view(coach) == ('classic', 'classic')
+    # Against the device width, not innerWidth: mobile emulation widens the
+    # layout viewport to fit overflow (see test_home_tablet_layout.MEASURE).
+    fits = coach.evaluate("""(vw) => {
+      const out = [...document.querySelectorAll('.cb-home-card, .cb-home-quick, [data-cb-view-notice], #userMenuDesktop, a[href="#userOffcanvas"]')]
+        .filter(e => e.getClientRects().length)
+        .filter(e => { const r = e.getBoundingClientRect(); return r.left < -0.5 || r.right > vw + 0.5; })
+        .map(e => e.className || e.id);
+      return {scroll: document.documentElement.scrollWidth, vw, out};
+    }""", spec[1]['width'])
+    assert fits['scroll'] <= fits['vw'] and fits['out'] == [], fits
+    # The menu still offers both views, and the choice is marked.
+    if spec[1]['width'] >= 992:
+        coach.locator('#userMenuDesktop').click()
+        expect(coach.locator('.dropdown-menu [data-cb-view-set="classic"]')).to_have_attribute('aria-pressed', 'true')
+    else:
+        coach.locator('a[href="#userOffcanvas"]').click()
+        expect(coach.locator('#userOffcanvas [data-cb-view-set="classic"]')).to_have_attribute('aria-pressed', 'true')
+    assert coach.cb_errors == []

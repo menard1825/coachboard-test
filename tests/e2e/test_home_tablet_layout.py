@@ -31,9 +31,12 @@ SIZES = [
     (1280, 800), (1440, 900),
 ]
 
-MEASURE = r"""async () => {
+# `vw` is the device width the context was opened with. Not window.innerWidth:
+# with mobile emulation (phones, iPads) Chrome widens the layout viewport to
+# fit overflowing content, so innerWidth grows with the very overflow being
+# looked for.
+MEASURE = r"""async (vw) => {
   await document.fonts.ready;
-  const vw = window.innerWidth;
   const shown = el => el && el.getClientRects().length > 0;
   const box = el => { const r = el.getBoundingClientRect(); return {left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width}; };
   const outside = el => { const r = el.getBoundingClientRect(); return r.left < -0.5 || r.right > vw + 0.5; };
@@ -116,7 +119,7 @@ def _assert_fits(m):
 @pytest.mark.parametrize('size', SIZES, ids=lambda s: f'{s[0]}x{s[1]}')
 def test_home_fits_the_screen(home, size):
     page = home(size)
-    m = page.evaluate(MEASURE)
+    m = page.evaluate(MEASURE, page.viewport_size['width'])
     _assert_fits(m)
 
     width = size[0]
@@ -138,7 +141,7 @@ def test_home_fits_the_screen(home, size):
 def test_a_long_team_name_and_label_give_way_not_the_page(home, size):
     page = home(size)
     page.evaluate(LONG_NAMES)
-    m = page.evaluate(MEASURE)
+    m = page.evaluate(MEASURE, page.viewport_size['width'])
     _assert_fits(m)
     brand = page.evaluate("""() => {
       const text = document.querySelector('.navbar-brand-text');
