@@ -227,7 +227,7 @@ def test_sits_come_from_the_recorded_defense_and_who_was_here(live, coachboard_u
     _advance(page, coachboard_url)                           # the 2nd: RF still open
     _open_game(page, coachboard_url)
     report = _open_report(page)
-    expect(_row(report, RF).locator('.cb-br-history')).to_have_text('Sat: 1 · Sitting now (inning 2)')
+    expect(_row(report, RF).locator('.cb-br-history')).to_have_text('Sat: 1st inning · On bench now (2nd inning)')
     expect(_row(report, LF).locator('.cb-br-history')).to_have_text('Sat: None')
     expect(report.locator('[data-cb-br-unknown]')).to_have_count(0)
     assert page.cb_errors == []
@@ -249,5 +249,5 @@ def test_an_inning_with_no_record_is_unknown_not_read_from_the_plan(live, coachb
     _open_game(page, coachboard_url)
     report = _open_report(page)
     expect(report.locator('[data-cb-br-unknown]')).to_contain_text('No defense recorded: 1st')
-    expect(_row(report, RF).locator('.cb-br-history')).to_have_text('Sat: None · Sitting now (inning 2)')
+    expect(_row(report, RF).locator('.cb-br-history')).to_have_text('Sat: None · On bench now (2nd inning)')
     assert page.cb_errors == []

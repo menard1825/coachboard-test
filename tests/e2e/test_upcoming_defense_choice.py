@@ -279,8 +279,8 @@ def test_bench_report_follows_the_defense_that_will_start(page: Page, coachboard
     modal = _bench_report(page)
     expect(modal.locator('[data-cb-br-basis]')).to_have_text(
         'Planned innings use the 2nd-inning defense as set now, then the pregame plan.')
-    expect(_row(modal, BENCH)).to_contain_text('Planned to sit: 2')
-    expect(_row(modal, 'Left Lee')).not_to_contain_text('Planned to sit')
+    expect(_row(modal, BENCH)).to_contain_text('Scheduled to sit: 2nd inning')
+    expect(_row(modal, 'Left Lee')).not_to_contain_text('Scheduled to sit')
     # The 3rd has CF open and the 4th-6th have no plan: named, not counted.
     expect(modal.locator('[data-cb-br-unprojected]')).to_have_text(
         "Not in the plan yet: 3rd (CF open), 4th (no defense planned), 5th (no defense planned), "
@@ -294,8 +294,8 @@ def test_bench_report_follows_the_defense_that_will_start(page: Page, coachboard
     _expect_board(page, D2, 'Pregame plan for the 2nd')
     page.wait_for_timeout(800)
     modal = _bench_report(page)
-    expect(_row(modal, 'Left Lee')).to_contain_text('Planned to sit: 2', timeout=10_000)
-    expect(_row(modal, BENCH)).not_to_contain_text('Planned to sit')
+    expect(_row(modal, 'Left Lee')).to_contain_text('Scheduled to sit: 2nd inning', timeout=10_000)
+    expect(_row(modal, BENCH)).not_to_contain_text('Scheduled to sit')
 
 
 # 8. A different pitcher in the plan meets End Inning's pitching check ----------------------

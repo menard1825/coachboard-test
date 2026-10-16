@@ -270,13 +270,39 @@
       upcomingKnown: Boolean(prep?.confirmed?.alignment)};
   }
 
-  // Completed, now and planned, side by side: information for the coach,
-  // not a score.
-  function countLabel(row) {
-    const parts = [`${row.sat.length} sat`];
-    if (row.currentBench) parts.push('sitting now');
-    if (row.plannedSat.length) parts.push(`${row.plannedSat.length} planned`);
-    return parts.join(' · ');
+  // Innings named by ordinal, never as a bare number that could be read as
+  // a count: "3rd inning", "3rd and 5th innings", "2nd, 4th and 6th innings".
+  function inningsText(labels) {
+    const names = (labels || []).map(ordinal);
+    if (!names.length) return '';
+    const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    return `${list} ${names.length === 1 ? 'inning' : 'innings'}`;
+  }
+
+  // One player's bench time in words: completed innings, the inning being
+  // played, and innings the plan has them sitting -- kept apart, counts as
+  // counts and innings as ordinals. Information for the coach, not a score.
+  //   count: "1 inning sat · On bench now · Sitting next inning"
+  //   sat:   "Sat: 1st inning · On bench now (2nd inning)"
+  //   plan:  "Scheduled to sit: 3rd and 5th innings" ('' when none)
+  function describeRow(row, report) {
+    const upcoming = (report?.futurePlanned || []).find(item => item.upcoming);
+    const nextLabel = upcoming ? inningLabel(upcoming.inning) : null;
+    const planned = row.plannedSat || [];
+    // "Next inning" only when that inning's defense is set and benches them.
+    const sitsNext = nextLabel !== null && planned.includes(nextLabel);
+    const later = planned.filter(label => label !== nextLabel || !sitsNext).length;
+    const done = (row.sat || []).length;
+    const count = [done ? `${done} ${done === 1 ? 'inning' : 'innings'} sat` : 'No innings sat'];
+    if (row.currentBench) count.push('On bench now');
+    if (sitsNext) count.push('Sitting next inning');
+    if (later) count.push(`${later} later ${later === 1 ? 'inning' : 'innings'} scheduled`);
+    const now = row.currentBench ? ` · On bench now (${ordinal(report?.currentLabel)} inning)` : '';
+    return {
+      count: count.join(' · '),
+      sat: `Sat: ${done ? inningsText(row.sat) : 'None'}${now}`,
+      plan: planned.length ? `Scheduled to sit: ${inningsText(planned)}` : '',
+    };
   }
 
   function renderReport(state, prep = null) {
@@ -286,16 +312,17 @@
     const report = buildReport(state, prep);
     const onBench = report.history.filter(row => row.currentBench).length;
     const rows = report.history.length ? report.history.map(row => {
-      const completedText = row.sat.length ? row.sat.join(', ') : 'None';
-      const current = row.currentBench ? `<span class="cb-br-now"> · Sitting now (inning ${esc(report.currentLabel)})</span>` : '';
-      const planned = row.plannedSat.length
-        ? `<div class="cb-br-plan"><strong>Planned to sit:</strong> ${esc(row.plannedSat.join(', '))}</div>`
+      const words = describeRow(row, report);
+      const [satText, nowText] = words.sat.replace(/^Sat: /, '').split(' · ');
+      const current = nowText ? `<span class="cb-br-now"> · ${esc(nowText)}</span>` : '';
+      const planned = words.plan
+        ? `<div class="cb-br-plan"><strong>Scheduled to sit:</strong> ${esc(words.plan.replace(/^Scheduled to sit: /, ''))}</div>`
         : '';
-      return `<div class="cb-br-row ${row.currentBench ? 'current' : ''}" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-count">${esc(countLabel(row))}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(completedText)}${current}</div>${planned}</div>`;
+      return `<div class="cb-br-row ${row.currentBench ? 'current' : ''}" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-count">${esc(words.count)}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(satText)}${current}</div>${planned}</div>`;
     }).join('') : '<div class="cb-br-empty">No bench history yet.</div>';
     const away = report.away.length
       ? `<div class="cb-br-away" data-cb-br-not-here><div class="cb-br-away-title">Not here</div>${report.away.map(row => `
-          <div class="cb-br-row away" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(row.sat.length ? row.sat.join(', ') : 'None')}</div></div>`).join('')}<div class="cb-br-away-hint">Change who is here in Menu → Player availability.</div></div>`
+          <div class="cb-br-row away" data-cb-br-player="${esc(row.name)}"><div class="cb-br-player">${esc(row.display)}</div><div class="cb-br-history"><strong>Sat:</strong> ${esc(row.sat.length ? inningsText(row.sat) : 'None')}</div></div>`).join('')}<div class="cb-br-away-hint">Change who is here in Menu → Player availability.</div></div>`
       : '';
     const unknown = report.unknown.length
       ? `<div class="cb-br-unprojected" data-cb-br-unknown><strong>No defense recorded:</strong> ${esc(report.unknown.map(ordinal).join(', '))}. Bench innings there aren't counted.</div>`
@@ -537,7 +564,7 @@
   // The one bench calculation: the Next Inning planner's Bench time panel
   // calls it with the defense as planned on its board, so the two can never
   // disagree.
-  window.CBBenchReport = Object.freeze({build: buildReport, open: openReport});
+  window.CBBenchReport = Object.freeze({build: buildReport, open: openReport, describe: describeRow});
 
   function ensureButton() {
     const benchWrap = document.querySelector('#cbQuickDefense .cb-qd-bench-wrap');

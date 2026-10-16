@@ -87,13 +87,12 @@ def _cells(quick, name):
 
 
 def _report_counts(report, name):
-    """Sat / projected counts as the full Bench Report shows them."""
+    """Completed / now / scheduled, as the full Bench Report names the innings."""
     text = report.locator(f'[data-cb-br-player="{name}"]').inner_text()
+    ordinals = lambda line: len(re.findall(r'\b\d+(?:st|nd|rd|th)\b', line))
     sat = re.search(r'Sat:\s*([^\n·]*)', text).group(1).strip()
-    sat_count = 0 if sat == 'None' else len([x for x in sat.split(',') if x.strip()])
-    proj = re.search(r'Planned to sit:\s*([^\n]*)', text)
-    proj_count = len([x for x in proj.group(1).split(',') if x.strip()]) if proj else 0
-    return sat_count, 'Sitting now' in text, proj_count
+    proj = re.search(r'Scheduled to sit:\s*([^\n]*)', text)
+    return (0 if sat == 'None' else ordinals(sat)), 'On bench now' in text, (ordinals(proj.group(1)) if proj else 0)
 
 
 def test_bench_time_agrees_with_the_bench_report_and_moves_with_each_tap(live, coachboard_url):

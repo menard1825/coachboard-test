@@ -8,6 +8,7 @@ the players sitting in it show as sitting now, with nothing projected past it.
 """
 
 import os
+import re
 
 import pytest
 
@@ -48,12 +49,12 @@ def test_no_projection_past_the_scheduled_innings(live, coachboard_url):
     extra = scheduled + 1
 
     report = _open_report(page, coachboard_url)
-    expect(report.locator('.cb-br-plan')).to_have_count(0)                  # no "Planned to sit"
+    expect(report.locator('.cb-br-plan')).to_have_count(0)                  # no "Scheduled to sit"
     expect(report.get_by_text('Planned innings ahead')).to_have_count(0)
     expect(report.locator('[data-cb-br-unprojected]')).to_have_count(0)
     expect(report.locator('[data-cb-br-basis]')).to_have_text(
         f'The {scheduled}th is the last scheduled inning: no innings left in the plan.')
-    expect(report.locator('.cb-br-count').first).not_to_contain_text('planned')
+    expect(report.locator('.cb-br-count').first).not_to_contain_text(re.compile('next inning|scheduled'))
     report.locator('[data-bs-dismiss="modal"]').first.click()
 
     # Extra innings still happen, and count once played.
