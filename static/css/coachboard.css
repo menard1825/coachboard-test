@@ -332,6 +332,16 @@ body.cb-ui .coach-primary-nav .dropdown-item:focus {
   }
 }
 
+/* Up to 1199px the account menu is the fixed 48px icon button above, so its
+   menu must not shrink below it (it would spill past the header's edge); the
+   team name gives way instead. */
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  body.cb-ui .navbar-nav:has(#userMenuDesktop),
+  body.cb-ui .navbar-nav .nav-item:has(#userMenuDesktop) {
+    flex: 0 0 auto;
+  }
+}
+
 /* Shared cards */
 body.cb-ui main .card,
 body.cb-ui main .accordion-item,

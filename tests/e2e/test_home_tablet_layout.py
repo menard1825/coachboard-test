@@ -52,6 +52,8 @@ MEASURE = r"""async (vw) => {
     navOutside: nav.filter(outside).map(l => l.textContent.trim()),
     navClipped: nav.filter(l => l.scrollWidth > l.clientWidth + 1).map(l => l.textContent.trim()),
     account: account ? box(account) : null,
+    // The account menu stays whole inside its own menu, not spilling past it.
+    accountSpills: !!account && account.getBoundingClientRect().right > account.closest('.navbar-nav').getBoundingClientRect().right + 0.5,
     nextGame: box(document.querySelector('.cb-home-grid-top > :first-child')),
     alerts: box(document.querySelector('.cb-home-grid-top > :nth-child(2)')),
     columns: {top: grid('.cb-home-grid-top'), three: grid('.cb-home-grid-three'), quick: grid('.cb-home-quick-grid')},
@@ -114,6 +116,7 @@ def _assert_fits(m):
     assert m['cards'] >= 9 and m['cardsOutside'] == [], m
     assert m['navOutside'] == [] and m['navClipped'] == [], m
     assert m['account'] and m['account']['left'] >= 0 and m['account']['right'] <= m['vw'] + 0.5, m
+    assert not m['accountSpills'], m
 
 
 @pytest.mark.parametrize('size', SIZES, ids=lambda s: f'{s[0]}x{s[1]}')
