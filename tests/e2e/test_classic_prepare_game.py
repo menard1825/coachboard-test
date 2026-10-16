@@ -542,6 +542,12 @@ def test_start_asks_the_same_questions_as_updated(device, classic_view_url):
         # An open position is the coach's call: Start asks, and Fix shows the 1st inning.
         _inning(coach, 3)
         expect(coach.locator(START)).to_be_enabled(timeout=15_000)
+        # The strip says so once, the way Updated does: a heading, then the detail.
+        ask = coach.locator('#start-live-blockers li')
+        expect(ask).to_have_count(1, timeout=15_000)
+        expect(ask.locator('strong')).to_contain_text('CF')
+        heading = ask.locator('strong').inner_text()
+        assert ask.inner_text().count(heading) == 1, ask.inner_text()
         coach.locator(START).click()
         sheet = coach.locator(SHEET)
         expect(sheet).to_be_visible(timeout=10_000)

@@ -101,10 +101,10 @@
     // usable and asks about it (the same as Updated).
     const asks = [];
     if (ready && response.open_question) {
-      asks.push(`${response.open_question.title} ${response.open_question.message || ''}`.trim());
+      asks.push([response.open_question.title, response.open_question.message]);
     }
     if (ready && response.pitching_rules_selected === false) {
-      asks.push("Pitching rules aren't selected for this game, so CoachBoard can't confirm the starting pitcher's eligibility.");
+      asks.push(["Pitching rules aren't selected", "CoachBoard can't confirm the starting pitcher's eligibility without the game rules."]);
     }
 
     if (!ready) {
@@ -115,7 +115,8 @@
     } else if (asks.length) {
       summary.textContent = 'Ready. Start Live Game will ask you first:';
       box.className = 'alert alert-warning mb-0 mt-3';
-      box.innerHTML = `<ul class="mb-0 ps-3">${asks.map((text) => `<li>${esc(text)}</li>`).join('')}</ul>`;
+      box.innerHTML = `<ul class="mb-0 ps-3">${asks.map(([title, text]) => `<li><strong>${esc(title)}</strong>${
+        text ? `<div class="small">${esc(text)}</div>` : ''}</li>`).join('')}</ul>`;
     } else {
       summary.textContent = 'Ready for first pitch. The batting order and later innings can be finished later.';
       box.className = 'alert mb-0 mt-3 d-none';
