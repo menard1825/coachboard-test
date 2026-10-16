@@ -22,6 +22,9 @@ function initializeGameManagement(gameData) {
     // All data for this page is stored in a local 'state' object.
     const state = {
         roster: (gameData.roster || []).filter(p => !(gameData.absent_player_ids || []).includes(p.id)),
+        // Everyone on the team, Out players included: a planned player who is
+        // now Out stays visible (and in the plan) until the coach moves them.
+        fullRoster: gameData.roster || [],
         lineup: gameData.lineup || { id: null, title: `Lineup for vs ${gameData.game.opponent}`, lineup_positions: [], associated_game_id: gameData.game.id },
         rotation: window.CBPregameRotation.getRotation(defaultRotationTitle()),
         game: gameData.game,
@@ -77,8 +80,8 @@ function initializeGameManagement(gameData) {
             innings.push('1');
         }
         container.innerHTML = innings.map(inn => `
-            <input type="radio" class="btn-check" name="inning-radio" id="inning-${inn}" value="${inn}" ${state.currentInning == inn ? 'checked' : ''}>
-            <label class="btn btn-outline-primary" for="inning-${inn}">${inn}</label>
+            <input type="radio" class="btn-check" name="inning-radio" id="inning-${escapeHTML(inn)}" value="${escapeHTML(inn)}" ${state.currentInning == inn ? 'checked' : ''}>
+            <label class="btn btn-outline-primary" for="inning-${escapeHTML(inn)}">${escapeHTML(inn)}</label>
         `).join('');
         container.querySelectorAll('input[name="inning-radio"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
@@ -90,6 +93,32 @@ function initializeGameManagement(gameData) {
 
     function getActiveInnings() {
         return state.liveMode ? state.actual_rotation : (state.rotation.innings || {});
+    }
+
+    // A planned player who can't play this game: marked Out (or no longer on
+    // the roster), never hidden.
+    function unavailableReason(name) {
+        return state.fullRoster.some(p => p.name === name) ? 'Out' : 'Not on roster';
+    }
+
+    function unavailableTag(name) {
+        return `<div class="player-tag is-unavailable" data-player-name="${escapeHTML(name)}">${escapeHTML(name)} <span class="player-tag-out">(${unavailableReason(name)})</span></div>`;
+    }
+
+    // Classic lists them in its tables too, so the coach sees where they
+    // still are. (Updated has its own Out-player notices for this.)
+    const classicView = document.body?.dataset.cbView === 'classic';
+
+    function plannedUnavailablePlayers(innings) {
+        if (!classicView) return [];
+        const available = new Set(state.roster.map(p => p.name));
+        const names = new Set();
+        Object.values(innings || {}).forEach(inning => {
+            Object.values(inning || {}).forEach(name => {
+                if (name && !available.has(name)) names.add(name);
+            });
+        });
+        return [...names].sort().map(name => ({name, unavailable: unavailableReason(name)}));
     }
 
     function renderRotationDiamondAndBench() {
@@ -111,15 +140,17 @@ function initializeGameManagement(gameData) {
 
         // Modify the rendering of player tags on the diamond to pass the full player object
         document.querySelectorAll('.position-dropzone .player-tag').forEach(tag => tag.remove());
+        // A planned player who is now Out is drawn too, marked, so the plan on
+        // screen is the plan that is saved -- and a drag (which rebuilds the
+        // inning from the drawn tags) never drops them silently.
         for (const [pos, playerName] of Object.entries(currentInningData)) {
+            if (!playerName) continue;
             const player = state.roster.find(p => p.name === playerName);
-            if (player) {
-                const dropzoneDesktop = document.getElementById(`pos-desktop-${pos}`);
-                const dropzoneMobile = document.getElementById(`pos-mobile-${pos}`);
-                // Pass true for isOnField
-                if (dropzoneDesktop) dropzoneDesktop.insertAdjacentHTML('beforeend', createPlayerTag(player, true));
-                if (dropzoneMobile) dropzoneMobile.insertAdjacentHTML('beforeend', createPlayerTag(player, true));
-            }
+            const tag = player ? createPlayerTag(player, true) : unavailableTag(playerName);
+            const dropzoneDesktop = document.getElementById(`pos-desktop-${pos}`);
+            const dropzoneMobile = document.getElementById(`pos-mobile-${pos}`);
+            if (dropzoneDesktop) dropzoneDesktop.insertAdjacentHTML('beforeend', tag);
+            if (dropzoneMobile) dropzoneMobile.insertAdjacentHTML('beforeend', tag);
         }
 
         // Update the bench rendering logic
@@ -167,16 +198,18 @@ function initializeGameManagement(gameData) {
         html += '<thead class="table-light"><tr><th style="width: 150px; text-align: left;">Player</th>';
         innings.forEach(inn => {
             const isCurrent = inn === state.currentInning;
-            html += `<th class="${isCurrent ? 'table-primary border-primary' : ''}">Inning ${inn}</th>`;
+            html += `<th class="${isCurrent ? 'table-primary border-primary' : ''}">Inning ${escapeHTML(inn)}</th>`;
         });
         html += '</tr></thead><tbody>';
 
         // Player Rows
         // Sort players alphabetically
-        const sortedRoster = [...state.roster].sort((a, b) => a.name.localeCompare(b.name));
+        const sortedRoster = [...state.roster].sort((a, b) => a.name.localeCompare(b.name))
+            .concat(plannedUnavailablePlayers(inningsSource));
 
         sortedRoster.forEach(player => {
-            html += `<tr><td style="text-align: left; font-weight: 500;">${escapeHTML(player.name)}</td>`;
+            const out = player.unavailable ? ` <span class="badge text-bg-danger">${player.unavailable}</span>` : '';
+            html += `<tr${player.unavailable ? ' class="table-danger"' : ''}><td style="text-align: left; font-weight: 500;">${escapeHTML(player.name)}${out}</td>`;
 
             innings.forEach(inn => {
                 const inningData = inningsSource[inn] || {};
@@ -191,7 +224,7 @@ function initializeGameManagement(gameData) {
                 }
 
                 if (position) {
-                    html += `<td><span class="badge bg-success bg-opacity-10 text-success border border-success w-100">${position}</span></td>`;
+                    html += `<td><span class="badge bg-success bg-opacity-10 text-success border border-success w-100">${escapeHTML(position)}</span></td>`;
                 } else {
                     html += `<td class="bg-light"><span class="text-muted small">BENCH</span></td>`;
                 }
@@ -235,7 +268,7 @@ function initializeGameManagement(gameData) {
 
             html += `<div class="list-group-item">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-bold">Inning ${inn}</span>
+                    <span class="fw-bold">Inning ${escapeHTML(inn)}</span>
                     <span class="badge bg-secondary rounded-pill">${benchPlayers.length} Sitting</span>
                 </div>
                 <div class="d-flex flex-wrap gap-1">`;
@@ -286,9 +319,9 @@ function initializeGameManagement(gameData) {
                 }
 
                 if (position) {
-                    html += `<span class="badge bg-success bg-opacity-10 text-success border border-success" title="Inning ${inn}: ${position}">${inn}: ${position}</span>`;
+                    html += `<span class="badge bg-success bg-opacity-10 text-success border border-success" title="Inning ${escapeHTML(inn)}: ${escapeHTML(position)}">${escapeHTML(inn)}: ${escapeHTML(position)}</span>`;
                 } else {
-                     html += `<span class="badge bg-light text-muted border" title="Inning ${inn}: Bench">${inn}: BN</span>`;
+                     html += `<span class="badge bg-light text-muted border" title="Inning ${escapeHTML(inn)}: Bench">${escapeHTML(inn)}: BN</span>`;
                 }
             });
 
@@ -321,7 +354,7 @@ function initializeGameManagement(gameData) {
         for (const playerName of sortedPlayerNames) {
             const data = summary[playerName];
             if (!data) continue;
-            tableHtml += `<tr><td><strong>${playerName}</strong></td><td>${data.inningsOnField}</td><td>${data.inningsOnBench}</td><td>${Array.from(data.positions).join(', ') || 'N/A'}</td></tr>`;
+            tableHtml += `<tr><td><strong>${escapeHTML(playerName)}</strong></td><td>${data.inningsOnField}</td><td>${data.inningsOnBench}</td><td>${escapeHTML(Array.from(data.positions).join(', ')) || 'N/A'}</td></tr>`;
         }
         tableHtml += `</tbody></table></div>`;
         const summaryDesktop = document.getElementById('summary-desktop');
@@ -642,6 +675,7 @@ function applyOutOfPositionIndicators() {
             // Update state
             state.game = newData.game;
             state.roster = (newData.roster || []).filter(p => !(newData.absent_player_ids || []).includes(p.id));
+            state.fullRoster = newData.roster || [];
             state.lineup = newData.lineup || { id: null, title: `Lineup for vs ${newData.game.opponent}`, lineup_positions: [], associated_game_id: newData.game.id };
 
             // Only apply the server's rotation snapshot when it was safe to
@@ -728,6 +762,10 @@ function applyOutOfPositionIndicators() {
                 ? (state.lineup.title || 'Game lineup')
                 : 'Not set';
 
+            // The fresh game for any screen that shows more of it (Classic's
+            // Availability and Batting Lineup cards).
+            document.dispatchEvent(new CustomEvent('coachboard:game-data', {detail: {game_id: state.game.id, data: newData}}));
+
         } catch (e) {
             console.error(e);
         }
@@ -761,6 +799,9 @@ function applyOutOfPositionIndicators() {
 
             // Listen for authoritative state broadcasts specifically for the live game
             socket.on('game_state_update', (newState) => {
+                // First, before any rendering: Classic Prepare Game hands over
+                // to the live screens on this.
+                document.dispatchEvent(new CustomEvent('coachboard:game-state-broadcast', {detail: {game_id: state.game.id, is_live: Boolean(newState?.game?.is_live)}}));
                 console.log("Received server-authoritative live game state broadcast.", newState);
 
                 // Re-apply essential parsed objects if needed
