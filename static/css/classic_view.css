@@ -83,3 +83,24 @@ body.cb-ui[data-cb-view="classic"] #startLiveGameBtnAction {
     flex: 1 1 auto;
   }
 }
+
+/* iPad Pro portrait and other 992-1199px widths: the Playing Time Summary
+   sits in the narrow right-hand column beside the diamond. Let it fit that
+   column (smaller type, tighter cells, positions may wrap) instead of
+   scrolling sideways inside it. */
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  body.cb-ui[data-cb-view="classic"] #summary-desktop .table {
+    font-size: .78rem;
+    table-layout: auto;
+  }
+
+  body.cb-ui[data-cb-view="classic"] #summary-desktop .table > :not(caption) > * > * {
+    padding: .25rem .3rem;
+    white-space: normal;
+  }
+
+  body.cb-ui[data-cb-view="classic"] #summary-desktop .table th {
+    font-size: .7rem;
+    white-space: nowrap;
+  }
+}

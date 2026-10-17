@@ -603,3 +603,27 @@ def test_a_game_started_by_another_coach_hands_over_to_the_live_screens(device, 
         expect(coach.locator('#classicPrepareGame')).to_have_count(0)
     finally:
         _delete(coach, classic_view_url, game_id)
+
+
+def test_the_playing_time_summary_fits_the_ipad_pro_portrait_column(device, classic_view_url):
+    """At 992-1199px the summary sits in a narrow column beside the diamond:
+    it fits that column, with each header on one line."""
+    coach = device(IPAD_PORTRAIT)
+    game_id = _game(coach, classic_view_url, 'Summary Fit', {'1': FULL, '2': dict(FULL, LF='Center Casey', CF='Left Lee')})
+    try:
+        _open(coach, classic_view_url, game_id)
+        table = coach.locator('#summary-desktop table')
+        expect(table).to_be_visible(timeout=15_000)
+        fit = table.evaluate("""t => {
+          const box = t.closest('.table-responsive') || t.parentElement;
+          const headerLines = [...t.querySelectorAll('th')].map(th => {
+            const range = document.createRange();
+            range.selectNodeContents(th);
+            return new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size;
+          });
+          return {table: t.scrollWidth, box: box.clientWidth, headerLines};
+        }""")
+        assert fit['table'] <= fit['box'], fit
+        assert all(lines == 1 for lines in fit['headerLines']), fit
+    finally:
+        _delete(coach, classic_view_url, game_id)
