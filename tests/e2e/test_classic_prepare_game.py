@@ -26,6 +26,7 @@ from playwright.sync_api import expect  # noqa: E402
 
 import cdn_assets  # noqa: E402
 from start_helpers import start_body  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 from e2e_cleanup import release_game  # noqa: E402
 
 
@@ -106,9 +107,9 @@ def _game(page, url, opponent, innings=None, lineup=None):
     data = _data(page, url, game_id)
     if innings:
         rotation = data['rotation']
-        saved = page.request.post(f'{url}/save_rotation', data=json.dumps({
+        saved = page.request.post(f'{url}/save_rotation', data=json.dumps(with_stored_base(page.request, url, {
             'id': rotation['id'], 'title': rotation['title'], 'associated_game_id': game_id,
-            'innings': {**rotation['innings'], **innings}}), headers={'Content-Type': 'application/json'})
+            'innings': {**rotation['innings'], **innings}})), headers={'Content-Type': 'application/json'})
         assert saved.ok, saved.text()
     if lineup:
         by_name = {player['name']: player['id'] for player in data['roster']}

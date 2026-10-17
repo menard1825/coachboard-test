@@ -31,6 +31,7 @@ from start_helpers import start_body  # noqa: E402
 from live_fixtures import open_next_inning_planner, plan_undo  # noqa: E402
 
 from e2e_cleanup import delete_players_named, release_game
+from plan_helpers import with_stored_base  # noqa: E402
 from cdp_touch import (
     DRAG_OVER_SELECTOR,
     GHOST_SELECTOR,
@@ -180,10 +181,10 @@ def create_game(page: Page, url: str):
         'title': 'Contract Lineup', 'lineup_data': list(alignment().values()),
         'associated_game_id': game_id,
     })
-    post_json(page, url, '/save_rotation', {
+    post_json(page, url, '/save_rotation', with_stored_base(page.request, url, {
         'title': 'Contract Rotation', 'innings': {'1': alignment(), '2': alignment()},
         'associated_game_id': game_id,
-    })
+    }))
     return game_id
 
 

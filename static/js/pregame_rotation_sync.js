@@ -305,7 +305,10 @@ window.CBPregameRotation = window.CBPregameRotation || (() => {
       // A malformed/empty HTTP 200 must fail closed, not be treated as a
       // silent success — only an explicit 'success' status counts.
       if (!response.ok || result.status !== 'success') {
-        throw new Error(result.message || 'Failed to save rotation.');
+        const error = new Error(result.message || 'Failed to save rotation.');
+        // e.g. 'rotation_refresh_required': this page is out of date.
+        if (result.code) error.code = result.code;
+        throw error;
       }
 
       if (result.new_id) {

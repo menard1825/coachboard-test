@@ -32,6 +32,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import expect  # noqa: E402
 
 import cdn_assets  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 COACH = ('playwright-coach', 'playwright-password')
@@ -113,9 +114,10 @@ def game(browser, classic_view_url):
         created.append(game_id)
         page.request.get(f'{classic_view_url}/game/{game_id}')
         rotation = page.request.get(f'{classic_view_url}/api/game_data/{game_id}').json()['rotation']
-        saved = page.request.post(f'{classic_view_url}/save_rotation', data=json.dumps({
-            'id': rotation['id'], 'title': rotation['title'], 'associated_game_id': game_id,
-            'innings': {**rotation['innings'], '1': TWO_OPEN}}), headers={'Content-Type': 'application/json'})
+        saved = page.request.post(f'{classic_view_url}/save_rotation', data=json.dumps(with_stored_base(
+            page.request, classic_view_url, {
+                'id': rotation['id'], 'title': rotation['title'], 'associated_game_id': game_id,
+                'innings': {**rotation['innings'], '1': TWO_OPEN}})), headers={'Content-Type': 'application/json'})
         assert saved.ok, saved.text()
         return game_id
 
@@ -302,4 +304,55 @@ def test_an_edit_made_while_saving_is_asked_about_and_retry_asks_again(coaches, 
     _settled(classic)
     stored = _stored(classic, classic_view_url, game_id)
     assert stored['RF'] == 'Right Riley' and stored['CF'] == 'Center Casey'
+    assert classic.cb_errors == [] and updated.cb_errors == []
+
+
+def _as_an_old_page(page):
+    """Send this page's saves the way a tab opened before this protection
+    would: the whole plan, without the stored plan it was made from."""
+    def strip_base(route):
+        body = json.loads(route.request.post_data or '{}')
+        body.pop('base_innings', None)
+        route.continue_(post_data=json.dumps(body))
+    page.route('**/save_rotation', strip_base)
+
+
+def test_an_out_of_date_page_cannot_overwrite_the_saved_plan(coaches, game, classic_view_url):
+    game_id = game('Two Coaches Old Tab')
+    classic, updated = coaches(game_id)
+
+    # The Updated coach saves CF; then a Classic page running old code
+    # saves its own (older) plan with RF filled.
+    _updated_assign(updated, 'CF', 'Center Casey')
+    _settled(updated)
+    _as_an_old_page(classic)
+    _classic_assign(classic, 'RF', 'Right Riley')
+
+    pill = classic.locator('#classic-save-status')
+    expect(pill).to_have_attribute('data-state', 'failed', timeout=15_000)
+    expect(pill).to_have_text('Not saved — refresh this page to keep editing')
+    assert classic.evaluate("() => window.CBPregameRotation.getLastError().code") == 'rotation_refresh_required'
+    # The saved plan is the Updated coach's, untouched; the old page's edit
+    # is still on its own screen, unsaved.
+    stored = _stored(classic, classic_view_url, game_id)
+    assert stored['CF'] == 'Center Casey' and 'RF' not in stored
+    expect(_classic_at(classic, 'RF')).to_have_text('Right Riley')
+    expect(classic.locator(DIALOG)).to_have_count(0)
+
+    # The same in Updated: told to refresh, nothing overwritten.
+    _as_an_old_page(updated)
+    _updated_assign(updated, 'RF', 'Right Riley')
+    status = updated.locator('#pde-save-status')
+    expect(status).to_have_attribute('data-status', 'failed', timeout=15_000)
+    expect(status).to_contain_text('This page is out of date')
+    expect(status).to_contain_text('Refresh the page')
+    assert 'RF' not in _stored(classic, classic_view_url, game_id)
+
+    # After a refresh (current code), the edit saves normally.
+    classic.unroute('**/save_rotation')
+    classic.reload()
+    expect(classic.locator('#pos-desktop-P .player-tag')).to_have_count(1, timeout=15_000)
+    _classic_assign(classic, 'RF', 'Right Riley')
+    _settled(classic)
+    assert _stored(classic, classic_view_url, game_id) == FULL
     assert classic.cb_errors == [] and updated.cb_errors == []

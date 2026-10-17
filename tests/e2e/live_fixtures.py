@@ -29,6 +29,7 @@ import live_field_markers
 from e2e_cleanup import delete_players_named
 from live_field_markers import LINEUP, create_named_live_game, remove_named_live_game
 from start_helpers import start_body
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -355,11 +356,11 @@ def live_field(page: Page, coachboard_url: str):
             max_redirects=0,
         )
         game_id = int(re.search(r'/game/(\d+)', response.headers['location']).group(1))
-        post_json(page, coachboard_url, '/save_rotation', {
+        post_json(page, coachboard_url, '/save_rotation', with_stored_base(page.request, coachboard_url, {
             'title': 'Pitching Change Plan',
             'innings': {'1': BASE},
             'associated_game_id': game_id,
-        })
+        }))
         post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
 
         def open_field(before_load=None):
@@ -437,11 +438,11 @@ def _create_next_board_game(page: Page, url: str):
     game_id = int(
         re.search(r'/game/(\d+)', response.headers['location']).group(1)
     )
-    post_json(page, url, '/save_rotation', {
+    post_json(page, url, '/save_rotation', with_stored_base(page.request, url, {
         'title': 'Next Inning Queue Rotation',
         'innings': {'1': starting_alignment(), '2': starting_alignment()},
         'associated_game_id': game_id,
-    })
+    }))
     post_json(page, url, f'/api/live-game/{game_id}/start', start_body(page.request, url, game_id))
     return game_id
 

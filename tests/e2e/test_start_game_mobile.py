@@ -25,6 +25,7 @@ from playwright.sync_api import Page, expect  # noqa: E402
 from e2e_cleanup import delete_players_named  # noqa: E402
 from test_live_game_switcher_boot import alignment, cleanup_game, login, post_json  # noqa: E402
 from test_pregame_player_time_summary import add_player  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 PHONE = {'width': 390, 'height': 844}
@@ -42,8 +43,8 @@ def create_game(page: Page, url: str, innings):
         'pitching_rule_set': 'USSSA',
     }, max_redirects=0)
     game_id = int(re.search(r'/game/(\d+)', response.headers['location']).group(1))
-    post_json(page, url, '/save_rotation', {
-        'title': 'Mobile Start Rotation', 'innings': innings, 'associated_game_id': game_id})
+    post_json(page, url, '/save_rotation', with_stored_base(page.request, url, {
+        'title': 'Mobile Start Rotation', 'innings': innings, 'associated_game_id': game_id}))
     return game_id
 
 
@@ -113,11 +114,11 @@ def test_a_real_blocker_is_explained_right_under_start_game(page: Page, coachboa
         assert not state['game']['is_live']
 
         # Fixed in place: Start becomes usable and the note goes away.
-        post_json(page, coachboard_url, '/save_rotation', {
+        post_json(page, coachboard_url, '/save_rotation', with_stored_base(page.request, coachboard_url, {
             'title': 'Mobile Start Rotation', 'associated_game_id': game_id,
             'id': page.request.get(f'{coachboard_url}/api/game_data/{game_id}').json()['rotation']['id'],
             'innings': {str(n): dict(alignment(), **{'2B': PADDED}) for n in range(1, 7)},
-        })
+        }))
         expect(start).to_be_enabled(timeout=12_000)
         expect(reason).to_be_hidden()
     finally:

@@ -17,6 +17,7 @@ from datetime import datetime
 import eventlet
 import pytest
 from werkzeug.security import generate_password_hash
+from stored_plan import with_stored_base
 
 
 TEAM_ID = 1
@@ -283,10 +284,12 @@ def test_a_save_arriving_during_start_cannot_replace_the_reviewed_defense(app, m
 
     starting = eventlet.spawn(_start, app, inning_one=plan, open_positions=['CF'])
     eventlet.sleep(0.02)
-    saving = eventlet.spawn(lambda: _client(app).post('/save_rotation', json={
+    saver = _client(app)
+    body = with_stored_base(saver, {
         'id': rotation_id, 'title': 'Rotation', 'associated_game_id': GAME_ID,
         'innings': {'1': FULL},
-    }))
+    })
+    saving = eventlet.spawn(lambda: saver.post('/save_rotation', json=body))
 
     status, body = starting.wait()
     saved = saving.wait()

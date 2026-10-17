@@ -40,6 +40,7 @@ from start_helpers import start_body  # noqa: E402
 
 from change_pitcher_flow import DESTINATION_QUESTION, choose_outgoing_destination
 from live_fixtures import cleanup_game, login, post_json, end_inning_from_live
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 PHONE = {'width': 430, 'height': 932}
@@ -81,11 +82,11 @@ def create_game(page: Page, url: str, day: date, pitcher: str, opponent: str, ru
     if pitcher != 'Pitcher Pat':
         old_spot = next(pos for pos, name in BASE.items() if name == pitcher)
         lineup['P'], lineup[old_spot] = pitcher, 'Pitcher Pat'
-    post_json(page, url, '/save_rotation', {
+    post_json(page, url, '/save_rotation', with_stored_base(page.request, url, {
         'title': f'{opponent} Plan',
         'innings': {'1': lineup, '2': lineup},
         'associated_game_id': game_id,
-    })
+    }))
     post_json(page, url, f'/api/live-game/{game_id}/start', start_body(page.request, url, game_id))
     return game_id
 

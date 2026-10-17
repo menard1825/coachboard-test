@@ -43,6 +43,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -166,12 +167,12 @@ def test_later_started_server_refresh_wins_over_earlier_one_arriving_after(page:
         r1_innings['1'] = {**r1_innings.get('1', {}), 'SS': 'SecondCoachAssigned'}
         second_coach_write = page.request.post(
             f'{coachboard_url}/save_rotation',
-            data=json.dumps({
+            data=json.dumps(with_stored_base(page.request, coachboard_url, {
                 'id': rotation_id,
                 'title': baseline['rotation']['title'],
                 'innings': r1_innings,
                 'associated_game_id': game_id,
-            }),
+            })),
             headers={'Content-Type': 'application/json'},
         )
         assert second_coach_write.ok, second_coach_write.text()

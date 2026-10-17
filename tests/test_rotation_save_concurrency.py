@@ -1,11 +1,12 @@
 """Two coaches saving one game's pregame defense: merged or refused, never
 silently overwritten (rotation_merge.py, /save_rotation's base_innings).
 
-The browser's shared save queue sends the plan it started from. If another
-coach saved in between, changes to different positions are merged; a
-position both changed differently is refused with code 'rotation_conflict'
-and nothing is saved. A save without base_innings (a direct API call) keeps
-the old whole-plan behavior.
+Every save of a game's plan says which stored plan it was made from. If
+another coach saved in between, changes to different positions are merged;
+a position both changed differently is refused with code 'rotation_conflict'
+and nothing is saved. A save of a game's plan without a base (an out-of-date
+page) is refused with code 'rotation_refresh_required', and the stored plan
+is kept. Reusable rotation templates are not game plans and save as before.
 """
 
 from datetime import datetime
@@ -14,6 +15,7 @@ import pytest
 from werkzeug.security import generate_password_hash
 
 from rotation_merge import merge, normalize
+from stored_plan import with_stored_base
 
 
 TEAM_ID = 1
@@ -134,12 +136,21 @@ def _client(app, username='coach'):
     return client
 
 
-def _save(app, innings, base=None, rotation_id=None, username='coach'):
+#: base= for _save: the plan stored right now, as a page that just loaded has.
+CURRENT = object()
+#: base= for _save: no base at all, as an out-of-date page sends.
+NO_BASE = object()
+
+
+def _save(app, innings, base=CURRENT, rotation_id=None, username='coach', game_id=GAME_ID):
+    client = _client(app, username)
     body = {'id': rotation_id, 'title': 'Rotation for vs Visitors', 'innings': innings,
-            'associated_game_id': GAME_ID}
-    if base is not None:
+            'associated_game_id': game_id}
+    if base is CURRENT:
+        body = with_stored_base(client, body)
+    elif base is not NO_BASE:
         body['base_innings'] = base
-    response = _client(app, username).post('/save_rotation', json=body)
+    response = client.post('/save_rotation', json=body)
     return response.status_code, response.get_json()
 
 
@@ -194,12 +205,56 @@ def test_a_stale_save_to_the_same_position_is_refused_and_nothing_changes(app):
     assert _stored(app) == [{'1': _with(FULL, CF='Jo')}]
 
 
-def test_without_a_base_the_plan_is_replaced_as_before(app):
+REFRESH = 'rotation_refresh_required'
+
+
+def test_a_save_without_a_base_cannot_overwrite_another_coachs_plan(app):
     rotation_id = _seed(app, {'1': FULL})
-    _save(app, {'1': _with(FULL, CF='Jo')}, rotation_id=rotation_id, username='assistant')
-    status, _ = _save(app, {'1': FULL}, rotation_id=rotation_id)
+    status, _ = _save(app, {'1': _with(FULL, CF='Jo')}, rotation_id=rotation_id, username='assistant')
     assert status == 200
+    # An out-of-date page sends its whole older plan, with no base.
+    status, body = _save(app, {'1': FULL}, base=NO_BASE, rotation_id=rotation_id)
+    assert (status, body['code']) == (409, REFRESH)
+    assert 'Refresh the page' in body['message']
+    assert _stored(app) == [{'1': _with(FULL, CF='Jo')}]
+
+
+def test_a_first_save_without_a_base_adds_no_plan(app):
+    status, body = _save(app, {'1': FULL}, base=NO_BASE)
+    assert (status, body['code']) == (409, REFRESH)
+    assert _stored(app) == []
+
+
+def test_a_base_must_be_a_plan(app):
+    rotation_id = _seed(app, {'1': FULL})
+    for base in (None, [], 'stale'):
+        status, body = _save(app, {'1': {}}, base=base, rotation_id=rotation_id)
+        assert (status, body['code']) == (409, REFRESH), base
     assert _stored(app) == [{'1': FULL}]
+
+
+def test_reusable_templates_save_as_before(app):
+    from db import db
+    from models import Rotation
+    status, body = _save(app, {'1': FULL}, base=NO_BASE, game_id=None)
+    assert status == 200, body
+    with app.app_context():
+        template = db.session.get(Rotation, body['new_id'])
+        assert template.associated_game_id is None and template.innings == {'1': FULL}
+
+
+def test_one_coach_keeps_saving_from_what_was_stored(app):
+    # The single-coach path: each save starts from the plan the last one
+    # stored (as the page's queue does), and nothing is ever refused.
+    rotation_id = _seed(app, {'1': FULL})
+    plan = {'1': FULL}
+    for change in ({'CF': 'Jo'}, {'CF': None}, {'RF': 'Jo', 'CF': 'Indy'}):
+        new_plan = {'1': _with(plan['1'], **change)}
+        status, body = _save(app, new_plan, base=plan, rotation_id=rotation_id)
+        assert status == 200, body
+        assert body['innings'] == new_plan
+        plan = new_plan
+    assert _stored(app) == [plan]
 
 
 def test_the_existing_checks_still_come_first(app):
@@ -214,6 +269,9 @@ def test_the_existing_checks_still_come_first(app):
         db.session.get(Game, GAME_ID).is_live = True
         db.session.commit()
     status, body = _save(app, {'1': _with(FULL, CF='Jo')}, base={'1': FULL}, rotation_id=rotation_id)
+    assert status == 409 and 'locked while the game is live' in body['message']
+    # The live lock comes first even for an out-of-date page.
+    status, body = _save(app, {'1': _with(FULL, CF='Jo')}, base=NO_BASE, rotation_id=rotation_id)
     assert status == 409 and 'locked while the game is live' in body['message']
     assert _stored(app) == [{'1': FULL}]
 

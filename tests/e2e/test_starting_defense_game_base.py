@@ -12,6 +12,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -109,7 +110,7 @@ def test_starting_defense_can_seed_game_without_overwriting_pitchers(page: Page,
             'innings': innings,
             'associated_game_id': game_id,
         }
-        post_json(page, coachboard_url, '/save_rotation', rotation_payload)
+        post_json(page, coachboard_url, '/save_rotation', with_stored_base(page.request, coachboard_url, rotation_payload))
 
         page.reload(wait_until='domcontentloaded')
 

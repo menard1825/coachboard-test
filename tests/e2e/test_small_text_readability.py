@@ -28,6 +28,7 @@ from playwright.sync_api import expect  # noqa: E402
 from start_helpers import start_body  # noqa: E402
 
 import cdn_assets  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -167,9 +168,9 @@ def live_game(make_page, coachboard_url):
     page.request.post(f'{coachboard_url}/add_lineup', data={
         'title': 'Readability Lineup', 'lineup_player_ids': [int(p['id']) for p in roster],
         'associated_game_id': game_id})
-    page.request.post(f'{coachboard_url}/save_rotation', data={
+    page.request.post(f'{coachboard_url}/save_rotation', data=with_stored_base(page.request, coachboard_url, {
         'title': 'Readability Rotation', 'innings': {'1': _alignment(), '2': _alignment()},
-        'associated_game_id': game_id})
+        'associated_game_id': game_id}))
     assert page.request.post(f'{coachboard_url}/api/live-game/{game_id}/start', data=start_body(page.request, coachboard_url, game_id)).ok
     page.goto(f'{coachboard_url}/game/{game_id}')
     expect(page.locator('#cbQuickDefense')).to_be_visible(timeout=20_000)

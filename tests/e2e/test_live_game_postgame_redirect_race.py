@@ -29,6 +29,7 @@ if os.environ.get("COACHBOARD_E2E") != "1":
     )
 
 from playwright.sync_api import Browser, Page, expect
+from plan_helpers import with_stored_base  # noqa: E402
 from start_helpers import start_body  # noqa: E402
 
 import cdn_assets
@@ -94,11 +95,11 @@ def create_game(page: Page, coachboard_url: str, opponent: str):
 
     rotation = page.request.post(
         f"{coachboard_url}/save_rotation",
-        data={
+        data=with_stored_base(page.request, coachboard_url, {
             "title": f"{opponent} Rotation",
             "innings": {"1": alignment()},
             "associated_game_id": game_id,
-        },
+        }),
     )
 
     assert rotation.status == 200

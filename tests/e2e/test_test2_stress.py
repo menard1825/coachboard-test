@@ -18,6 +18,7 @@ from start_helpers import start_body  # noqa: E402
 from live_fixtures import end_inning_from_live, open_next_inning_planner  # noqa: E402
 
 import cdn_assets
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 def routed_context(browser: Browser, **kwargs):
@@ -79,10 +80,10 @@ def create_game(page: Page, coachboard_url: str, opponent: str, *, complete=True
             innings['2'] = planned_two()
         rotation = page.request.post(
             f'{coachboard_url}/save_rotation',
-            data={
+            data=with_stored_base(page.request, coachboard_url, {
                 'title': f'{opponent} Stress Rotation', 'innings': innings,
                 'associated_game_id': game_id,
-            },
+            }),
         )
         assert rotation.status == 200, rotation.text()
         assert rotation.json().get('status') == 'success', rotation.json()

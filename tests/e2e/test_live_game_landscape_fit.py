@@ -32,6 +32,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
 from live_fixtures import PLANNER, open_next_inning_planner, return_to_live_field  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -111,11 +112,11 @@ def create_live_game(page: Page, coachboard_url: str, opponent: str):
         'lineup_player_ids': [int(player['id']) for player in roster],
         'associated_game_id': game_id,
     })
-    post_json(page, coachboard_url, '/save_rotation', {
+    post_json(page, coachboard_url, '/save_rotation', with_stored_base(page.request, coachboard_url, {
         'title': 'Landscape Fit Rotation',
         'innings': {'1': alignment(), '2': alignment()},
         'associated_game_id': game_id,
-    })
+    }))
     post_json(page, coachboard_url, f'/api/live-game/{game_id}/start', start_body(page.request, coachboard_url, game_id))
     return game_id
 

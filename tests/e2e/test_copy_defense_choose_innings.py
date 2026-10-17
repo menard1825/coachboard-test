@@ -27,6 +27,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import expect  # noqa: E402
 
 import cdn_assets  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -86,8 +87,8 @@ def game(make_page, coachboard_url):
     game_id = int(re.search(r'/game/(\d+)', response.headers['location']).group(1))
     innings = {str(i): {} for i in range(1, INNINGS + 1)}
     innings['1'], innings['3'] = dict(DEFENSE_A), dict(DEFENSE_B)
-    saved = setup.request.post(f'{coachboard_url}/save_rotation', data={
-        'title': 'Rotation', 'innings': innings, 'associated_game_id': game_id})
+    saved = setup.request.post(f'{coachboard_url}/save_rotation', data=with_stored_base(setup.request, coachboard_url, {
+        'title': 'Rotation', 'innings': innings, 'associated_game_id': game_id}))
     assert saved.ok and saved.json().get('status') == 'success', saved.text()
     yield game_id
     setup.request.post(f'{coachboard_url}/game-day/{game_id}/delete', headers={'Accept': 'application/json'})

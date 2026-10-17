@@ -14,6 +14,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -65,11 +66,11 @@ def create_game_without_lineup(page: Page, coachboard_url: str):
     match = re.search(r'/game/(\d+)', response.headers.get('location') or '')
     assert match
     game_id = int(match.group(1))
-    post_json(page, coachboard_url, '/save_rotation', {
+    post_json(page, coachboard_url, '/save_rotation', with_stored_base(page.request, coachboard_url, {
         'title': 'Test 2 Surface Rotation',
         'innings': {'1': alignment(), '2': inning_two_alignment()},
         'associated_game_id': game_id,
-    })
+    }))
     return game_id
 
 

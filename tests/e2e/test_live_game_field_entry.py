@@ -14,6 +14,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 from start_helpers import start_body  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -73,11 +74,11 @@ def create_game(page: Page, coachboard_url: str):
         'lineup_data': list(alignment().values()),
         'associated_game_id': game_id,
     })
-    post_json(page, coachboard_url, '/save_rotation', {
+    post_json(page, coachboard_url, '/save_rotation', with_stored_base(page.request, coachboard_url, {
         'title': 'Field Entry Rotation',
         'innings': {'1': alignment(), '2': alignment()},
         'associated_game_id': game_id,
-    })
+    }))
     return game_id
 
 

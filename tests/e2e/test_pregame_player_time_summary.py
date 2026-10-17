@@ -25,6 +25,7 @@ from playwright.sync_api import Page, expect
 
 from e2e_cleanup import delete_players_named
 from live_fixtures import cleanup_game, login, post_json
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 DESKTOP = {'width': 1280, 'height': 900}
@@ -103,11 +104,11 @@ def planned_game(page: Page, coachboard_url: str):
             game_id = int(
                 re.search(r'/game/(\d+)', response.headers['location']).group(1)
             )
-            post_json(page, coachboard_url, '/save_rotation', {
+            post_json(page, coachboard_url, '/save_rotation', with_stored_base(page.request, coachboard_url, {
                 'title': 'Player Time Plan',
                 'innings': innings,
                 'associated_game_id': game_id,
-            })
+            }))
             return game_id
 
         yield create
