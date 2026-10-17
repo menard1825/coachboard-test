@@ -189,7 +189,11 @@ def test_no_upcoming_game_is_clean(open_home, device):
 
 def test_manage_game_still_opens_the_real_game(browser, coachboard_url):
     cdn_assets.require_vendored_assets()
-    context = browser.new_context(viewport=DESKTOP[1])
+    # The coach is in the team's time zone, where the server seeded
+    # "Browser Bears" for today. In the runner's UTC, just after midnight,
+    # that game is already yesterday and another test's later game is next.
+    context = browser.new_context(
+        viewport=DESKTOP[1], timezone_id='America/Indiana/Indianapolis')
     cdn_assets.install(context)
     try:
         page = context.new_page()
