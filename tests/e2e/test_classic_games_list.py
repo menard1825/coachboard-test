@@ -161,6 +161,7 @@ def test_the_classic_games_list(coach, classic_view_url, spec):
     opened = page.cb_game(f'Opened Only {spec[0]}')
     page.request.get(f'{classic_view_url}/game/{opened}')        # an opened game has empty innings
     live = page.cb_game(f'Classic Live {spec[0]}', days=0, live=True, start='18:00')
+    past = page.cb_game(f'Classic Past {spec[0]}', days=-3)
 
     _open_games(page, classic_view_url)
     expect(page.locator('#games .card-header', has_text='Add New Game')).to_be_visible()
@@ -171,6 +172,13 @@ def test_the_classic_games_list(coach, classic_view_url, spec):
     listed = {int(value) for value in page.locator(f'{LIST} [data-cb-game]').evaluate_all(
         'rows => rows.map(row => row.dataset.cbGame)')}
     assert listed == team_games
+    # One list on every screen, newest first, as the original showed it
+    # (past games included).
+    order = [int(value) for value in page.locator(f'{LIST} > li[data-cb-game]').evaluate_all(
+        'rows => rows.map(row => row.dataset.cbGame)')]
+    dates = {game['id']: game['date'] for game in page.request.get(f'{classic_view_url}/api/games').json()}
+    assert [dates[game_id] for game_id in order] == sorted((dates[game_id] for game_id in order), reverse=True)
+    assert past in order
 
     row = _row(page, planned)
     expect(row).to_contain_text(f'vs Classic List {spec[0]}')

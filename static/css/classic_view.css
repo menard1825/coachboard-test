@@ -104,3 +104,13 @@ body.cb-ui[data-cb-view="classic"] #startLiveGameBtnAction {
     white-space: nowrap;
   }
 }
+
+/* Classic Games list, iPads and other 768-1199px widths: the original Add
+   New Game row is four narrow columns there, which squeezes the date and
+   time; two columns of two fit them. */
+@media (min-width: 768px) and (max-width: 1199.98px) {
+  body.cb-ui[data-cb-view="classic"] #games form > .col-md-3 {
+    flex: 0 0 auto;
+    width: 50%;
+  }
+}

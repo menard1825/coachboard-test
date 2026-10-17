@@ -2,6 +2,10 @@
   'use strict';
 
   if (window.location.pathname !== '/' || !window.matchMedia('(max-width: 991.98px)').matches) return;
+  // Classic view: the #games pane is the original Games list, the same on a
+  // phone as on a desktop (one list, every game, newest first), so this
+  // later phone re-arrangement of it stays off.
+  if (document.body?.dataset.cbView === 'classic') return;
 
   let gamesById = new Map();
   let scheduleObserver = null;
