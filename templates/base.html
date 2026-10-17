@@ -134,7 +134,12 @@
               <a class="cb-nav-link active" data-cb-section="game-day" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-card-checklist"></i>GameChanger Setup</a>
             {% else %}
               <a class="cb-nav-link{% if request.path == '/' %} active{% endif %}" data-cb-section="overview" href="{{ url_for('home') }}#overview"><i class="bi bi-house-door"></i>Home</a>
+              {% if cb_view == 'classic' %}
+              {# Classic: the original Home "Games" tab is the games list. #}
+              <a class="cb-nav-link" data-cb-section="games" href="{{ url_for('home') }}#games"><i class="bi bi-calendar3"></i>Games</a>
+              {% else %}
               <a class="cb-nav-link{% if request.path in ['/game-day', '/game-day/'] %} active{% endif %}" data-cb-section="game-day" href="{{ url_for('game_day.game_day_home') }}"><i class="bi bi-diamond"></i>Game Day</a>
+              {% endif %}
               <a class="cb-nav-link" data-cb-section="roster" href="{{ url_for('home') }}#roster"><i class="bi bi-people"></i>Roster</a>
               <a class="cb-nav-link d-none d-xl-inline-flex" data-cb-section="player_development" href="{{ url_for('home') }}#player_development"><i class="bi bi-graph-up-arrow"></i>Development</a>
               <a class="cb-nav-link d-none d-xl-inline-flex" data-cb-section="practice_plan" href="{{ url_for('home') }}#practice_plan"><i class="bi bi-clipboard-check"></i>Practice</a>
@@ -239,7 +244,11 @@
     <nav id="cb-global-mobile-nav" class="fixed-bottom d-lg-none bottom-nav-fixed shadow-lg" aria-label="Primary mobile navigation">
       <ul class="nav nav-tabs w-100">
         <li class="nav-item flex-fill"><a class="nav-link text-center{% if request.path == '/' %} active{% endif %}" data-cb-mobile-section="overview" href="{% if request.path == '/' %}#overview{% else %}{{ url_for('home') }}#overview{% endif %}"{% if request.path == '/' %} aria-current="page"{% endif %}><i class="bi bi-house-door d-block"></i><span>Home</span></a></li>
+        {% if cb_view == 'classic' %}
+        <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="game-day" href="{% if request.path == '/' %}#games{% else %}{{ url_for('home') }}#games{% endif %}"><i class="bi bi-calendar3 d-block"></i><span>Games</span></a></li>
+        {% else %}
         <li class="nav-item flex-fill"><a class="nav-link text-center{% if request.path in ['/game-day', '/game-day/'] %} active{% endif %}" data-cb-mobile-section="game-day" href="{{ url_for('game_day.game_day_home') }}"{% if request.path in ['/game-day', '/game-day/'] %} aria-current="page"{% endif %}><i class="bi bi-diamond d-block"></i><span>Game Day</span></a></li>
+        {% endif %}
         <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="roster" href="{% if request.path == '/' %}#roster{% else %}{{ url_for('home') }}#roster{% endif %}"><i class="bi bi-people d-block"></i><span>Roster</span></a></li>
         <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="practice_plan" href="{% if request.path == '/' %}#practice_plan{% else %}{{ url_for('home') }}#practice_plan{% endif %}"><i class="bi bi-clipboard-check d-block"></i><span>Practice</span></a></li>
         <li class="nav-item flex-fill"><a class="nav-link text-center" data-cb-mobile-section="more" href="{% if request.path == '/' %}#more{% else %}{{ url_for('home') }}#more{% endif %}"><i class="bi bi-three-dots d-block"></i><span>More</span></a></li>
@@ -358,7 +367,8 @@
         if (path === '/pitching') return 'pitching';
         if (path !== '/') return null;
         const section = activeHomePane();
-        return ['overview', 'roster', 'player_development', 'practice_plan'].includes(section) ? section : null;
+        // ('games' is the Classic Games tab; Updated never shows it.)
+        return ['overview', 'games', 'roster', 'player_development', 'practice_plan'].includes(section) ? section : null;
       }
 
       function syncPrimaryNavigationState() {

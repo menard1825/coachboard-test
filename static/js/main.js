@@ -553,21 +553,54 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList('not_interested', 'scouting-list-not_interested');
     }
 
+    // The Home "Games" tab: the original schedule list, now shown only to a
+    // coach on the Classic view (navigation_v2.js sends everyone else to Game
+    // Day). Every game of the team (/api/games, the same records Game Day
+    // lists). A live game opens the live screens; it can't be deleted.
     function renderGames() {
         const container = document.getElementById('games-list-container');
         if (!container) return;
         const games = (AppState.full_data.games || []).sort((a,b) => b.date.localeCompare(a.date));
         if (games.length === 0) { container.innerHTML = `<li class="list-group-item text-center text-muted">No games scheduled.</li>`; return; }
+        const set = `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>`;
+        const notSet = `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
+        // A plan counts as set once a position is filled: opening a game
+        // creates its (empty) regulation innings.
+        // The game's day, and its start time the way Game Day shows it
+        // (stored apart, as "15:00"); a game without one shows no time.
+        const startTime = (value) => {
+            const raw = String(value || '').trim();
+            if (/\b(am|pm)\b/i.test(raw)) return escapeHTML(raw);
+            const match = raw.match(/^(\d{1,2}):(\d{2})/);
+            if (!match) return '';
+            const hour = Number(match[1]);
+            return `${hour % 12 || 12}:${match[2]} ${hour < 12 ? 'AM' : 'PM'}`;
+        };
+        const when = (game) => {
+            const day = formatDateTime(String(game.date || '').slice(0, 10));
+            const time = startTime(game.start_time);
+            return time ? `${day}, ${time}` : day;
+        };
+        const planned = (rotation) => {
+            let innings = rotation?.innings || {};
+            if (typeof innings === 'string') { try { innings = JSON.parse(innings); } catch (_) { innings = {}; } }
+            return Object.values(innings || {}).some(inning => Object.values(inning || {}).some(name => String(name || '').trim()));
+        };
         container.innerHTML = games.map(game => {
             const lineup = AppState.full_data.lineups.find(l => l.associated_game_id === game.id);
             const rotation = AppState.full_data.rotations.find(r => r.associated_game_id === game.id);
-            const lineupHTML = lineup && lineup.lineup_positions && lineup.lineup_positions.length > 0 ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
-            const rotationHTML = rotation ? `<span class="text-success"><i class="bi bi-check-circle-fill"></i> Set</span>` : `<span class="text-muted"><i class="bi bi-x-circle"></i> Not Set</span>`;
-            const deleteButtonHtml = `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-delete-url="/delete_game/${game.id}" data-delete-name="the game against ${escapeHTML(game.opponent)}"><i class="bi bi-trash"></i></button>`;
-            return `<li class="list-group-item"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${formatDateTime(game.date, game.start_time)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm"><a href="/game/${game.id}" class="btn btn-primary"><i class="bi bi-tools"></i> Manage</a>${deleteButtonHtml}</div></div></div></li>`;
+            const lineupHTML = lineup && lineup.lineup_positions && lineup.lineup_positions.length > 0 ? set : notSet;
+            const rotationHTML = planned(rotation) ? set : notSet;
+            const live = Boolean(game.is_live);
+            const liveBadge = live ? ` <span class="badge text-bg-danger align-middle" data-cb-game-live>LIVE</span>` : '';
+            const open = live
+                ? `<a href="/game/${game.id}" class="btn btn-danger" data-cb-game-open><i class="bi bi-broadcast"></i> Open Live Game</a>`
+                : `<a href="/game/${game.id}" class="btn btn-primary" data-cb-game-open><i class="bi bi-tools"></i> Manage</a>`;
+            const deleteButtonHtml = live ? '' : `<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-cb-delete-game="${game.id}" data-delete-url="#" data-delete-name="the game against ${escapeHTML(game.opponent)}" aria-label="Delete the game against ${escapeHTML(game.opponent)}"><i class="bi bi-trash"></i></button>`;
+            return `<li class="list-group-item" data-cb-game="${game.id}"><div class="d-flex justify-content-between align-items-center flex-wrap"><div class="me-auto"><h5 class="mb-1">vs ${escapeHTML(game.opponent)}${liveBadge}</h5><p class="mb-1"><i class="bi bi-calendar-event"></i> ${when(game)} <span class="text-muted mx-2">|</span> <i class="bi bi-geo-alt"></i> ${escapeHTML(game.location || 'TBD')}</p></div><div class="d-flex align-items-center mt-2 mt-md-0"><div class="text-end me-3"><div class="mb-1"><small>Lineup:</small> ${lineupHTML}</div><div><small>Rotation:</small> ${rotationHTML}</div></div><div class="btn-group-vertical btn-group-sm">${open}${deleteButtonHtml}</div></div></div></li>`;
         }).join('');
     }
-    
+
     // Home sections below (Practice plans, Roster cards, a player's lesson
     // info) are rebuilt with innerHTML on every refresh, including
     // data_updated from any coach's change. Carry over what the coach has
@@ -1623,6 +1656,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const modalBody = e.target.querySelector('.modal-body');
             const url = e.relatedTarget.dataset.deleteUrl;
             const name = e.relatedTarget.dataset.deleteName;
+            // A game is deleted only through Game Day's guarded POST, which
+            // refuses a live game (the old /delete_game link no longer deletes).
+            if (e.relatedTarget.dataset.cbDeleteGame) deleteButton.dataset.cbDeleteGame = e.relatedTarget.dataset.cbDeleteGame;
+            else delete deleteButton.dataset.cbDeleteGame;
 
             if (url) {
                 deleteButton.href = url;
@@ -1630,6 +1667,28 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 console.error("Delete modal opened without a data-delete-url attribute on the trigger.");
                 e.preventDefault();
+            }
+        });
+
+        document.getElementById('confirmDeleteButton')?.addEventListener('click', async (e) => {
+            const button = e.currentTarget;
+            const gameId = button.dataset.cbDeleteGame;
+            if (!gameId) return;
+            e.preventDefault();
+            if (button.classList.contains('disabled')) return;
+            const modal = document.getElementById('confirmDeleteModal');
+            button.classList.add('disabled');
+            try {
+                const response = await fetch(`/game-day/${gameId}/delete`, {method: 'POST', headers: {'Accept': 'application/json'}});
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.status === 'error') throw new Error(result.message || `Unable to delete the game (${response.status}).`);
+                AppState.full_data.games = (AppState.full_data.games || []).filter(g => String(g.id) !== String(gameId));
+                renderGames();
+                bootstrap.Modal.getInstance(modal)?.hide();
+            } catch (error) {
+                modal.querySelector('.modal-body').innerHTML = `<div class="alert alert-danger mb-0">${escapeHTML(error.message)}</div>`;
+            } finally {
+                button.classList.remove('disabled');
             }
         });
 

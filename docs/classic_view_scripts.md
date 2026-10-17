@@ -90,3 +90,21 @@ The same server rules apply to every save from either view:
 - the security guard.
 
 Classic adds no write path of its own.
+
+## Classic Games list (Home `#games`)
+
+A Classic coach's **Games** link opens the original Home "Games" tab:
+- **Add New Game**: the same form and the same `/game-day/add`.
+- **Game Schedule**, with Lineup / Rotation status and **Manage**. It lists every game of the team (`/api/games`, the same records Game Day shows), kept current by the existing socket events.
+- **Manage** opens Classic Prepare Game, and its **Back to All Games** returns here.
+- **A live game** is marked LIVE and offers **Open Live Game**, which opens the Updated live screens. It has no delete button.
+- **Delete** goes through Game Day's guarded `POST /game-day/<id>/delete`, which refuses a live game. The old `/delete_game` link no longer deletes anything.
+
+| File | Change |
+|---|---|
+| `navigation_v2.js` | **Mixed, split.** For an Updated coach, `#games` still goes to Game Day and the tab's links still point there. For a Classic coach, neither is changed. |
+| `templates/base.html` | A Classic coach's header and phone bar show **Games** (`/#games`) where Updated shows **Game Day**. |
+| `main.js` `renderGames` | Shared, and only ever shown in Classic. A plan counts as "Set" once a position is filled. Each game shows its start time as Game Day does. Live games are handled as above, and delete uses the guarded route. |
+| `coachboard_ui.js` | The section heading reads "Games" for a Classic coach. |
+
+Updated navigation is unchanged.

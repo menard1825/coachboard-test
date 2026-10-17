@@ -40,6 +40,10 @@
     collaboration: ['Coach Notes', 'Keep team and player notes shared among the coaching staff.'],
     games: ['Game Day', 'Add, review, and manage scheduled games without leaving the primary mobile workspace.'],
   };
+  // Classic view: the Games tab is the original games list, under its name.
+  if (document.body?.dataset.cbView === 'classic') {
+    HOME_SECTIONS.games = ['Games', 'Add a game, then Manage it to set the lineup, defense and pitching.'];
+  }
 
   const MOBILE_PRIMARY_TARGETS = new Set(['#overview', '#games', '#roster', '#practice_plan', '#more']);
 

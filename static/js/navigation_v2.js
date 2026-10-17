@@ -1,6 +1,10 @@
 (() => {
   'use strict';
 
+  // Classic view (ui_view.py): a coach who chose the original screens keeps
+  // the original Home "Games" tab (#games) instead of Game Day.
+  const classicView = document.body?.dataset.cbView === 'classic';
+
   function installDesktopRosterBootGuard() {
     if (
       window.location.pathname !== '/' ||
@@ -104,7 +108,9 @@
     // Game Day now has one dedicated route on every screen size. Old #games
     // bookmarks and links are redirected so phones/tablets cannot land on the
     // retired dashboard Games tab while desktop shows the newer Game Day page.
+    // (Classic keeps that tab: it is the Classic Games list.)
     if (
+      !classicView &&
       window.location.pathname === '/' &&
       window.location.hash.toLowerCase() === '#games'
     ) {
@@ -253,7 +259,8 @@
   function normalizeSharedMobileNav() {
     const nav = sharedMobileNav();
     if (!nav) return;
-    if (window.location.pathname === '/') {
+    if (window.location.pathname === '/' && !classicView) {
+      // (Classic's slot is its Games tab, #games.)
       const gameDay = nav.querySelector('[data-cb-mobile-section="game-day"]');
       if (gameDay) gameDay.setAttribute('href', '/game-day');
     }
@@ -428,7 +435,7 @@
     loadScript('/static/js/assignment_picker_availability.js', 'assignment-picker-availability');
   }
 
-  document.querySelectorAll('a[href="#games"]').forEach((link) => {
+  if (!classicView) document.querySelectorAll('a[href="#games"]').forEach((link) => {
     link.removeAttribute('data-bs-toggle');
     link.removeAttribute('role');
     link.setAttribute('href', '/game-day');
