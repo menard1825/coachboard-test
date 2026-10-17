@@ -28,6 +28,8 @@ Requests are attributed to the script whose code called fetch().
 import os
 import uuid
 from collections import Counter
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -211,6 +213,13 @@ def _fire(page, event, payload, *, listener_owner):
 @pytest.mark.parametrize('viewport', [DESKTOP, PHONE], ids=['desktop', 'phone'])
 def test_home_makes_only_its_own_requests(make_page, coachboard_url, viewport, delay):
     page = make_page(viewport, api_delay_ms=delay)
+    # Home's next game (and with it the readiness and pitching-rules reads
+    # counted below) is chosen by the browser's own "today". The server
+    # seeds that game for today in the team's zone; on the runner's UTC
+    # clock, just after midnight, it is already yesterday. Show the
+    # browser the team's wall clock, leaving its zone as it is.
+    team_now = datetime.now(ZoneInfo('America/Indiana/Indianapolis'))
+    page.clock.set_system_time(team_now.replace(tzinfo=timezone.utc))
     _open_home(page, coachboard_url)
     initiators = _by_initiator(page)
     for script in (TRAITS_JS, SEASON_JS, MOBILE_GAMES_JS, 'main.js'):
