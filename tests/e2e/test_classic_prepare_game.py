@@ -605,10 +605,20 @@ def test_a_game_started_by_another_coach_hands_over_to_the_live_screens(device, 
         _delete(coach, classic_view_url, game_id)
 
 
-def test_the_playing_time_summary_fits_the_ipad_pro_portrait_column(device, classic_view_url):
+# The runner's default font (DejaVu Sans on Ubuntu) is wider than most
+# desktops' and set this table 20px wider than its column; test both.
+@pytest.mark.parametrize('font', ['', 'DejaVu Sans'], ids=['default-font', 'dejavu-sans'])
+def test_the_playing_time_summary_fits_the_ipad_pro_portrait_column(device, classic_view_url, font):
     """At 992-1199px the summary sits in a narrow column beside the diamond:
-    it fits that column, with each header on one line."""
+    it fits that column, with each header on one line and no name broken
+    inside a word."""
     coach = device(IPAD_PORTRAIT)
+    if font:
+        coach.add_init_script(
+            "document.addEventListener('DOMContentLoaded', () => {"
+            " const style = document.createElement('style');"
+            f" style.textContent = '* {{ font-family: \"{font}\" !important; }}';"
+            " document.head.appendChild(style); })")
     game_id = _game(coach, classic_view_url, 'Summary Fit', {'1': FULL, '2': dict(FULL, LF='Center Casey', CF='Left Lee')})
     try:
         _open(coach, classic_view_url, game_id)
@@ -616,14 +626,28 @@ def test_the_playing_time_summary_fits_the_ipad_pro_portrait_column(device, clas
         expect(table).to_be_visible(timeout=15_000)
         fit = table.evaluate("""t => {
           const box = t.closest('.table-responsive') || t.parentElement;
+          const lines = range => new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size;
           const headerLines = [...t.querySelectorAll('th')].map(th => {
             const range = document.createRange();
             range.selectNodeContents(th);
-            return new Set([...range.getClientRects()].map(rect => Math.round(rect.top))).size;
+            return lines(range);
           });
-          return {table: t.scrollWidth, box: box.clientWidth, headerLines};
+          const brokenNames = [...t.querySelectorAll('tbody td:first-child strong')].filter(name => {
+            const text = name.firstChild;
+            let at = 0;
+            return text.textContent.split(' ').some(word => {
+              const range = document.createRange();
+              range.setStart(text, at);
+              range.setEnd(text, at + word.length);
+              at += word.length + 1;
+              return lines(range) > 1;
+            });
+          }).map(name => name.textContent);
+          return {table: t.scrollWidth, box: box.clientWidth, headerLines, brokenNames,
+                  font: getComputedStyle(t).fontFamily};
         }""")
         assert fit['table'] <= fit['box'], fit
         assert all(lines == 1 for lines in fit['headerLines']), fit
+        assert fit['brokenNames'] == [], fit
     finally:
         _delete(coach, classic_view_url, game_id)
