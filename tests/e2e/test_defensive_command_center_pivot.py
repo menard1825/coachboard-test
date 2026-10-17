@@ -12,6 +12,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -99,7 +100,7 @@ def test_first_pitch_launches_quick_field_command_center(page: Page, coachboard_
         existing_rotation = game_data.get('rotation') or {}
         if existing_rotation.get('id'):
             rotation_payload['id'] = int(existing_rotation['id'])
-        post_json(page, coachboard_url, '/save_rotation', rotation_payload)
+        post_json(page, coachboard_url, '/save_rotation', with_stored_base(page.request, coachboard_url, rotation_payload))
 
         page.goto(f'{coachboard_url}/game/{game_id}', wait_until='domcontentloaded')
 

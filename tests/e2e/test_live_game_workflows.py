@@ -17,6 +17,7 @@ from start_helpers import start_body  # noqa: E402
 
 import cdn_assets
 from e2e_cleanup import release_game
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -146,11 +147,11 @@ def create_game_with_plan(page: Page, coachboard_url: str):
         ],
         'associated_game_id': game_id,
     })
-    rotation = post_json(page, coachboard_url, '/save_rotation', {
+    rotation = post_json(page, coachboard_url, '/save_rotation', with_stored_base(page.request, coachboard_url, {
         'title': 'Automation Game Rotation',
         'innings': {'1': alignment(), '2': alignment()},
         'associated_game_id': game_id,
-    })
+    }))
     return game_id, lineup['new_id'], rotation['new_id']
 
 

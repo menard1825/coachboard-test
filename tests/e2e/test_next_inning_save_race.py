@@ -17,6 +17,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 
 from playwright.sync_api import Page, expect
 
+from plan_helpers import with_stored_base  # noqa: E402
 from live_fixtures import (
     cleanup_game,
     end_inning_from_live,
@@ -72,14 +73,14 @@ def create_game(page: Page, coachboard_url: str):
         page,
         coachboard_url,
         '/save_rotation',
-        {
+        with_stored_base(page.request, coachboard_url, {
             'title': 'NEXT Save Race Rotation',
             'innings': {
                 '1': starting_alignment(),
                 '2': planned_alignment(),
             },
             'associated_game_id': game_id,
-        },
+        }),
     )
 
     return game_id

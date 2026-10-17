@@ -36,6 +36,7 @@ from live_fixtures import (
     starting_alignment,
 )
 from test_pregame_player_time_summary import add_player
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 pytestmark = pytest.mark.e2e
@@ -66,8 +67,8 @@ def _create_game(page, url, innings, *, day=None, rule='USSSA', opponent='Upcomi
         'game_opponent': opponent, 'game_location': 'Choice Field', 'pitching_rule_set': rule,
     }, max_redirects=0)
     game_id = int(re.search(r'/game/(\d+)', response.headers['location']).group(1))
-    post_json(page, url, '/save_rotation', {
-        'title': 'Upcoming Defense Rotation', 'innings': innings, 'associated_game_id': game_id})
+    post_json(page, url, '/save_rotation', with_stored_base(page.request, url, {
+        'title': 'Upcoming Defense Rotation', 'innings': innings, 'associated_game_id': game_id}))
     return game_id
 
 

@@ -394,9 +394,21 @@ def save_rotation():
                 'message': 'Pregame defense is locked while the game is live. Use Live Game controls.',
             }), 409
 
+        # A game's plan is always saved from the stored plan it was made from
+        # (base_innings), so another coach's saved change is merged or asked
+        # about, never overwritten. A page without it is out of date (an old
+        # tab): refuse, and keep the stored plan as it is.
+        if not isinstance(rotation_data.get('base_innings'), dict):
+            return jsonify({
+                'status': 'error',
+                'code': 'rotation_refresh_required',
+                'message': "This page is out of date, so your change wasn't saved. "
+                           'Refresh the page to keep editing; the saved plan was not changed.',
+            }), 409
+
         if rotation_id:
             rotation_to_update = db.session.query(Rotation).filter_by(id=rotation_id, team_id=team_id).first()
-        elif 'base_innings' in rotation_data:
+        else:
             # A first save from a page that had no plan yet: another coach's
             # first save may have created it since. Update that plan (under
             # the checks below) rather than adding a second one for the game.
@@ -412,23 +424,21 @@ def save_rotation():
             stored = {}
 
         # Another coach saved since this page's plan was loaded: merge
-        # position by position, or refuse (rotation_merge.py). Without
-        # base_innings (a direct API call) the plan is replaced as before.
-        if 'base_innings' in rotation_data:
-            base = normalize(rotation_data.get('base_innings'))
-            current = normalize(stored)
-            if base != current:
-                merged, conflicts = merge(base, normalize(innings_data), current)
-                if conflicts:
-                    return jsonify({
-                        'status': 'error',
-                        'code': 'rotation_conflict',
-                        'message': 'Another coach changed the same part of this defense. '
-                                   "Your changes weren't saved yet.",
-                        'conflicts': conflicts,
-                        'innings': current,
-                    }), 409
-                innings_data = merged
+        # position by position, or refuse (rotation_merge.py).
+        base = normalize(rotation_data['base_innings'])
+        current = normalize(stored)
+        if base != current:
+            merged, conflicts = merge(base, normalize(innings_data), current)
+            if conflicts:
+                return jsonify({
+                    'status': 'error',
+                    'code': 'rotation_conflict',
+                    'message': 'Another coach changed the same part of this defense. '
+                               "Your changes weren't saved yet.",
+                    'conflicts': conflicts,
+                    'innings': current,
+                }), 409
+            innings_data = merged
 
         duplicate = _duplicate_assignment(innings_data, stored)
         if duplicate:

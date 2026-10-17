@@ -43,6 +43,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
     pytest.skip('Set COACHBOARD_E2E=1 to run Playwright tests.', allow_module_level=True)
 
 from playwright.sync_api import Page, expect
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -282,10 +283,10 @@ def test_server_refresh_removing_current_inning_does_not_resurrect_it(page: Page
         # the plan the page started from, so a page can never delete an
         # inning the server still has on the strength of a snapshot the
         # server never held -- the removal has to be real.
-        removed = page.request.post(f'{coachboard_url}/save_rotation', data=json.dumps({
+        removed = page.request.post(f'{coachboard_url}/save_rotation', data=json.dumps(with_stored_base(page.request, coachboard_url, {
             'id': baseline['rotation']['id'], 'title': baseline['rotation']['title'],
             'innings': modified_snapshot['rotation']['innings'], 'associated_game_id': game_id,
-        }), headers={'Content-Type': 'application/json'})
+        })), headers={'Content-Type': 'application/json'})
         assert removed.ok, removed.text()
 
         # A later, real edit/save (against the real, unmocked endpoint from

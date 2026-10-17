@@ -22,6 +22,7 @@ from datetime import datetime
 import eventlet
 import pytest
 from werkzeug.security import generate_password_hash
+from stored_plan import with_stored_base
 
 
 TEAM_ID = 1
@@ -104,12 +105,18 @@ def _client(app):
 
 
 def _save(app, innings, rotation_id=None, game_id=GAME_ID):
-    response = _client(app).post('/save_rotation', json={
+    client = _client(app)
+    body = {
         'id': rotation_id,
         'title': 'Rotation for vs Visitors',
         'innings': innings,
         'associated_game_id': game_id,
-    })
+    }
+    # A real game's plan is saved from the plan stored now; a save for a
+    # game that doesn't exist is refused before any base is looked at.
+    if game_id == GAME_ID:
+        body = with_stored_base(client, body)
+    response = client.post('/save_rotation', json=body)
     return response.status_code, response.get_json()
 
 

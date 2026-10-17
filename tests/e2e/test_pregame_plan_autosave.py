@@ -34,6 +34,7 @@ if os.environ.get('COACHBOARD_E2E') != '1':
 from playwright.sync_api import expect
 
 import cdn_assets
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -200,8 +201,8 @@ def test_another_games_save_does_not_refresh_over_an_inflight_autosave(open_page
         refreshes = []
         page.on('request', lambda request: refreshes.append(request.url)
                 if f'/api/game_data/{game_id}' in request.url else None)
-        other = page.request.post(f'{coachboard_url}/save_rotation', data={
-            'title': 'Other Game', 'innings': {'1': {}}, 'associated_game_id': other_game_id})
+        other = page.request.post(f'{coachboard_url}/save_rotation', data=with_stored_base(page.request, coachboard_url, {
+            'title': 'Other Game', 'innings': {'1': {}}, 'associated_game_id': other_game_id}))
         assert other.ok and other.json().get('status') == 'success', other.text()
         page.wait_for_timeout(700)
 

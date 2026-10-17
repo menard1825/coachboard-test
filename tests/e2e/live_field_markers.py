@@ -6,6 +6,7 @@ import re
 
 from e2e_cleanup import delete_players_named, release_game
 from start_helpers import start_body
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 TEST_USERNAME = 'playwright-coach'
@@ -119,9 +120,10 @@ def create_named_live_game(page, base_url, innings=None):
         game_id = int(re.search(r'/game/(\d+)', response.headers['location']).group(1))
         for path, payload in (
             ('/add_lineup', {'title': 'Marker Lineup', 'lineup_player_ids': player_ids, 'associated_game_id': game_id}),
-            ('/save_rotation', {'title': 'Marker Rotation',
-                                'innings': innings or {'1': _alignment(), '2': _alignment()},
-                                'associated_game_id': game_id}),
+            ('/save_rotation', with_stored_base(page.request, base_url, {
+                'title': 'Marker Rotation',
+                'innings': innings or {'1': _alignment(), '2': _alignment()},
+                'associated_game_id': game_id})),
         ):
             response = page.request.post(f'{base_url}{path}', data=payload)
             assert response.ok and response.json().get('status') == 'success', (path, response.text()[:200])

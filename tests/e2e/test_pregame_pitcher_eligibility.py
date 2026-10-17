@@ -25,6 +25,7 @@ from test_set_defense_simplified import (  # noqa: F401 (make_page is a fixture)
 from test_saved_defense_pitcher import setup  # noqa: F401 (fixture)
 
 from playwright.sync_api import expect  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 pytestmark = pytest.mark.e2e
@@ -62,8 +63,8 @@ def resting_rex(setup, coachboard_url):
         assert saved.status in {302, 303}, saved.text()[:200]
         game_id = _add_game(page, coachboard_url, today + timedelta(days=1), 'Tomorrow Opponent')
         games.append(game_id)
-        page.request.post(f'{coachboard_url}/save_rotation', data={
-            'title': 'Rotation', 'innings': {'1': dict(FIELDERS)}, 'associated_game_id': game_id})
+        page.request.post(f'{coachboard_url}/save_rotation', data=with_stored_base(page.request, coachboard_url, {
+            'title': 'Rotation', 'innings': {'1': dict(FIELDERS)}, 'associated_game_id': game_id}))
         _open_game(page, coachboard_url, game_id)
         yield page, game_id
     finally:

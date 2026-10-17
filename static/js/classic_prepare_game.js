@@ -54,10 +54,12 @@
     const unsynced = store.hasUnsyncedLocalState() || store.isSaveInFlightOrQueued();
     const shown = state === 'idle' && unsynced ? 'saving' : state;
     pill.dataset.state = shown;
-    const conflicted = shown === 'failed' && store.getLastError?.()?.code === 'rotation_conflict';
-    pill.textContent = conflicted
+    const code = shown === 'failed' ? store.getLastError?.()?.code : null;
+    pill.textContent = code === 'rotation_conflict'
       ? 'Not saved — another coach changed this; tap to choose'
-      : (SAVE_TEXT[shown] || 'All changes saved');
+      : code === 'rotation_refresh_required'
+        ? 'Not saved — refresh this page to keep editing'
+        : (SAVE_TEXT[shown] || 'All changes saved');
     pill.className = `badge rounded-pill cb-classic-save ${
       shown === 'failed' ? 'text-bg-danger'
         : shown === 'saving' ? 'text-bg-warning'

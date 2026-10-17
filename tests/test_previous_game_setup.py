@@ -13,6 +13,7 @@ from datetime import datetime
 
 import pytest
 from werkzeug.security import generate_password_hash
+from stored_plan import with_stored_base
 
 
 TEAM_ID = 1
@@ -350,10 +351,10 @@ def test_applying_the_preview_copies_today_and_never_changes_the_earlier_game(ap
 
     # What the page sends: today's plan with only the 1st inning replaced.
     innings['1'] = data['defense']['proposed']
-    saved = client.post('/save_rotation', json={
+    saved = client.post('/save_rotation', json=with_stored_base(client, {
         'id': rotation_id, 'title': 'Rotation for vs Visitors',
         'innings': innings, 'associated_game_id': TODAY,
-    })
+    }))
     assert saved.status_code == 200, saved.get_json()
 
     lineup = client.post('/add_lineup', json={
@@ -411,9 +412,9 @@ def _copy(app, *, lineup=True, defense=True):
             rotation_id = rotation.id if rotation else None
             innings = copy.deepcopy(rotation.innings) if rotation else {}
         innings['1'] = data['defense']['proposed']
-        assert client.post('/save_rotation', json={
+        assert client.post('/save_rotation', json=with_stored_base(client, {
             'id': rotation_id, 'title': 'Rotation for vs Visitors', 'innings': innings,
-            'associated_game_id': TODAY}).status_code == 200
+            'associated_game_id': TODAY})).status_code == 200
     if lineup:
         assert client.post('/add_lineup', json={
             'title': 'Lineup for vs Visitors', 'lineup_player_ids': data['lineup']['player_ids'],
@@ -457,9 +458,10 @@ def test_the_card_stops_saying_copied_once_the_coach_changes_it(app):
         innings = copy.deepcopy(rotation.innings)
         innings['1']['C'], innings['1']['1B'] = innings['1']['1B'], innings['1']['C']
         rotation_id = rotation.id
-    assert _client(app).post('/save_rotation', json={
+    client = _client(app)
+    assert client.post('/save_rotation', json=with_stored_base(client, {
         'id': rotation_id, 'title': 'Rotation for vs Visitors', 'innings': innings,
-        'associated_game_id': TODAY}).status_code == 200
+        'associated_game_id': TODAY})).status_code == 200
 
     state, page = _page_state(app)
     assert state == 'partial'

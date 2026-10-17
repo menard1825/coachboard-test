@@ -23,6 +23,7 @@ from test_set_defense_simplified import (  # noqa: F401 (make_page is a fixture)
 from test_pregame_player_time_summary import mark_absent
 
 from playwright.sync_api import expect  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 pytestmark = pytest.mark.e2e
@@ -48,8 +49,8 @@ def setup(make_page, coachboard_url):
         games.append(game_id)
         plan = {str(i): {} for i in range(1, 7)}
         plan.update(innings)
-        saved = page.request.post(f'{coachboard_url}/save_rotation', data={
-            'title': 'Rotation', 'innings': plan, 'associated_game_id': game_id})
+        saved = page.request.post(f'{coachboard_url}/save_rotation', data=with_stored_base(page.request, coachboard_url, {
+            'title': 'Rotation', 'innings': plan, 'associated_game_id': game_id}))
         assert saved.ok and saved.json().get('status') == 'success', saved.text()
         return game_id
 

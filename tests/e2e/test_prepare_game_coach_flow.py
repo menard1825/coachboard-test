@@ -35,6 +35,7 @@ from test_saved_defense_pitcher import FIELDERS, setup  # noqa: F401 (fixture)
 from test_pregame_player_time_summary import mark_absent
 
 from playwright.sync_api import expect  # noqa: E402
+from plan_helpers import with_stored_base  # noqa: E402
 
 
 pytestmark = pytest.mark.e2e
@@ -86,10 +87,10 @@ def test_the_chosen_saved_defense_survives_rerenders_and_one_tap_uses_it(setup, 
 
     # Another device saves the plan; the panel re-renders under the coach.
     rotation = page.request.get(f'{coachboard_url}/api/game_data/{game_id}').json()['rotation']
-    saved = page.request.post(f'{coachboard_url}/save_rotation', data={
+    saved = page.request.post(f'{coachboard_url}/save_rotation', data=with_stored_base(page.request, coachboard_url, {
         'id': rotation['id'], 'title': rotation['title'],
         'innings': {**_innings(page, coachboard_url, game_id), '1': {'P': 'Relief Rex', 'C': 'Catcher Cole'}},
-        'associated_game_id': game_id})
+        'associated_game_id': game_id}))
     assert saved.ok and saved.json().get('status') == 'success', saved.text()
     expect(coach.locator(f'{PANEL} [data-pde-pos="C"] .pde-name')).to_have_text('Catcher Cole', timeout=15_000)
     expect(coach.locator('#pde-preset')).to_have_value(re.compile(r'^\d+$'))
@@ -264,8 +265,8 @@ def test_an_arm_care_concern_is_shown_inline_without_game_rules(setup, coachboar
         game_id = int(re.search(r'/game/(\d+)', tomorrow.headers['location']).group(1))
         try:
             _game_without_rules(page, coachboard_url, game_id)
-            page.request.post(f'{coachboard_url}/save_rotation', data={
-                'title': 'Rotation', 'innings': {'1': dict(FIELDERS)}, 'associated_game_id': game_id})
+            page.request.post(f'{coachboard_url}/save_rotation', data=with_stored_base(page.request, coachboard_url, {
+                'title': 'Rotation', 'innings': {'1': dict(FIELDERS)}, 'associated_game_id': game_id}))
             _open_game(page, coachboard_url, game_id)
             page.locator(f'{PANEL} [data-pde-pos="P"]').click()
             rex_choice = page.locator('#pde-list .pde-choice[data-player="Relief Rex"]')
